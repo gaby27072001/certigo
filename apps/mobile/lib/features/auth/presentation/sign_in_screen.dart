@@ -344,7 +344,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               const SizedBox(height: PrismSpacing.lg),
                               _ErrorCard(message: shownError),
                             ],
-                            if (diagnostics.isNotEmpty) ...<Widget>[
+                            if (kAuthDiagnosticsOnScreen && diagnostics.isNotEmpty) ...<Widget>[
                               const SizedBox(height: PrismSpacing.md),
                               _DiagnosticCard(entries: diagnostics),
                             ],
@@ -370,12 +370,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   }
 }
 
-/// Carte d'erreur d'authentification **persistante** et **sélectionnable**.
+/// Carte d'erreur d'authentification **persistante**.
 ///
-/// Remplace le SnackBar (trop fugace) : reste affichée jusqu'à la prochaine
-/// tentative, avec le message complet (incluant le détail technique `[technique]`
-/// remonté par la passerelle/le contrôleur) afin que l'utilisateur puisse le
-/// lire, le copier ou le capturer pour diagnostiquer l'échec réel.
+/// Canal : inline plutôt qu'une `SnackBar` (trop fugace — l'échec doit rester
+/// lisible pendant que l'apprenant décide quoi faire) et plutôt qu'une alerte
+/// modale (l'écran de connexion offre déjà les actions : réessayer un
+/// fournisseur, ou basculer sur l'e-mail).
+///
+/// Le message vient du contrôleur, qui **ne concatène plus** le détail
+/// technique de la passerelle : celui-ci part dans les journaux.
 class _ErrorCard extends StatelessWidget {
   const _ErrorCard({required this.message});
 
@@ -413,11 +416,6 @@ class _ErrorCard extends StatelessWidget {
           SelectableText(
             message,
             style: text.bodySmall?.copyWith(color: p.textPrimary, height: 1.35),
-          ),
-          const SizedBox(height: PrismSpacing.xs),
-          Text(
-            'Copie ou capture ce message pour le diagnostic.',
-            style: text.bodySmall?.copyWith(color: p.textSecondary),
           ),
         ],
       ),

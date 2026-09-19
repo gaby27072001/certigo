@@ -21,11 +21,14 @@ class AuthGatewayException implements Exception {
   /// Cause normalisée (pour la télémétrie et le repli de message).
   final AuthFailureCause cause;
 
-  /// Détail technique **brut** de l'erreur sous-jacente (build de diagnostic) :
-  /// `code=…/msg=…/details=…` d'une [PlatformException] `flutter_appauth`, ou
-  /// `type : toString()` d'une erreur inattendue. Concaténé au message affiché
-  /// par le contrôleur afin de révéler la cause réelle à l'écran, sans rien
-  /// perdre. `null` pour les cas volontairement propres (ex. annulation).
+  /// Détail technique **brut** de l'erreur sous-jacente : `code=…/msg=…/details=…`
+  /// d'une [PlatformException] `flutter_appauth`, ou `type : toString()` d'une
+  /// erreur inattendue.
+  ///
+  /// **Destiné aux journaux, jamais à l'écran.** Le contrôleur le journalise et
+  /// affiche une phrase qui dit quoi faire : un `PlatformException code=…`
+  /// recopié devant l'apprenant lui donnait tout sauf une action possible.
+  /// `null` pour les cas volontairement propres (ex. annulation).
   final String? diagnostic;
 
   @override

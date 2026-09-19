@@ -6,6 +6,7 @@ import 'package:flutter/semantics.dart' show SemanticsAction;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:certigo/features/auth/application/auth_controller.dart';
+import 'package:certigo/features/auth/application/auth_diagnostics.dart';
 import 'package:certigo/features/auth/application/auth_gateway.dart';
 import 'package:certigo/features/auth/application/auth_state.dart';
 import 'package:certigo/features/auth/presentation/sign_in_screen.dart';
@@ -232,7 +233,7 @@ void main() {
     expect(button.enabled, isTrue);
   });
 
-  testWidgets('échec social → carte persistante et sélectionnable avec détail technique', (
+  testWidgets('échec social → carte persistante, sans le détail technique', (
     tester,
   ) async {
     final FakeAuthGateway gateway = FakeAuthGateway(
@@ -251,8 +252,6 @@ void main() {
     await tester.pump(); // AuthLoading
     await tester.pump(const Duration(milliseconds: 50)); // échec → carte persistante
 
-    // La carte d'erreur persistante est affichée, avec le message convivial ET
-    // le détail technique brut, dans un SelectableText (copiable/capturable).
     final Finder card = find.byKey(const Key('auth-error'));
     expect(card, findsOneWidget);
     final Finder selectableFinder = find.descendant(
@@ -261,13 +260,45 @@ void main() {
     );
     expect(selectableFinder, findsOneWidget);
     final SelectableText selectable = tester.widget<SelectableText>(selectableFinder);
-    expect(selectable.data, contains('Fournisseur microsoft indisponible'));
-    expect(selectable.data, contains('[technique] PlatformException code=access_denied'));
+
+    // Ni le `diagnostic` brut, ni le message de configuration destiné à un
+    // développeur : l'apprenant ne peut rien faire d'un `code=access_denied`
+    // ni d'un `domain_hint`. Les deux partent dans les journaux.
+    expect(selectable.data, isNot(contains('[technique]')));
+    expect(selectable.data, isNot(contains('PlatformException')));
+    expect(selectable.data, isNot(contains('Entra External ID')));
+
+    // Ce qui reste dit quoi faire, et nomme les deux issues disponibles ici.
+    expect(selectable.data, contains('Réessaie'));
+    expect(selectable.data, contains('e-mail'));
 
     // Persistance : le temps passe mais la carte reste (contrairement à un
-    // SnackBar auto-disparaissant) → l'utilisateur peut la lire et la capturer.
+    // SnackBar auto-disparaissant) → l'utilisateur peut la lire posément.
     await tester.pump(const Duration(seconds: 5));
     expect(find.byKey(const Key('auth-error')), findsOneWidget);
+  });
+
+  testWidgets('la trace de diagnostic technique est éteinte par défaut', (tester) async {
+    final FakeAuthGateway gateway = FakeAuthGateway(
+      onSignIn: (_) => throw const AuthGatewayException(
+        'La connexion a échoué.',
+        cause: AuthFailureCause.providerError,
+        diagnostic: 'PlatformException code=access_denied',
+      ),
+    );
+    await pumpSignIn(tester, gateway: gateway, store: FakeSessionStore());
+
+    final Finder microsoft = find.text('Continuer avec Microsoft');
+    await tester.ensureVisible(microsoft);
+    await tester.pump();
+    await tester.tap(microsoft);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // Le journal d'étapes reste collecté (il alimente les logs), mais il n'est
+    // affiché que sous `--dart-define=CERTIGO_AUTH_DIAGNOSTICS=true`.
+    expect(kAuthDiagnosticsOnScreen, isFalse);
+    expect(find.byKey(const Key('auth-diagnostic')), findsNothing);
   });
 
   testWidgets('pendant une connexion e-mail en cours, le bouton est désactivé', (tester) async {

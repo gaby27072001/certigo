@@ -2,6 +2,7 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../shared/errors/error_copy.dart';
 import 'auth_gateway.dart';
 import 'auth_state.dart';
 
@@ -168,13 +169,18 @@ class HttpCredentialsGateway implements CredentialsGateway {
             cause: AuthFailureCause.invalidCredentials,
           ),
         _ => (
-            message: 'Le service est momentanément indisponible. Réessayez.',
+            message: 'Le service est momentanément indisponible. '
+                'Réessayez dans quelques minutes.',
             cause: AuthFailureCause.providerError,
           ),
       };
     }
+    // Repli : ce que l'échec n'a pas permis de qualifier ici (cache, contrat
+    // rompu, 404…) passe par la couche de traduction partagée, qui classe sur
+    // le type et dit quoi faire. L'ancien « Une erreur est survenue. Réessayez. »
+    // n'expliquait ni la cause ni l'action précise.
     return (
-      message: 'Une erreur est survenue. Réessayez.',
+      message: describeFailure(failure, subject: ErrorSubject.account).message,
       cause: AuthFailureCause.unknown,
     );
   }

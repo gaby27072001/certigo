@@ -286,7 +286,7 @@ void main() {
       expect((await store.read())?.accessToken, 'jeton-google');
     });
 
-    test('échec de la passerelle → message d\'erreur, Unauthenticated', () async {
+    test('échec de la passerelle → message actionnable, Unauthenticated', () async {
       final FakeSessionStore store = FakeSessionStore();
       // onSignIn non câblé → la passerelle lève.
       final ProviderContainer container = makeContainer(gateway: FakeAuthGateway(), store: store);
@@ -297,17 +297,17 @@ void main() {
 
       final AuthState state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
-      // L'erreur inattendue est désormais **révélée** (build de diagnostic) :
-      // message convivial + détail technique (type + toString) concaténé,
-      // jamais avalé derrière un message générique.
+      // L'erreur inattendue est journalisée, pas affichée : `StateError` ne dit
+      // rien à un apprenant. Ce qu'il voit nomme les deux issues disponibles.
       final String? message = (state as Unauthenticated).message;
-      expect(message, startsWith('Connexion Apple échouée.'));
-      expect(message, contains('[technique]'));
-      expect(message, contains('StateError'));
+      expect(message, isNot(contains('[technique]')));
+      expect(message, isNot(contains('StateError')));
+      expect(message, contains('Réessaie'));
+      expect(message, contains('e-mail'));
       expect(store.writeCalls, 0);
     });
 
-    test('erreur métier passerelle → message explicite propagé', () async {
+    test('cause non qualifiée → message actionnable, pas la consigne développeur', () async {
       final FakeSessionStore store = FakeSessionStore();
       final FakeAuthGateway gateway = FakeAuthGateway(
         onSignIn: (_) => throw const AuthGatewayException('Configuration de redirection invalide.'),
@@ -320,8 +320,35 @@ void main() {
 
       final AuthState state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
-      expect((state as Unauthenticated).message, 'Configuration de redirection invalide.');
+      // « Vérifiez ENTRA_REDIRECT_URI » s'adresse à un développeur : l'apprenant
+      // ne peut rien en faire. Le message part dans les journaux.
+      expect((state as Unauthenticated).message, isNot(contains('redirection')));
+      expect(state.message, contains('Réessaie'));
       expect(store.writeCalls, 0);
+    });
+
+    test('cause qualifiée → le message métier est conservé tel quel', () async {
+      // La règle n'est pas « tout jeter » : quand la passerelle a su qualifier
+      // une cause que l'apprenant peut traiter (réseau, annulation,
+      // identifiants), son message passe intact.
+      final FakeSessionStore store = FakeSessionStore();
+      final FakeAuthGateway gateway = FakeAuthGateway(
+        onSignIn: (_) => throw const AuthGatewayException(
+          'Pas de connexion. Vérifiez votre réseau puis réessayez.',
+          cause: AuthFailureCause.network,
+        ),
+      );
+      final ProviderContainer container = makeContainer(gateway: gateway, store: store);
+      container.read(authControllerProvider);
+      await settle();
+
+      await container.read(authControllerProvider.notifier).signIn(AuthProvider.microsoft);
+
+      final AuthState state = container.read(authControllerProvider);
+      expect(
+        (state as Unauthenticated).message,
+        'Pas de connexion. Vérifiez votre réseau puis réessayez.',
+      );
     });
 
     test('Entra non configuré → message de configuration, aucun appel passerelle', () async {
@@ -810,13 +837,17 @@ void main() {
         final AuthState state = container.read(authControllerProvider);
         expect(state, isA<Unauthenticated>());
         final String? message = (state as Unauthenticated).message;
-        expect(message, startsWith('Connexion Microsoft expirée : aucune réponse après 45s.'));
-        expect(message, contains('TimeoutException'));
+        // Plus jamais de spinner infini, et plus de `TimeoutException` à
+        // l'écran : le délai n'est pas une information exploitable, l'issue si.
+        expect(message, isNot(contains('TimeoutException')));
+        expect(message, isNot(contains('[technique]')));
+        expect(message, contains('Réessaie'));
+        expect(message, contains('e-mail'));
         expect(telemetry.failures.last.cause, AuthFailureCause.timeout);
       });
     });
 
-    test('détail technique de la passerelle propagé dans le message (diagnostic)', () async {
+    test('détail technique de la passerelle NON propagé dans le message', () async {
       final FakeSessionStore store = FakeSessionStore();
       final FakeAuthGateway gateway = FakeAuthGateway(
         onSignIn: (_) => throw const AuthGatewayException(
@@ -834,9 +865,13 @@ void main() {
       final AuthState state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
       final String? message = (state as Unauthenticated).message;
-      // Le message convivial ET le détail technique brut sont présents à l'écran.
-      expect(message, contains('Fournisseur microsoft indisponible'));
-      expect(message, contains('[technique] PlatformException code=access_denied'));
+      // Ni le diagnostic brut, ni la consigne de configuration Entra : les deux
+      // sont journalisés. L'apprenant reçoit la seule chose qu'il peut tenter.
+      expect(message, isNot(contains('[technique]')));
+      expect(message, isNot(contains('PlatformException')));
+      expect(message, isNot(contains('access_denied')));
+      expect(message, isNot(contains('Entra External ID')));
+      expect(message, contains('Réessaie'));
       expect(store.writeCalls, 0);
     });
 

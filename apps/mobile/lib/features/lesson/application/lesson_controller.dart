@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../app/content/runtime_content_providers.dart';
 import '../../../app/session_resume_store.dart';
+import '../../../shared/errors/error_copy.dart';
 import 'answer_grading.dart';
 import 'check_outcome.dart';
 import 'lesson_args.dart';
@@ -89,6 +90,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
     );
     if (_disposed) return;
 
+    Failure? loadFailure;
     final Lesson? lesson = res.when(
       success: (Lesson remote) {
         _contentPin?.release();
@@ -100,7 +102,10 @@ class LessonController extends StateNotifier<LessonSessionState> {
         _grader = const EmbeddedKeyGrader(<String, CheckOutcome>{});
         return remote;
       },
-      failure: (Failure _) {
+      failure: (Failure f) {
+        // La cause était jetée ici : hors ligne et serveur en panne donnaient
+        // le même « contenu indisponible ». On la garde pour nommer laquelle.
+        loadFailure = f;
         _contentPin?.release();
         _contentPin = null;
         return null;
@@ -110,7 +115,8 @@ class LessonController extends StateNotifier<LessonSessionState> {
     if (lesson == null) {
       state = state.copyWith(
         status: LessonStatus.error,
-        errorMessage: 'Le contenu est indisponible. Réessaie ou lance la démo.',
+        errorMessage: '${describeFailure(loadFailure, subject: ErrorSubject.lesson).message} '
+            'Tu peux aussi lancer la démo, sans synchronisation.',
       );
       return;
     }
@@ -122,9 +128,12 @@ class LessonController extends StateNotifier<LessonSessionState> {
     if (lesson.blocks.isEmpty ||
         checks.isEmpty ||
         checks.any((QuizItem? check) => check == null || !isAnswerableCheck(check))) {
+      // Cause distincte du cas précédent : le contenu est arrivé, mais il lui
+      // manque de quoi être joué. Réessayer ne changera rien.
       state = state.copyWith(
         status: LessonStatus.error,
-        errorMessage: 'Le contenu est indisponible. Réessaie ou lance la démo.',
+        errorMessage: 'Cette leçon n\'est pas encore jouable. Lance la démo, '
+            'ou reviens à la bibliothèque pour en choisir une autre.',
       );
       return;
     }

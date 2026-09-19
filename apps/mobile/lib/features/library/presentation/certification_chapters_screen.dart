@@ -1,4 +1,5 @@
-import 'package:core/core.dart';
+import 'dart:async';
+
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/router.dart';
+import '../../../shared/errors/error_copy.dart';
 
 /// Third level of the catalogue: the chapters (units) of one certification,
 /// rendered as a Duolingo "section picker".
@@ -51,9 +53,7 @@ class CertificationChaptersScreen extends ConsumerWidget {
           data: (LearningPath data) => _buildList(context, ref, data),
           loading: () => const _LoadingList(),
           error: (Object err, StackTrace __) => _ErrorView(
-            message: err is Failure
-                ? err.message
-                : 'Impossible de charger les chapitres. Réessaie dans un instant.',
+            copy: describeFailure(err, subject: ErrorSubject.chapters),
             onRetry: () => ref.invalidate(pathProvider(trackId)),
           ),
         ),
@@ -114,8 +114,19 @@ class CertificationChaptersScreen extends ConsumerWidget {
       context.go(Routes.path);
       return;
     }
+    // Canal : changer de certification est une action volontaire et isolée. Son
+    // échec ne casse aucun flux en cours — l'apprenant reste où il est. Un
+    // toast est le bon niveau ; une alerte pleine page serait disproportionnée.
+    // Il dit quand même la cause, et rend l'action refaisable d'un geste.
+    final ErrorCopy copy = describeFailure(result.failure, subject: ErrorSubject.chapters);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result.failure?.message ?? 'Impossible de changer de certification.')),
+      SnackBar(
+        content: Text('Ta certification n\'a pas changé. ${copy.title}.'),
+        action: SnackBarAction(
+          label: 'Réessayer',
+          onPressed: () => unawaited(_openChapter(context, ref)),
+        ),
+      ),
     );
   }
 }
@@ -226,21 +237,21 @@ class _EmptyView extends StatelessWidget {
 }
 
 class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
+  const _ErrorView({required this.copy, required this.onRetry});
 
-  final String message;
+  final ErrorCopy copy;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(PrismSpacing.gutter),
-      children: <Widget>[
-        const SizedBox(height: PrismSpacing.md),
-        CalloutBlock(kind: CalloutKind.warning, title: 'Chapitres indisponibles', text: message),
-        const SizedBox(height: PrismSpacing.md),
-        PrismButton.secondary(label: 'Réessayer', icon: Icons.refresh_rounded, onPressed: onRetry),
-      ],
+    final bool canRetry = copy.retryResolves;
+    return PrismStatusView(
+      icon: copy.icon,
+      title: copy.title,
+      message: copy.message,
+      actionLabel: copy.actionLabel,
+      actionIcon: copy.actionIcon,
+      onAction: canRetry ? onRetry : () => Navigator.of(context).maybePop(),
     );
   }
 }

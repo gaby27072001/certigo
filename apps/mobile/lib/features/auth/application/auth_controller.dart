@@ -183,10 +183,13 @@ class AuthController extends Notifier<AuthState> {
           AuthDiagnosticStep.failed,
           detail: 'jeton d\'accès vide après échange du code',
         );
+        _logAuthDetail(
+          'signIn(${provider.id})',
+          'la réponse OIDC ne contenait ni access_token ni id_token',
+        );
         state = Unauthenticated(
-          'Connexion ${_providerLabel(provider)} échouée : jeton d\'accès vide.\n'
-          '[technique] La réponse OIDC ne contenait ni access_token ni id_token '
-          '(étape : échange du code).',
+          'La connexion ${_providerLabel(provider)} n\'a pas abouti. '
+          'Réessaie, ou connecte-toi avec ton e-mail.',
         );
         return;
       }
@@ -204,33 +207,50 @@ class AuthController extends Notifier<AuthState> {
         detail: 'timeout ${seconds}s — voir la dernière étape atteinte ci-dessus',
       );
       state = Unauthenticated(
-        'Connexion ${_providerLabel(provider)} expirée : aucune réponse après ${seconds}s.\n'
-        '[technique] TimeoutException après ${seconds}s — le navigateur ou le '
-        'callback OIDC n\'est jamais revenu (étape : autorisation + échange du code).',
+        'La fenêtre ${_providerLabel(provider)} n\'a pas répondu. '
+        'Réessaie, ou connecte-toi avec ton e-mail.',
       );
     } on AuthGatewayException catch (e) {
       if (!_isCurrent(revision)) return;
       _telemetry.authFailure(method, e.cause, durationMs: sw.elapsedMilliseconds);
-      state = Unauthenticated(_composeError(e));
+      state = Unauthenticated(_displayError(e, provider));
     } catch (e, st) {
       if (!_isCurrent(revision)) return;
       _logAuthError('signIn(${provider.id})', e, st);
       _telemetry.authFailure(method, AuthFailureCause.unknown, durationMs: sw.elapsedMilliseconds);
       _diagnostics.mark(AuthDiagnosticStep.failed, detail: '${e.runtimeType} : $e');
       state = Unauthenticated(
-        'Connexion ${_providerLabel(provider)} échouée.\n'
-        '[technique] ${e.runtimeType} : $e',
+        'La connexion ${_providerLabel(provider)} a échoué. '
+        'Réessaie, ou connecte-toi avec ton e-mail.',
       );
     }
   }
 
-  /// Compose le message affiché à partir d'une erreur métier passerelle : le
-  /// message convivial **concaténé** au détail technique brut (quand présent),
-  /// pour révéler la cause réelle à l'écran sans rien perdre.
-  String _composeError(AuthGatewayException e) {
-    final String? diagnostic = e.diagnostic;
-    if (diagnostic == null || diagnostic.isEmpty) return e.message;
-    return '${e.message}\n[technique] $diagnostic';
+  /// Message affiché pour une erreur métier passerelle.
+  ///
+  /// Le détail technique porté par [AuthGatewayException.diagnostic] **ne
+  /// traverse pas** : il part dans les journaux. Un `PlatformException
+  /// code=… msg=… details=…` recopié à l'écran donnait à l'apprenant tout sauf
+  /// ce qu'il pouvait en faire.
+  ///
+  /// Le message métier, lui, est conservé quand la passerelle a su qualifier la
+  /// cause (réseau, annulation, identifiants) ; les causes que seul un
+  /// développeur peut corriger (configuration, refus du fournisseur) sont
+  /// remplacées par la seule action que l'apprenant peut réellement tenter.
+  String _displayError(AuthGatewayException e, AuthProvider provider) {
+    _logAuthDetail('signIn(${provider.id})', e.diagnostic ?? e.message);
+    return switch (e.cause) {
+      AuthFailureCause.cancelled ||
+      AuthFailureCause.network ||
+      AuthFailureCause.timeout ||
+      AuthFailureCause.invalidCredentials =>
+        e.message,
+      AuthFailureCause.providerError ||
+      AuthFailureCause.configError ||
+      AuthFailureCause.unknown =>
+        'La connexion ${_providerLabel(provider)} a échoué. '
+            'Réessaie, ou connecte-toi avec ton e-mail.',
+    };
   }
 
   /// Libellé lisible du fournisseur, inséré dans les messages d'erreur.
@@ -585,6 +605,15 @@ class AuthController extends Notifier<AuthState> {
   void _logAuthError(String operation, Object error, StackTrace stackTrace) {
     debugPrint('[AuthController] $operation failed: $error');
     debugPrint('$stackTrace');
+  }
+
+  /// Journalise un détail technique **au lieu** de l'afficher.
+  ///
+  /// C'est la contrepartie de [_displayError] : rien n'est perdu, mais le
+  /// destinataire change. Sentry capte déjà les erreurs non rattrapées ; ceci
+  /// couvre les échecs que l'on rattrape volontairement.
+  void _logAuthDetail(String operation, String detail) {
+    debugPrint('[AuthController] $operation: $detail');
   }
 
   bool _isCurrent(int revision) => revision == _sessionRevision;

@@ -1,4 +1,3 @@
-import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../../shared/errors/error_copy.dart';
 import '../application/vendor_catalog.dart';
 
 /// Second level of the catalogue: every certification a [vendor] offers.
@@ -59,9 +59,7 @@ class _VendorCertificationsScreenState extends ConsumerState<VendorCertification
           data: (List<TrackSummary> tracks) => _buildBody(context, p, tracks),
           loading: () => const _LoadingList(),
           error: (Object err, StackTrace __) => _ErrorView(
-            message: err is Failure
-                ? err.message
-                : 'Impossible de charger les certifications. Réessaie dans un instant.',
+            copy: describeFailure(err, subject: ErrorSubject.catalogue),
             onRetry: () => ref.invalidate(catalogProvider),
           ),
         ),
@@ -421,22 +419,31 @@ class _EmptyResults extends StatelessWidget {
   }
 }
 
+/// État terminal : l'écran n'a pas pu se remplir.
+///
+/// **Canal.** Une `SnackBar` serait trop légère pour une panne de flux — elle
+/// disparaît et laisse un écran vide sans explication. Une alerte modale serait
+/// trop lourde pour un module qu'on peut simplement quitter. L'état inline
+/// plein cadre est le bon niveau, et c'est ce que [PrismStatusView] rend.
 class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
+  const _ErrorView({required this.copy, required this.onRetry});
 
-  final String message;
+  final ErrorCopy copy;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(PrismSpacing.gutter),
-      children: <Widget>[
-        const SizedBox(height: PrismSpacing.md),
-        CalloutBlock(kind: CalloutKind.warning, title: 'Catalogue indisponible', text: message),
-        const SizedBox(height: PrismSpacing.md),
-        PrismButton.secondary(label: 'Réessayer', icon: Icons.refresh_rounded, onPressed: onRetry),
-      ],
+    // Quand réessayer ne peut rien résoudre (contenu absent, app trop
+    // ancienne), le bouton offre la sortie que le message nomme — avec son
+    // glyphe, pas une icône de rafraîchissement qui promettrait autre chose.
+    final bool canRetry = copy.retryResolves;
+    return PrismStatusView(
+      icon: copy.icon,
+      title: copy.title,
+      message: copy.message,
+      actionLabel: copy.actionLabel,
+      actionIcon: copy.actionIcon,
+      onAction: canRetry ? onRetry : () => Navigator.of(context).maybePop(),
     );
   }
 }

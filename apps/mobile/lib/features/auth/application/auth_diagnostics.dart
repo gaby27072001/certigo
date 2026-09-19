@@ -1,14 +1,30 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// Affiche la trace de diagnostic d'authentification **à l'écran**.
+///
+/// Par défaut `false` : un journal d'étapes techniques (`PlatformException
+/// code=… msg=…`) n'a rien à faire devant un apprenant, qui ne peut rien en
+/// faire. La trace continue d'être collectée en mémoire et journalisée — seul
+/// son affichage est éteint. Un développeur la rallume pour une session de
+/// débogage sur appareil réel :
+///
+/// ```
+/// flutter run --dart-define=CERTIGO_AUTH_DIAGNOSTICS=true
+/// ```
+const bool kAuthDiagnosticsOnScreen = bool.fromEnvironment(
+  'CERTIGO_AUTH_DIAGNOSTICS',
+);
+
 /// Étape **tracée** du flux de connexion sociale (OIDC via Entra External ID).
 ///
 /// Motivation (build de diagnostic iOS) : le callback `certigo://auth/` peut ne
 /// jamais revenir à `ASWebAuthenticationSession` après la page de confirmation
-/// CIAM, ou l'échange de jeton peut bloquer. En horodatant chaque étape et en
-/// l'affichant de façon **persistante** sur l'écran de connexion (voir
-/// `sign_in_screen`), on voit EXACTEMENT la dernière étape atteinte avant un
-/// éventuel timeout — sans logs distants ni reproduction à l'aveugle.
+/// CIAM, ou l'échange de jeton peut bloquer. En horodatant chaque étape, on voit
+/// EXACTEMENT la dernière étape atteinte avant un éventuel timeout — sans logs
+/// distants ni reproduction à l'aveugle. L'affichage de cette trace sur l'écran
+/// de connexion est conditionné à [kAuthDiagnosticsOnScreen].
+
 enum AuthDiagnosticStep {
   /// (1) La requête d'autorisation a été ouverte (navigateur système lancé).
   authorizeOpened,
