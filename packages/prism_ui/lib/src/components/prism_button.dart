@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../feedback/prism_haptics.dart';
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_elevation.dart';
 import '../tokens/prism_motion.dart';
@@ -14,8 +14,12 @@ import 'prism_pressable.dart';
 /// * [PrismButtonVariant.secondary] — supporting actions. Glass/tonal.
 /// * [PrismButtonVariant.ghost] — low-emphasis / tertiary. Text-like.
 ///
-/// Provides press scale + haptics and a built-in [loading] state so call sites
-/// never have to reimplement button busy logic.
+/// Provides press scale and a built-in [loading] state so call sites never have
+/// to reimplement button busy logic.
+///
+/// **Un bouton ne vibre pas par défaut.** [haptic] vaut [PrismHaptic.none] et
+/// doit être demandé explicitement — voir le champ pour la mesure qui a conduit
+/// à ce défaut.
 enum PrismButtonVariant { primary, secondary, ghost }
 
 class PrismButton extends StatefulWidget {
@@ -28,6 +32,7 @@ class PrismButton extends StatefulWidget {
     this.loading = false,
     this.expand = true,
     this.tone,
+    this.haptic = PrismHaptic.none,
   });
 
   const PrismButton.secondary({
@@ -38,6 +43,7 @@ class PrismButton extends StatefulWidget {
     this.loading = false,
     this.expand = true,
     this.tone,
+    this.haptic = PrismHaptic.none,
   }) : variant = PrismButtonVariant.secondary;
 
   const PrismButton.ghost({
@@ -48,6 +54,7 @@ class PrismButton extends StatefulWidget {
     this.loading = false,
     this.expand = false,
     this.tone,
+    this.haptic = PrismHaptic.none,
   }) : variant = PrismButtonVariant.ghost;
 
   final String label;
@@ -61,6 +68,22 @@ class PrismButton extends StatefulWidget {
   /// accent, success, ember…) while keeping the same strong, rounded shape.
   final Color? tone;
 
+  /// Le retour haptique de ce bouton — **[PrismHaptic.none] par défaut**.
+  ///
+  /// Mesuré sur `main` : ce champ n'existait pas et `_handleTap` appelait
+  /// `HapticFeedback.lightImpact()` sans condition. `PrismButton` étant le
+  /// bouton de toute l'application, **les 38 sites d'appel vibraient**, dont
+  /// « Précédent », « Suivant » et « Refaire un examen ».
+  ///
+  /// Le défaut est sûr ; l'exception se nomme au site d'appel (DESIGN.md §10,
+  /// règle 8). Mesuré à la reprise : **un seul** site la mérite — « Soumettre »
+  /// de l'examen blanc. Les deux autres candidats évidents, valider une
+  /// question et terminer une leçon, vibrent **déjà** par
+  /// `HapticLessonFeedback` (`lesson_controller.dart:244/288/351`,
+  /// `quiz_controller.dart:200`) : leur en donner un ici ferait **deux
+  /// vibrations pour un seul geste**.
+  final PrismHaptic haptic;
+
   @override
   State<PrismButton> createState() => _PrismButtonState();
 }
@@ -73,7 +96,7 @@ class _PrismButtonState extends State<PrismButton> {
   bool get _enabled => widget.onPressed != null && !widget.loading;
 
   void _handleTap() {
-    HapticFeedback.lightImpact();
+    PrismHaptics.play(widget.haptic);
     widget.onPressed?.call();
   }
 

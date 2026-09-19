@@ -316,6 +316,15 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
                         label: 'Soumettre',
                         icon: Icons.flag_rounded,
                         loading: _submitting,
+                        // La **seule** exception nommée du dépôt (DESIGN.md §10,
+                        // règle 8). Rendre un examen blanc est une « fin de
+                        // tâche importante » au sens des HIG, et c'est le seul
+                        // moment de ce genre qu'aucune autre couche ne couvre :
+                        // mesuré, `features/exam/` ne contenait aucun haptique.
+                        // Valider une question et terminer une leçon vibrent,
+                        // eux, par `HapticLessonFeedback` — en ajouter un ici
+                        // ferait deux vibrations pour un seul geste.
+                        haptic: PrismHaptic.light,
                         onPressed: _submitting ? null : _submit,
                       )
                     : PrismButton(

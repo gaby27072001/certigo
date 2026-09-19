@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../feedback/prism_haptics.dart';
 import '../motion/app_lifecycle_motion.dart';
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_motion.dart';
@@ -121,7 +121,7 @@ class _PathNodeState extends State<PathNode>
     final Widget interactive = GestureDetector(
       onTap: _tappable
           ? () {
-              HapticFeedback.selectionClick();
+              PrismHaptics.selection();
               widget.onTap!.call();
             }
           : null,

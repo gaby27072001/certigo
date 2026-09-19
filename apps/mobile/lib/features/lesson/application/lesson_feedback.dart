@@ -1,4 +1,4 @@
-import 'package:flutter/services.dart';
+import 'package:prism_ui/prism_ui.dart';
 
 /// The meaningful audio-haptic moments of a lesson (§3.14 — son & haptique).
 enum LessonSound { correct, incorrect, complete }
@@ -32,10 +32,16 @@ abstract interface class LessonFeedback {
   void completed();
 }
 
-/// Real device feedback: haptics via [HapticFeedback] + a [SoundPlayer] cue.
+/// Real device feedback: haptics via [PrismHaptics] + a [SoundPlayer] cue.
 ///
-/// Every haptic call is best-effort — wrapped so a missing platform channel
-/// (e.g. in a pure unit test) can never break a lesson.
+/// Les vibrations passent par [PrismHaptics], la **porte unique** du dépôt :
+/// c'est elle qui applique la préférence « Vibrations » du profil, et c'est
+/// elle qui conserve le caractère best-effort — un canal de plateforme absent
+/// (en test unitaire pur, par exemple) ne peut pas casser une leçon.
+///
+/// Le `_safe` local qui tenait ce second rôle a été remplacé par cette porte.
+/// Le **vocabulaire** ci-dessous est inchangé : il est épinglé au canal de
+/// plateforme par `lesson_haptic_vocabulary_test.dart`.
 class HapticLessonFeedback implements LessonFeedback {
   const HapticLessonFeedback({this._sound = const NullSoundPlayer()});
 
@@ -50,10 +56,10 @@ class HapticLessonFeedback implements LessonFeedback {
   @override
   void graded({required bool correct}) {
     if (correct) {
-      _safe(HapticFeedback.mediumImpact);
+      PrismHaptics.medium();
       _sound.play(LessonSound.correct);
     } else {
-      _safe(HapticFeedback.heavyImpact);
+      PrismHaptics.heavy();
       _sound.play(LessonSound.incorrect);
     }
   }
@@ -72,17 +78,9 @@ class HapticLessonFeedback implements LessonFeedback {
     // Deux frappes, une fois par leçon : c'est ce qui distingue une
     // célébration d'un choc, sans tomber dans le retour haptique permanent
     // qui finit par fatiguer.
-    _safe(HapticFeedback.lightImpact);
-    Future<void>.delayed(successBeatGap, () => _safe(HapticFeedback.mediumImpact));
+    PrismHaptics.light();
+    Future<void>.delayed(successBeatGap, PrismHaptics.medium);
     _sound.play(LessonSound.complete);
-  }
-
-  void _safe(void Function() action) {
-    try {
-      action();
-    } catch (_) {
-      // Haptics are a nicety; never let them surface as a lesson error.
-    }
   }
 }
 

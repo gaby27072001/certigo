@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../bootstrap/reduce_transparency_scope.dart';
+import '../features/profile/application/settings_preferences.dart';
 import 'providers.dart';
 import 'router.dart';
 
@@ -23,6 +24,13 @@ class CertigoApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeMode mode = ref.watch(themeModeProvider);
     final GoRouter router = ref.watch(routerProvider);
+
+    // Crée le notifier des vibrations dès le démarrage. C'est **lui** qui
+    // pousse la préférence stockée dans `PrismHaptics` ; un provider Riverpod
+    // étant paresseux, sans cette ligne la porte resterait ouverte jusqu'à la
+    // première ouverture du profil — un utilisateur ayant coupé les vibrations
+    // les retrouverait à chaque lancement de l'application.
+    ref.watch(hapticsEnabledProvider);
 
     return MaterialApp.router(
       title: 'Certigo',

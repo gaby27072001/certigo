@@ -185,11 +185,24 @@ class _ProfileContent extends ConsumerWidget {
                 onChanged: (bool v, WidgetRef r) => r.read(streakReminderProvider.notifier).set(v),
               ),
               Divider(color: p.border, height: 24),
+              // Mesuré : cet interrupteur s'intitulait « Sons & vibrations » et
+              // `soundsEnabledProvider` n'était lu que par l'interrupteur
+              // lui-même — il ne commandait ni son ni vibration. Un libellé qui
+              // promet deux commandes et n'en tient aucune est pire qu'absent.
+              // Les deux réglages sont désormais séparés, et celui des
+              // vibrations est réellement branché.
               SwitchPrefRow(
                 icon: Icons.volume_up_rounded,
-                label: 'Sons & vibrations',
+                label: 'Sons',
                 provider: soundsEnabledProvider,
                 onChanged: (bool v, WidgetRef r) => r.read(soundsEnabledProvider.notifier).set(v),
+              ),
+              Divider(color: p.border, height: 24),
+              SwitchPrefRow(
+                icon: Icons.vibration_rounded,
+                label: 'Vibrations',
+                provider: hapticsEnabledProvider,
+                onChanged: (bool v, WidgetRef r) => r.read(hapticsEnabledProvider.notifier).set(v),
               ),
               Divider(color: p.border, height: 24),
               const LanguagePrefRow(),

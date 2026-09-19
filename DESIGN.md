@@ -310,6 +310,12 @@ Honnêteté sur les limites de cette livraison.
   tient sa barre d'onglets autour de 1.2:1 avec le même motif. Forcer un écart
   de clarté ferait descendre `textSecondary` sous son plancher sur le verre,
   là où se trouvent quatre onglets sur cinq. Mesure connue, pas dette.
+- **Le réglage « Sons » ne commande encore rien.** L'interrupteur s'intitulait
+  « Sons & vibrations » alors que `soundsEnabledProvider` n'était lu que par
+  l'interrupteur lui-même. La moitié « vibrations » est désormais un réglage
+  séparé et réellement branché ; la moitié « sons » reste décorative tant que
+  `NullSoundPlayer` est la seule implémentation de `SoundPlayer` — brancher un
+  vrai moteur audio suppose des assets, délibérément hors de ce lot.
 - **Neuf valeurs d'espacement hors grille**, 38 usages, documentées comme dette
   dans `prism_spacing.dart`.
 - **85 widgets Material bruts**, dont 32 sur le seul écran Profil.
@@ -335,6 +341,13 @@ Honnêteté sur les limites de cette livraison.
    couleurs système d'Apple s'adaptent seules ; les nôtres sont toutes
    personnalisées, donc elles doivent fournir leurs variantes ou le réglage ne
    fait rien.
+10. **Une vibration informe ; elle ne ponctue pas.** Un retour haptique se
+    demande explicitement et se justifie au site d'appel. Le défaut d'un
+    contrôle est `PrismHaptic.none`, et **toute** vibration passe par
+    `PrismHaptics` — une seule porte, donc un réglage utilisateur qui ferme
+    réellement tout. Mesuré avant correction : `PrismButton` appelait
+    `HapticFeedback.lightImpact()` sans condition, donc les 38 sites d'appel du
+    bouton de l'application vibraient, et rien ne pouvait les couper.
 
 Ces règles sont des **tests**, pas des vœux, et elles re-dérivent leurs seuils
 au lieu de figer des valeurs hexadécimales — pour qu'une modification qui
@@ -348,11 +361,20 @@ au lieu de figer des valeurs hexadécimales — pour qu'une modification qui
 | `theme/prism_typography_contract_test.dart` | un créneau de `TextTheme` qui retombe sur la police plateforme |
 | `theme/prism_voiceover_contract_test.dart` | une jauge ou un compteur qui perd son annonce de valeur |
 | `theme/prism_accessibility_scope_test.dart` | un axe d'accessibilité résolu mais jamais branché |
+| `apps/mobile/test/haptics_discipline_test.dart` | un `HapticFeedback` hors de `PrismHaptics`, un tap ordinaire qui vibre, un réglage « Vibrations » qui ne coupe pas tout |
 
-Les trois dernières existent parce que les trois défauts correspondants ont
+Les quatre dernières existent parce que les défauts correspondants ont
 réellement été livrés, puis mesurés. Chacune a été vérifiée **en cassant
 délibérément le code pour la voir rougir** : une garde qui ne peut pas échouer
 est une décoration.
+
+La dernière est donnée avec son chemin complet parce qu'elle est la seule à
+**ne pas** vivre dans `packages/prism_ui/test/`. Mesuré : ce répertoire compte
+41 fichiers de test et `ci-mobile.yml` n'en exécute qu'**un seul**
+(`test/rendering/renderer_golden_test.dart`) ; le job requis lance
+`flutter test` dans `apps/mobile` uniquement. Une garde posée à côté du code
+qu'elle protège y serait verte et incapable de bloquer une fusion — c'est le
+même raisonnement que `apps/mobile/test/prism_tokens_contract_test.dart`.
 
 Et une leçon de méthode, payée deux fois : **un correctif qui déplace un défaut
 d'un endroit à un autre n'est pas un correctif tant qu'on n'a pas énuméré les

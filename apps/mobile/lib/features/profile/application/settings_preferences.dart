@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:prism_ui/prism_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../onboarding/application/onboarding_controller.dart';
@@ -8,6 +9,7 @@ const String kPrefDailyGoal = 'pref_daily_goal';
 const String kPrefLevel = 'pref_knowledge_level';
 const String kPrefDomains = 'pref_domains';
 const String kPrefSoundsEnabled = 'pref_sounds';
+const String kPrefHapticsEnabled = 'pref_haptics';
 const String kPrefStreakReminder = 'pref_streak_reminder';
 const String kPrefDisplayName = 'pref_display_name';
 const String kPrefHandle = 'pref_handle';
@@ -167,6 +169,47 @@ class SoundsEnabledNotifier extends StateNotifier<bool> {
 
 final StateNotifierProvider<SoundsEnabledNotifier, bool> soundsEnabledProvider =
     StateNotifierProvider<SoundsEnabledNotifier, bool>((_) => SoundsEnabledNotifier());
+
+// ---------------------------------------------------------------------------
+// HapticsEnabled
+// ---------------------------------------------------------------------------
+
+/// La préférence « Vibrations », et **le seul** écrivain de [PrismHaptics].
+///
+/// Mesuré avant correction : `hapticsEnabled`, `hapticService` et
+/// `enableHaptics` n'existaient nulle part dans le dépôt — aucune vibration
+/// n'était coupable. Il existait bien un interrupteur intitulé « Sons &
+/// vibrations », mais `soundsEnabledProvider` n'était lu que par
+/// l'interrupteur lui-même : **il ne commandait rien**. Le libellé promettait
+/// une maîtrise des vibrations que le code n'offrait pas.
+///
+/// La porte est poussée depuis le notifier, pas depuis un widget : une
+/// préférence ne doit pas dépendre de la présence à l'écran de l'écran qui la
+/// règle. Le chargement initial la pousse aussi, sinon un utilisateur ayant
+/// coupé les vibrations les retrouverait à chaque démarrage jusqu'à sa
+/// première visite du profil.
+class HapticsEnabledNotifier extends StateNotifier<bool> {
+  HapticsEnabledNotifier() : super(true) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final bool value = prefs.getBool(kPrefHapticsEnabled) ?? true;
+    state = value;
+    PrismHaptics.enabled = value;
+  }
+
+  Future<void> set(bool value) async {
+    state = value;
+    PrismHaptics.enabled = value;
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(kPrefHapticsEnabled, value);
+  }
+}
+
+final StateNotifierProvider<HapticsEnabledNotifier, bool> hapticsEnabledProvider =
+    StateNotifierProvider<HapticsEnabledNotifier, bool>((_) => HapticsEnabledNotifier());
 
 // ---------------------------------------------------------------------------
 // StreakReminder

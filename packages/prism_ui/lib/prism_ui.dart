@@ -23,6 +23,7 @@ export 'src/tokens/prism_brand_icons.dart';
 export 'src/tokens/prism_token_export.dart';
 
 // Theme
+export 'src/feedback/prism_haptics.dart';
 export 'src/theme/prism_color_scheme.dart';
 export 'src/theme/prism_theme.dart';
 export 'src/theme/prism_accessibility_scope.dart';

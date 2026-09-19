@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../application/auth_state.dart';
@@ -52,7 +51,11 @@ class _AuthProviderButtonState extends State<AuthProviderButton> {
   bool get _interactive => widget.enabled && !widget.loading;
 
   void _handleTap() {
-    HapticFeedback.lightImpact();
+    // Pas de retour haptique ici, volontairement. « Continuer avec Microsoft »
+    // est un **tap ordinaire** : il ne sélectionne aucune valeur, ne franchit
+    // aucun seuil et ne termine aucune tâche. Il appelait pourtant
+    // `HapticFeedback.lightImpact()` — c'est l'anti-pattern « haptic à chaque
+    // tap », qui use la signification des vibrations qui, elles, en ont une.
     widget.onPressed();
   }
 

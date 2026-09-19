@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../feedback/prism_haptics.dart';
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_motion.dart';
 import '../tokens/prism_state.dart';
-
-enum PrismHaptic { none, selection, light }
 
 /// Shared tactile wrapper for Prism surfaces.
 ///
@@ -60,16 +58,7 @@ class _PrismPressableState extends State<PrismPressable> {
   bool _focused = false;
 
   void _handleTap() {
-    switch (widget.haptic) {
-      case PrismHaptic.none:
-        break;
-      case PrismHaptic.selection:
-        HapticFeedback.selectionClick();
-        break;
-      case PrismHaptic.light:
-        HapticFeedback.lightImpact();
-        break;
-    }
+    PrismHaptics.play(widget.haptic);
     widget.onPressed();
   }
 

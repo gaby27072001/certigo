@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
@@ -106,7 +105,7 @@ class _LevelTileState extends State<_LevelTile> {
         onTapUp: (_) => setState(() => _down = false),
         onTapCancel: () => setState(() => _down = false),
         onTap: () {
-          HapticFeedback.selectionClick();
+          PrismHaptics.selection();
           widget.onTap();
         },
         child: AnimatedContainer(

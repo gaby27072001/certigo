@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../feedback/prism_haptics.dart';
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_motion.dart';
 import '../tokens/prism_radii.dart';
@@ -58,7 +58,7 @@ class QuizOptionTile extends StatelessWidget {
         onTap: onTap == null
             ? null
             : () {
-                HapticFeedback.selectionClick();
+                PrismHaptics.selection();
                 onTap!.call();
               },
         child: AnimatedContainer(
