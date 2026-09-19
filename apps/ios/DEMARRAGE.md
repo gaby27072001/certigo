@@ -31,29 +31,38 @@ gh repo clone gchambaud_microsoft/Certigo ~/Certigo && cd ~/Certigo && git check
 ➜ Tu dois voir `Switched to branch 'gchambaud-microsoft-squelette-ios-natif'`.
 
 **Si tu as déjà le dépôt quelque part** — ou si tu reviens après une
-correction de ma part — utilise **ceci et pas `git pull`** :
+correction de ma part — **n'écrase rien**. Crée un checkout séparé :
 
 ```bash
-cd ~/Certigo && git fetch origin && git reset --hard origin/gchambaud-microsoft-squelette-ios-natif
+cd ~/Certigo && git fetch origin
+git worktree add ~/certigo-ios-essai origin/gchambaud-microsoft-squelette-ios-natif
+cd ~/certigo-ios-essai && git log --oneline -1
 ```
 
-➜ Puis vérifie ce que tu as vraiment :
+➜ Ton dossier `~/Certigo` **n'est pas touché** : ni ta branche, ni tes
+modifications en cours. Le worktree est un dossier jetable :
 
 ```bash
-git log --oneline -1
+git worktree remove ~/certigo-ios-essai     # quand tu as fini
 ```
 
-> ### ⚠️ Pourquoi pas `git pull` ?
+Puis lance depuis **ce** dossier :
+
+```bash
+cd ~/certigo-ios-essai/apps/ios && ./Scripts/demarrer.sh
+```
+
+> ### ⚠️ Pourquoi pas `git pull`, et pourquoi pas `git reset --hard` ?
 >
 > Cette branche est **réécrite** (rebase) chaque fois que je la remets à jour
 > sur `main`. Après une réécriture, `git pull` ne ramène pas la correction :
-> il échoue, ou pire, il fabrique une fusion qui mélange l'ancien et le
-> nouveau. **C'est déjà arrivé une fois** — tu étais resté sur une version
-> antérieure sans le savoir, et le script relancé était l'ancien.
+> il échoue, ou fabrique une fusion qui mélange l'ancien et le nouveau.
+> **C'est déjà arrivé une fois** — tu étais resté sur une version antérieure
+> sans le savoir, et le script relancé était l'ancien.
 >
-> `git reset --hard origin/<branche>` prend toujours exactement ce qui est
-> publié. Il jette tes modifications locales, et c'est sans risque ici : le
-> script n'écrit que dans `.build/`, qui est ignoré par git.
+> `git reset --hard` réglerait ça, **mais il détruit tout travail non
+> committé** dans le dossier. Le worktree séparé ci-dessus obtient le même
+> résultat **sans rien risquer** : c'est la méthode à préférer.
 
 ### ③ Lancer
 
