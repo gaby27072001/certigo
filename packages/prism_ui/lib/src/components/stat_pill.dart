@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_radii.dart';
+import '../tokens/prism_typography.dart';
 
 /// A compact pill that surfaces a single gamification stat (streak, XP, energy).
 ///
@@ -55,9 +56,12 @@ class StatPill extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               value,
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700),
+              style: PrismTypography.tabular(
+                Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),

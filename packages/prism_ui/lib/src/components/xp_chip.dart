@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_radii.dart';
+import '../tokens/prism_typography.dart';
 
 /// A compact, gold-accented chip showing accumulated XP.
 ///
@@ -38,13 +39,17 @@ class XpChip extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               _compact(xp),
-              style: t.labelLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800),
+              style: PrismTypography.tabular(
+                t.labelLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800),
+              ),
             ),
             if (delta != null && delta! > 0) ...<Widget>[
               const SizedBox(width: 6),
               Text(
                 '+${_compact(delta!)}',
-                style: t.labelMedium?.copyWith(color: p.success, fontWeight: FontWeight.w700),
+                style: PrismTypography.tabular(
+                  t.labelMedium?.copyWith(color: p.success, fontWeight: FontWeight.w700),
+                ),
               ),
             ],
           ],

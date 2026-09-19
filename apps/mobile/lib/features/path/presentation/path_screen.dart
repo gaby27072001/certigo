@@ -543,7 +543,9 @@ class _ReadinessChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             '$score',
-            style: TextStyle(color: p.primary, fontWeight: FontWeight.w800, fontSize: 15),
+            style: PrismTypography.tabular(
+              TextStyle(color: p.primary, fontWeight: FontWeight.w800, fontSize: 15),
+            ),
           ),
           const SizedBox(width: 4),
           Icon(

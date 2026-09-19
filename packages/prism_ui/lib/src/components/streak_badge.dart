@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_radii.dart';
+import '../tokens/prism_typography.dart';
 
 /// The streak signature of Certigo: a flame badge showing the number of
 /// consecutive active days.
@@ -41,7 +42,9 @@ class StreakBadge extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               '$days',
-              style: t.labelLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800),
+              style: PrismTypography.tabular(
+                t.labelLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800),
+              ),
             ),
           ],
         ),

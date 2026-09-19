@@ -245,7 +245,10 @@ class _ExamRunnerState extends ConsumerState<_ExamRunner> {
                 ),
               ),
               const SizedBox(width: 12),
-              Text('${_index + 1}/$total', style: t.labelMedium?.copyWith(color: p.textSecondary)),
+              Text(
+                '${_index + 1}/$total',
+                style: PrismTypography.tabular(t.labelMedium?.copyWith(color: p.textSecondary)),
+              ),
             ],
           ),
         ),
@@ -493,7 +496,10 @@ class _DomainScoreRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Text('${score.pct}%', style: t.labelLarge?.copyWith(color: p.primary)),
+              Text(
+                '${score.pct}%',
+                style: PrismTypography.tabular(t.labelLarge?.copyWith(color: p.primary)),
+              ),
             ],
           ),
           const SizedBox(height: 6),

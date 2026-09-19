@@ -74,7 +74,9 @@ class _AchievementsContent extends StatelessWidget {
                   Expanded(child: Text('Trophées débloqués', style: t.titleMedium)),
                   Text(
                     '${board.unlocked}/${board.total}',
-                    style: t.titleLarge?.copyWith(color: p.xpGold, fontWeight: FontWeight.w800),
+                    style: PrismTypography.tabular(
+                      t.titleLarge?.copyWith(color: p.xpGold, fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ],
               ),
@@ -170,7 +172,9 @@ class _AchievementCard extends StatelessWidget {
               const SizedBox(width: 12),
               Text(
                 '${achievement.progress}/${achievement.threshold}',
-                style: t.labelMedium?.copyWith(color: p.textSecondary),
+                style: PrismTypography.tabular(
+                  t.labelMedium?.copyWith(color: p.textSecondary),
+                ),
               ),
             ],
           ),

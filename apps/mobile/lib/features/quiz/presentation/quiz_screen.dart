@@ -183,7 +183,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   const SizedBox(width: 12),
                   Text(
                     '${_controller.index + 1}/${_controller.items.length}',
-                    style: t.labelMedium?.copyWith(color: p.textSecondary),
+                    style: PrismTypography.tabular(
+                      t.labelMedium?.copyWith(color: p.textSecondary),
+                    ),
                   ),
                 ],
               ),

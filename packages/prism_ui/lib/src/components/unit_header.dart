@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../tokens/prism_radii.dart';
+import '../tokens/prism_typography.dart';
 import 'aurora_mascot.dart';
 import 'prism_tap_target.dart';
 
@@ -138,10 +139,12 @@ class UnitHeader extends StatelessWidget {
                         const SizedBox(width: 10),
                         Text(
                           '$completed/$total',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
+                          style: PrismTypography.tabular(
+                            const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],

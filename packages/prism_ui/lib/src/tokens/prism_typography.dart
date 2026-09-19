@@ -169,4 +169,47 @@ class PrismTypography {
         height: 1.5,
         color: color,
       );
+
+  /// Chiffres **tabulaires** : les dix chiffres partagent une chasse unique.
+  ///
+  /// À réserver aux nombres dont la variation ferait *danser* la mise en page —
+  /// un compteur qui s'incrémente sous les yeux, une jauge qui s'anime, un
+  /// index `3/20` collé à une barre de progression, une colonne de scores. Le
+  /// reste du produit garde les chiffres proportionnels, qui se lisent mieux
+  /// dans une phrase : appliquer `tabular` à un nombre qui ne bouge jamais est
+  /// une régression typographique gratuite, pas une amélioration.
+  ///
+  /// Pourquoi c'est nécessaire ici, mesuré sur Archivo (`TextPainter`, chasse
+  /// de la plus large moins la plus étroite des dix suites de huit chiffres) :
+  ///
+  /// | Créneau | Proportionnel | Tabulaire |
+  /// |---|---|---|
+  /// | `displayMedium` 28/800 | 10.75 px | 0 px |
+  /// | `bodyLarge` 17/400 | 7.21 px | 0 px |
+  /// | `labelLarge` 15/600 | 1.17 px | 0 px |
+  ///
+  /// L'écart n'est pas monotone : Archivo dessine ses chiffres presque
+  /// isométriques autour de la graisse 600 et les laisse diverger aux deux
+  /// extrémités de l'axe. Comparer seulement « 111 » à « 000 » ne mesure donc
+  /// **rien** dans la bande des libellés (0,045 px) alors que l'écart réel y
+  /// atteint 1,17 px. La garde mesure les dix chiffres, pas deux.
+  ///
+  /// Le modificateur est **composable et idempotent** : il se pose sur
+  /// n'importe quel créneau de [TextTheme] sans en consommer un — la règle n°4
+  /// de `DESIGN.md` veut que les quinze appartiennent à la marque — et il
+  /// préserve les fonctionnalités OpenType déjà présentes. Un futur compteur
+  /// adopte la bonne forme sans jamais nommer [FontFeature].
+  static TextStyle? tabular(TextStyle? style) {
+    if (style == null) {
+      return null;
+    }
+    const FontFeature tabularFigures = FontFeature.tabularFigures();
+    final List<FontFeature> existing = style.fontFeatures ?? const <FontFeature>[];
+    if (existing.contains(tabularFigures)) {
+      return style;
+    }
+    return style.copyWith(
+      fontFeatures: <FontFeature>[...existing, tabularFigures],
+    );
+  }
 }
