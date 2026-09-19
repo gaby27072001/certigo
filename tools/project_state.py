@@ -49,6 +49,7 @@ OBSERVABLE_PATHS = (
     "content",
     "backend/src/Certigo.Domain/Content/ContentModels.cs",
     "backend/tests",
+    "apps/ios",
     "apps/mobile/test",
     "apps/mobile/integration_test",
     ":(glob)packages/*/test/**",
@@ -200,6 +201,8 @@ class ProjectState:
     dart_test_files: int
     python_test_roots: int
     python_test_files: int
+    swift_test_roots: int
+    swift_test_files: int
     tracks: int
     lessons: int
     pedagogical_types: tuple[str, ...]
@@ -895,7 +898,7 @@ def parse_pedagogical_types(root: Path) -> tuple[str, ...]:
     return tuple(schema_types)
 
 
-def discover_tests(root: Path) -> tuple[int, int, int, int, int, int]:
+def discover_tests(root: Path) -> tuple[int, int, int, int, int, int, int, int]:
     dotnet_projects = sorted((root / "backend/tests").glob("*/*.csproj"))
     dotnet_files = sorted((root / "backend/tests").rglob("*Tests.cs"))
 
@@ -916,9 +919,38 @@ def discover_tests(root: Path) -> tuple[int, int, int, int, int, int]:
     ]
     python_files = sorted((root / "tools/tests").glob("test_*.py"))
     python_roots = {path.parent for path in python_files}
+
+    # Famille Swift : observable dès qu'`apps/ios` existe, tolérée absente
+    # avant. Cette tolérance est la migration elle-même — elle permet à ce
+    # générateur d'atterrir sur `main` avant l'arbre qu'il mesure, et donc au
+    # validateur de confiance de rester la version de la base.
+    swift_roots = [
+        path
+        for path in (
+            root / "apps/ios/Tests",
+            *sorted((root / "apps/ios/Packages").glob("*/Tests")),
+        )
+        if path.is_dir()
+    ]
+    swift_files = [
+        path
+        for test_root in swift_roots
+        for path in test_root.rglob("*Tests.swift")
+        if path.is_file()
+    ]
+
     if not dotnet_projects or not dotnet_files or not dart_roots or not dart_files:
         raise ProjectStateError(
             "Test discovery found an empty required family (.NET projects/files or Dart roots/files)."
+        )
+
+    # Fail-closed là où c'est vérifiable : un arbre iOS présent SANS tests
+    # découvrables est un instrument muet, et doit échouer. Un arbre absent
+    # n'est pas une anomalie — c'est l'état d'avant la migration.
+    if (root / "apps/ios").is_dir() and not swift_files:
+        raise ProjectStateError(
+            "apps/ios exists but no *Tests.swift was discovered under "
+            "apps/ios/Tests or apps/ios/Packages/*/Tests."
         )
     return (
         len(dotnet_projects),
@@ -927,6 +959,8 @@ def discover_tests(root: Path) -> tuple[int, int, int, int, int, int]:
         len(dart_files),
         len(python_roots),
         len(python_files),
+        len(swift_roots),
+        len(swift_files),
     )
 
 
@@ -974,7 +1008,18 @@ def collect(root: Path) -> ProjectState:
 
 def render(state: ProjectState) -> str:
     total_test_files = (
-        state.dotnet_test_files + state.dart_test_files + state.python_test_files
+        state.dotnet_test_files
+        + state.dart_test_files
+        + state.python_test_files
+        + state.swift_test_files
+    )
+    # Le segment Swift n'apparaît QUE lorsque la famille existe. Sans cela, le
+    # document changerait au moment où le générateur atterrit sur `main`,
+    # avant l'arbre qu'il mesure — et le contrôle de `push` casserait `main`.
+    swift_segment = (
+        f" ; Swift/iOS : {state.swift_test_roots} racines / {state.swift_test_files} fichiers"
+        if state.swift_test_files
+        else ""
     )
     workflow_list = ", ".join(f"`{name}`" for name in state.workflows)
     item_types = ", ".join(f"`{name}`" for name in state.pedagogical_types)
@@ -997,7 +1042,7 @@ def render(state: ProjectState) -> str:
             f"| Package public actif | **{state.active_content.public.file_count} fichiers** — `{state.active_content.public.manifest_id}` |",
             f"| Package privé actif (`answerKey`) | **{state.active_content.private.file_count} fichiers** — `{state.active_content.private.manifest_id}` |",
             f"| Workflows GitHub Actions | **{len(state.workflows)}** fichiers : {workflow_list} |",
-            f"| Tests découverts | **{total_test_files} fichiers** — .NET : {state.dotnet_test_projects} projets / {state.dotnet_test_files} fichiers ; Flutter/Dart : {state.dart_test_roots} racines / {state.dart_test_files} fichiers ; Python : {state.python_test_roots} racine / {state.python_test_files} fichier |",
+            f"| Tests découverts | **{total_test_files} fichiers** — .NET : {state.dotnet_test_projects} projets / {state.dotnet_test_files} fichiers ; Flutter/Dart : {state.dart_test_roots} racines / {state.dart_test_files} fichiers{swift_segment} ; Python : {state.python_test_roots} racine / {state.python_test_files} fichier |",
             f"| Corpus **historique** local | **{state.tracks} pistes**, **{state.lessons} leçons** sous `content/` — instantané de compatibilité, non actif |",
             f"| Types pédagogiques canoniques | **{len(state.pedagogical_types)}** : {item_types} (schéma JSON et `ItemType` C# alignés) |",
             "",

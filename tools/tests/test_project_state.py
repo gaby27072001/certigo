@@ -386,7 +386,20 @@ class ProjectStateTests(unittest.TestCase):
     def test_test_discovery(self) -> None:
         self.fixture.write("packages/core/test/core_test.dart", "void main() {}\n")
         result = project_state.discover_tests(self.root)
-        self.assertEqual((1, 1, 2, 2, 1, 1), result)
+        # Les deux derniers éléments sont la famille Swift, nulle tant
+        # qu'`apps/ios` n'existe pas : c'est l'état de la migration.
+        self.assertEqual((1, 1, 2, 2, 1, 1, 0, 0), result)
+
+    def test_apps_ios_present_sans_tests_est_refuse(self) -> None:
+        """Un arbre iOS présent SANS test découvrable est un instrument muet.
+
+        La tolérance de la migration ne vaut que pour un arbre ABSENT. Dès
+        qu'`apps/ios` existe, ses tests doivent être découvrables, sinon la
+        mesure décrirait une réalité qu'elle ne regarde pas.
+        """
+        self.fixture.write("apps/ios/Packages/CertigoKit/Sources/X.swift", "// vide\n")
+        with self.assertRaisesRegex(project_state.ProjectStateError, "apps/ios exists"):
+            project_state.discover_tests(self.root)
 
     def test_every_observable_input_family_changes_output(self) -> None:
         baseline = project_state.render(project_state.collect(self.root))
