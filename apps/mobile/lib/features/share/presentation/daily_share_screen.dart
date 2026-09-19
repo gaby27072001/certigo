@@ -6,6 +6,7 @@ import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
 import '../application/share_intent.dart';
+import '../../../shared/widgets/async_module.dart';
 import '../../../shared/widgets/screen_header.dart';
 
 class DailyShareScreen extends ConsumerWidget {
@@ -22,11 +23,15 @@ class DailyShareScreen extends ConsumerWidget {
           children: <Widget>[
             const ScreenHeader(title: 'Partage du jour'),
             Expanded(
-              child: async.when(
-                data: (ShareCard card) => _DailyShareContent(card: card),
-                loading: () => const _DailyShareLoading(),
-                error: (Object error, StackTrace _) =>
-                    PrismStatusView.error(onRetry: () => ref.invalidate(dailyShareCardProvider)),
+              child: RefreshIndicator(
+                onRefresh: () => refreshQuietly(() => ref.refresh(dailyShareCardProvider.future)),
+                child: AsyncModule<ShareCard>(
+                  state: async,
+                  errorMessage: DailyShareLabels.unavailable,
+                  onRetry: () => ref.invalidate(dailyShareCardProvider),
+                  loading: (BuildContext context) => const _DailyShareLoading(),
+                  data: (BuildContext context, ShareCard card) => _DailyShareContent(card: card),
+                ),
               ),
             ),
           ],
@@ -34,6 +39,12 @@ class DailyShareScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Copy asserted by tests. Naming it keeps a wording change from silently
+/// turning a widget test red in an unrelated branch.
+abstract final class DailyShareLabels {
+  static const String unavailable = 'Impossible de charger ton partage du jour.';
 }
 
 class _DailyShareContent extends ConsumerStatefulWidget {
@@ -81,6 +92,7 @@ class _DailyShareContentState extends ConsumerState<_DailyShareContent> {
     ).formatFullDate(card.generatedAt.toLocal());
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         PrismCard(

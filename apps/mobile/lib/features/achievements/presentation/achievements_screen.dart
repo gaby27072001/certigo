@@ -1,10 +1,13 @@
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/router.dart';
+import '../../../shared/widgets/async_module.dart';
 import '../../../shared/widgets/screen_header.dart';
 
 /// Achievements — the learner's trophy cabinet. Read-only board fed by
@@ -25,11 +28,16 @@ class AchievementsScreen extends ConsumerWidget {
           children: <Widget>[
             const ScreenHeader(title: 'Succès'),
             Expanded(
-              child: async.when(
-                data: (AchievementBoard board) => _AchievementsContent(board: board),
-                loading: () => const _AchievementsLoading(),
-                error: (Object error, StackTrace _) =>
-                    PrismStatusView.error(onRetry: () => ref.invalidate(achievementBoardProvider)),
+              child: RefreshIndicator(
+                onRefresh: () => refreshQuietly(() => ref.refresh(achievementBoardProvider.future)),
+                child: AsyncModule<AchievementBoard>(
+                  state: async,
+                  errorMessage: AchievementLabels.unavailable,
+                  onRetry: () => ref.invalidate(achievementBoardProvider),
+                  loading: (BuildContext context) => const _AchievementsLoading(),
+                  data: (BuildContext context, AchievementBoard board) =>
+                      _AchievementsContent(board: board),
+                ),
               ),
             ),
           ],
@@ -37,6 +45,15 @@ class AchievementsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Copy asserted by tests. Naming it keeps a wording change from silently
+/// turning a widget test red in an unrelated branch.
+abstract final class AchievementLabels {
+  static const String unavailable = 'Impossible de charger tes succès.';
+  static const String emptyTitle = 'Aucun succès pour le moment';
+  static const String emptyMessage = 'Tes premiers trophées se débloquent en terminant une leçon.';
+  static const String emptyAction = 'Continuer à apprendre';
 }
 
 class _AchievementsContent extends StatelessWidget {
@@ -51,14 +68,22 @@ class _AchievementsContent extends StatelessWidget {
     final double overall = board.total > 0 ? (board.unlocked / board.total).clamp(0.0, 1.0) : 0.0;
 
     if (board.achievements.isEmpty) {
-      return const PrismStatusView(
-        icon: Icons.workspace_premium_rounded,
-        title: 'Aucun succès pour le moment',
-        message: 'Continue d\'apprendre : tes premiers trophées arrivent vite.',
+      // "Rien n'existe encore", not "impossible de charger": the board came
+      // back, it is simply empty, and the way out of it is a lesson.
+      return ScrollableStatus(
+        child: PrismStatusView(
+          icon: Icons.workspace_premium_rounded,
+          title: AchievementLabels.emptyTitle,
+          message: AchievementLabels.emptyMessage,
+          actionLabel: AchievementLabels.emptyAction,
+          actionIcon: Icons.school_rounded,
+          onAction: () => context.go(Routes.path),
+        ),
       );
     }
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         PrismCard(

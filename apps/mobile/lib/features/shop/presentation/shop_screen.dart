@@ -4,9 +4,12 @@ import 'package:core/core.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/router.dart';
+import '../../../shared/widgets/async_module.dart';
 import '../../../shared/widgets/inline_error.dart';
 import '../../../shared/widgets/screen_header.dart';
 
@@ -31,11 +34,16 @@ class ShopScreen extends ConsumerWidget {
           children: <Widget>[
             const ScreenHeader(title: 'Boutique'),
             Expanded(
-              child: async.when(
-                data: (ShopCatalog catalog) => _ShopContent(catalog: catalog),
-                loading: () => const _ShopLoading(),
-                error: (Object error, StackTrace _) =>
-                    PrismStatusView.error(onRetry: () => ref.invalidate(shopCatalogProvider)),
+              child: RefreshIndicator(
+                onRefresh: () => refreshQuietly(() => ref.refresh(shopCatalogProvider.future)),
+                child: AsyncModule<ShopCatalog>(
+                  state: async,
+                  errorMessage: ShopLabels.unavailable,
+                  onRetry: () => ref.invalidate(shopCatalogProvider),
+                  loading: (BuildContext context) => const _ShopLoading(),
+                  data: (BuildContext context, ShopCatalog catalog) =>
+                      _ShopContent(catalog: catalog),
+                ),
               ),
             ),
           ],
@@ -123,14 +131,23 @@ class _ShopContentState extends ConsumerState<_ShopContent> {
     final int? freezeTokens = ref.watch(meProvider).asData?.value.freezeTokens;
 
     if (catalog.items.isEmpty) {
-      return const PrismStatusView(
-        icon: Icons.storefront_rounded,
-        title: 'Boutique vide',
-        message: 'De nouveaux articles arrivent bientôt.',
+      // "Rien n'existe encore" — distinct from "impossible de charger", which
+      // the module above resolves, and it names what to do next rather than
+      // leaving the learner on a dead end.
+      return ScrollableStatus(
+        child: PrismStatusView(
+          icon: Icons.storefront_rounded,
+          title: ShopLabels.emptyTitle,
+          message: ShopLabels.emptyMessage,
+          actionLabel: ShopLabels.emptyAction,
+          actionIcon: Icons.school_rounded,
+          onAction: () => context.go(Routes.path),
+        ),
       );
     }
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         PrismCard(
@@ -363,6 +380,12 @@ String _freezeLabel(int tokens) =>
 /// widget test red from an unrelated branch.
 abstract final class ShopLabels {
   static const String buy = 'Acheter';
+
+  static const String unavailable = 'Impossible de charger la boutique.';
+  static const String emptyTitle = 'Boutique vide';
+  static const String emptyMessage =
+      'De nouveaux articles arrivent bientôt. En attendant, tes gemmes continuent de monter.';
+  static const String emptyAction = 'Gagner des gemmes';
 
   /// How many gems are still missing. The button names its action; this names
   /// the obstacle, precisely, next to the price it refers to.

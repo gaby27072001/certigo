@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../../shared/widgets/async_module.dart';
 import '../../../shared/widgets/inline_error.dart';
 import '../../../shared/widgets/screen_header.dart';
 
@@ -27,11 +28,15 @@ class SeasonsScreen extends ConsumerWidget {
           children: <Widget>[
             const ScreenHeader(title: 'Saison'),
             Expanded(
-              child: async.when(
-                data: (Season season) => _SeasonContent(season: season),
-                loading: () => const _SeasonLoading(),
-                error: (Object error, StackTrace _) =>
-                    PrismStatusView.error(onRetry: () => ref.invalidate(seasonProvider)),
+              child: RefreshIndicator(
+                onRefresh: () => refreshQuietly(() => ref.refresh(seasonProvider.future)),
+                child: AsyncModule<Season>(
+                  state: async,
+                  errorMessage: SeasonLabels.unavailable,
+                  onRetry: () => ref.invalidate(seasonProvider),
+                  loading: (BuildContext context) => const _SeasonLoading(),
+                  data: (BuildContext context, Season season) => _SeasonContent(season: season),
+                ),
               ),
             ),
           ],
@@ -39,6 +44,12 @@ class SeasonsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Copy asserted by tests. Naming it keeps a wording change from silently
+/// turning a widget test red in an unrelated branch.
+abstract final class SeasonLabels {
+  static const String unavailable = 'Impossible de charger la saison.';
 }
 
 class _SeasonContent extends ConsumerStatefulWidget {
@@ -96,6 +107,7 @@ class _SeasonContentState extends ConsumerState<_SeasonContent> {
         : (challenge.completed ? 1.0 : 0.0);
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         PrismCard(

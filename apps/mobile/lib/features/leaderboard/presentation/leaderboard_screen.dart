@@ -1,9 +1,12 @@
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/router.dart';
+import '../../../shared/widgets/async_module.dart';
 
 /// Leaderboard — the weekly "Momentum League". Cohort of ~30, tiered, with a
 /// clear promotion zone. Framed positively: we highlight the promotion line and
@@ -19,11 +22,15 @@ class LeaderboardScreen extends ConsumerWidget {
     return AuroraBackground(
       child: SafeArea(
         bottom: false,
-        child: async.when(
-          data: (League league) => _LeagueContent(league: league),
-          loading: () => const _LeaderboardLoading(),
-          error: (Object error, StackTrace _) =>
-              PrismStatusView.error(onRetry: () => ref.invalidate(leagueProvider)),
+        child: RefreshIndicator(
+          onRefresh: () => refreshQuietly(() => ref.refresh(leagueProvider.future)),
+          child: AsyncModule<League>(
+            state: async,
+            errorMessage: LeagueLabels.unavailable,
+            onRetry: () => ref.invalidate(leagueProvider),
+            loading: (BuildContext context) => const _LeaderboardLoading(),
+            data: (BuildContext context, League league) => _LeagueContent(league: league),
+          ),
         ),
       ),
     );
@@ -45,17 +52,23 @@ class _LeagueContent extends StatelessWidget {
     final bool hasCut = league.entries.length > promote;
 
     return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: <Widget>[
         SliverToBoxAdapter(
           child: _LeagueHeader(league: league, hasCut: hasCut),
         ),
         if (league.entries.isEmpty)
-          const SliverFillRemaining(
+          SliverFillRemaining(
             hasScrollBody: false,
+            // The cohort came back empty — that is data, not a failure, and
+            // the message already named the way in. Now it is a control.
             child: PrismStatusView(
               icon: Icons.groups_rounded,
-              title: 'Pas encore de ligue',
-              message: 'Termine une leçon pour rejoindre la ligue de la semaine.',
+              title: LeagueLabels.emptyTitle,
+              message: LeagueLabels.emptyMessage,
+              actionLabel: LeagueLabels.emptyAction,
+              actionIcon: Icons.play_arrow_rounded,
+              onAction: () => context.go(Routes.path),
             ),
           )
         else
@@ -120,6 +133,10 @@ class _LeagueContent extends StatelessWidget {
 abstract final class LeagueLabels {
   static const String everyonePromotes = 'Toute la cohorte monte cette semaine';
   static const String promotionZone = 'ZONE DE PROMOTION';
+  static const String unavailable = 'Impossible de charger la ligue.';
+  static const String emptyTitle = 'Pas encore de ligue';
+  static const String emptyMessage = 'Termine une leçon pour rejoindre la ligue de la semaine.';
+  static const String emptyAction = 'Commencer une leçon';
 
   static String cut(int promote) => 'top $promote montent';
 }

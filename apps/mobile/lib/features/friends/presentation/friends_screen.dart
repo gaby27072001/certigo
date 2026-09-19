@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
+import '../../../shared/widgets/async_module.dart';
 import '../../../shared/widgets/inline_error.dart';
 import '../../../shared/widgets/screen_header.dart';
 
@@ -22,6 +23,10 @@ class FriendsScreen extends ConsumerStatefulWidget {
 
 class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   final TextEditingController _handleController = TextEditingController();
+
+  /// Lets the empty roster hand the learner straight to the one control that
+  /// resolves it, instead of describing an action they must then go find.
+  final FocusNode _handleFocus = FocusNode();
   bool _adding = false;
   String? _removingId;
   String? _error;
@@ -29,6 +34,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   @override
   void dispose() {
     _handleController.dispose();
+    _handleFocus.dispose();
     super.dispose();
   }
 
@@ -113,7 +119,12 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
           child: Column(
             children: <Widget>[
               const ScreenHeader(title: 'Amis'),
-              _AddFriendCard(controller: _handleController, adding: _adding, onSubmit: _add),
+              _AddFriendCard(
+                controller: _handleController,
+                focusNode: _handleFocus,
+                adding: _adding,
+                onSubmit: _add,
+              ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
@@ -126,15 +137,20 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                 ),
               const SizedBox(height: 8),
               Expanded(
-                child: async.when(
-                  data: (FriendList list) => _FriendRoster(
-                    list: list,
-                    removingId: _removingId,
-                    onRemove: _removingId == null ? _remove : null,
+                child: RefreshIndicator(
+                  onRefresh: () => refreshQuietly(() => ref.refresh(friendListProvider.future)),
+                  child: AsyncModule<FriendList>(
+                    state: async,
+                    errorMessage: FriendLabels.unavailable,
+                    onRetry: () => ref.invalidate(friendListProvider),
+                    loading: (BuildContext context) => const _FriendsLoading(),
+                    data: (BuildContext context, FriendList list) => _FriendRoster(
+                      list: list,
+                      removingId: _removingId,
+                      onRemove: _removingId == null ? _remove : null,
+                      onAddFriend: _handleFocus.requestFocus,
+                    ),
                   ),
-                  loading: () => const _FriendsLoading(),
-                  error: (Object error, StackTrace _) =>
-                      PrismStatusView.error(onRetry: () => ref.invalidate(friendListProvider)),
                 ),
               ),
             ],
@@ -145,10 +161,26 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   }
 }
 
+/// Copy asserted by tests. Naming it keeps a wording change from silently
+/// turning a widget test red in an unrelated branch.
+abstract final class FriendLabels {
+  static const String unavailable = 'Impossible de charger ta liste d\'amis.';
+  static const String emptyTitle = 'Aucun ami pour l\'instant';
+  static const String emptyMessage =
+      'Ajoute un ami avec son identifiant pour vous motiver mutuellement.';
+  static const String emptyAction = 'Saisir un identifiant';
+}
+
 class _AddFriendCard extends StatelessWidget {
-  const _AddFriendCard({required this.controller, required this.adding, required this.onSubmit});
+  const _AddFriendCard({
+    required this.controller,
+    required this.focusNode,
+    required this.adding,
+    required this.onSubmit,
+  });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
   final bool adding;
   final Future<void> Function() onSubmit;
 
@@ -171,6 +203,7 @@ class _AddFriendCard extends StatelessWidget {
             const SizedBox(height: 10),
             TextField(
               controller: controller,
+              focusNode: focusNode,
               enabled: !adding,
               textInputAction: TextInputAction.done,
               onSubmitted: (_) {
@@ -205,11 +238,17 @@ class _AddFriendCard extends StatelessWidget {
 }
 
 class _FriendRoster extends StatelessWidget {
-  const _FriendRoster({required this.list, required this.removingId, required this.onRemove});
+  const _FriendRoster({
+    required this.list,
+    required this.removingId,
+    required this.onRemove,
+    required this.onAddFriend,
+  });
 
   final FriendList list;
   final String? removingId;
   final Future<void> Function(Friend friend)? onRemove;
+  final VoidCallback onAddFriend;
 
   @override
   Widget build(BuildContext context) {
@@ -217,14 +256,23 @@ class _FriendRoster extends StatelessWidget {
     final TextTheme t = Theme.of(context).textTheme;
 
     if (list.friends.isEmpty) {
-      return const PrismStatusView(
-        icon: Icons.group_outlined,
-        title: 'Aucun ami pour l\'instant',
-        message: 'Ajoute un ami avec son identifiant pour vous motiver mutuellement.',
+      // The roster loaded and is empty — not a failure. The action puts the
+      // cursor in the field directly above rather than naming a control the
+      // learner then has to find for themselves.
+      return ScrollableStatus(
+        child: PrismStatusView(
+          icon: Icons.group_outlined,
+          title: FriendLabels.emptyTitle,
+          message: FriendLabels.emptyMessage,
+          actionLabel: FriendLabels.emptyAction,
+          actionIcon: Icons.person_add_alt_1_rounded,
+          onAction: onAddFriend,
+        ),
       );
     }
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: PrismSpacing.scrollBody(top: PrismSpacing.xxs),
       children: <Widget>[
         Padding(
