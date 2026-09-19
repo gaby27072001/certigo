@@ -32,43 +32,84 @@ gh repo clone gchambaud_microsoft/Certigo ~/Certigo && cd ~/Certigo && git check
 
 **Si tu as déjà le dépôt quelque part** — ou si tu reviens après une
 correction de ma part — **rien n'est supprimé ni écrasé**. On crée un
-checkout séparé, dans un dossier neuf :
+checkout séparé, dans un dossier neuf.
+
+**Colle ce bloc entier** dans le Terminal :
 
 ```bash
-cd ~/Certigo && git fetch origin
+preparer_essai_certigo() {
+  local branche="gchambaud-microsoft-squelette-ios-natif"
 
-# 1. La version publiée, résolue MAINTENANT (aucun numéro à recopier)
-ATTENDU=$(git rev-parse origin/gchambaud-microsoft-squelette-ios-natif)
-echo "Version publiée : $ATTENDU"
+  cd ~/Certigo || { echo "❌ Dossier ~/Certigo introuvable."; return 1; }
 
-# 2. Un dossier neuf, horodaté : il ne peut pas déjà exister
-ESSAI=~/certigo-ios-$(date +%Y%m%d-%H%M%S)
-echo "Dossier d'essai : $ESSAI"
+  git fetch origin \
+    || { echo "❌ Récupération impossible (réseau ?). Rien n'a été créé."; return 1; }
 
-# 3. Le checkout exact de CETTE version
-git worktree add "$ESSAI" "$ATTENDU"
+  ATTENDU=$(git rev-parse --verify "origin/$branche^{commit}" 2>/dev/null) \
+    || { echo "❌ Version introuvable pour origin/$branche. Rien n'a été créé."; return 1; }
 
-# 4. Le HEAD réellement obtenu est-il celui qu'on visait ?
-if [ "$(git -C "$ESSAI" rev-parse HEAD)" = "$ATTENDU" ]; then
-  echo "✅ Checkout conforme à la version publiée"
-else
-  echo "❌ Écart — ne continue pas, signale-le-moi"
-fi
+  ESSAI="$HOME/certigo-ios-$(date +%Y%m%d-%H%M%S)-$$"
+
+  if [ -e "$ESSAI" ] || [ -L "$ESSAI" ]; then
+    echo "❌ $ESSAI existe déjà. Rien n'est supprimé ni modifié."
+    echo "   Relance dans quelques secondes, ou choisis toi-même un autre chemin."
+    return 1
+  fi
+
+  git worktree add "$ESSAI" "$ATTENDU" \
+    || { echo "❌ Création du dossier d'essai impossible. Rien n'a été supprimé."; return 1; }
+
+  if [ ! -d "$ESSAI" ]; then
+    echo "❌ Le dossier n'a pas été créé, malgré un code de succès."
+    echo "   Chemin visé : $ESSAI"
+    echo "   Rien n'a été supprimé. Signale-moi ce chemin."
+    return 1
+  fi
+
+  local obtenu
+  obtenu=$(git -C "$ESSAI" rev-parse HEAD 2>/dev/null)
+  if [ "$obtenu" != "$ATTENDU" ]; then
+    echo "❌ Le dossier ne porte pas la version visée."
+    echo "   visée   : $ATTENDU"
+    echo "   obtenue : ${obtenu:-<inconnue>}"
+    echo "   Le dossier est conservé tel quel. Signale-moi ces deux valeurs."
+    return 1
+  fi
+
+  echo "✅ Prêt."
+  echo "   Version testée : $ATTENDU"
+  echo "   Dossier        : $ESSAI"
+  return 0
+}
+
+preparer_essai_certigo
 ```
 
-➜ **Attends la ligne `✅`.** Si tu vois `❌`, arrête-toi et dis-le-moi.
+➜ **Attends la ligne `✅`.** Si tu vois une ligne `❌`, **arrête-toi là** et
+envoie-la-moi : rien n'aura été supprimé, et la suite ne doit pas être lancée.
 
-Puis lance depuis **ce** dossier — celui que la commande 2 a affiché :
+**Note les deux valeurs affichées** — la version testée et le dossier. Ce sont
+elles qui permettent de reproduire une erreur.
+
+Puis lance depuis ce dossier :
 
 ```bash
 cd "$ESSAI/apps/ios" && ./Scripts/demarrer.sh
 ```
 
-> ### Pourquoi un dossier horodaté plutôt qu'un nom fixe
+> ### Pourquoi une fonction plutôt qu'une suite de commandes
+>
+> Collée ligne à ligne, une suite de commandes **continue après un échec** :
+> une erreur défile, les commandes suivantes s'exécutent quand même, et on
+> compile une version qu'on croit à jour. La fonction **s'arrête au premier
+> échec** — et comme elle utilise `return`, elle ne ferme pas ton Terminal.
+>
+> ### Pourquoi un dossier horodaté
 >
 > Un nom fixe finirait par exister déjà, et la seule façon de le réutiliser
-> serait de le supprimer. **Un dossier daté ne peut pas entrer en collision**,
-> donc la question de l'écrasement ne se pose jamais.
+> serait de le supprimer. L'horodatage et le numéro de session rendent la
+> collision très improbable — **mais le bloc la vérifie quand même**, symlink
+> compris, et s'arrête plutôt que d'écraser quoi que ce soit.
 >
 > Si un dossier d'essai précédent traîne, **il reste où il est**. Il contient
 > peut-être des commits locaux, des journaux ou des artefacts qui te servent —
@@ -82,25 +123,24 @@ cd "$ESSAI/apps/ios" && ./Scripts/demarrer.sh
 > message devient donc caduc en quelques minutes.** Mesuré deux fois le
 > 2026-09-19.
 >
-> La commande ci-dessus ne te demande de recopier **aucun** numéro : elle
-> **résout** la version au moment où tu la lances, puis **vérifie** que le
-> dossier obtenu porte bien cette version-là. Elle reste juste quel que soit le
-> nombre de réécritures, et elle garde la traçabilité — `$ATTENDU` te dit
-> exactement ce que tu as testé, à rapporter en cas d'échec.
+> Le bloc ne te demande de recopier **aucun** numéro : il **résout** la version
+> au moment où tu le lances, **vérifie que le dossier existe vraiment** — un
+> `git worktree add` peut rendre un code de succès sans rien créer, c'est
+> mesuré — puis **compare le `HEAD` réellement obtenu** à la version visée.
 >
 > ### Pourquoi pas `git pull`
 >
 > Après une réécriture, `git pull` ne ramène pas la correction : il échoue, ou
 > fabrique une fusion qui mélange l'ancien et le nouveau. **C'est déjà arrivé**
 > — une version antérieure avait été relancée sans que personne ne le sache.
-> Le checkout neuf ci-dessus n'a pas ce problème : il part directement de la
-> version publiée.
+> Le checkout neuf ci-dessus n'a pas ce problème.
 
 **Ce que ça touche, exactement :**
 
 - ✅ Les **fichiers de travail** et la **branche** de `~/Certigo` ne sont pas
   modifiés. Rien de ce que tu as en cours n'est perdu.
-- ✅ **Aucun dossier existant n'est supprimé ni modifié.**
+- ✅ **Aucun dossier existant n'est supprimé ni modifié**, y compris en cas
+  d'échec.
 - ⚠️ En revanche les **métadonnées Git** le sont : `git fetch` met à jour les
   références distantes, et `git worktree add` inscrit le nouveau worktree dans
   `.git/worktrees`. Ce n'est pas destructeur — mais ce n'est pas « rien ».
