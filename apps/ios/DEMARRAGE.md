@@ -24,78 +24,112 @@ navigateur pour te connecter à GitHub.
 
 ### ② Le code
 
+**Deux gestes, et le second est le seul que tu relanceras.**
+
+**②·a — seulement si tu n'as pas encore le dépôt :**
+
 ```bash
-gh repo clone gchambaud_microsoft/Certigo ~/Certigo && cd ~/Certigo && git checkout gchambaud-microsoft-squelette-ios-natif
+gh repo clone gchambaud_microsoft/Certigo ~/Certigo
 ```
 
-➜ Tu dois voir `Switched to branch 'gchambaud-microsoft-squelette-ios-natif'`.
+➜ **Si `~/Certigo` existe déjà, saute cette ligne** — elle échouerait, et tu
+n'en as pas besoin. Il n'y a **pas** de `git checkout` à faire ici : c'est le
+bloc ②·b qui choisit la version, et lui seul.
 
-**Si tu as déjà le dépôt quelque part** — ou si tu reviens après une
-correction de ma part — **rien n'est supprimé ni écrasé**. On crée un
-checkout séparé, dans un dossier neuf.
+**②·b — à chaque essai**, y compris quand tu reviens après une correction de
+ma part. **Rien n'est supprimé ni écrasé** : on prépare un checkout séparé,
+dans un dossier neuf, sans toucher à `~/Certigo`.
 
 **Colle ce bloc entier** dans le Terminal :
 
 ```bash
 preparer_essai_certigo() {
   local branche="gchambaud-microsoft-squelette-ios-natif"
+  local depot="$HOME/Certigo"
+  local attendu essai obtenu
 
-  cd ~/Certigo || { echo "❌ Dossier ~/Certigo introuvable."; return 1; }
+  # Toute préparation réussie AVANT cesse d'être utilisable ici même,
+  # avant le premier geste qui peut échouer.
+  unset CERTIGO_ESSAI CERTIGO_ATTENDU
 
-  git fetch origin \
+  git -C "$depot" rev-parse --git-dir >/dev/null 2>&1 \
+    || { echo "❌ Pas de dépôt Git dans $depot. Fais d'abord ②·a."; return 1; }
+
+  git -C "$depot" fetch origin \
     || { echo "❌ Récupération impossible (réseau ?). Rien n'a été créé."; return 1; }
 
-  ATTENDU=$(git rev-parse --verify "origin/$branche^{commit}" 2>/dev/null) \
+  attendu=$(git -C "$depot" rev-parse --verify "origin/$branche^{commit}" 2>/dev/null) \
     || { echo "❌ Version introuvable pour origin/$branche. Rien n'a été créé."; return 1; }
 
-  ESSAI="$HOME/certigo-ios-$(date +%Y%m%d-%H%M%S)-$$"
+  essai="$HOME/certigo-ios-$(date +%Y%m%d-%H%M%S)-$$"
 
-  if [ -e "$ESSAI" ] || [ -L "$ESSAI" ]; then
-    echo "❌ $ESSAI existe déjà. Rien n'est supprimé ni modifié."
+  if [ -e "$essai" ] || [ -L "$essai" ]; then
+    echo "❌ $essai existe déjà. Rien n'est supprimé ni modifié."
     echo "   Relance dans quelques secondes, ou choisis toi-même un autre chemin."
     return 1
   fi
 
-  git worktree add "$ESSAI" "$ATTENDU" \
+  git -C "$depot" worktree add "$essai" "$attendu" \
     || { echo "❌ Création du dossier d'essai impossible. Rien n'a été supprimé."; return 1; }
 
-  if [ ! -d "$ESSAI" ]; then
+  if [ ! -d "$essai" ]; then
     echo "❌ Le dossier n'a pas été créé, malgré un code de succès."
-    echo "   Chemin visé : $ESSAI"
+    echo "   Chemin visé : $essai"
     echo "   Rien n'a été supprimé. Signale-moi ce chemin."
     return 1
   fi
 
-  local obtenu
-  obtenu=$(git -C "$ESSAI" rev-parse HEAD 2>/dev/null)
-  if [ "$obtenu" != "$ATTENDU" ]; then
+  obtenu=$(git -C "$essai" rev-parse HEAD 2>/dev/null)
+  if [ "$obtenu" != "$attendu" ]; then
     echo "❌ Le dossier ne porte pas la version visée."
-    echo "   visée   : $ATTENDU"
+    echo "   visée   : $attendu"
     echo "   obtenue : ${obtenu:-<inconnue>}"
     echo "   Le dossier est conservé tel quel. Signale-moi ces deux valeurs."
     return 1
   fi
 
+  # Publication : ici seulement, une fois TOUS les contrôles passés.
+  CERTIGO_ESSAI="$essai"
+  CERTIGO_ATTENDU="$attendu"
   echo "✅ Prêt."
-  echo "   Version testée : $ATTENDU"
-  echo "   Dossier        : $ESSAI"
+  echo "   Version testée : $CERTIGO_ATTENDU"
+  echo "   Dossier        : $CERTIGO_ESSAI"
   return 0
+}
+
+lancer_certigo() {
+  local obtenu
+  if [ -z "$CERTIGO_ESSAI" ] || [ -z "$CERTIGO_ATTENDU" ]; then
+    echo "❌ Aucune préparation réussie dans ce Terminal."
+    echo "   Relance le bloc ②·b et attends la ligne ✅. Rien n'a été lancé."
+    return 1
+  fi
+  if [ ! -d "$CERTIGO_ESSAI" ]; then
+    echo "❌ Dossier préparé introuvable : $CERTIGO_ESSAI"
+    echo "   Relance le bloc ②·b. Rien n'a été lancé ni supprimé."
+    return 1
+  fi
+  obtenu=$(git -C "$CERTIGO_ESSAI" rev-parse HEAD 2>/dev/null)
+  if [ "$obtenu" != "$CERTIGO_ATTENDU" ]; then
+    echo "❌ Le dossier ne porte plus la version préparée."
+    echo "   préparée : $CERTIGO_ATTENDU"
+    echo "   actuelle : ${obtenu:-<inconnue>}"
+    echo "   Relance le bloc ②·b. Rien n'a été lancé ni supprimé."
+    return 1
+  fi
+  echo "▶ Version testée : $CERTIGO_ATTENDU"
+  ( cd "$CERTIGO_ESSAI/apps/ios" && ./Scripts/demarrer.sh "$@" )
 }
 
 preparer_essai_certigo
 ```
 
 ➜ **Attends la ligne `✅`.** Si tu vois une ligne `❌`, **arrête-toi là** et
-envoie-la-moi : rien n'aura été supprimé, et la suite ne doit pas être lancée.
+envoie-la-moi : rien n'aura été supprimé, et **`lancer_certigo` refusera de
+lancer quoi que ce soit** de toute façon.
 
 **Note les deux valeurs affichées** — la version testée et le dossier. Ce sont
 elles qui permettent de reproduire une erreur.
-
-Puis lance depuis ce dossier :
-
-```bash
-cd "$ESSAI/apps/ios" && ./Scripts/demarrer.sh
-```
 
 > ### Pourquoi une fonction plutôt qu'une suite de commandes
 >
@@ -103,6 +137,36 @@ cd "$ESSAI/apps/ios" && ./Scripts/demarrer.sh
 > une erreur défile, les commandes suivantes s'exécutent quand même, et on
 > compile une version qu'on croit à jour. La fonction **s'arrête au premier
 > échec** — et comme elle utilise `return`, elle ne ferme pas ton Terminal.
+>
+> ### Pourquoi la préparation efface d'abord, et ne publie qu'à la fin
+>
+> C'est le point le plus important du bloc, et il vient d'un défaut réel.
+>
+> Les deux valeurs (dossier, version) survivent à l'appel — c'est ce qui
+> permet à `lancer_certigo` de les retrouver. Mais **survivre, c'est aussi
+> survivre à un échec.** Si un second essai échoue avant de les recalculer —
+> réseau coupé, dépôt déplacé — celles du **premier** sont toujours là, et un
+> lancement compilerait l'**ancien** dossier, sur l'**ancienne** version, sans
+> le dire.
+>
+> Le bloc coupe ça en deux :
+>
+> - il **efface les deux valeurs dès la première ligne**, avant tout ce qui
+>   peut échouer — un échec n'en laisse donc jamais d'utilisables ;
+> - il ne les **publie qu'après le dernier contrôle**, jamais en cours de
+>   route. Pendant le travail, elles n'existent que dans des variables locales
+>   que rien d'autre ne peut lire.
+>
+> **Mesuré le 2026-09-19** sur un banc qui exécute le bloc publié : sans cette
+> coupure, un second essai échoué lançait bien l'ancien dossier.
+>
+> ### Pourquoi `lancer_certigo` revérifie avant de lancer
+>
+> Une préparation réussie dit la vérité **au moment où elle s'exécute**. Entre
+> ce moment et le lancement, le dossier peut avoir été déplacé, ou passé sur
+> une autre version. `lancer_certigo` revérifie donc les deux à chaque appel —
+> le dossier existe, et il porte toujours la version annoncée — et **refuse**
+> sinon. Il ne te fait recopier aucun numéro.
 >
 > ### Pourquoi un dossier horodaté
 >
@@ -138,7 +202,8 @@ cd "$ESSAI/apps/ios" && ./Scripts/demarrer.sh
 **Ce que ça touche, exactement :**
 
 - ✅ Les **fichiers de travail** et la **branche** de `~/Certigo` ne sont pas
-  modifiés. Rien de ce que tu as en cours n'est perdu.
+  modifiés. Rien de ce que tu as en cours n'est perdu. Le bloc n'y entre même
+  pas : il n'y a aucun `cd`, donc ton Terminal reste où il est.
 - ✅ **Aucun dossier existant n'est supprimé ni modifié**, y compris en cas
   d'échec.
 - ⚠️ En revanche les **métadonnées Git** le sont : `git fetch` met à jour les
@@ -150,18 +215,24 @@ auras fini, et seulement si tu as vérifié que le dossier ne contient rien que
 tu veux garder :
 
 ```bash
-git worktree remove "$ESSAI"     # volontaire, jamais un préalable
+git -C ~/Certigo worktree remove "$CERTIGO_ESSAI"   # volontaire, jamais un préalable
 ```
 
 ### ③ Lancer
 
 ```bash
-cd ~/Certigo/apps/ios && ./Scripts/demarrer.sh
+lancer_certigo
 ```
 
-➜ **C'est la seule commande qui compte.** Elle vérifie ta machine, lance les
-tests, fabrique le projet Xcode, compile, et ouvre l'application dans le
-simulateur. Compte 3 à 5 minutes la première fois.
+➜ **C'est la seule commande qui compte**, et **c'est aussi celle que tu
+relances** après chaque correction — d'Xcode comme de code. Elle vérifie ta
+machine, lance les tests, fabrique le projet Xcode, compile, et ouvre
+l'application dans le simulateur. Compte 3 à 5 minutes la première fois.
+
+**Elle lance toujours le dossier préparé en ②·b, et lui seul.** Il n'y a plus
+de chemin à retaper, donc plus de risque de relancer `~/Certigo` par habitude.
+Si ②·b n'a pas affiché `✅` dans ce Terminal — y compris si un essai
+**précédent** avait réussi — elle refuse et ne lance rien.
 
 **Ce que tu dois voir à la fin :**
 
@@ -178,7 +249,7 @@ simulateur. Compte 3 à 5 minutes la première fois.
 > **Si le script s'arrête, il te dit toujours pourquoi et quoi faire.** Il
 > distingue « Xcode absent », « Command Line Tools seuls », « Xcode ne répond
 > pas » et « mauvaise version » — quatre situations dont les remèdes diffèrent.
-> Suis ce qu'il affiche, puis relance la commande ③.
+> Suis ce qu'il affiche, puis relance `lancer_certigo`.
 
 ---
 
@@ -275,7 +346,7 @@ Le script s'arrêtera en le disant. Deux possibilités :
   ```
 - **Tu veux quand même essayer avec ta version** :
   ```bash
-  CERTIGO_IGNORER_XCODE=1 ./Scripts/demarrer.sh
+  CERTIGO_IGNORER_XCODE=1 lancer_certigo
   ```
 
   > ⚠️ **Diagnostic uniquement**, tant qu'aucune compilation n'a été observée.
@@ -377,7 +448,7 @@ sudo xcode-select -s /Applications/Xcode-26.6.app/Contents/Developer
 Si tu veux quand même essayer avec ta version, le script te laissera passer :
 
 ```bash
-CERTIGO_IGNORER_XCODE=1 ./Scripts/demarrer.sh
+CERTIGO_IGNORER_XCODE=1 lancer_certigo
 ```
 
 ---
@@ -385,7 +456,7 @@ CERTIGO_IGNORER_XCODE=1 ./Scripts/demarrer.sh
 ## Ce que fait la commande ③, en détail
 
 ```bash
-cd ~/Certigo/apps/ios && ./Scripts/demarrer.sh
+lancer_certigo
 ```
 
 Dans l'ordre :
@@ -409,8 +480,8 @@ configurer.
 Deux variantes utiles :
 
 ```bash
-./Scripts/demarrer.sh --tests-seuls   # s'arrête après les tests
-./Scripts/demarrer.sh --sans-lancer   # compile mais ne lance pas
+lancer_certigo --tests-seuls   # s'arrête après les tests
+lancer_certigo --sans-lancer   # compile mais ne lance pas
 ```
 
 > ### ⚠️ `--tests-seuls` ne prouve **pas** que l'application iOS compile
@@ -488,7 +559,7 @@ Choisis un simulateur iOS 26 :
 
 ```bash
 xcrun simctl list devices available        # voir la liste
-CERTIGO_SIMULATEUR="iPhone 17" ./Scripts/demarrer.sh
+CERTIGO_SIMULATEUR="iPhone 17" lancer_certigo
 ```
 
 > **Un point que je n'ai pas pu vérifier :** la refonte Flutter avait mesuré
@@ -535,10 +606,10 @@ fichier et remplace `iOS 26.0, macOS 26.0` par `iOS 99.0, macOS 99.0` partout
 sûrs. L'application se lance, sans Liquid Glass.
 
 ```bash
-cd ~/Certigo/apps/ios
+cd "$CERTIGO_ESSAI/apps/ios"
 sed -i '' 's/iOS 26.0, macOS 26.0/iOS 99.0, macOS 99.0/g' \
   Packages/CertigoKit/Sources/DesignSystem/PrismGlass.swift
-./Scripts/demarrer.sh
+lancer_certigo
 ```
 
 **Puis dis-moi l'erreur exacte**, et je corrige le fichier proprement. Ne perds
@@ -609,10 +680,10 @@ corrigées, pas l'inverse.
 | **Le script s'arrête après « ✓ macOS » sans rien dire** | **Ne devrait plus arriver.** Si ça se produit, c'est un défaut du script : il affiche désormais un code et une ligne. Envoie-les-moi. |
 | `... requires Xcode ... CommandLineTools ...` | Tu n'as que les Command Line Tools → **Étape 0** en haut |
 | `xcodegen: command not found` | `brew install xcodegen` (commande ①) |
-| `No such module 'DesignSystem'` | Le paquet n'a pas été résolu. `cd ~/Certigo/apps/ios/Packages/CertigoKit && swift build` |
+| `No such module 'DesignSystem'` | Le paquet n'a pas été résolu. `cd "$CERTIGO_ESSAI/apps/ios/Packages/CertigoKit" && swift build` |
 | `Aucun simulateur iPhone disponible` | Xcode ▸ Settings ▸ Components ▸ installer un runtime iOS |
 | L'app se lance mais l'écran est **vide et blanc** | La vue a planté au rendu. Dans le simulateur : `⌘⇧H` puis relance. Envoie-moi la console Xcode. |
-| L'app s'affiche **en petit, avec des bandes noires** | `UILaunchScreen` manquant dans le plist généré. Un test le vérifie — lance `./Scripts/demarrer.sh --tests-seuls`. |
+| L'app s'affiche **en petit, avec des bandes noires** | `UILaunchScreen` manquant dans le plist généré. Un test le vérifie — lance `lancer_certigo --tests-seuls`. |
 | Les tests passent mais l'app ne compile pas | Normal : les tests ne compilent que le paquet, pas la cible d'application. L'erreur est dans `App/Sources/`. |
 
 ---
@@ -660,7 +731,7 @@ de bloquer quoi que ce soit.** Une tentative de les activer a été étudiée pu
 > sont hors de portée de la CI actuelle.
 
 **Le seul verdict qui compte pour ton squelette, c'est ton Terminal.** Si
-`./Scripts/demarrer.sh` va jusqu'au bout et que l'application s'affiche, le
+`lancer_certigo` va jusqu'au bout et que l'application s'affiche, le
 squelette marche — quelle que soit la couleur de la page GitHub.
 
 Et c'est précisément pour cette raison que `Scripts/verifier-tests.sh` **compte
@@ -676,7 +747,7 @@ par défaut.**
 ### Ouvrir le projet dans Xcode et regarder les aperçus
 
 ```bash
-cd ~/Certigo/apps/ios
+cd "$CERTIGO_ESSAI/apps/ios"
 open Certigo.xcodeproj
 ```
 
@@ -693,7 +764,7 @@ Ouvre `PrismShowcaseView.swift`, puis le canevas d'aperçu (`⌥⌘↩`). Il y a
 ### Vérifier que les tests mordent vraiment
 
 ```bash
-cd ~/Certigo/apps/ios && ./Scripts/prouver-le-rouge.sh
+cd "$CERTIGO_ESSAI/apps/ios" && ./Scripts/prouver-le-rouge.sh
 ```
 
 Ce script ajoute un test volontairement faux, vérifie que le lot **rougit**,
@@ -706,7 +777,7 @@ puis le retire et vérifie qu'il **reverdit**. Il ne laisse aucune trace.
 ### Lancer seulement les tests
 
 ```bash
-cd ~/Certigo/apps/ios && ./Scripts/verifier-tests.sh
+cd "$CERTIGO_ESSAI/apps/ios" && ./Scripts/verifier-tests.sh
 ```
 
 ---
@@ -741,7 +812,7 @@ moins pour le premier soir. Pour installer sur ton iPhone :
 2. supprime les trois lignes `CODE_SIGNING_REQUIRED`, `CODE_SIGNING_ALLOWED` et
    `CODE_SIGN_IDENTITY` ;
 3. ajoute `DEVELOPMENT_TEAM: TONIDENTIFIANT` ;
-4. relance `./Scripts/demarrer.sh --sans-lancer`, puis lance depuis Xcode.
+4. relance `lancer_certigo --sans-lancer`, puis lance depuis Xcode.
 
 L'identifiant de l'application est `com.certigo.native` — **volontairement
 différent** de `com.certigo.mobileapp`, qui est celui de l'application Flutter.
@@ -774,7 +845,7 @@ Envoie-moi, dans cet ordre :
 1. **La commande exacte** que tu as tapée.
 2. **Le message d'erreur complet**, copié-collé tel quel. Pas résumé — les
    erreurs Swift sont longues mais chaque ligne compte.
-3. Le contenu de **`~/Certigo/apps/ios/.build/compilation.log`** s'il existe.
+3. Le contenu de **`"$CERTIGO_ESSAI/apps/ios/.build/compilation.log"`** s'il existe.
 4. Le résultat de ces trois lignes :
 
 ```bash
