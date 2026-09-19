@@ -35,13 +35,42 @@ correction de ma part — **n'écrase rien**. Crée un checkout séparé :
 
 ```bash
 cd ~/Certigo && git fetch origin
-ls -d ~/certigo-ios-essai 2>/dev/null && echo "⚠️ CHEMIN DÉJÀ PRIS — choisis un autre nom"
+git worktree remove ~/certigo-ios-essai 2>/dev/null   # s'il reste d'un essai précédent
 git worktree add ~/certigo-ios-essai origin/gchambaud-microsoft-squelette-ios-natif
-cd ~/certigo-ios-essai && git log --oneline -1
 ```
 
-➜ **Vérifie la 2ᵉ ligne avant de continuer** : si elle affiche l'avertissement,
-le dossier existe déjà — change de nom plutôt que d'écraser quoi que ce soit.
+**Puis vérifie que tu as bien la version corrigée :**
+
+```bash
+grep -c "macOS Tahoe 26.2" ~/certigo-ios-essai/apps/ios/DEMARRAGE.md
+```
+
+➜ **Doit répondre `1` ou plus.** Si ça répond `0`, ta copie est antérieure aux
+corrections : refais le `git fetch origin`, supprime et recrée le worktree.
+
+> ### ⚠️ Pourquoi ce contrôle, et pas un numéro de commit
+>
+> Cette branche est **réécrite** (rebase) chaque fois qu'elle est remise à jour
+> sur `main` — ce qui arrive plusieurs fois par jour. **Un identifiant de
+> commit devient donc caduc en quelques minutes**, alors même que le contenu
+> qu'il désignait est toujours là. Mesuré deux fois le 2026-09-19.
+>
+> Le `grep` ci-dessus teste **ce qui compte** — que la documentation corrigée
+> est présente — et il reste valable après n'importe quel rebase.
+>
+> ### ⚠️ Et pourquoi `git pull` ne répare pas
+>
+> Après une réécriture, `git pull` ne ramène pas la correction : il échoue, ou
+> fabrique une fusion qui mélange l'ancien et le nouveau. **C'est déjà arrivé**
+> — une version antérieure avait été relancée sans que personne ne le sache.
+>
+> Pire : si un worktree a été créé **avant** la réécriture, il reste accroché à
+> un commit devenu orphelin. **Un `git fetch` seul ne le corrige pas** — le
+> geste naturel de mise à jour échoue en silence. D'où la suppression puis la
+> recréation ci-dessus.
+>
+> `git reset --hard` réglerait ça aussi, **mais il détruit tout travail non
+> committé**. Le worktree séparé obtient le même résultat sans rien risquer.
 
 **Ce que ça touche, exactement :**
 
