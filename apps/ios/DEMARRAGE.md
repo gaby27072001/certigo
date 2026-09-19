@@ -31,78 +31,87 @@ gh repo clone gchambaud_microsoft/Certigo ~/Certigo && cd ~/Certigo && git check
 ➜ Tu dois voir `Switched to branch 'gchambaud-microsoft-squelette-ios-natif'`.
 
 **Si tu as déjà le dépôt quelque part** — ou si tu reviens après une
-correction de ma part — **n'écrase rien**. Crée un checkout séparé :
+correction de ma part — **rien n'est supprimé ni écrasé**. On crée un
+checkout séparé, dans un dossier neuf :
 
 ```bash
 cd ~/Certigo && git fetch origin
-git worktree remove ~/certigo-ios-essai 2>/dev/null   # s'il reste d'un essai précédent
-git worktree add ~/certigo-ios-essai origin/gchambaud-microsoft-squelette-ios-natif
+
+# 1. La version publiée, résolue MAINTENANT (aucun numéro à recopier)
+ATTENDU=$(git rev-parse origin/gchambaud-microsoft-squelette-ios-natif)
+echo "Version publiée : $ATTENDU"
+
+# 2. Un dossier neuf, horodaté : il ne peut pas déjà exister
+ESSAI=~/certigo-ios-$(date +%Y%m%d-%H%M%S)
+echo "Dossier d'essai : $ESSAI"
+
+# 3. Le checkout exact de CETTE version
+git worktree add "$ESSAI" "$ATTENDU"
+
+# 4. Le HEAD réellement obtenu est-il celui qu'on visait ?
+if [ "$(git -C "$ESSAI" rev-parse HEAD)" = "$ATTENDU" ]; then
+  echo "✅ Checkout conforme à la version publiée"
+else
+  echo "❌ Écart — ne continue pas, signale-le-moi"
+fi
 ```
 
-**Puis vérifie que tu as bien la version corrigée :**
+➜ **Attends la ligne `✅`.** Si tu vois `❌`, arrête-toi et dis-le-moi.
+
+Puis lance depuis **ce** dossier — celui que la commande 2 a affiché :
 
 ```bash
-grep -c "macOS Tahoe 26.2" ~/certigo-ios-essai/apps/ios/DEMARRAGE.md
+cd "$ESSAI/apps/ios" && ./Scripts/demarrer.sh
 ```
 
-➜ **Doit répondre `1` ou plus.** Si ça répond `0`, ta copie est antérieure aux
-corrections : refais le `git fetch origin`, supprime et recrée le worktree.
-
-> ### ⚠️ Pourquoi ce contrôle, et pas un numéro de commit
+> ### Pourquoi un dossier horodaté plutôt qu'un nom fixe
+>
+> Un nom fixe finirait par exister déjà, et la seule façon de le réutiliser
+> serait de le supprimer. **Un dossier daté ne peut pas entrer en collision**,
+> donc la question de l'écrasement ne se pose jamais.
+>
+> Si un dossier d'essai précédent traîne, **il reste où il est**. Il contient
+> peut-être des commits locaux, des journaux ou des artefacts qui te servent —
+> et de toute façon, **un ancien commit reste une version reproductible**, pas
+> du jetable. Le supprimer est une décision, pas une étape.
+>
+> ### Pourquoi ce contrôle-là, et pas un numéro recopié
 >
 > Cette branche est **réécrite** (rebase) chaque fois qu'elle est remise à jour
-> sur `main` — ce qui arrive plusieurs fois par jour. **Un identifiant de
-> commit devient donc caduc en quelques minutes**, alors même que le contenu
-> qu'il désignait est toujours là. Mesuré deux fois le 2026-09-19.
+> sur `main` — plusieurs fois par jour. **Un numéro de commit noté dans un
+> message devient donc caduc en quelques minutes.** Mesuré deux fois le
+> 2026-09-19.
 >
-> Le `grep` ci-dessus teste **ce qui compte** — que la documentation corrigée
-> est présente — et il reste valable après n'importe quel rebase.
+> La commande ci-dessus ne te demande de recopier **aucun** numéro : elle
+> **résout** la version au moment où tu la lances, puis **vérifie** que le
+> dossier obtenu porte bien cette version-là. Elle reste juste quel que soit le
+> nombre de réécritures, et elle garde la traçabilité — `$ATTENDU` te dit
+> exactement ce que tu as testé, à rapporter en cas d'échec.
 >
-> ### ⚠️ Et pourquoi `git pull` ne répare pas
+> ### Pourquoi pas `git pull`
 >
 > Après une réécriture, `git pull` ne ramène pas la correction : il échoue, ou
 > fabrique une fusion qui mélange l'ancien et le nouveau. **C'est déjà arrivé**
 > — une version antérieure avait été relancée sans que personne ne le sache.
->
-> Pire : si un worktree a été créé **avant** la réécriture, il reste accroché à
-> un commit devenu orphelin. **Un `git fetch` seul ne le corrige pas** — le
-> geste naturel de mise à jour échoue en silence. D'où la suppression puis la
-> recréation ci-dessus.
->
-> `git reset --hard` réglerait ça aussi, **mais il détruit tout travail non
-> committé**. Le worktree séparé obtient le même résultat sans rien risquer.
+> Le checkout neuf ci-dessus n'a pas ce problème : il part directement de la
+> version publiée.
 
 **Ce que ça touche, exactement :**
 
 - ✅ Les **fichiers de travail** et la **branche** de `~/Certigo` ne sont pas
   modifiés. Rien de ce que tu as en cours n'est perdu.
+- ✅ **Aucun dossier existant n'est supprimé ni modifié.**
 - ⚠️ En revanche les **métadonnées Git** le sont : `git fetch` met à jour les
   références distantes, et `git worktree add` inscrit le nouveau worktree dans
   `.git/worktrees`. Ce n'est pas destructeur — mais ce n'est pas « rien ».
 
-Quand tu auras fini, **le nettoyage t'appartient** :
+**Le nettoyage est une décision séparée, et elle t'appartient.** Quand tu
+auras fini, et seulement si tu as vérifié que le dossier ne contient rien que
+tu veux garder :
 
 ```bash
-git worktree remove ~/certigo-ios-essai
+git worktree remove "$ESSAI"     # volontaire, jamais un préalable
 ```
-
-Puis lance depuis **ce** dossier :
-
-```bash
-cd ~/certigo-ios-essai/apps/ios && ./Scripts/demarrer.sh
-```
-
-> ### ⚠️ Pourquoi pas `git pull`, et pourquoi pas `git reset --hard` ?
->
-> Cette branche est **réécrite** (rebase) chaque fois que je la remets à jour
-> sur `main`. Après une réécriture, `git pull` ne ramène pas la correction :
-> il échoue, ou fabrique une fusion qui mélange l'ancien et le nouveau.
-> **C'est déjà arrivé une fois** — tu étais resté sur une version antérieure
-> sans le savoir, et le script relancé était l'ancien.
->
-> `git reset --hard` réglerait ça, **mais il détruit tout travail non
-> committé** dans le dossier. Le worktree séparé ci-dessus obtient le même
-> résultat **sans rien risquer** : c'est la méthode à préférer.
 
 ### ③ Lancer
 
