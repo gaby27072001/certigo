@@ -183,12 +183,15 @@ class CoachCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(item.title, style: t.bodyLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
+                // Le titre porte l'information : il reflue sur plusieurs lignes
+                // au lieu d'être amputé. Mesuré à 1× : « Révise le stockage
+                // Azure et ses niveaux » était tronqué sur 215,8 px.
+                Text(item.title, style: t.bodyLarge),
                 if (item.reason.isNotEmpty)
                   Text(
                     item.reason,
                     style: t.bodySmall?.copyWith(color: p.textSecondary),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
               ],

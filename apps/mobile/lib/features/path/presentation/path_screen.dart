@@ -73,6 +73,14 @@ class _PathResourceBar extends StatelessWidget {
   }
 }
 
+/// Plus grande taille Dynamic Type **standard** d'iOS (`xxxLarge`), exprimée en
+/// facteur d'échelle. Au-delà commencent les tailles d'**accessibilité**
+/// (AX1–AX5, jusqu'à ≈ 3,1×), pour lesquelles un en-tête épinglé confisquerait
+/// l'écran : mesuré, afficher en entier un nom de certification de
+/// 65 caractères réclame ≈ 294 px à 2×, soit 35 % d'un iPhone 14. Le bandeau
+/// défile donc au lieu de rester épinglé — il rend sa place au parcours.
+const double _kMaxStandardDynamicType = 1.35;
+
 /// Guardian mascots seated on each unit, cycled by unit index.
 const List<AuroraMascot> _guardians = <AuroraMascot>[
   AuroraMascot.nimbus,
@@ -149,21 +157,38 @@ class _PathContent extends StatelessWidget {
     int running = 0; // continuous sine phase across units for one flowing trail
     final List<Widget> slivers = <Widget>[
       if (me != null) SliverToBoxAdapter(child: _PathResourceBar(me: me!)),
-      SliverPersistentHeader(
-        pinned: true,
-        delegate: _PathBannerDelegate(
-          trackName: path.trackName,
-          exam: path.exam,
-          chapterLabel: chapterLabel,
-          score: path.readinessScore,
-          trend: path.readinessTrend7d,
-          onTapTitle: () => showCertPickerSheet(context),
+      // Le bandeau se dimensionne sur son contenu. Épinglé aux tailles Dynamic
+      // Type **standard**, il défile aux tailles d'**accessibilité** : mesuré,
+      // afficher en entier un nom de 65 caractères réclame 294 px à 2×, soit
+      // 35 % d'un iPhone 14 — un en-tête épinglé de cette taille confisquerait
+      // l'écran au lieu de servir le contenu.
+      if (MediaQuery.textScalerOf(context).scale(1) <= _kMaxStandardDynamicType)
+        PinnedHeaderSliver(
+          child: _PathBanner(
+            trackName: path.trackName,
+            exam: path.exam,
+            chapterLabel: chapterLabel,
+            score: path.readinessScore,
+            trend: path.readinessTrend7d,
+            onTapTitle: () => showCertPickerSheet(context),
+          ),
+        )
+      else
+        SliverToBoxAdapter(
+          child: _PathBanner(
+            trackName: path.trackName,
+            exam: path.exam,
+            chapterLabel: chapterLabel,
+            score: path.readinessScore,
+            trend: path.readinessTrend7d,
+            onTapTitle: () => showCertPickerSheet(context),
+          ),
         ),
-      ),
+      // Le CTA reste épinglé à TOUTES les échelles : c'est l'action primaire,
+      // et « Dynamic Type maximal ne masque aucune action ».
       if (active != null)
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _ContinueCtaDelegate(
+        PinnedHeaderSliver(
+          child: _ContinueCta(
             label: activeInProgress ? 'Continuer' : 'Commencer',
             accent: ctaAccent,
             onTap: () => _openLesson(context, active!.id),
@@ -357,11 +382,19 @@ class _UnitTrail extends StatelessWidget {
   }
 }
 
-/// Pinned banner that keeps the active certification and current chapter in view
-/// while the long path scrolls beneath it. Tapping the title opens the course
-/// picker so the learner can switch certifications, Duolingo-style.
-class _PathBannerDelegate extends SliverPersistentHeaderDelegate {
-  _PathBannerDelegate({
+/// Banner that keeps the active certification and current chapter in view while
+/// the long path scrolls beneath it. Tapping the title opens the course picker
+/// so the learner can switch certifications, Duolingo-style.
+///
+/// Il **se dimensionne sur son contenu** au lieu d'imposer une hauteur fixe.
+/// L'ancienne valeur figée de 88 px débordait de 2 px dès 1,5× de Dynamic Type
+/// et de 23 px à 2×. Le nom de certification reflue désormais librement : borné
+/// à une ligne, il rendait « Microsoft Certified: Az… » sur 221 px pour les
+/// 65 caractères de « Microsoft Certified: Azure AI Apps and Agents Developer
+/// Associate » — c'est-à-dire le préfixe commun à *toutes* les certifications
+/// Microsoft, qui n'en distingue donc aucune.
+class _PathBanner extends StatelessWidget {
+  const _PathBanner({
     required this.trackName,
     required this.exam,
     required this.chapterLabel,
@@ -378,13 +411,7 @@ class _PathBannerDelegate extends SliverPersistentHeaderDelegate {
   final VoidCallback onTapTitle;
 
   @override
-  double get minExtent => 88;
-
-  @override
-  double get maxExtent => 88;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
     return Container(
@@ -395,93 +422,87 @@ class _PathBannerDelegate extends SliverPersistentHeaderDelegate {
         PrismSpacing.gutter,
         PrismSpacing.debt10,
       ),
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: onTapTitle,
-                  child: Row(
-                    children: <Widget>[
-                      Flexible(
-                        child: Text(
-                          trackName,
-                          style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.expand_more_rounded, size: 22, color: p.textSecondary),
-                    ],
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints c) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // Le nom occupe la **pleine largeur**. Coincé dans la colonne de
+            // 221 px que lui laissait la puce de readiness, il réclamait 7
+            // lignes (168 px) à 1× et 784 px à 2× : lui rendre la largeur le
+            // ramène à deux lignes, où les 65 caractères tiennent en entier.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTapTitle,
+              child: Row(
+                children: <Widget>[
+                  Flexible(
+                    child: Text(
+                      trackName,
+                      style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.expand_more_rounded, size: 22, color: p.textSecondary),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            // `Wrap` plutôt que `Row` : pastille d'examen, readiness et
+            // chapitre restent côte à côte tant que la place existe, et le
+            // chapitre bascule sur sa propre ligne pleine largeur sinon.
+            // Mesuré à 2× : la `Row` n'accordait que 34,8 px au chapitre pour
+            // 57 caractères — il ne restait rien à lire.
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: PrismSpacing.xs,
+              runSpacing: 4,
+              children: <Widget>[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: PrismSpacing.debt9,
+                    vertical: PrismSpacing.debt3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: p.primarySoft,
+                    borderRadius: PrismRadii.pillAll,
+                  ),
+                  child: Text(
+                    exam,
+                    style: t.labelSmall?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _ReadinessChip(score: score, trend: trend),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: <Widget>[
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: PrismSpacing.debt9,
-                  vertical: PrismSpacing.debt3,
+                _ReadinessChip(score: score, trend: trend),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: c.maxWidth),
+                  child: Text(
+                    chapterLabel,
+                    style: t.bodySmall?.copyWith(color: p.textSecondary),
+                  ),
                 ),
-                decoration: BoxDecoration(color: p.primarySoft, borderRadius: PrismRadii.pillAll),
-                child: Text(
-                  exam,
-                  style: t.labelSmall?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  chapterLabel,
-                  style: t.bodySmall?.copyWith(color: p.textSecondary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
-
-  @override
-  bool shouldRebuild(_PathBannerDelegate old) =>
-      old.trackName != trackName ||
-      old.exam != exam ||
-      old.chapterLabel != chapterLabel ||
-      old.score != score ||
-      old.trend != trend ||
-      old.onTapTitle != onTapTitle;
 }
 
 /// Pinned, full-width "next action" button mirroring the bouncing trail node.
-class _ContinueCtaDelegate extends SliverPersistentHeaderDelegate {
-  _ContinueCtaDelegate({required this.label, required this.accent, required this.onTap});
+///
+/// Se dimensionne sur son contenu : sa hauteur figée de 78 px ne survivait pas
+/// aux tailles Dynamic Type d'accessibilité. Il reste épinglé à **toutes** les
+/// échelles, parce que c'est l'action primaire de l'écran.
+class _ContinueCta extends StatelessWidget {
+  const _ContinueCta({required this.label, required this.accent, required this.onTap});
 
   final String label;
   final Color accent;
   final VoidCallback onTap;
 
   @override
-  double get minExtent => 78;
-
-  @override
-  double get maxExtent => 78;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     return Container(
       color: p.background,
@@ -514,10 +535,6 @@ class _ContinueCtaDelegate extends SliverPersistentHeaderDelegate {
       ),
     );
   }
-
-  @override
-  bool shouldRebuild(_ContinueCtaDelegate old) =>
-      old.label != label || old.accent != accent || old.onTap != onTap;
 }
 
 class _ReadinessChip extends StatelessWidget {

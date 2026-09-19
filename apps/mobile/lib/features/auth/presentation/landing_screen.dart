@@ -42,6 +42,16 @@ const LinearGradient _kBrandGradient = LinearGradient(
   end: Alignment.bottomRight,
 );
 
+/// Plus grande taille Dynamic Type **standard** d'iOS (`xxxLarge`), exprimée en
+/// facteur d'échelle. Au-delà commencent les tailles d'**accessibilité**
+/// (AX1–AX5, jusqu'à ≈ 3,1×).
+const double _kMaxStandardDynamicType = 1.35;
+
+/// Part du viewport concédée au champ orbital **décoratif** aux tailles
+/// standard. Reproduit la proportion historique (`Flexible(flex: 5)` sur 9) ;
+/// le `FittedBox` ramène de toute façon le graphique à la largeur disponible.
+const double _kHeroViewportShare = 0.45;
+
 /// **Écran d'ouverture façon Luma** — le vrai premier écran au lancement (avant
 /// toute authentification).
 ///
@@ -245,39 +255,56 @@ class _LandingScreenState extends ConsumerState<LandingScreen> with SingleTicker
           // Backdrop lumineux edge-to-edge (sous la SafeArea).
           const Positioned.fill(child: _LandingBackdrop()),
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.lg),
-              child: Column(
-                children: <Widget>[
-                  const SizedBox(height: PrismSpacing.md),
-                  // Hero orbital — scale-to-fit pour rester dans la largeur.
-                  Flexible(
-                    flex: 5,
-                    child: Center(
-                      child: FittedBox(
-                        fit: BoxFit.contain,
-                        child: OrbitField(
-                          ringRadii: const <double>[72, 122, 170],
-                          centerSize: 104,
-                          floatAmplitude: 5,
-                          center: _RevealIn(
-                            controller: _reveal,
-                            interval: const Interval(0, 0.5, curve: PrismMotion.decelerate),
-                            child: const _HeroAnchor(),
-                          ),
-                          items: _orbitItems(),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: PrismSpacing.md),
-                  // Bloc texte + CTA.
-                  Flexible(
-                    flex: 4,
-                    child: SingleChildScrollView(
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints viewport) {
+                // Le champ orbital est **décoratif** : il garde sa place aux
+                // tailles Dynamic Type standard et la rend entièrement au
+                // contenu aux tailles d'accessibilité. Mesuré à 2× sur un
+                // iPhone 14, il conservait 342 px — 40 % de l'écran — pendant
+                // que le CTA « Commencer » tombait à y=1443 au fond d'une
+                // sous-fenêtre défilante de 361 px de haut.
+                final double scale = MediaQuery.textScalerOf(context).scale(1);
+                final bool showHero = scale <= _kMaxStandardDynamicType;
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: viewport.maxHeight),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.lg),
                       child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: <Widget>[
+                          const SizedBox(height: PrismSpacing.md),
+                          if (showHero) ...<Widget>[
+                            SizedBox(
+                              height: viewport.maxHeight * _kHeroViewportShare,
+                              child: Center(
+                                // `BoxFit.contain` protège ici un **graphique**
+                                // de 444 px de large dans une colonne de 342 px
+                                // — il ne comprime aucun texte, et le retirer
+                                // ferait déborder l'orbite.
+                                child: FittedBox(
+                                  fit: BoxFit.contain,
+                                  child: OrbitField(
+                                    ringRadii: const <double>[72, 122, 170],
+                                    centerSize: 104,
+                                    floatAmplitude: 5,
+                                    center: _RevealIn(
+                                      controller: _reveal,
+                                      interval: const Interval(
+                                        0,
+                                        0.5,
+                                        curve: PrismMotion.decelerate,
+                                      ),
+                                      child: const _HeroAnchor(),
+                                    ),
+                                    items: _orbitItems(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: PrismSpacing.md),
+                          ],
                           // Pas de sur-titre « Certigo » ici : la marque est
                           // déjà portée par l'ancre de l'orbite juste
                           // au-dessus, et un sur-titre au-dessus d'un titre
@@ -347,8 +374,8 @@ class _LandingScreenState extends ConsumerState<LandingScreen> with SingleTicker
                       ),
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ],
