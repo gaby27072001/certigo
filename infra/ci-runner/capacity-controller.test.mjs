@@ -31,19 +31,25 @@ const f55VmId =
   '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
   'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
   `virtualMachines/${f55VmName}`;
-const pilotVmName = 'vmss-certigo-pr-pilot-z1_bbf83c5c';
-const pilotVmId =
-  '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
-  'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
-  `virtualMachines/${pilotVmName}`;
-// The second PR runner bought in #402. The fixture carries it because the
-// redundancy floor is now two per trust class: a fixture stuck on the
-// pre-scale-out fleet would make a satisfied floor look like a shortfall.
-const pilot2VmName = 'vmss-certigo-pr-pilot-z1_a14700a3';
-const pilot2VmId =
-  '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
-  'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
-  `virtualMachines/${pilot2VmName}`;
+// The four live PR instances measured on 2026-09-23 (osProfile.computerName ==
+// GitHub runner name). The redundancy floor is two per trust class: a fixture stuck
+// on a retired fleet would make a satisfied floor look like a shortfall.
+function vmIdOf(name) {
+  return (
+    '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
+    'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
+    `virtualMachines/${name}`
+  );
+}
+const livePilots = [
+  { id: 31, runnerName: 'certigo-prMVOC2P', vmName: 'vmss-certigo-pr-pilot-z1_5275ea21' },
+  { id: 32, runnerName: 'certigo-prTRHQEY', vmName: 'vmss-certigo-pr-pilot-z1_94bad106' },
+  { id: 33, runnerName: 'certigo-pr7BZU76', vmName: 'vmss-certigo-pr-pilot-z1_1a6deaa2' },
+  { id: 34, runnerName: 'certigo-prUL1UCK', vmName: 'vmss-certigo-pr-pilot-z1_6e3abce4' },
+].map((pilot) => ({ ...pilot, vmId: vmIdOf(pilot.vmName) }));
+const [firstPilot] = livePilots;
+const pilotVmName = firstPilot.vmName;
+const pilotVmId = firstPilot.vmId;
 
 function runner(
   name,
@@ -685,9 +691,9 @@ test('real inventory binds f55 and the PR pilot while keeping runner 26 and VM 4
         { id: 27 },
       ),
       runner(
-        'certigo-prIVJAN8',
+        firstPilot.runnerName,
         ['certigo-pr', 'certigo-pr-pilot'],
-        { id: 28 },
+        { id: firstPilot.id },
       ),
     ],
     repositoryConfig.inventory,
@@ -918,7 +924,7 @@ const be505VmId =
   'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
   `virtualMachines/${be505VmName}`;
 
-// Mirrors the live topology: one certigo-pr pilot instance and two
+// Mirrors the live topology: four certigo-pr pilot instances and two
 // certigo-trusted instances of vmss-certigo-runner-zonal across zones 1 and 2.
 function zonalInventory({ zone1Powered = true, zone1Online = true } = {}) {
   const scaleSet = (name, index) => ({
@@ -954,8 +960,9 @@ function zonalInventory({ zone1Powered = true, zone1Online = true } = {}) {
           runner('vmss-certigo-runner-zonal_be505fa1-Certigo', [
             'certigo-trusted',
           ], { id: 29, status: zone1Online ? 'online' : 'offline' }),
-          runner('certigo-prIVJAN8', ['certigo-pr'], { id: 28 }),
-          runner('certigo-prQA5OWT', ['certigo-pr'], { id: 30 }),
+          ...livePilots.map((pilot) =>
+            runner(pilot.runnerName, ['certigo-pr'], { id: pilot.id }),
+          ),
         ],
       },
       virtualMachines: [
@@ -973,20 +980,13 @@ function zonalInventory({ zone1Powered = true, zone1Online = true } = {}) {
           virtualMachineScaleSet: { id: '/vmss/vmss-certigo-runner-zonal' },
           zones: ['1'],
         },
-        {
-          id: pilotVmId,
-          name: pilotVmName,
+        ...livePilots.map((pilot) => ({
+          id: pilot.vmId,
+          name: pilot.vmName,
           powerState: 'VM running',
           virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-pilot-z1' },
           zones: ['1'],
-        },
-        {
-          id: pilot2VmId,
-          name: pilot2VmName,
-          powerState: 'VM running',
-          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-pilot-z1' },
-          zones: ['1'],
-        },
+        })),
       ],
       vmScaleSets: [
         scaleSet('vmss-certigo-runner-zonal', 0),
@@ -1005,8 +1005,7 @@ test('the versioned inventory binds both trusted zones so neither can go missing
 
   assert.deepEqual(result.unclassifiedVirtualMachines, []);
   assert.deepEqual(result.managedMachineNames, [
-    pilot2VmName,
-    pilotVmName,
+    ...livePilots.map(({ vmName }) => vmName).sort(),
     be505VmName,
     f55VmName,
   ]);

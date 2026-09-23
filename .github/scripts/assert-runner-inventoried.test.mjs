@@ -26,11 +26,15 @@ test('both live trusted runners are present in the versioned inventory', () => {
   }
 });
 
-test('the PR pilot runner is present in the versioned inventory', () => {
-  assert.deepEqual(
-    assertRunnerInventoried('certigo-prIVJAN8', repositoryConfig),
-    [],
-  );
+test('every live PR runner is present in the versioned inventory', () => {
+  for (const name of [
+    'certigo-prMVOC2P',
+    'certigo-prTRHQEY',
+    'certigo-pr7BZU76',
+    'certigo-prUL1UCK',
+  ]) {
+    assert.deepEqual(assertRunnerInventoried(name, repositoryConfig), []);
+  }
 });
 
 test('an uninventoried runner fails closed', () => {

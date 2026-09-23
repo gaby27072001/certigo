@@ -69,14 +69,19 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 
 | Élément | Valeur |
 |---|---|
-| **VMSS live** | trusted `vmss-certigo-runner-zonal` (capacité 2, zones 1 et 2) + pilote PR `vmss-certigo-pr-pilot-z1` (capacité 1, zone 1) |
-| **Capacité Azure live** | `f55d176e` (zone 2) et `be505fa1` (zone 1) trusted, `bbf83c5c` (zone 1) PR — les trois `VM running`; `4153d1dd` externe; `22f7fb52` et `4596a9d5` absentes/interdites |
+| **VMSS live** | trusted `vmss-certigo-runner-zonal` (capacité 2, zones 1 et 2) + pilote PR `vmss-certigo-pr-pilot-z1` (zone 1, 4 instances utiles sur 11 présentes) |
+| **Capacité Azure live** | `f55d176e` (zone 2) et `be505fa1` (zone 1) trusted; `5275ea21`, `94bad106`, `1a6deaa2`, `6e3abce4` (zone 1) PR; 7 instances PR retirées (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2` désallouées, `a14700a3`, `bbf83c5c`, `d8d42366` en `Failed`) interdites; `4153d1dd` externe; `22f7fb52` et `4596a9d5` absentes/interdites |
 | **Resource group** | `RG-CERTIGO-CI` |
 | **Subscription** | `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**) |
-| **Runners GitHub live** | ID 27 `…_f55d176e-Certigo` **trusted**; ID 29 `…_be505fa1-Certigo` **trusted**; ID 28 `certigo-prIVJAN8` **pr** — tous `online`, labels disjoints |
-| **Classification contrôleur** | f55 + be5 + bbf liés explicitement dans `capacity-controller.config.json` · `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit |
+| **Runners GitHub live** | ID 27 `…_f55d176e-Certigo` et ID 29 `…_be505fa1-Certigo` **trusted**; ID 31 `certigo-prMVOC2P`, ID 32 `certigo-prTRHQEY`, ID 33 `certigo-pr7BZU76`, ID 34 `certigo-prUL1UCK` **pr** — labels disjoints |
+| **Classification contrôleur** | f55 + be5 + les 4 instances PR liées explicitement dans `capacity-controller.config.json` · les 7 instances PR retirées dans `forbiddenVirtualMachines` · `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit |
 | **Identités** | f55/be5 : UAMI du VMSS zonal; pilote PR : aucune identité |
 | **Repo desservi** | `gchambaud_microsoft/Certigo` (les mêmes VMs hébergent aussi un agent pour `gchambaud_microsoft/certigo-content`) |
+
+> Inventaire mesuré le 2026-09-23 vers 16:10 UTC (`az vm list -g rg-certigo-ci -d` et
+> `gh api repos/gchambaud_microsoft/Certigo/actions/runners`; `osProfile.computerName` =
+> nom du runner GitHub). Invalidé par tout ajout, remplacement ou suppression d'instance
+> dans l'un des deux scale sets.
 
 > ✅ Les labels `certigo-pr` et `certigo-trusted` **sont** mutuellement exclusifs depuis le
 > 4 septembre 2026. Un éventuel runner **macOS** dédié à iOS (cf. §9) est **distinct** et
@@ -343,9 +348,10 @@ validations PR ne peut donc être restauré sur le pool trusted.
 
 ## 11. Reprise automatique côté Azure (01:30 UTC)
 
-Un Logic App `logic-certigo-ci-runner-recovery` dans `rg-certigo-ci` démarre les trois
-instances **chaque jour à 01:30 UTC**, puis vérifie que chacune atteint
-`PowerState/running`. Il est décrit en Bicep : ne pas le modifier dans le portail.
+Un Logic App `logic-certigo-ci-runner-recovery` dans `rg-certigo-ci` démarre les instances
+listées dans `virtualMachineNames` (six au 2026-09-23 : 2 trusted + 4 PR) **chaque jour à
+01:30 UTC**, puis vérifie que chacune atteint `PowerState/running`. Il est décrit en Bicep :
+ne pas le modifier dans le portail.
 
 - Composition : [`infra/ci-runner/auto-recovery.bicep`](../../infra/ci-runner/auto-recovery.bicep)
 - Workflow + alerte : [`infra/ci-runner/modules/runnerAutoRecovery.bicep`](../../infra/ci-runner/modules/runnerAutoRecovery.bicep)
@@ -356,6 +362,17 @@ instances **chaque jour à 01:30 UTC**, puis vérifie que chacune atteint
 > reprise, confirmer toujours avec le §6 (`gh api ... /actions/runners`). Et rallumer les VMs
 > ne protège **pas** une opération longue : une publication de contenu de ~4 h démarrée trop
 > tard sera tranchée à 00:46 UTC quoi qu'il soit rallumé ensuite.
+
+> 🔁 **Remplacer une instance runner impose de mettre à jour la liste de reprise.** Depuis
+> le 2026-09-12, `bbf83c5c` et `a14700a3` sont en `provisioningState: Failed` et leur
+> démarrage rend `InternalServerError`; le 2026-09-14, des instances PR de remplacement
+> (`5275ea21`, `94bad106`, `1a6deaa2`, `6e3abce4`) ont été créées sans que la liste suive.
+> Résultat mesuré le 2026-09-23 : **12 runs `Failed` consécutifs, du 2026-09-12 au
+> 2026-09-23**, et les quatre vrais runners PR restaient éteints chaque matin. Toute
+> nouvelle instance doit être reportée dans `inventory.managedRunnerBindings`, le défaut de
+> `auto-recovery.bicep` **et** le bicepparam, puis le Logic App redéployé (voir
+> ci-dessous) ; les tests imposent l'égalité des trois listes, pas leur fraîcheur par
+> rapport à Azure.
 
 ### Vérifier que la reprise a bien tourné
 

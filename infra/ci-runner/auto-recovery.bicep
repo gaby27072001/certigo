@@ -40,8 +40,10 @@ param resourceGroupName string = 'rg-certigo-ci'
 param virtualMachineNames array = [
   'vmss-certigo-runner-zonal_f55d176e'
   'vmss-certigo-runner-zonal_be505fa1'
-  'vmss-certigo-pr-pilot-z1_bbf83c5c'
-  'vmss-certigo-pr-pilot-z1_a14700a3'
+  'vmss-certigo-pr-pilot-z1_5275ea21'
+  'vmss-certigo-pr-pilot-z1_94bad106'
+  'vmss-certigo-pr-pilot-z1_1a6deaa2'
+  'vmss-certigo-pr-pilot-z1_6e3abce4'
 ]
 
 @description('Heure UTC du déclenchement. 01:30 UTC laisse ~41 min de marge après la fin de la fenêtre de teardown 00:46-00:49 UTC, sans course avec elle.')

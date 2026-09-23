@@ -1276,6 +1276,16 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
   assert.deepEqual(config.inventory.forbiddenVirtualMachines, [
     'vmss-certigo-runner-zonal_22f7fb52',
     'vmss-certigo-pr-pilot-z1_4596a9d5',
+    // Retired PR instances measured on 2026-09-23: no GitHub registration, four of them
+    // deallocated and three in provisioningState Failed. Listing them here keeps them out
+    // of the nightly recovery until they are deleted.
+    'vmss-certigo-pr-pilot-z1_2c1eeb41',
+    'vmss-certigo-pr-pilot-z1_3601055e',
+    'vmss-certigo-pr-pilot-z1_765cf6af',
+    'vmss-certigo-pr-pilot-z1_7d3001c2',
+    'vmss-certigo-pr-pilot-z1_a14700a3',
+    'vmss-certigo-pr-pilot-z1_bbf83c5c',
+    'vmss-certigo-pr-pilot-z1_d8d42366',
   ]);
   // Pin the exact managed set, not just its size. A bare length check is what let the
   // zone-1 trusted instance stay absent from the inventory until GitHub garbage-collected
@@ -1300,14 +1310,24 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
         virtualMachineName: 'vmss-certigo-runner-zonal_be505fa1',
       },
       {
-        githubRunnerId: 28,
-        runnerName: 'certigo-prIVJAN8',
-        virtualMachineName: 'vmss-certigo-pr-pilot-z1_bbf83c5c',
+        githubRunnerId: 31,
+        runnerName: 'certigo-prMVOC2P',
+        virtualMachineName: 'vmss-certigo-pr-pilot-z1_5275ea21',
       },
       {
-        githubRunnerId: 30,
-        runnerName: 'certigo-prQA5OWT',
-        virtualMachineName: 'vmss-certigo-pr-pilot-z1_a14700a3',
+        githubRunnerId: 32,
+        runnerName: 'certigo-prTRHQEY',
+        virtualMachineName: 'vmss-certigo-pr-pilot-z1_94bad106',
+      },
+      {
+        githubRunnerId: 33,
+        runnerName: 'certigo-pr7BZU76',
+        virtualMachineName: 'vmss-certigo-pr-pilot-z1_1a6deaa2',
+      },
+      {
+        githubRunnerId: 34,
+        runnerName: 'certigo-prUL1UCK',
+        virtualMachineName: 'vmss-certigo-pr-pilot-z1_6e3abce4',
       },
     ],
   );

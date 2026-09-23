@@ -60,19 +60,20 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 
 | Élément | État observé |
 |---|---|
-| Compute géré | `f55d176e` (zone 2) **et `be505fa1` (zone 1)** dans `vmss-certigo-runner-zonal`; pilotes `bbf83c5c` **et `a14700a3`** dans `vmss-certigo-pr-pilot-z1` zone 1 |
-| Inventaire Azure courant | `f55d176e`, `be505fa1`, `bbf83c5c` **et `a14700a3`** running; `4153d1dd` externe/deallocated; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
+| Compute géré | `f55d176e` (zone 2) **et `be505fa1` (zone 1)** dans `vmss-certigo-runner-zonal`; pilotes `5275ea21`, `94bad106`, `1a6deaa2` **et `6e3abce4`** dans `vmss-certigo-pr-pilot-z1` zone 1 |
+| Inventaire Azure courant | les six instances gérées ci-dessus; 7 instances PR retirées et interdites (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2` désallouées; `a14700a3`, `bbf83c5c`, `d8d42366` en `Failed`); `4153d1dd` externe; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
 | Scale-in | CPU moyenne < 20 % pendant 45 min — **non conscient des jobs GitHub** |
-| Inventaire GitHub | runner `27` `f55d176e-Certigo` online **trusted**; runner `29` `be505fa1-Certigo` online **trusted**; runner `28` `certigo-prIVJAN8` online, PR-only; runner `30` `certigo-prQA5OWT` online, PR-only; runner `26` `22f7fb52-Certigo` offline/stale et hors scope |
+| Inventaire GitHub | runner `27` `f55d176e-Certigo` online **trusted**; runner `29` `be505fa1-Certigo` online **trusted**; runners `31` `certigo-prMVOC2P`, `32` `certigo-prTRHQEY`, `33` `certigo-pr7BZU76`, `34` `certigo-prUL1UCK` online, PR-only; runners `28` et `30` n'existent plus; runner `26` hors scope |
 | Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` et `be505fa1` conservent UAMI + `snet-runners`. **Les labels sont désormais strictement disjoints** — plus aucun label double bloquant |
-| Capacité réellement réconciliée | **4 instances gérées/online** : `f55d176e`, `be505fa1`, `bbf83c5c` et `a14700a3`; `4153d1dd` reste externe |
+| Capacité réellement réconciliée | **6 instances gérées/online** : `f55d176e`, `be505fa1`, `5275ea21`, `94bad106`, `1a6deaa2` et `6e3abce4`; `4153d1dd` reste externe |
 | Plancher de redondance | `minimumOnlineByTrust` = `certigo-pr: 2`, `certigo-trusted: 2` |
 
-> Inventaire mesuré le 2026-09-09 à 07:47 UTC (`gh api .../actions/runners` et
-> `az vm list -d -g rg-certigo-ci`). Invalidé par tout ajout ou retrait d'instance dans
-> l'un des deux scale sets, ou par un changement de `minimumOnlineByTrust` dans
+> Inventaire mesuré le 2026-09-23 vers 16:10 UTC (`gh api .../actions/runners` et
+> `az vm list -d -g rg-certigo-ci`, `osProfile.computerName` = nom du runner). Invalidé par
+> tout ajout, remplacement ou retrait d'instance dans l'un des deux scale sets, ou par un
+> changement de `minimumOnlineByTrust` dans
 > `infra/ci-runner/capacity-controller.config.json`.
 
 > ⚠️ **`be505fa1` était absente de cet inventaire jusqu'au 4 septembre 2026.** C'est
@@ -84,13 +85,16 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 Le premier snapshot avait vu trois VM, avant le scale-in CPU. L'état consolidé prouve qu'un
 simple comptage « VM Azure / runners GitHub » est faux. La réconciliation explicite classe
 le runner 26 (`22f7fb52-Certigo`) et la VM `4153d1dd` comme **externes**, et les bindings
-exacts `f55d176e`/runner `27`, `be505fa1`/runner `29` et `bbf83c5c`/runner `28` comme
+exacts `f55d176e`/runner `27`, `be505fa1`/runner `29` et les quatre instances PR
+`5275ea21`/`31`, `94bad106`/`32`, `1a6deaa2`/`33`, `6e3abce4`/`34` comme
 **gérés**. Externe ne
 signifie ni orphelin ni adoptable : ces ressources sont
 exclue de `currentCapacity`, de toute sélection de cible et de toute opération future par
 une classification exacte dans `inventory.externalVirtualMachines`. Toute autre VM sans
 runner reste `unclassifiedVirtualMachines` et bloque le plan; elle n'est jamais implicitement
-considérée externe.
+considérée externe. Une instance retirée mais pas encore supprimée est inscrite dans
+`inventory.forbiddenVirtualMachines` : elle bloque aussi le plan, et le test de reprise
+interdit qu'elle revienne dans la liste de démarrage nocturne.
 
 ### Baseline capacité et coût sur 30 jours
 
@@ -842,7 +846,8 @@ la persistance, l'acquittement du réarmement et le chemin mutable. Tant que `en
 `lifecycle-preflight.sh` bloque aussi bien `start` que `deallocate` et n'arme aucune action.
 
 La passation opérationnelle externe v3 possède les IDs exacts
-`f55d176e`, `be505fa1` et `bbf83c5c`; le runner 26 et la VM 415 restent hors scope. Elle
+`f55d176e`, `be505fa1` et `bbf83c5c` (état du 2026-09-04 : `bbf83c5c` est retirée depuis le
+2026-09-12, voir l'inventaire des runners plus haut); le runner 26 et la VM 415 restent hors scope. Elle
 maintient ces instances pendant l'activité, applique une quiet period coordonnée de 5 minutes resettable,
 contrôle 2 + garde finale sous la même génération de lease, désalloue le pilote puis le
 primaire et réarme les capacités exactes supprimées si une activité apparaît. Ce processus

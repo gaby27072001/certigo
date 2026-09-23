@@ -41,6 +41,15 @@ VM `4153d1dd` restent **hors scope**; `4596a9d5` reste interdite. Toute VM du VM
 binding est **non classée** et bloque le plan — c'est précisément le contrôle qui manquait
 à `be505fa1` avant le 4 septembre 2026.
 
+> 📅 **État au 2026-09-23 — le pool PR a été reconstruit.** Mesuré par `az vm list -g
+> rg-certigo-ci -d` et `gh api .../actions/runners` : le pool PR compte quatre instances
+> utiles (`5275ea21`/ID 31, `94bad106`/ID 32, `1a6deaa2`/ID 33, `6e3abce4`/ID 34, créées
+> le 2026-09-14) et sept instances retirées sans runner GitHub (`2c1eeb41`, `3601055e`,
+> `765cf6af`, `7d3001c2` désallouées; `a14700a3`, `bbf83c5c`, `d8d42366` en `Failed`). Les
+> six instances utiles sont liées dans `managedRunnerBindings`; les sept retirées sont dans
+> `forbiddenVirtualMachines` en attendant leur suppression. Le tableau ci-dessus reste
+> l'état du 4 septembre. Invalidé par tout ajout, remplacement ou suppression d'instance.
+
 > 🔒 **Le pool trusted n'est pas seulement « celui qui exécute les gates ».**
 > `vmss-certigo-runner-zonal` vit dans `vnet-certigo-ci/snet-runners` (10.42.1.0/24), et la
 > zone DNS privée `privatelink.blob.core.windows.net` est liée à `vnet-certigo-ci`, `-dev`,
@@ -372,6 +381,18 @@ et n'a rien vu ; un second test épinglait même le défaut à `assert.equal(rec
 c'est-à-dire qu'il **certifiait le défaut**. Les deux tests exigent désormais l'égalité
 ensembliste entre le défaut, le bicepparam et `inventory.managedRunnerBindings` : toute
 divergence future échoue des deux côtés indépendamment.
+
+**Limite démontrée le 2026-09-23 : cohérentes entre elles ne veut pas dire fraîches.** Les
+trois listes étaient égales, et toutes pointaient vers `bbf83c5c` et `a14700a3`, deux
+instances en `provisioningState: Failed` depuis le 2026-09-12. Leur démarrage rendait
+`InternalServerError`, donc **les 12 runs du 2026-09-12 au 2026-09-23 ont fini `Failed`**,
+pendant que les quatre instances PR de remplacement (créées le 2026-09-14) n'étaient jamais
+rallumées : la CI PR était morte chaque matin jusqu'à un `az vm start` manuel. L'alerte
+`RunsFailed` existait mais n'a pas conduit à une correction. La correction met à jour les
+trois listes et inscrit les instances retirées dans `forbiddenVirtualMachines`, ce qui rend
+leur retour dans la liste de reprise impossible sans casser un test. Aucun test hors ligne ne
+peut en revanche prouver qu'une liste figée suit Azure : c'est l'argument qui pèse désormais
+en faveur de l'énumération dynamique ci-dessous.
 
 #### Énumération dynamique — mesurée faisable, ajournée
 

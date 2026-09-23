@@ -19,6 +19,10 @@ classification : elle bloque toute automation et n'est ajoutée à aucune allow-
 Les exclusions historiques du runner 26 et de `4153d1dd` restent des garde-fous,
 pas une affirmation de présence live.
 
+> État au 2026-09-23 : `be505fa1`/runner 29 est gérée; le pool PR est porté par
+> `5275ea21`, `94bad106`, `1a6deaa2` et `6e3abce4` (runners 31 à 34), et `bbf83c5c` est
+> retirée (voir `docs/runbooks/CI_RUNNERS.md` §2 et §11).
+
 ## Egress legacy réconcilié
 
 ```
@@ -198,9 +202,14 @@ GitHub/NuGet/pub.dev/npm fonctionnel. Le pilote ne crée volontairement aucun ru
 
 La sortie structurée de `register-pilot.ps1` fournit l'`id` et le `name` GitHub. Avant toute
 activation future du contrôleur, reporter ces deux valeurs avec le nom et l'ID ARM exacts de
-la nouvelle VM dans `inventory.managedRunnerBindings`, puis mettre à jour les assertions de
+la nouvelle VM dans `inventory.managedRunnerBindings` et `inventory.observedRunnerBindings`,
+ajouter son nom au défaut `virtualMachineNames` de `auto-recovery.bicep` **et** à
+`infra/params/ci-runner-auto-recovery.bicepparam` (sinon elle n'est jamais rallumée après la
+désallocation nocturne), inscrire l'instance remplacée dans
+`inventory.forbiddenVirtualMachines`, puis mettre à jour les assertions de
 `infra/tests/least-privilege.test.mjs` et l'inventaire
-`docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`. Un nom de runner Flexible diffère du nom de VM :
+`docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`, et redéployer le Logic App de reprise
+(`docs/runbooks/CI_RUNNERS.md` §11). Un nom de runner Flexible diffère du nom de VM :
 sans binding explicite, le contrôleur doit rester bloqué. Ne jamais réutiliser le binding d'une
 instance pilote remplacée ni retirer les exclusions du runner 26 et de la VM `4153d1dd`.
 
