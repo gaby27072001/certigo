@@ -1536,71 +1536,85 @@ test('every managed runner is restarted after the nightly teardown', () => {
     ),
     'utf8',
   );
-
-  const block = /param virtualMachineNames = \[([^\]]*)\]/.exec(bicepparam);
-  assert.ok(block, 'the recovery parameters must declare virtualMachineNames');
-  const recovered = [...block[1].matchAll(/'([^']+)'/g)].map(([, name]) => name);
-  // A parser that silently yields nothing would make every membership assertion below
-  // vacuously true, which is the failure mode this whole test exists to prevent.
-  assert.ok(recovered.length > 0, 'the parsed recovery list must not be empty');
-
-  // The same list exists twice: in this parameter file, and as the default of
-  // `auto-recovery.bicep`. The recovery stack is deployed by hand — no workflow may hold
-  // Azure credentials — so an operator who omits `--parameters` silently deploys the
-  // default instead. On 2026-09-08 the default still held three instances while the
-  // parameter file held four; the omitted instance stayed deallocated for 7h48 and no
-  // alarm fired, because the workflow's own assertion only covered the instances it knew.
-  // Guarding one copy and not the other is what let them diverge, so both are pinned here.
-  const template = readFileSync(
+  const composition = readFileSync(
     path.join(repositoryRoot, 'infra', 'ci-runner', 'auto-recovery.bicep'),
     'utf8',
   );
-  const defaultBlock = /param virtualMachineNames array = \[([^\]]*)\]/.exec(
-    template,
-  );
-  assert.ok(
-    defaultBlock,
-    'auto-recovery.bicep must declare a default for virtualMachineNames',
-  );
-  const defaulted = [...defaultBlock[1].matchAll(/'([^']+)'/g)].map(
-    ([, name]) => name,
-  );
-  assert.ok(
-    defaulted.length > 0,
-    'the parsed auto-recovery.bicep default must not be empty',
-  );
-  // Every start action carries `runAfter: {}` and therefore runs in parallel, so ordering
-  // carries no meaning: set equality is the real invariant, and it survives a reordering
-  // that would make a positional comparison fail for no operational reason.
-  assert.deepEqual(
-    [...defaulted].sort(),
-    [...recovered].sort(),
-    'the auto-recovery.bicep default must restart exactly the instances the parameter file does',
+
+  // Until 2026-09-23 the restart list existed three times (this inventory, the bicepparam,
+  // and the auto-recovery.bicep default). Tests kept the three copies equal to each other,
+  // but nothing kept them equal to Azure: from 2026-09-12 all three still named two dead
+  // instances while the four replacement PR instances were never restarted, and the PR CI
+  // was down every morning for twelve days. The recovery now enumerates the members of each
+  // scale set at run time, so no instance list may reappear in the deployment inputs.
+  for (const [label, source] of [
+    ['ci-runner-auto-recovery.bicepparam', bicepparam],
+    ['auto-recovery.bicep', composition],
+  ]) {
+    assert.doesNotMatch(
+      source,
+      /^\s*param\s+virtualMachineNames\b/m,
+      `${label} must not reintroduce a frozen restart list`,
+    );
+    assert.doesNotMatch(
+      source,
+      /vmss-certigo-[a-z0-9-]+_[0-9a-f]{8}/,
+      `${label} must not name a runner instance`,
+    );
+  }
+  // A second copy of the scale set scope in the parameter file could silently diverge from
+  // the default, which is exactly how the frozen lists drifted apart on 2026-09-07.
+  assert.doesNotMatch(bicepparam, /^\s*param\s+scaleSets\b/m);
+
+  const template = compileTemplate('infra/ci-runner/auto-recovery.bicep');
+  const scaleSets = template.parameters.scaleSets.defaultValue;
+  assert.ok(scaleSets.length > 0, 'the recovery must cover at least one scale set');
+  const excluded = new Set(
+    [
+      ...config.inventory.forbiddenVirtualMachines,
+      ...config.inventory.externalVirtualMachines,
+    ].map((name) => name.toLowerCase()),
   );
 
+  // The subscription-wide teardown deallocates every instance; one outside the recovered
+  // scale sets, or excluded from them, simply stays off, and a runner that never comes back
+  // is invisible until a job queues behind the survivors. Capacity is only real if it
+  // restarts, so every managed runner must be both in scope and not excluded.
   const managed = config.inventory.managedRunnerBindings.map(
     ({ virtualMachineName }) => virtualMachineName,
   );
-
-  // The subscription-wide teardown deallocates every instance; one absent from this
-  // list simply stays off, and a runner that never comes back online is invisible
-  // until a job queues behind the survivors. Capacity is only real if it restarts.
+  assert.ok(managed.length > 0, 'the inventory must declare managed runner bindings');
   assert.deepEqual(
-    managed.filter((name) => !recovered.includes(name)),
-    [],
-    'each managed runner instance must appear in the recovery parameters',
-  );
-  assert.deepEqual(
-    recovered.filter((name) => !managed.includes(name)),
-    [],
-    'the recovery job must not restart an instance the inventory does not manage',
-  );
-  assert.deepEqual(
-    recovered.filter((name) =>
-      config.inventory.forbiddenVirtualMachines.includes(name),
+    managed.filter(
+      (name) => !scaleSets.some(({ name: scaleSet }) => name.startsWith(`${scaleSet}_`)),
     ),
     [],
-    'a forbidden instance must never be restarted',
+    'each managed runner instance must belong to a recovered scale set',
+  );
+  assert.deepEqual(
+    managed.filter((name) => excluded.has(name.toLowerCase())),
+    [],
+    'a managed runner instance must never be excluded from the recovery',
+  );
+
+  // The exclusions are read from this inventory at compile time, never copied: a retired
+  // instance listed in forbiddenVirtualMachines can therefore never be restarted.
+  assert.match(
+    composition,
+    /loadJsonContent\('capacity-controller\.config\.json', '\$\.inventory\.forbiddenVirtualMachines'\)/,
+  );
+  assert.match(
+    composition,
+    /loadJsonContent\('capacity-controller\.config\.json', '\$\.inventory\.externalVirtualMachines'\)/,
+  );
+  const loaded = Object.values(template.variables).filter(Array.isArray);
+  assert.ok(
+    loaded.some(
+      (values) =>
+        JSON.stringify(values) ===
+        JSON.stringify(config.inventory.forbiddenVirtualMachines),
+    ),
+    'the compiled recovery must embed the current forbiddenVirtualMachines',
   );
 });
 

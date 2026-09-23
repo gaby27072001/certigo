@@ -64,7 +64,7 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 | Inventaire Azure courant | les six instances gérées ci-dessus; 7 instances PR retirées et interdites (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2` désallouées; `a14700a3`, `bbf83c5c`, `d8d42366` en `Failed`); `4153d1dd` externe; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
-| Scale-in | CPU moyenne < 20 % pendant 45 min — **non conscient des jobs GitHub** |
+| Scale-in | **retiré du live le 2026-09-23 à 18:01Z** (application de `capacity.bicep`) : la règle « CPU < 20 % pendant 45 min » ignorait les jobs GitHub et, sous le verrou `CanNotDelete`, laissait l'instance visée en `Failed` |
 | Inventaire GitHub | runner `27` `f55d176e-Certigo` online **trusted**; runner `29` `be505fa1-Certigo` online **trusted**; runners `31` `certigo-prMVOC2P`, `32` `certigo-prTRHQEY`, `33` `certigo-pr7BZU76`, `34` `certigo-prUL1UCK` online, PR-only; runners `28` et `30` n'existent plus; runner `26` hors scope |
 | Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` et `be505fa1` conservent UAMI + `snet-runners`. **Les labels sont désormais strictement disjoints** — plus aucun label double bloquant |
 | Capacité réellement réconciliée | **6 instances gérées/online** : `f55d176e`, `be505fa1`, `5275ea21`, `94bad106`, `1a6deaa2` et `6e3abce4`; `4153d1dd` reste externe |
@@ -93,8 +93,9 @@ exclue de `currentCapacity`, de toute sélection de cible et de toute opération
 une classification exacte dans `inventory.externalVirtualMachines`. Toute autre VM sans
 runner reste `unclassifiedVirtualMachines` et bloque le plan; elle n'est jamais implicitement
 considérée externe. Une instance retirée mais pas encore supprimée est inscrite dans
-`inventory.forbiddenVirtualMachines` : elle bloque aussi le plan, et le test de reprise
-interdit qu'elle revienne dans la liste de démarrage nocturne.
+`inventory.forbiddenVirtualMachines` : elle bloque aussi le plan, et la reprise nocturne,
+qui lit cette liste à la compilation, ne la démarre jamais (les autres membres des scale sets
+sont énumérés et rallumés sans liste figée, depuis le 2026-09-23).
 
 ### Baseline capacité et coût sur 30 jours
 

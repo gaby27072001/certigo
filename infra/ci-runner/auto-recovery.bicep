@@ -7,14 +7,23 @@
 //
 // Modèle de privilège — trois actions, chacune justifiée :
 //   * `Microsoft.Compute/virtualMachines/read`
-//       Résoudre l'instance avant de la démarrer et lister son état. C'est le
-//       droit minimal sans lequel aucun appel ARM ciblé n'est possible.
+//       Énumérer, à chaque run, les instances de chaque scale set de runners et
+//       lire leur power state : `GET .../virtualMachines?$filter=...&$expand=instanceView`
+//       au scope du resource group. C'est aussi le droit minimal sans lequel aucun
+//       appel ARM ciblé n'est possible.
 //   * `Microsoft.Compute/virtualMachines/start/action`
 //       La seule mutation autorisée. Démarrer est idempotent et sans effet sur
 //       une VM déjà sous tension.
 //   * `Microsoft.Compute/virtualMachines/instanceView/read`
-//       Lire le power state pour VÉRIFIER la reprise. `GET .../instanceView`
-//       est autorisé par cette action distincte, pas par le `read` ci-dessus.
+//       Lire le power state d'une instance nommée (`GET .../instanceView`). Depuis
+//       l'énumération dynamique (2026-09-23) le workflow ne l'appelle plus : le power
+//       state arrive avec la liste filtrée. Conservée délibérément pour ne pas changer
+//       le rôle dans le même déploiement que le workflow ; son retrait est une mesure
+//       séparée (docs/CI_RUNNER_RESILIENCE.md, « Reprise automatique »).
+//
+// Aucune énumération ne passe par l'API du scale set : `virtualMachineScaleSets/read`
+// n'est PAS accordé (mesuré `NotAllowed` le 2026-09-09) et n'est pas nécessaire, le
+// filtre portant sur la propriété `virtualMachineScaleSet/id` de chaque VM.
 //
 // Ce qui est délibérément EXCLU, alors que le rôle intégré « Virtual Machine
 // Contributor » l'accorderait via `Microsoft.Compute/virtualMachines/*` :
@@ -35,15 +44,17 @@ targetScope = 'subscription'
 @minLength(1)
 param resourceGroupName string = 'rg-certigo-ci'
 
-@description('Instances exactes du VMSS Flexible à rallumer chaque matin. Doit rester identique à `infra/params/ci-runner-auto-recovery.bicepparam` : le déploiement est manuel, donc un `--parameters` oublié applique CE défaut. Invariant vérifié par « every managed runner is restarted after the nightly teardown ».')
+@description('Scale sets Flexible dont CHAQUE instance est rallumée chaque nuit, sauf exclusion versionnée. `trustClass` choisit le plancher `minimumOnlineByTrust` de `capacity-controller.config.json`. Unique exemplaire : `infra/params/ci-runner-auto-recovery.bicepparam` ne le redéclare pas, pour qu\'aucune seconde copie ne puisse diverger (vérifié par « the recovery scope is declared once and follows the inventory »).')
 @minLength(1)
-param virtualMachineNames array = [
-  'vmss-certigo-runner-zonal_f55d176e'
-  'vmss-certigo-runner-zonal_be505fa1'
-  'vmss-certigo-pr-pilot-z1_5275ea21'
-  'vmss-certigo-pr-pilot-z1_94bad106'
-  'vmss-certigo-pr-pilot-z1_1a6deaa2'
-  'vmss-certigo-pr-pilot-z1_6e3abce4'
+param scaleSets array = [
+  {
+    name: 'vmss-certigo-runner-zonal'
+    trustClass: 'certigo-trusted'
+  }
+  {
+    name: 'vmss-certigo-pr-pilot-z1'
+    trustClass: 'certigo-pr'
+  }
 ]
 
 @description('Heure UTC du déclenchement. 01:30 UTC laisse ~41 min de marge après la fin de la fenêtre de teardown 00:46-00:49 UTC, sans course avec elle.')
@@ -68,6 +79,18 @@ param deployResourceGroupDeletionLock bool = true
 resource runnerResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: resourceGroupName
 }
+
+// L'inventaire versionné est la SEULE source des exclusions et des planchers : aucune liste
+// d'instances n'est recopiée ici, donc aucune ne peut vieillir séparément. Une instance
+// retirée ou externe n'est jamais démarrée ; toute autre instance des scale sets l'est.
+var forbiddenVirtualMachines = loadJsonContent('capacity-controller.config.json', '$.inventory.forbiddenVirtualMachines')
+var externalVirtualMachines = loadJsonContent('capacity-controller.config.json', '$.inventory.externalVirtualMachines')
+var minimumOnlineByTrust = loadJsonContent('capacity-controller.config.json', '$.minimumOnlineByTrust')
+var excludedVirtualMachineNames = union(forbiddenVirtualMachines, externalVirtualMachines)
+var recoveredScaleSets = map(scaleSets, scaleSet => {
+  name: scaleSet.name
+  minimumRunning: minimumOnlineByTrust[scaleSet.trustClass]
+})
 
 // Portée d'assignation réduite au seul resource group des runners : le rôle ne
 // peut pas être assigné ailleurs, même par un futur opérateur distrait.
@@ -105,7 +128,8 @@ module recovery 'modules/runnerAutoRecovery.bicep' = {
     location: location
     scheduleHourUtc: scheduleHourUtc
     scheduleMinuteUtc: scheduleMinuteUtc
-    virtualMachineNames: virtualMachineNames
+    scaleSets: recoveredScaleSets
+    excludedVirtualMachineNames: excludedVirtualMachineNames
   }
 }
 
@@ -135,3 +159,5 @@ output workflowName string = recovery.outputs.workflowName
 output workflowResourceId string = recovery.outputs.workflowResourceId
 output recoveryPrincipalId string = recovery.outputs.principalId
 output alertName string = recovery.outputs.alertName
+output recoveredScaleSets array = recoveredScaleSets
+output excludedVirtualMachineNames array = excludedVirtualMachineNames
