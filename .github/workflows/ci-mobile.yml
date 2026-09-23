@@ -229,6 +229,16 @@ jobs:
       - name: Test (app)
         working-directory: apps/mobile
         run: flutter test --coverage
+      # Toute la suite prism_ui (#487), dans ce job parce que son contexte
+      # « Flutter app + UI packages » est requis sur main, contrairement à
+      # « Prism UI renderer goldens ». Ne pas renommer ce job : la protection de
+      # branche attendrait un contexte que plus aucun workflow ne produirait.
+      - name: Pub get (prism_ui)
+        working-directory: packages/prism_ui
+        run: flutter pub get --enforce-lockfile
+      - name: Test (prism_ui)
+        working-directory: packages/prism_ui
+        run: flutter test
       - name: Upload coverage
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
