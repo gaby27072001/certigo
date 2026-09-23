@@ -447,8 +447,8 @@ work_packages:
       - "Exécuter et consigner un exercice arrêt, basculement et reconstruction depuis zéro."
     dod: "La perte d'un runner ne bloque pas les gates critiques ; un runner est reconstruisible depuis la définition versionnée ; l'exercice de reprise est consigné avec durée et preuves ; permissions, fork guards et environnements restent actifs."
     rollback: "Conserver l'ancien runner pendant la validation ; revenir aux labels précédents sans changement applicatif."
-    status: in_progress
-    notes: "Source : gchambaud_microsoft/Certigo#249. PR #250 et PR #253 fusionnées (2026-08-06) : IaC versionnée, sonde quotidienne et drill de reconstruction (run 31090379901) exécutés et verts. Vérification live du 2026-09-03 (API GitHub Actions) : un seul runner par classe (certigo-pr-pilot, certigo-trusted) après une migration ultérieure et hors périmètre vers des pools VMSS (PR #301/#302/#308/#309, issue #302) ; la redondance intra-classe n'est plus démontrée, la DoD reste ouverte. Ce lot est indépendant de la chaîne de contenu."
+    status: blocked
+    notes: "Source : gchambaud_microsoft/Certigo#249 (close le 2026-08-07). PR #250 et PR #253 fusionnées (2026-08-06) : IaC versionnée, sonde quotidienne et drill de reconstruction (run 31090379901) exécutés et verts sur les anciennes VM. Réconciliation live du 2026-09-23 : la redondance est rétablie (2 runners certigo-trusted et 4 runners certigo-pr online, labels disjoints), mais aucun exercice de perte d'un runner n'a été fait sur l'architecture VMSS actuelle (drill suspendu par docs/CI_RUNNER_RESILIENCE.md, première précondition non remplie : scale-in CPU encore actif en live) et la CI PR a été hors service chaque matin du 2026-09-12 au 2026-09-23 (corrigé par #508). Statut blocked ; preuves et conditions de déblocage dans state/wp-p2-07.json. Ce lot est indépendant de la chaîne de contenu."
 
   - id: wp-p2-08
     phase: 2
