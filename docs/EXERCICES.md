@@ -74,26 +74,22 @@ La correction, elle, se répartit en **trois familles** côté client
 | ensembliste | `mcq`, `multi`, `scenario`, `spotTheIssue` | ensemble d'`id`, ordre indifférent |
 | paires | `matchQPairs` → `matchPairs` | ensemble de jetons `"gauche:droite"` |
 
-> ⚠️ **Écart client/serveur mesuré.** Le serveur ne connaît pas ces familles.
-> `Certigo.Application/Services/QuizService.cs:616` trie les deux listes avant
-> de les comparer :
+> ✅ **Écart client/serveur corrigé (`wp-p2-06`).** Jusqu'au 2026-09-23,
+> `QuizService` et `ExamService` triaient les deux listes avant de les comparer :
+> la correction serveur était insensible à l'ordre pour les huit types, et le
+> serveur, qui fait autorité, acceptait pour `ordering`, `cloze` et `applied` une
+> séquence dans le désordre que l'application refusait à l'écran.
 >
-> ```csharp
-> var expected = item.Correct.OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
-> var actual   = answer.Selected.OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
-> return expected.SequenceEqual(actual, StringComparer.OrdinalIgnoreCase);
-> ```
->
-> La correction serveur est donc **insensible à l'ordre pour les huit types**.
-> Pour `ordering`, `cloze` et `applied`, le serveur — qui fait autorité —
-> accepte une séquence dans le désordre, alors que l'application la refuse à
-> l'écran. Le commentaire d'en-tête de `answer_grading.dart` affirme pourtant
-> que ce module « lets P0 (offline) and P1 (server) grade identically » : cette
-> affirmation est **fausse** pour ces trois types.
->
-> L'écart est épinglé, exécutable, par le groupe « familles de correction —
-> parité client/serveur » de `apps/mobile/test/exercise_variety_render_test.dart`.
-> Le corriger relève du backend (`QuizService`), hors du périmètre de ce travail.
+> La comparaison passe désormais par une fonction de domaine unique,
+> `backend/src/Certigo.Domain/Content/AnswerGrading.cs`, avec les trois mêmes
+> familles que le client : séquence pour `ordering`, `cloze` et `applied`,
+> multiensemble pour les autres types (jetons `"gauche:droite"` pour
+> `matchPairs`). La parité est exécutable dans les deux langages sur les mêmes
+> vecteurs, `docs/contracts/learning-journey/v1/answer-grading.vectors.json`,
+> rejoués par `AnswerGradingVectorTests` (C#) et `answer_grading_vectors_test.dart`
+> (Dart). Ces vecteurs ont aussi révélé l'écart inverse, côté client : un `id` en
+> double remplaçait un `id` manquant. Le client compare maintenant des
+> multiensembles.
 
 ### Aiguillage type → widget
 
@@ -321,7 +317,8 @@ minimum, `spotTheIssue` à une seule, `matchPairs` refusé avec sa raison.
 Exécuté par `ci-mobile.yml` (`flutter test --coverage`). Il fait passer la
 charge utile **publique** de chaque type dans le vrai `StepRenderer` et vérifie
 que chacun atteint le widget attendu, qu'il est répondable, que `matchPairs`
-publié ne l'est pas — et il épingle l'écart de correction client/serveur du §2.
+publié ne l'est pas — et il épingle les familles de correction du client, dont la
+parité avec le serveur est prouvée par les vecteurs partagés du §2.
 
 ### Preuve que les cliquets mordent
 Mesuré le 2026-09-11, chaque mutation accompagnée de l'empreinte SHA-256 du
