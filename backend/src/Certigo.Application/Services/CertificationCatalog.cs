@@ -68,7 +68,8 @@ public sealed record CertificationLifecycle(
     DateOnly? RecommendThrough = null,
     IReadOnlyList<string>? Replaces = null,
     string? Successor = null,
-    string? Note = null);
+    string? Note = null,
+    string? Transition = null);
 
 public sealed record CertificationProvenance(
     DateOnly CheckedOn,
@@ -196,6 +197,12 @@ public static partial class CertificationCatalogValidator
     {
         "exact",
         "approximate",
+    };
+
+    private static readonly HashSet<string> LifecycleTransitions = new(StringComparer.Ordinal)
+    {
+        "announced",
+        "none-announced",
     };
 
     private static readonly HashSet<string> SourceKinds = new(StringComparer.Ordinal)
@@ -403,6 +410,12 @@ public static partial class CertificationCatalogValidator
             && !CatalogIdRegex().IsMatch(entry.Lifecycle.Successor))
         {
             errors.Add($"{entry.Id}: lifecycle.successor is not a canonical id.");
+        }
+
+        if (entry.Lifecycle.Transition is not null
+            && !LifecycleTransitions.Contains(entry.Lifecycle.Transition))
+        {
+            errors.Add($"{entry.Id}: lifecycle.transition is unsupported.");
         }
     }
 

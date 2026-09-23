@@ -94,6 +94,37 @@ releases de contenu) ne déploie, ne publie et n'active aucune release.
 - Le `releaseId` vient du rapport de package `certigo-content`; ne jamais
   accepter une URL ou un package fourni dans le body HTTP.
 
+## Vérifier une release candidate avant publication
+
+Un import est refusé si le vérificateur du backend **déployé** n'accepte pas la
+release : schémas embarqués
+(`backend/src/Certigo.Infrastructure/ContentContracts/Schemas/`), parseur C# du
+catalogue (toute propriété inconnue est refusée), graphe, projection et règles
+anti-fuite publiques. Une forme nouvelle du contrat canonique doit donc d'abord
+être acceptée par le backend (étape *expand*), déployée, puis seulement publiée
+et importée.
+
+Avant de publier, rejouer ce vérificateur exact sur le paquet construit
+localement :
+
+```powershell
+# Dans un clone de certigo-content, à la révision candidate :
+npm ci
+npm run package
+# Dans Certigo :
+$env:CERTIGO_CONTENT_CANDIDATE_ROOT = "<clone certigo-content>\dist"
+dotnet test backend\tests\Certigo.Infrastructure.Tests `
+  --filter "FullyQualifiedName~CandidateContentPackageTests"
+```
+
+Le test est ignoré sans cette variable ; il ne lit ni Blob, ni Cosmos, ni Azure.
+
+> Mesuré le 2026-09-23 : la release `sha256:dc322dd6…` construite depuis
+> `certigo-content` `3a29d858` était refusée par `main` `d0ce2638` à deux niveaux
+> successifs — le schéma embarqué du catalogue ignorait `lifecycle.transition`
+> (ajouté par certigo-content#84), puis le parseur C# refusait la même propriété.
+> Les deux sont corrigés ensemble ; le même paquet est alors accepté.
+
 ## Import en staging
 
 ```bash

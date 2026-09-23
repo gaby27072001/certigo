@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Certigo.Application.Services;
 using FluentAssertions;
 using Xunit;
@@ -85,6 +86,46 @@ public sealed class CertificationCatalogTests
 
         act.Should().Throw<InvalidDataException>()
             .WithMessage("*schema must be 'certigo.certification-catalog/v1'*");
+    }
+
+    // certigo-content PR #84 (2026-09-08) added the optional lifecycle.transition
+    // field to the canonical catalog; releases carrying it must stay importable.
+    [Theory]
+    [InlineData("announced")]
+    [InlineData("none-announced")]
+    public void Parser_accepts_each_canonical_lifecycle_transition(string transition)
+    {
+        var document = new CertificationCatalogParser().Parse(WithDvaTransition(transition));
+
+        document.Certifications.Single(entry => entry.Id == "aws:dva-c02")
+            .Lifecycle!.Transition.Should().Be(transition);
+    }
+
+    [Fact]
+    public void Parser_keeps_lifecycles_without_transition_valid()
+    {
+        var document = ParseFixture();
+
+        document.Certifications.Where(entry => entry.Lifecycle is not null)
+            .Should().OnlyContain(entry => entry.Lifecycle!.Transition == null);
+    }
+
+    [Fact]
+    public void Parser_rejects_a_lifecycle_transition_outside_the_canonical_enum()
+    {
+        var act = () => new CertificationCatalogParser().Parse(WithDvaTransition("scheduled"));
+
+        act.Should().Throw<InvalidDataException>()
+            .WithMessage("*aws:dva-c02: lifecycle.transition is unsupported.*");
+    }
+
+    private static string WithDvaTransition(string transition)
+    {
+        var catalog = JsonNode.Parse(ReadFixture())!.AsObject();
+        var dva = catalog["certifications"]!.AsArray()
+            .Single(entry => (string?)entry!["id"] == "aws:dva-c02")!;
+        dva["lifecycle"]!["transition"] = transition;
+        return catalog.ToJsonString();
     }
 
     private static CertificationCatalogDocument ParseFixture()

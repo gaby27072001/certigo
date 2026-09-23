@@ -24,4 +24,9 @@
     <ProjectReference Include="..\..\src\Certigo.Domain\Certigo.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="..\Certigo.Application.Tests\Fixtures\canonical-certification-catalog-v1.json"
+                      LogicalName="Certigo.Infrastructure.Tests.Fixtures.canonical-certification-catalog-v1.json" />
+  </ItemGroup>
+
 </Project>
