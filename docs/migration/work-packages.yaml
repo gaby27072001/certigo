@@ -283,8 +283,8 @@ work_packages:
     precondition: "Comparer les ressources Azure live au code Bicep pour identifier le drift et les ressources non gérées. Idempotent : si tout est déjà géré en IaC sans drift, le lot est déjà fait."
     dod: "Les ressources hors-Bicep sont importées/décrites en IaC ; un what-if Bicep ne montre aucun drift non intentionnel ; procédure de détection de drift documentée et exécutable."
     rollback: "Abandon de la branche ; aucune modification appliquée aux ressources live (import descriptif uniquement)."
-    status: in_review
-    notes: "Vague V5 · voie ops/live Azure · PR #371. Inventaire et what-if Provider read-only du 2026-09-04 : staging déjà Bicep/healthy ; réseau CI et autoscale bornés, OpenAI privé/keyless ; aucune création/suppression. be505fa1 reste non classifiée, contrôleur désactivé et R-03 exclu. Apply racine bloqué jusqu'à configuration vérifiée du domaine public staging exigée depuis #364 ; activation OpenAI bloquée séparément car le DNS privé Foundry `privatelink.services.ai.azure.com` n'est pas établi."
+    status: blocked
+    notes: "Réconciliation du 2026-09-23 : voir « Réconciliation staging du 23 septembre 2026 » dans docs/runbooks/AZURE_IAC_OPERATIONS.md et la preuve JSON liée. PR #371 fusionnée, ancien blocage domaine levé. Conservation explicite de la restauration Blob corrigée et mesurée par what-if Provider ; clôture bloquée par le préflight racine avec secret autorisé et le delta Cosmos non classifié. Aucun apply ; tuteur LLM laissé désactivé. Runners et gouvernance hors périmètre."
 
   - id: wp-p1-13-staging-environment
     phase: 1
@@ -295,8 +295,8 @@ work_packages:
     precondition: "Vérifier l'existence d'un environnement de staging isolé de la prod. Idempotent : si le staging existe déjà et est provisionné par IaC, le lot est déjà fait."
     dod: "Un environnement de staging est provisionnable par IaC (paramètres dédiés) et isolé de la prod ; un déploiement de staging réussit + /health vert."
     rollback: "Abandon de la modification ; si un changement approuvé a été appliqué, restaurer le template et les paramètres précédents en mode Incremental. Ne jamais supprimer le RG staging actif comme rollback générique ; prod inchangée."
-    status: todo
-    notes: "Vague V5 · voie ops/live. Précondition et DoD live observées le 2026-09-04 : déploiement subscription Bicep réussi le 2026-08-16, RG peuplé et health vert. Statut conservé todo tant que wp-p1-12 n'est pas done."
+    status: blocked
+    notes: "Réconciliation du 2026-09-23 : voir « Réconciliation staging du 23 septembre 2026 » dans docs/runbooks/AZURE_IAC_OPERATIONS.md. Domaine, déploiement staging et health vérifiés ; aucune configuration de domaine restante pour ce backend. Clôture bloquée par wp-p1-12, pas par Apple ni par le DNS Foundry du tuteur volontairement désactivé."
 
   - id: wp-p1-14-opentelemetry-correlation
     phase: 1

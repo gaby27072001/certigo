@@ -16,8 +16,17 @@ param containerSoftDeleteDays int = 7
 @description('Enable blob versioning (recommended for prod).')
 param enableVersioning bool = false
 
+@description('Point-in-time restore retention in days. Requires versioning and strictly longer blob soft-delete retention.')
+@minValue(1)
+@maxValue(365)
+param blobRestoreDays int
+
 @description('Object id of the GitHub Actions OIDC service principal that uploads immutable deployment packages.')
 param ciDeploymentPrincipalId string
+
+var effectiveRestoreDays = enableVersioning && blobSoftDeleteDays > blobRestoreDays
+  ? blobRestoreDays
+  : fail('Blob point-in-time restore requires versioning and blobSoftDeleteDays greater than blobRestoreDays.')
 
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
   name: accountName
@@ -44,6 +53,8 @@ resource blob 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' = {
   name: 'default'
   properties: {
     isVersioningEnabled: enableVersioning
+    changeFeed: { enabled: true }
+    restorePolicy: { enabled: true, days: effectiveRestoreDays }
     deleteRetentionPolicy: blobSoftDeleteDays > 0 ? { enabled: true, days: blobSoftDeleteDays } : { enabled: false }
     containerDeleteRetentionPolicy: containerSoftDeleteDays > 0 ? { enabled: true, days: containerSoftDeleteDays } : { enabled: false }
   }

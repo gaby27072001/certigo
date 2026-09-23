@@ -145,6 +145,109 @@ au jeu partagé. Vérifier les dix liens et la résolution privée avant de pass
 
 ## Prévol sans mutation
 
+### Réconciliation staging du 23 septembre 2026
+
+**Périmètre de preuve :** mesures en lecture seule depuis le commit
+`43e06a5f6cdc2dbcd84fb2dd00152f29d2ae0bd9`, puis what-if du module Storage corrigé
+dans cette livraison. Abonnement `b8952c8c-8f72-469d-99cd-ac906da4e2fc`,
+tenant `16b3c013-d300-468d-ac64-7eda0820b6d3`. Aucun apply, changement d'accès,
+rotation de secret, modification de runner ou activation du tuteur.
+Les résultats structurés et les deltas complets des ressources analysées sont
+dans [la preuve de préflight](../migration/evidence/2026-09-23-staging-iac.json).
+Cette photographie est invalidée par toute modification des templates,
+paramètres effectifs, variables GitHub, déploiements, policies ou ressources
+Azure concernés ; elle n'autorise aucun déploiement ultérieur.
+
+| Mesure | Résultat vérifié |
+|---|---|
+| PR de réconciliation | [#371](https://github.com/gchambaud_microsoft/Certigo/pull/371) fusionnée le 8 septembre à 15:28:20 UTC |
+| Déploiement racine | `certigo-staging`, `Succeeded`, 9 septembre à 20:40:09 UTC ; correlation ID `2bffde7e-22e5-4b6a-8c9b-39bf68196473` |
+| CD correspondant | [34402007646](https://github.com/gchambaud_microsoft/Certigo/actions/runs/34402007646), `success`, source `10c0c834b63c48410e161cf44ae6c608bdd41cad` |
+| Variables GitHub staging | `PUBLIC_WEB_ORIGIN=https://www.certigo-app.com`, `PUBLIC_DOMAIN_VERIFIED=true`, `APPLE_CIAM_DOMAIN_RECONFIGURED=false` |
+| Pages publiques | GET HTTPS `/privacy-policy/` : 200, sans désactiver la validation TLS |
+| Santé à 19:02–19:03 UTC | `/api/health/live`, `/api/health/ready`, `/api/health` : 200 sur staging et prod ; Cosmos, Storage et Key Vault `ok` |
+| Tuteur runtime | `TUTOR_LLM_ENABLED=False` dans les deux environnements ; inchangé, conformément à ADR-O-01 |
+| Compilation | `infra/main.bicep` et `infra/params/staging.bicepparam`, Bicep 0.44.1 |
+
+L'ancien blocage « variables de domaine absentes » n'est donc plus actuel.
+`accountDeletionEnabled=false` dans le déploiement observé ; la preuve Apple
+ne bloque pas ce backend. Elle ne doit pas être passée à `true` sans test réel.
+Le DNS privé Foundry n'est pas nécessaire à la clôture du staging tant que
+le tuteur LLM reste volontairement désactivé ; aucune ressource Foundry n'a
+été modifiée dans ce lot.
+
+**What-if Provider bornés** contre le RG staging peuplé, avec les paramètres
+non secrets des déploiements modulaires live, et le nouveau `blobRestoreDays=29`
+du template racine pour la seconde mesure Storage :
+
+| Module | Heure UTC | Create / Delete (ressources) | Modify | NoChange | Ignore |
+|---|---|---|---|---|---|
+| `privateNetwork` | 19:09:57 | 0 / 0 | 12 | 0 | 36 |
+| `cosmos` | 19:09:43 | 0 / 0 | 14 | 1 | 41 |
+| `storage`, avant correction | 19:09:45 | 0 / 0 | 3 | 4 | 41 |
+| `storage`, après correction | 19:24:33 | 0 / 0 | 3 | 4 | 41 |
+
+`Ignore` n'est **pas** une preuve d'absence de dérive. Les plans modulaires
+ne couvrent pas les autres modules ni leur composition au scope abonnement.
+Un `Delete` de propriété n'est pas un `Delete` de ressource :
+
+- Storage omettait `changeFeed.enabled=true` et `restorePolicy` activée à
+  29 jours, observés sur dev, staging et prod. Le correctif les préserve
+  explicitement, avec versioning et soft-delete à 30 jours. Le second
+  what-if ne contient plus ces deux suppressions. Il conserve des deltas
+  sur les valeurs par défaut `allowPermanentDelete=false`,
+  `defaultEncryptionScope=$account-encryption-key` et
+  `denyEncryptionScopeOverride=false` ; aucun changement de ces valeurs
+  n'est demandé par le template.
+- Réseau : deltas de métadonnées calculées des zone groups et peerings,
+  et propriétés par défaut ; aucun changement annoncé de CIDR ou d'ID de
+  zone DNS. Le peering applicatif est `Connected` et le zone group Vault
+  référence bien la zone partagée dans `rg-certigo-ci`. Les anciennes
+  zones locales encore inventoriées ne sont ni supprimées ni supposées
+  adoptées par le plan.
+- Cosmos : **écart non classifié**, `enablePartitionKeyMonitor: true -> false`.
+  Le GET ARM avec l'API `2024-11-15` confirme `true` sur les trois comptes,
+  mais le modèle `az cosmosdb show` et le schéma Bicep publié ne l'exposent
+  pas. Ne pas inventer une propriété Bicep ni déclarer ce delta inoffensif.
+  Les autres deltas concernent notamment les valeurs par défaut de
+  résolution des conflits, les métadonnées de sauvegarde des conteneurs
+  et l'endpoint calculé. Le compte conserve le mode de sauvegarde déclaré.
+
+**Clôture non acquise :** `wp-p1-12` reste bloqué, et `wp-p1-13` est bloqué
+par cette dépendance malgré sa santé et son déploiement déjà prouvés.
+Le préflight racine complet n'a pas été lancé : l'opérateur reçoit
+`ForbiddenByRbac` sur `Microsoft.KeyVault/vaults/secrets/getSecret/action`
+pour la clé JWT staging, et les paramètres sécurisés ne sont pas restitués
+par l'historique ARM. Aucune clé fictive, extraction GitHub de secret,
+augmentation RBAC ou ouverture réseau ne remplace cette entrée.
+
+Pour lever le blocage : exécuter le préflight racine `Provider` ci-dessous
+dans un contexte déjà autorisé à fournir la clé réelle, faire classifier le
+delta Cosmos, puis vérifier l'absence de dérive non intentionnelle sur
+**tout** le plan. Si un apply s'avère nécessaire, demander un feu vert
+explicite après présentation du plan et remesurer la santé ensuite.
+Ne pas rejouer CD uniquement pour obtenir un what-if : CD peut appliquer.
+
+Les commandes de mesure ne lisent aucune valeur de secret :
+
+```powershell
+gh api --paginate "repos/gchambaud_microsoft/Certigo/environments/staging/variables?per_page=100"
+az deployment sub show --name certigo-staging --query "{state:properties.provisioningState,at:properties.timestamp,correlationId:properties.correlationId}"
+az deployment group show --resource-group rg-certigo-staging --name storage --query properties.parameters
+# Convertir chaque paramètre non secret {type,value} en {value}, refuser
+# SecureString/SecureObject ou une value absente. Ne pas inventer les entrées.
+# Compiler le module courant ; pour Storage ajouter blobRestoreDays=29,
+# valeur vérifiée dans les paramètres du module du template racine compilé.
+az deployment group what-if --resource-group rg-certigo-staging --template-file infra\modules\storage.bicep --parameters "@storage-parameters.json" --validation-level Provider --no-pretty-print
+```
+
+Sur ce poste Windows, borner chaque invocation Azure (60 secondes pour les
+lectures, 180 secondes pour un what-if), arrêter uniquement son arbre de
+processus en cas de dépassement et conserver l'erreur. Une limite de temps
+atteinte n'est jamais un plan vide réussi.
+
+### Préflight racine avec les secrets autorisés
+
 ```bash
 # 0. Vérifier identité, scope et permissions effectives.
 az account show --query "{subscription:id,tenantId:tenantId,user:user.name}" -o json

@@ -1,18 +1,19 @@
 {
   "id": "wp-p1-13-staging-environment",
-  "status": "todo",
-  "session_id": "3a7e6f1c-db41-4342-9907-f75a1daad567",
-  "branch": "gchambaud-microsoft-p1-13-staging-entra-config",
+  "status": "blocked",
+  "session_id": "121bb363-116e-49c5-860c-59d0035db30c",
+  "branch": "gchambaud-microsoft-phase-1-staging-et-iac",
   "pr": {
     "number": 232,
     "url": "https://github.com/gchambaud_microsoft/Certigo/pull/232"
   },
   "head": "91cb0d4f56666bd381796bfb0c4fea5828334734",
   "checkpoint": {
-    "step": "live-dod-observed-domain-contract-pending",
-    "note": "Le déploiement subscription Bicep certigo-staging a réussi le 2026-08-16 en mode Incremental. RG peuplé, ressources isolées et /health/live, /health/ready, /health verts le 2026-09-04. Le prochain what-if racine exige PUBLIC_WEB_ORIGIN, PUBLIC_DOMAIN_VERIFIED et APPLE_CIAM_DOMAIN_RECONFIGURED, absents de l'environnement GitHub staging ; aucune valeur n'est devinée. Statut todo conservé jusqu'à wp-p1-12 done.",
-    "at": "2026-09-04T07:48:23Z"
+    "step": "domain-and-health-verified-iac-dependency-blocked",
+    "note": "Domaine, déploiement Bicep et santé remesurés ; voir docs/runbooks/AZURE_IAC_OPERATIONS.md, « Réconciliation staging du 23 septembre 2026 », et evidence/2026-09-23-staging-iac.json. Les variables de domaine ne sont plus un blocage. Statut blocked jusqu'à wp-p1-12 done : préflight racine complet et classification Cosmos encore requis. Aucun déploiement effectué.",
+    "at": "2026-09-23T19:24:33Z"
   },
-  "updated_at": "2026-09-04T07:48:23Z",
+  "evidence_ref": "../evidence/2026-09-23-staging-iac.json",
+  "updated_at": "2026-09-23T19:24:33Z",
   "history_ref": "log.jsonl"
 }

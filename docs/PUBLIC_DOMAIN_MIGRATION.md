@@ -1,8 +1,9 @@
 # Migration vers un domaine public possédé
 
-Le dépôt ne configure aucun domaine public par défaut. Les pages légales et les
-fonctions applicatives liées au web restent désactivées tant que la possession
-du domaine et la reconfiguration des dépendances Apple ne sont pas prouvées.
+Le dépôt ne configure aucun domaine public par défaut. Une origine vide garde
+les fonctions de domaine public désactivées, sans interdire le déploiement du
+backend. Une origine renseignée exige une preuve de possession du domaine ;
+l'activation de la suppression de compte exige en plus la preuve Apple.
 
 ## Contrat de configuration
 
@@ -24,8 +25,11 @@ pages légales. Pour ce seul workload, la reconfiguration Apple n'est pas
 requise, mais l'origine et la vérification explicite le sont. Les Environments
 `staging` et `prod` fournissent les trois variables au writer de paramètres ARM.
 L'Environment `beta` et le groupe Codemagic `certigo_mobile_config` fournissent
-le même triplet aux releases mobiles. Toute opération staging/prod, rollback
-compris, et toute release mobile exigent les trois conditions.
+le même triplet aux releases mobiles. Pour le backend, la preuve Apple n'est
+requise que si `ACCOUNT_DELETION_ENABLED=true`. Les releases mobiles conservent
+leur propre gate d'activation. Voir le bilan daté « Réconciliation staging du
+23 septembre 2026 » dans [le runbook IaC](runbooks/AZURE_IAC_OPERATIONS.md) pour
+les valeurs mesurées ; les constats historiques ci-dessous ne les remplacent pas.
 
 ## Garde-fous
 
@@ -34,9 +38,10 @@ compris, et toute release mobile exigent les trois conditions.
 - `.github/scripts/write-secure-bicep-parameters.mjs` valide les variables du
   GitHub Environment et les injecte dans le fichier ARM temporaire en mode
   privé.
-- `infra/main.bicep` répète les contrôles au plan de déploiement. Tout plan
-  staging/prod échoue lorsque le contrat n'est pas prêt, même si la suppression
-  de compte reste désactivée.
+- `infra/main.bicep` répète les contrôles au plan de déploiement. Une preuve
+  sans origine ou une origine non vérifiée échoue ; l'absence de preuve Apple
+  bloque l'activation de la suppression de compte, pas un backend qui la laisse
+  désactivée.
 - `cd-backend.yml` exécute un job de préflight lié à l'Environment cible avant
   tout job qui accède à Azure pour les promotions comme pour les rollbacks, puis
   répète le contrôle dans le job IaC. Les pipelines Android, iOS historique et

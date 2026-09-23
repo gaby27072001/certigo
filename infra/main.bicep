@@ -481,6 +481,7 @@ module storage 'modules/storage.bicep' = {
     // requires versioning and sufficient soft-delete retention, including dev.
     enableVersioning: true
     blobSoftDeleteDays: 30
+    blobRestoreDays: 29
     containerSoftDeleteDays: 30
     ciDeploymentPrincipalId: ciDeploymentPrincipalId
     tags: effectiveTags

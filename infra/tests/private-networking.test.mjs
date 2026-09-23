@@ -273,7 +273,29 @@ test('storage protections remain compatible with policy-enforced point-in-time r
   const parameters = template.resources.storage.properties.parameters;
   assert.equal(parameters.enableVersioning.value, true);
   assert.equal(parameters.blobSoftDeleteDays.value, 30);
+  assert.equal(parameters.blobRestoreDays.value, 29);
   assert.equal(parameters.containerSoftDeleteDays.value, 30);
+
+  const [blob] = resourcesOfType(
+    compileTemplate('infra/modules/storage.bicep'),
+    'Microsoft.Storage/storageAccounts/blobServices',
+  );
+  assert.deepEqual(blob.properties.changeFeed, {
+    enabled: true,
+  });
+  assert.deepEqual(blob.properties.restorePolicy, {
+    enabled: true,
+    days: "[variables('effectiveRestoreDays')]",
+  });
+  const storage = compileTemplate('infra/modules/storage.bicep');
+  assert.equal(storage.parameters.blobRestoreDays.defaultValue, undefined);
+  assert.equal(storage.parameters.blobRestoreDays.minValue, 1);
+  assert.equal(storage.parameters.blobRestoreDays.maxValue, 365);
+  assert.match(
+    storage.variables.effectiveRestoreDays,
+    /and\(parameters\('enableVersioning'\), greater\(parameters\('blobSoftDeleteDays'\), parameters\('blobRestoreDays'\)\)\)/,
+  );
+  assert.match(storage.variables.effectiveRestoreDays, /fail\('Blob point-in-time restore/);
 });
 
 test('policy-constrained services permanently disable public access', () => {
