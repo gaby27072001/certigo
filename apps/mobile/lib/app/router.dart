@@ -21,6 +21,7 @@ import '../features/shop/presentation/shop_screen.dart';
 import '../features/friends/presentation/friends_screen.dart';
 import '../features/exam/presentation/exam_screen.dart';
 import '../features/share/presentation/daily_share_screen.dart';
+import '../features/streak/presentation/streak_screen.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/auth_state.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
@@ -70,6 +71,7 @@ abstract class Routes {
   static const String friends = '/friends';
   static const String exam = '/exam';
   static const String dailyShare = '/share-daily';
+  static const String streak = '/streak';
   static const String accountDeletion = '/account/delete';
   static const String accountDeleted = '/account/deleted';
   static const String manager = '/enterprise';
@@ -450,6 +452,16 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
           state: state,
           begin: const Offset(0, 0.04),
           child: const DailyShareScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.streak,
+        name: 'streak',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (BuildContext context, GoRouterState state) => _stepPage(
+          state: state,
+          begin: const Offset(0, 0.04),
+          child: const StreakScreen(),
         ),
       ),
     ],

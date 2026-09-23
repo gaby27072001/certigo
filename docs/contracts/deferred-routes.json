@@ -45,14 +45,6 @@
       "reason": "Economie. Hors parcours critique, mais mutation idempotente : a contracter avant toute seconde application native."
     },
     {
-      "operation": "GET /streak",
-      "reason": "Gamification. Hors parcours critique."
-    },
-    {
-      "operation": "POST /streak/repair",
-      "reason": "Economie. Hors parcours critique."
-    },
-    {
       "operation": "GET /me/league",
       "reason": "Classement. Hors parcours critique."
     },

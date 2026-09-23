@@ -132,4 +132,47 @@ public sealed class StreakRepairServiceTests
         status.StreakDays.Should().Be(5);
         status.Reason.Should().BeNull();
     }
+
+    [Fact]
+    public async Task GetStatusAsync_publishes_the_balance_and_the_instant_the_window_closes()
+    {
+        var (service, users, _, _) = Build();
+        users.Seed(Profile(5, Today.AddDays(-3), gems: 120));
+
+        var status = await service.GetStatusAsync();
+
+        // Last active 2025-01-03: repairable through the 11th, closed from 2025-01-12T00:00Z.
+        status.Gems.Should().Be(120);
+        status.RepairExpiresAt.Should().Be(new DateTimeOffset(2025, 1, 12, 0, 0, 0, TimeSpan.Zero));
+        status.CoveredByFreeze.Should().BeFalse("two missed days are beyond what one token absorbs");
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_says_when_a_freeze_token_already_covers_the_missed_day()
+    {
+        var (service, users, _, _) = Build();
+        users.Seed(Profile(5, Today.AddDays(-2), gems: 120) with { FreezeTokens = 1 });
+
+        var status = await service.GetStatusAsync();
+
+        // The paid repair stays available — it keeps the token and adds the day — but the
+        // learner must be told that doing nothing already saves the streak.
+        status.Repairable.Should().BeTrue();
+        status.CoveredByFreeze.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_publishes_no_window_and_no_coverage_for_an_intact_streak()
+    {
+        var (service, users, _, _) = Build();
+        users.Seed(Profile(5, Today.AddDays(-1), gems: 120) with { FreezeTokens = 1 });
+
+        var status = await service.GetStatusAsync();
+
+        status.Repairable.Should().BeFalse();
+        status.Reason.Should().Be("intact");
+        status.RepairExpiresAt.Should().BeNull();
+        status.CoveredByFreeze.Should().BeFalse();
+        status.Gems.Should().Be(120);
+    }
 }

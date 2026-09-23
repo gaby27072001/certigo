@@ -215,6 +215,49 @@ class ApiClient {
     });
   }
 
+  /// POSTs [body] and returns the reply with its status, for 2xx and for any
+  /// status [acceptStatus] admits.
+  ///
+  /// [postJson] turns every 4xx into a [ServerFailure] and drops the body. That is
+  /// right for an error, and wrong for an endpoint whose business refusal *is* a
+  /// typed body under a 4xx: `POST /streak/repair` answers 400 with the same shape
+  /// as its 200, naming the reason the repair was refused. The caller interprets
+  /// the accepted body; every other status still takes the uniform error path,
+  /// including the 401 re-authentication hook.
+  ///
+  /// A 2xx body must be a JSON object, or the contract is broken
+  /// ([ParseFailure]). An accepted non-2xx body is passed through only when it is
+  /// one, and is null otherwise: an empty or HTML 400 from a gateway is a refused
+  /// request, not a sign that the app is outdated.
+  Future<Result<ApiResponse<Map<String, dynamic>>>> postJsonResponse(
+    String path,
+    Map<String, dynamic> body, {
+    required bool Function(int status) acceptStatus,
+  }) async {
+    return _guard(() async {
+      final Response<dynamic> res = await _dio.post<dynamic>(
+        path,
+        data: body,
+        options: Options(
+          validateStatus: (int? status) =>
+              status != null && ((status >= 200 && status < 300) || acceptStatus(status)),
+        ),
+      );
+      final int statusCode = res.statusCode ?? 0;
+      final dynamic raw = res.data;
+      return ApiResponse<Map<String, dynamic>>(
+        statusCode: statusCode,
+        headers: res.headers.map.map(
+          (String key, List<String> value) =>
+              MapEntry<String, List<String>>(key.toLowerCase(), List<String>.unmodifiable(value)),
+        ),
+        data: statusCode >= 200 && statusCode < 300
+            ? _asMap(raw)
+            : (raw is Map<String, dynamic> ? raw : null),
+      );
+    });
+  }
+
   /// Runs [action], converting any exception into a typed [Failure].
   Future<Result<T>> _guard<T>(Future<T> Function() action) async {
     try {

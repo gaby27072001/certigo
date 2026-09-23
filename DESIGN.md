@@ -362,6 +362,7 @@ au lieu de figer des valeurs hexadécimales — pour qu'une modification qui
 | `theme/prism_voiceover_contract_test.dart` | une jauge ou un compteur qui perd son annonce de valeur |
 | `theme/prism_accessibility_scope_test.dart` | un axe d'accessibilité résolu mais jamais branché |
 | `apps/mobile/test/haptics_discipline_test.dart` | un `HapticFeedback` hors de `PrismHaptics`, un tap ordinaire qui vibre, un réglage « Vibrations » qui ne coupe pas tout |
+| `apps/mobile/test/prism_button_accessibility_guard_test.dart` | un `PrismButton` qui ampute son libellé à grand texte, ou dont VoiceOver fusionne l'action avec le texte voisin |
 
 Les quatre dernières existent parce que les défauts correspondants ont
 réellement été livrés, puis mesurés. Chacune a été vérifiée **en cassant
@@ -491,3 +492,24 @@ Le modèle correct existait déjà dans le même paquet — `PrismProgressBar` a
 un `label` et une `value` — et il a été généralisé plutôt que réinventé. La
 valeur annoncée est le score **visé**, pas l'image de l'animation : lire la
 trame ferait parler VoiceOver à chaque frame du tween.
+
+### Le bouton coupait son nom, et VoiceOver le noyait
+
+Deux défauts de `PrismButton`, mesurés en livrant « Ma série », tous deux dans le
+composant — donc sur chacun de ses sites d'appel.
+
+- **Troncature.** La face faisait 54 pt **fixes** et le libellé s'élidait. Rendu
+  avec les vraies polices à Dynamic Type 2× sur 390 pt, « Réparer ma série » était
+  peint dans 233 px et coupé. Une action dont le nom est amputé n'en nomme plus
+  aucune. 54 pt devient un **plancher** : un libellé qui ne tient plus sur une ligne
+  passe à la ligne et la face grandit. À 1× — et à 2× tant qu'il tient sur une
+  ligne — le bouton garde exactement sa hauteur, donc aucun écran ne bouge.
+- **Fusion VoiceOver.** Sans `container`, l'étiquette et l'action du bouton
+  fusionnaient dans la frontière sémantique la plus proche. Dans un élément de
+  liste, toute la carte — titre, texte, faits **et** bouton — était annoncée comme
+  un seul bouton. Les boutons Material de Flutter posent `container: true` pour
+  cette raison ; `PrismButton` le pose désormais aussi.
+
+La garde vit dans `apps/mobile/test/`, avec un témoin qui prouve que l'instrument
+sait voir une fusion : sans lui, « un seul nœud trouvé » pourrait venir d'une mesure
+qui n'en voit jamais.

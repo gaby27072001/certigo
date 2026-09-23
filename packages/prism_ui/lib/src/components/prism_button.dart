@@ -4,8 +4,14 @@ import '../theme/prism_color_scheme.dart';
 import '../tokens/prism_elevation.dart';
 import '../tokens/prism_motion.dart';
 import '../tokens/prism_radii.dart';
+import '../tokens/prism_spacing.dart';
 import '../tokens/prism_state.dart';
 import 'prism_pressable.dart';
+
+/// Height of a [PrismButton]'s face at every text size where its label fits one
+/// line. It is a floor: a label that needs more lines grows the face instead of
+/// being truncated.
+const double kPrismButtonFaceHeight = 54;
 
 /// Button hierarchy for Certigo.
 ///
@@ -130,13 +136,21 @@ class _PrismButtonState extends State<PrismButton> {
             const SizedBox(width: 8),
           ],
           Flexible(
-            child: Text(widget.label, style: labelStyle, overflow: TextOverflow.ellipsis),
+            // Wraps rather than ellipsizes: a label cut to « Réparer ma… » names no
+            // action at all. At 1× every label fits one line, so nothing moves.
+            child: Text(widget.label, style: labelStyle, textAlign: TextAlign.center),
           ),
         ],
       ],
     );
 
     return Semantics(
+      // A button is its own VoiceOver element. Without a container, its label and
+      // tap action merge into the nearest boundary — measured: inside a list
+      // item, the whole card (title, body, facts and the button) was announced
+      // as one single button. Flutter's Material buttons set this for the same
+      // reason.
+      container: true,
       button: true,
       enabled: _enabled,
       liveRegion: widget.loading,
@@ -166,34 +180,45 @@ class _PrismButtonState extends State<PrismButton> {
             child: Padding(
               // Room for the focus ring to sit outside the control.
               padding: const EdgeInsets.all(PrismFocusRing.inset),
-              child: SizedBox(
-                height: 54 + lip,
+              child: Padding(
+                // Room for the lip, which sits under the face.
+                padding: EdgeInsets.only(bottom: lip),
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: <Widget>[
                     if (depth)
                       Positioned(
                         top: lip,
+                        bottom: -lip,
                         left: 0,
                         right: 0,
-                        child: Container(height: 54, decoration: _baseDecoration(p)),
+                        child: DecoratedBox(decoration: _baseDecoration(p)),
                       ),
-                    AnimatedPositioned(
+                    // The face sizes the button, and its height is a floor, not a
+                    // fixed value. Measured at Dynamic Type 2× on a 390 pt screen:
+                    // with a fixed 54 pt face, « Réparer ma série » was cut to fit
+                    // 233 px. A label that no longer fits one line now wraps and the
+                    // face grows. At 1× — and at 2× for one line — it stays 54 pt.
+                    AnimatedContainer(
                       duration: state,
                       curve: PrismMotion.continuous,
-                      top: sink,
-                      left: 0,
-                      right: 0,
+                      transform: Matrix4.translationValues(0, sink, 0),
                       child: AnimatedScale(
                         scale: _down ? 0.995 : 1.0,
                         duration: state,
                         curve: PrismMotion.continuous,
                         child: Container(
-                          height: 54,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          constraints: const BoxConstraints(minHeight: kPrismButtonFaceHeight),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: PrismSpacing.xs,
+                          ),
                           decoration: _topDecoration(p),
-                          alignment: Alignment.center,
-                          child: content,
+                          // Not `alignment:` — an Align fills any bounded height,
+                          // so under a Center or in a dialog the face would take
+                          // the whole screen. heightFactor 1 hugs the label; the
+                          // floor above supplies the 54 pt.
+                          child: Center(heightFactor: 1, child: content),
                         ),
                       ),
                     ),
@@ -202,7 +227,9 @@ class _PrismButtonState extends State<PrismButton> {
                         left: -PrismFocusRing.inset,
                         right: -PrismFocusRing.inset,
                         top: -PrismFocusRing.inset,
-                        bottom: -PrismFocusRing.inset,
+                        // The ring still surrounds the lip, which now lies outside
+                        // the stack's own box.
+                        bottom: -PrismFocusRing.inset - lip,
                         child: IgnorePointer(
                           child: PrismFocusIndicator(
                             borderRadius: PrismRadii.buttonAll,

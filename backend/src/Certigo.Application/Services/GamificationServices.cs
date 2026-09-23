@@ -684,7 +684,11 @@ public sealed class StreakRepairService(
             profile.FreezeTokens,
             assessment.Repairable,
             assessment.CostGems,
-            assessment.Reason);
+            assessment.Reason,
+            profile.Gems,
+            assessment.ExpiresAt,
+            assessment.Repairable
+                && StreakService.FreezeCoversGap(profile.FreezeTokens, profile.LastActiveDate, today));
     }
 
     public async Task<StreakRepairResultDto> RepairAsync(StreakRepairRequest request, CancellationToken cancellationToken = default)

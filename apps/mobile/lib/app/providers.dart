@@ -167,6 +167,10 @@ final shopRepositoryProvider = Provider<ShopRepository>(
   (Ref ref) => RemoteShopRepository(ref.watch(apiClientProvider)),
 );
 
+final streakRepositoryProvider = Provider<StreakRepository>(
+  (Ref ref) => RemoteStreakRepository(ref.watch(apiClientProvider)),
+);
+
 final friendRepositoryProvider = Provider<FriendRepository>(
   (Ref ref) => RemoteFriendRepository(ref.watch(apiClientProvider)),
 );
@@ -689,6 +693,13 @@ final achievementBoardProvider = FutureProvider.autoDispose<AchievementBoard>((R
 /// refreshed after a purchase via `ref.invalidate`.
 final shopCatalogProvider = FutureProvider.autoDispose<ShopCatalog>((Ref ref) async {
   return _orThrow(await ref.watch(shopRepositoryProvider).getShop());
+});
+
+/// The server's streak snapshot and repair offer, shared by the Home prompt and
+/// the « Ma série » screen. Auto-disposed; invalidated after a repair ruling so
+/// every surface re-reads the authoritative state.
+final streakStatusProvider = FutureProvider.autoDispose<StreakStatus>((Ref ref) async {
+  return _orThrow(await ref.watch(streakRepositoryProvider).getStatus());
 });
 
 /// The learner's friends list. Auto-disposed; refreshed after add/remove.

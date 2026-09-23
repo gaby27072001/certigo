@@ -28,6 +28,7 @@ enum ErrorSubject {
   lesson('la leçon'),
   quiz('le quiz'),
   account('ton compte'),
+  streak('ta série'),
   generic('ces informations');
 
   const ErrorSubject(this.label);

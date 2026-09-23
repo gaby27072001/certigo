@@ -16,6 +16,7 @@ import '../models/exam.dart';
 import '../models/share_card.dart';
 import '../models/account_deletion.dart';
 import '../models/notification.dart';
+import '../models/streak.dart';
 
 /// Repository contracts consumed by the app's feature controllers.
 ///
@@ -109,6 +110,20 @@ abstract interface class AchievementRepository {
 abstract interface class ShopRepository {
   Future<Result<ShopCatalog>> getShop();
   Future<Result<PurchaseResult>> purchase(PurchaseRequest request);
+}
+
+/// The learner's streak and its paid repair. The server rules on eligibility,
+/// price, balance and window; a repair is idempotent via `clientRepairId`.
+abstract interface class StreakRepository {
+  Future<Result<StreakStatus>> getStatus();
+
+  /// Asks the server to repair the streak.
+  ///
+  /// A **ruling** — granted or refused — is a [Success]: read
+  /// [StreakRepairResult.success] and [StreakRepairResult.refusal]. Only an
+  /// outcome the server did not rule on (transport, 5xx, malformed request,
+  /// expired session) is an [Err], and only then is the outcome unknown.
+  Future<Result<StreakRepairResult>> repair(StreakRepairRequest request);
 }
 
 /// The social graph: friends list, add/remove, and a friends-only leaderboard.

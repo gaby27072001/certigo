@@ -38,7 +38,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-09-23** |
-| Commit de référence analysé | `1a97146f4b9417783d0c46c7076957189ccc498d` |
+| Commit de référence analysé | `36546c8c64f5bdd88af0b1da960d5c8b51b4f65e` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -46,7 +46,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Package public actif | **1735 fichiers** — `sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f` |
 | Package privé actif (`answerKey`) | **812 fichiers** — `sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` |
 | Workflows GitHub Actions | **31** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `ciam-posture-monitor.yml`, `codeql.yml`, `content-infra-apply.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `post-merge-cosmos-account-deletion.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **287 fichiers** — .NET : 4 projets / 115 fichiers ; Flutter/Dart : 6 racines / 164 fichiers ; Python : 1 racine / 8 fichier |
+| Tests découverts | **298 fichiers** — .NET : 4 projets / 117 fichiers ; Flutter/Dart : 6 racines / 173 fichiers ; Python : 1 racine / 8 fichier |
 | Corpus **historique** local | **91 pistes**, **147 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
@@ -473,7 +473,7 @@ flowchart LR
 | **Leçons & exercices** | 🟢 | 🟢 | Leçon paginée façon Duolingo : QCM, multi‑réponses, scénario, texte à trous, **appariement**, **remise en ordre**, spot‑the‑issue. Son + haptique. |
 | **Quiz & scoring** | 🟢 | 🟢 | `POST /quiz/{lessonId}/submit` → score, XP, paliers, feedback. |
 | **Parcours « skill‑path »** | 🟢 | 🟢 | Écran vivant façon Duolingo, règles de progression pures. |
-| **Streak (série)** | 🟢 | 🔴 | `GET /streak` + `POST /streak/repair` : **aucun client mobile** — voir « Réparation de série : backend seul » ci‑dessous. |
+| **Streak (série)** | 🟢 | 🟢 | `GET /streak` + `POST /streak/repair` — écran `streak` (« Ma série » : offre, prix, solde, fenêtre, réparation idempotente) + invite d'accueil — voir « Réparation de série : livrée sur mobile » ci‑dessous. |
 | **Ligues hebdo** | 🟢 | 🟡 | Classement et projection serveur : voir « Exposition mobile des ligues » dans « Prochaines étapes & écarts ». |
 | **Saisons** | 🟢 | 🟢 | Défi mensuel thématisé : `GET /season`, `POST /season/claim` — écran `seasons` (thème, paliers, réclamation). |
 | **Quêtes & succès** | 🟢 | 🟢 | `GET /quests` + `claim`, `GET /achievements` — écrans `quests` & `achievements`. |
@@ -491,23 +491,30 @@ flowchart LR
 | **Organization / Membership** | 🟡 (`off`) | — | Contexte tenant explicite, résolution Person/Membership active, matrice owner/admin/manager/learner, anti-IDOR invitations/teams/offboarding et policies réservées aux futures assignations ; aucun endpoint live. |
 
 > **Lecture clé :** l'écart backend ↔ UI est **comblé pour l'économie de gemmes** : saisons, quêtes,
-> succès, boutique, amis et examens disposent d'un **écran mobile + test widget**. Restent à exposer la
-> **validation E2E sur appareil** et la réparation de série ci‑dessous.
+> succès, boutique, amis, examens et réparation de série disposent d'un **écran mobile + test widget**.
+> Reste à mener la **validation E2E sur appareil**.
 
-> **Réparation de série : backend seul.** Mesuré le **2026-09-09** sur `64dcc22b` : `POST /streak/repair`
-> est **atteignable** (`Certigo.Api/Program.cs` enregistre `IStreakRepairService`, et `StreakFunctions`
-> n'a **aucun** middleware de feature — contrairement aux fonctions `Organization`, `VivaLearning`,
-> `EnterpriseIdentity` et `EnterpriseLearningMetrics`, qui lèvent toutes un
-> `…FeatureDisabledException`). Côté client, **rien** : ni modèle `StreakStatus`, ni `StreakRepository`
-> dans `packages/data`, ni appel à `/streak` — `repair` est **absent** de `apps/mobile/lib`. Le statut
-> est donc 🔴 (absent) et non 🟡 (partiel) : il n'y a pas de client partiel à compléter, il n'y en a
-> aucun. **Ce constat devient faux dès qu'un client `/streak` existe dans `packages/data` et qu'un
-> point d'entrée mobile l'appelle** — c'est la seule condition qui l'invalide.
+> **Réparation de série : livrée sur mobile.** Mesuré le **2026-09-23** sur la branche
+> `gchambaud-microsoft-mobile-reparer-ma-serie` : `RemoteStreakRepository` (`packages/data`) lit
+> `GET /streak` et appelle `POST /streak/repair` ; l'écran « Ma série »
+> (`apps/mobile/lib/features/streak/`) est atteint par le badge de série de l'accueil, toujours, et par
+> une invite d'accueil qui n'apparaît que si le serveur offre une réparation. Le serveur reste seul
+> juge : éligibilité, prix, solde, instant de clôture de la fenêtre et couverture par un gel arrivent
+> dans **un seul instantané** (contrat `docs/contracts/learner-streak/v1`, champs additifs `gems`,
+> `repairExpiresAt`, `coveredByFreeze`) ; l'app les met en forme sans en recalculer aucun. Le refus
+> métier, rendu en `400` avec le corps typé, est distingué d'un `400` de requête mal formée ; la clé
+> `clientRepairId` est conservée tant que l'issue est inconnue. Preuves : `streak_screen_test.dart`,
+> `streak_repair_controller_test.dart`, `home_streak_entry_test.dart`, `streak_dynamic_type_test.dart`
+> (`apps/mobile/test`), et les vecteurs dorés du contrat, lus par `StreakContractGoldenVectorTests`
+> (.NET) et `streak_contract_golden_test.dart` (Dart). **Ce constat devient faux si l'écran, son
+> entrée d'accueil ou le client `/streak` disparaît, ou si le contrat change sans ses vecteurs.** Il ne
+> dit **rien** d'un appareil réel : aucune réparation n'y a encore été jouée, et ce « pas encore »
+> cesse d'être vrai dès qu'un essai sur appareil est consigné.
 >
-> À ne pas confondre avec le **gel de série** (`streak-freeze`, 200 gemmes), qui lui **fonctionne** :
-> le jeton est crédité par la boutique puis consommé automatiquement par `StreakService.UpdateStreak`,
-> sans aucune UI. Le gel protège une série ; la réparation en rachète une déjà rompue, pour 50 gemmes,
-> et c'est elle qui n'est pas exposée.
+> À ne pas confondre avec le **gel de série** (`streak-freeze`, 200 gemmes) : le jeton est crédité par
+> la boutique puis consommé automatiquement par `StreakService.UpdateStreak`. Le gel protège une série ;
+> la réparation en rachète une déjà rompue, pour 50 gemmes. Quand un gel couvre déjà le jour manqué,
+> « Ma série » le dit (`coveredByFreeze`) au lieu de vendre une réparation dont la série n'a pas besoin.
 
 ---
 
@@ -733,7 +740,7 @@ déclarée est dans `codemagic.yaml`.
 - 🟢 Saisons, quêtes, succès, boutique, amis, examens blancs, partage quotidien : **écrans livrés** (+ tests widget) — reste la **validation E2E sur appareil**.
 - Ligues : voir « Exposition mobile des ligues » ci-dessous.
 - Notifications : voir « Exposition mobile des notifications » ci-dessous.
-- 🔴 **Réparation de série** : backend atteignable, **aucun client mobile** — voir « Réparation de série : backend seul » (§4).
+- 🟢 **Réparation de série** : écran « Ma série » + invite d'accueil livrés — reste la **validation E2E sur appareil** ; voir « Réparation de série : livrée sur mobile ».
 
 ### Exposition mobile des ligues
 

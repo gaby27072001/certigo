@@ -95,4 +95,11 @@ public static class StreakService
 
         return stats with { StreakDays = 1, LastActiveDate = today };
     }
+
+    // Mirrors the freeze branch of UpdateStreak for a last-active day in the past:
+    // a token absorbs exactly one missed day, when the goal is met the day after it.
+    // Exposed so a status read can say "your freeze will carry this" instead of a
+    // client re-deriving the rule. StreakFreezeCoverageTests pins the parity.
+    public static bool FreezeCoversGap(int freezeTokens, DateOnly? lastActiveDate, DateOnly today)
+        => freezeTokens > 0 && lastActiveDate == today.AddDays(-2);
 }

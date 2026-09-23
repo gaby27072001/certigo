@@ -48,6 +48,8 @@ void main() {
           // network. It self-hides on failure, so its content is not asserted.
           nextBestProvider('microsoft.az-900.track.main')
               .overrideWith((Ref ref) async => throw StateError('offline')),
+          // Same for the streak-repair prompt, which also self-hides on failure.
+          streakStatusProvider.overrideWith((Ref ref) async => throw StateError('offline')),
         ],
         child: MaterialApp(
           theme: PrismTheme.light(),

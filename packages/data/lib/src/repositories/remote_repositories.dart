@@ -17,6 +17,7 @@ import '../models/exam.dart';
 import '../models/share_card.dart';
 import '../models/account_deletion.dart';
 import '../models/notification.dart';
+import '../models/streak.dart';
 import 'repositories.dart';
 
 /// HTTP-backed implementations of the repository contracts. Each method maps a
@@ -226,6 +227,47 @@ class RemoteShopRepository implements ShopRepository {
   @override
   Future<Result<PurchaseResult>> purchase(PurchaseRequest request) =>
       _api.postJson('/shop/purchase', request.toJson(), PurchaseResult.fromJson);
+}
+
+class RemoteStreakRepository implements StreakRepository {
+  const RemoteStreakRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<StreakStatus>> getStatus() => _api.getJson('/streak', StreakStatus.fromJson);
+
+  @override
+  Future<Result<StreakRepairResult>> repair(StreakRepairRequest request) async {
+    // The server answers a refusal with 400 and the result shape; the middleware
+    // answers a malformed request with 400 and a ProblemDetails. Only the first
+    // is a ruling, and the boolean `success` is what tells them apart
+    // (docs/contracts/learner-streak/v1).
+    final Result<ApiResponse<Map<String, dynamic>>> reply = await _api.postJsonResponse(
+      '/streak/repair',
+      request.toJson(),
+      acceptStatus: (int status) => status == 400,
+    );
+    return reply.when(
+      success: (ApiResponse<Map<String, dynamic>> response) {
+        final Map<String, dynamic>? json = response.data;
+        if (json == null || json['success'] is! bool) {
+          if (response.statusCode == 400) {
+            final Object? detail = json?['detail'];
+            return Err<StreakRepairResult>(
+              ServerFailure(detail is String ? detail : 'Requête refusée', statusCode: 400),
+            );
+          }
+          return const Err<StreakRepairResult>(ParseFailure());
+        }
+        try {
+          return Success<StreakRepairResult>(StreakRepairResult.fromJson(json));
+        } on TypeError {
+          return const Err<StreakRepairResult>(ParseFailure());
+        }
+      },
+      failure: Err<StreakRepairResult>.new,
+    );
+  }
 }
 
 class RemoteFriendRepository implements FriendRepository {

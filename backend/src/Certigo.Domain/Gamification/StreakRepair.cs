@@ -1,6 +1,20 @@
 namespace Certigo.Domain.Gamification;
 
-public readonly record struct StreakRepairAssessment(bool Repairable, int CostGems, DateOnly BridgeTo, string? Reason);
+public readonly record struct StreakRepairAssessment(
+    bool Repairable,
+    int CostGems,
+    DateOnly BridgeTo,
+    string? Reason,
+    DateOnly? LastRepairableDay = null)
+{
+    // Callers derive `today` from the UTC clock, so every day here is a UTC calendar
+    // day and the offer closes at the first UTC instant after LastRepairableDay.
+    // Publishing that instant lets a client state the window without re-deriving
+    // MaxGapDays, and stay correct in any time zone.
+    public DateTimeOffset? ExpiresAt => LastRepairableDay is { } day
+        ? new DateTimeOffset(day.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
+        : null;
+}
 
 // Pure policy for the paid streak-repair gem sink (plan §3.4). A repair bridges
 // a recent gap by moving the last-active marker to yesterday, so the next
@@ -34,6 +48,7 @@ public static class StreakRepairPolicy
             return new StreakRepairAssessment(false, CostGems, bridgeTo, "expired");
         }
 
-        return new StreakRepairAssessment(true, CostGems, bridgeTo, null);
+        // Still repairable while missedDays <= MaxGapDays, i.e. through last + MaxGapDays + 1.
+        return new StreakRepairAssessment(true, CostGems, bridgeTo, null, last.AddDays(MaxGapDays + 1));
     }
 }

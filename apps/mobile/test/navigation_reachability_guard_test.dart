@@ -66,6 +66,9 @@ void main() {
     'exam',
     'dailyShare',
     'notifications',
+    // « Ma série » : le badge de série de l'accueil y mène toujours, et
+    // l'invite de réparation seulement quand le serveur en offre une.
+    'streak',
   };
 
   /// Surfaces d'avant-authentification : ce ne sont pas des destinations de

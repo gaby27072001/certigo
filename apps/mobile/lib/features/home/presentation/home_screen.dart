@@ -6,6 +6,8 @@ import 'package:prism_ui/prism_ui.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/router.dart';
+import '../../streak/presentation/streak_copy.dart';
+import '../../streak/presentation/streak_repair_banner.dart';
 import '../application/home_controller.dart';
 import 'coach_section.dart';
 
@@ -17,6 +19,8 @@ import 'coach_section.dart';
 /// the landing surface:
 ///
 /// * **You** — streak, gems, XP, greeting and the daily goal, from [meProvider].
+///   The streak badge opens « Ma série »; a repair prompt appears beside it only
+///   while the server offers one (`StreakRepairBanner`, self-hiding).
 /// * **Your certification** — readiness, coach, next lesson and weakest domain,
 ///   from [homePathProvider]. Having selected no track yet is data, not an
 ///   error, so it degrades to an invitation instead of a takeover.
@@ -57,6 +61,9 @@ class HomeScreen extends ConsumerWidget {
                 subtitle: _greetingSubtitle(path),
               ),
               const SizedBox(height: 22),
+
+              // ── Your streak — only while the server offers a repair ───────
+              const StreakRepairBanner(),
 
               // ── Your certification ────────────────────────────────────────
               _TrackBand(
@@ -167,7 +174,21 @@ class _ResourceBar extends StatelessWidget {
     }
     return Row(
       children: <Widget>[
-        StreakBadge(days: me.streakDays, active: me.dailyProgress >= 1),
+        // The permanent way into « Ma série ». The badge keeps its size; only the
+        // touch area grows to the 44 pt floor. The container keeps it one
+        // VoiceOver element: without it, this row's gems and XP labels would be
+        // read as part of the same button.
+        Semantics(
+          container: true,
+          hint: StreakLabels.badgeHint,
+          child: PrismPressable(
+            borderRadius: PrismRadii.pillAll,
+            onPressed: () => context.push(Routes.streak),
+            child: PrismTapTarget(
+              child: StreakBadge(days: me.streakDays, active: me.dailyProgress >= 1),
+            ),
+          ),
+        ),
         const SizedBox(width: 8),
         GemCounter(gems: me.gems),
         const Spacer(),

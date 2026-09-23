@@ -105,8 +105,10 @@ void main() {
         disableAnimations: true,
       );
 
+      // Depth: the face sinks onto its lip through a transform, so that the face
+      // can size the button and grow with its label instead of being clipped.
       expect(
-        tester.widget<AnimatedPositioned>(find.byType(AnimatedPositioned)).duration,
+        tester.widget<AnimatedContainer>(find.byType(AnimatedContainer)).duration,
         Duration.zero,
       );
       // The button no longer animates opacity: fading the whole control was

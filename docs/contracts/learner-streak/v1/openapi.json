@@ -1,0 +1,188 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Certigo Learner Streak",
+    "version": "1.0.0",
+    "description": "Statut de serie et reparation payante d'une serie interrompue. Le serveur fait autorite sur la serie, le solde de gemmes et la fenetre de reparation : un client affiche ces valeurs, il ne les recalcule jamais."
+  },
+  "servers": [{ "url": "/api" }],
+  "security": [{ "bearerAuth": [] }],
+  "x-certigo-authorization": {
+    "middleware": "Certigo.Api.Middleware.JwtAuthMiddleware",
+    "bearerRequired": true,
+    "ownerClaimSource": "jwt",
+    "ownerAcceptedFromRequestBody": false,
+    "note": "userId est derive du JWT valide, jamais d'un corps de requete. Aucune operation de ce contrat ne figure dans AnonymousPaths."
+  },
+  "x-certigo-time": {
+    "dayBoundary": "UTC",
+    "note": "Les dates de serie sont des jours calendaires UTC : le service derive aujourd'hui de l'horloge UTC. repairExpiresAt est donc publie comme un instant UTC exclusif, qu'un client convertit en heure locale au lieu de deviner la frontiere de jour du serveur."
+  },
+  "x-certigo-idempotency": {
+    "header": null,
+    "bodyField": "clientRepairId",
+    "operations": ["repairStreakV1"],
+    "note": "Le rejeu d'une reparation avec le meme clientRepairId rend la meme issue sans debiter une seconde fois (operation::streakRepair::{clientRepairId}, ledger streakrepair::{clientRepairId}). Une issue rendue par le serveur, accordee ou refusee, epuise la cle : une nouvelle reparation en exige une neuve."
+  },
+  "paths": {
+    "/streak": {
+      "get": {
+        "operationId": "getStreakStatusV1",
+        "summary": "Serie courante et offre de reparation, en un seul instantane.",
+        "responses": {
+          "200": {
+            "description": "Statut courant. Un profil absent se lit comme une serie nulle (reason noStreak), jamais comme un 404.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StreakStatus" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "423": { "$ref": "#/components/responses/AccountDeletionInProgress" }
+        }
+      }
+    },
+    "/streak/repair": {
+      "post": {
+        "operationId": "repairStreakV1",
+        "summary": "Rachete une serie interrompue contre des gemmes.",
+        "description": "La reparation deplace le dernier jour actif a hier : la serie garde son compte, et le prochain jour ou l'objectif est atteint la prolonge. L'eligibilite et le solde sont reverifies au moment de l'ecriture, sous ETag.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StreakRepairRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reparation accordee : success vaut true.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StreakRepairResult" }
+              }
+            }
+          },
+          "400": {
+            "description": "Deux corps partagent ce statut. Une decision metier porte la forme StreakRepairResult, success a false et error renseigne. Une requete mal formee porte un ProblemDetails, sans champ success. Un client les distingue par la presence d'un booleen success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/StreakRepairResult" },
+                    { "$ref": "#/components/schemas/ProblemDetails" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": {
+            "description": "Ecriture concurrente non resolue apres relecture, ou clientRepairId deja employe par un autre achat.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "423": { "$ref": "#/components/responses/AccountDeletionInProgress" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Jeton porteur absent, invalide ou expire."
+      },
+      "AccountDeletionInProgress": {
+        "description": "Suppression de compte en cours : toute mutation et toute lecture hors /account/deletion est refusee."
+      }
+    },
+    "schemas": {
+      "StreakStatus": {
+        "type": "object",
+        "required": ["streakDays", "lastActiveDate", "freezeTokens", "repairable", "repairCostGems", "reason"],
+        "properties": {
+          "streakDays": { "type": "integer", "minimum": 0 },
+          "lastActiveDate": {
+            "type": ["string", "null"],
+            "format": "date",
+            "description": "Dernier jour UTC ou l'objectif a ete atteint, ou null sans activite."
+          },
+          "freezeTokens": { "type": "integer", "minimum": 0 },
+          "repairable": { "type": "boolean" },
+          "repairCostGems": { "type": "integer", "minimum": 0 },
+          "reason": {
+            "type": ["string", "null"],
+            "enum": ["intact", "expired", "noStreak", null],
+            "description": "Pourquoi la reparation n'est pas offerte ; null quand repairable vaut true. Un client traite une valeur inconnue comme une offre indisponible."
+          },
+          "gems": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Solde de gemmes lu dans le meme instantane que l'offre. Champ additif : un serveur anterieur l'omet, et un client le traite alors comme inconnu."
+          },
+          "repairExpiresAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "Premier instant UTC ou la reparation n'est plus acceptee (borne exclusive) ; null quand repairable vaut false. Champ additif, omis par un serveur anterieur."
+          },
+          "coveredByFreeze": {
+            "type": "boolean",
+            "description": "Vrai quand un gel de serie absorbera le jour manque si l'objectif est atteint aujourd'hui : la reparation reste offerte mais n'est pas necessaire pour sauver la serie. Champ additif, omis par un serveur anterieur."
+          }
+        }
+      },
+      "StreakRepairRequest": {
+        "type": "object",
+        "required": ["clientRepairId"],
+        "properties": {
+          "clientRepairId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cle d'idempotence generee par le client, conservee tant que l'issue est inconnue."
+          }
+        }
+      },
+      "StreakRepairResult": {
+        "type": "object",
+        "required": ["success", "streakDays", "gemsSpent", "gemsBalance", "lastActiveDate", "error"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "streakDays": { "type": "integer", "minimum": 0 },
+          "gemsSpent": { "type": "integer", "minimum": 0 },
+          "gemsBalance": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Solde reconcilie apres l'operation, y compris sur un refus."
+          },
+          "lastActiveDate": { "type": ["string", "null"], "format": "date" },
+          "error": {
+            "type": ["string", "null"],
+            "enum": ["insufficientGems", "intact", "expired", "noStreak", "noLongerRepairable", "conflict", null],
+            "description": "Cause du refus ; null quand success vaut true. Un client traite une valeur inconnue comme un refus sans cause precise."
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -117,7 +117,14 @@ public sealed record StreakStatusDto(
     int FreezeTokens,
     bool Repairable,
     int RepairCostGems,
-    string? Reason);
+    string? Reason,
+    // Additive: one snapshot carries everything a client needs to present the
+    // offer — the balance it is paid from, the instant the window closes, and
+    // whether a freeze token already covers the gap — so no client re-derives a
+    // server rule on the device.
+    int Gems = 0,
+    DateTimeOffset? RepairExpiresAt = null,
+    bool CoveredByFreeze = false);
 
 public sealed record StreakRepairRequest(string ClientRepairId);
 
