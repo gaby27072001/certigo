@@ -123,11 +123,20 @@ contrôle trusted, jamais celui du checkout de PR : une PR ne peut donc pas
 s'auto-approuver en modifiant simultanément un workflow et son empreinte.
 
 La commande manuelle
-`node .github/scripts/generate-workflow-semantic-manifest.mjs --write` est réservée
-à une revue explicite de baseline. Le validateur ne l'appelle jamais. Une rotation
-de baseline doit être fusionnée comme contrôle trusted avant la modification
-sémantique correspondante ; `--check` vérifie ensuite que la génération revue est
-reproductible.
+`node .github/scripts/generate-workflow-semantic-manifest.mjs` n'est appelée par
+aucun workflow, et le validateur ne régénère jamais les empreintes. Un changement
+de workflow passe par deux PR : une **pré-approbation** fusionnée d'abord
+(`--pre-approve` : l'empreinte future s'ajoute à côté de l'actuelle, et le
+contenu exact du futur workflow est versionné, non exécuté, sous
+`.github/workflows-proposed/`), puis la PR qui applique le changement (`--write`,
+qui consomme la pré-approbation). `main` décrit ainsi ses propres workflows après
+chaque fusion. Faire tourner les `states` sans le workflow correspondant — l'ancien
+remède — est désormais refusé : il laissait `main` incohérent et bloquait toutes
+les PR (#497). Procédure : [`runbooks/CI_WORKFLOW_CHANGES.md`](./runbooks/CI_WORKFLOW_CHANGES.md).
+
+Les deux workflows de cycle de vie restent régis par les états A, B et C : leur
+contenu peut être pré-approuvé, jamais leur retrait, et la PR qui l'applique reste
+soumise au contrat exact que le validateur de la base impose à ces fichiers.
 
 Cette PR d’activation ne provisionne aucune ressource et ne lance aucun test :
 elle déplace le one-shot sous `.github/workflows/` tandis que la variable

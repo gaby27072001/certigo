@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "canonicalization": "certigo-workflow-semantic-v1",
   "states": {
     "A": {
@@ -100,5 +100,6 @@
       ".github/workflows/security-scan.yml": "7fe58d8aa920b85581993dd5c83f4956a5a6505812ae9bf60297dd808aa3a26a",
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
-  }
+  },
+  "preApproved": {}
 }

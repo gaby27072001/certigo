@@ -58,6 +58,13 @@ au sens de `docs/GOVERNANCE.md` : il ne rend pas faux, il ne rend rien.
 
 ## La condition d'exécution — pourquoi pas aujourd'hui
 
+> **Levée le 2026-09-23 (#497).** La fenêtre décrite ci-dessous n'existe plus : un changement
+> de workflow passe désormais par une pré-approbation fusionnée d'abord, puis par la PR qui
+> l'applique, et `main` reste cohérent entre les deux — aucune PR ouverte n'échoue plus sur un
+> contrôle étranger à son contenu. Procédure :
+> [`../runbooks/CI_WORKFLOW_CHANGES.md`](../runbooks/CI_WORKFLOW_CHANGES.md). Le texte suivant
+> décrit l'état antérieur.
+
 **Attendre une file de PR vide.**
 
 `.github/scripts/account-deletion-cosmos-policy.test.mjs` compare chaque workflow au
@@ -66,10 +73,12 @@ une fenêtre pendant laquelle **toute PR ouverte échoue** sur un contrôle étr
 contenu, jusqu'à rebase. Au 2026-09-11 il y a une dizaine de PR en vol : le coût dépasse
 le gain.
 
-Rappel de plomberie pour l'exécutant :
+Rappel de plomberie pour l'exécutant (état antérieur au 2026-09-23, remplacé par
+`docs/runbooks/CI_WORKFLOW_CHANGES.md`) :
 
-- le workflow **et** `workflow-semantic-manifest.json` **et** `manifestGoldenDigest`
-  doivent changer **dans un seul commit** ; fractionner casse la CI de tout le monde ;
+- ~~le workflow **et** `workflow-semantic-manifest.json` **et** `manifestGoldenDigest`
+  doivent changer **dans un seul commit** ; fractionner casse la CI de tout le monde~~ — une
+  PR unique est refusée par le validateur ; la pré-approbation, puis la fusion, la remplacent ;
 - `ci-mobile.yml` **n'est pas scellé à l'octet** — vérifié le 2026-09-11 : il ne contient
   ni `secrets.`, ni `environment:`, ni permission d'écriture, donc il n'est pas
   « privilégié » au sens de `.github/scripts/backend-deploy-workflow-policy.mjs`. La

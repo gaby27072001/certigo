@@ -238,8 +238,9 @@ Le passage de B à C doit conserver exactement la baseline active B et ajouter l
 seul workflow one-shot décrit ci-dessus. Le manifeste sémantique trusted épingle
 les ensembles A, B et C par chemin canonique et SHA-256 ; le générateur manuel ne
 fait partie d'aucun workflow et le validateur ne régénère jamais les empreintes.
-Toute rotation de baseline est revue et fusionnée séparément avant le changement
-de workflow qu'elle autorise.
+Tout changement sémantique d'un workflow est d'abord pré-approuvé sur `main`, puis
+appliqué par une PR distincte qui consomme l'approbation : voir
+[`CI_WORKFLOW_CHANGES.md`](./CI_WORKFLOW_CHANGES.md).
 
 ## Fin d'un job et destruction obligatoire
 

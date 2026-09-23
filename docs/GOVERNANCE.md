@@ -222,6 +222,26 @@ déclarées par schéma dans `manifestShapes`, jamais fusionnées en une union p
 > 2026-08-17 et arrive à échéance en bloc à la mi-septembre 2026. **Ce rafraîchissement-là est un
 > changement de données seules : une PR, pas trois.**
 
+### Modifier un workflow : pré-approuver, puis fusionner
+
+> **Invariant : après chaque fusion, le manifeste sémantique de `main` décrit exactement les
+> workflows de `main`.** En place depuis le 2026-09-23 (#497). **Invalidé si**
+> `validate-workflow-security.mjs` cesse d'appeler `validateCandidateWorkflowManifest`.
+
+Le validateur lit le manifeste de la **base**, jamais celui de la PR : une PR ne peut pas
+approuver son propre changement de workflow. Le seul chemin est donc en deux PR — une
+**pré-approbation** qui ajoute l'empreinte future *à côté* de l'actuelle et montre le contenu exact
+du futur workflow sous `.github/workflows-proposed/`, puis la PR qui l'applique et **consomme**
+l'approbation. Procédure, contrôles et preuves :
+[`runbooks/CI_WORKFLOW_CHANGES.md`](runbooks/CI_WORKFLOW_CHANGES.md).
+
+**Le remède qui a précédé était destructeur.** Il faisait tourner les `states` du manifeste dans
+une première PR, avant le workflow : entre les deux fusions, `main` contredisait ses propres
+workflows, et le validateur comme les tests trusted de la base refusaient alors **toutes** les PR —
+y compris celle qui devait réparer. Le validateur juge désormais aussi le manifeste **du candidat**,
+avec le code de la base : une PR dont le manifeste ne décrit pas ses propres workflows, ou dont le
+golden digest ne correspond pas, est refusée **avant** de pouvoir casser `main`.
+
 ### Workflow privilégié : ni ajout, ni modification — la règle est scellée
 
 > **Avant de concevoir quoi que ce soit : un workflow qui parle à Azure ne peut plus être ajouté
@@ -358,7 +378,10 @@ ci-dessus n'a donc de valeur que si `node --version` affiche la version épingl�
 > sur `cd-backend.yml` désaccordé du fichier réel : plus de cent erreurs, toutes issues de la même
 > cause. Témoin qui exclut une autre explication : `main` seule ne produisait aucun échec, et
 > `main` + #357 seule en produisait un. Les deux ont été corrigées avant fusion parce que la suite
-> avait été lancée à la main sur le head fusionné.
+> avait été lancée à la main sur le head fusionné. Depuis le 2026-09-23, le premier cas — un
+> manifeste qui ne décrit pas les workflows de sa propre branche — est refusé par le validateur
+> lui-même (section « Modifier un workflow : pré-approuver, puis fusionner ») ; le second reste
+> du ressort de cette procédure.
 
 > **Et le précédent où la procédure n'a pas été appliquée — celui-là a cassé `main`.** Le train
 > #407 (*merge #328, #357 and #369 as one CI train*) a fusionné le 2026-09-08 à 11 h 51 UTC en

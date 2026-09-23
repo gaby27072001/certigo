@@ -51,9 +51,11 @@ privilégiés**, décrit dans [`../GOVERNANCE.md`](../GOVERNANCE.md) :
   une seule ligne de commentaire à `deploy-privacy-policy.yml` — le validateur
   rend `changed or new privileged capability is forbidden outside cd-backend.yml`.
 
-Le message d'erreur du validateur suggère une rotation de baseline en deux pull
-requests ; **elle ne lève pas ce refus-ci**. Elle traite le jeu de workflows
-attendu, pas la capacité privilégiée.
+Le message d'erreur du validateur recommande une pré-approbation puis une PR de
+fusion (voir [`../runbooks/CI_WORKFLOW_CHANGES.md`](../runbooks/CI_WORKFLOW_CHANGES.md)) ;
+**elle ne lève pas ce refus-ci**. Elle traite l'empreinte du workflow attendu, pas
+la capacité privilégiée : mesuré le 2026-09-23, une montée de version pré-approuvée
+de `release-android.yml` reste refusée à la fusion par le scellé.
 
 Ne pas repartir sur cette piste sans lever le scellé lui-même, ce qui est une
 décision de posture de sécurité et non un choix d'implémentation.

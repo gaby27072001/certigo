@@ -654,9 +654,10 @@ de commentaire** suffit à le faire rejeter.
 > un commentaire vérifiera ses permissions, ses secrets et son environnement, n'y trouvera rien de
 > modifié, et conclura à un bug de l'outil.
 
-Le message qui l'accompagne aggrave la confusion : il propose de régénérer le manifeste sémantique
-avec `generate-workflow-semantic-manifest.mjs --write`. **Ce remède adresse la première erreur et
-jamais la seconde** — vérifié en régénérant réellement le manifeste, le refus reste mot pour mot.
+Le message qui l'accompagne aggrave la confusion : il propose de pré-approuver le changement
+(`generate-workflow-semantic-manifest.mjs --pre-approve`), puis de le fusionner. **Ce remède
+adresse la première erreur et jamais la seconde** — vérifié le 2026-09-23 en pré-approuvant
+réellement une modification de `release-android.yml` : le refus du scellé reste mot pour mot.
 
 **Ne pas tenter de « réparer » Android.** Ce n'est pas un oubli, c'est fermé, et l'essai coûte un
 aller-retour CI complet pour un message trompeur. L'anomalie y disparaîtra d'elle-même le jour où

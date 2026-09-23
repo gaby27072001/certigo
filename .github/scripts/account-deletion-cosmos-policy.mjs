@@ -4,24 +4,34 @@ import { fileURLToPath } from 'node:url';
 import { isAlias, isMap, isPair, isSeq, parseDocument } from 'yaml';
 import {
   fingerprintWorkflow,
+  isPreApprovalActive,
+  legacyWorkflowName,
   loadWorkflowManifest,
+  oneShotWorkflowName,
 } from './workflow-semantic-fingerprint.mjs';
 
-const legacyWorkflow = 'test-account-deletion-cosmos.yml';
-const oneShotWorkflow = 'post-merge-cosmos-account-deletion.yml';
+const legacyWorkflow = legacyWorkflowName;
+const oneShotWorkflow = oneShotWorkflowName;
 const manifestName = 'workflow-semantic-manifest.json';
 const trustedManifestPath = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   manifestName,
 );
 
-// Le validateur lit toujours le manifeste du contrôle trusted, jamais celui du checkout de PR.
-// Régénérer dans la branche est donc sans effet sur la gate : le remède doit nommer les deux PR.
-const baselineRotationRemedy = 'Regenerating inside this branch does NOT unblock this pull '
-  + 'request: the validator always reads the manifest of the trusted control (the base branch), '
-  + 'never the one in this checkout. The regenerated manifest must land on `main` as its own '
-  + 'baseline-rotation pull request first; the workflow change follows in a second one. See '
-  + 'docs/ACCOUNT_DELETION.md, section "Gate d\'intégration Cosmos".';
+// Le validateur lit toujours le manifeste du contrôle trusted (la base), jamais celui du checkout
+// de PR : une PR ne peut donc pas s'auto-approuver. Le seul chemin légitime est la pré-approbation,
+// qui garde `main` cohérent après chaque fusion. Faire tourner `states` sans le workflow
+// correspondant laisserait `main` incohérent et bloquerait toutes les PR (#497).
+const preApprovalRemedy = 'The validator always reads the manifest of the trusted control (the '
+  + 'base branch), never the one in this checkout, so regenerating it here cannot unblock this '
+  + 'pull request. A workflow change takes two pull requests, and main stays consistent after '
+  + 'each: (1) pre-approval: apply the change locally, run `node '
+  + '.github/scripts/generate-workflow-semantic-manifest.mjs --pre-approve`, restore the workflow '
+  + 'files, update manifestGoldenDigest, and merge the manifest alone; (2) landing: apply the '
+  + 'same change on the updated main, run the generator with `--write` (it consumes the '
+  + 'pre-approval), and update manifestGoldenDigest. Never rotate the manifest states without '
+  + 'the workflow change: a main whose manifest disagrees with its own workflows blocks every '
+  + 'pull request (#497). See docs/runbooks/CI_WORKFLOW_CHANGES.md.';
 
 const oneShotCondition = [
   "github.event_name == 'workflow_dispatch'",
@@ -563,10 +573,10 @@ function validateControlledWorkflowFile(filePath, label, errors) {
   }
 }
 
-function validateActiveWorkflowSet(root, workflows, state, errors) {
+function validateActiveWorkflowSet(root, workflows, state, errors, manifestPath, now) {
   let loaded;
   try {
-    loaded = loadWorkflowManifest(trustedManifestPath);
+    loaded = loadWorkflowManifest(manifestPath);
   } catch (error) {
     errors.push(`workflow semantic manifest: ${error.message}`);
     return;
@@ -591,21 +601,60 @@ function validateActiveWorkflowSet(root, workflows, state, errors) {
     return;
   }
 
+  // Un chemin est accepté s'il porte l'empreinte revue de `states` ou l'empreinte d'une
+  // pré-approbation non expirée de la base ; une pré-approbation `null` autorise le retrait, et
+  // l'absence d'un chemin hors `states` est l'état revu (ajout pas encore fusionné).
   const expected = loaded.manifest.states[state];
-  const expectedPaths = Object.keys(expected);
+  const preApproved = loaded.manifest.preApproved;
+  const acceptedValues = new Map();
+  const expiredApprovals = new Map();
+  for (const canonicalPath of new Set([...Object.keys(expected), ...Object.keys(preApproved)])) {
+    const accepted = new Set([
+      Object.hasOwn(expected, canonicalPath) ? expected[canonicalPath] : null,
+    ]);
+    const entry = preApproved[canonicalPath];
+    if (entry && isPreApprovalActive(entry, now)) {
+      accepted.add(entry.digest);
+    } else if (entry) {
+      expiredApprovals.set(canonicalPath, entry.expires);
+    }
+    acceptedValues.set(canonicalPath, accepted);
+  }
+  const pathsByName = new Map(
+    [...acceptedValues.keys()].map((canonicalPath) => [
+      path.posix.basename(canonicalPath),
+      canonicalPath,
+    ]),
+  );
   const entries = fs.readdirSync(workflows, { withFileTypes: true });
-  const actualNames = entries.map((entry) => entry.name).sort();
-  const expectedNames = expectedPaths.map((entry) => path.posix.basename(entry)).sort();
-  if (JSON.stringify(actualNames) !== JSON.stringify(expectedNames)) {
+  const actualNames = new Set(entries.map((entry) => entry.name));
+  const unexpected = [...actualNames].filter((name) => !pathsByName.has(name)).sort();
+  const missing = [...pathsByName]
+    .filter(([name, canonicalPath]) => (
+      !actualNames.has(name) && !acceptedValues.get(canonicalPath).has(null)
+    ))
+    .map(([name]) => name)
+    .sort();
+  if (unexpected.length > 0 || missing.length > 0) {
+    const expectedNames = Object.keys(expected).map((entry) => path.posix.basename(entry)).sort();
+    const pending = Object.keys(preApproved)
+      .map((entry) => (
+        expiredApprovals.has(entry)
+          ? `${path.posix.basename(entry)} (expired ${expiredApprovals.get(entry)})`
+          : path.posix.basename(entry)
+      ))
+      .sort();
     errors.push(
-      `.github/workflows must contain the exact reviewed state ${state} set; `
-      + `expected ${expectedNames.join(', ') || 'none'}; found ${actualNames.join(', ') || 'none'}. `
-      + baselineRotationRemedy,
+      `.github/workflows must contain the exact reviewed state ${state} set`
+      + `${missing.length > 0 ? `; missing ${missing.join(', ')}` : ''}`
+      + `${unexpected.length > 0 ? `; unexpected ${unexpected.join(', ')}` : ''}`
+      + `; expected ${expectedNames.join(', ') || 'none'}`
+      + `; pre-approved ${pending.join(', ') || 'none'}. `
+      + preApprovalRemedy,
     );
   }
 
-  for (const canonicalPath of expectedPaths) {
-    const expectedName = path.posix.basename(canonicalPath);
+  for (const [expectedName, canonicalPath] of [...pathsByName].sort()) {
     const entry = entries.find((candidate) => candidate.name === expectedName);
     if (!entry) {
       continue;
@@ -629,12 +678,16 @@ function validateActiveWorkflowSet(root, workflows, state, errors) {
     const content = fs.readFileSync(filePath, 'utf8');
     const result = fingerprintWorkflow(canonicalPath, content);
     errors.push(...result.errors);
-    if (result.errors.length === 0 && result.digest !== expected[canonicalPath]) {
+    if (result.errors.length === 0 && !acceptedValues.get(canonicalPath).has(result.digest)) {
+      const approval = expiredApprovals.has(canonicalPath)
+        ? `; its pre-approval expired on ${expiredApprovals.get(canonicalPath)} and must be renewed`
+        : Object.hasOwn(preApproved, canonicalPath)
+          ? ' and from its pre-approved digest'
+          : '';
       errors.push(
-        `${canonicalPath}: differs from reviewed semantic manifest; `
-        + 'review the workflow change, then regenerate with '
-        + '`node .github/scripts/generate-workflow-semantic-manifest.mjs --write`. '
-        + baselineRotationRemedy,
+        `${canonicalPath}: differs from reviewed semantic manifest${approval} `
+        + `(found ${result.digest}). `
+        + preApprovalRemedy,
       );
     }
     if (
@@ -664,7 +717,12 @@ function findUnexpectedActiveCosmosWorkflows(workflows, allowedFiles) {
   return unexpected;
 }
 
-export function validateAccountDeletionCosmosLayout(root) {
+// `manifestPath` et `now` n'existent que pour les tests : le validateur CLI lit toujours le
+// manifeste trusted, situé à côté de ce module, à l'heure courante.
+export function validateAccountDeletionCosmosLayout(
+  root,
+  { manifestPath = trustedManifestPath, now = new Date() } = {},
+) {
   const errors = [];
   const workflows = path.join(root, '.github', 'workflows');
   const disabled = path.join(root, '.github', 'workflows-disabled');
@@ -717,6 +775,8 @@ export function validateAccountDeletionCosmosLayout(root) {
     workflows,
     legacyState ? 'A' : archivedState ? 'B' : 'C',
     errors,
+    manifestPath,
+    now,
   );
   if (
     !errors.some((error) => error.startsWith('.github/workflows must be a real'))

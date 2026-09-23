@@ -7,6 +7,14 @@ import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-p
 import { validateBackendDeployWorkspace } from './backend-deploy-workflow-policy.mjs';
 import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
+import {
+  listProposalFiles,
+  validateCandidateWorkflowManifest,
+  validatePreApprovalChanges,
+  validateWorkflowRemovals,
+} from './workflow-manifest-consistency.mjs';
+import { validateRequiredContexts } from './required-context-policy.mjs';
+import { validateRunnerLabels } from './workflow-runner-labels.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -315,6 +323,7 @@ function validateWorkflow(file) {
       errors.push(`${file}: runner must use a fixed Azure self-hosted label set`);
     }
   }
+  errors.push(...validateRunnerLabels(text, file));
   if (
     lines.some(
       (line) => line.trim().startsWith('runs-on:') && line.includes('certigo-ci'),
@@ -1745,12 +1754,21 @@ const workflowFiles = fs
   .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
   .sort()
   .map((file) => path.join(workflowsDir, file));
+// Une proposition deviendra un workflow : les règles par fichier s'y appliquent dès la PR de
+// pré-approbation, pour qu'une approbation ne porte jamais sur un contenu que la fusion refuserait.
+const proposalFiles = listProposalFiles(root).files
+  .map((proposal) => path.join(root, ...proposal.relativePath.split('/')));
 const errors = [
   ...validateAccountDeletionCosmosLayout(root),
+  ...validateCandidateWorkflowManifest(root),
+  ...validatePreApprovalChanges(root),
+  ...validateWorkflowRemovals(root),
+  ...validateRequiredContexts(root, { trustedRoot: controlRoot }),
   ...(fs.existsSync(path.join(workflowsDir, 'copilot-auto-merge.yml'))
     ? ['copilot-auto-merge.yml: privileged auto-merge workflow must remain removed']
     : []),
   ...workflowFiles.flatMap(validateWorkflow),
+  ...proposalFiles.flatMap(validateWorkflow),
   ...validateRepositoryInvariants(),
 ];
 
