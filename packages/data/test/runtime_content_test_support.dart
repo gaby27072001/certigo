@@ -115,8 +115,14 @@ class FakePublicContentSource implements PublicContentSource {
   final Map<String, Uint8List> _files;
   bool corruptNextFile = false;
   Failure? manifestFailure;
+
+  /// When set, every file request after this many successful downloads fails
+  /// with [fileFailure], simulating a connection lost in the middle of a sync.
+  int? failFilesAfter;
+  Failure fileFailure = const NetworkFailure();
   int manifestRequests = 0;
   int fileRequests = 0;
+  int servedFiles = 0;
 
   void promote(PublicContentManifest manifest, List<ContentFixture> fixtures) {
     _manifest = manifest;
@@ -153,6 +159,11 @@ class FakePublicContentSource implements PublicContentSource {
     String? ifNoneMatch,
   }) async {
     fileRequests++;
+    final int? limit = failFilesAfter;
+    if (limit != null && servedFiles >= limit) {
+      return Err<PublicContentFileFetch>(fileFailure);
+    }
+    servedFiles++;
     final Uint8List bytes = Uint8List.fromList(_files[file.id]!);
     if (corruptNextFile) {
       corruptNextFile = false;

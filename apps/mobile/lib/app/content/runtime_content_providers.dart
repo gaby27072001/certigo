@@ -18,6 +18,7 @@ final runtimeContentSynchronizerProvider = Provider<RuntimeContentSynchronizer>(
     source: ref.watch(runtimeContentSourceProvider),
     store: ref.watch(runtimeContentStoreProvider),
     pins: ref.watch(runtimeContentPinRegistryProvider),
+    telemetry: ref.watch(runtimeContentTelemetryProvider),
   );
   return synchronizer;
 });

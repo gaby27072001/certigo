@@ -29,6 +29,7 @@ export 'src/content/api_public_content_source.dart';
 export 'src/content/runtime_content.dart';
 export 'src/content/runtime_content_store.dart';
 export 'src/content/runtime_content_sync.dart';
+export 'src/content/runtime_content_telemetry.dart';
 export 'src/content/runtime_content_lesson_repository.dart';
 
 export 'src/repositories/repositories.dart';
