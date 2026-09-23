@@ -51,8 +51,8 @@ jobs:
               - 'apps/**'
               - 'packages/**'
               - '.github/workflows/ci-mobile.yml'
-              # Voir ci-backend.yml : meme vecteur golden, meme raison.
-              - 'docs/contracts/**/*.golden.json'
+              # Voir ci-backend.yml : tout docs/contracts/, meme raison (#472).
+              - 'docs/contracts/**'
 
   packages:
     name: Pure-Dart packages (core, cortex, data)

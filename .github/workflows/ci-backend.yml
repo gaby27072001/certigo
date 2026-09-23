@@ -47,11 +47,12 @@ jobs:
             relevant:
               - 'backend/**'
               - '.github/workflows/ci-backend.yml'
-              # Les golden vectors cross-langage sont lus par les tests .NET ET Dart
-              # depuis docs/contracts/. Sans ce filtre, une PR ne modifiant que le
-              # vecteur n'executerait aucun des deux cotes : le garde-fou serait
-              # affaibli en vert. Meme filtre dans ci-mobile.yml.
-              - 'docs/contracts/**/*.golden.json'
+              # Tout docs/contracts/ est lu par les tests .NET : documents OpenAPI et
+              # routes differees (ApiSurfaceContractTests), schemas, et golden vectors
+              # cross-langage, aussi lus cote Dart. Sans ce filtre, une PR ne modifiant
+              # qu'un contrat n'executerait pas la garde et fusionnerait en vert (#472).
+              # Meme filtre dans ci-mobile.yml.
+              - 'docs/contracts/**'
 
   build-test:
     name: Build & test
