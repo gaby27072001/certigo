@@ -268,11 +268,11 @@ work_packages:
     size: S
     effort_pweeks: 0.5
     depends_on: [wp-p1-00-decomposition]
-    precondition: "Auditer les workflows CI pour tout point unique de défaillance sur les runners. Idempotent : si les jobs tolèrent déjà l'indisponibilité d'un runner, le lot est déjà fait."
+    precondition: "Vérifier le routage des sources PR, des opérations et des agrégateurs, les labels live disjoints et l'absence d'identité/secrets injectés au pool PR. Le drill de perte d'un runner relève de wp-p2-07, pas de cette DoD."
     dod: "Les sources PR ciblent certigo-pr sans identité/secrets et les opérations ciblent certigo-trusted sans checkout PR, sans runner GitHub-hosted ni fallback croisé."
     rollback: "Abandon de la branche ; les workflows précédents restent en place."
-    status: todo
-    notes: "Vague V5 · voie ops/live (SPOF = point unique de défaillance)."
+    status: done
+    notes: "Clôture de la DoD d'isolation ; preuve datée, inventaire exhaustif et limites dans state/wp-p1-11-ci-spof-runners.json (checkpoint « Isolation des classes de confiance »). Ne vaut ni attestation du disque OS ni validation de reprise : voir le lot distinct wp-p2-07."
 
   - id: wp-p1-12-iac-drift-import
     phase: 1
