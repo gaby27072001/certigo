@@ -20,9 +20,11 @@ import seed_content  # noqa: E402
 
 ITEM_TYPES = ("mcq", "multi", "scenario", "cloze", "ordering", "matchPairs", "spotTheIssue", "applied")
 ANSWER_MATERIAL = frozenset(
-    {"correct", "correctoptionids", "explanation", "rationale", "answerkey", "solution", "matches", "pairs"}
+    {"correct", "correctoptionids", "explanation", "rationale", "answerkey", "solution", "pairs"}
 )
 PUBLIC_CHECK_FIELDS = {"id", "conceptId", "type", "stem", "options"}
+# The right-hand column of matchPairs is public by design (ADR-022); it may ship.
+OPTIONAL_PUBLIC_CHECK_FIELDS = {"matches"}
 
 
 def answer_keys_in(value: Any) -> set[str]:
@@ -68,7 +70,8 @@ class PublicLessonAntiLeakTests(unittest.TestCase):
             with self.subTest(item_type=item_type):
                 public = seed_content.public_block({"type": "check", "check": authored_item(item_type)})
 
-                self.assertEqual(set(public["check"]), PUBLIC_CHECK_FIELDS)
+                self.assertLessEqual(PUBLIC_CHECK_FIELDS, set(public["check"]))
+                self.assertLessEqual(set(public["check"]), PUBLIC_CHECK_FIELDS | OPTIONAL_PUBLIC_CHECK_FIELDS)
                 self.assertEqual(public["check"]["type"], item_type)
                 self.assertEqual(answer_keys_in(public), set())
 
