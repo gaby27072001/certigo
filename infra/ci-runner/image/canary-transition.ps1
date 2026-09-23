@@ -71,6 +71,10 @@ if (
 ) {
   throw 'Image transition is blocked until APT and Flutter network artifacts are fully locked.'
 }
+& node (Join-Path $scriptRoot 'validate-network-inputs.mjs')
+if ($LASTEXITCODE -ne 0) {
+  throw 'Network lock files and exhaustive offline consumption must be validated before any Azure call.'
+}
 if (
   $attestationPolicy.activation.status -ne 'active' -or
   $attestationPolicy.signerDigest -notmatch '^[0-9a-f]{40}$'

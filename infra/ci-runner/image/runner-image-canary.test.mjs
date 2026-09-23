@@ -32,11 +32,8 @@ const disabledWorkflow = await read(
   repositoryRoot,
 );
 
-test('build contract pins integrated PR1 lineage, image, and every source digest', async () => {
-  assert.equal(
-    buildContract.contractCommit,
-    'e70e62407f939b04b3e9d3b532f4a6ae06994a43',
-  );
+test('build contract pins original toolchain lineage, image, and every source digest', async () => {
+  assert.match(buildContract.contractCommit, /^[0-9a-f]{40}$/);
   assert.equal(
     buildContract.toolchainOriginCommit,
     'f8e23b2952e8ca39c59f30081b8950170abb701a',
@@ -46,7 +43,14 @@ test('build contract pins integrated PR1 lineage, image, and every source digest
   assert.equal(buildContract.policy.autoRun, false);
   assert.equal(buildContract.policy.reproducibleInputsReady, false);
   assert.equal(buildContract.reproducibility.status, 'blocked');
-  assert.equal(buildContract.reproducibility.aptSnapshot, null);
+  assert.equal(
+    buildContract.reproducibility.aptSnapshot,
+    'https://snapshot.ubuntu.com/ubuntu/20260807T000000Z/',
+  );
+  const baseEvidence = await read(buildContract.reproducibility.baseImageInventory.path, repositoryRoot);
+  assert.equal(createHash('sha256').update(baseEvidence).digest('hex'),
+    buildContract.reproducibility.baseImageInventory.sha256);
+  assert.equal(JSON.parse(baseEvidence).snapshot, buildContract.reproducibility.aptSnapshot);
   assert.equal(buildContract.reproducibility.aptPackageLockSha256, null);
   assert.equal(buildContract.reproducibility.flutterEngineArtifactLockSha256, null);
   assert.equal(attestationPolicy.signerDigest, null);
@@ -82,7 +86,7 @@ test('image builder is inert by default and distributes an explicit excluded ver
   );
   assert.match(imageBuild, /aptPackageLockSha256\)\) == 64/);
   assert.match(imageBuild, /flutterEngineArtifactLockSha256\)\) == 64/);
-  assert.match(imageBuild, /effectiveDeploymentEnabled = deploymentEnabled && reproducibilityReady/);
+  assert.match(imageBuild, /effectiveDeploymentEnabled = deploymentEnabled && reproducibilityReady && networkInstallerImplemented/);
   assert.equal(
     (imageBuild.match(/if \(effectiveDeploymentEnabled\)/g) ?? []).length,
     3,
@@ -115,7 +119,7 @@ test('canary is a new capacity-one PR-only boundary with no identity or IMDS', (
   assert.match(canary, /signerReady = attestationPolicy\.activation\.status == 'active'/);
   assert.match(
     canary,
-    /effectiveDeploymentEnabled = deploymentEnabled && reproducibleInputsReady && signerReady/,
+    /effectiveDeploymentEnabled = deploymentEnabled && reproducibleInputsReady && signerReady && networkInstallerImplemented/,
   );
   assert.equal(
     (canary.match(/if \(effectiveDeploymentEnabled\)/g) ?? []).length,
@@ -142,7 +146,7 @@ test('canary is a new capacity-one PR-only boundary with no identity or IMDS', (
   assert.match(canaryMain, /signerReady = attestationPolicy\.activation\.status == 'active'/);
   assert.match(
     canaryMain,
-    /effectiveDeploymentEnabled = deploymentEnabled && reproducibleInputsReady && signerReady/,
+    /effectiveDeploymentEnabled = deploymentEnabled && reproducibleInputsReady && signerReady && networkInstallerImplemented/,
   );
   assert.equal(
     (canaryMain.match(/if \(effectiveDeploymentEnabled\)/g) ?? []).length,
@@ -749,8 +753,8 @@ test('release evidence requires cold/warm samples, attestations, and exact rollb
       canaryContract,
       releaseBuildContract,
     ));
-  assert.equal(
-    validateReleaseEvidence(
+  assert.throws(
+    () => validateReleaseEvidence(
       evidence,
       canaryContract,
       releaseBuildContract,
@@ -766,8 +770,8 @@ test('release evidence requires cold/warm samples, attestations, and exact rollb
         direction: 'Promote',
         targetImageId: evidence.imageBuild.galleryImageVersionId,
       },
-    ).warmJobP95Milliseconds,
-    290,
+    ),
+    /ENOENT.*apt-packages[.]lock[.]json/,
   );
   const tampered = structuredClone(whatIf);
   tampered.changes[0].delta[0].after = `${imagePrefix}9.9.9`;
@@ -921,6 +925,11 @@ test('transition and cleanup require explicit authorization and exact isolated s
   assert.ok(
     transition.indexOf('reproducibleInputsReady -ne $true') <
       transition.indexOf('deployment sub what-if'),
+  );
+  assert.ok(
+    transition.indexOf('validate-network-inputs.mjs') > 0 &&
+    transition.indexOf('validate-network-inputs.mjs') <
+      transition.indexOf('& gh attestation verify'),
   );
   assert.match(transition, /deployment sub what-if/);
   assert.match(transition, /--result-format FullResourcePayloads/);

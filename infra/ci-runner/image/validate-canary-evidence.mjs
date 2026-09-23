@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { assertNetworkInputsReady } from './validate-network-inputs.mjs';
 import { pathToFileURL } from 'node:url';
 
 const moduleRoot = new URL('./', import.meta.url);
@@ -816,6 +817,7 @@ export function validateReleaseEvidence(
   if (options.targetImageId !== targetImageId) {
     throw new Error('Requested transition target does not match release evidence.');
   }
+  assertNetworkInputsReady(buildContract);
   return {
     ...summary,
     transitionKind,

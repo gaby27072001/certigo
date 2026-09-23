@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Hashes alone cannot confine the legacy bootstrap, APT, pip or Flutter.
+# Keep direct invocation inert until the offline installer is implemented.
+echo "Image installation blocked: exhaustive offline network input consumption is not implemented (#341)." >&2
+exit 1
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 manifest="${CERTIGO_TOOLCHAIN_MANIFEST:-${script_dir}/toolchain-manifest.json}"
 sbom="${script_dir}/toolchain-sbom.cyclonedx.document"

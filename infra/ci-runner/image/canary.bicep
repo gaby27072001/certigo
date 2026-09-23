@@ -37,13 +37,15 @@ param tags object = {
 }
 
 var contract = loadJsonContent('canary-contract.json')
+// Hashes cannot authorize the legacy network installer. Removal requires #341 execution proofs.
+var networkInstallerImplemented = false
 var buildContract = loadJsonContent('image-build-contract.json')
 var attestationPolicy = loadJsonContent('attestation-policy.json')
 var aptInputsReady = !empty(buildContract.reproducibility.aptSnapshot) && length(string(buildContract.reproducibility.aptPackageLockSha256)) == 64
 var flutterInputsReady = length(string(buildContract.reproducibility.flutterEngineArtifactLockSha256)) == 64
 var reproducibleInputsReady = buildContract.policy.reproducibleInputsReady && buildContract.reproducibility.status == 'locked' && aptInputsReady && flutterInputsReady
 var signerReady = attestationPolicy.activation.status == 'active'
-var effectiveDeploymentEnabled = deploymentEnabled && reproducibleInputsReady && signerReady
+var effectiveDeploymentEnabled = deploymentEnabled && reproducibleInputsReady && signerReady && networkInstallerImplemented
 var labels = join(contract.runner.labels, ',')
 var imageIdLower = toLower(galleryImageVersionId)
 var isExactImageVersion = contains(imageIdLower, '/galleries/') && contains(imageIdLower, '/images/') && contains(imageIdLower, '/versions/') && !endsWith(imageIdLower, '/latest')

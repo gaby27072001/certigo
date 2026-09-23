@@ -24,13 +24,15 @@ param tags object = {
 }
 
 var contract = loadJsonContent('image-build-contract.json')
+// Hashes cannot authorize the legacy network installer. Removal requires #341 execution proofs.
+var networkInstallerImplemented = false
 var aptInputsReady = !empty(contract.reproducibility.aptSnapshot) && length(string(contract.reproducibility.aptPackageLockSha256)) == 64
 var flutterInputsReady = length(string(contract.reproducibility.flutterEngineArtifactLockSha256)) == 64
 var reproducibilityReady = contract.policy.reproducibleInputsReady && contract.reproducibility.status == 'locked' && aptInputsReady && flutterInputsReady
-var effectiveDeploymentEnabled = deploymentEnabled && reproducibilityReady
+var effectiveDeploymentEnabled = deploymentEnabled && reproducibilityReady && networkInstallerImplemented
 var sourceRoot = 'https://raw.githubusercontent.com/${contract.repository}/${contract.contractCommit}/'
 var inputRoot = '/var/tmp/certigo-image-input'
-var contractSha256 = 'e77c1badf0a1e442d38fb7063961e42c0883522473a6bb7e4ddbb2aa3b874a0b'
+var contractSha256 = 'cae8bc67bff8f115ca721fc246d222b5491f12dac9acf2af855949a655f6e4e3'
 var galleryImageDefinitionId = resourceId(
   'Microsoft.Compute/galleries/images',
   contract.destination.galleryName,
@@ -144,6 +146,7 @@ resource imageTemplate 'Microsoft.VirtualMachineImages/imageTemplates@2025-10-01
           name: 'install-exact-toolchain'
           inline: [
             'set -euo pipefail'
+            'echo "Image installation blocked: exhaustive offline network input consumption is not implemented (#341)." >&2; exit 1'
             'cd ${inputRoot}'
             'sudo chmod 0755 bootstrap.sh prewarm-toolchain.sh validate-toolchain.sh inventory-toolchain.sh seal-runner-state.sh job-temp.sh certigo-toolchain-guard-generator'
             'sudo env CERTIGO_RUNNER_LABELS=certigo-pr-image-canary CERTIGO_BLOCK_IMDS=true bash ./bootstrap.sh'
