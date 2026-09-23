@@ -135,12 +135,16 @@ class RemoteQuizRepository implements QuizRepository {
       _api.postJson('/quiz/$lessonId/submit', request.toJson(), SubmitQuizResult.fromJson);
 }
 
-class RemoteLeaderboardRepository implements LeaderboardRepository {
+class RemoteLeaderboardRepository implements LeaderboardRepository, LeagueResolutionRepository {
   const RemoteLeaderboardRepository(this._api);
   final ApiClient _api;
 
   @override
   Future<Result<League>> getMyLeague() => _api.getJson('/me/league', League.fromJson);
+
+  @override
+  Future<Result<LeagueResolution>> previewResolution() =>
+      _api.getJson('/me/league/resolution', LeagueResolution.fromJson);
 }
 
 class RemoteTutorRepository implements TutorRepository {

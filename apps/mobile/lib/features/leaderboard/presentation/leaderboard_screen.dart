@@ -7,6 +7,8 @@ import 'package:prism_ui/prism_ui.dart';
 import '../../../app/providers.dart';
 import '../../../app/router.dart';
 import '../../../shared/widgets/async_module.dart';
+import '../../../shared/errors/error_copy.dart';
+import 'league_resolution_card.dart';
 
 /// Leaderboard — the weekly "Momentum League". Cohort of ~30, tiered, with a
 /// clear promotion zone. Framed positively: we highlight the promotion line and
@@ -23,10 +25,15 @@ class LeaderboardScreen extends ConsumerWidget {
       child: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          onRefresh: () => refreshQuietly(() => ref.refresh(leagueProvider.future)),
+          onRefresh: () async {
+            ref.invalidate(leagueResolutionProvider);
+            await refreshQuietly(() => ref.refresh(leagueProvider.future));
+          },
           child: AsyncModule<League>(
             state: async,
-            errorMessage: LeagueLabels.unavailable,
+            errorMessage: '${LeagueLabels.unavailable} ${describeFailure(async.error).message}',
+            staleMessage: 'Classement non actualisé. Les dernières données restent affichées. '
+                '${describeFailure(async.error).message}',
             onRetry: () => ref.invalidate(leagueProvider),
             loading: (BuildContext context) => const _LeaderboardLoading(),
             data: (BuildContext context, League league) => _LeagueContent(league: league),
@@ -44,12 +51,10 @@ class _LeagueContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int promote = league.promoteCount;
+    final int promote = league.tier == LeagueTier.obsidian ? 0 : league.promoteCount;
     final PrismColorScheme p = context.prism;
-    // A cut only exists when more learners are present than promote. Below that
-    // the whole cohort moves up, and the header must not promise a line the
-    // list cannot draw.
-    final bool hasCut = league.entries.length > promote;
+    // Use the server's count, never a locally reconstructed percentage.
+    final bool hasCut = promote > 0 && league.entries.length > promote;
 
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -57,6 +62,16 @@ class _LeagueContent extends StatelessWidget {
         SliverToBoxAdapter(
           child: _LeagueHeader(league: league, hasCut: hasCut),
         ),
+        if (league.entries.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.gutter),
+              child: LeagueResolutionCard(
+                key: ValueKey<String>(league.periodLeagueId),
+                league: league,
+              ),
+            ),
+          ),
         if (league.entries.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
@@ -81,8 +96,8 @@ class _LeagueContent extends StatelessWidget {
                 final bool isMe = e.userId == league.meUserId;
                 return Column(
                   children: <Widget>[
-                    _EntryRow(entry: e, rank: i + 1, isMe: isMe),
-                    if (hasCut && i == promote - 1) const _PromotionDivider(),
+                    _EntryRow(entry: e, rank: e.rank, isMe: isMe),
+                    if (hasCut && e.rank == promote) const _PromotionDivider(),
                     const SizedBox(height: 8),
                   ],
                 );
@@ -94,7 +109,7 @@ class _LeagueContent extends StatelessWidget {
         // that applies to them anchored at the bottom. The space between is
         // then deliberate, not an unfinished edge. When the list overflows,
         // the remaining space is zero and this costs nothing.
-        if (league.entries.isNotEmpty && !hasCut)
+        if (league.entries.isNotEmpty && !hasCut && promote > 0)
           SliverFillRemaining(
             hasScrollBody: false,
             child: Align(
@@ -131,14 +146,14 @@ class _LeagueContent extends StatelessWidget {
 /// Copy asserted by tests. Named so a wording change cannot silently turn a
 /// widget test red from an unrelated branch.
 abstract final class LeagueLabels {
-  static const String everyonePromotes = 'Toute la cohorte monte cette semaine';
+  static const String everyonePromotes = 'À ce stade, toute la cohorte est en position de monter';
   static const String promotionZone = 'ZONE DE PROMOTION';
   static const String unavailable = 'Impossible de charger la ligue.';
   static const String emptyTitle = 'Pas encore de ligue';
   static const String emptyMessage = 'Termine une leçon pour rejoindre la ligue de la semaine.';
   static const String emptyAction = 'Commencer une leçon';
 
-  static String cut(int promote) => 'top $promote montent';
+  static String cut(int promote) => 'Top $promote en position de monter';
 }
 
 /// The league's anchor. A short cohort leaves most of the viewport unused, so
@@ -182,7 +197,8 @@ class _LeagueHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(_tierLabel(league.tier), style: t.titleLarge),
+                Text(league.tierName == null ? _tierLabel(league.tier) : 'Ligue ${league.tierName}',
+                    style: t.titleLarge),
                 const SizedBox(height: PrismSpacing.xxs),
                 Text(
                   _endsInLabel(league.endsAt),
@@ -195,6 +211,23 @@ class _LeagueHeader extends StatelessWidget {
                     style: t.labelMedium?.copyWith(color: p.success),
                   ),
                 ],
+                if ((league.promoteCount == 0 || league.tier == LeagueTier.obsidian) &&
+                    league.entries.isNotEmpty)
+                  const Text('Aucune promotion prévue pour cette cohorte.'),
+                if (league.nextTier != null) Text('Échelon suivant : ${league.nextTier}'),
+                if ((league.relegateCount ?? 0) > 0)
+                  Text('${league.relegateCount} places de descente'
+                      '${league.previousTier == null ? '' : ' vers ${league.previousTier}'}.'),
+                if ((league.myRank ?? 0) > 0)
+                  Text(
+                    'Votre rang : ${league.myRank}'
+                    '${league.myWeeklyXp == null ? '' : ' · ${league.myWeeklyXp} XP'}\n'
+                    '${_zoneLabel(league.myZone)} · position provisoire',
+                    style: t.bodyMedium?.copyWith(
+                      fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+                    ),
+                  ),
+                const Text('Le résultat final dépend du classement à la clôture.'),
               ],
             ),
           ),
@@ -223,51 +256,51 @@ class _EntryRow extends StatelessWidget {
         horizontal: PrismSpacing.debt14,
         vertical: PrismSpacing.sm,
       ),
-      child: Row(
-        children: <Widget>[
-          _RankMark(rank: rank),
-          const SizedBox(width: 8),
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: p.primarySoft,
-            child: Text(
-              _initials(entry.displayName),
-              style: t.labelMedium?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
+      child: Semantics(
+        label: 'Rang $rank, ${entry.displayName}${isMe ? ', vous' : ''}, '
+            '${entry.weeklyXp} XP, ${_zoneLabel(entry.zone)}',
+        excludeSemantics: true,
+        child: Row(
+          children: <Widget>[
+            _RankMark(rank: rank),
+            const SizedBox(width: 8),
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: p.primarySoft,
+              child: Text(
+                _initials(entry.displayName),
+                style: t.labelMedium?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // One line per learner: a long name plus the "(vous)" suffix used to
-          // wrap, making that single row taller than every other and breaking
-          // the list's rhythm exactly where the eye is drawn. The name yields
-          // first — the "vous" marker never truncates, because it is the one
-          // thing the learner scans this list for.
-          Expanded(
-            child: Row(
-              children: <Widget>[
-                Flexible(
-                  child: Text(
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
                     entry.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: t.bodyLarge?.copyWith(
                       fontWeight: isMe ? FontWeight.w800 : FontWeight.w600,
                     ),
                   ),
-                ),
-                if (isMe)
-                  Text(
-                    ' (vous)',
-                    style: t.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: p.primary,
+                  if (isMe)
+                    Text(
+                      ' (vous)',
+                      style: t.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: p.primary,
+                      ),
                     ),
-                  ),
-              ],
+                  Text('${entry.weeklyXp} XP',
+                      style: t.labelLarge?.copyWith(
+                        color: p.textSecondary,
+                        fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+                      )),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: PrismSpacing.xs),
-          Text('${entry.weeklyXp} XP', style: t.labelLarge?.copyWith(color: p.textSecondary)),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -296,13 +329,17 @@ class _RankMark extends StatelessWidget {
     final bool dark = p.brightness == Brightness.dark;
     final Color? tone = podiumTone(p, rank);
 
-    if (tone == null) {
+    if (tone == null || MediaQuery.textScalerOf(context).scale(14) > 20) {
       return SizedBox(
-        width: 30,
+        width: 48,
         child: Text(
           '$rank',
           textAlign: TextAlign.center,
-          style: t.titleMedium?.copyWith(color: p.textSecondary, fontWeight: FontWeight.w800),
+          style: t.titleMedium?.copyWith(
+            color: p.textSecondary,
+            fontWeight: FontWeight.w800,
+            fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+          ),
         ),
       );
     }
@@ -317,7 +354,11 @@ class _RankMark extends StatelessWidget {
       ),
       child: Text(
         '$rank',
-        style: t.labelLarge?.copyWith(color: tone, fontWeight: FontWeight.w800),
+        style: t.labelLarge?.copyWith(
+          color: tone,
+          fontWeight: FontWeight.w800,
+          fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+        ),
       ),
     );
   }
@@ -344,14 +385,18 @@ class _PromotionDivider extends StatelessWidget {
       child: Row(
         children: <Widget>[
           Expanded(child: Divider(color: p.success, thickness: 1.5)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.debt10),
-            child: Text(
-              LeagueLabels.promotionZone,
-              style: t.labelSmall?.copyWith(
-                color: p.success,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5,
+          Flexible(
+            flex: 5,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: PrismSpacing.debt10),
+              child: Text(
+                LeagueLabels.promotionZone,
+                textAlign: TextAlign.center,
+                style: t.labelSmall?.copyWith(
+                  color: p.success,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           ),
@@ -391,6 +436,13 @@ String _tierLabel(LeagueTier tier) {
     LeagueTier.gold => 'Ligue Or',
     LeagueTier.platinum => 'Ligue Platine',
     LeagueTier.diamond => 'Ligue Diamant',
+    LeagueTier.sapphire => 'Ligue Saphir',
+    LeagueTier.ruby => 'Ligue Rubis',
+    LeagueTier.emerald => 'Ligue Émeraude',
+    LeagueTier.amethyst => 'Ligue Améthyste',
+    LeagueTier.pearl => 'Ligue Perle',
+    LeagueTier.obsidian => 'Ligue Obsidienne',
+    LeagueTier.unknown => 'Ligue',
   };
 }
 
@@ -406,6 +458,11 @@ Color _tierColor(PrismColorScheme p, LeagueTier tier) {
     LeagueTier.gold => p.medalFor(1)!,
     LeagueTier.platinum => p.info,
     LeagueTier.diamond => p.primary,
+    LeagueTier.sapphire || LeagueTier.pearl => p.info,
+    LeagueTier.ruby => p.error,
+    LeagueTier.emerald => p.success,
+    LeagueTier.amethyst || LeagueTier.obsidian => p.primary,
+    LeagueTier.unknown => p.textSecondary,
   };
 }
 
@@ -429,7 +486,14 @@ String _initials(String name) {
   if (parts.isEmpty) {
     return '?';
   }
-  final String a = parts.first.substring(0, 1);
-  final String b = parts.length > 1 ? parts[1].substring(0, 1) : '';
+  final String a = parts.first.characters.first;
+  final String b = parts.length > 1 ? parts[1].characters.first : '';
   return (a + b).toUpperCase();
 }
+
+String _zoneLabel(LeagueZone? zone) => switch (zone) {
+      LeagueZone.promotion => 'Zone de promotion',
+      LeagueZone.safe => 'Zone de maintien',
+      LeagueZone.relegation => 'Zone de descente',
+      null => 'Zone non communiquée',
+    };

@@ -37,8 +37,8 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 
 | Fait observable | Valeur générée |
 |---|---|
-| Date de référence analysée | **2026-09-19** |
-| Commit de référence analysé | `6d1bf140bf5efd31792ff2e42ff89774cab744df` |
+| Date de référence analysée | **2026-09-23** |
+| Commit de référence analysé | `8fc13c5152c51f276da887df7ebb591186081b88` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -46,7 +46,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Package public actif | **1735 fichiers** — `sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f` |
 | Package privé actif (`answerKey`) | **812 fichiers** — `sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` |
 | Workflows GitHub Actions | **31** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `ciam-posture-monitor.yml`, `codeql.yml`, `content-infra-apply.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `post-merge-cosmos-account-deletion.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **279 fichiers** — .NET : 4 projets / 112 fichiers ; Flutter/Dart : 6 racines / 159 fichiers ; Python : 1 racine / 8 fichier |
+| Tests découverts | **281 fichiers** — .NET : 4 projets / 112 fichiers ; Flutter/Dart : 6 racines / 161 fichiers ; Python : 1 racine / 8 fichier |
 | Corpus **historique** local | **91 pistes**, **147 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
@@ -474,7 +474,7 @@ flowchart LR
 | **Quiz & scoring** | 🟢 | 🟢 | `POST /quiz/{lessonId}/submit` → score, XP, paliers, feedback. |
 | **Parcours « skill‑path »** | 🟢 | 🟢 | Écran vivant façon Duolingo, règles de progression pures. |
 | **Streak (série)** | 🟢 | 🔴 | `GET /streak` + `POST /streak/repair` : **aucun client mobile** — voir « Réparation de série : backend seul » ci‑dessous. |
-| **Ligues hebdo** | 🟢 | 🟡 | Tournoi XP hebdomadaire serveur‑autoritaire + `GET /me/league/resolution`. |
+| **Ligues hebdo** | 🟢 | 🟡 | Classement et projection serveur : voir « Exposition mobile des ligues » dans « Prochaines étapes & écarts ». |
 | **Saisons** | 🟢 | 🟢 | Défi mensuel thématisé : `GET /season`, `POST /season/claim` — écran `seasons` (thème, paliers, réclamation). |
 | **Quêtes & succès** | 🟢 | 🟢 | `GET /quests` + `claim`, `GET /achievements` — écrans `quests` & `achievements`. |
 | **Boutique** | 🟢 | 🟢 | `GET /shop` + `POST /shop/purchase` (économie de gemmes) — écran `shop`. |
@@ -731,8 +731,28 @@ déclarée est dans `codemagic.yaml`.
 
 **Écarts backend ↔ mobile (à brancher en UI) :**
 - 🟢 Saisons, quêtes, succès, boutique, amis, examens blancs, partage quotidien : **écrans livrés** (+ tests widget) — reste la **validation E2E sur appareil**.
-- 🟡 Ligues, notifications : partiellement exposés.
+- Ligues : voir « Exposition mobile des ligues » ci-dessous.
+- 🟡 Notifications : partiellement exposées.
 - 🔴 **Réparation de série** : backend atteignable, **aucun client mobile** — voir « Réparation de série : backend seul » (§4).
+
+### Exposition mobile des ligues
+
+Constat du **23 septembre 2026**, borné aux contrats
+`backend/src/Certigo.Application/Dtos/LeaderboardDtos.cs`, au moteur `Leagues.cs`,
+aux écrans `apps/mobile/lib/features/leaderboard/presentation/` et aux tests
+`league_details_test.dart`, `leaderboard_podium_test.dart` et
+`packages/data/test/leaderboard_test.dart` : les échelons du serveur, les rangs/XP/zones,
+les voisins de ligue et la projection personnelle de `GET /me/league/resolution`
+sont exposés. Les champs enrichis absents restent inconnus ; un endpoint de projection
+indisponible n'empêche pas de consulter le classement. L'aperçu n'attribue ni mouvement
+ni gemmes et n'annonce aucune promotion au sommet. Les noms se replient sans troncature
+en grande taille de texte et chaque rang possède un libellé sémantique.
+
+Ce constat doit être revérifié si **les contrats, règles métier, écrans, tests ou
+configurations de déploiement changent**. Il prouve le câblage et les comportements
+automatisés, pas une réponse authentifiée en production ni un parcours VoiceOver sur
+iPhone réel. La parité des identifiants de ligue est vérifiée contre le moteur C#
+par la suite Dart existante.
 
 **Chantiers techniques :**
 - 🏗️ **Provisionner `staging`** par Bicep et valider `/health` ; `dev`, `prod` et CI sont déjà déployés.

@@ -8,6 +8,7 @@ import 'package:certigo/features/shop/presentation/shop_screen.dart';
 import 'package:certigo/shared/widgets/inline_error.dart';
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
+import 'package:certigo/shared/errors/error_copy.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -351,6 +352,9 @@ void main() {
           WidgetTester tester,
         ) async {
           int loads = 0;
+          final String message = surface.name == 'Ligue'
+              ? '${surface.unavailable} ${describeFailure(probe.error).message}'
+              : surface.unavailable;
           await pump(tester, surface, surface.cold(probe.error, () => loads++));
 
           expectNoTechnicalText(tester, context: '${surface.name} / ${probe.name} / froid');
@@ -360,7 +364,7 @@ void main() {
           expect(
             find.descendant(
               of: find.byType(PrismStatusView),
-              matching: find.text(surface.unavailable),
+              matching: find.text(message),
             ),
             findsOneWidget,
             reason: '${surface.name}: the error must say what could not be loaded',
@@ -383,7 +387,7 @@ void main() {
 
           expect(loads, 2,
               reason: '${surface.name}: retry must reload this module, not be a no-op');
-          expect(find.text(surface.unavailable), findsOneWidget);
+          expect(find.text(message), findsOneWidget);
           expectNoTechnicalText(tester, context: '${surface.name} / ${probe.name} / retry');
         });
       }
@@ -423,7 +427,10 @@ void main() {
           expect(
             find.descendant(
               of: find.byType(InlineError),
-              matching: find.text(AsyncModuleLabels.stale),
+              matching: find.text(surface.name == 'Ligue'
+                  ? 'Classement non actualisé. Les dernières données restent affichées. '
+                      '${describeFailure(probe.error).message}'
+                  : AsyncModuleLabels.stale),
             ),
             findsOneWidget,
             reason: '${surface.name}: the stale banner reports the failed update',

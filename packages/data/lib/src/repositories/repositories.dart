@@ -65,6 +65,10 @@ abstract interface class LeaderboardRepository {
   Future<Result<League>> getMyLeague();
 }
 
+abstract interface class LeagueResolutionRepository {
+  Future<Result<LeagueResolution>> previewResolution();
+}
+
 /// The continuously-learning AI tutor: explains one answered item, grounded in
 /// the official lesson and personalised from the learner's running model.
 abstract interface class TutorRepository {
