@@ -57,12 +57,19 @@ bool _orderedEquals(List<String> a, List<String> b) {
   return true;
 }
 
-/// Order-independent multiset-free set equality over ids (no duplicates expected).
+/// Order-independent multiset equality over ids: the same ids with the same
+/// counts, exactly like the server's `AnswerGrading` (a duplicated id never
+/// stands in for a missing one).
 bool unorderedEquals(List<String> a, List<String> b) {
   if (a.length != b.length) return false;
-  final Set<String> other = b.toSet();
+  final Map<String, int> remaining = <String, int>{};
+  for (final String id in b) {
+    remaining[id] = (remaining[id] ?? 0) + 1;
+  }
   for (final String id in a) {
-    if (!other.contains(id)) return false;
+    final int count = remaining[id] ?? 0;
+    if (count == 0) return false;
+    remaining[id] = count - 1;
   }
   return true;
 }
