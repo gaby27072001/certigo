@@ -1,0 +1,979 @@
+{
+  "sourceCommit": "43e06a5f6cdc2dbcd84fb2dd00152f29d2ae0bd9",
+  "subscriptionId": "b8952c8c-8f72-469d-99cd-ac906da4e2fc",
+  "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3",
+  "resourceGroup": "rg-certigo-staging",
+  "validationLevel": "Provider",
+  "deploymentPerformed": false,
+  "rootWhatIf": {
+    "status": "notRun",
+    "blocker": "ForbiddenByRbac",
+    "action": "Microsoft.KeyVault/vaults/secrets/getSecret/action",
+    "secretName": "AUTH-JWT-SIGNING-KEY",
+    "vaultName": "kv-certigo-staging-hwbsy",
+    "fakeSecretUsed": false
+  },
+  "scopeLimit": "Bounded module plans are not a subscription-root drift certificate. Ignore is not NoChange.",
+  "measurements": [
+    {
+      "module": "privateNetwork",
+      "measuredAt": "2026-09-23T19:09:57.250856+00:00",
+      "parameterSource": "live deployment privateNetwork",
+      "sourceDeploymentAt": "2026-09-23T19:09:55.358378+00:00",
+      "status": "Succeeded",
+      "rawResultSha256": "c358a3e9f72be3b49cc1c86c71290fe09a74d48d773b92ccc12b332247325369",
+      "counts": {
+        "Ignore": 36,
+        "Modify": 12
+      },
+      "deltas": [
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-cosmos-certigo-staging",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.isIPv6EnabledPrivateEndpoint",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-cosmos-certigo-staging/privateDnsZoneGroups/default",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": null,
+              "children": [
+                {
+                  "after": null,
+                  "before": null,
+                  "children": [
+                    {
+                      "after": null,
+                      "before": "W/\"359cc390-b6a7-45e3-aa43-ecf23ece02f8\"",
+                      "children": null,
+                      "path": "etag",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-cosmos-certigo-staging/privateDnsZoneGroups/default/privateDnsZoneConfigs/sql",
+                      "children": null,
+                      "path": "id",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "Succeeded",
+                      "children": null,
+                      "path": "properties.provisioningState",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups/privateDnsZoneConfigs",
+                      "children": null,
+                      "path": "type",
+                      "propertyChangeType": "Delete"
+                    }
+                  ],
+                  "path": "0",
+                  "propertyChangeType": "Modify"
+                }
+              ],
+              "path": "properties.privateDnsZoneConfigs",
+              "propertyChangeType": "Array"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-kv-certigo-staging",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.isIPv6EnabledPrivateEndpoint",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-kv-certigo-staging/privateDnsZoneGroups/pdzg-kv-certigo-staging",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": null,
+              "children": [
+                {
+                  "after": null,
+                  "before": null,
+                  "children": [
+                    {
+                      "after": null,
+                      "before": "W/\"0b937303-eeae-4dd6-8395-543bb56d0c7b\"",
+                      "children": null,
+                      "path": "etag",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-kv-certigo-staging/privateDnsZoneGroups/pdzg-kv-certigo-staging/privateDnsZoneConfigs/vault",
+                      "children": null,
+                      "path": "id",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "Succeeded",
+                      "children": null,
+                      "path": "properties.provisioningState",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups/privateDnsZoneConfigs",
+                      "children": null,
+                      "path": "type",
+                      "propertyChangeType": "Delete"
+                    }
+                  ],
+                  "path": "0",
+                  "propertyChangeType": "Modify"
+                }
+              ],
+              "path": "properties.privateDnsZoneConfigs",
+              "propertyChangeType": "Array"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-st-certigo-staging-blob",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.isIPv6EnabledPrivateEndpoint",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-st-certigo-staging-blob/privateDnsZoneGroups/pdzg-st-certigo-staging-blob",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": null,
+              "children": [
+                {
+                  "after": null,
+                  "before": null,
+                  "children": [
+                    {
+                      "after": null,
+                      "before": "W/\"00e01e75-c900-4ebd-9897-3b42b8a45e03\"",
+                      "children": null,
+                      "path": "etag",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-st-certigo-staging-blob/privateDnsZoneGroups/pdzg-st-certigo-staging-blob/privateDnsZoneConfigs/blob",
+                      "children": null,
+                      "path": "id",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "Succeeded",
+                      "children": null,
+                      "path": "properties.provisioningState",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups/privateDnsZoneConfigs",
+                      "children": null,
+                      "path": "type",
+                      "propertyChangeType": "Delete"
+                    }
+                  ],
+                  "path": "0",
+                  "propertyChangeType": "Modify"
+                }
+              ],
+              "path": "properties.privateDnsZoneConfigs",
+              "propertyChangeType": "Array"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-st-certigo-staging-queue",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.isIPv6EnabledPrivateEndpoint",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-st-certigo-staging-queue/privateDnsZoneGroups/default",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": null,
+              "children": [
+                {
+                  "after": null,
+                  "before": null,
+                  "children": [
+                    {
+                      "after": null,
+                      "before": "W/\"cc268aae-8b2a-49e1-80bd-f886658f9ed3\"",
+                      "children": null,
+                      "path": "etag",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-st-certigo-staging-queue/privateDnsZoneGroups/default/privateDnsZoneConfigs/queue",
+                      "children": null,
+                      "path": "id",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "Succeeded",
+                      "children": null,
+                      "path": "properties.provisioningState",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups/privateDnsZoneConfigs",
+                      "children": null,
+                      "path": "type",
+                      "propertyChangeType": "Delete"
+                    }
+                  ],
+                  "path": "0",
+                  "propertyChangeType": "Modify"
+                }
+              ],
+              "path": "properties.privateDnsZoneConfigs",
+              "propertyChangeType": "Array"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-st-certigo-staging-table",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.isIPv6EnabledPrivateEndpoint",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-st-certigo-staging-table/privateDnsZoneGroups/default",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": null,
+              "children": [
+                {
+                  "after": null,
+                  "before": null,
+                  "children": [
+                    {
+                      "after": null,
+                      "before": "W/\"2fd83571-ac4b-4f4e-a4d9-87fb763172f4\"",
+                      "children": null,
+                      "path": "etag",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/privateEndpoints/pe-st-certigo-staging-table/privateDnsZoneGroups/default/privateDnsZoneConfigs/table",
+                      "children": null,
+                      "path": "id",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "Succeeded",
+                      "children": null,
+                      "path": "properties.provisioningState",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups/privateDnsZoneConfigs",
+                      "children": null,
+                      "path": "type",
+                      "propertyChangeType": "Delete"
+                    }
+                  ],
+                  "path": "0",
+                  "propertyChangeType": "Modify"
+                }
+              ],
+              "path": "properties.privateDnsZoneConfigs",
+              "propertyChangeType": "Array"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/virtualNetworks/vnet-certigo-staging",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": "Disabled",
+              "children": null,
+              "path": "properties.privateEndpointVNetPolicies",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": null,
+              "children": [
+                {
+                  "after": null,
+                  "before": null,
+                  "children": [
+                    {
+                      "after": null,
+                      "before": false,
+                      "children": null,
+                      "path": "properties.doNotVerifyRemoteGateways",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": true,
+                      "children": null,
+                      "path": "properties.peerCompleteVnets",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": "FullyInSync",
+                      "children": null,
+                      "path": "properties.peeringSyncLevel",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": {
+                        "addressPrefixes": [
+                          "10.42.0.0/16"
+                        ]
+                      },
+                      "children": null,
+                      "path": "properties.remoteAddressSpace",
+                      "propertyChangeType": "Delete"
+                    },
+                    {
+                      "after": null,
+                      "before": {
+                        "addressPrefixes": [
+                          "10.42.0.0/16"
+                        ]
+                      },
+                      "children": null,
+                      "path": "properties.remoteVirtualNetworkAddressSpace",
+                      "propertyChangeType": "Delete"
+                    }
+                  ],
+                  "path": "0",
+                  "propertyChangeType": "Modify"
+                }
+              ],
+              "path": "properties.virtualNetworkPeerings",
+              "propertyChangeType": "Array"
+            },
+            {
+              "after": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+              "before": null,
+              "children": null,
+              "path": "properties.virtualNetworkPeerings[0].type",
+              "propertyChangeType": "NoEffect"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Network/virtualNetworks/vnet-certigo-staging/virtualNetworkPeerings/peer-to-vnet-certigo-ci",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.doNotVerifyRemoteGateways",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": true,
+              "children": null,
+              "path": "properties.peerCompleteVnets",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "FullyInSync",
+              "children": null,
+              "path": "properties.peeringSyncLevel",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": {
+                "addressPrefixes": [
+                  "10.42.0.0/16"
+                ]
+              },
+              "children": null,
+              "path": "properties.remoteAddressSpace",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": {
+                "addressPrefixes": [
+                  "10.42.0.0/16"
+                ]
+              },
+              "children": null,
+              "path": "properties.remoteVirtualNetworkAddressSpace",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "cosmos",
+      "measuredAt": "2026-09-23T19:09:43.344598+00:00",
+      "parameterSource": "live deployment cosmos",
+      "sourceDeploymentAt": "2026-09-23T19:09:26.806939+00:00",
+      "status": "Succeeded",
+      "rawResultSha256": "cb94bc003696bf479d688e87c24d77a1e83c3d77a443b3fe67ca93b8ce918f54",
+      "counts": {
+        "Ignore": 41,
+        "Modify": 14,
+        "NoChange": 1
+      },
+      "deltas": [
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "schemaType": "WellDefined"
+              },
+              "children": null,
+              "path": "properties.analyticalStorageConfiguration",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "FirstPartyIdentity",
+              "children": null,
+              "path": "properties.defaultIdentity",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": false,
+              "before": true,
+              "children": null,
+              "path": "properties.enablePartitionKeyMonitor",
+              "propertyChangeType": "Modify"
+            },
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.enablePerRegionPerPartitionAutoscale",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "https://cosmos-certigo-staging-hwbsyiwa7tqnw.documents.azure.com:443/",
+              "children": null,
+              "path": "properties.sqlEndpoint",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/attempts",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/content",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/content-control",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/content-private",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/content-public",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/economy",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/enterpriseMetricReceipts",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/events",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/friends",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/leaderboard",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/organizations",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/progress",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-certigo-staging-hwbsyiwa7tqnw/sqlDatabases/certigo/containers/users",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "type": 1
+              },
+              "children": null,
+              "path": "properties.resource.backupPolicy",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": "/_ts",
+              "children": null,
+              "path": "properties.resource.conflictResolutionPolicy.conflictResolutionPath",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "storage-before",
+      "measuredAt": "2026-09-23T19:09:45.505824+00:00",
+      "parameterSource": "live deployment storage",
+      "sourceDeploymentAt": "2026-09-23T19:08:54.529713+00:00",
+      "status": "Succeeded",
+      "rawResultSha256": "7524e82fbb2a608755b5a90d03216b7b1066c8867e84678c5540c84ef047a792",
+      "counts": {
+        "Ignore": 41,
+        "NoChange": 4,
+        "Modify": 3
+      },
+      "deltas": [
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Storage/storageAccounts/stcertigostaginghwbsyiwa/blobServices/default",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": {
+                "enabled": true
+              },
+              "children": null,
+              "path": "properties.changeFeed",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.deleteRetentionPolicy.allowPermanentDelete",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": {
+                "days": 29,
+                "enabled": true
+              },
+              "children": null,
+              "path": "properties.restorePolicy",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Storage/storageAccounts/stcertigostaginghwbsyiwa/blobServices/default/containers/app-package",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": "$account-encryption-key",
+              "children": null,
+              "path": "properties.defaultEncryptionScope",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.denyEncryptionScopeOverride",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Storage/storageAccounts/stcertigostaginghwbsyiwa/blobServices/default/containers/lesson-assets",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": "$account-encryption-key",
+              "children": null,
+              "path": "properties.defaultEncryptionScope",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.denyEncryptionScopeOverride",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "storage",
+      "measuredAt": "2026-09-23T19:24:33.864218+00:00",
+      "parameterSource": "live deployment storage; blobRestoreDays from current compiled root",
+      "sourceDeploymentAt": "2026-09-23T19:08:54.529713+00:00",
+      "status": "Succeeded",
+      "rawResultSha256": "80b11532c76ee86519c3a39b6f16ce732b91ca079640ce1edcd0451fa185c81f",
+      "counts": {
+        "Ignore": 41,
+        "NoChange": 4,
+        "Modify": 3
+      },
+      "deltas": [
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Storage/storageAccounts/stcertigostaginghwbsyiwa/blobServices/default",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.deleteRetentionPolicy.allowPermanentDelete",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Storage/storageAccounts/stcertigostaginghwbsyiwa/blobServices/default/containers/app-package",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": "$account-encryption-key",
+              "children": null,
+              "path": "properties.defaultEncryptionScope",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.denyEncryptionScopeOverride",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        },
+        {
+          "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-staging/providers/Microsoft.Storage/storageAccounts/stcertigostaginghwbsyiwa/blobServices/default/containers/lesson-assets",
+          "changeType": "Modify",
+          "delta": [
+            {
+              "after": null,
+              "before": "$account-encryption-key",
+              "children": null,
+              "path": "properties.defaultEncryptionScope",
+              "propertyChangeType": "Delete"
+            },
+            {
+              "after": null,
+              "before": false,
+              "children": null,
+              "path": "properties.denyEncryptionScopeOverride",
+              "propertyChangeType": "Delete"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "correctedSourcesSha256": {
+    "infra/main.bicep": "942b01124f118323083df1dcb18d1d8df92c8a3f5a7d57ff2e3a20f685f1e15b",
+    "infra/modules/storage.bicep": "118ff56a1f15c3123dbc91a995c217f1234e8cd1ff54d09e0538d960fce1d814"
+  }
+}
