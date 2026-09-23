@@ -529,21 +529,26 @@ et content**. Le verrou transforme cette destruction silencieuse en échec immé
 > suppressions.
 
 > 🧟 **Piège mesuré : ne jamais réduire la capacité d'un scale set tant que le verrou est posé.**
-> Un scale-in (baisse de `sku.capacity`, par `az vmss scale` ou par une règle d'autoscale)
-> demande au scale set de SUPPRIMER des instances. Le verrou refuse chaque suppression
-> (`ScopeLocked`), mais l'instance visée ne revient pas à l'état normal : à l'opération
-> suivante elle passe en `provisioningState: Failed` (`InternalExecutionError`) et ne démarre
-> plus. Mesuré dans l'Activity Log : le 2026-09-11 à 16:09:36Z et 16:14:57Z, trois
-> scale-in manuels ont tenté de supprimer `bbf83c5c`, `a14700a3` et `d8d42366` → `ScopeLocked` ;
-> le 2026-09-12 à 00:48:33Z, la désallocation MCAPS de `bbf83c5c` et `a14700a3` a échoué en
-> `InternalExecutionError`, et chaque `start` a ensuite échoué pareil. Le VMSS PR affiche depuis
-> `sku.capacity = 8` pour 11 instances présentes (11 − 3 suppressions refusées). Conséquences :
+> Un scale-in (baisse de `sku.capacity`, par `az vmss scale`, par une règle d'autoscale ou par
+> un déploiement complet de `pilot.bicep` avec une capacité inférieure au live) demande au scale
+> set de SUPPRIMER des instances. Le verrou refuse chaque suppression (`ScopeLocked`). Séquence
+> mesurée dans l'Activity Log : le 2026-09-11 à 16:09:36Z et 16:14:57Z, deux scale-in manuels
+> ont tenté de supprimer `bbf83c5c`, `a14700a3` (saines, rallumées avec succès le matin même)
+> et `d8d42366` (déjà en échec de provisionnement) → `ScopeLocked` ; le 2026-09-12 à 00:48:33Z,
+> la désallocation MCAPS de `bbf83c5c` et `a14700a3` a échoué en `InternalExecutionError`
+> (`provisioningState: Failed`), et chaque `start` a ensuite échoué pareil. Le mécanisme exact
+> n'est pas documenté par Microsoft, mais les deux instances saines visées sont mortes. Le
+> 2026-09-23, le VMSS PR affiche `sku.capacity = 8` pour 11 instances, soit 11 − 3 : cohérent
+> avec les trois suppressions refusées. Conséquences :
 > - retirer une instance = lever le verrou, supprimer **la VM exacte** (`az vm delete`), vérifier,
->   remettre le verrou (procédure de nettoyage validée par Gabriel) — jamais un scale-in ;
+>   remettre le verrou — jamais un scale-in. Toute suppression exige l'accord explicite de
+>   Gabriel (procédure des sept instances retirées préparée le 2026-09-23, non exécutée) ;
 > - la règle d'autoscale « CPU < 20 % → −1 » du pool trusted était ce piège armé : elle a été
 >   retirée du live le 2026-09-23 à 18:01Z en appliquant `infra/ci-runner/capacity.bicep`
 >   (déploiement `certigo-ci-capacity-20260923180037`, what-if : 1 seul `Modify`, aucune
->   création ni suppression).
+>   création ni suppression ; what-if suivant à 20:11Z : `NoChange`) ;
+> - `pilot.bicep` n'a plus de capacité par défaut : l'opérateur passe la capacité live (voir
+>   `infra/ci-runner/README.md`, « Vérifier aussi la capacité »).
 
 **Effet de bord attendu, pas un bug.** Les verrous sont hérités. Supprimer le private
 endpoint de contenu (`pe-stcertigocntz3wqbdww-blob`, dans `rg-certigo-content`) tente de

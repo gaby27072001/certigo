@@ -472,21 +472,35 @@ la mesure, et deux mécanismes précis les remplacent :
    donc `az vmss show` rend `False` même quand `pilot.bicep` le fournit (voir
    `infra/ci-runner/README.md`, « Séquence de provisionnement »). Le bootstrap prépare le runner
    mais ne l'enregistre jamais, par conception : aucun jeton dans l'IaC.
-2. **Toute création avec `deny-imds-outbound` actif échoue au provisionnement OS.** `d8d42366`
-   (créée à 15:59:32Z le 2026-09-11) finit en `OSProvisioningInternalError` à 16:05:22Z ;
-   `2c1eeb41` et `3601055e` (08:05:58Z le 2026-09-14) échouent à 08:12:00Z ; `765cf6af` et
-   `7d3001c2` (16:13:02Z le 2026-09-11) mettent 6 min et sont ensuite inutilisables. Les quatre
-   créations réussies du 2026-09-14 ont eu lieu juste après la modification de la règle
-   (09:24:52Z) : `Succeeded` en 3 à 40 s. La règle a été remise à 09:27:01Z. La suppression
-   de la règle, tentée d'abord à 09:21:49Z, avait été refusée par le verrou (`Conflict`).
-3. **Tout scale-in sous le verrou `CanNotDelete` laisse l'instance visée en `Failed`.** Le
-   2026-09-11 à 16:09:36Z et 16:14:57Z, trois scale-in ont tenté de supprimer `bbf83c5c`,
-   `a14700a3` et `d8d42366` : `ScopeLocked`. Le 2026-09-12 à 00:48:33Z, la désallocation MCAPS
-   de `bbf83c5c` et `a14700a3` a échoué en `InternalExecutionError`, et chaque `start` ensuite
-   aussi. Le scale set affiche depuis `sku.capacity = 8` pour 11 instances (11 − 3 suppressions
-   refusées). La règle d'autoscale trusted « CPU < 20 % → −1 » armait le même piège sur le pool
-   trusted : elle a été retirée du live le 2026-09-23 à 18:01Z (application de
-   `capacity.bicep`, déploiement `certigo-ci-capacity-20260923180037`).
+2. **Aucune des cinq créations faites avec `deny-imds-outbound` actif n'a donné d'instance
+   utilisable.** `d8d42366` (créée à 15:59:32Z le 2026-09-11) finit en
+   `OSProvisioningInternalError` à 16:05:22Z ; `2c1eeb41` et `3601055e` (08:05:58Z le
+   2026-09-14) échouent à 08:12:00Z ; `765cf6af` et `7d3001c2` (16:13:02Z le 2026-09-11)
+   aboutissent en 6 min puis échouent au redémarrage suivant (constat de #503 du 2026-09-14 :
+   `OSProvisioningClientError ... non-recoverable`, ou retour en `Failed`). Le 2026-09-14, la
+   règle a été **neutralisée** de 09:24:53Z à 09:27:01Z (2 min 08 s) : sa destination a été
+   remplacée par l'adresse de documentation `192.0.2.1/32`. Deux créations lancées à 09:21:58Z
+   ont abouti 3 et 9 s après cette neutralisation ; deux autres, lancées à 09:25:12Z, ont
+   abouti en 41 s. La règle a été rétablie vers `AzurePlatformIMDS` à 09:27:01Z. Avant cela,
+   Azure a refusé les trois variantes plus fines (Activity Log, corps des requêtes) : la
+   suppression (`ScopeLocked`, verrou), une règle `Allow` (`SecurityRuleInvalidAccessType :
+   Allowed values: Deny`) et une restriction de source (`InvalidDNSExfilSourceTag : ... must
+   have "*" as a sourceaddressPrefix`). **La balise `AzurePlatformIMDS` ne peut donc être ni
+   autorisée ni restreinte à quelques sources** : au niveau NSG, le blocage vaut pour tout le
+   sous-réseau ou pour rien.
+3. **Les deux scale-in tentés sous le verrou `CanNotDelete` ont laissé les instances saines
+   visées en `Failed`.** Le 2026-09-11 à 16:09:36Z et 16:14:57Z, deux scale-in ont tenté de
+   supprimer trois instances : `bbf83c5c`, `a14700a3` (saines, runners 28 et 30, rallumées avec
+   succès par la reprise du matin même) et `d8d42366` (déjà en échec de provisionnement) ;
+   chaque suppression a été refusée (`ScopeLocked`). Le 2026-09-12 à 00:48:33Z, la
+   désallocation MCAPS de `bbf83c5c` et `a14700a3` a échoué en `InternalExecutionError`, et
+   chaque `start` ensuite aussi. Le mécanisme exact n'est pas documenté par Microsoft ; la
+   séquence, elle, est mesurée, et la règle de prudence s'impose : ne jamais réduire la
+   capacité sous le verrou. Le 2026-09-23, le scale set affiche `sku.capacity = 8` pour 11
+   instances, soit 11 − 3 : cohérent avec les trois suppressions refusées. La règle
+   d'autoscale trusted « CPU < 20 % → −1 » armait le même piège sur le pool trusted : elle a
+   été retirée du live le 2026-09-23 à 18:01Z (application de `capacity.bicep`, déploiement
+   `certigo-ci-capacity-20260923180037`).
 
 **Conséquence sur le modèle.** Une reconstruction depuis la définition versionnée est
 possible, à deux conditions opérationnelles qui ne sont pas des faiblesses de sécurité des
@@ -501,19 +515,21 @@ plus haut). La cible durable est l'image immuable préchauffée (`infra/ci-runne
 
 **Le modèle live a dérivé de `pilot.bicep` — mesuré par what-if le 2026-09-23 à ~19:45Z**
 (lecture seule, `imageVersion=24.04.202608070`, clé publique lue sur le modèle live,
-`blockImdsAtNsg=true`) : un déploiement complet sur le VMSS existant ferait passer
-`sku.capacity` de 8 à 2 (scale-in, donc le piège du point 3) et `bootstrapSha256` de
-`a590730b…` (live) à `6e798d4e…` (dépôt), c'est-à-dire réécrirait le `customData`. Le reste du
-what-if n'est que du bruit connu (valeurs injectées par Azure sur NAT, IP et VNet, tags). La
-reconstruction documentée passe donc par un **nom de VMSS neuf** (voir
-`infra/ci-runner/README.md`, « Séquence de provisionnement ») ; ce nom doit alors rejoindre
-`scaleSets` de la reprise et `capacity.bicep`.
+`blockImdsAtNsg=true`) : un déploiement complet sur le VMSS existant, avec l'ancien défaut
+`capacity: 2`, aurait fait passer `sku.capacity` de 8 à 2 (scale-in, donc le piège du point 3)
+et `bootstrapSha256` de `a590730b…` (live) à `6e798d4e…` (dépôt), c'est-à-dire réécrit le
+`customData`. Le reste du what-if n'est que du bruit connu (valeurs injectées par Azure sur
+NAT, IP et VNet, tags). Depuis, `capacity` est un paramètre **obligatoire, sans défaut**, de
+`pilot.bicep` (test « the PR pilot template cannot scale in the live pool by default ») :
+l'opérateur doit lire et passer la capacité live. La reconstruction documentée passe par un
+**nom de VMSS neuf** (voir `infra/ci-runner/README.md`, « Séquence de provisionnement ») ; ce
+nom doit alors rejoindre `scaleSets` de la reprise et `capacity.bicep`.
 
-> ⏱️ **Effet mesuré de l'IMDS bloqué sur chaque démarrage.** Un `start` depuis `deallocated`
-> dure ~1 min pour une instance trusted et **~7 min 30 s pour une instance PR** (2026-09-11 :
-> 7 min 32 s et 8 min 01 s ; 2026-09-23 : 7 min 32 s). Hypothèse cohérente mais non prouvée :
-> l'agent invité attend l'IMDS avant de signaler l'état prêt. La reprise en tient compte (aucun
-> délai de vérification n'est déclenché avant la fin des démarrages).
+> ⏱️ **Durée mesurée d'un démarrage PR.** Un `start` depuis `deallocated` dure ~1 min pour
+> une instance trusted et **~7 min 30 s pour une instance PR** (2026-09-11 : 7 min 32 s et
+> 8 min 01 s ; 2026-09-23 : 7 min 32 s). Hypothèse cohérente mais non prouvée : l'agent invité
+> attend l'IMDS, bloqué sur le sous-réseau PR, avant de signaler l'état prêt. La reprise en
+> tient compte (aucun délai de vérification n'est déclenché avant la fin des démarrages).
 
 ### Verrou de suppression sur `rg-certigo-ci`
 
@@ -967,17 +983,32 @@ attendu, trois runners de la classe restant disponibles. Permissions, fork guard
 environnements n'ont pas été modifiés.
 
 > ⚖️ **Reconstruction depuis zéro : le compromis, dit franchement.** Recréer une instance PR
-> depuis `pilot.bicep` exige de lever la règle NSG `deny-imds-outbound` pendant le
-> provisionnement (section « Cause racine des instances PR mortes »). La règle est posée au
-> niveau du **sous-réseau** : pendant cette fenêtre (quelques minutes), les runners PR
-> **déjà en service** perdent la couche NSG du blocage IMDS et ne gardent que la couche OS
-> (`certigo-block-imds.service`, iptables), que le compte `runner` ne peut pas retirer (sudo
-> limité). Aucun jeton n'est exposé dans les deux cas : le VMSS PR n'a pas d'identité managée.
-> Pour ne pas réduire la défense en profondeur des jobs, la reconstruction se fait sans job PR
-> en cours (drainage ou fenêtre creuse), et la nouvelle instance n'est enregistrée qu'après
-> remise de la règle (`pilot-register.sh` refuse tant que l'IMDS répond). Ce drill ne l'a pas
-> exécutée : la dernière reconstruction réelle date du 2026-09-14 (quatre instances,
-> Activity Log) ; celle du 2026-08-06 (run `31090379901`) visait les anciennes VM.
+> depuis `pilot.bicep` exige que l'IMDS soit joignable pendant le provisionnement (section
+> « Cause racine des instances PR mortes », point 2). Or la balise `AzurePlatformIMDS` ne peut
+> être ni autorisée ni restreinte à quelques sources (refus Azure mesurés le 2026-09-14) :
+> réutiliser le réseau du pool en service, c'est lever le blocage NSG pour **tout** le
+> sous-réseau. Pendant cette fenêtre (2 min 08 s le 2026-09-14), les runners PR déjà en service
+> ne gardent que la couche OS (`certigo-block-imds.service`, iptables), que le compte `runner`
+> ne peut pas retirer (sudo limité). Aucun jeton n'est exposable : le VMSS PR n'a pas
+> d'identité managée (mesuré le 2026-09-23) ; l'IMDS ne livrerait que des métadonnées.
+>
+> Deux façons de reconstruire :
+> - **sans compromis (recommandée, jamais exécutée)** : déployer le nouveau VMSS dans une
+>   **pile réseau neuve**. `pilot.bicep` paramètre déjà `vnetName`, `subnetName`, `nsgName`,
+>   `natGatewayName`, `natPublicIpName` et les plages d'adresses : la nouvelle instance a
+>   donc son propre NSG, levé puis reposé sans jamais toucher la règle du pool en service.
+>   Coût : une NAT et une IP publique de plus pendant la cohabitation (~36,50 USD/mois selon
+>   l'estimation du 2026-08-20 dans `infra/ci-runner/README.md`). Ne pas réutiliser le VNet
+>   existant avec un autre sous-réseau : son tableau `subnets` inline demanderait la
+>   suppression du sous-réseau en service ;
+> - **avec compromis borné** : réutiliser le réseau existant, seulement sans job PR en cours
+>   (drainage ou fenêtre creuse), la règle neutralisée le moins longtemps possible.
+>
+> Dans les deux cas, `register-pilot.ps1` refuse de demander un jeton tant que la règle
+> `deny-imds-outbound` ne vise pas `AzurePlatformIMDS` en `Deny`, puis `pilot-register.sh`
+> refuse tant que l'IMDS répond depuis l'instance. Ce drill n'a exécuté aucune
+> reconstruction : la dernière réelle date du 2026-09-14 (quatre instances, Activity Log, avec
+> le compromis) ; celle du 2026-08-06 (run `31090379901`) visait les anciennes VM.
 
 ## Résilience exclusivement Azure
 

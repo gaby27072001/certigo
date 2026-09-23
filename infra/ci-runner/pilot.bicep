@@ -45,6 +45,10 @@ param blockImdsAtNsg bool = true
 @minValue(64)
 param osDiskSizeGiB int = 128
 
+@description('Number of instances in the scale set. No default on purpose: on the EXISTING scale set this must equal the live sku.capacity (az vmss show -g RG-CERTIGO-CI -n <name> --query sku.capacity), because a lower value is a scale-in. Under the rg-certigo-ci CanNotDelete lock, the refused deletions of 2026-09-11 left the two healthy targeted instances in provisioningState Failed (docs/CI_RUNNER_RESILIENCE.md).')
+@minValue(1)
+param capacity int
+
 @description('Dedicated, unpeered virtual network for the PR-only runner.')
 param vnetName string = 'vnet-certigo-pr-pilot'
 
@@ -230,7 +234,7 @@ resource runnerScaleSet 'Microsoft.Compute/virtualMachineScaleSets@2024-11-01' =
     // actif. Mesuré : ~30 min d'échec avec la règle, `Succeeded` en 1,1 min sans elle.
     // La défense en profondeur reste assurée par certigo-block-imds.service au niveau
     // de l'OS (voir infra/ci-runner/pilot-preflight.sh).
-    capacity: 2
+    capacity: capacity
   }
   properties: {
     orchestrationMode: 'Flexible'

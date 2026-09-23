@@ -83,7 +83,7 @@ reste un pool éphémère. Un même runner ne doit jamais porter à la fois `cer
 
 | Propriété | Valeur épinglée |
 | --- | --- |
-| VMSS | `vmss-certigo-pr-pilot-z1`, Flexible, capacité 1, zone 1 |
+| VMSS | `vmss-certigo-pr-pilot-z1`, Flexible, zone 1 ; capacité : paramètre obligatoire `capacity`, sans défaut (voir « Vérifier aussi la capacité ») |
 | Taille / disque | `Standard_D2ads_v6` / Premium SSD LRS 128 Gio |
 | Image | `Canonical:ubuntu-24_04-lts:server:24.04.202608070` |
 | Sécurité | Trusted Launch, Secure Boot, vTPM, chiffrement hôte |
@@ -111,14 +111,19 @@ l'identité prévue par `runner.bicep`, tandis que le pilote PR échoue fermé.
 > `what-if`, en comparant le `bootstrapSha256` déployé à celui du dépôt :
 >
 > ```bash
+> LIVE_CAPACITY="$(az vmss show --subscription <SUBSCRIPTION_ID> \
+>   --resource-group RG-CERTIGO-CI --name vmss-certigo-pr-pilot-z1 \
+>   --query sku.capacity --output tsv)"
 > az deployment group what-if \
 >   --subscription <SUBSCRIPTION_ID> \
 >   --resource-group RG-CERTIGO-CI \
 >   --template-file infra/ci-runner/pilot.bicep \
 >   --parameters imageVersion="$IMAGE_VERSION" \
 >                adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
+>                runnerScaleSetName=vmss-certigo-pr-pilot-z1 \
+>                capacity="$LIVE_CAPACITY" \
 >                blockImdsAtNsg=true \
->   | grep -A2 bootstrapSha256
+>   | grep -A2 -E 'bootstrapSha256|sku.capacity'
 > ```
 >
 > Si les deux empreintes diffèrent, **ne pas déployer le modèle complet** :
@@ -127,13 +132,14 @@ l'identité prévue par `runner.bicep`, tandis que le pilote PR échoue fermé.
 > présente au moment de l'ajout de la deuxième instance PR ; c'est pourquoi ce
 > scale-out n'a pas emprunté la voie documentée ci-dessous.
 >
-> **Vérifier aussi la capacité.** `pilot.bicep` déclare `capacity: 2` alors que le
-> live affichait `sku.capacity = 8` pour 11 instances le 2026-09-23 (quatre utiles).
-> Un déploiement complet non aligné ferait baisser la capacité, donc un scale-in :
-> sous le verrou `CanNotDelete`, les instances visées — possiblement des runners en
-> service — finiraient en `Failed` (voir « Cause racine des instances PR mortes »
-> dans `docs/CI_RUNNER_RESILIENCE.md`). Le what-if doit montrer `sku.capacity`
-> inchangé ; sinon, aligner le paramètre avant tout déploiement.
+> **Vérifier aussi la capacité.** Depuis le 2026-09-23, `capacity` n'a plus de valeur
+> par défaut : sur le VMSS existant, lui passer la valeur live (`LIVE_CAPACITY`
+> ci-dessus). Le what-if du 2026-09-23, fait avec l'ancien défaut `capacity: 2`
+> alors que le live affichait `sku.capacity = 8`, montrait un passage de 8 à 2 :
+> un scale-in. Sous le verrou `CanNotDelete`, les suppressions refusées du
+> 2026-09-11 ont laissé les deux instances saines visées en `Failed` (voir « Cause
+> racine des instances PR mortes » dans `docs/CI_RUNNER_RESILIENCE.md`). Le what-if
+> doit montrer `sku.capacity` inchangé avant tout déploiement.
 
 Toujours utiliser un nom de VMSS neuf et le mode incrémentiel. Le premier déploiement
 laisse temporairement la règle NSG IMDS absente pour que l'agent Azure et cloud-init
@@ -144,14 +150,18 @@ terminent ; il ne contient aucun jeton et le bootstrap installe immédiatement l
 > qui doivent rester égaux aux deux scale sets de `infra/ci-runner/capacity.bicep` (test
 > « the recovery scope is declared once and follows the inventory »). Un nouveau VMSS sans
 > ces deux mises à jour — puis un redéploiement de la reprise (`docs/runbooks/CI_RUNNERS.md`
-> §11) — aurait des instances jamais rallumées après la désallocation nocturne. Le même
-> déploiement réutilise le VNet, le NSG et la NAT de noms fixes : la règle IMDS retirée pour
-> le provisionnement l'est donc aussi pour les runners PR déjà en service (voir « Drill de
-> perte d'un runner » dans `docs/CI_RUNNER_RESILIENCE.md`) ; opérer sans job PR en cours.
+> §11) — aurait des instances jamais rallumées après la désallocation nocturne. Avec les
+> noms réseau par défaut, le même déploiement réutilise le VNet, le NSG et la NAT du pool en
+> service : la règle IMDS retirée pour le provisionnement l'est donc aussi pour les runners PR
+> déjà en service. Soit opérer sans job PR en cours, soit — sans ce compromis — passer des
+> noms réseau et des plages d'adresses neufs (voir « Drill de perte d'un runner » dans
+> `docs/CI_RUNNER_RESILIENCE.md`).
 
 ```bash
 IMAGE_VERSION=24.04.202608070
-PILOT_VMSS=vmss-certigo-pr-pilot-z1
+# Nom NEUF : le VMSS vmss-certigo-pr-pilot-z1 existe déjà et ne doit pas être redéployé ici.
+PILOT_VMSS=<NOUVEAU_NOM_VMSS>
+PILOT_CAPACITY=<NOMBRE_D_INSTANCES_VOULU>
 
 bicep build infra/ci-runner/pilot.bicep --stdout >/dev/null
 az deployment group what-if \
@@ -160,6 +170,8 @@ az deployment group what-if \
   --template-file infra/ci-runner/pilot.bicep \
   --parameters imageVersion="$IMAGE_VERSION" \
                adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
+               runnerScaleSetName="$PILOT_VMSS" \
+               capacity="$PILOT_CAPACITY" \
                blockImdsAtNsg=false
 az deployment group create \
   --subscription <SUBSCRIPTION_ID> \
@@ -168,6 +180,8 @@ az deployment group create \
   --template-file infra/ci-runner/pilot.bicep \
   --parameters imageVersion="$IMAGE_VERSION" \
                adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
+               runnerScaleSetName="$PILOT_VMSS" \
+               capacity="$PILOT_CAPACITY" \
                blockImdsAtNsg=false
 ```
 
@@ -186,6 +200,8 @@ az deployment group what-if \
   --template-file infra/ci-runner/pilot.bicep \
   --parameters imageVersion="$IMAGE_VERSION" \
                adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
+               runnerScaleSetName="$PILOT_VMSS" \
+               capacity="$PILOT_CAPACITY" \
                blockImdsAtNsg=true
 az deployment group create \
   --subscription <SUBSCRIPTION_ID> \
@@ -194,6 +210,8 @@ az deployment group create \
   --template-file infra/ci-runner/pilot.bicep \
   --parameters imageVersion="$IMAGE_VERSION" \
                adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
+               runnerScaleSetName="$PILOT_VMSS" \
+               capacity="$PILOT_CAPACITY" \
                blockImdsAtNsg=true
 ```
 
@@ -373,6 +391,13 @@ provisionnement. La règle fait donc exactement ce qu'elle annonce, y compris
 contre l'agent. Le contraste a été mesuré dans les deux sens sur ce VMSS : avec
 la règle, échec ; sans la règle, `Succeeded` en une poignée de secondes.
 
+> **« Retirée » ne veut pas dire supprimée.** Sous le verrou `CanNotDelete`, la
+> suppression de la règle est refusée (`ScopeLocked`, 2026-09-14 à 09:21:49Z), et
+> Azure refuse aussi de la passer en `Allow` ou de restreindre sa source. Le
+> 2026-09-14, elle a été **neutralisée** en remplaçant sa destination par l'adresse de
+> documentation `192.0.2.1/32` (09:24:52Z), puis rétablie vers `AzurePlatformIMDS`
+> (09:27:01Z) : 2 min 08 s sans blocage IMDS au niveau NSG, pour tout le sous-réseau.
+
 Le blocage OS installé par `bootstrap.sh` (`certigo-block-imds.service`,
 `iptables -j REJECT` sur `169.254.169.254/32`) ne couvre pas ce moment : il est
 posé *par* le bootstrap, donc après que le réseau du premier démarrage est déjà
@@ -423,10 +448,14 @@ commande rend zéro événement pour toute requête, ce qui se lit comme une abs
 > levée de verrou explicite (`docs/runbooks/CI_RUNNERS.md` §12).
 
 **Dette de conception, à ne pas entreprendre dans une opération de capacité.**
-Le correctif propre n'est pas de lever la règle à chaque ajout, mais de la
-restreindre pour laisser passer l'agent invité pendant la seule phase de
-provisionnement. C'est un chantier de conception réseau — portée, source
-autorisée, durée — pas une correction ponctuelle.
+Restreindre la règle pour laisser passer l'agent invité pendant la seule phase de
+provisionnement est **impossible au niveau NSG** : mesuré le 2026-09-14 dans l'Activity
+Log, Azure refuse pour la balise `AzurePlatformIMDS` toute règle `Allow`
+(`SecurityRuleInvalidAccessType`) et toute source autre que `*`
+(`InvalidDNSExfilSourceTag`). La seule voie sans affaiblir le pool en service est de
+provisionner le nouveau VMSS dans une pile réseau neuve (VNet, NSG, NAT et IP de noms
+neufs, tous paramètres de `pilot.bicep`), voir « Drill de perte d'un runner » dans
+`docs/CI_RUNNER_RESILIENCE.md`.
 
 > À noter : le compte **Azure OpenAI** (`certigo-openai`), autre ressource en drift citée
 > par le finding G, est lui **réintégré en IaC** dans ce livrable via

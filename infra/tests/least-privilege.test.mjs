@@ -1342,6 +1342,30 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
   });
 });
 
+test('the PR pilot template cannot scale in the live pool by default', () => {
+  // On 2026-09-23 a read-only what-if of pilot.bicep against the live scale set showed
+  // sku.capacity 8 -> 2: the former `capacity: 2` literal turned the documented full
+  // deployment into a scale-in. Under the rg-certigo-ci CanNotDelete lock, the refused
+  // deletions of 2026-09-11 left the two healthy targeted instances in provisioningState
+  // Failed. The operator must therefore state the capacity, read from the live pool.
+  const template = compileTemplate('infra/ci-runner/pilot.bicep');
+  const capacity = template.parameters.capacity;
+  assert.ok(capacity, 'pilot.bicep must expose the scale set capacity as a parameter');
+  assert.equal(capacity.type, 'int');
+  assert.equal(
+    Object.hasOwn(capacity, 'defaultValue'),
+    false,
+    'a capacity default would silently scale in any larger live pool',
+  );
+  assert.equal(capacity.minValue, 1);
+  const [scaleSet] = resourcesOfType(
+    template,
+    'Microsoft.Compute/virtualMachineScaleSets',
+  );
+  assert.ok(scaleSet, 'pilot.bicep must declare the PR scale set');
+  assert.equal(scaleSet.sku.capacity, "[parameters('capacity')]");
+});
+
 test('CI drift IaC manages only bounded network and autoscale surfaces', () => {
   const network = compileTemplate('infra/ci-runner/network.bicep');
   const networkSource = readFileSync(
