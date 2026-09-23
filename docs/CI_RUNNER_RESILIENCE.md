@@ -488,15 +488,26 @@ la mesure, et deux mécanismes précis les remplacent :
    trusted : elle a été retirée du live le 2026-09-23 à 18:01Z (application de
    `capacity.bicep`, déploiement `certigo-ci-capacity-20260923180037`).
 
-**Conséquence sur le modèle.** Une reconstruction depuis la définition versionnée fonctionne,
-à deux conditions opérationnelles qui ne sont pas des faiblesses de sécurité des jobs :
-retirer la règle NSG IMDS pendant le seul provisionnement (aucun runner n'est enregistré à ce
-moment, donc aucun code de PR ne s'exécute ; le VMSS n'a pas d'identité, donc l'IMDS ne délivre
-aucun jeton ; `pilot-register.sh` refuse l'enregistrement tant que l'IMDS répond), et
-enregistrer le runner par `register-pilot.ps1` avec un jeton éphémère. Ce qui reste non résolu
-par conception : une instance neuve ne s'enregistre pas seule, faute de credential GitHub dans
-Azure (option écartée plus haut). La cible durable est l'image immuable préchauffée
-(`infra/ci-runner/image/`, #341).
+**Conséquence sur le modèle.** Une reconstruction depuis la définition versionnée est
+possible, à deux conditions opérationnelles qui ne sont pas des faiblesses de sécurité des
+jobs : retirer la règle NSG IMDS pendant le seul provisionnement (aucun runner n'est enregistré
+à ce moment, donc aucun code de PR ne s'exécute ; le VMSS n'a pas d'identité, donc l'IMDS ne
+délivre aucun jeton ; `pilot-register.sh` refuse l'enregistrement tant que l'IMDS répond), et
+enregistrer le runner par `register-pilot.ps1` avec un jeton éphémère. Elle n'est pas prouvée
+pour le `pilot.bicep` actuel : la dernière reconstruction réelle (2026-09-14) est partie du
+modèle live, qui a dérivé (paragraphe suivant). Ce qui reste non résolu par conception : une
+instance neuve ne s'enregistre pas seule, faute de credential GitHub dans Azure (option écartée
+plus haut). La cible durable est l'image immuable préchauffée (`infra/ci-runner/image/`, #341).
+
+**Le modèle live a dérivé de `pilot.bicep` — mesuré par what-if le 2026-09-23 à ~19:45Z**
+(lecture seule, `imageVersion=24.04.202608070`, clé publique lue sur le modèle live,
+`blockImdsAtNsg=true`) : un déploiement complet sur le VMSS existant ferait passer
+`sku.capacity` de 8 à 2 (scale-in, donc le piège du point 3) et `bootstrapSha256` de
+`a590730b…` (live) à `6e798d4e…` (dépôt), c'est-à-dire réécrirait le `customData`. Le reste du
+what-if n'est que du bruit connu (valeurs injectées par Azure sur NAT, IP et VNet, tags). La
+reconstruction documentée passe donc par un **nom de VMSS neuf** (voir
+`infra/ci-runner/README.md`, « Séquence de provisionnement ») ; ce nom doit alors rejoindre
+`scaleSets` de la reprise et `capacity.bicep`.
 
 > ⏱️ **Effet mesuré de l'IMDS bloqué sur chaque démarrage.** Un `start` depuis `deallocated`
 > dure ~1 min pour une instance trusted et **~7 min 30 s pour une instance PR** (2026-09-11 :

@@ -139,6 +139,16 @@ Toujours utiliser un nom de VMSS neuf et le mode incrémentiel. Le premier dépl
 laisse temporairement la règle NSG IMDS absente pour que l'agent Azure et cloud-init
 terminent ; il ne contient aucun jeton et le bootstrap installe immédiatement le bloc OS.
 
+> 🔁 **Un nom de VMSS neuf doit rejoindre la reprise nocturne.** La reprise énumère les
+> membres des seuls scale sets déclarés dans `scaleSets` (`infra/ci-runner/auto-recovery.bicep`),
+> qui doivent rester égaux aux deux scale sets de `infra/ci-runner/capacity.bicep` (test
+> « the recovery scope is declared once and follows the inventory »). Un nouveau VMSS sans
+> ces deux mises à jour — puis un redéploiement de la reprise (`docs/runbooks/CI_RUNNERS.md`
+> §11) — aurait des instances jamais rallumées après la désallocation nocturne. Le même
+> déploiement réutilise le VNet, le NSG et la NAT de noms fixes : la règle IMDS retirée pour
+> le provisionnement l'est donc aussi pour les runners PR déjà en service (voir « Drill de
+> perte d'un runner » dans `docs/CI_RUNNER_RESILIENCE.md`) ; opérer sans job PR en cours.
+
 ```bash
 IMAGE_VERSION=24.04.202608070
 PILOT_VMSS=vmss-certigo-pr-pilot-z1
