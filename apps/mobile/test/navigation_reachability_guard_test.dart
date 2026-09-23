@@ -65,6 +65,7 @@ void main() {
     'friends',
     'exam',
     'dailyShare',
+    'notifications',
   };
 
   /// Surfaces d'avant-authentification : ce ne sont pas des destinations de
@@ -155,7 +156,7 @@ void main() {
 
   // --- Le cœur : joignabilité --------------------------------------------
 
-  test('les 12 destinations de premier niveau sont joignables', () {
+  test('toutes les destinations de premier niveau sont joignables', () {
     final Set<String> wired = _wiredRoutes(sources, table.rootScreenClasses);
 
     final Set<String> orphans = aboveShellDestinations.difference(wired);
@@ -169,7 +170,7 @@ void main() {
           'Rends-les atteignables depuis un écran de la coquille.',
     );
 
-    // Contrôle de présence : l'ensemble mesuré doit contenir les 7, sinon le
+    // Contrôle de présence : l'ensemble mesuré doit contenir les destinations, sinon le
     // « isEmpty » ci-dessus pourrait être vrai faute d'avoir rien lu.
     expect(
       wired.intersection(aboveShellDestinations).length,

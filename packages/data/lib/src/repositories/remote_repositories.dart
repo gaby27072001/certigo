@@ -16,6 +16,7 @@ import '../models/friend.dart';
 import '../models/exam.dart';
 import '../models/share_card.dart';
 import '../models/account_deletion.dart';
+import '../models/notification.dart';
 import 'repositories.dart';
 
 /// HTTP-backed implementations of the repository contracts. Each method maps a
@@ -24,6 +25,23 @@ import 'repositories.dart';
 
 const String _kAppCatalogSchema = 'certigo.app-certification-catalog/v2';
 const String _kCanonicalCatalogSchema = 'certigo.certification-catalog/v1';
+
+class RemoteNotificationRepository implements NotificationRepository {
+  const RemoteNotificationRepository(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<Result<NotificationSettings>> getSettings() =>
+      _api.getJson('/me/notifications/settings', NotificationSettings.fromJson);
+
+  @override
+  Future<Result<NotificationSettings>> updateSettings(NotificationSettings settings) =>
+      _api.postJson('/me/notifications/settings', settings.toJson(), NotificationSettings.fromJson);
+
+  @override
+  Future<Result<NotificationPlan>> getPlan() =>
+      _api.getJson('/me/notifications/plan', NotificationPlan.fromJson);
+}
 
 List<TrackSummary> _decodeTrackSummaries(Map<String, dynamic> json) {
   final String? schema = json['schema'] as String?;

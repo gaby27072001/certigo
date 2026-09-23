@@ -10,7 +10,6 @@ const String kPrefLevel = 'pref_knowledge_level';
 const String kPrefDomains = 'pref_domains';
 const String kPrefSoundsEnabled = 'pref_sounds';
 const String kPrefHapticsEnabled = 'pref_haptics';
-const String kPrefStreakReminder = 'pref_streak_reminder';
 const String kPrefDisplayName = 'pref_display_name';
 const String kPrefHandle = 'pref_handle';
 const String kPrefAppLanguage = 'pref_app_language';
@@ -210,30 +209,6 @@ class HapticsEnabledNotifier extends StateNotifier<bool> {
 
 final StateNotifierProvider<HapticsEnabledNotifier, bool> hapticsEnabledProvider =
     StateNotifierProvider<HapticsEnabledNotifier, bool>((_) => HapticsEnabledNotifier());
-
-// ---------------------------------------------------------------------------
-// StreakReminder
-// ---------------------------------------------------------------------------
-
-class StreakReminderNotifier extends StateNotifier<bool> {
-  StreakReminderNotifier() : super(true) {
-    _load();
-  }
-
-  Future<void> _load() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    state = prefs.getBool(kPrefStreakReminder) ?? true;
-  }
-
-  Future<void> set(bool value) async {
-    state = value;
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(kPrefStreakReminder, value);
-  }
-}
-
-final StateNotifierProvider<StreakReminderNotifier, bool> streakReminderProvider =
-    StateNotifierProvider<StreakReminderNotifier, bool>((_) => StreakReminderNotifier());
 
 // ---------------------------------------------------------------------------
 // DisplayName override

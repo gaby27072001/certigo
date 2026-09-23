@@ -6,6 +6,7 @@ import UIKit
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var crashReportingHealthChannel: FlutterMethodChannel?
   private var accessibilityChannel: FlutterMethodChannel?
+  private var notificationSettingsChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
@@ -31,6 +32,22 @@ import UIKit
     registerAccessibilityChannel(
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
+    let channel = FlutterMethodChannel(
+      name: "com.certigo.mobileapp/notifications",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "openSettings" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard let url = URL(string: UIApplication.openSettingsURLString) else {
+        result(false)
+        return
+      }
+      UIApplication.shared.open(url, options: [:]) { opened in result(opened) }
+    }
+    notificationSettingsChannel = channel
   }
 
   /// Backs `SentryNativeIntegrationVerifier` on the Dart side. If this channel is

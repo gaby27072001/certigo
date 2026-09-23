@@ -16,6 +16,7 @@ import '../features/library/presentation/vendor_certifications_screen.dart';
 import '../features/achievements/presentation/achievements_screen.dart';
 import '../features/seasons/presentation/seasons_screen.dart';
 import '../features/quests/presentation/quests_screen.dart';
+import '../features/notifications/notifications_screen.dart';
 import '../features/shop/presentation/shop_screen.dart';
 import '../features/friends/presentation/friends_screen.dart';
 import '../features/exam/presentation/exam_screen.dart';
@@ -50,6 +51,7 @@ abstract class Routes {
   static const String library = '/library';
   static const String leaderboard = '/leaderboard';
   static const String profile = '/profile';
+  static const String notifications = '/notifications';
 
   /// Auth flows (outside the shell, on the root navigator).
   static const String splash = '/splash'; // session restore in progress
@@ -196,6 +198,12 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
         parentNavigatorKey: _rootKey,
         builder: (_, GoRouterState state) =>
             AccountDeletionScreen(expectedUserId: state.extra as String?),
+      ),
+      GoRoute(
+        path: Routes.notifications,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, GoRouterState state) =>
+            _stepPage(state: state, child: const NotificationsScreen()),
       ),
       GoRoute(
         path: Routes.accountDeleted,

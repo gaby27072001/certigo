@@ -15,6 +15,7 @@ import '../models/friend.dart';
 import '../models/exam.dart';
 import '../models/share_card.dart';
 import '../models/account_deletion.dart';
+import '../models/notification.dart';
 
 /// Repository contracts consumed by the app's feature controllers.
 ///
@@ -29,6 +30,12 @@ abstract interface class UserRepository {
     required String trackId,
     required String? expectedTrackId,
   });
+}
+
+abstract interface class NotificationRepository {
+  Future<Result<NotificationSettings>> getSettings();
+  Future<Result<NotificationSettings>> updateSettings(NotificationSettings settings);
+  Future<Result<NotificationPlan>> getPlan();
 }
 
 abstract interface class AccountDeletionRepository {

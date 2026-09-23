@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart';
 
-import '../../../notifications/notification_service.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../app/router.dart';
 import 'profile_sheets.dart';
 
 class ThemeRow extends StatelessWidget {
@@ -39,104 +40,23 @@ class ThemeRow extends StatelessWidget {
   }
 }
 
-/// Interactive row that lets the user schedule a daily reminder.
-class NotificationPrefRow extends StatefulWidget {
+class NotificationPrefRow extends StatelessWidget {
   const NotificationPrefRow({super.key});
-
-  @override
-  State<NotificationPrefRow> createState() => _NotificationPrefRowState();
-}
-
-class _NotificationPrefRowState extends State<NotificationPrefRow> {
-  TimeOfDay? _time;
-  bool _loaded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedTime();
-  }
-
-  Future<void> _loadSavedTime() async {
-    try {
-      final TimeOfDay? stored = await NotificationService.loadDailyReminderTime();
-      if (stored != null && mounted) setState(() => _time = stored);
-    } on Object catch (error, stackTrace) {
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: error,
-          stack: stackTrace,
-          library: 'certigo.notifications',
-          context: ErrorDescription('while restoring reminder preference'),
-        ),
-      );
-    }
-    if (mounted) setState(() => _loaded = true);
-  }
-
-  Future<void> _pickTime() async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: _time ?? NotificationService.defaultReminderTime,
-    );
-    if (picked == null || !mounted) return;
-
-    try {
-      final bool scheduled = await NotificationService.scheduleDailyReminder(
-        picked,
-      );
-      if (!scheduled) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Autorise les notifications pour activer ce rappel.'),
-          ),
-        );
-        return;
-      }
-      if (mounted) setState(() => _time = picked);
-    } on Object catch (error, stackTrace) {
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: error,
-          stack: stackTrace,
-          library: 'certigo.notifications',
-          context: ErrorDescription('while scheduling daily reminder'),
-        ),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Impossible de programmer ce rappel pour le moment.'),
-        ),
-      );
-    }
-  }
-
-  String get _trailingLabel {
-    if (!_loaded) return '…';
-    if (_time == null) return 'Désactivé';
-    final String h = _time!.hour.toString().padLeft(2, '0');
-    final String m = _time!.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-  }
 
   @override
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme t = Theme.of(context).textTheme;
-    return InkWell(
-      onTap: _pickTime,
-      borderRadius: BorderRadius.circular(PrismRadii.sm),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.notifications_rounded, color: p.textSecondary, size: 20),
-          const SizedBox(width: 12),
-          Expanded(child: Text('Rappels quotidiens', style: t.bodyLarge)),
-          Text(_trailingLabel, style: t.labelMedium?.copyWith(color: p.primary)),
-          const SizedBox(width: 4),
-          Icon(Icons.chevron_right_rounded, color: p.textSecondary, size: 18),
-        ],
+    return Material(
+      type: MaterialType.transparency,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        minVerticalPadding: 12,
+        onTap: () => context.push(Routes.notifications),
+        leading: Icon(Icons.notifications_rounded, color: p.textSecondary),
+        title: Text('Notifications et rappels', style: t.bodyLarge),
+        subtitle: const Text('Réglages serveur, aperçu et rappels sur cet appareil'),
+        trailing: const Icon(Icons.chevron_right_rounded),
       ),
     );
   }

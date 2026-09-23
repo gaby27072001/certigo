@@ -41,6 +41,10 @@ final userRepositoryProvider = Provider<UserRepository>(
   (Ref ref) => RemoteUserRepository(ref.watch(apiClientProvider)),
 );
 
+final notificationRepositoryProvider = Provider<NotificationRepository>(
+  (Ref ref) => RemoteNotificationRepository(ref.watch(apiClientProvider)),
+);
+
 final accountDeletionRepositoryProvider = Provider<AccountDeletionRepository>(
   (Ref ref) => RemoteAccountDeletionRepository(ref.watch(apiClientProvider)),
 );

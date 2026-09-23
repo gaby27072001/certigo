@@ -178,13 +178,6 @@ class _ProfileContent extends ConsumerWidget {
               Divider(color: p.border, height: 24),
               const NotificationPrefRow(),
               Divider(color: p.border, height: 24),
-              SwitchPrefRow(
-                icon: Icons.local_fire_department_rounded,
-                label: 'Rappel de série',
-                provider: streakReminderProvider,
-                onChanged: (bool v, WidgetRef r) => r.read(streakReminderProvider.notifier).set(v),
-              ),
-              Divider(color: p.border, height: 24),
               // Mesuré : cet interrupteur s'intitulait « Sons & vibrations » et
               // `soundsEnabledProvider` n'était lu que par l'interrupteur
               // lui-même — il ne commandait ni son ni vibration. Un libellé qui

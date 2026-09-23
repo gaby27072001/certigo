@@ -38,7 +38,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-09-23** |
-| Commit de référence analysé | `e2a1135f195022ba8891a4289358c12bc2b498e4` |
+| Commit de référence analysé | `1a97146f4b9417783d0c46c7076957189ccc498d` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -46,7 +46,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Package public actif | **1735 fichiers** — `sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f` |
 | Package privé actif (`answerKey`) | **812 fichiers** — `sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` |
 | Workflows GitHub Actions | **31** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `ciam-posture-monitor.yml`, `codeql.yml`, `content-infra-apply.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `post-merge-cosmos-account-deletion.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **284 fichiers** — .NET : 4 projets / 115 fichiers ; Flutter/Dart : 6 racines / 161 fichiers ; Python : 1 racine / 8 fichier |
+| Tests découverts | **287 fichiers** — .NET : 4 projets / 115 fichiers ; Flutter/Dart : 6 racines / 164 fichiers ; Python : 1 racine / 8 fichier |
 | Corpus **historique** local | **91 pistes**, **147 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
@@ -483,7 +483,7 @@ flowchart LR
 | **Examens blancs** | 🟢 | 🟢 | Moteur adaptatif : `POST /exam/generate` + `submit` — écran `exam` (génération, soumission, score). |
 | **Tuteur IA** | 🟢 | 🟢 | `POST /tutor/explain` — branché dans l'app via `tutor_sheet`. |
 | **Recommandation + coach** | 🟢 | 🟢 | `GET /me/recommendations/{trackId}` + coach IA sur l'accueil. |
-| **Notifications intelligentes** | 🟢 | 🟡 | `GET /me/notifications/plan` + réglages ; meilleure heure d'envoi estimée. |
+| **Notifications intelligentes** | 🟢 | 🟢 | Réglages, aperçu et remise locale : voir « Exposition mobile des notifications » pour le périmètre et les limites. |
 | **Anti‑triche / intégrité** | 🟢 | — | Évaluateur déterministe : **signaux durs sanctionnent** (`Reject` → 0 récompense, câblé quiz + examens) ; **cadence** (XP/tentatives sur 1 h, conteneur `attempts`) reste **détection pure par construction** (`attempt.flagged`), plafonnée sous le seuil de rejet, seule ou combinée. |
 | **Offline‑first** | 🟢 | 🟢 | Synchro idempotente rejouable, backoff. |
 | **Authentification** | 🟢 | 🟢 | Microsoft / Google / Apple via Entra External ID (Android + iOS natifs câblés). |
@@ -732,7 +732,7 @@ déclarée est dans `codemagic.yaml`.
 **Écarts backend ↔ mobile (à brancher en UI) :**
 - 🟢 Saisons, quêtes, succès, boutique, amis, examens blancs, partage quotidien : **écrans livrés** (+ tests widget) — reste la **validation E2E sur appareil**.
 - Ligues : voir « Exposition mobile des ligues » ci-dessous.
-- 🟡 Notifications : partiellement exposées.
+- Notifications : voir « Exposition mobile des notifications » ci-dessous.
 - 🔴 **Réparation de série** : backend atteignable, **aucun client mobile** — voir « Réparation de série : backend seul » (§4).
 
 ### Exposition mobile des ligues
@@ -753,6 +753,37 @@ configurations de déploiement changent**. Il prouve le câblage et les comporte
 automatisés, pas une réponse authentifiée en production ni un parcours VoiceOver sur
 iPhone réel. La parité des identifiants de ligue est vérifiée contre le moteur C#
 par la suite Dart existante.
+
+### Exposition mobile des notifications
+
+Constat du **23 septembre 2026**, borné à
+[`NotificationDtos.cs`](../backend/src/Certigo.Application/Dtos/NotificationDtos.cs),
+[`notifications_screen.dart`](../apps/mobile/lib/features/notifications/notifications_screen.dart),
+[`notification_service.dart`](../apps/mobile/lib/features/notifications/notification_service.dart)
+et aux tests `notification_repository_test.dart`, `notifications_screen_test.dart`,
+`notification_service_test.dart`, `notification_lifecycle_scope_test.dart` et
+`notification_permissions_test.dart` : Profil › Notifications et rappels expose
+les neuf réglages serveur, leur remplacement intégral et un aperçu indépendant.
+Une erreur ou un contrat incomplet ne produit ni valeur par défaut inventée ni
+fausse réussite. Le serveur choisit seul horaires, silence, priorités et quotas.
+
+La programmation volontaire confie au système les seuls instants UTC futurs
+du plan, avec un texte neutre et sans récurrence. Le retour depuis l'arrière-plan,
+le changement de compte et le démarrage invalident ce lot ; l'utilisateur doit
+en programmer un nouveau. La permission est demandée uniquement à cette activation,
+avec accès aux Réglages en cas de refus. Le pont de migration conserve l'ancien
+HH:mm exact ; des minutes non nulles exigent une confirmation avant remplacement
+par une heure entière. Une ancienne désactivation reste prioritaire hors ligne,
+et la migration réussie est marquée par compte.
+
+Ce constat doit être revérifié si **les contrats, règles serveur, écrans, cycle de vie,
+stockage, intégrations natives, dépendances, tests ou configurations de déploiement
+changent**. Les preuves automatisées couvrent le câblage, les erreurs, la grande
+taille de texte et les cibles tactiles ; elles ne prouvent ni livraison native,
+ni parcours VoiceOver sur iPhone réel, ni contrat authentifié de production.
+Le **push distant est hors périmètre** : il manque l'enregistrement, le renouvellement
+et la suppression des jetons appareil ainsi que le transport serveur, la clé APNs
+et la capability Apple, puis une validation sur iPhone.
 
 **Chantiers techniques :**
 - 🏗️ **Provisionner `staging`** par Bicep et valider `/health` ; `dev`, `prod` et CI sont déjà déployés.
