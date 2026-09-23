@@ -21,10 +21,11 @@ internal sealed class QuizServiceHarness
     public InMemoryEconomyOperationRepository EconomyOperations { get; } = new();
     public FakeClock Clock { get; } = new(new DateTimeOffset(2025, 1, 6, 12, 0, 0, TimeSpan.Zero));
     public string UserId { get; } = "user-1";
+    public InMemoryContentRepository Content { get; } = TestContent.Build();
 
     public QuizService Build()
     {
-        var content = TestContent.Build();
+        var content = Content;
         var context = new FakeUserContext(UserId, "Tester");
         return new QuizService(
             context,
@@ -551,6 +552,47 @@ public sealed class QuizServiceTests
         profile!.StreakDays.Should().Be(4);
         profile.LastActiveDate.Should().Be(today);
         profile.DailyXpDate.Should().Be(today);
+    }
+
+    [Theory]
+    [InlineData(ItemType.Ordering)]
+    [InlineData(ItemType.Cloze)]
+    [InlineData(ItemType.Applied)]
+    public async Task SubmitAsync_grades_ordered_items_by_their_order(ItemType type)
+    {
+        var h = new QuizServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        TestContent.AddTypedLesson(h.Content, "l4", type, ["a", "b", "c"]);
+        var service = h.Build();
+
+        var wrongOrder = await service.SubmitAsync(
+            "l4",
+            QuizServiceHarness.Request("ordered-wrong", new AnswerDto("l4-i1", type, ["c", "b", "a"], 5_000)));
+        var rightOrder = await service.SubmitAsync(
+            "l4",
+            QuizServiceHarness.Request("ordered-right", new AnswerDto("l4-i1", type, ["a", "b", "c"], 5_000)));
+
+        wrongOrder.Results.Should().ContainSingle().Which.Correct.Should().BeFalse();
+        rightOrder.Results.Should().ContainSingle().Which.Correct.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SubmitAsync_grades_match_pairs_as_a_set_of_pair_tokens()
+    {
+        var h = new QuizServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        TestContent.AddTypedLesson(h.Content, "l5", ItemType.MatchPairs, ["a:y", "b:x"]);
+        var service = h.Build();
+
+        var swapped = await service.SubmitAsync(
+            "l5",
+            QuizServiceHarness.Request("pairs-order", new AnswerDto("l5-i1", ItemType.MatchPairs, ["b:x", "a:y"], 5_000)));
+        var wrongPairs = await service.SubmitAsync(
+            "l5",
+            QuizServiceHarness.Request("pairs-wrong", new AnswerDto("l5-i1", ItemType.MatchPairs, ["a:x", "b:y"], 5_000)));
+
+        swapped.Results.Should().ContainSingle().Which.Correct.Should().BeTrue();
+        wrongPairs.Results.Should().ContainSingle().Which.Correct.Should().BeFalse();
     }
 
     [Fact]
