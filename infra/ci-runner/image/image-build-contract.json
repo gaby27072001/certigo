@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractCommit": "e70e62407f939b04b3e9d3b532f4a6ae06994a43",
+  "contractCommit": "f03ecf3c40374cdca715be2aa0cb877235048980",
   "toolchainOriginCommit": "f8e23b2952e8ca39c59f30081b8950170abb701a",
   "repository": "gchambaud_microsoft/Certigo",
   "baseImage": {
@@ -30,12 +30,17 @@
   },
   "reproducibility": {
     "status": "blocked",
-    "aptSnapshot": null,
+    "aptSnapshot": "https://snapshot.ubuntu.com/ubuntu/20260807T000000Z/",
+    "baseImageInventory": {
+      "path": "infra/ci-runner/image/base-image-evidence/base-image-reconstruction.json",
+      "sha256": "a79b48083f5d31ac04b6a0bc850583e085b830df5de51c1e0cd2350f5b118c48"
+    },
     "aptPackageLockSha256": null,
     "flutterEngineArtifactLockSha256": null,
     "blockedReasons": [
-      "Ubuntu and Microsoft APT transitive packages are not locked to an immutable snapshot with package hashes.",
-      "Flutter precache engine artifacts are not enumerated with SHA-256 digests."
+      "The exact reconstructed base matches the authenticated Ubuntu snapshot, but the final Ubuntu and Microsoft APT dependency closure is not locked.",
+      "Flutter precache engine artifacts are not enumerated with SHA-256 digests.",
+      "The bootstrap (including installdependencies.sh), APT, pip and Flutter are not confined to verified offline artifacts."
     ]
   },
   "inputs": [
@@ -67,7 +72,7 @@
       "id": "prewarm",
       "path": "infra/ci-runner/image/prewarm-toolchain.sh",
       "destination": "prewarm-toolchain.sh",
-      "sha256": "80ce3cf0f856f571da1c446ee3f222f63ffbf87efa5eb2b08d75106e6cc7178a"
+      "sha256": "b6bcfa4ddab4ea3ba2a6187dfc7f55c3524162e8084fe2bc0a3a4de86193a96a"
     },
     {
       "id": "validator",

@@ -1,9 +1,10 @@
 # Image runner immuable
 
-Ce dossier est un livrable **hors deploiement**. Il fige la toolchain deja utilisee
-par Certigo, telecharge chaque artefact par URL versionnee, verifie son empreinte,
-produit une attestation locale et refuse le demarrage du service runner si le boot
-ne retrouve pas exactement le meme contenu.
+Ce dossier est un livrable **hors deploiement**, dont l'installation reste
+**bloquee**. Les archives principales de la toolchain sont epinglees, mais les
+entrees reseau transitives ne sont pas encore toutes verrouillees. Une attestation
+de fichiers installes ne prouve pas la reproductibilite des telechargements qui
+les ont produits. Les controles de boot prevus refusent un contenu different.
 
 Il ne modifie aucun VMSS, SKU, capacite, label, binding, identite, route, IP
 publique, acces prive ou automate de lifecycle. `runner.bicep`, `pilot.bicep`, les
@@ -16,8 +17,11 @@ inventaires live et les IDs hors scope ne referencent pas cette image dans PR1.
   chaque paquet transitif de l'environnement Python;
 - `toolchain-requirements.lock` verrouille avec hashes tout l'environnement
   Checkov/PyYAML Python 3.12;
-- `prewarm-toolchain.sh` installe les SDK et outils sans `npm ci`, `dotnet restore`
-  ni `flutter pub get`: aucun cache de dependances projet n'entre dans l'image;
+- `prewarm-toolchain.sh` conserve le futur chemin d'installation des SDK, mais
+  refuse actuellement toute execution avant une ecriture ou un telechargement;
+- `validate-network-inputs.mjs` exige les deux vrais fichiers de lock et leurs
+  empreintes, puis refuse encore l'admission tant que le consommateur hors ligne
+  et ses preuves d'exhaustivite ne sont pas implementes;
 - `validate-toolchain.sh --boot` verifie manifest, SBOM, lock, attestation,
   versions et l'inventaire exhaustif (fichiers, repertoires, liens, modes et
   hashes) des toolchains, du runner et d'Azure CLI; tout ajout inattendu echoue;
@@ -29,12 +33,15 @@ inventaires live et les IDs hors scope ne referencent pas cette image dans PR1.
 - `measure-cold-start.sh` emet les timestamps monotoniques validation/runner du
   futur canari.
 
-Le build d'image devra executer, sur Ubuntu 24.04 x64:
+Le controle d'admission suivant **doit echouer** dans cet etat du depot:
 
 ```bash
-sudo bash infra/ci-runner/bootstrap.sh
-sudo bash infra/ci-runner/image/prewarm-toolchain.sh
+node infra/ci-runner/image/validate-network-inputs.mjs
 ```
+
+Ne pas executer le bootstrap existant pour contourner ce refus. Il reste le
+bootstrap mutable des runners actuels et appelle notamment
+`bin/installdependencies.sh`; il n'est pas un installateur d'image reproductible.
 
 L'image ne doit contenir ni `.runner`, ni token GitHub, ni secret, ni dependance
 du depot. L'enregistrement ulterieur doit copier les variables sans secret de
@@ -100,12 +107,14 @@ PR2 ajoute uniquement des ressources **nouvelles et desactivees par defaut**:
 
 - `image-build-contract.json` conserve le commit PR1
   `f8e23b2952e8ca39c59f30081b8950170abb701a` comme origine du toolchain et
-  lie les sources au commit integre exact
-  `e70e62407f939b04b3e9d3b532f4a6ae06994a43`, a l'image Marketplace exacte
+  lie les sources au SHA Git exact de `contractCommit` (mis a jour seulement
+  apres le commit des entrees, sans reference circulaire), a l'image Marketplace exacte
   `24.04.202608070`, a la version Gallery `1.0.337` et aux SHA-256 de chaque
   entree;
-- le contrat reste fail-closed avec `reproducibleInputsReady=false`: le template
-  ne peut creer aucune ressource, meme avec `deploymentEnabled=true`, tant que
+- le contrat reste fail-closed avec `reproducibleInputsReady=false`: les trois
+  Bicep ont aussi un garde de code `networkInstallerImplemented=false`, non
+  exposable comme parametre. Ils ne peuvent creer aucune ressource, meme avec
+  `deploymentEnabled=true` et des drapeaux JSON falsifies, tant que
   les paquets transitifs Ubuntu/Microsoft ne sont pas lies a un snapshot APT et
   a leurs hashes, et que les artefacts du `flutter precache` ne sont pas tous
   enumeres et hashes. PR2 n'assimile jamais une version seule a une preuve de
@@ -197,3 +206,70 @@ entree de delta `Microsoft.Resources/deployments`, meme en `NoChange`. Cette
 premiere autorisation produit seulement le statut
 `provision-authorized`: les mesures cold/warm et la preuve de rollback restent
 obligatoires apres provisioning, sans jamais etre inventees avant.
+
+## Verrous #341 : preuves et limites
+
+Le releve date et borne du **23 septembre 2026** est conserve dans
+[`base-image-evidence/base-image-reconstruction.json`](base-image-evidence/base-image-reconstruction.json).
+Ce fichier est la source des identifiants d'instance, timestamps, nombres de
+paquets, empreintes et index sources. Le contrat epingle son SHA-256. Les fichiers
+TSV, dpkg, APT et `build.info` associes sont des preuves selectionnees en lecture
+seule, distinctes du dossier ignore `evidence/` des futures operations live.
+
+La VM observee provient de l'URN exacte du contrat, pas d'une image voisine.
+L'inversion des transactions dpkg conservees reconstitue la base avant bootstrap;
+le rejeu reproduit exactement l'inventaire observe. Chaque version reconstruite
+figure dans les index du snapshot immuable epingle par le contrat. Les trois
+signatures `InRelease` ont ete verifiees avec `gpgv` et la cle Ubuntu Archive
+2018; les tailles et SHA-256 des douze index compresses correspondent aux
+metadonnees signees. Les URL et SHA-256 des `.deb` de base viennent de ces index :
+les archives elles-memes n'ont pas toutes ete telechargees.
+
+```bash
+node infra/ci-runner/image/verify-base-image-evidence.mjs
+```
+
+Ce controle local verifie les empreintes des observations, la reconstruction,
+le rejeu et la couverture du manifeste. Il ne refait pas une verification GPG
+ni un telechargement reseau. Pour refaire la verification externe, recuperer les
+`InRelease` et les `Packages.xz` aux URL snapshot de `sources`, verifier les
+signatures avec la cle dont le fingerprint est consigne, puis les hashes des
+index et les tuples Package/Version/Architecture/SHA256/Filename.
+
+Le statut reste `reconstructed-not-independent` : les journaux invites ne sont
+ni un inventaire signe par Canonical, ni une observation independante d'une VM
+vierge. Toute lacune des journaux ou divergence d'une future observation vierge
+invalide cette reconstruction; une autre version Marketplace demande son propre
+releve. Les ajouts et upgrades posterieurs restent dans les journaux, jamais
+assimiles a la base. L'installation d'`ubuntu-advantage-tools` est observee dans
+l'historique APT; son auteur n'y est pas renseigne.
+
+**Reste obligatoire avant `locked` :**
+
+1. Faire relire cette reconstruction, resoudre puis verrouiller la fermeture
+   finale Ubuntu **et** Microsoft, incluant les dependances de prewarm et du
+   runner. Le manifeste de base n'est pas `apt-packages.lock.json`.
+2. Enumerer et hasher les artefacts effectivement consommes par le SDK Flutter
+   epingle, son precache Linux et ses entrees universelles. Le commit moteur
+   publie pour Flutter 3.44.4 est
+   `a10d8ac38de835021c8d2f920dbf50a920ccc030`
+   ([source au commit Flutter exact](https://github.com/flutter/flutter/blob/ad70ec4617166f1c38e5d2bfd388af71fda14f06/bin/internal/engine.version)).
+   Ce commit seul n'est pas `flutter-engine-artifacts.lock.json`.
+3. Remplacer ou confiner, dans le chemin image uniquement, tous les resolvers
+   reseau : bootstrap, `installdependencies.sh`, APT, pip et Flutter. Verifier
+   les octets avant execution et prouver l'installation sans reseau depuis
+   l'ensemble ferme d'artefacts approuve.
+4. Ajouter les tests d'execution de ce consommateur (alteration, omission,
+   redirection, telechargement imprevu), puis seulement retirer les gardes de
+   code. Les tests actuels portent sur l'integrite des fichiers et le **refus
+   d'admission** : des propositions redirigees ou ajoutees, meme rehashees, ne
+   peuvent rien activer. Ils ne pretendent pas valider un downloader inexistant.
+5. Activer et epingler le signataire dans le changement separe prevu par #497.
+   Aucun workflow actif ni le workflow signataire desactive n'est modifie ici.
+
+Les premiers tests compilent aussi les trois Bicep avec tous les drapeaux JSON
+forces sur `locked/true/active`, et verifient que chaque ressource reste sous le
+garde literalement faux. Le controle de transition lit les fichiers de lock
+avant les attestations et tout appel Azure; le validateur de release applique
+le meme refus. Le prewarm direct et le customizer AIB refusent eux aussi avant
+le bootstrap mutable. Un digest correct est necessaire, jamais suffisant.

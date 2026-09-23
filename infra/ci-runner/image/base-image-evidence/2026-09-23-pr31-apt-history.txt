@@ -1,0 +1,31 @@
+
+Start-Date: 2026-09-14  09:26:06
+Commandline: apt-get install -y --no-install-recommends ca-certificates curl git gnupg iptables jq sudo tar unzip zip xz-utils
+Install: zip:amd64 (3.0-13ubuntu0.2), unzip:amd64 (6.0-28ubuntu4.1)
+Upgrade: gpg:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6), keyboxd:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6), gnupg:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6), gpg-agent:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6), libcurl3t64-gnutls:amd64 (8.5.0-2ubuntu10.11, 8.5.0-2ubuntu10.13), gpgv:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6), libcurl4t64:amd64 (8.5.0-2ubuntu10.11, 8.5.0-2ubuntu10.13), gpgsm:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6), dirmngr:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6), gnupg-utils:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6), curl:amd64 (8.5.0-2ubuntu10.11, 8.5.0-2ubuntu10.13), gnupg-l10n:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6), gpg-wks-client:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6), gpgconf:amd64 (2.4.4-2ubuntu17.4, 2.4.4-2ubuntu17.6)
+End-Date: 2026-09-14  09:26:21
+
+Start-Date: 2026-09-14  09:26:27
+Commandline: apt-get install -y --allow-downgrades --no-install-recommends azure-cli=2.89.0-1~noble
+Install: azure-cli:amd64 (2.89.0-1~noble)
+End-Date: 2026-09-14  09:26:39
+
+Start-Date: 2026-09-14  09:26:50
+Commandline: apt-get install -y libkrb5-3 zlib1g
+Upgrade: krb5-locales:amd64 (1.20.1-6ubuntu2.7, 1.20.1-6ubuntu2.8), libgssapi-krb5-2:amd64 (1.20.1-6ubuntu2.7, 1.20.1-6ubuntu2.8), libkrb5support0:amd64 (1.20.1-6ubuntu2.7, 1.20.1-6ubuntu2.8), libkrb5-3:amd64 (1.20.1-6ubuntu2.7, 1.20.1-6ubuntu2.8), libk5crypto3:amd64 (1.20.1-6ubuntu2.7, 1.20.1-6ubuntu2.8), zlib1g:amd64 (1:1.3.dfsg-3.1ubuntu2.1, 1:1.3.dfsg-3.1ubuntu2.2)
+End-Date: 2026-09-14  09:26:51
+
+Start-Date: 2026-09-14  09:26:53
+Commandline: apt-get install -y liblttng-ust1t64
+Install: liblttng-ust1t64:amd64 (2.13.7-1.1ubuntu2), liblttng-ust-common1t64:amd64 (2.13.7-1.1ubuntu2, automatic), liblttng-ust-ctl5t64:amd64 (2.13.7-1.1ubuntu2, automatic)
+End-Date: 2026-09-14  09:26:53
+
+Start-Date: 2026-09-14  09:26:55
+Commandline: apt-get install -y libssl3t64$
+Upgrade: libssl3t64:amd64 (3.0.13-0ubuntu3.12, 3.0.13-0ubuntu3.15), openssl:amd64 (3.0.13-0ubuntu3.12, 3.0.13-0ubuntu3.15)
+End-Date: 2026-09-14  09:26:59
+
+Start-Date: 2026-09-19  12:53:07
+Commandline: apt-get install ubuntu-advantage-tools -y
+Install: ubuntu-advantage-tools:amd64 (37.2ubuntu~24.04.1)
+End-Date: 2026-09-19  12:53:11
