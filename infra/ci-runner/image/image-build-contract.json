@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractCommit": "e70e62407f939b04b3e9d3b532f4a6ae06994a43",
+  "contractCommit": "f03ecf3c40374cdca715be2aa0cb877235048980",
   "toolchainOriginCommit": "f8e23b2952e8ca39c59f30081b8950170abb701a",
   "repository": "gchambaud_microsoft/Certigo",
   "baseImage": {
