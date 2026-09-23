@@ -21,7 +21,9 @@ pas une affirmation de présence live.
 
 > État au 2026-09-23 : `be505fa1`/runner 29 est gérée; le pool PR est porté par
 > `5275ea21`, `94bad106`, `1a6deaa2` et `6e3abce4` (runners 31 à 34), et `bbf83c5c` est
-> retirée (voir `docs/runbooks/CI_RUNNERS.md` §2 et §11).
+> retirée (voir `docs/runbooks/CI_RUNNERS.md` §2 et §11). Depuis le même jour, la reprise
+> nocturne énumère les instances des deux scale sets à chaque run : aucune liste d'instances
+> n'est plus à tenir à jour pour qu'une instance soit rallumée.
 
 ## Egress legacy réconcilié
 
@@ -120,10 +122,18 @@ l'identité prévue par `runner.bicep`, tandis que le pilote PR échoue fermé.
 > ```
 >
 > Si les deux empreintes diffèrent, **ne pas déployer le modèle complet** :
-> traiter la dérive séparément, ou opérer de façon ciblée (`az vmss scale`,
-> mise à jour d'une seule ressource). Une dérive était présente au moment de
-> l'ajout de la deuxième instance PR ; c'est pourquoi ce scale-out n'a pas
-> emprunté la voie documentée ci-dessous.
+> traiter la dérive séparément, ou opérer de façon ciblée (`az vmss scale`
+> **vers le haut uniquement**, mise à jour d'une seule ressource). Une dérive était
+> présente au moment de l'ajout de la deuxième instance PR ; c'est pourquoi ce
+> scale-out n'a pas emprunté la voie documentée ci-dessous.
+>
+> **Vérifier aussi la capacité.** `pilot.bicep` déclare `capacity: 2` alors que le
+> live affichait `sku.capacity = 8` pour 11 instances le 2026-09-23 (quatre utiles).
+> Un déploiement complet non aligné ferait baisser la capacité, donc un scale-in :
+> sous le verrou `CanNotDelete`, les instances visées — possiblement des runners en
+> service — finiraient en `Failed` (voir « Cause racine des instances PR mortes »
+> dans `docs/CI_RUNNER_RESILIENCE.md`). Le what-if doit montrer `sku.capacity`
+> inchangé ; sinon, aligner le paramètre avant tout déploiement.
 
 Toujours utiliser un nom de VMSS neuf et le mode incrémentiel. Le premier déploiement
 laisse temporairement la règle NSG IMDS absente pour que l'agent Azure et cloud-init
@@ -203,13 +213,12 @@ GitHub/NuGet/pub.dev/npm fonctionnel. Le pilote ne crée volontairement aucun ru
 La sortie structurée de `register-pilot.ps1` fournit l'`id` et le `name` GitHub. Avant toute
 activation future du contrôleur, reporter ces deux valeurs avec le nom et l'ID ARM exacts de
 la nouvelle VM dans `inventory.managedRunnerBindings` et `inventory.observedRunnerBindings`,
-ajouter son nom au défaut `virtualMachineNames` de `auto-recovery.bicep` **et** à
-`infra/params/ci-runner-auto-recovery.bicepparam` (sinon elle n'est jamais rallumée après la
-désallocation nocturne), inscrire l'instance remplacée dans
-`inventory.forbiddenVirtualMachines`, puis mettre à jour les assertions de
-`infra/tests/least-privilege.test.mjs` et l'inventaire
+inscrire l'instance remplacée dans `inventory.forbiddenVirtualMachines`, puis mettre à jour
+les assertions de `infra/tests/least-privilege.test.mjs` et l'inventaire
 `docs/runbooks/CLOUD_LEAST_PRIVILEGE.md`, et redéployer le Logic App de reprise
-(`docs/runbooks/CI_RUNNERS.md` §11). Un nom de runner Flexible diffère du nom de VM :
+(`docs/runbooks/CI_RUNNERS.md` §11) pour qu'il cesse de tenter l'instance retirée. La
+nouvelle instance, elle, est rallumée chaque nuit sans autre action : la reprise énumère les
+membres du scale set depuis le 2026-09-23. Un nom de runner Flexible diffère du nom de VM :
 sans binding explicite, le contrôleur doit rester bloqué. Ne jamais réutiliser le binding d'une
 instance pilote remplacée ni retirer les exclusions du runner 26 et de la VM `4153d1dd`.
 
@@ -309,8 +318,10 @@ explicitement à une PR2 séparée.
 Les deux VMSS live sont `Standard_D2ads_v6`. L'autoscale legacy est min 2 /
 défaut 2 / max 4. Son scale-out CPU (`> 70 %` pendant 10 minutes) est conservé
 dans `capacity.bicep`; son scale-in CPU (`< 20 %` pendant 45 minutes) est retiré
-du contrat car il ignore GitHub `busy`. Tant que ce changement n'est pas appliqué
-et que `be505fa1` reste non classifiée, toute automation mutable est bloquée.
+du contrat car il ignore GitHub `busy`, et parce qu'un scale-in sous le verrou
+`CanNotDelete` laisse l'instance visée en `Failed` (mesuré, voir « Cause racine des
+instances PR mortes » dans `docs/CI_RUNNER_RESILIENCE.md`). Ce retrait est appliqué en
+live depuis le 2026-09-23 à 18:01Z (déploiement `certigo-ci-capacity-20260923180037`).
 
 Le script `lifecycle-preflight.sh` inventorie sans mutation les dépôts Certigo et
 certigo-content et refuse une déallocation en présence d'un label double, d'un job actif/en
@@ -388,8 +399,18 @@ commande rend zéro événement pour toute requête, ce qui se lit comme une abs
 
 > **`az vmss scale` peut sortir en échec alors que l'instance a été créée et
 > qu'elle est facturée.** Relancer sans vérifier crée une instance fantôme de
-> plus, absente de l'inventaire et de la liste de rallumage nocturne. Toujours
+> plus, absente de l'inventaire. Depuis le 2026-09-23 elle serait en outre rallumée
+> chaque nuit par la reprise (qui énumère le scale set) et facturée sans runner,
+> jusqu'à son inscription dans `inventory.forbiddenVirtualMachines`. Toujours
 > relire `sku.capacity` et `az vm list` avant toute relance.
+
+> 🧟 **Ne jamais utiliser `az vmss scale` pour RÉDUIRE la capacité.** Sous le verrou
+> `CanNotDelete`, chaque suppression demandée par le scale set est refusée
+> (`ScopeLocked`) et l'instance visée finit en `provisioningState: Failed` à l'opération
+> suivante : c'est ainsi que `bbf83c5c`, `a14700a3` et `d8d42366` sont mortes les
+> 11-12 septembre 2026 (preuves : « Cause racine des instances PR mortes » dans
+> `docs/CI_RUNNER_RESILIENCE.md`). Retirer une instance = supprimer la VM exacte dans une
+> levée de verrou explicite (`docs/runbooks/CI_RUNNERS.md` §12).
 
 **Dette de conception, à ne pas entreprendre dans une opération de capacité.**
 Le correctif propre n'est pas de lever la règle à chaque ajout, mais de la

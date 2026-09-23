@@ -177,14 +177,132 @@ test('recovery verifies power state and fails loudly when it is not running', ()
   const template = compileTemplate('infra/ci-runner/modules/runnerAutoRecovery.bicep');
   const serialized = JSON.stringify(template);
 
-  // Starting is not the same as recovering: the run must assert the result.
-  assert.match(serialized, /instanceView/);
+  // Starting is not the same as recovering: the run must assert the result. The power state
+  // now arrives with the filtered listing of each scale set rather than a per-VM call.
+  assert.match(serialized, /\$expand=instanceView/);
   assert.match(serialized, /PowerState\/running/);
 
   // A silent success would make the whole mechanism worthless.
   assert.match(serialized, /Terminate/);
   assert.match(serialized, /Failed/);
-  assert.match(serialized, /RunnerPowerStateNotRunning/);
+  for (const code of [
+    'RunnerPowerStateNotRunning',
+    'RunnerPoolBelowRedundancyFloor',
+    'RunnerEnumerationIncomplete',
+  ]) {
+    assert.match(serialized, new RegExp(code), `${code} must terminate the run as Failed`);
+  }
+});
+
+test('recovery enumerates scale set members at run time instead of freezing names', () => {
+  const template = compileTemplate('infra/ci-runner/modules/runnerAutoRecovery.bicep');
+  const serialized = JSON.stringify(template);
+
+  assert.equal(template.parameters.virtualMachineNames, undefined);
+  assert.equal(template.parameters.scaleSets.type, 'array');
+  assert.equal(template.parameters.scaleSets.minLength, 1);
+
+  // ARM only accepts `$expand=instanceView` together with this filter, and only when the
+  // property name is quoted; the filter is also what makes the membership authoritative
+  // (tags are asymmetric between the pools and would lose the trusted instances).
+  assert.match(
+    serialized,
+    /uriComponent\(format\('''virtualMachineScaleSet\/id'' eq ''\{0\}''', resourceId\('Microsoft\.Compute\/virtualMachineScaleSets'/,
+  );
+  // Scale set enumeration through the VMSS API would need virtualMachineScaleSets/read,
+  // which the recovery role deliberately does not hold.
+  assert.doesNotMatch(serialized, /virtualMachineScaleSets\/[^'"]*\/virtualMachines/);
+  assert.doesNotMatch(serialized, /vmss-certigo-[a-z0-9-]+_[0-9a-f]{8}/);
+
+  // Exclusions are compared in lower case on both sides.
+  assert.match(serialized, /toLower\(item\(\)\?\[''name''\]\)/);
+  assert.match(serialized, /toLower\(string\(lambdaVariables\('name'\)\)\)/);
+});
+
+test('the recovery scope is declared once and follows the inventory', async () => {
+  const template = compileTemplate('infra/ci-runner/auto-recovery.bicep');
+  const capacity = compileTemplate('infra/ci-runner/capacity.bicep');
+  const { readFileSync } = await import('node:fs');
+  const config = JSON.parse(
+    readFileSync(
+      path.join(repositoryRoot, 'infra', 'ci-runner', 'capacity-controller.config.json'),
+      'utf8',
+    ),
+  );
+
+  assert.equal(template.parameters.virtualMachineNames, undefined);
+  const scaleSets = template.parameters.scaleSets.defaultValue;
+  // The recovered scale sets are the two pools the capacity contract observes: a pool added
+  // there without being added here would never be restarted.
+  assert.deepEqual(
+    scaleSets.map(({ name }) => name).sort(),
+    [
+      capacity.parameters.legacyVmScaleSetName.defaultValue,
+      capacity.parameters.pilotVmScaleSetName.defaultValue,
+    ].sort(),
+  );
+  assert.deepEqual(
+    Object.fromEntries(scaleSets.map(({ name, trustClass }) => [name, trustClass])),
+    {
+      'vmss-certigo-runner-zonal': 'certigo-trusted',
+      'vmss-certigo-pr-pilot-z1': 'certigo-pr',
+    },
+  );
+  // Each pool's floor comes from minimumOnlineByTrust; a zero floor would make the floor
+  // assertion vacuous, which is precisely the failure mode it exists to prevent.
+  for (const { trustClass } of scaleSets) {
+    assert.ok(
+      Number.isInteger(config.minimumOnlineByTrust[trustClass]) &&
+        config.minimumOnlineByTrust[trustClass] >= 1,
+      `${trustClass} must have a redundancy floor of at least 1`,
+    );
+  }
+
+  // The exclusions are loaded from the inventory, not copied: the compiled template must
+  // embed exactly the current forbidden and external instance lists.
+  const loaded = Object.values(template.variables).filter(Array.isArray);
+  for (const list of [
+    config.inventory.forbiddenVirtualMachines,
+    config.inventory.externalVirtualMachines,
+  ]) {
+    assert.ok(
+      loaded.some((values) => JSON.stringify(values) === JSON.stringify(list)),
+      `the compiled recovery must embed ${JSON.stringify(list)}`,
+    );
+  }
+  assert.equal(
+    template.variables.excludedVirtualMachineNames,
+    "[union(variables('forbiddenVirtualMachines'), variables('externalVirtualMachines'))]",
+  );
+
+  const module = resources(template).find(
+    (resource) => resource.name === 'certigo-ci-runner-auto-recovery',
+  );
+  assert.deepEqual(module.properties.parameters.scaleSets, {
+    value: "[variables('recoveredScaleSets')]",
+  });
+  assert.deepEqual(module.properties.parameters.excludedVirtualMachineNames, {
+    value: "[variables('excludedVirtualMachineNames')]",
+  });
+
+  // Every managed runner is in scope and never excluded; every forbidden instance is.
+  const excluded = new Set(
+    [
+      ...config.inventory.forbiddenVirtualMachines,
+      ...config.inventory.externalVirtualMachines,
+    ].map((name) => name.toLowerCase()),
+  );
+  const managed = config.inventory.managedRunnerBindings.map(
+    ({ virtualMachineName }) => virtualMachineName,
+  );
+  assert.ok(managed.length > 0, 'the inventory must declare managed runner bindings');
+  for (const name of managed) {
+    assert.ok(
+      scaleSets.some(({ name: scaleSet }) => name.startsWith(`${scaleSet}_`)),
+      `${name} must belong to a recovered scale set`,
+    );
+    assert.ok(!excluded.has(name.toLowerCase()), `${name} must never be excluded`);
+  }
 });
 
 test('recovery failure surfaces through an alert, not only a run history', () => {
@@ -251,42 +369,5 @@ test('recovery composition wires the lock and reuses the shared RBAC primitive',
   assert.ok(
     !rbacParameters.includes('b24988ac-6180-42a0-ab88-20f7382dd24c'),
     'the built-in Contributor role must never be assigned',
-  );
-});
-
-test('the versioned inventory covers every VM the recovery starts', async () => {
-  const template = compileTemplate('infra/ci-runner/auto-recovery.bicep');
-  const recovered = template.parameters.virtualMachineNames.defaultValue;
-  const { readFileSync } = await import('node:fs');
-  const config = JSON.parse(
-    readFileSync(
-      path.join(repositoryRoot, 'infra', 'ci-runner', 'capacity-controller.config.json'),
-      'utf8',
-    ),
-  );
-
-  const managed = config.inventory.managedRunnerBindings.map(
-    ({ virtualMachineName }) => virtualMachineName,
-  );
-  // A hardcoded count froze this expectation at three while the pool had already grown to
-  // four. The instance added on 2026-09-07 was therefore never restarted after the nightly
-  // teardown, stayed deallocated for 7h48 on 2026-09-08, and the assertion meant to catch
-  // that asserted the defect instead. The size is derived from the inventory now, so adding
-  // a runner moves the expectation with it rather than pinning yesterday's fleet.
-  assert.ok(managed.length > 0, 'the inventory must declare managed runner bindings');
-  assert.deepEqual(
-    [...recovered].sort(),
-    [...managed].sort(),
-    'the recovery default must start exactly the managed runner instances',
-  );
-
-  // A substring probe across the whole serialized config was also satisfied by a name that
-  // appears only in forbiddenVirtualMachines, which is the exact opposite of the intent.
-  assert.deepEqual(
-    recovered.filter((name) =>
-      config.inventory.forbiddenVirtualMachines.includes(name),
-    ),
-    [],
-    'a forbidden instance must never be started by the recovery',
   );
 });

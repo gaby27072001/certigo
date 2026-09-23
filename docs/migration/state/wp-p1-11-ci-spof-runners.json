@@ -1,14 +1,118 @@
 {
   "id": "wp-p1-11-ci-spof-runners",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
-  "pr": null,
+  "status": "done",
+  "session_id": "6b6abaaa-49a7-49da-8506-a4034ad86277",
+  "branch": "gchambaud-microsoft-runners-clore-wp-p1-11",
+  "pr": 515,
   "checkpoint": {
-    "step": null,
-    "note": null,
-    "at": null
+    "step": "Isolation des classes de confiance",
+    "note": "DoD d'isolation constatée ; cette PR enregistre la clôture du registre, sans changement de routage. Les exceptions de typologie et les limites de preuve sont explicites ci-dessous. Aucun exercice de failover n'est déduit de l'inventaire.",
+    "at": "2026-09-23"
   },
-  "updated_at": "2026-07-07T00:16:20+01:00",
+  "evidence": {
+    "measured_at": "2026-09-23",
+    "source_revision": "43e06a5f6cdc2dbcd84fb2dd00152f29d2ae0bd9",
+    "source_scope": "Tous les fichiers .github/workflows/*.yml de main à la révision ci-dessus, y compris les workflows réutilisables. Les références chemin:ligne ci-dessous désignent cette révision, pas une ligne stable de main futur.",
+    "invalidated_by": "Toute modification des workflows, actions/scripts appelés, permissions, secrets/environnements injectés, enregistrements/labels de runners, identité ou configuration VM/VMSS, image/bootstrap/disque OS, réseau/NSG ou paramètres d'activation. L'état online n'est qu'un instantané ; il ne garantit aucune disponibilité future.",
+    "workflow_policy": {
+      "command": "node .github/scripts/validate-workflow-security.mjs --workspace .",
+      "result": "Workflow security policy passed.",
+      "sources": [
+        ".github/scripts/validate-workflow-security.mjs:300-324 — labels fixes, pas de GitHub-hosted ni de fallback configurable",
+        ".github/scripts/validate-workflow-security.mjs:407-430 — routage des opérations/agrégateurs et absence de secrets/environnements/login Azure dans les jobs PR",
+        ".github/scripts/validate-workflow-security.mjs:476-507 — exclusion du code PR sur trusted et confinement de l'émulateur Cosmos"
+      ],
+      "interpretation": "Sans identité/secrets désigne l'absence d'identité cloud attachée/injectée et de secrets applicatifs exposés aux jobs PR. Ce n'est pas l'absence de GITHUB_TOKEN : permissions GitHub explicites, notamment security-events: write pour CodeQL (.github/workflows/codeql.yml:137-141). Le validateur est une preuve statique, pas une attestation des machines."
+    },
+    "workflow_inventory": [
+      {"source": ".github/workflows/cd-backend.yml", "jobs": "validate-target:36, validate-public-domain:92, build-release:112, resolve-release:236, deploy-infra:340, deploy-backend:713", "routing": "certigo-trusted", "type": "opérations main"},
+      {"source": ".github/workflows/ci-backend.yml", "jobs": "freshness:19 -> pr-head-freshness ; changes:32, build-test:56", "routing": "certigo-pr", "type": "sources PR / CI main"},
+      {"source": ".github/workflows/ci-content-drift.yml", "jobs": "detect-content-drift:48", "routing": "certigo-trusted", "type": "opération main, lecture du contenu publié"},
+      {"source": ".github/workflows/ci-content.yml", "jobs": "freshness:21 -> pr-head-freshness ; validate:30", "routing": "certigo-pr", "type": "sources PR / CI main"},
+      {"source": ".github/workflows/ci-cortex-parity.yml", "jobs": "freshness:29 -> pr-head-freshness ; changes:42, parity:63", "routing": "certigo-pr", "type": "sources PR / CI main"},
+      {"source": ".github/workflows/ci-infra.yml", "jobs": "freshness:64 -> pr-head-freshness ; bicep-build:73", "routing": "certigo-pr", "type": "compilation PR sans déploiement"},
+      {"source": ".github/workflows/ci-migration-registry.yml", "jobs": "freshness:25 -> pr-head-freshness ; validate:34", "routing": "certigo-pr", "type": "sources PR / CI main"},
+      {"source": ".github/workflows/ci-mobile.yml", "jobs": "freshness:22 -> pr-head-freshness ; changes:35, packages:57, app:132, prism-goldens:240", "routing": "certigo-pr", "type": "sources PR / CI main"},
+      {"source": ".github/workflows/ci-preflight.yml", "jobs": "freshness:17 -> pr-head-freshness ; preflight:25", "routing": "certigo-pr", "type": "sources PR"},
+      {"source": ".github/workflows/ci-project-state.yml", "jobs": "freshness:20 -> pr-head-freshness ; validate-source:29 ; validate:89", "routing": "certigo-pr pour freshness/validate-source ; certigo-trusted pour validate", "type": "sources PR séparées de l'agrégateur"},
+      {"source": ".github/workflows/ciam-posture-monitor.yml", "jobs": "audit:30", "routing": "certigo-trusted", "type": "opération main"},
+      {"source": ".github/workflows/codeql.yml", "jobs": "freshness:24 -> pr-head-freshness ; changes:33, analyze:128 ; security-gate:211", "routing": "certigo-pr pour freshness/changes/analyze ; certigo-trusted pour security-gate", "type": "sources PR séparées de l'agrégateur"},
+      {"source": ".github/workflows/content-infra-apply.yml", "jobs": "apply:32", "routing": "certigo-trusted", "type": "opération main"},
+      {"source": ".github/workflows/content-infra-what-if.yml", "jobs": "what-if:96", "routing": "certigo-trusted", "type": "opération main"},
+      {"source": ".github/workflows/dependency-vuln-scan.yml", "jobs": "osv-scan:10, locked-restore:221", "routing": "certigo-pr", "type": "réutilisable appelé par security-gate pour les sources PR"},
+      {"source": ".github/workflows/deploy-privacy-policy.yml", "jobs": "build:19, deploy:46", "routing": "certigo-trusted", "type": "opération main"},
+      {"source": ".github/workflows/fork-pr-policy.yml", "jobs": "trust-gate:17", "routing": "certigo-pr", "type": "contrôle des métadonnées PR, sans checkout"},
+      {"source": ".github/workflows/governance-bootstrap-phase-a-what-if.yml", "jobs": "what-if:14", "routing": "certigo-trusted", "type": "opération main"},
+      {"source": ".github/workflows/governance-bootstrap-phase-b-what-if.yml", "jobs": "what-if:14", "routing": "certigo-trusted", "type": "opération main"},
+      {"source": ".github/workflows/lint-workflows.yml", "jobs": "freshness:17 -> pr-head-freshness ; validate:25", "routing": "certigo-pr", "type": "sources PR"},
+      {"source": ".github/workflows/post-merge-cosmos-account-deletion.yml", "jobs": "account-deletion:16", "routing": "certigo-cosmos-emulator", "type": "exception : test post-merge local, non déploiement"},
+      {"source": ".github/workflows/pr-head-freshness.yml", "jobs": "freshness:20", "routing": "certigo-pr", "type": "réutilisable, métadonnées PR uniquement"},
+      {"source": ".github/workflows/promote-backend-staging-prod.yml", "jobs": "validate-dispatch:14, deploy-staging:46, deploy-prod:54", "routing": "certigo-trusted", "type": "opération main"},
+      {"source": ".github/workflows/publish-verified-public-pages.yml", "jobs": "build:17, deploy:68", "routing": "certigo-trusted", "type": "opération main"},
+      {"source": ".github/workflows/release-android.yml", "jobs": "release:44", "routing": "certigo-trusted", "type": "opération main"},
+      {"source": ".github/workflows/release-ios.yml", "jobs": "release:43", "routing": "macOS certigo-trusted", "type": "exception : référence historique iOS, dispatch legacy main"},
+      {"source": ".github/workflows/runner-health.yml", "jobs": "probe:18", "routing": "certigo-trusted", "type": "opération main"},
+      {"source": ".github/workflows/runner-resilience-drill.yml", "jobs": "probe:15", "routing": "certigo-trusted", "type": "opération main ; présence du workflow ne prouve pas un drill"},
+      {"source": ".github/workflows/security-gate.yml", "jobs": "freshness:21 -> pr-head-freshness ; changes:30 ; osv:151 -> dependency-vuln-scan ; checkov:160 -> security-scan ; security-gate:169", "routing": "certigo-pr pour freshness/changes/osv/checkov ; certigo-trusted pour security-gate", "type": "sources PR séparées de l'agrégateur"},
+      {"source": ".github/workflows/security-scan.yml", "jobs": "iac-scan:10", "routing": "certigo-pr", "type": "réutilisable appelé par security-gate pour les sources PR"},
+      {"source": ".github/workflows/sync-ios-certs.yml", "jobs": "sync:34", "routing": "macOS certigo-trusted", "type": "exception : référence historique iOS, dispatch legacy main"}
+    ],
+    "aggregates": [
+      ".github/workflows/ci-project-state.yml:89-106 : validate ne reçoit que needs.validate-source.result ; aucun checkout, téléchargement ou lecture de code PR. La tête PR est extraite dans validate-source sur certigo-pr (:33, :67-79).",
+      ".github/workflows/codeql.yml:211-268 : security-gate ne reçoit que le type d'événement et les résultats/booléens des dépendances ; permissions: {}, aucun code PR.",
+      ".github/workflows/security-gate.yml:169-202 : security-gate ne reçoit que les résultats et booléens d'applicabilité ; permissions: {}, aucun code PR.",
+      ".github/workflows/runner-health.yml:18-40 : probe est une opération main sans déclencheur PR, pas un agrégateur consommant une tête PR."
+    ],
+    "typology_exceptions": [
+      "post-merge-cosmos-account-deletion.yml:18-34 est un test manuel local sur main fusionné, conditionné à CERTIGO_COSMOS_EMULATOR_ENABLED == true, sans identité/secrets cloud ; :63-80 vide explicitement les variables d'identité. Il n'est ni un job de sources PR ni un déploiement. Son label dédié est conservé ; l'inventaire GitHub ci-dessous ne contient aucun runner de ce type, donc aucune exécution n'est attestée.",
+      "release-ios.yml:3-5, :27-29, :43-54 et sync-ios-certs.yml:3-6, :19-21, :34-53 : références historiques déclarant la migration vers Codemagic, mais conservant des déclencheurs repository_dispatch legacy. Elles restent sur macOS certigo-trusted et main, sans checkout PR. Ne pas confondre commentaire « désactivé » et impossibilité de déclenchement ; aucun runner macOS dans l'inventaire ci-dessous. Aucun label n'est modifié."
+    ],
+    "github_runners": {
+      "source": "GET https://api.github.com/repos/gchambaud_microsoft/Certigo/actions/runners",
+      "runners": [
+        {"id": 31, "name": "certigo-prMVOC2P", "status": "online", "trust_label": "certigo-pr"},
+        {"id": 32, "name": "certigo-prTRHQEY", "status": "online", "trust_label": "certigo-pr"},
+        {"id": 33, "name": "certigo-pr7BZU76", "status": "online", "trust_label": "certigo-pr"},
+        {"id": 34, "name": "certigo-prUL1UCK", "status": "online", "trust_label": "certigo-pr"},
+        {"id": 27, "name": "vmss-certigo-runner-zonal_f55d176e-Certigo", "status": "online", "trust_label": "certigo-trusted"},
+        {"id": 29, "name": "vmss-certigo-runner-zonal_be505fa1-Certigo", "status": "online", "trust_label": "certigo-trusted"}
+      ],
+      "interpretation": "Les labels de confiance sont disjoints, pas les labels techniques : self-hosted/Linux/X64 sont communs. Aucun runner ne porte les deux labels de confiance."
+    },
+    "arm_report": {
+      "measured_at": "2026-09-23T17:45:00Z",
+      "provenance": "Relevé ARM en lecture seule fourni par la session créatrice 425dacb0-22bc-41e5-8a80-51b7c1c3daa0 dans la consigne de reprise ; non rejoué par cette session. Résultats rapportés, pas une nouvelle attestation Azure.",
+      "subscription": "b8952c8c-8f72-469d-99cd-ac906da4e2fc",
+      "resource_group": "rg-certigo-ci",
+      "pr_virtual_machines": [
+        "vmss-certigo-pr-pilot-z1_5275ea21",
+        "vmss-certigo-pr-pilot-z1_94bad106",
+        "vmss-certigo-pr-pilot-z1_1a6deaa2",
+        "vmss-certigo-pr-pilot-z1_6e3abce4"
+      ],
+      "observations": [
+        "Pour chacune des VM PR : propriété identity absente ; osProfile.secrets = [] ; NIC sans IP publique, sous-réseau vnet-certigo-pr-pilot/snet-pr-runners.",
+        "Modèle VMSS PR : identity = null. Contrôle discriminant : le VMSS trusted retourne UserAssigned.",
+        "NSG nsg-certigo-pr-pilot : deny-imds-outbound, priorité 100, Outbound Deny AzurePlatformIMDS ; deny-vnet-outbound priorité 110 ; deny-vnet-inbound priorité 100."
+      ],
+      "limits": "ARM atteste seulement la configuration déclarée : ni inspection du disque OS/credentials résiduels, ni mesure des règles iptables effectives, ni test de connectivité IMDS."
+    },
+    "prior_proposal": {
+      "pr": 356,
+      "state": "CLOSED",
+      "closed_at": "2026-09-23T17:46:06Z",
+      "source": "https://github.com/gchambaud_microsoft/Certigo/pull/356#issuecomment-5799931922",
+      "branch": "gchambaud-microsoft-isolate-ci-gate-runners",
+      "retained_head": "447a18de80bedba494f8a94c2a8f05e2af29f7f9",
+      "verification": "gh pr view 356 ; git ls-remote origin refs/heads/gchambaud-microsoft-isolate-ci-gate-runners",
+      "interpretation": "Fermeture de la proposition, pas livraison de son architecture. Aucun cherry-pick, aucune suppression de branche, aucun changement de workflow."
+    },
+    "excluded_claims": [
+      "Aucune attestation du disque ou de l'OS des runners PR ; absence de secrets bornée aux workflows et aux propriétés ARM rapportées.",
+      "Aucune preuve de failover, de reprise nocturne ou de disponibilité durable déduite des labels/états online ; la DoD de reprise reste celle du lot distinct wp-p2-07.",
+      "Aucun déploiement Azure, arrêt de runner, changement de permissions ou contournement des protections réalisé pour cette clôture."
+    ]
+  },
+  "updated_at": "2026-09-23",
   "history_ref": "log.jsonl"
 }

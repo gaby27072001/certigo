@@ -302,7 +302,7 @@ et son module [`modules/runnerAutoRecovery.bicep`](../infra/ci-runner/modules/ru
 |---|---|
 | Déclencheur | Logic App (Consumption) `logic-certigo-ci-runner-recovery`, récurrence quotidienne |
 | Heure | **01:30 UTC** |
-| Action | démarre les 3 instances, attend 30 s, relit `instanceView`, exige `PowerState/running` pour **chacune** |
+| Action | pour chaque scale set de runners : énumère ses instances, démarre toutes celles qui ne sont pas exclues, attend 30 s, relit, exige `PowerState/running` pour **chacune** et au moins `minimumOnlineByTrust` instances `running` par pool |
 | Identité | managée **assignée par le système** — aucun secret, aucun credential |
 | Rôle | rôle personnalisé `Certigo CI Runner Recovery`, 3 actions, assignable au seul `rg-certigo-ci` |
 | Échec | run `Failed` → métrique `RunsFailed` → alerte `alert-certigo-ci-runner-recovery-failed` (sévérité 1) |
@@ -317,9 +317,9 @@ test (`infra/tests/ci-runner-auto-recovery.test.mjs`) qui refuse toute heure ant
 
 | Action | Pourquoi elle est nécessaire |
 |---|---|
-| `Microsoft.Compute/virtualMachines/read` | résoudre l'instance avant de l'adresser |
+| `Microsoft.Compute/virtualMachines/read` | énumérer les instances de chaque scale set **et** lire leur power state en un seul appel (liste filtrée `$expand=instanceView`, au scope du RG) |
 | `Microsoft.Compute/virtualMachines/start/action` | la **seule** mutation autorisée; idempotente sur une VM déjà allumée |
-| `Microsoft.Compute/virtualMachines/instanceView/read` | lire le power state pour **vérifier** la reprise; `GET .../instanceView` n'est pas couvert par le `read` ci-dessus |
+| `Microsoft.Compute/virtualMachines/instanceView/read` | lire le power state d'une instance nommée (`GET .../instanceView`). **N'est plus appelée par le workflow depuis le 2026-09-23** : conservée pour ne pas changer le rôle dans le même déploiement ; son retrait est une mesure séparée à faire (retirer, attendre la propagation, relancer un run, vérifier) |
 
 Le rôle intégré **« Virtual Machine Contributor » a été écarté comme trop large** : via
 `Microsoft.Compute/virtualMachines/*` il accorderait aussi `delete`, `deallocate/action`,
@@ -365,22 +365,24 @@ soit un **contrôle** et non un rapport.
 Le mode dégradé manuel reste valable et documenté dans
 [`docs/runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) §4.
 
-#### La liste d'instances existe en deux exemplaires — invariant scellé par test
+#### Historique : la liste d'instances figée (jusqu'au 2026-09-23)
 
-`virtualMachineNames` est écrit **deux fois** : comme défaut dans `auto-recovery.bicep` et
+> Section historique. Depuis le 2026-09-23 la reprise n'a plus de liste d'instances : voir
+> « Énumération dynamique — en service depuis le 2026-09-23 » ci-dessous.
+
+`virtualMachineNames` était écrit **deux fois** : comme défaut dans `auto-recovery.bicep` et
 comme valeur dans `infra/params/ci-runner-auto-recovery.bicepparam`. Aucun workflow ne peut
 déployer cette pile — un workflow porteur de credentials Azure est interdit par le scellé du
 dépôt — donc **le seul déployeur possible est un opérateur humain**, et un `--parameters`
-oublié applique le défaut. Les deux copies sont donc opérationnelles, pas l'une principale et
-l'autre décorative.
+oublié appliquait le défaut. Les deux copies étaient donc opérationnelles, pas l'une
+principale et l'autre décorative.
 
 Elles ont divergé : le 2026-09-07 la PR #402 a porté le pool PR à deux instances et ajouté
 `a14700a3` au bicepparam **sans l'ajouter au défaut**, qui est resté à trois. Le test
 « every managed runner is restarted after the nightly teardown » ne lisait que le bicepparam
 et n'a rien vu ; un second test épinglait même le défaut à `assert.equal(recovered.length, 3)`,
-c'est-à-dire qu'il **certifiait le défaut**. Les deux tests exigent désormais l'égalité
-ensembliste entre le défaut, le bicepparam et `inventory.managedRunnerBindings` : toute
-divergence future échoue des deux côtés indépendamment.
+c'est-à-dire qu'il **certifiait le défaut**. Les tests ont ensuite exigé l'égalité
+ensembliste entre le défaut, le bicepparam et `inventory.managedRunnerBindings`.
 
 **Limite démontrée le 2026-09-23 : cohérentes entre elles ne veut pas dire fraîches.** Les
 trois listes étaient égales, et toutes pointaient vers `bbf83c5c` et `a14700a3`, deux
@@ -388,43 +390,119 @@ instances en `provisioningState: Failed` depuis le 2026-09-12. Leur démarrage r
 `InternalServerError`, donc **les 12 runs du 2026-09-12 au 2026-09-23 ont fini `Failed`**,
 pendant que les quatre instances PR de remplacement (créées le 2026-09-14) n'étaient jamais
 rallumées : la CI PR était morte chaque matin jusqu'à un `az vm start` manuel. L'alerte
-`RunsFailed` existait mais n'a pas conduit à une correction. La correction met à jour les
-trois listes et inscrit les instances retirées dans `forbiddenVirtualMachines`, ce qui rend
-leur retour dans la liste de reprise impossible sans casser un test. Aucun test hors ligne ne
-peut en revanche prouver qu'une liste figée suit Azure : c'est l'argument qui pèse désormais
-en faveur de l'énumération dynamique ci-dessous.
+`RunsFailed` existait mais n'avait aucun destinataire. #508 a corrigé les trois listes le
+2026-09-23 ; aucun test hors ligne ne pouvant prouver qu'une liste figée suit Azure, la liste
+a été supprimée le même jour au profit de l'énumération dynamique.
 
-#### Énumération dynamique — mesurée faisable, ajournée
+#### Énumération dynamique — en service depuis le 2026-09-23
 
-Rendre l'énumération dynamique (interroger le scale set plutôt que lister des noms figés)
-supprimerait cette duplication. **Mesuré le 2026-09-09, c'est faisable sans nouveau
-privilège**, mais la décision est de **ne pas le faire** : le graphe déplié est une propriété
-revendiquée du module — « un relecteur voit exactement quelles ressources sont touchées » — et
-sur un mécanisme déployé à la main, cette lisibilité vaut davantage que l'auto-mise à jour.
-Ce constat est consigné pour ne pas être remesuré :
+Mesurée faisable le 2026-09-09 puis ajournée au nom de la lisibilité d'un graphe déplié, elle
+a été mise en service le 2026-09-23 (#503) : l'incident du 2026-09-12 au 2026-09-23 a montré
+qu'une liste lisible mais périmée coûte plus cher qu'un graphe à boucle. La lisibilité est
+reportée ailleurs : la règle (deux scale sets, liste d'exclusion versionnée) se relit dans le
+dépôt, et chaque run rend visibles les instances réellement démarrées (répétitions de
+`Start_an_instance_of_<pool>`, voir [`runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) §11).
 
-- **Droit déjà accordé.** `checkAccess` sur le principal de la Logic App
-  (`logic-certigo-ci-runner-recovery`) au scope `rg-certigo-ci` rend `Allowed` pour
+- **Aucun nouveau droit.** `checkAccess` sur le principal de la Logic App
+  (`logic-certigo-ci-runner-recovery`) au scope `rg-certigo-ci` rendait `Allowed` pour
   `virtualMachines/read`, `start/action` et `instanceView/read`, et `NotAllowed` pour
-  `virtualMachineScaleSets/read`, `deallocate/action`, `runCommand/action` et `delete`.
-  L'énumération par VM est donc autorisée ; **passer par l'API du scale set ne l'est pas**.
-- **Un seul appel remplace énumération *et* vérification** :
-  `GET .../virtualMachines?$filter='virtualMachineScaleSet/id' eq '{id}'&$expand=instanceView`
-  rend les instances **avec** leur `PowerState`. Le nom de propriété doit être **quoté** :
-  sans les apostrophes, ARM rend `The request URL is not valid`. `$expand=instanceView` sans
-  ce `$filter` est refusé (`Expand Instance View is only supported when Virtual Machine Scale
-  Set resource filter is applied`).
-- **`Terminate` resterait au niveau supérieur.** Un seul appel rendant un tableau, l'assertion
-  s'écrit par agrégation sans `Foreach`, donc l'objection documentée dans le module tombe.
+  `virtualMachineScaleSets/read`, `deallocate/action`, `runCommand/action` et `delete`
+  (2026-09-09). L'énumération passe par les VM, jamais par l'API du scale set. Le
+  2026-09-23, les runs réels ont confirmé que l'identité managée liste les instances avec ce
+  seul rôle.
+- **Un seul appel par pool rend membres et power state** :
+  `GET .../virtualMachines?$filter='virtualMachineScaleSet/id' eq '{id}'&$expand=instanceView`.
+  Le nom de propriété doit être **quoté** : sans les apostrophes, ARM rend
+  `The request URL is not valid`. `$expand=instanceView` sans ce `$filter` est refusé
+  (`Expand Instance View is only supported when Virtual Machine Scale Set resource filter is
+  applied`). Le `$filter` est insensible à la casse côté ARM (mesuré : il rend aussi les
+  instances dont la référence porte `RG-CERTIGO-CI`).
+- **Exclusions et planchers ne sont pas recopiés** : `auto-recovery.bicep` lit
+  `inventory.forbiddenVirtualMachines`, `inventory.externalVirtualMachines` et
+  `minimumOnlineByTrust` dans `capacity-controller.config.json` (`loadJsonContent`). Une
+  exclusion périmée est inoffensive ; une exclusion manquante fait échouer le run en nommant
+  l'instance, sans empêcher les autres de démarrer.
+- **Pas d'assertion vide.** Trois échecs explicites au niveau supérieur :
+  `RunnerEnumerationIncomplete` (pagination), `RunnerPowerStateNotRunning` (instance non
+  exclue sans `PowerState/running`, nommée), `RunnerPoolBelowRedundancyFloor` (moins de
+  `minimumOnlineByTrust` instances `running` dans un pool). Le plancher empêche qu'une liste
+  d'exclusion trop large ou un scale set vide rendent la vérification vraie par vacuité.
+- **`Terminate` reste au niveau supérieur** : les démarrages sont dans un `Foreach` par pool,
+  les assertions agrègent la re-lecture hors boucle.
+- **Piège Logic Apps mesuré.** `createArray()` sans argument est refusé à l'exécution
+  (`InvalidTemplate ... 'createArray' expects a comma separated list of parameters`), mais
+  seulement quand il est réellement évalué : caché derrière un `coalesce` dont le premier
+  argument est non nul, il passe inaperçu. Le premier déploiement du 2026-09-23 (18:19Z) a
+  échoué ainsi (run `08584114192689525938465393788CU124`, après avoir tout de même démarré
+  les six instances) ; le littéral est désormais `json('[]')`.
+- **Tests hors ligne.** `infra/tests/ci-runner-auto-recovery-simulation.test.mjs` développe le
+  template ARM compilé puis exécute la définition Logic Apps contre un ARM simulé : topologie
+  live du 2026-09-23, instance de remplacement absente de toute liste, instance cassée,
+  plancher, pagination, 403 sur un pool, casse, et deux contrôles de mutation qui prouvent
+  que les assertions mordent.
 - **⚠️ Ne jamais discriminer par tag.** Les tags sont asymétriques : les instances
   `pr-pilot` portent `workload=github-actions-runner` et `trustBoundary`, les instances
   `runner-zonal` ne portent que `VirtualMachineProfileTimeCreated`. Un filtre sur
-  `workload` **perdrait les deux runners trusted**, recréant exactement la classe de défaut
-  que l'on cherche à fermer. Le seul discriminant fiable est
-  `properties.virtualMachineScaleSet.id`, présent sur les quatre instances.
-- **⚠️ La casse varie.** La référence VMSS d'une instance porte `RG-CERTIGO-CI`, les autres
-  `rg-certigo-ci`. Toute comparaison locale doit être insensible à la casse ; le `$filter`
-  côté ARM, lui, l'est déjà.
+  `workload` **perdrait les deux runners trusted**. Le seul discriminant fiable est
+  `properties.virtualMachineScaleSet.id`.
+
+**Preuves live du 2026-09-23.** Déploiement `certigo-ci-runner-auto-recovery-20260923182604`
+(`Succeeded`, what-if sans création ni suppression). Run manuel
+`08584114187060282646156606064CU126` : `Succeeded`, six démarrages (`be505fa1`, `f55d176e`,
+`1a6deaa2`, `5275ea21`, `6e3abce4`, `94bad106`), aucune des sept instances retirées touchée,
+2/2 et 4/4 `running`, les trois `Fail_*` en `Skipped`. Run
+`08584114180865363275771379711CU123` pendant le drill (section « Drill de perte d'un
+runner ») : une instance désallouée, absente de toute liste, rallumée et vérifiée.
+
+#### Cause racine des instances PR mortes — mesurée le 2026-09-23
+
+> Mesuré le 2026-09-23 dans l'Activity Log de `rg-certigo-ci` (fenêtre 2026-09-10 → 2026-09-23)
+> et par `GET` ARM sur les deux scale sets. Invalidé par une modification du modèle du pilote PR
+> (`pilot.bicep`), de la règle NSG `deny-imds-outbound` ou du verrou `certigo-ci-cannot-delete`.
+
+L'issue #503 attribuait la panne à un modèle « sans customData ni extension » dont le scale
+set aurait recréé des instances « de sa propre initiative ». Les deux points sont réfutés par
+la mesure, et deux mécanismes précis les remplacent :
+
+1. **Le scale set ne crée jamais d'instance seul.** Les sept créations du 2026-09-11 et du
+   2026-09-14 suivent chacune un `virtualMachineScaleSets/write` d'un opérateur
+   (`az vmss scale`), exécuté ensuite par le principal d'orchestration Flexible
+   `bb5a6d41-d40e-4a32-8eb3-d68e8c8b12ab`. Le scale set n'a ni autoscale, ni
+   `automaticRepairsPolicy`. Et le `customData` n'est pas absent : il est **write-only**,
+   donc `az vmss show` rend `False` même quand `pilot.bicep` le fournit (voir
+   `infra/ci-runner/README.md`, « Séquence de provisionnement »). Le bootstrap prépare le runner
+   mais ne l'enregistre jamais, par conception : aucun jeton dans l'IaC.
+2. **Toute création avec `deny-imds-outbound` actif échoue au provisionnement OS.** `d8d42366`
+   (créée à 15:59:32Z le 2026-09-11) finit en `OSProvisioningInternalError` à 16:05:22Z ;
+   `2c1eeb41` et `3601055e` (08:05:58Z le 2026-09-14) échouent à 08:12:00Z ; `765cf6af` et
+   `7d3001c2` (16:13:02Z le 2026-09-11) mettent 6 min et sont ensuite inutilisables. Les quatre
+   créations réussies du 2026-09-14 ont eu lieu juste après la modification de la règle
+   (09:24:52Z) : `Succeeded` en 3 à 40 s. La règle a été remise à 09:27:01Z. La suppression
+   de la règle, tentée d'abord à 09:21:49Z, avait été refusée par le verrou (`Conflict`).
+3. **Tout scale-in sous le verrou `CanNotDelete` laisse l'instance visée en `Failed`.** Le
+   2026-09-11 à 16:09:36Z et 16:14:57Z, trois scale-in ont tenté de supprimer `bbf83c5c`,
+   `a14700a3` et `d8d42366` : `ScopeLocked`. Le 2026-09-12 à 00:48:33Z, la désallocation MCAPS
+   de `bbf83c5c` et `a14700a3` a échoué en `InternalExecutionError`, et chaque `start` ensuite
+   aussi. Le scale set affiche depuis `sku.capacity = 8` pour 11 instances (11 − 3 suppressions
+   refusées). La règle d'autoscale trusted « CPU < 20 % → −1 » armait le même piège sur le pool
+   trusted : elle a été retirée du live le 2026-09-23 à 18:01Z (application de
+   `capacity.bicep`, déploiement `certigo-ci-capacity-20260923180037`).
+
+**Conséquence sur le modèle.** Une reconstruction depuis la définition versionnée fonctionne,
+à deux conditions opérationnelles qui ne sont pas des faiblesses de sécurité des jobs :
+retirer la règle NSG IMDS pendant le seul provisionnement (aucun runner n'est enregistré à ce
+moment, donc aucun code de PR ne s'exécute ; le VMSS n'a pas d'identité, donc l'IMDS ne délivre
+aucun jeton ; `pilot-register.sh` refuse l'enregistrement tant que l'IMDS répond), et
+enregistrer le runner par `register-pilot.ps1` avec un jeton éphémère. Ce qui reste non résolu
+par conception : une instance neuve ne s'enregistre pas seule, faute de credential GitHub dans
+Azure (option écartée plus haut). La cible durable est l'image immuable préchauffée
+(`infra/ci-runner/image/`, #341).
+
+> ⏱️ **Effet mesuré de l'IMDS bloqué sur chaque démarrage.** Un `start` depuis `deallocated`
+> dure ~1 min pour une instance trusted et **~7 min 30 s pour une instance PR** (2026-09-11 :
+> 7 min 32 s et 8 min 01 s ; 2026-09-23 : 7 min 32 s). Hypothèse cohérente mais non prouvée :
+> l'agent invité attend l'IMDS avant de signaler l'état prêt. La reprise en tient compte (aucun
+> délai de vérification n'est déclenché avant la fin des démarrages).
 
 ### Verrou de suppression sur `rg-certigo-ci`
 
@@ -838,18 +916,57 @@ Le second résultat doit être vide avant suppression d'une VM compromise.
 
 ## Drill de perte d'un runner
 
-Le drill mutable est **suspendu**. Ne pas reprendre les anciennes commandes
-`vm-certigo-runner` / `vm-certigo-runner-2` : elles ne représentent plus le live.
-Avant un nouveau drill, les trois conditions suivantes sont obligatoires :
+Ne pas reprendre les anciennes commandes `vm-certigo-runner` / `vm-certigo-runner-2` : elles
+ne représentent plus le live. Préconditions d'un drill, et leur état mesuré le 2026-09-23 :
 
-1. le what-if puis l'application approuvée de `capacity.bicep` ont retiré le scale-in CPU ;
-2. `be505fa1` possède une classification et une décision de lifecycle documentées ;
-3. `lifecycle-preflight.sh` est vert tout en gardant le contrôleur `enabled=false`.
+| # | Précondition | État au 2026-09-23 |
+|---|---|---|
+| 1 | le what-if puis l'application approuvée de `capacity.bicep` ont retiré le scale-in CPU | ✅ appliqué à 18:01:06Z (`certigo-ci-capacity-20260923180037`, what-if : 1 `Modify`, 0 création/suppression) |
+| 2 | `be505fa1` possède une classification et une décision de lifecycle documentées | ✅ liée dans `managedRunnerBindings` depuis le 2026-09-04 |
+| 3 | `lifecycle-preflight.sh` est vert tout en gardant le contrôleur `enabled=false` | ⚠️ impossible au sens strict : `evaluate-lifecycle.mjs` ajoute toujours la raison « capacity controller feature flag is off » quand `enabled=false`. Hors cette raison, une seule reste à 19:05Z : « forbidden Azure VMs are present » (les sept instances PR retirées, en attente de suppression). Tout le reste est conforme : 0 runner double label, 0 VM non classée, 0 binding incohérent, capacité utilisable 4 PR + 2 trusted. |
 
 Le ticket de drill doit ensuite nommer l'ID ARM exact de l'instance PR, prouver
 `busy=false` et zéro job en file, définir la fenêtre et le rollback, puis recevoir
 une approbation opérateur. Le workflow `Runner resilience drill` reste la preuve
 GitHub, mais ce document n'autorise aucun arrêt ou redémarrage Azure.
+
+### Drill du 2026-09-23 — arrêt, bascule, remise en ligne (instance PR)
+
+Approuvé par l'orchestrateur par délégation de Gabriel, avec trois conditions : aucun job en
+cours sur l'instance arrêtée, au moins deux autres runners PR en ligne pendant l'exercice,
+instance remise en ligne à la fin. Instance :
+`/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/virtualMachines/vmss-certigo-pr-pilot-z1_6e3abce4`
+(runner 34 `certigo-prUL1UCK`).
+
+| Heure (UTC) | Événement |
+|---|---|
+| 18:34:16 | prévol : runner 34 `online`, `busy=false` ; 0 run en file, 0 en cours ; 3 autres runners PR `online` |
+| 18:34:19 → 18:34:59 | `az vm deallocate` (40 s) → `PowerState/deallocated` |
+| 18:35:17 | runner 34 `offline` côté GitHub (premier sondage) |
+| 18:35:16 → 18:47:14 | **bascule** : 68 jobs `certigo-pr` exécutés par les trois autres runners (`certigo-pr7BZU76` 35, `certigo-prMVOC2P` 20, `certigo-prTRHQEY` 13), dont toute la CI de #513 ; 15 jobs trusted sur `f55d176e`/`be505fa1` |
+| 18:36:18 → 18:36:23 | `Runner resilience drill` (run `35903619428`, `expected_offline_runner=certigo-prUL1UCK`) : `success` sur `vmss-certigo-runner-zonal_be505fa1-Certigo` |
+| 18:39:58 | reprise déclenchée à la main (même déclencheur que 01:30 UTC), run `08584114180865363275771379711CU123` |
+| 18:39:59 → 18:47:31 | `start` de `6e3abce4` par la reprise dynamique (7 min 32 s) ; les cinq autres instances déjà allumées : 12 s |
+| 18:46:21 | premier job repris par le runner 34 (`Select CodeQL languages`, run `35904765960`) |
+| 18:48:03 | run de reprise `Succeeded`, trois `Fail_*` en `Skipped` ; runner 34 `online`, `busy=false` à 18:48:12 |
+
+Durées : indisponibilité du runner 34 ≈ 12 min (dont 5 min d'attente volontaire avant la
+reprise) ; reprise complète 8 min 05 s ; **aucune gate bloquée** : la file PR n'a jamais
+attendu, trois runners de la classe restant disponibles. Permissions, fork guards et
+environnements n'ont pas été modifiés.
+
+> ⚖️ **Reconstruction depuis zéro : le compromis, dit franchement.** Recréer une instance PR
+> depuis `pilot.bicep` exige de lever la règle NSG `deny-imds-outbound` pendant le
+> provisionnement (section « Cause racine des instances PR mortes »). La règle est posée au
+> niveau du **sous-réseau** : pendant cette fenêtre (quelques minutes), les runners PR
+> **déjà en service** perdent la couche NSG du blocage IMDS et ne gardent que la couche OS
+> (`certigo-block-imds.service`, iptables), que le compte `runner` ne peut pas retirer (sudo
+> limité). Aucun jeton n'est exposé dans les deux cas : le VMSS PR n'a pas d'identité managée.
+> Pour ne pas réduire la défense en profondeur des jobs, la reconstruction se fait sans job PR
+> en cours (drainage ou fenêtre creuse), et la nouvelle instance n'est enregistrée qu'après
+> remise de la règle (`pilot-register.sh` refuse tant que l'IMDS répond). Ce drill ne l'a pas
+> exécutée : la dernière reconstruction réelle date du 2026-09-14 (quatre instances,
+> Activity Log) ; celle du 2026-08-06 (run `31090379901`) visait les anciennes VM.
 
 ## Résilience exclusivement Azure
 

@@ -137,6 +137,23 @@ a required check and blocks no pull request, but that post-merge cleanup never r
 > `vmss-certigo-pr-pilot-z1` stops booting a stock image. Either change alone
 > invalidates this whole subsection; re-read it rather than amend it.
 
+> ⚠️ **Corrected by measurement on 2026-09-23 — read this before the text below.** Three
+> statements of this 2026-09-11 subsection are contradicted by the Activity Log and by ARM,
+> and the measured facts are written once in `docs/CI_RUNNER_RESILIENCE.md`, section
+> « Cause racine des instances PR mortes — mesurée le 2026-09-23 »:
+> 1. `pr-pilot` does not boot "with no cloud-init": `pilot.bicep` ships the bootstrap as
+>    `customData`, which is write-only (`az vmss show` renders `False`). New instances carry
+>    no runner because registration is manual by design, and because every instance created
+>    while the NSG rule `deny-imds-outbound` was active failed OS provisioning.
+> 2. The scale-in rule was not harmless: a scale-in under the lock is refused per instance
+>    (`ScopeLocked`) and leaves the targeted instance in `provisioningState: Failed`. That is
+>    how `bbf83c5c`, `a14700a3` and `d8d42366` died on 2026-09-11/12. The rule was removed from
+>    the live autoscale on 2026-09-23 at 18:01Z.
+> 3. The recovery Logic App no longer names any instance: since 2026-09-23 it enumerates the
+>    members of both scale sets on every run.
+> Disk figures below are also stale: on 2026-09-23 all 13 OS disks, including the seven of
+> the retired PR instances, are 128 GiB `Standard_LRS`, not `Premium_LRS` (`az disk list`).
+
 Two independent mechanisms, each sufficient on its own to prevent scaling:
 
 1. **Adding capacity to `certigo-pr` cannot add a runner.**

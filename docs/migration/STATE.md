@@ -26,7 +26,7 @@
 | `wp-p1-08-offline-study-cache` | 1 | M | done | `wp-p1-07-content-manifest-immutable` | [#231](https://github.com/gchambaud_microsoft/Certigo/pull/231) |
 | `wp-p1-09-cortex-parity-gate` | 1 | M | done | `wp-p1-00-decomposition` | [#216](https://github.com/gchambaud_microsoft/Certigo/pull/216) |
 | `wp-p1-10-mobile-crash-reporting` | 1 | S | done | `wp-p1-00-decomposition` | [#213](https://github.com/gchambaud_microsoft/Certigo/pull/213) (lot clos avec écart accepté) + suivi Sentry natif/dSYM [#374](https://github.com/gchambaud_microsoft/Certigo/pull/374), gate Alpha iOS distincte encore ouverte |
-| `wp-p1-11-ci-spof-runners` | 1 | S | todo | `wp-p1-00-decomposition` | — |
+| `wp-p1-11-ci-spof-runners` | 1 | S | done | `wp-p1-00-decomposition` | [Isolation des classes de confiance — preuves et limites](state/wp-p1-11-ci-spof-runners.json) ; reprise traitée séparément par `wp-p2-07` |
 | `wp-p1-12-iac-drift-import` | 1 | M | in_review | `wp-p1-00-decomposition` | [#371](https://github.com/gchambaud_microsoft/Certigo/pull/371) — what-if Provider bornés verts ; apply racine bloqué sans contrat de domaine staging, activation OpenAI bloquée sans DNS privé Foundry |
 | `wp-p1-13-staging-environment` | 1 | S | todo | `wp-p1-12-iac-drift-import` | [#232 fusionnée](https://github.com/gchambaud_microsoft/Certigo/pull/232) · staging Bicep live/healthy ; variables de domaine et clôture après p1-12 |
 | `wp-p1-14-opentelemetry-correlation` | 1 | M | done | `wp-p1-00-decomposition` | [#215](https://github.com/gchambaud_microsoft/Certigo/pull/215) |

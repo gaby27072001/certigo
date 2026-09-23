@@ -193,75 +193,38 @@ Débloque `wp-p1-05` (migration contenu, dépend aussi de p1-02) et `wp-p1-06` (
 
 ---
 
-### 2. Résilience CI — supprimer le SPOF des runners (wp-p1-11-ci-spof-runners)
+### 2. Isolation des runners CI (wp-p1-11-ci-spof-runners)
 
-**Objectif (DoD).** Les jobs CI critiques n'ont **plus de dépendance à un runner unique** :
-ils ciblent le label commun d'un pool d'au moins deux runners Azure self-hosted.
-Une simulation d'indisponibilité d'une instance **ne bloque plus** la CI.
+**Objectif (DoD du manifeste).** Les sources PR ciblent `certigo-pr` sans identité/secrets
+cloud ; les opérations ciblent `certigo-trusted` sans checkout PR. Aucun runner
+GitHub-hosted ni fallback croisé.
 
-**Finding opérationnel.** La CI Certigo tourne aujourd'hui sur **un seul** runner
-auto-hébergé (`vm-certigo-runner`, groupe `rg-certigo-ci`). Une panne de ce pool a déjà
-**bloqué la CI ~6 h** — d'où la priorité. ⚠️ **Contrainte EMU** : les runners **hébergés par
-GitHub sont désactivés durablement par la politique d'entreprise**
-(voir `infra/ci-runner/README.md`). La résilience repose exclusivement sur plusieurs
-instances Azure séparées par les labels `certigo-pr` et `certigo-trusted`.
+**Clôture et preuve de référence.** Voir le checkpoint **« Isolation des classes de
+confiance »** dans [la fiche du lot](state/wp-p1-11-ci-spof-runners.json). Elle centralise
+l'inventaire daté de chaque job, les sources chemin:ligne, les runners live, le relevé ARM
+rapporté, les exceptions macOS/Cosmos et les conditions d'invalidation. Les agrégateurs qui
+ne consomment que des résultats ne sont pas des jobs de sources PR.
 
-**Pré-requis.**
-- `az login` + abonnement sélectionné (`az account set --subscription <SUBSCRIPTION_ID>`).
-- Droits d'admin sur les runners de l'org/dépôt GitHub (pour l'enregistrement).
-- Précondition idempotente : auditer les workflows — si les jobs ciblent déjà un pool
-  Azure isolé par les labels `certigo-pr`/`certigo-trusted`, le lot est **fait**.
+**Vérification en lecture seule lors d'une reprise.**
 
-**Étapes (intention + commande type — provisionnement live).**
-
-```bash
-# 1. Inventorier l'existant : combien de runners réels dans le pool ?
-az vm list -g rg-certigo-ci -o table
-gh api repos/<ORG>/<REPO>/actions/runners --jq '.runners[] | {name,status,busy}'
-# -> objectif : confirmer qu'il n'existe qu'UN runner actif (le SPOF à corriger).
-
-# 2a. OPTION A (recommandée) — 2e+ runner(s) self-hosted via VMSS/ARC.
-#     Provisionner un 2e VM/scale set homogène au premier, puis l'enregistrer avec
-#     le MÊME label que le premier pour former un pool (les jobs ciblent le label,
-#     pas la machine). Exemple type (VMSS) :
-az vmss create -g rg-certigo-ci -n vmss-certigo-runners \
-  --image <IMAGE> --instance-count 2 --vnet-name vnet-certigo-ci --subnet snet-runners \
-  --assign-identity <IDENTITY> --tags product=Certigo role=ci-runner
-#     Puis, sur chaque instance, installer + enregistrer le runner GitHub Actions
-#     (script actions-runner config.sh) avec un label commun, ex. "self-hosted,certigo".
-
-# 2b. OPTION B — ARC (Actions Runner Controller) sur Kubernetes : déployer un
-#     RunnerScaleSet ciblant le même label, min replicas >= 2.
+```powershell
+gh api repos/gchambaud_microsoft/Certigo/actions/runners --jq '.runners[] | {id,name,status,labels:[.labels[].name]}'
+node .github/scripts/validate-workflow-security.mjs --workspace .
+python tools/validate_migration_registry.py
 ```
 
-**Rendre les jobs tolérants à la panne (côté workflow — hors périmètre docs, à faire en code
-lors du lot réel).** Principe à appliquer dans les `.github/workflows/*` :
+Vérifier les **labels de confiance disjoints**, pas l'absence de labels techniques communs
+(`self-hosted`, `Linux`, `X64`). Le validateur statique et l'inventaire GitHub ne prouvent
+pas seuls l'absence d'identité cloud : toute modification des machines, images, identités
+ou réseaux impose de renouveler la preuve correspondante. Le disque OS n'est pas attesté.
 
-```yaml
-# Le label commun route vers une instance disponible du pool Azure.
-runs-on: [self-hosted, Linux, X64, certigo-trusted]
-# Conserver au moins deux runners Azure homogènes dans ce pool.
-```
+**Reprise après panne.** Le drill et la disponibilité durable relèvent du lot distinct
+[`wp-p2-07`](state/wp-p2-07.json). Ne pas arrêter ni provisionner de runner pour rejouer
+cette clôture documentaire. Ne pas attribuer une identité au pool PR, partager un label
+de confiance entre les classes ou ajouter un fallback pour lever une file d'attente.
 
-**Placeholders.** `<SUBSCRIPTION_ID>`, `<ORG>`, `<REPO>`, `<IMAGE>`, `<IDENTITY>`.
-
-**Vérification.**
-
-```bash
-gh api repos/<ORG>/<REPO>/actions/runners --jq '[.runners[] | select(.status=="online")] | length'
-# -> attendu : >= 2 runners en ligne partageant le même label.
-```
-
-Test réel : **désactiver un runner** (arrêter une instance), relancer un workflow critique et
-constater qu'il **s'exécute quand même** sur une autre instance (pas de blocage de la CI).
-
-**Rollback.** Abandon de la branche de workflow ; **désallouer** les runners ajoutés
-(`az vmss delete` / retrait de l'enregistrement GitHub). Les workflows précédents restent en
-place (cf. fiche). Aucune donnée applicative touchée.
-
-**Durée estimée.** ~2–4 h (provisionnement + enregistrement + test de bascule).
-**Ordre / dépendances.** Indépendant ; peut être joué en parallèle des lots 3–4. Priorité
-opérationnelle haute (stabilité de toute la CI Phase 1+).
+**Rollback.** Revenir sur la réconciliation du registre si une preuve est invalidée ;
+aucune suppression de ressource, aucun changement de workflow ou de label.
 
 ---
 
@@ -417,9 +380,10 @@ environnement actif.
 - [x] Vérif : PR de test **exige** l'approbation d'un CODEOWNER avant merge
 
 **Lot 2 — `wp-p1-11-ci-spof-runners`**
-- [ ] **1 runner `certigo-pr` + 1 runner `certigo-trusted`** en ligne, sans label commun
-- [ ] Aucun label GitHub-hosted ni fallback configurable dans les workflows
-- [ ] Simulation d'indisponibilité d'un runner : la CI **ne bloque pas**
+- [x] DoD d'isolation réconciliée — voir **« Isolation des classes de confiance »** dans
+  [la fiche du lot](state/wp-p1-11-ci-spof-runners.json), avec preuves datées et limites
+- [x] Ancienne simulation d'indisponibilité retirée de cette checklist : son résultat
+  n'est pas attesté ici et reste suivi par [`wp-p2-07`](state/wp-p2-07.json)
 
 **Lot 3 — `wp-p1-12-iac-drift-import`**
 - [ ] Syntaxe, permissions et trois what-if Provider archivés

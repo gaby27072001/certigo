@@ -107,6 +107,11 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 > aucun artefact versionné, donc la liste de rallumage de l'opérateur l'ignorait
 > silencieusement. Restée éteinte plus de 14 jours, son enregistrement runner a été
 > supprimé par GitHub et `az vm start` ne suffisait plus à la rétablir.
+>
+> Depuis le 2026-09-23, la **reprise nocturne ne dépend plus de cet inventaire pour savoir
+> quoi rallumer** : elle énumère les membres des deux scale sets à chaque run (§11). L'inventaire
+> reste la source des **exclusions** (`forbiddenVirtualMachines`, `externalVirtualMachines`), des
+> planchers (`minimumOnlineByTrust`) et des bindings du contrôleur et de `runner-health.yml`.
 
 > ℹ️ **Prérequis outillage** (poste opérateur) : `az` (Azure CLI) connecté à la subscription Non-Prod,
 > et `gh` (GitHub CLI) authentifié sur `gchambaud_microsoft/Certigo`.
@@ -116,9 +121,9 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 ## 3. Capacité et stratégie d'exploitation
 
 Chaque runner traite **un job GitHub Actions à la fois**. L'autoscale CPU live peut encore
-ajouter ou retirer une VM sans connaître GitHub. `capacity.bicep` conserve seulement le
-scale-out `> 70 % / 10 min` et retire le scale-in `< 20 % / 45 min`; tant que ce
-what-if n'est pas approuvé puis appliqué séparément, tout scale-in reste interdit.
+ajouter une VM trusted sans connaître GitHub (`> 70 % / 10 min`). Le scale-in
+`< 20 % / 45 min` a été retiré du live le 2026-09-23 à 18:01Z en appliquant `capacity.bicep`
+(voir §12, « Piège mesuré ») ; toute réduction de capacité reste interdite.
 
 Baseline 30 jours : **242,06 USD**, 413 jobs, 18,84 runner-heures, CPU moyen 3,78 %,
 file P95 5 108 s et P99 12 628 s. Le CPU faible combiné à une file longue justifie un
@@ -136,7 +141,7 @@ ce n'est ni le plafond live actuel de 4, ni un maximum de production définitif.
 | Pendant une session | zéro scale-in CPU | Ne jamais laisser Azure retirer une instance sur simple faible CPU. |
 | Après la session | 5 min continues à zéro, reset sur toute activité, puis deux gardes | Prévol seulement; changement sous lease, un pool à la fois, avec réarmement sur nouvelle activité. |
 | Panne/maintenance | autre classe préservée | Ne jamais déplacer son label pour contourner la panne. |
-| Chaque matin | les 3 VMs sont désallouées par la gouvernance MCAPS | Rallumer **les trois** instances, puis confirmer 3 runners `online` côté GitHub. |
+| Chaque matin | toutes les VMs de `rg-certigo-ci` sont désallouées par la gouvernance MCAPS (00:46–00:49 UTC) | La reprise §11 rallume à 01:30 UTC toutes les instances non exclues des deux scale sets ; confirmer ensuite ≥ 2 runners `online` **par classe** côté GitHub (§6). |
 
 Le détail de reconstruction, de santé et de révocation est dans
 [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md).
@@ -152,8 +157,9 @@ bash infra/ci-runner/capacity-plan.sh
 ## 4. Rallumer la CI (avant une session de travail)
 
 > 📌 **Depuis la reprise automatique (§11), ce rallumage manuel n'est plus la voie normale.**
-> Les trois instances sont démarrées chaque jour à **01:30 UTC**. Cette section reste le mode
-> dégradé : reprise en échec, reprise désactivée, ou besoin de rallumer en cours de journée.
+> Toutes les instances non exclues des deux scale sets sont démarrées chaque jour à
+> **01:30 UTC**. Cette section reste le mode dégradé : reprise en échec, reprise désactivée,
+> ou besoin de rallumer en cours de journée.
 > Rappel : une VM sous tension n'est **pas** un runner `online` — toujours confirmer au §6.
 
 Le dépôt ne fournit pas de chemin mutable tant que les findings live restent ouverts.
@@ -348,14 +354,34 @@ validations PR ne peut donc être restauré sur le pool trusted.
 
 ## 11. Reprise automatique côté Azure (01:30 UTC)
 
-Un Logic App `logic-certigo-ci-runner-recovery` dans `rg-certigo-ci` démarre les instances
-listées dans `virtualMachineNames` (six au 2026-09-23 : 2 trusted + 4 PR) **chaque jour à
-01:30 UTC**, puis vérifie que chacune atteint `PowerState/running`. Il est décrit en Bicep :
-ne pas le modifier dans le portail.
+Un Logic App `logic-certigo-ci-runner-recovery` dans `rg-certigo-ci` rallume **chaque jour à
+01:30 UTC** toutes les instances des scale sets `vmss-certigo-runner-zonal` et
+`vmss-certigo-pr-pilot-z1`, sauf celles exclues par l'inventaire, puis vérifie le résultat. Il
+est décrit en Bicep : ne pas le modifier dans le portail.
 
 - Composition : [`infra/ci-runner/auto-recovery.bicep`](../../infra/ci-runner/auto-recovery.bicep)
 - Workflow + alerte : [`infra/ci-runner/modules/runnerAutoRecovery.bicep`](../../infra/ci-runner/modules/runnerAutoRecovery.bicep)
 - Paramètres : [`infra/params/ci-runner-auto-recovery.bicepparam`](../../infra/params/ci-runner-auto-recovery.bicepparam)
+- Exclusions et planchers : `inventory.forbiddenVirtualMachines`, `inventory.externalVirtualMachines`
+  et `minimumOnlineByTrust` de [`infra/ci-runner/capacity-controller.config.json`](../../infra/ci-runner/capacity-controller.config.json),
+  lus à la compilation (`loadJsonContent`) : aucune liste n'est recopiée ailleurs.
+
+**Déroulé d'un run, pool par pool** (les deux pools sont indépendants jusqu'à la vérification :
+l'échec de l'un n'empêche pas de rallumer l'autre) :
+
+1. `List_the_instances_of_<pool>` : `GET .../virtualMachines?$filter='virtualMachineScaleSet/id' eq '<id>'&$expand=instanceView`.
+   Un seul appel rend les membres **et** leur power state, sous le seul droit `virtualMachines/read`.
+2. `Select_the_instances_to_start_in_<pool>` : retire les exclusions (comparaison en minuscules).
+3. `Start_each_instance_of_<pool>` : un `start` par instance, en parallèle ; une instance cassée
+   n'empêche pas les autres.
+4. `Wait_for_the_power_state_to_settle` (30 s), puis `Relist_the_instances_of_<pool>`.
+5. Trois assertions, dans cet ordre, chacune terminant le run en `Failed` :
+
+| Action d'échec | Code | Signification |
+|---|---|---|
+| `Fail_the_run_when_the_enumeration_is_incomplete` | `RunnerEnumerationIncomplete` | ARM a paginé une liste : des instances n'ont été ni démarrées ni vérifiées |
+| `Fail_the_run_when_a_runner_is_not_running` | `RunnerPowerStateNotRunning` | une instance non exclue n'a pas `PowerState/running` ; le message la **nomme** |
+| `Fail_the_run_when_a_pool_is_below_its_floor` | `RunnerPoolBelowRedundancyFloor` | un pool a moins d'instances `running` que `minimumOnlineByTrust` (2 par classe) |
 
 > ⚠️ **Ce mécanisme prouve le power state Azure, rien de plus.** Il ne dit **pas** qu'un
 > runner est `online` côté GitHub — c'est précisément la panne du 1er septembre. Après une
@@ -363,16 +389,19 @@ ne pas le modifier dans le portail.
 > ne protège **pas** une opération longue : une publication de contenu de ~4 h démarrée trop
 > tard sera tranchée à 00:46 UTC quoi qu'il soit rallumé ensuite.
 
-> 🔁 **Remplacer une instance runner impose de mettre à jour la liste de reprise.** Depuis
-> le 2026-09-12, `bbf83c5c` et `a14700a3` sont en `provisioningState: Failed` et leur
-> démarrage rend `InternalServerError`; le 2026-09-14, des instances PR de remplacement
-> (`5275ea21`, `94bad106`, `1a6deaa2`, `6e3abce4`) ont été créées sans que la liste suive.
-> Résultat mesuré le 2026-09-23 : **12 runs `Failed` consécutifs, du 2026-09-12 au
-> 2026-09-23**, et les quatre vrais runners PR restaient éteints chaque matin. Toute
-> nouvelle instance doit être reportée dans `inventory.managedRunnerBindings`, le défaut de
-> `auto-recovery.bicep` **et** le bicepparam, puis le Logic App redéployé (voir
-> ci-dessous) ; les tests imposent l'égalité des trois listes, pas leur fraîcheur par
-> rapport à Azure.
+> 🔁 **Remplacer ou ajouter une instance ne demande plus rien ici.** Elle est rallumée la nuit
+> suivante parce qu'elle appartient au scale set. Seule une instance **retirée** (sans runner,
+> ou en `Failed`) doit être inscrite dans `inventory.forbiddenVirtualMachines`, puis le Logic App
+> redéployé : sinon le run échoue en `RunnerPowerStateNotRunning` en la nommant — les autres
+> instances étant quand même rallumées. Historique : jusqu'au 2026-09-23 la liste était figée ;
+> du 2026-09-12 au 2026-09-23 elle visait `bbf83c5c` et `a14700a3` (en `Failed`) et ignorait les
+> quatre instances PR de remplacement, d'où **12 runs `Failed` consécutifs** et une CI PR éteinte
+> chaque matin (#503, #508).
+
+> ⏱️ **Durée mesurée d'un démarrage depuis `deallocated`** : ~1 min pour une instance trusted,
+> **~7 min 30 s pour une instance PR** (2026-09-11 : `a14700a3` 7 min 32 s, `bbf83c5c` 8 min 01 s ;
+> 2026-09-23 drill : `6e3abce4` 7 min 32 s). Un run complet dure donc ~8 min ; un runner PR
+> n'est pas en ligne avant ~01:38 UTC.
 
 ### Vérifier que la reprise a bien tourné
 
@@ -389,11 +418,17 @@ az rest --method get --subscription "$SUB" \
 az rest --method get --subscription "$SUB" \
   --uri "https://management.azure.com${WF}/runs/<RUN_ID>/actions?api-version=2016-06-01" \
   --query "value[].{action:name,status:properties.status}" -o table
+
+# Instances réellement démarrées par un pool (une répétition par instance).
+az rest --method get --subscription "$SUB" \
+  --uri "https://management.azure.com${WF}/runs/<RUN_ID>/actions/Start_an_instance_of_vmss_certigo_pr_pilot_z1/repetitions?api-version=2019-05-01" \
+  --query "value[].{rep:name,status:properties.status,start:properties.startTime,end:properties.endTime}" -o table
 ```
 
-Un run sain se termine `Succeeded` avec `Fail_the_run_when_a_runner_is_not_running` en
-`Skipped`. Si cette action est `Succeeded`, la reprise a **échoué volontairement** : au moins
-une VM n'était pas `running`.
+Un run sain se termine `Succeeded` avec les **trois** actions `Fail_the_run_when_*` en
+`Skipped`. Si l'une est `Succeeded`, la reprise a **échoué volontairement** : lire son code
+dans le tableau ci-dessus. Les répétitions n'existent qu'avec l'API `2019-05-01` (`2016-06-01`
+rend `ApiNotIntroduced`).
 
 ### Déclencher la reprise à la main
 
@@ -404,7 +439,8 @@ az rest --method post --subscription "$SUB" \
 
 > 📌 **Un premier run en échec juste après un déploiement neuf est normal.** Le déclencheur
 > `Recurrence` se déclenche immédiatement à la création, avant propagation de l'assignation
-> de rôle : ce run échoue en `ActionFailed`. Rejouer manuellement une minute plus tard.
+> de rôle : ce run échoue en `ActionFailed`. Rejouer manuellement une minute plus tard. Une
+> simple mise à jour du workflow existant ne déclenche pas de run.
 
 ### Comment on est prévenu d'un échec
 
@@ -421,6 +457,30 @@ az monitor metrics alert show -g rg-certigo-ci -n alert-certigo-ci-runner-recove
 l'alerte ne part pas. Le filet est `runner-health.yml`, qui s'exécute **sur un runner
 trusted** : son échec à trouver un runner est la preuve que la reprise n'a pas eu lieu.
 
+### Redéployer
+
+Toujours depuis `main`, what-if d'abord, en repassant le destinataire d'alerte : un
+déploiement sans `alertEmail` retire le destinataire de l'action group.
+
+```bash
+ALERT_EMAIL="$(az deployment sub show --subscription "$SUB" \
+  --name <DERNIER_DEPLOIEMENT_REUSSI> --query properties.parameters.alertEmail.value -o tsv)"
+az deployment sub what-if --subscription "$SUB" --location westeurope \
+  --parameters infra/params/ci-runner-auto-recovery.bicepparam \
+  --parameters alertEmail="$ALERT_EMAIL"
+az deployment sub create --subscription "$SUB" --location westeurope \
+  --name "certigo-ci-runner-auto-recovery-$(date -u +%Y%m%d%H%M%S)" \
+  --parameters infra/params/ci-runner-auto-recovery.bicepparam \
+  --parameters alertEmail="$ALERT_EMAIL"
+```
+
+Le what-if attendu ne crée ni ne supprime aucune ressource. Il montre toujours un `Modify`
+de `properties.principalId` sur l'assignation de rôle : c'est la référence
+`reference(...).identity.principalId`, non résolue au moment du what-if. L'identité du
+workflow ne change pas (`04bca2c4-12ed-45fc-aab6-2f9641e76273`, système). Le
+`Delete ... evaluatedRecurrence` est une propriété calculée par le service. Terminer par
+un run manuel et la vérification ci-dessus.
+
 ### Rollback
 
 ```bash
@@ -428,7 +488,11 @@ trusted** : son échec à trouver un runner est la preuve que la reprise n'a pas
 az resource update --ids "$WF" --subscription "$SUB" --set properties.state=Disabled
 az resource update --ids "$WF" --subscription "$SUB" --set properties.state=Enabled   # ré-activer
 
-# 2. Suppression complète (workflow + alerte + action group + RBAC + rôle).
+# 2. Revenir à la définition précédente : redéployer la composition depuis le commit précédent
+#    (git worktree add <dir> <commit>), avec le même alertEmail, what-if d'abord.
+
+# 3. Suppression complète (workflow + alerte + action group + RBAC + rôle).
+#    Exige de lever le verrou du §12 : opération délibérée.
 az logic workflow delete -g rg-certigo-ci -n logic-certigo-ci-runner-recovery --subscription "$SUB" --yes
 az monitor metrics alert delete -g rg-certigo-ci -n alert-certigo-ci-runner-recovery-failed --subscription "$SUB"
 az monitor action-group delete -g rg-certigo-ci -n ag-certigo-ci-recovery --subscription "$SUB"
@@ -463,6 +527,23 @@ et content**. Le verrou transforme cette destruction silencieuse en échec immé
 > ⚠️ **Toujours déployer en `--mode Incremental` (défaut) sur ce RG. Jamais `Complete`.**
 > Lancer systématiquement `az deployment group what-if` d'abord et lire la section des
 > suppressions.
+
+> 🧟 **Piège mesuré : ne jamais réduire la capacité d'un scale set tant que le verrou est posé.**
+> Un scale-in (baisse de `sku.capacity`, par `az vmss scale` ou par une règle d'autoscale)
+> demande au scale set de SUPPRIMER des instances. Le verrou refuse chaque suppression
+> (`ScopeLocked`), mais l'instance visée ne revient pas à l'état normal : à l'opération
+> suivante elle passe en `provisioningState: Failed` (`InternalExecutionError`) et ne démarre
+> plus. Mesuré dans l'Activity Log : le 2026-09-11 à 16:09:36Z et 16:14:57Z, trois
+> scale-in manuels ont tenté de supprimer `bbf83c5c`, `a14700a3` et `d8d42366` → `ScopeLocked` ;
+> le 2026-09-12 à 00:48:33Z, la désallocation MCAPS de `bbf83c5c` et `a14700a3` a échoué en
+> `InternalExecutionError`, et chaque `start` a ensuite échoué pareil. Le VMSS PR affiche depuis
+> `sku.capacity = 8` pour 11 instances présentes (11 − 3 suppressions refusées). Conséquences :
+> - retirer une instance = lever le verrou, supprimer **la VM exacte** (`az vm delete`), vérifier,
+>   remettre le verrou (procédure de nettoyage validée par Gabriel) — jamais un scale-in ;
+> - la règle d'autoscale « CPU < 20 % → −1 » du pool trusted était ce piège armé : elle a été
+>   retirée du live le 2026-09-23 à 18:01Z en appliquant `infra/ci-runner/capacity.bicep`
+>   (déploiement `certigo-ci-capacity-20260923180037`, what-if : 1 seul `Modify`, aucune
+>   création ni suppression).
 
 **Effet de bord attendu, pas un bug.** Les verrous sont hérités. Supprimer le private
 endpoint de contenu (`pe-stcertigocntz3wqbdww-blob`, dans `rg-certigo-content`) tente de
