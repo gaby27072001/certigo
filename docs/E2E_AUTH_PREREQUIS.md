@@ -83,8 +83,12 @@ mobile (évite les **401 systématiques**). À fournir uniquement les vraies val
 
 1. **Authority** : backend = `https://<domain>.ciamlogin.com/<tenant-id>/v2.0` (CIAM),
    identique au mobile. ✅
-2. **Audience** : `ENTRA_AUDIENCE` = `api://<client-id>` — le scope
-   `api://<client-id>/user_impersonation` produit aud = `api://<client-id>`. ✅
+2. **Audience** : `ENTRA_AUDIENCE` = `api://<client-id>`. L'app API émet des jetons
+   **v2** (`requestedAccessTokenVersion = 2`) : le scope
+   `api://<client-id>/user_impersonation` produit alors aud = `<client-id>` (GUID nu),
+   pas `api://<client-id>` (réservé aux jetons v1). Le backend accepte les deux
+   écritures de la même app. Mesuré le 2026-09-23 sur staging : avant ce correctif, un
+   jeton v2 était refusé (401) même sur une route learner. ✅
 
 L'infra (`infra/params/*.bicepparam` → `functionApp.bicep`) câble déjà
 `ENTRA_AUTHORITY` / `ENTRA_AUDIENCE` sur les mêmes valeurs CIAM.

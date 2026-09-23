@@ -54,7 +54,9 @@ param cosmosLocation = 'northeurope'
 // flutter_appauth validates the issuer strictly against the OIDC discovery document.
 // ============================================================================
 param entraAuthority = 'https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0'
-// Audience = Application ID URI currently used by staging.
+// Audience = Application ID URI currently used by staging. "Certigo API" issues v2
+// access tokens whose aud is the bare client id; EntraTokenValidator accepts both
+// spellings of this same app (see prod.bicepparam).
 param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
 param personLinkedIdentityV1 = 'off'
 

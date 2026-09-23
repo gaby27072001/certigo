@@ -62,10 +62,13 @@ param entraAuthority = 'https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.c
 
 // Audience = Application ID URI of the backend "Certigo API" app registration.
 // The mobile ENTRA_API_SCOPE (api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation)
-// mints an access_token whose aud = api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915; the
-// backend validates it against this value. This is the BACKEND app registration
-// client id (12910b8e-...), NOT the mobile client id (4d1f1075-...), both in the
-// same tenant (af721be8-...).
+// requests an access token for this API. "Certigo API" issues v2 access tokens
+// (requestedAccessTokenVersion = 2), whose aud is ALWAYS the bare client id
+// 12910b8e-6c75-4d51-91d8-4d5fb8a6e915; only v1 tokens carry aud = api://12910b8e-….
+// EntraTokenValidator therefore accepts both spellings of this same app (measured on
+// staging 2026-09-23: a v2 token with aud = client id was rejected with 401 before that).
+// This is the BACKEND app registration client id (12910b8e-...), NOT the mobile client
+// id (4d1f1075-...), both in the same tenant (af721be8-...).
 param entraAudience = 'api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915'
 param personLinkedIdentityV1 = 'off'
 

@@ -12,27 +12,56 @@ namespace Certigo.Infrastructure.Identity;
 
 public sealed class EntraTokenValidator : ITokenValidator
 {
-    private readonly string _audience;
+    private const string ApplicationIdUriPrefix = "api://";
+
+    private readonly IReadOnlyList<string> _audiences;
     private readonly string _issuer;
     private readonly ILogger<EntraTokenValidator> _logger;
-    private readonly ConfigurationManager<OpenIdConnectConfiguration> _configurationManager;
+    private readonly IConfigurationManager<OpenIdConnectConfiguration> _configurationManager;
     private readonly JwtSecurityTokenHandler _handler = new();
 
     public EntraTokenValidator(string authority, string audience, ILogger<EntraTokenValidator>? logger = null)
+        : this(authority, audience, configurationManager: null, logger)
+    {
+    }
+
+    internal EntraTokenValidator(
+        string authority,
+        string audience,
+        IConfigurationManager<OpenIdConnectConfiguration>? configurationManager,
+        ILogger<EntraTokenValidator>? logger = null)
     {
         if (string.IsNullOrWhiteSpace(authority))
         {
             throw new ArgumentException("ENTRA_AUTHORITY is required.", nameof(authority));
         }
 
-        _audience = !string.IsNullOrWhiteSpace(audience)
-            ? audience
+        _audiences = !string.IsNullOrWhiteSpace(audience)
+            ? AcceptedAudiences(audience.Trim())
             : throw new ArgumentException("ENTRA_AUDIENCE is required.", nameof(audience));
         _issuer = authority.TrimEnd('/');
         _logger = logger ?? NullLogger<EntraTokenValidator>.Instance;
-        _configurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
-            $"{_issuer}/.well-known/openid-configuration",
-            new OpenIdConnectConfigurationRetriever());
+        _configurationManager = configurationManager
+            ?? new ConfigurationManager<OpenIdConnectConfiguration>(
+                $"{_issuer}/.well-known/openid-configuration",
+                new OpenIdConnectConfigurationRetriever());
+    }
+
+    /// Entra v2 access tokens always carry the API's client id as <c>aud</c>, whereas
+    /// v1 tokens carry the requested Application ID URI (<c>api://{client id}</c>). Both
+    /// spellings name the same API registration, so both are accepted — the default of
+    /// Microsoft.Identity.Web. Any other audience, issuer or signing key is still rejected.
+    internal static IReadOnlyList<string> AcceptedAudiences(string audience)
+    {
+        if (audience.StartsWith(ApplicationIdUriPrefix, StringComparison.OrdinalIgnoreCase)
+            && Guid.TryParseExact(audience[ApplicationIdUriPrefix.Length..], "D", out var uriClientId))
+        {
+            return [audience, uriClientId.ToString("D")];
+        }
+
+        return Guid.TryParseExact(audience, "D", out var clientId)
+            ? [audience, $"{ApplicationIdUriPrefix}{clientId:D}"]
+            : [audience];
     }
 
     public async Task<AppTokenValidationResult> TryValidateAsync(string token, CancellationToken cancellationToken = default)
@@ -42,7 +71,7 @@ public sealed class EntraTokenValidator : ITokenValidator
             var config = await _configurationManager.GetConfigurationAsync(cancellationToken);
             var principal = _handler.ValidateToken(token, new TokenValidationParameters
             {
-                ValidAudience = _audience,
+                ValidAudiences = _audiences,
                 ValidIssuer = config.Issuer,
                 IssuerSigningKeys = config.SigningKeys,
                 ValidateAudience = true,

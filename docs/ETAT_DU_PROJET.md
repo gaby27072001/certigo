@@ -38,7 +38,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-09-23** |
-| Commit de référence analysé | `18dc21d85cd2dad61492b76c75608833718866bf` |
+| Commit de référence analysé | `e2a1135f195022ba8891a4289358c12bc2b498e4` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -46,7 +46,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Package public actif | **1735 fichiers** — `sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f` |
 | Package privé actif (`answerKey`) | **812 fichiers** — `sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` |
 | Workflows GitHub Actions | **31** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `ciam-posture-monitor.yml`, `codeql.yml`, `content-infra-apply.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `post-merge-cosmos-account-deletion.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **283 fichiers** — .NET : 4 projets / 114 fichiers ; Flutter/Dart : 6 racines / 161 fichiers ; Python : 1 racine / 8 fichier |
+| Tests découverts | **284 fichiers** — .NET : 4 projets / 115 fichiers ; Flutter/Dart : 6 racines / 161 fichiers ; Python : 1 racine / 8 fichier |
 | Corpus **historique** local | **91 pistes**, **147 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
@@ -757,6 +757,16 @@ par la suite Dart existante.
 **Chantiers techniques :**
 - 🏗️ **Provisionner `staging`** par Bicep et valider `/health` ; `dev`, `prod` et CI sont déjà déployés.
 - 🔐 **Valider l'auth de bout en bout** sur un vrai tenant Entra External ID (E2E).
+  - Constat du **23 septembre 2026**, borné à `EntraTokenValidator` et à l'app CIAM
+    « Certigo API » (`requestedAccessTokenVersion = 2`) : un jeton d'accès v2 porte
+    `aud` = identifiant client nu, alors que staging et prod n'acceptaient que
+    `api://<identifiant client>`. Un jeton applicatif CIAM a été mesuré refusé (401) sur
+    staging, même sur une route learner. Correctif de code le même jour : le backend accepte
+    les deux écritures de la même app, émetteur, signature et expiration restant stricts ;
+    déploiement dev puis staging avec le même run, la prod suivant son propre plan. Le drill de
+    rollback de contenu en staging prouvera ce chemin avec un jeton applicatif ; la preuve
+    avec un **vrai compte utilisateur sur iPhone** reste à faire. À revérifier si la version
+    de jeton de l'app, `ENTRA_AUDIENCE`, `ENTRA_AUTHORITY` ou le validateur changent.
 - 🪪 **Person / LinkedIdentity — prochain lot** : observer le mode `shadow`, traiter toute collision,
   puis livrer séparément le resolver autoritaire `resolve`. Les endpoints/UI `link` restent hors
   périmètre jusqu'à validation des cohortes et de la suppression multi-identités.
