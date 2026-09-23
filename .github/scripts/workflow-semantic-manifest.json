@@ -101,5 +101,10 @@
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
   },
-  "preApproved": {}
+  "preApproved": {
+    ".github/workflows/ci-mobile.yml": {
+      "digest": "294ab9d701c5476c13986fcb0515dd4caeccdf29ac3fa86526b4d2ffc0bab3a2",
+      "expires": "2026-10-07"
+    }
+  }
 }
