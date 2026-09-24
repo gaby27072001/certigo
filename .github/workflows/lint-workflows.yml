@@ -22,6 +22,61 @@ jobs:
     permissions:
       pull-requests: read
 
+  # Les tests de .github/scripts du job `validate` sont ceux de la BASE : une PR qui y
+  # apporte un test cassé ne le voit qu'après la fusion, sur toutes les PR (#497). Ce job
+  # exécute ceux de la PR, sur son propre arbre. C'est du code de PR : même régime que les
+  # autres jobs certigo-pr (aucun secret, jeton en lecture), jamais la frontière de confiance.
+  candidate-script-tests:
+    name: Candidate workflow security script tests
+    needs: freshness
+    if: ${{ always() && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Enforce initial PR freshness validation
+        shell: bash
+        env:
+          FRESHNESS_RESULT: ${{ needs.freshness.result }}
+        run: |
+          if [ "$FRESHNESS_RESULT" != "success" ]; then
+            echo "::error::Initial PR head freshness validation did not succeed."
+            exit 1
+          fi
+      - name: Recheck current PR head after assignment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+
+      - name: Install candidate script dependencies
+        working-directory: .untrusted-source
+        run: npm ci --ignore-scripts
+
+      - name: Test the candidate's own workflow security scripts
+        working-directory: .untrusted-source
+        run: node --test .github/scripts/*.test.mjs
+
   validate:
     name: Validate workflow YAML
     needs: freshness

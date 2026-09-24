@@ -314,6 +314,15 @@ celle qui exige une lecture Azure ne l'est pas.
 
 ### Un test ajouté sous `.github/scripts/` ne s'exécute jamais sur sa propre PR
 
+> **Comblé en deux temps depuis le 2026-09-24.** Le job `Candidate workflow security script tests`
+> de `lint-workflows.yml` exécute désormais `node --test .github/scripts/*.test.mjs` sur l'arbre
+> **de la PR** (`.untrusted-source`), comme code de PR : runner `certigo-pr`, sans secret, jeton en
+> lecture, jamais `.trusted-control`. **Phase 1** : informatif, pour l'observer sur de vraies PR.
+> **Phase 2** (une seconde pré-approbation) : `Validate workflow YAML` en dépendra. Tant que la
+> phase 2 n'est pas sur `main`, la procédure manuelle ci-dessous reste nécessaire. L'invariant
+> `candidate-script-tests-policy.mjs` interdit de retirer ou de neutraliser ce job. **Invalidé
+> si** ce job disparaît de `lint-workflows.yml`.
+
 **Symptôme.** Il n'y en a aucun. C'est tout le problème : la PR qui introduit le test passe au
 vert sans que le test ait tourné une seule fois. La panne se déclare **après la fusion**, sur les
 PR de tout le monde — et l'auteur, lui, n'a rien vu.

@@ -22,7 +22,7 @@
       ".github/workflows/fork-pr-policy.yml": "140ec5d7607b6f1e78554aa999fb12a49b977b3e7fc7b73209205f996fe098fd",
       ".github/workflows/governance-bootstrap-phase-a-what-if.yml": "ca632193fe9791f25f9c3e46d1bdce12cccbec96cab9abd1e6f9ef4a36e8c71e",
       ".github/workflows/governance-bootstrap-phase-b-what-if.yml": "13ee3fc22aed63c7dd77a759226ee83c6baf485cd73d25fe5ef7f69522525b9e",
-      ".github/workflows/lint-workflows.yml": "a2477ad4c9d6a6d3bdcc099f0ea1234c48b97bfd73361afaac7ac8769f8e2d17",
+      ".github/workflows/lint-workflows.yml": "21e5975301e50771a52f837f30aef6f8735a9d9ced0b077af5135ea1e4f5f01a",
       ".github/workflows/pr-head-freshness.yml": "f98245f17b71ce3a431f1023bb60da54543eb09902589baf35de450bfd73b5f6",
       ".github/workflows/promote-backend-staging-prod.yml": "dd72c89012ca59f7d8eb3a78f7158652bc5b2537228be11adf2e8ee55afb695b",
       ".github/workflows/publish-verified-public-pages.yml": "aa4b8c6bd083a9653926211e81e10929a60bee49720ffe26bfbba4dc217bbdae",
@@ -55,7 +55,7 @@
       ".github/workflows/fork-pr-policy.yml": "140ec5d7607b6f1e78554aa999fb12a49b977b3e7fc7b73209205f996fe098fd",
       ".github/workflows/governance-bootstrap-phase-a-what-if.yml": "ca632193fe9791f25f9c3e46d1bdce12cccbec96cab9abd1e6f9ef4a36e8c71e",
       ".github/workflows/governance-bootstrap-phase-b-what-if.yml": "13ee3fc22aed63c7dd77a759226ee83c6baf485cd73d25fe5ef7f69522525b9e",
-      ".github/workflows/lint-workflows.yml": "a2477ad4c9d6a6d3bdcc099f0ea1234c48b97bfd73361afaac7ac8769f8e2d17",
+      ".github/workflows/lint-workflows.yml": "21e5975301e50771a52f837f30aef6f8735a9d9ced0b077af5135ea1e4f5f01a",
       ".github/workflows/pr-head-freshness.yml": "f98245f17b71ce3a431f1023bb60da54543eb09902589baf35de450bfd73b5f6",
       ".github/workflows/promote-backend-staging-prod.yml": "dd72c89012ca59f7d8eb3a78f7158652bc5b2537228be11adf2e8ee55afb695b",
       ".github/workflows/publish-verified-public-pages.yml": "aa4b8c6bd083a9653926211e81e10929a60bee49720ffe26bfbba4dc217bbdae",
@@ -87,7 +87,7 @@
       ".github/workflows/fork-pr-policy.yml": "140ec5d7607b6f1e78554aa999fb12a49b977b3e7fc7b73209205f996fe098fd",
       ".github/workflows/governance-bootstrap-phase-a-what-if.yml": "ca632193fe9791f25f9c3e46d1bdce12cccbec96cab9abd1e6f9ef4a36e8c71e",
       ".github/workflows/governance-bootstrap-phase-b-what-if.yml": "13ee3fc22aed63c7dd77a759226ee83c6baf485cd73d25fe5ef7f69522525b9e",
-      ".github/workflows/lint-workflows.yml": "a2477ad4c9d6a6d3bdcc099f0ea1234c48b97bfd73361afaac7ac8769f8e2d17",
+      ".github/workflows/lint-workflows.yml": "21e5975301e50771a52f837f30aef6f8735a9d9ced0b077af5135ea1e4f5f01a",
       ".github/workflows/post-merge-cosmos-account-deletion.yml": "037567590f74fede30414be48e5b06d4a575d52402351d1520bf8dc4a1b984c4",
       ".github/workflows/pr-head-freshness.yml": "f98245f17b71ce3a431f1023bb60da54543eb09902589baf35de450bfd73b5f6",
       ".github/workflows/promote-backend-staging-prod.yml": "dd72c89012ca59f7d8eb3a78f7158652bc5b2537228be11adf2e8ee55afb695b",
@@ -101,10 +101,5 @@
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
   },
-  "preApproved": {
-    ".github/workflows/lint-workflows.yml": {
-      "digest": "21e5975301e50771a52f837f30aef6f8735a9d9ced0b077af5135ea1e4f5f01a",
-      "expires": "2026-10-08"
-    }
-  }
+  "preApproved": {}
 }
