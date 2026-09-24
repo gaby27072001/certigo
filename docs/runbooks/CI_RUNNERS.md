@@ -293,6 +293,13 @@ Si, après un `az vm start` et ~1–2 minutes d'attente, un runner reste `offlin
    `certigo-pr` ni `certigo-pr-pilot` à un runner trusted — le chevauchement de labels
    effondre la frontière de confiance et le validateur du dépôt le bloque.
 
+> 🩹 **Un job échoue sur `Could not get lock /var/lib/dpkg/lock-frontend` ?** Le patching
+> invité Azure (`LinuxPatchExtension`) exécute lui-même apt sur les runners : constaté le
+> 2026-09-19 sur les runners 31 et 34 (voir « Le patching invité Azure modifie les runners »
+> dans [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md)). Relancer le job ; ne
+> rien réinstaller ni reconfigurer sur le runner. Aucune occurrence de ce symptôme n'a encore
+> été observée : c'est un risque déduit.
+
 > 🔐 **Aucun secret en clair.** Ne copiez **jamais** de token d'enregistrement (`--token …`), de PAT ou
 > de secret dans ce runbook, un ticket, un chat ou un commit. Les tokens d'enregistrement de runner sont
 > **éphémères** et se régénèrent depuis **Settings → Actions → Runners** du repo au moment du besoin.

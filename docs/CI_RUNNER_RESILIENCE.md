@@ -525,6 +525,55 @@ l'opérateur doit lire et passer la capacité live. La reconstruction documenté
 **nom de VMSS neuf** (voir `infra/ci-runner/README.md`, « Séquence de provisionnement ») ; ce
 nom doit alors rejoindre `scaleSets` de la reprise et `capacity.bicep`.
 
+**Les runners PR exécutent un bootstrap jamais revu — mesuré le 2026-09-23.** Sur
+`vmss-certigo-pr-pilot-z1_6e3abce4` (runner 34, Run Command en lecture seule, instance
+inoccupée, 21:10:48Z), le `user-data` réellement reçu a pour SHA-256 `f5ce4b89…`. C'est
+exactement l'emballage de `pilot.bicep` (`#!/usr/bin/env bash`, puis
+`export CERTIGO_RUNNER_LABELS='certigo-pr,certigo-pr-pilot'`, sans `CERTIGO_BLOCK_IMDS`)
+suivi du blob Git `da050d7e` de `bootstrap.sh`, dont le SHA-256 brut est `a590730b…`, la
+valeur du tag live. Dans ce dépôt, ce blob n'apparaît que dans 18 commits de checkpoint locaux
+d'une session Copilot (du 2026-08-19 17:35Z au 2026-08-20 06:46Z), absents de toutes les
+branches d'`origin` : il n'est ni sur `main`, ni dans #309. Le VMSS a été créé depuis cet état
+le 2026-08-20 à 06:03 UTC, avant la fusion de #309 (19:50 UTC). Écarts avec le `bootstrap.sh`
+de `main` (blob `43686478`, +38/−16 lignes) :
+- le blocage IMDS y est inconditionnel, alors que `main` le conditionne à
+  `CERTIGO_BLOCK_IMDS=true` ;
+- `certigo-block-imds.service` y est ordonné `Before=network-online.target`, alors que
+  `main` le place avant `network-pre.target`, donc avant toute configuration réseau ;
+- `Runner.Listener --version` y tourne en root (`main` : utilisateur `runner`), `svc.sh` y
+  est appelé par chemin absolu sans `cd` dans son répertoire, et `chown -R` n'y est fait qu'à
+  l'installation du runner.
+
+Sur cette instance à cet instant, le durcissement attendu est présent :
+- `certigo-block-imds.service` est actif ;
+- la règle `iptables ... 169.254.169.254/32 -j REJECT` est présente ;
+- l'IMDS est injoignable (HTTP `000`) ;
+- `/etc/sudoers.d/certigo-runner` est en `440 root`, avec les mêmes règles que le bootstrap
+  de `main`.
+
+**Bornes** : une instance, un instant ; les trois autres runners PR n'ont pas été lus. Le
+`customData` du modèle est en écriture seule, donc illisible. Le runner 34 en est issu (créé
+le 2026-09-14 à 09:21:59Z) et la seule écriture du modèle journalisée depuis est le scale-out
+de 09:25:12Z. Déduction : une instance que `az vmss scale` créerait aujourd'hui exécuterait ce
+même script non revu. Invalidé par tout remplacement de l'instance, toute modification de son
+OS ou du modèle du VMSS. Détail des relevés :
+[commentaire du 2026-09-23 sur #341](https://github.com/gchambaud_microsoft/Certigo/issues/341#issuecomment-5803012081).
+
+**Le patching invité Azure modifie les runners — mesuré le 2026-09-23.** Le 2026-09-19,
+entre 12:53:07 et 12:53:11Z, `apt-get install ubuntu-advantage-tools -y` a été exécuté hors
+bootstrap sur les runners 31 et 34 : même transaction, même version `37.2ubuntu~24.04.1`,
+sans `Requested-By`. **Auteur** : l'extension Azure `LinuxPatchExtension`, démarrée à
+12:53:06Z pour une opération `ConfigurePatching` (début 12:52:41Z). Son client Ubuntu Pro
+exécute exactement cette commande (`UbuntuProClient.install_or_update_pro`,
+[source, lignes 28 à 40](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/package_managers/UbuntuProClient.py#L28-L40) ;
+version déployée sur la VM non relevée). Un job PR ne pouvait pas l'exécuter (sudoers
+ci-dessus), et l'Activity Log ne montre aucun Run Command ce jour-là. **Conséquences** :
+1. la plateforme peut lancer apt sur un runner à tout moment. Un job qui lance
+   `sudo apt-get install` au même instant peut échouer sur le verrou dpkg : risque déduit,
+   aucune occurrence observée (voir `runbooks/CI_RUNNERS.md` §7) ;
+2. une image immuable « sans artefact non listé » devra soit neutraliser ce patching
+   invité sur les VM runners, soit le vérifier au boot (#341).
+
 > ⏱️ **Durée mesurée d'un démarrage PR.** Un `start` depuis `deallocated` dure ~1 min pour
 > une instance trusted et **~7 min 30 s pour une instance PR** (2026-09-11 : 7 min 32 s et
 > 8 min 01 s ; 2026-09-23 : 7 min 32 s). Hypothèse cohérente mais non prouvée : l'agent invité
