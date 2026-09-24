@@ -83,9 +83,10 @@ var bootstrapSource = loadTextContent('bootstrap.sh')
 var bootstrapContent = '#!/usr/bin/env bash\nexport CERTIGO_RUNNER_LABELS=\'${runnerLabels}\'\nexport CERTIGO_BLOCK_IMDS=\'true\'\n${bootstrapSource}'
 // The repository validator keeps this value synchronized with bootstrap.sh.
 // Il peut en revanche differer de la valeur *deployee* : un deploiement du modele
-// complet reecrit alors `customData` sur les instances en service, pas seulement sur
-// une nouvelle. `customData` etant write-only, la comparaison passe obligatoirement par
-// un what-if. Voir « Avant tout redeploiement complet » dans README.md.
+// complet reecrit alors le `customData` du modele. Avec upgradePolicy Manual, seules
+// les instances creees ensuite recoivent le nouveau script : le pool melange alors
+// deux bootstraps. `customData` etant write-only, la comparaison passe
+// obligatoirement par un what-if. Voir « Avant tout redeploiement complet » dans README.md.
 var bootstrapSha256 = '6e798d4eeddc032eb948336cf17aef3539a91b8a33097b3cb877c4f3019c844c'
 var runnerVersion = '2.336.0'
 var pinnedImageVersion = toLower(imageVersion) == 'latest' ? 'mutable-latest-is-not-allowed' : imageVersion

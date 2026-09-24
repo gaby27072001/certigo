@@ -102,9 +102,15 @@ l'identité prévue par `runner.bicep`, tandis que le pilote PR échoue fermé.
 > **Avant tout redéploiement complet : vérifier la dérive du bootstrap.**
 >
 > `pilot.bicep` livre le bootstrap via `customData`. Un déploiement du modèle
-> complet le réécrit donc **sur les instances existantes**, pas seulement sur la
-> nouvelle. Si le bootstrap du dépôt a changé depuis le dernier déploiement, la
-> procédure ci-dessous — pourtant correcte — reconstruit les runners en service.
+> complet réécrit le `customData` **du modèle du VMSS**. Le VMSS PR est en
+> orchestration `Flexible` avec `upgradePolicy: Manual` (mesuré le 2026-09-24).
+> D'après la [documentation Azure](https://learn.microsoft.com/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-upgrade-policy#manual-upgrade-policy-mode),
+> *« nothing happens automatically to the existing virtual machines when changes
+> occur to the scale set model »* ; seules les instances créées ensuite reçoivent
+> le nouveau script. Si le bootstrap du dépôt a changé depuis
+> le dernier déploiement, le pool mélange alors deux bootstraps selon la date de
+> création des instances, ce qui est une dérive pour des runners censés être
+> interchangeables.
 >
 > `customData` est **write-only** : `az vmss show` rend `False`, ce qui n'est pas
 > une absence mais une impossibilité de lecture. La dérive se révèle par le
