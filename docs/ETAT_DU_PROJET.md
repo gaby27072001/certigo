@@ -37,8 +37,8 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 
 | Fait observable | Valeur générée |
 |---|---|
-| Date de référence analysée | **2026-09-23** |
-| Commit de référence analysé | `61348633eac24f1d7cc0c08a916dd96274b74283` |
+| Date de référence analysée | **2026-09-24** |
+| Commit de référence analysé | `a1b61af80e8c2839fffd51a2195c6cd80b433a8c` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -46,7 +46,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Package public actif | **1735 fichiers** — `sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f` |
 | Package privé actif (`answerKey`) | **812 fichiers** — `sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` |
 | Workflows GitHub Actions | **31** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `ciam-posture-monitor.yml`, `codeql.yml`, `content-infra-apply.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `post-merge-cosmos-account-deletion.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **298 fichiers** — .NET : 4 projets / 117 fichiers ; Flutter/Dart : 6 racines / 173 fichiers ; Python : 1 racine / 8 fichier |
+| Tests découverts | **299 fichiers** — .NET : 4 projets / 117 fichiers ; Flutter/Dart : 6 racines / 173 fichiers ; Python : 1 racine / 9 fichier |
 | Corpus **historique** local | **91 pistes**, **147 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 

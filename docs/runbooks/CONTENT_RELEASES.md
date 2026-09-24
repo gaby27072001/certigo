@@ -285,6 +285,59 @@ artefacts. L'ETag doit être relu immédiatement avant l'opération : toute
 promotion ou rollback concurrent rend le CAS obsolète et retourne 412, sans
 écraser le pointeur. Un second rollback sans nouvelle promotion retourne 409.
 
+## Drill N-1 outillé
+
+`tools/content_release_drill.py` rejoue de bout en bout la procédure ci-dessus et
+s'arrête au premier écart (code de sortie non nul) :
+
+1. import de N-1 puis de N, chacun suivi d'un replay exact (201 ou 200, puis 200) ;
+2. promotion sans `If-Match` → 428, avec une ETag périmée → 412 ;
+3. activation de N-1 (`If-Match: *` si aucun pointeur n'existe), puis promotion de N ;
+4. rollback avec l'ETag d'avant la promotion → 412, puis rollback avec l'ETag
+   courante → N-1 actif, `previous` vidé, et N-1 **servi** par le manifeste actif
+   (`X-Content-Release-Id`, ETag = `publicManifestId`, aucune clé de corrigé) ;
+5. second rollback sans promotion → 409 ;
+6. nouvelle promotion de N : l'environnement **finit sur la release la plus
+   récente**, N-1 restant disponible en `previous` ; le manifeste actif le prouve,
+   puis un `If-None-Match` rend 304.
+
+```powershell
+# Le jeton n'est lu que dans l'environnement, jamais en argument ni en journal.
+$env:CERTIGO_CONTENT_ADMIN_TOKEN = "<jeton portant Content.Release.Admin>"
+python tools\content_release_drill.py `
+  --api https://<function-app>.azurewebsites.net/api `
+  --previous sha256:<N-1> --latest sha256:<N> `
+  --evidence content-release-drill.json
+Remove-Item Env:CERTIGO_CONTENT_ADMIN_TOKEN
+```
+
+Le fichier de preuve (`certigo.content-release-drill/v1`) consigne codes,
+durées, états successifs du pointeur et identités de manifeste : jamais le jeton,
+un en-tête de requête ni un corps de réponse hors champs du pointeur. Le drill est
+rejouable : sur un environnement déjà sur N, il réactive N-1 puis refait le cycle.
+
+## Identité opérateur `Content.Release.Admin`
+
+- Le rôle applicatif existe sur « Certigo API » (`12910b8e-6c75-4d51-91d8-4d5fb8a6e915`,
+  id de rôle `8bf21569-a9aa-41db-b8a9-debd6d89619d`, membres **User + Application**).
+  Constat du 2026-09-23 : aucune attribution. Ne pas le recréer.
+- « Certigo API » émet des jetons d'accès **v2** : `aud` vaut l'identifiant client
+  nu. Le backend accepte `api://<id>` **et** `<id>` depuis #512 ; avant, tout jeton
+  CIAM était refusé en 401, rôle ou non.
+- **Drill ponctuel** : identité **dédiée et temporaire**, jamais un identifiant
+  existant ni l'app « Certigo API » elle-même. Dans le tenant CIAM, via un profil
+  `az` isolé (`AZURE_CONFIG_DIR`) : créer l'app et son principal de service,
+  attribuer le rôle sur le principal de « Certigo API », créer un secret à durée
+  courte, obtenir le jeton `client_credentials`
+  (scope `api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/.default`) puis **supprimer le
+  secret dans le même processus**, avant même le drill. Après le drill : retirer
+  l'attribution, supprimer l'app, prouver `passwordCredentials = 0`,
+  `keyCredentials = 0` et `appRoleAssignedTo` sans cette identité, puis
+  `az logout` et suppression du profil isolé.
+- **Pipeline futur** (import et promotion après publication) : identifiant
+  **fédéré OIDC** GitHub sur une app opérateur dédiée, jamais de secret — modèle de
+  `certigo-ciam-posture-monitor`. Non créé (constat du 2026-09-24) ; décision à prendre.
+
 ## Rollback applicatif
 
 Si le nouveau repository présente un défaut indépendant du contenu:
