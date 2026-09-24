@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractCommit": "7f6de6d1f62a6c15bca3e63413e2e96df15a63ef",
+  "contractCommit": "f4e4001b17d22454e036c3c055fdd68cadb0b9b5",
   "toolchainOriginCommit": "f8e23b2952e8ca39c59f30081b8950170abb701a",
   "repository": "gchambaud_microsoft/Certigo",
   "baseImage": {
@@ -36,7 +36,7 @@
       "sha256": "a79b48083f5d31ac04b6a0bc850583e085b830df5de51c1e0cd2350f5b118c48"
     },
     "aptPackageLockSha256": "3682ce190d65ee2680862f29562bdf3120c83452c022400620a4a857bb1ea69b",
-    "flutterEngineArtifactLockSha256": "1670d098a763075cf165c99551b98af7bcde0b1b5bf34c5c1542707ba2f28e15",
+    "flutterEngineArtifactLockSha256": "7bd761bd69be44f7f5c043d7da1b77f7accdbe99c4314c274c387392dcb730a1",
     "blockedReasons": [
       "APT and Flutter locks are captured and replayable, but the bootstrap (including installdependencies.sh), APT, pip and Flutter are not confined to verified offline artifacts.",
       "The future consumer must enforce the Flutter entrypoint preconditions and prohibit online Pub metadata resolution.",
@@ -54,7 +54,7 @@
       "id": "flutter-lock",
       "path": "infra/ci-runner/image/flutter-engine-artifacts.lock.json",
       "destination": "flutter-engine-artifacts.lock.json",
-      "sha256": "1670d098a763075cf165c99551b98af7bcde0b1b5bf34c5c1542707ba2f28e15"
+      "sha256": "7bd761bd69be44f7f5c043d7da1b77f7accdbe99c4314c274c387392dcb730a1"
     },
     {
       "id": "bootstrap",
