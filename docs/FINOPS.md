@@ -153,6 +153,9 @@ a required check and blocks no pull request, but that post-merge cleanup never r
 >    members of both scale sets on every run.
 > Disk figures below are also stale: on 2026-09-23 all 13 OS disks, including the seven of
 > the retired PR instances, are 128 GiB `Standard_LRS`, not `Premium_LRS` (`az disk list`).
+> The templates still request `Premium_LRS`. Azure Resource Graph change history shows that
+> the MCAPS governance automation (appid `a1a9c5b6-7a4f-4288-89ab-6805873f65d1`) downgraded
+> the six PR OS disks created on 2026-09-14 between 00:56:04 and 01:06:09Z on 2026-09-15.
 
 Two independent mechanisms, each sufficient on its own to prevent scaling:
 

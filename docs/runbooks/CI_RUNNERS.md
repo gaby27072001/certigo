@@ -293,12 +293,15 @@ Si, après un `az vm start` et ~1–2 minutes d'attente, un runner reste `offlin
    `certigo-pr` ni `certigo-pr-pilot` à un runner trusted — le chevauchement de labels
    effondre la frontière de confiance et le validateur du dépôt le bloque.
 
-> 🩹 **Un job échoue sur `Could not get lock /var/lib/dpkg/lock-frontend` ?** Le patching
-> invité Azure (`LinuxPatchExtension`) exécute lui-même apt sur les runners : constaté le
-> 2026-09-19 sur les runners 31 et 34 (voir « Le patching invité Azure modifie les runners »
-> dans [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md)). Relancer le job ; ne
-> rien réinstaller ni reconfigurer sur le runner. Aucune occurrence de ce symptôme n'a encore
-> été observée : c'est un risque déduit.
+> 🩹 **Un job échoue sur `Could not get lock /var/lib/dpkg/lock-frontend` ou
+> `/var/lib/apt/lists/lock` ?** Le patching invité Azure (`LinuxPatchExtension`) exécute
+> lui-même apt sur les runners PR. L'automate de gouvernance MCAPS l'a activé le 2026-09-15.
+> Une évaluation quotidienne lance `apt-get update` (le 2026-09-24 entre 05:48 et 05:51 UTC),
+> et une installation a eu lieu le 2026-09-19 sur les runners 31 et 34. Détails dans
+> « Le patching invité Azure modifie les runners » et « Qui a activé ce patching », dans
+> [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md). Conduite à tenir : relancer
+> le job, ne rien réinstaller ni reconfigurer sur le runner. Aucune occurrence de ce symptôme
+> n'a encore été observée : c'est un risque déduit.
 
 > 🔐 **Aucun secret en clair.** Ne copiez **jamais** de token d'enregistrement (`--token …`), de PAT ou
 > de secret dans ce runbook, un ticket, un chat ou un commit. Les tokens d'enregistrement de runner sont

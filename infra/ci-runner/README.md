@@ -84,7 +84,7 @@ reste un pool éphémère. Un même runner ne doit jamais porter à la fois `cer
 | Propriété | Valeur épinglée |
 | --- | --- |
 | VMSS | `vmss-certigo-pr-pilot-z1`, Flexible, zone 1 ; capacité : paramètre obligatoire `capacity`, sans défaut (voir « Vérifier aussi la capacité ») |
-| Taille / disque | `Standard_D2ads_v6` / Premium SSD LRS 128 Gio |
+| Taille / disque | `Standard_D2ads_v6` / Premium SSD LRS 128 Gio demandé ; en service : `Standard_LRS`, rétrogradé par l'automate MCAPS le 2026-09-15 (voir `docs/CI_RUNNER_RESILIENCE.md`) |
 | Image | `Canonical:ubuntu-24_04-lts:server:24.04.202608070` |
 | Sécurité | Trusted Launch, Secure Boot, vTPM, chiffrement hôte |
 | Réseau | `10.43.0.0/16`, sous-réseau privé `10.43.1.0/24`, NAT dédié, aucun peering |

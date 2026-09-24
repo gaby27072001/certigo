@@ -574,17 +574,57 @@ sans `Requested-By`. **Auteur** : l'extension Azure `LinuxPatchExtension`, déma
 exécute exactement cette commande (`UbuntuProClient.install_or_update_pro`,
 [source, lignes 28 à 40](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/package_managers/UbuntuProClient.py#L28-L40) ;
 version déployée sur la VM non relevée). Un job PR ne pouvait pas l'exécuter (sudoers
-ci-dessus), et l'Activity Log ne montre aucun Run Command ce jour-là. **Conséquences** :
-1. la plateforme peut lancer apt sur un runner à tout moment. Un job qui lance
-   `sudo apt-get install` au même instant peut échouer sur le verrou dpkg : risque déduit,
-   aucune occurrence observée (voir `runbooks/CI_RUNNERS.md` §7) ;
-2. une image immuable « sans artefact non listé » devra soit neutraliser ce patching
-   invité sur les VM runners, soit le vérifier au boot (#341).
+ci-dessus), et l'Activity Log ne montre aucun Run Command ce jour-là.
+
+**Qui a activé ce patching : l'automate de gouvernance MCAPS — mesuré le 2026-09-24.**
+- Le modèle du VMSS PR déclare `patchMode` et `assessmentMode` à `ImageDefault`, et les
+  instances en ont hérité à leur création, le 2026-09-14.
+- L'historique des changements de propriétés d'Azure Resource Graph (`resourcechanges`,
+  conservé 14 jours) montre leur passage à `AutomaticByPlatform`, avec
+  `bypassPlatformSafetyChecksOnUserSchedule: true`, le **2026-09-15 à 08:06:24Z**. L'auteur
+  est une écriture PowerShell de **MCAPSGovernance-AutomationApp** (appid
+  `a1a9c5b6-7a4f-4288-89ab-6805873f65d1`, délégation Lighthouse). C'est le même automate qui
+  désalloue les VM chaque nuit et remet les comptes de stockage en LRS.
+- D'après l'Activity Log (écritures `virtualMachines/write` réussies depuis le 2026-09-14 à
+  09:00Z), c'est la seule écriture hors plateforme sur les instances PR. Elle a touché les 6
+  instances PR créées le 2026-09-14, dont 2 des instances retirées, entre 08:06:25 et
+  08:06:27Z.
+- Le `ConfigurePatching` du 2026-09-19 (12:52:41Z) suit de 46 s un démarrage manuel de la VM
+  (12:51:55Z).
+- Sur les instances **trusted**, la même écriture a **échoué** le 2026-09-19 à 08:05Z :
+  `PropertyChangeNotAllowed`, « Changing property 'osProfile' is not allowed ». Une image de
+  galerie spécialisée n'a pas d'`osProfile` modifiable. Le pool trusted n'a ni
+  `patchSettings`, ni évaluation de correctifs.
+
+**Conséquences** :
+1. une évaluation des correctifs tourne chaque jour sur les runners PR : le 2026-09-24,
+   entre 05:48:51 et 05:50:55Z sur les 4 instances. Elle commence par `sudo apt-get -q update`
+   ([`AptitudePackageManager.py` ligne 51](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/package_managers/AptitudePackageManager.py#L51),
+   appelée par [`PatchAssessor.py` ligne 64](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/core_logic/PatchAssessor.py#L64)).
+   Un job qui lance `sudo apt-get update` ou `install` au même instant peut échouer sur un
+   verrou APT ou dpkg. C'est un risque déduit : aucune occurrence n'a été observée (voir
+   `runbooks/CI_RUNNERS.md` §7) ;
+2. aucune installation automatique n'a été observée à ce jour. Aucune configuration de
+   maintenance n'est assignée. Le 2026-09-24, l'évaluation comptait encore, selon
+   l'instance, 35 ou 99 correctifs critiques ou de sécurité en attente. Les journaux APT
+   relevés le 2026-09-23 sur le runner 31 ne contiennent, après le bootstrap, que la
+   transaction du 19/09 (oracle de #533) ;
+3. remettre `ImageDefault` dans nos templates ne protégerait pas durablement : l'automate
+   agit sur les instances après leur création, et on ne connaît pas sa fréquence ;
+4. une image immuable « sans artefact non listé » devra soit neutraliser ce patching invité
+   sur les VM runners, soit le vérifier au boot (#341). Une image **spécialisée** y échappe
+   (mesuré sur le pool trusted). Une image **généralisée**, comme celle que produit Azure
+   Image Builder, a un `osProfile` et subira cette écriture.
 
 > ⏱️ **Durée mesurée d'un démarrage PR.** Un `start` depuis `deallocated` dure ~1 min pour
 > une instance trusted et **~7 min 30 s pour une instance PR** (2026-09-11 : 7 min 32 s et
 > 8 min 01 s ; 2026-09-23 : 7 min 32 s). Hypothèse cohérente mais non prouvée : l'agent invité
-> attend l'IMDS, bloqué sur le sous-réseau PR, avant de signaler l'état prêt. La reprise en
+> attend l'IMDS, bloqué sur le sous-réseau PR, avant de signaler l'état prêt. Le type de
+> disque n'explique pas l'écart : le 2026-09-24, les 6 disques OS en service, PR comme
+> trusted, sont en `Standard_LRS` à 60 Mo/s. `pilot.bicep` demande `Premium_LRS`, mais
+> l'automate MCAPS a rétrogradé les 6 disques PR créés le 2026-09-14 (les 4 en service et
+> 2 des instances retirées). Resource Graph date ce changement du 2026-09-15, entre
+> 00:56:04 et 01:06:09Z. La reprise en
 > tient compte (aucun délai de vérification n'est déclenché avant la fin des démarrages).
 
 ### Verrou de suppression sur `rg-certigo-ci`
