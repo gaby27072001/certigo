@@ -137,7 +137,7 @@ class InputTests(unittest.TestCase):
                         compare_lock(changed, original)
 
     def test_flutter_entrypoint_rejects_unmodelled_rebuild_download_and_feature_branches(self):
-        files = {"bin/cache/flutter_tools.snapshot"}
+        files = {"bin/cache/flutter_tools.snapshot", ".git/index"}
         directories = {"bin/cache/dart-sdk"}
         contents = {
             "bin/cache/flutter_tools.stamp": (FRAMEWORK + ":").encode(),
@@ -145,6 +145,7 @@ class InputTests(unittest.TestCase):
             "bin/cache/engine-dart-sdk.stamp": ENGINE.encode(),
             ".git/HEAD": b"ref: refs/heads/stable",
             ".git/packed-refs": (FRAMEWORK + " refs/heads/stable").encode(),
+            ".git/index": b"DIRC\x00\x00\x00\x02bin/internal/engine.version\x00",
             "packages/flutter_tools/lib/src/features.dart":
                 b"const flutterLinuxDesktopFeature = Feature.fullyEnabled(",
         }

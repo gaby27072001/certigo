@@ -321,6 +321,8 @@ l'hote ARM64; ce n'est **pas une trace d'execution native**.
 Le point d'entree `bin/flutter` est aussi borne : snapshot flutter_tools et
 Dart SDK presents, stamps moteur concordants, stamp outil coherent avec le HEAD
 Git exact et `FLUTTER_TOOL_ARGS` vide, pubspec pas plus recent que son lock.
+L'index Git v2 est conserve et lie par SHA; `engine.version` doit y etre suivi,
+sinon `update_engine_version.sh` emprunterait le fallback content-hash.
 Les sources `shared.sh`, `update_engine_version.sh`, `update_dart_sdk.sh` et
 `features.dart` sont liees; le defaut Linux `Feature.fullyEnabled` est verifie.
 `entrypointPreconditions` declare un SDK non modifie (Git et mtimes conserves),
@@ -393,7 +395,8 @@ dans `unshare -n` : original, omission, ajout, URL redirigee et hash altere.
 Chaque mutation doit echouer sur la comparaison au graphe **recalcule**, pas
 sur une autre erreur ni seulement sur une comparaison de fixtures.
 Mesure du 24 septembre 2026 sous WSL ARM64 : 15 tests reussis, aucun ignore,
-en 616,266 s, dont ces dix executions CLI hors reseau. Le gate court seul
+en 619,562 s apres la correction de l'index Git, dont ces dix executions CLI
+hors reseau. Le gate court seul
 execute les 13 autres tests et signale explicitement les deux tests ignores.
 
 ### Relecture independante
@@ -414,8 +417,11 @@ et la correspondance exacte des 102 archives Pub (nom/version/SHA).
 Il n'a pas execute les replays Linux ni verifie independamment les repertoires
 de l'archive complete : ces mesures sont celles de l'implementatrice.
 L'authenticite editeur des empreintes moteur et l'independance de l'inventaire
-de base ne sont toujours pas demontrees. La contre-relecture des corrections
-est en cours; aucun avis d'approbation global n'est presume.
+de base ne sont toujours pas demontrees. La contre-relecture a confirme les
+corrections ci-dessus et les 11 tests canary; elle a releve un dernier manque,
+l'index Git qui commande le fallback moteur. Cet index et sa precondition
+ont ensuite ete ajoutes avec un test negatif. Aucun avis d'approbation global
+ni reproduction independante des mesures WSL n'est presume.
 
 **Reste obligatoire avant `locked` et installation :**
 

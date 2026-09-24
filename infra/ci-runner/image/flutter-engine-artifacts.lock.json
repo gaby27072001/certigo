@@ -35,10 +35,12 @@
     "bin/cache/flutter.version.json": "7e67b626758e669c4792fdf4f9a5f15acb5c8da96572636c46f8f7ac10de8249",
     "bin/cache/engine.realm": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
     ".git/HEAD": "b5c097d4e902fc407dfbfb12cc2e39e85434d694c39501c5456811f890aa2a29",
-    ".git/packed-refs": "1430d31df8186584f25479daead4c4007db4a80fb89c1b88aa546830fa88cdb7"
+    ".git/packed-refs": "1430d31df8186584f25479daead4c4007db4a80fb89c1b88aa546830fa88cdb7",
+    ".git/index": "b1b93f622e2bace701f9c913f2a9dcf5f8dfe516957545f0609c45ee80b81932"
   },
   "entrypointPreconditions": {
     "gitHead": "ad70ec4617166f1c38e5d2bfd388af71fda14f06",
+    "engineVersionTracked": true,
     "flutterToolArgs": "",
     "pubspecMtime": 1782343038,
     "pubspecLockMtime": 1782343278,

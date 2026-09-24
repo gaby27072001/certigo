@@ -42,6 +42,7 @@ SOURCES = [
     "bin/cache/engine.realm",
     ".git/HEAD",
     ".git/packed-refs",
+    ".git/index",
 ]
 
 
@@ -59,11 +60,15 @@ def entrypoint_preconditions(files, directories, contents, mtimes):
     require(contents[".git/HEAD"].decode().strip() == "ref: refs/heads/stable" and
             f"{FRAMEWORK} refs/heads/stable" in contents[".git/packed-refs"].decode().splitlines() and
             ".git/refs/heads/stable" not in files, "SDK Git HEAD differs from tool stamp")
+    index = contents.get(".git/index", b"")
+    require(".git/index" in files and index.startswith(b"DIRC\x00\x00\x00\x02") and
+            b"bin/internal/engine.version\x00" in index,
+            "engine.version must stay Git-tracked to avoid the content-hash engine fallback")
     require(re.search(r"const flutterLinuxDesktopFeature = Feature\.fullyEnabled\(",
                       contents["packages/flutter_tools/lib/src/features.dart"].decode()),
             "Linux desktop default requires a new source review")
     return {
-        "gitHead": FRAMEWORK, "flutterToolArgs": "",
+        "gitHead": FRAMEWORK, "engineVersionTracked": True, "flutterToolArgs": "",
         "pubspecMtime": mtimes["packages/flutter_tools/pubspec.yaml"],
         "pubspecLockMtime": mtimes["packages/flutter_tools/pubspec.lock"],
         "toolSnapshot": "bundled-current", "dartSdk": "bundled-current",
