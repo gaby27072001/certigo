@@ -101,5 +101,10 @@
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
   },
-  "preApproved": {}
+  "preApproved": {
+    ".github/workflows/lint-workflows.yml": {
+      "digest": "21e5975301e50771a52f837f30aef6f8735a9d9ced0b077af5135ea1e4f5f01a",
+      "expires": "2026-10-08"
+    }
+  }
 }
