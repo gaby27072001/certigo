@@ -49,7 +49,7 @@ fi
 
 trap cleanup EXIT
 
-for command in curl docker dotnet openssl timeout; do
+for command in curl docker dotnet openssl python3 timeout; do
   command -v "${command}" >/dev/null 2>&1 || {
     echo "${command} is required for the local Cosmos emulator gate." >&2
     exit 1
@@ -147,30 +147,98 @@ export CERTIGO_COSMOS_TESTS=1
 export COSMOS_EMULATOR_ENDPOINT=https://127.0.0.1:8081
 export COSMOS_EMULATOR_KEY="${cosmos_key}"
 
+# The gate runs the whole emulator suite, not only account deletion: every test
+# marked [CosmosEmulatorFact] must execute and pass. The expected count comes from
+# the sources so a test left outside the Category=CosmosEmulator trait, skipped or
+# silently dropped fails the gate instead of shrinking it.
+test_sources="${root}/backend/tests/Certigo.Infrastructure.Tests"
+expected_tests="$(
+  {
+    grep -rhE --include='*.cs' --exclude-dir=bin --exclude-dir=obj \
+      '^[[:space:]]*\[CosmosEmulatorFact([](,]|$)' "${test_sources}" || true
+  } | wc -l
+)"
+if (( expected_tests < 1 )); then
+  echo "No [CosmosEmulatorFact] test was found under ${test_sources}." >&2
+  exit 1
+fi
+
 results_dir="$(mktemp -d /tmp/certigo-cosmos-results.XXXXXX)"
-result_file="${results_dir}/account-deletion.trx"
+result_file="${results_dir}/cosmos-emulator.trx"
+set +e
 timeout --signal=TERM --kill-after=30s 1200 dotnet test \
   "${root}/backend/tests/Certigo.Infrastructure.Tests/Certigo.Infrastructure.Tests.csproj" \
   --configuration Release \
   --no-restore \
-  --filter \
-  'FullyQualifiedName~CosmosRepositoriesIntegrationTests.Account_deletion_removes_user_partitions_and_keeps_only_pseudonymous_tombstone' \
-  --logger 'trx;LogFileName=account-deletion.trx' \
+  --filter 'Category=CosmosEmulator' \
+  --logger 'trx;LogFileName=cosmos-emulator.trx' \
   --results-directory "${results_dir}" \
   --verbosity normal
+test_exit=$?
+set -e
 
 if [[ ! -f "${result_file}" ]]; then
-  echo "The account-deletion test did not produce a TRX result." >&2
+  echo "The Cosmos emulator suite did not produce a TRX result (dotnet exit ${test_exit})." >&2
   exit 1
 fi
-mapfile -t test_results < <(grep -o '<UnitTestResult [^>]*>' "${result_file}" || true)
-expected_test="Account_deletion_removes_user_partitions_and_keeps_only_pseudonymous_tombstone"
-if (( ${#test_results[@]} != 1 )); then
-  echo "Expected exactly one account-deletion test result; found ${#test_results[@]}." >&2
-  exit 1
-fi
-if [[ "${test_results[0]}" != *"${expected_test}"* ||
-      "${test_results[0]}" != *'outcome="Passed"'* ]]; then
-  echo "The single account-deletion test was skipped, renamed, or did not pass." >&2
-  exit 1
-fi
+
+EXPECTED_TESTS="${expected_tests}" \
+REQUIRED_TEST='Certigo.Infrastructure.Tests.CosmosRepositoriesIntegrationTests.Account_deletion_removes_user_partitions_and_keeps_only_pseudonymous_tombstone' \
+RESULT_FILE="${result_file}" \
+TEST_EXIT="${test_exit}" \
+python3 -P - <<'PY'
+import os
+import sys
+import xml.etree.ElementTree as ElementTree
+
+namespace = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+expected = int(os.environ["EXPECTED_TESTS"])
+required = os.environ["REQUIRED_TEST"]
+results = [
+    (node.get("testName", ""), node.get("outcome", ""), node.get("duration", ""))
+    for node in ElementTree.parse(os.environ["RESULT_FILE"]).getroot().iterfind(
+        ".//t:UnitTestResult", namespace
+    )
+]
+names = [name for name, _, _ in results]
+passed = [name for name, outcome, _ in results if outcome == "Passed"]
+errors = []
+if len(results) != expected:
+    errors.append(
+        f"expected {expected} Cosmos emulator results (one per [CosmosEmulatorFact]); "
+        f"found {len(results)}"
+    )
+if len(set(names)) != len(names):
+    errors.append("a Cosmos emulator test was reported more than once")
+not_passed = [f"{name} ({outcome})" for name, outcome, _ in results if outcome != "Passed"]
+if not_passed:
+    errors.append("skipped or failed: " + ", ".join(not_passed))
+if required not in passed:
+    errors.append("the account-deletion test was skipped, renamed, or did not pass")
+if os.environ["TEST_EXIT"] != "0":
+    errors.append(f"dotnet test exited with {os.environ['TEST_EXIT']}")
+
+lines = [
+    "### Cosmos emulator suite",
+    "",
+    f"**{len(passed)}/{expected}** passed; account deletion "
+    + ("**passed**." if required in passed else "**did not pass**."),
+    "",
+    "| Test | Outcome | Duration |",
+    "| --- | --- | --- |",
+]
+lines += [
+    f"| `{name.rsplit('.', 2)[-2]}.{name.rsplit('.', 1)[-1]}` | {outcome} | {duration} |"
+    for name, outcome, duration in sorted(results)
+]
+report = "\n".join(lines) + "\n"
+print(report)
+summary = os.environ.get("GITHUB_STEP_SUMMARY")
+if summary:
+    with open(summary, "a", encoding="utf-8") as handle:
+        handle.write(report + "\n")
+if errors:
+    for error in errors:
+        print(f"Cosmos emulator gate: {error}.", file=sys.stderr)
+    sys.exit(1)
+PY

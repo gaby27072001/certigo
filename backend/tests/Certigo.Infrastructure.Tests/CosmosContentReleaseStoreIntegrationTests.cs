@@ -7,9 +7,18 @@ using Xunit;
 
 namespace Certigo.Infrastructure.Tests;
 
-public sealed class CosmosContentReleaseStoreIntegrationTests(CosmosEmulatorFixture fixture)
-    : IClassFixture<CosmosEmulatorFixture>
+[Trait(CosmosEmulatorFixture.TraitName, CosmosEmulatorFixture.TraitValue)]
+public sealed class CosmosContentReleaseStoreIntegrationTests : IAsyncLifetime
 {
+    // The active content pointer is a singleton document and a first promotion requires
+    // If-Match: *. A class-shared database made these tests pass or fail with xUnit's
+    // execution order, so every test provisions its own ephemeral database instead.
+    private readonly CosmosEmulatorFixture fixture = new();
+
+    public Task InitializeAsync() => fixture.InitializeAsync();
+
+    public Task DisposeAsync() => fixture.DisposeAsync();
+
     [CosmosEmulatorFact]
     public async Task Stage_promote_and_rollback_are_idempotent_and_etag_guarded()
     {

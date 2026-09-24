@@ -22,10 +22,11 @@ fenêtre et à une PR séparées.
   (`8a4f3be99b5d7cf97eb870d85e8481be24ceb1bc`) et #313
   (`8cd955faa790aa69a2f330a8f57781e8856d624b`). Le test réel doit partir d'un
   `main` contenant aussi le merge de la présente PR.
-- **PR #296** fournit la cible unique
+- **PR #296** fournit la cible
   `CosmosRepositoriesIntegrationTests.Account_deletion_removes_user_partitions_and_keeps_only_pseudonymous_tombstone`.
-  Son workflow temporaire sur `certigo-trusted` est désormais retiré de
-  `.github/workflows/` et ne doit pas être réactivé.
+  Elle reste obligatoire, mais n'est plus seule : le gate exécute désormais toute la suite
+  émulateur (voir « Contenu du gate : toute la suite émulateur »). Son workflow temporaire sur
+  `certigo-trusted` est retiré de `.github/workflows/` et ne doit pas être réactivé.
 - **PR #302** reste la source de décision pour les futurs pools/VMSS et le contrôleur
   de capacité. Ce canari n'entre ni dans ses pools `certigo-pr` / `certigo-trusted`,
   ni dans son autoscaling feature-off : il s'agit d'une VM singleton jetable, avec
@@ -220,8 +221,10 @@ Après fusion de la présente PR, alors que le gate et la feature restent off :
    `certigo-cosmos-emulator` ;
 9. définir la variable à `true`, puis lancer **une seule fois**
    `workflow_dispatch` depuis `main` avant l'expiration de 45 minutes du listener ;
-10. accepter comme preuve uniquement un job sur le SHA `main` attendu avec
-    exactement un résultat TRX, exécuté et `Passed` ;
+10. accepter comme preuve uniquement un job sur le SHA `main` attendu dont le résumé
+    affiche exactement un résultat TRX, exécuté et `Passed`, par test `[CosmosEmulatorFact]`,
+    test de suppression de compte compris (voir « Contenu du gate : toute la suite
+    émulateur ») ;
 11. après conclusion du job, remettre immédiatement la variable à `false`, puis
     appliquer le rollback externe ;
 12. n'ouvrir la PR produit qui active `ACCOUNT_DELETION_ENABLED` qu'après
@@ -230,8 +233,9 @@ Après fusion de la présente PR, alors que le gate et la feature restent off :
 
 Le workflow ne contient aucun événement PR, checkout de head SHA ou secret
 Azure. Il checkout explicitement `refs/heads/main`, vérifie `HEAD == origin/main`,
-exécute uniquement le test de suppression de compte, écrit le résultat dans
-`GITHUB_STEP_SUMMARY`, exige exactement un résultat TRX exécuté et réussi, ne
+exécute toute la suite émulateur (`--filter Category=CosmosEmulator`, test de suppression
+de compte compris), écrit le résultat par test dans `GITHUB_STEP_SUMMARY`, exige
+exactement un résultat TRX exécuté et réussi par test `[CosmosEmulatorFact]`, ne
 publie aucun artifact et nettoie conteneur, clé et résultat local.
 
 Le passage de B à C doit conserver exactement la baseline active B et ajouter le
@@ -241,6 +245,35 @@ fait partie d'aucun workflow et le validateur ne régénère jamais les empreint
 Tout changement sémantique d'un workflow est d'abord pré-approuvé sur `main`, puis
 appliqué par une PR distincte qui consomme l'approbation : voir
 [`CI_WORKFLOW_CHANGES.md`](./CI_WORKFLOW_CHANGES.md).
+
+## Contenu du gate : toute la suite émulateur
+
+> **Fait daté.** Mesuré le 2026-09-24 sur le build `vnext-EN20260810` (jumeau `arm64`
+> `sha256:8383edc6…ee41c` du digest `amd64` épinglé). **Invalidé si** l'image épinglée
+> change, ou si un test `[CosmosEmulatorFact]` est ajouté, retiré ou modifié.
+
+`run-account-deletion.sh` garde son nom, car le workflow scellé l'appelle mot pour mot,
+mais n'exécute plus un seul test. Il compte les attributs `[CosmosEmulatorFact]` dans
+`backend/tests/Certigo.Infrastructure.Tests`, lance `dotnet test --filter
+Category=CosmosEmulator`, puis refuse le résultat si le TRX ne contient pas exactement
+un résultat `Passed` par attribut, si un test est rapporté deux fois, si le test de
+suppression de compte manque ou si `dotnet test` échoue. Un test émulateur laissé hors
+du trait, sauté ou supprimé fait donc échouer le gate au lieu de le rétrécir.
+`CosmosEmulatorSuiteContractTests` vérifie la même frontière sans émulateur, à chaque
+CI backend.
+
+Mesures locales, émulateur `vnext-EN20260810-arm64` sous Docker Desktop :
+
+| Exécution | Résultat |
+| --- | --- |
+| Suite avant correction | 16/18 : deux tests de `CosmosContentReleaseStoreIntegrationTests` échouaient selon l'ordre d'exécution xUnit, parce que trois tests promouvaient le pointeur singleton avec `If-Match: *` dans une base partagée par la classe |
+| Suite après isolation d'une base par test | **18/18** |
+| Script du gate, conteneur Linux `dotnet/sdk:8.0`, socket Docker de l'hôte | **18/18**, sortie 0, zéro conteneur, clé ou résultat restant après `--cleanup-only` |
+| Même script, un test `[CosmosEmulatorFact]` ajouté hors du trait | sortie 1 : `expected 19 Cosmos emulator results … found 18` |
+
+L'ancien sixième échec, l'agrégat `GetRecentActivityAsync` sur `vnext-preview`, ne se
+reproduit plus : la requête projette désormais ses agrégats à plat
+(`SELECT COUNT(1) AS attempts, SUM(…) AS xp`), forme que Cosmos exige aussi.
 
 ## Fin d'un job et destruction obligatoire
 

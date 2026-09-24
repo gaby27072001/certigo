@@ -7,9 +7,10 @@ using Xunit;
 namespace Certigo.Infrastructure.Tests;
 
 /// <summary>
-/// Provisions a throw-away Cosmos database (one per test-class run) against a
-/// locally-running Azure Cosmos DB emulator, seeds the production container set,
-/// and tears the database down afterwards.
+/// Provisions a throw-away Cosmos database (one per fixture instance: per test class
+/// through <see cref="IClassFixture{TFixture}"/>, or per test when a class owns the
+/// fixture) against a locally-running Azure Cosmos DB emulator, seeds the production
+/// container set, and tears the database down afterwards.
 ///
 /// The whole suite is OPT-IN and gated behind <see cref="EnableFlag"/>: with the
 /// flag unset — the default on a developer box or CI agent without an emulator —
@@ -32,6 +33,15 @@ namespace Certigo.Infrastructure.Tests;
 public sealed class CosmosEmulatorFixture : IAsyncLifetime
 {
     public const string EnableFlag = "CERTIGO_COSMOS_TESTS";
+
+    /// <summary>
+    /// Trait carried by every class of emulator tests. The CI emulator gate selects the
+    /// suite with <c>--filter Category=CosmosEmulator</c> and fails closed unless it
+    /// executes exactly one passing result per <see cref="CosmosEmulatorFactAttribute"/>.
+    /// </summary>
+    public const string TraitName = "Category";
+
+    public const string TraitValue = "CosmosEmulator";
 
     /// <summary>True only when the opt-in flag is explicitly set to "1".</summary>
     public static bool Enabled =>
