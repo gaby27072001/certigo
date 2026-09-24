@@ -177,6 +177,7 @@ node --test \
   "${image_dir}/toolchain-contract.test.mjs" \
   "${image_dir}/runner-image-canary.test.mjs" \
   "${image_dir}/network-inputs.test.mjs"
+python3 -B -m unittest discover -s "${image_dir}" -p 'lock_inputs_test.py'
 node "${image_dir}/validate-canary-evidence.mjs" --plan
 canary_transition_ps="${canary_transition}"
 canary_cleanup_ps="${canary_cleanup}"

@@ -115,10 +115,9 @@ PR2 ajoute uniquement des ressources **nouvelles et desactivees par defaut**:
   Bicep ont aussi un garde de code `networkInstallerImplemented=false`, non
   exposable comme parametre. Ils ne peuvent creer aucune ressource, meme avec
   `deploymentEnabled=true` et des drapeaux JSON falsifies, tant que
-  les paquets transitifs Ubuntu/Microsoft ne sont pas lies a un snapshot APT et
-  a leurs hashes, et que les artefacts du `flutter precache` ne sont pas tous
-  enumeres et hashes. PR2 n'assimile jamais une version seule a une preuve de
-  reproductibilite;
+  le consommateur exhaustif hors ligne et ses preuves ne sont pas implementes.
+  Les locks decrits plus bas ne suffisent pas a lever ce garde. PR2 n'assimile
+  jamais une version seule a une preuve de reproductibilite;
 - `image-build.bicep` declare la Gallery, la definition et le template Azure VM
   Image Builder. `deploymentEnabled=false` et `autoRun=Disabled`: compiler ou
   deployer le modele sans parametre explicite ne construit rien;
@@ -244,27 +243,196 @@ releve. Les ajouts et upgrades posterieurs restent dans les journaux, jamais
 assimiles a la base. L'installation d'`ubuntu-advantage-tools` est observee dans
 l'historique APT; son auteur n'y est pas renseigne.
 
-**Reste obligatoire avant `locked` :**
+### Closure APT et Microsoft
 
-1. Faire relire cette reconstruction, resoudre puis verrouiller la fermeture
-   finale Ubuntu **et** Microsoft, incluant les dependances de prewarm et du
-   runner. Le manifeste de base n'est pas `apt-packages.lock.json`.
-2. Enumerer et hasher les artefacts effectivement consommes par le SDK Flutter
-   epingle, son precache Linux et ses entrees universelles. Le commit moteur
-   publie pour Flutter 3.44.4 est
-   `a10d8ac38de835021c8d2f920dbf50a920ccc030`
-   ([source au commit Flutter exact](https://github.com/flutter/flutter/blob/ad70ec4617166f1c38e5d2bfd388af71fda14f06/bin/internal/engine.version)).
-   Ce commit seul n'est pas `flutter-engine-artifacts.lock.json`.
-3. Remplacer ou confiner, dans le chemin image uniquement, tous les resolvers
+`apt-packages.lock.json` distingue `packages` (archives des transactions) et
+`snapshotResolvedPackages` (graphe resolu du snapshot, base comprise, **pas**
+l'inventaire final observe sur la VM). Chaque tuple inclut version,
+architecture, URL, taille, SHA-256 et index source; `controlSha256` lie les
+metadonnees completes utilisees par le solveur. Les dependances deja satisfaites
+par la base ne sont ni omises ni presentees comme de nouveaux telechargements.
+
+`lock_apt.py` authentifie les `InRelease` avec `gpgv`, puis les index par
+SHA-256/taille. Il reconstruit le statut dpkg depuis les paragraphes **complets**
+des index correspondants, pas uniquement nom/version : Depends, Pre-Depends,
+Provides, Multi-Arch, Conflicts, Breaks, Replaces, Essential et Recommends restent
+disponibles au solveur. Les commandes et fallbacks sont lus dans les deux scripts
+epingles et `bin/installdependencies.sh` extrait de l'archive runner verifiee.
+Le hold d'Azure CLI, les recommandations et l'ordre des transactions sont gardes.
+`apt-get check`, simulation et `--print-uris` doivent etre coherents.
+
+Le solveur est **APT et libapt 2.8.3 du meme snapshot Noble**. Leurs paquets
+amd64/arm64 sont identifies dans le lock; seule l'architecture du solveur depend
+de l'hote. La cible est toujours amd64. Les paquets verifies sont extraits dans
+un repertoire temporaire, sans installation sur l'hote. Les bibliotheques
+systeme restantes viennent de l'hote : le rejeu doit produire le meme lock,
+sinon il echoue. Ce calcul ne pretend pas etre un boot ni une installation Noble.
+`APT_CONFIG` isole sources, preferences, hooks, caches et statut. La resolution
+exige un namespace reseau ne contenant que `lo`; aucun `apt update` reseau n'y
+est execute.
+
+Le depot Microsoft **reste mutable**. `apt-index-evidence` conserve exactement
+sa cle publique, son `InRelease` signe et son index `Packages`, avec leurs
+hashes/provenance dans `indexes.json`. Un rejeu ne les actualise jamais. Il
+recupere seulement les index Ubuntu du snapshot exact. Les hashes des paquets
+sont authentifies par les index; la commande `download` mesure aussi les octets
+des archives des transactions. Les archives de la base ne sont pas toutes
+telechargees. La disponibilite future des URL Microsoft n'est pas garantie :
+un futur stockage hors ligne devra conserver les blobs verifies.
+
+L'oracle terrain couvre exactement les installations du bootstrap du 14/09.
+Il exclut une seule transaction APT conservee : 19/09/2026 12:53:07--11Z,
+`apt-get install ubuntu-advantage-tools -y`, version `37.2ubuntu~24.04.1`
+(`:amd64` dans l'historique APT, `:all` dans dpkg a 12:53:09Z).
+Les deux journaux sont verifies contre les hashes du rapport de base avant
+lecture. Toute autre installation ou upgrade tardif, y compris du meme nom,
+ainsi que toute suppression/purge, echoue.
+Cette transaction coincide sur PR31/PR34 avec ConfigurePatching :
+[preuves de #341](https://github.com/gchambaud_microsoft/Certigo/issues/341#issuecomment-5803012081).
+Le client Ubuntu Pro de
+[LinuxPatchExtension au commit source exact](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/package_managers/UbuntuProClient.py#L30)
+execute cette commande. **La version de l'extension deployee n'a pas ete lue** :
+ce commit source n'est pas presente comme le binaire observe. Les upgrades du
+14/09 provenaient alors des depots courants; ils ne sont pas artificiellement
+ajoutes a la resolution du snapshot du 07/08.
+Le bootstrap live etait le blob `da050d7e`, dont les commandes d'installation
+sont identiques a celles du bootstrap actuellement epingle; ce n'est pas une
+preuve d'execution du bootstrap de main.
+
+`observationReconciliation` rend cet ecart calculable : chaque transaction
+bootstrap porte ses versions precedente, observee et resolue, avec son resultat
+de comparaison. `unreproducedVersionTransactions` enumere les 22 upgrades
+non reproduits par le snapshot impose. Les six ajouts bootstrap et l'unique
+ajout plateforme expliquent les 663 paquets observes depuis les 656 de base.
+Les trois ajouts propres au prewarm (`python3-pip-whl`, `python3-setuptools-whl`,
+`python3.12-venv`) expliquent les 665 paquets resolus : 663 - 1 + 3.
+Ces identites d'ensembles et cardinalites sont controlees; le snapshot ne doit
+pas etre change pour faire artificiellement coincider les versions terrain.
+
+### Graphe Flutter Linux x64
+
+`lock_flutter.py` lit l'archive SDK apres verification de son SHA-256 et refuse
+toute autre version tant que son evaluateur specialise n'a pas ete relu.
+Le graphe est derive des classes du SDK epingle, notamment `PrecacheCommand`,
+`FlutterCache`, `EngineCachedArtifact` et `PubDependencies`. Les sources lues
+sont liees par `sdkSourceSha256`. Aucun binaire x64 du SDK n'est execute sur
+l'hote ARM64; ce n'est **pas une trace d'execution native**.
+
+Le point d'entree `bin/flutter` est aussi borne : snapshot flutter_tools et
+Dart SDK presents, stamps moteur concordants, stamp outil coherent avec le HEAD
+Git exact et `FLUTTER_TOOL_ARGS` vide, pubspec pas plus recent que son lock.
+Les sources `shared.sh`, `update_engine_version.sh`, `update_dart_sdk.sh` et
+`features.dart` sont liees; le defaut Linux `Feature.fullyEnabled` est verifie.
+`entrypointPreconditions` declare un SDK non modifie (Git et mtimes conserves),
+un home/config vierge et aucun override Flutter/Pub/moteur/Git. Le futur
+consommateur devra imposer ces conditions. Hors de ce domaine, `bin/flutter`
+peut lancer `pub upgrade` et telecharger un autre Dart SDK : ce lock ne revendique
+pas couvrir ces branches de re-resolution non bornee.
+
+`--linux` selectionne Linux **et** les groupes universal/informative par defaut.
+Le lock couvre fonts, Gradle wrapper, informations moteur, paquets sky_engine et
+flutter_gpu, SDK patches, outils hote, GTK debug/profile/release et font-subset.
+Il distingue `bundled-current` (cache deja present dans l'archive SDK selon les
+predicats du SDK) de `download-required`. Tous ces blobs ont neanmoins ete
+telecharges pour mesurer leurs SHA-256; les entrees integrees ne sont pas
+presentees comme des requetes reseau effectivement executees par precache.
+Les branches iOS USB sont sans telechargement sous Linux; les autres plateformes
+ne sont pas selectionnees.
+
+La branche universelle `PubDependencies` n'est pas oubliee : l'archive n'a pas
+de `package_config.json` local pour flutter_tools ni de reference workspace
+locale. Son `pub get` implique les archives de `packages/flutter_tools/pubspec.lock`.
+Le script les enumere et verifie les SHA-256 du lock inclus dans le SDK.
+Il ne declare pas le resolver Pub courant immuable et ne le lance pas en ligne.
+Le futur consommateur devra fournir le cache ferme et imposer le lock hors
+ligne, sans requete de metadonnees ni re-resolution implicite.
+
+Les empreintes moteur mesurees sous HTTPS sont des **octets verifies et
+rejouables**, pas une signature editeur independante. Les hashes Pub ont en plus
+ete compares au lock de l'archive SDK epinglee.
+
+### Rejouer sans modifier un runner
+
+Depuis la racine du depot, sous Linux avec Python 3.11+, gpg/gpgv, dpkg-deb et
+`unshare -n` (root ou namespace autorise), utiliser un cache prive hors depot :
+
+```bash
+IMAGE=infra/ci-runner/image
+CACHE=/chemin/prive/apt-cache
+# Rejeu : restaure Ubuntu, conserve Microsoft depuis le depot.
+python3 -B "$IMAGE/lock_apt.py" restore-indexes --cache "$CACHE"
+python3 -B "$IMAGE/lock_apt.py" capture-solver --cache "$CACHE"
+# RUNNER_ARCHIVE et FLUTTER_ARCHIVE : archives aux URL du manifest;
+# leur SHA-256 est reverifie AVANT extraction/lecture.
+unshare -n python3 -B "$IMAGE/lock_apt.py" verify \
+  --cache "$CACHE" --runner-archive "$RUNNER_ARCHIVE"
+python3 -B "$IMAGE/lock_apt.py" download \
+  --cache "$CACHE" --runner-archive "$RUNNER_ARCHIVE"
+python3 -B "$IMAGE/lock_flutter.py" capture \
+  --sdk-archive "$FLUTTER_ARCHIVE" --cache "$FLUTTER_CACHE" --output /tmp/flutter-recapture.json
+unshare -n python3 -B "$IMAGE/lock_flutter.py" verify \
+  --sdk-archive "$FLUTTER_ARCHIVE" --cache "$FLUTTER_CACHE"
+python3 -B -m unittest discover -s "$IMAGE" -p 'lock_inputs_test.py'
+```
+
+Pour une nouvelle capture **explicitement revue**, `lock_apt.py capture`
+remplace les preuves Microsoft; `resolve` ecrit un nouveau lock dans le
+namespace sans reseau. Ne pas confondre cette operation de maintenance avec
+`restore-indexes`/`verify`. Le telechargeur refuse les redirections, les blobs
+vides et les hashes divergents; il ne suit pas une nouvelle URL implicitement.
+La capture Flutter ecrit seulement un fichier propose; `resolve` permet de
+recalculer ce fichier depuis les blobs deja acquis, sans reseau. `verify` le
+compare au graphe et aux octets attendus du lock versionne.
+
+Les tests courts sont inclus dans `validate.sh`. Les deux tests de replay complets
+additionnels exigent les variables `CERTIGO_APT_CACHE`,
+`CERTIGO_RUNNER_ARCHIVE`, `CERTIGO_FLUTTER_CACHE`, `CERTIGO_FLUTTER_ARCHIVE`;
+ils sont explicitement marques ignores sans ces gros inputs, pas annonces
+comme executes par le gate court. Chacun lance la vraie CLI `verify` cinq fois
+dans `unshare -n` : original, omission, ajout, URL redirigee et hash altere.
+Chaque mutation doit echouer sur la comparaison au graphe **recalcule**, pas
+sur une autre erreur ni seulement sur une comparaison de fixtures.
+Mesure du 24 septembre 2026 sous WSL ARM64 : 15 tests reussis, aucun ignore,
+en 616,266 s, dont ces dix executions CLI hors reseau. Le gate court seul
+execute les 13 autres tests et signale explicitement les deux tests ignores.
+
+### Relecture independante
+
+Relecture `rubber-duck`, agent `77cfb627-b939-4e57-a9e4-9f2d1d92ea52`,
+24 septembre 2026 : scripts, deux locks, index Microsoft, oracle terrain,
+sources Flutter/Pub, tests et maintien des gardes. Les constats ont conduit a :
+
+- authentifier les deux logs et reconciler explicitement toutes les transactions
+  de version, les upgrades hors snapshot et les ajouts prewarm;
+- remplacer les seules mutations de fixtures par huit rejets via la vraie CLI;
+- borner les branches du point d'entree Flutter et le defaut de la feature Linux;
+- refuser les recettes APT dupliquees et remplacer le test d'absence du lock par
+  celui du garde d'installation.
+
+Le reviewer a verifie les 12 URL moteur/universelles contre les classes du SDK
+et la correspondance exacte des 102 archives Pub (nom/version/SHA).
+Il n'a pas execute les replays Linux ni verifie independamment les repertoires
+de l'archive complete : ces mesures sont celles de l'implementatrice.
+L'authenticite editeur des empreintes moteur et l'independance de l'inventaire
+de base ne sont toujours pas demontrees. La contre-relecture des corrections
+est en cours; aucun avis d'approbation global n'est presume.
+
+**Reste obligatoire avant `locked` et installation :**
+
+1. Remplacer ou confiner, dans le chemin image uniquement, tous les resolvers
    reseau : bootstrap, `installdependencies.sh`, APT, pip et Flutter. Verifier
    les octets avant execution et prouver l'installation sans reseau depuis
    l'ensemble ferme d'artefacts approuve.
-4. Ajouter les tests d'execution de ce consommateur (alteration, omission,
+2. Ajouter les tests d'execution de ce consommateur (alteration, omission,
    redirection, telechargement imprevu), puis seulement retirer les gardes de
    code. Les tests actuels portent sur l'integrite des fichiers et le **refus
    d'admission** : des propositions redirigees ou ajoutees, meme rehashees, ne
    peuvent rien activer. Ils ne pretendent pas valider un downloader inexistant.
-5. Activer et epingler le signataire dans le changement separe prevu par #497.
+3. Traiter le patching invite de la plateforme : il peut installer ou mettre a
+   jour des paquets apres le boot. Le futur contrat devra soit le neutraliser
+   sur les nouveaux runners, soit l'assumer et le verifier au boot. Rien de
+   cela n'est modifie ici.
+4. Activer et epingler le signataire dans un changement separe approuve.
    Aucun workflow actif ni le workflow signataire desactive n'est modifie ici.
 
 Les premiers tests compilent aussi les trois Bicep avec tous les drapeaux JSON
