@@ -32,7 +32,7 @@ var reproducibilityReady = contract.policy.reproducibleInputsReady && contract.r
 var effectiveDeploymentEnabled = deploymentEnabled && reproducibilityReady && networkInstallerImplemented
 var sourceRoot = 'https://raw.githubusercontent.com/${contract.repository}/${contract.contractCommit}/'
 var inputRoot = '/var/tmp/certigo-image-input'
-var contractSha256 = '02be193b969903ab99fbe3b111a3390c662683af71c9a205be62b662ba3854f5'
+var contractSha256 = '08cf81ddfc82a2df5c304d7573af980f169154fdfedaa17d8158706aad8a87c9'
 var galleryImageDefinitionId = resourceId(
   'Microsoft.Compute/galleries/images',
   contract.destination.galleryName,

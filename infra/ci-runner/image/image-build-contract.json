@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractCommit": "f03ecf3c40374cdca715be2aa0cb877235048980",
+  "contractCommit": "7f6de6d1f62a6c15bca3e63413e2e96df15a63ef",
   "toolchainOriginCommit": "f8e23b2952e8ca39c59f30081b8950170abb701a",
   "repository": "gchambaud_microsoft/Certigo",
   "baseImage": {
@@ -35,15 +35,27 @@
       "path": "infra/ci-runner/image/base-image-evidence/base-image-reconstruction.json",
       "sha256": "a79b48083f5d31ac04b6a0bc850583e085b830df5de51c1e0cd2350f5b118c48"
     },
-    "aptPackageLockSha256": null,
-    "flutterEngineArtifactLockSha256": null,
+    "aptPackageLockSha256": "3682ce190d65ee2680862f29562bdf3120c83452c022400620a4a857bb1ea69b",
+    "flutterEngineArtifactLockSha256": "1670d098a763075cf165c99551b98af7bcde0b1b5bf34c5c1542707ba2f28e15",
     "blockedReasons": [
-      "The exact reconstructed base matches the authenticated Ubuntu snapshot, but the final Ubuntu and Microsoft APT dependency closure is not locked.",
-      "Flutter precache engine artifacts are not enumerated with SHA-256 digests.",
-      "The bootstrap (including installdependencies.sh), APT, pip and Flutter are not confined to verified offline artifacts."
+      "APT and Flutter locks are captured and replayable, but the bootstrap (including installdependencies.sh), APT, pip and Flutter are not confined to verified offline artifacts.",
+      "The future consumer must enforce the Flutter entrypoint preconditions and prohibit online Pub metadata resolution.",
+      "Platform guest patching can mutate packages after boot and is not yet covered by the image installation and boot contract."
     ]
   },
   "inputs": [
+    {
+      "id": "apt-lock",
+      "path": "infra/ci-runner/image/apt-packages.lock.json",
+      "destination": "apt-packages.lock.json",
+      "sha256": "3682ce190d65ee2680862f29562bdf3120c83452c022400620a4a857bb1ea69b"
+    },
+    {
+      "id": "flutter-lock",
+      "path": "infra/ci-runner/image/flutter-engine-artifacts.lock.json",
+      "destination": "flutter-engine-artifacts.lock.json",
+      "sha256": "1670d098a763075cf165c99551b98af7bcde0b1b5bf34c5c1542707ba2f28e15"
+    },
     {
       "id": "bootstrap",
       "path": "infra/ci-runner/bootstrap.sh",
