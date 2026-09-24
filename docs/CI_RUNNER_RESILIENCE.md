@@ -454,6 +454,13 @@ dépôt, et chaque run rend visibles les instances réellement démarrées (rép
 `08584114180865363275771379711CU123` pendant le drill (section « Drill de perte d'un
 runner ») : une instance désallouée, absente de toute liste, rallumée et vérifiée.
 
+**Premier run automatique — 2026-09-24.** Après la désallocation MCAPS de 00:48:32 à
+00:48:41Z (6 VM), le run automatique `08584113934257882646280971546CU126` (01:30:59Z →
+01:40:03Z) est `Succeeded` : mêmes six démarrages, aucune instance retirée touchée, trusted
+rallumés en 1 min 25 s et PR en 8 min 31 s, les trois `Fail_*` en `Skipped`. À 09:39Z, les
+6 runners sont online. C'est le premier succès automatique depuis le 2026-09-11 (12 échecs du
+2026-09-12 au 2026-09-23).
+
 #### Cause racine des instances PR mortes — mesurée le 2026-09-23
 
 > Mesuré le 2026-09-23 dans l'Activity Log de `rg-certigo-ci` (fenêtre 2026-09-10 → 2026-09-23)
