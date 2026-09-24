@@ -244,6 +244,32 @@ l'API GitHub : runner `online`, labels exacts, service actif, IMDS inaccessible 
 GitHub/NuGet/pub.dev/npm fonctionnel. Le pilote ne crée volontairement aucun runner dans
 `certigo-content`.
 
+> 🧪 **Drill de reconstruction : un runner qui ne peut prendre aucun job réel.** Pour prouver
+> la reconstruction sans exposer de vraie PR, déployer `pilot.bicep` dans le groupe dédié
+> `rg-certigo-ci-rebuild-drill`, avec `runnerScaleSetName=vmss-certigo-pr-rebuild-drill`,
+> `nsgName=nsg-certigo-pr-rebuild-drill` et des noms et plages réseau neufs. Puis enregistrer
+> avec `-RebuildDrill` :
+>
+> ```powershell
+> .\infra\ci-runner\register-pilot.ps1 `
+>   -SubscriptionId <SUBSCRIPTION_ID> -VmName <DRILL_VM_NAME> -RebuildDrill `
+>   -ResourceGroupName rg-certigo-ci-rebuild-drill `
+>   -ScaleSetName vmss-certigo-pr-rebuild-drill `
+>   -NetworkSecurityGroupName nsg-certigo-pr-rebuild-drill
+> ```
+>
+> Le script remplace l'unique ligne `registration_mode='production'` de `pilot-register.sh`.
+> Le runner s'enregistre alors avec `--no-default-labels --labels certigo-rebuild-drill` :
+> un seul label, qu'aucun workflow ne cible (garde de `validate.sh`), sans `self-hosted`,
+> `Linux` ni `X64`. Garde-fous :
+> - `-RebuildDrill` est refusé hors de ces trois noms ;
+> - sans `-RebuildDrill`, ces noms sont refusés ;
+> - si le runner de la VM (nom = `computerName`) apparaît avec d'autres labels, il est
+>   supprimé côté GitHub avant l'échec.
+>
+> Fin du drill : supprimer le runner (`gh api -X DELETE .../actions/runners/<ID>`), puis le
+> groupe de ressources, et prouver l'absence des deux.
+
 La sortie structurée de `register-pilot.ps1` fournit l'`id` et le `name` GitHub. Avant toute
 activation future du contrôleur, reporter ces deux valeurs avec le nom et l'ID ARM exacts de
 la nouvelle VM dans `inventory.managedRunnerBindings` et `inventory.observedRunnerBindings`,
