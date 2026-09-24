@@ -51,8 +51,13 @@ test('build contract pins original toolchain lineage, image, and every source di
   assert.equal(createHash('sha256').update(baseEvidence).digest('hex'),
     buildContract.reproducibility.baseImageInventory.sha256);
   assert.equal(JSON.parse(baseEvidence).snapshot, buildContract.reproducibility.aptSnapshot);
-  assert.equal(buildContract.reproducibility.aptPackageLockSha256, null);
-  assert.equal(buildContract.reproducibility.flutterEngineArtifactLockSha256, null);
+  for (const [field, file] of [
+    ['aptPackageLockSha256', 'apt-packages.lock.json'],
+    ['flutterEngineArtifactLockSha256', 'flutter-engine-artifacts.lock.json'],
+  ]) {
+    assert.equal(buildContract.reproducibility[field],
+      createHash('sha256').update(await read(file)).digest('hex'), file);
+  }
   assert.equal(attestationPolicy.signerDigest, null);
   assert.equal(attestationPolicy.activation.status, 'blocked');
   assert.equal(attestationPolicy.activation.requiresTwoStageMerge, true);
@@ -628,11 +633,6 @@ test('release evidence requires cold/warm samples, attestations, and exact rollb
   const releaseAttestationPolicy = structuredClone(attestationPolicy);
   releaseBuildContract.policy.reproducibleInputsReady = true;
   releaseBuildContract.reproducibility.status = 'locked';
-  releaseBuildContract.reproducibility.aptSnapshot =
-    'https://snapshot.ubuntu.com/ubuntu/20260830T000000Z';
-  releaseBuildContract.reproducibility.aptPackageLockSha256 = '3'.repeat(64);
-  releaseBuildContract.reproducibility.flutterEngineArtifactLockSha256 =
-    '4'.repeat(64);
   releaseAttestationPolicy.activation.status = 'active';
   releaseAttestationPolicy.signerDigest = 'a'.repeat(40);
   evidence.status = 'validated';
@@ -771,7 +771,7 @@ test('release evidence requires cold/warm samples, attestations, and exact rollb
         targetImageId: evidence.imageBuild.galleryImageVersionId,
       },
     ),
-    /ENOENT.*apt-packages[.]lock[.]json/,
+    /exhaustive offline network input consumption is not implemented/,
   );
   const tampered = structuredClone(whatIf);
   tampered.changes[0].delta[0].after = `${imagePrefix}9.9.9`;

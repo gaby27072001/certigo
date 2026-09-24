@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "baseEvidenceSha256": "a79b48083f5d31ac04b6a0bc850583e085b830df5de51c1e0cd2350f5b118c48",
+  "microsoftKeySha256": "2fa9c05d591a1582a9aba276272478c262e95ad00acf60eaee1644d93941e3c6",
+  "sources": [
+    {
+      "url": "https://snapshot.ubuntu.com/ubuntu/20260807T000000Z/",
+      "suite": "noble",
+      "signer": "F6ECB3762474EDA9D21B7022871920D1991BC93C",
+      "inReleaseSha256": "cdb2f31d809f589719a53c6ad15f255b27569c4059542ada282aaa21b8e164b0",
+      "indexes": [
+        {
+          "path": "dists/noble/main/binary-amd64/Packages.xz",
+          "sha256": "2a6a199e1031a5c279cb346646d594993f35b1c03dd4a82aaa0323980dd92451",
+          "bytes": 1401160
+        },
+        {
+          "path": "dists/noble/restricted/binary-amd64/Packages.xz",
+          "sha256": "aa3f9520f4e46cdcd610c7f0ce9450cda430f20085b028845e95122e9d61680c",
+          "bytes": 93924
+        },
+        {
+          "path": "dists/noble/universe/binary-amd64/Packages.xz",
+          "sha256": "ba9057fa1b91438cc8a1d26808d00c85389fe101d0c1496254df97236405599a",
+          "bytes": 15037908
+        },
+        {
+          "path": "dists/noble/multiverse/binary-amd64/Packages.xz",
+          "sha256": "8080460fe0864ab72bfc2a6d52e76d8c82d55f2cc2188a12f83d6fbe3e1750ea",
+          "bytes": 269224
+        },
+        {
+          "path": "dists/noble/main/binary-arm64/Packages.xz",
+          "sha256": "4a1901e6124fb0a111f5dffc8f5c14474f449e2ecfa71f2eaf0b29917edb53f9",
+          "bytes": 1376632
+        }
+      ]
+    },
+    {
+      "url": "https://snapshot.ubuntu.com/ubuntu/20260807T000000Z/",
+      "suite": "noble-updates",
+      "signer": "F6ECB3762474EDA9D21B7022871920D1991BC93C",
+      "inReleaseSha256": "d32b55bb663124d22d74885b867cc8053ab21465a8a8ca11791989554f2d67ad",
+      "indexes": [
+        {
+          "path": "dists/noble-updates/main/binary-amd64/Packages.xz",
+          "sha256": "65a2fc2993ccd1d559ba0647827c93dba8df2633cb2125777577dc902cc70588",
+          "bytes": 1184488
+        },
+        {
+          "path": "dists/noble-updates/restricted/binary-amd64/Packages.xz",
+          "sha256": "b2d500eed07ca8c0bdb9784a1de0f0365eb576eb23efc5193b26bb45d8570138",
+          "bytes": 1413824
+        },
+        {
+          "path": "dists/noble-updates/universe/binary-amd64/Packages.xz",
+          "sha256": "627d5f51eee5d3e71895f931d821ec499af947978f27b5ad5d64014fc39f692e",
+          "bytes": 1681732
+        },
+        {
+          "path": "dists/noble-updates/multiverse/binary-amd64/Packages.xz",
+          "sha256": "09c1e8caad64ebe92783dcaa8aff88fc42b723d65dbf9b1c0250525fd20f91cf",
+          "bytes": 45372
+        },
+        {
+          "path": "dists/noble-updates/main/binary-arm64/Packages.xz",
+          "sha256": "4bf90ca5e865af473b0270bdda6c8af3980fcd8cae60977d5c4e2ebd51b26b4c",
+          "bytes": 1224556
+        }
+      ]
+    },
+    {
+      "url": "https://snapshot.ubuntu.com/ubuntu/20260807T000000Z/",
+      "suite": "noble-security",
+      "signer": "F6ECB3762474EDA9D21B7022871920D1991BC93C",
+      "inReleaseSha256": "aec9afa2073de34f73aa0366b6f27f59dec33dabed60a16614eb0ca44112b2df",
+      "indexes": [
+        {
+          "path": "dists/noble-security/main/binary-amd64/Packages.xz",
+          "sha256": "9912f85db9aa50105066b15e0b09ca20668c6e2e335c8bab2232ef6ef6483abb",
+          "bytes": 926952
+        },
+        {
+          "path": "dists/noble-security/restricted/binary-amd64/Packages.xz",
+          "sha256": "dd75d6b3492a68375b9af130b56b3c8d93cbdb8571c707774655b18b66f6fa47",
+          "bytes": 1319672
+        },
+        {
+          "path": "dists/noble-security/universe/binary-amd64/Packages.xz",
+          "sha256": "4c41e851d5be1807efdb33d3da9e661d597b9f58e8c0ec2078b2f4e330408163",
+          "bytes": 1199460
+        },
+        {
+          "path": "dists/noble-security/multiverse/binary-amd64/Packages.xz",
+          "sha256": "8e75889eb0413f57b6f543b24f0309c5cb9852cc0e708bd3961839d52d7d1e9b",
+          "bytes": 40304
+        },
+        {
+          "path": "dists/noble-security/main/binary-arm64/Packages.xz",
+          "sha256": "ac4b60d3606ab298a270fe3124a8f3b56f6e4d57ccb1074e43bbe792fd76c0bd",
+          "bytes": 973500
+        }
+      ]
+    },
+    {
+      "url": "https://packages.microsoft.com/repos/azure-cli/",
+      "suite": "noble",
+      "signer": "BC528686B50D79E339D3721CEB3E94ADBE1229CF",
+      "inReleaseSha256": "744634ef1efdf20f26a09ab43d91a35d9ac9f4ed751aaaaa6bc32867759118d0",
+      "indexes": [
+        {
+          "path": "dists/noble/main/binary-amd64/Packages",
+          "sha256": "bb76b7b19465bbcbb61ac646f60154fd885bc977fe6152e4bd102943ff2f9503",
+          "bytes": 22740
+        }
+      ]
+    }
+  ]
+}
