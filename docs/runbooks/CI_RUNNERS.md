@@ -302,6 +302,26 @@ Si, après un `az vm start` et ~1–2 minutes d'attente, un runner reste `offlin
 > [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md). Conduite à tenir : relancer
 > le job, ne rien réinstaller ni reconfigurer sur le runner. Aucune occurrence de ce symptôme
 > n'a encore été observée : c'est un risque déduit.
+>
+> **Prévention, si un workflow doit lancer apt sur un runner PR.** Garder l'appel
+> conditionnel, comme les étapes « Ensure CI prerequisites », qui ne lancent apt que si un
+> outil manque. Et envelopper les **deux commandes exactes** autorisées par le sudoers dans
+> une boucle bornée. `-o DPkg::Lock::Timeout=…` n'est pas utilisable : le sudoers du runner
+> n'autorise que `apt-get update` et `apt-get install -y unzip zip jq xz-utils`, sans aucun
+> autre argument. L'évaluation observée le 2026-09-24 a duré moins d'une minute par instance :
+> 6 essais espacés de 20 s la couvrent.
+>
+> ```bash
+> for attempt in 1 2 3 4 5 6; do
+>   if sudo apt-get update &&
+>     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y unzip zip jq xz-utils; then
+>     break
+>   fi
+>   if [ "${attempt}" -eq 6 ]; then exit 1; fi
+>   echo "apt occupé (essai ${attempt}/6) : nouvel essai dans 20 s"
+>   sleep 20
+> done
+> ```
 
 > 🔐 **Aucun secret en clair.** Ne copiez **jamais** de token d'enregistrement (`--token …`), de PAT ou
 > de secret dans ce runbook, un ticket, un chat ou un commit. Les tokens d'enregistrement de runner sont

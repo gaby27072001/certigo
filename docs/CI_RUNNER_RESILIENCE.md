@@ -602,8 +602,13 @@ ci-dessus), et l'Activity Log ne montre aucun Run Command ce jour-là.
    ([`AptitudePackageManager.py` ligne 51](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/package_managers/AptitudePackageManager.py#L51),
    appelée par [`PatchAssessor.py` ligne 64](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/core_logic/PatchAssessor.py#L64)).
    Un job qui lance `sudo apt-get update` ou `install` au même instant peut échouer sur un
-   verrou APT ou dpkg. C'est un risque déduit : aucune occurrence n'a été observée (voir
-   `runbooks/CI_RUNNERS.md` §7) ;
+   verrou APT ou dpkg. C'est un risque déduit : aucune occurrence n'a été observée. Mesuré le
+   2026-09-24 : les seuls appels apt des jobs sont les étapes « Ensure CI prerequisites »
+   (`ci-mobile.yml` ×3, `ci-cortex-parity.yml` ×1). Elles ne lancent apt que si `unzip`,
+   `zip`, `jq` ou `xz` manque. Sur les runs 35983554193 et 35920190487, les 10 étapes ont
+   affiché « All prerequisites already present. », sans aucune sortie apt. Le risque ne
+   concerne donc qu'un runner auquel il manquerait un outil. Recommandation et extrait prêt
+   à l'emploi dans `runbooks/CI_RUNNERS.md` §7 ;
 2. aucune installation automatique n'a été observée à ce jour. Aucune configuration de
    maintenance n'est assignée. Le 2026-09-24, l'évaluation comptait encore, selon
    l'instance, 35 ou 99 correctifs critiques ou de sécurité en attente. Les journaux APT
