@@ -23,6 +23,7 @@ import platform
 import pwd
 import re
 import shutil
+import signal
 import socket
 import stat
 import struct
@@ -332,13 +333,29 @@ class Installer:
         started = time.monotonic()
         with self.log.open("a", encoding="utf-8") as log:
             log.write(f"\n### {step}: {' '.join(str(a) for a in args)}\n")
-        result = subprocess.run([str(a) for a in args], env=env or self.env(), cwd=cwd,
-                                capture_output=True, text=True, errors="replace",
-                                stdin=subprocess.DEVNULL)
+        process = subprocess.Popen([str(a) for a in args], env=env or self.env(), cwd=cwd,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                   errors="replace", stdin=subprocess.DEVNULL,
+                                   start_new_session=True)
+        attempt = None
+        while True:
+            try:
+                stdout, stderr = process.communicate(timeout=1)
+                break
+            except subprocess.TimeoutExpired:
+                # Watchdog: a tool retrying a refused resolver must not hang the build.
+                attempt = self.network_attempt()
+                if attempt:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    stdout, stderr = process.communicate()
+                    break
+        result = subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
         with self.log.open("a", encoding="utf-8") as log:
             log.write(result.stdout)
             log.write(result.stderr)
         self.timings.append({"step": step, "seconds": round(time.monotonic() - started, 3)})
+        if attempt:
+            raise ValueError(f"Unexpected network attempt during {step}: {attempt}")
         # A network attempt is the reported cause even when the tool then fails.
         self.assert_no_network_attempt(step)
         if check and result.returncode != 0:
@@ -453,18 +470,24 @@ class Installer:
         self_test(sentinel, ipv6)
         self.sentinel = sentinel
 
-    def assert_no_network_attempt(self, step):
+    def network_attempt(self):
+        """Describe the first recorded attempt, or None."""
         if self.sentinel is None:
-            return
+            return None
         events = self.sentinel.snapshot()
         counts = {name: count for name, count in self.sentinel.counters().items() if count}
         if events:
             first = events[0]
             target = first.get("query") or f"{first.get('destination')}:{first.get('port')}"
-            raise ValueError(f"Unexpected network attempt during {step}: "
-                             f"{first['protocol']} {target} ({len(events)} recorded, flows {counts})")
+            return f"{first['protocol']} {target} ({len(events)} recorded, flows {counts})"
         if counts:
-            raise ValueError(f"Unexpected network attempt during {step}: new flows {counts}")
+            return f"new flows {counts}"
+        return None
+
+    def assert_no_network_attempt(self, step):
+        attempt = self.network_attempt()
+        if attempt:
+            raise ValueError(f"Unexpected network attempt during {step}: {attempt}")
 
     # --------------------------------------------------------------------- APT
     def dpkg_state(self):

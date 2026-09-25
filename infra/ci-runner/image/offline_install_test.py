@@ -296,6 +296,30 @@ class InstallerTests(unittest.TestCase):
         self.assertLessEqual(set(base), set(final))
         self.assertEqual(len(set(final) - set(base)), 9)
 
+    @unittest.skipUnless(hasattr(os, "killpg"), "requires POSIX process groups")
+    def test_watchdog_kills_a_step_at_its_first_network_attempt(self):
+        class Sentinel:
+            def __init__(self):
+                self.started = time.monotonic()
+
+            def snapshot(self):
+                if time.monotonic() - self.started > 1:
+                    return [{"protocol": "dns/udp", "destination": "127.0.0.53", "query": "pub.dev"}]
+                return []
+
+            def counters(self):
+                return {"ipv4/udp": 0}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            installer = install_offline.Installer(Path(tmp), Path(tmp), "0" * 64, Path(tmp))
+            installer.sentinel = Sentinel()
+            started = time.monotonic()
+            with self.assertRaisesRegex(ValueError,
+                                        "Unexpected network attempt during retrying: dns/udp pub.dev"):
+                installer.run("retrying", ["sh", "-c", "sleep 60; echo late-output-$((1 + 1))"])
+            self.assertLess(time.monotonic() - started, 20)
+            self.assertNotIn("late-output-2", (Path(tmp) / "install.log").read_text())
+
     def test_precache_and_config_may_only_create_the_lock_file(self):
         installer = self.installer(Path(tempfile.gettempdir()) / "unused", "0" * 64)
         before = {"bin/cache/engine.stamp": ("f", 41, "a"), "bin/cache/linux-sdk.stamp": ("f", 41, "b")}

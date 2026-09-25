@@ -457,11 +457,12 @@ hors ligne et exact. Une URL verrouillee disparue ou modifiee fait echouer
 l'acquisition (`Download failed`, `Digest mismatch`), sans substitution.
 
 Sentinelle : l'installateur ajoute des routes AnyIP (`local 0.0.0.0/0`, et
-`::/0` si IPv6 existe) sur `lo`, puis ecoute DNS UDP/TCP 53 et TCP 22, 80, 443,
-9418 et 11371. Une tentative est enregistree et fait echouer l'etape qui l'a
-provoquee, avant son code de retour. Un auto-test DNS et TCP prouve la sentinelle
-au demarrage. Hors de ces ports, une connexion echoue quand meme (aucune route
-externe) mais n'est pas nommee.
+`::/0` si IPv6 existe) sur `lo`, ecoute DNS UDP/TCP 53 et TCP 22, 80, 443, 9418 et
+11371 pour **nommer** les tentatives, et compte **toute** nouvelle connexion
+IPv4/IPv6 (TCP, UDP dont QUIC, ICMP, autres protocoles) par des compteurs
+conntrack `NEW` sur `OUTPUT` dans le namespace. Apres chaque commande, un nom ou
+un compteur non nul fait echouer l'etape, avant son code de retour. Un auto-test
+(DNS, TCP 443, UDP 4433 en IPv4 et IPv6) prouve noms et compteurs au demarrage.
 
 | Resolveur du chemin image | Traitement |
 | --- | --- |
@@ -549,10 +550,19 @@ mais le prive de tout effet, puis **verifie** au boot et a chaque job :
    regenere les sources que si ce drapeau est faux (`cc_apt_configure.py` l. 149);
    `package_update` et `package_upgrade` a `false`;
 4. aucun snap : l'installateur refuse des le preflight un snap installe ou seede;
-5. `validate-toolchain.sh --boot|--job` compare l'etat dpkg complet (paquet,
-   architecture, version, etat) a `dpkg-state.tsv` atteste par `attestation.json`,
-   et refuse une source APT, un `APT::Periodic` actif ou une unite demasquee.
-   Toute derive empeche le demarrage du runner ou l'admission du job.
+5. `validate-toolchain.sh --boot|--job`, avant l'inventaire : etat dpkg complet
+   (paquet, architecture, version, etat) egal a `dpkg-state.tsv` atteste par
+   `attestation.json`; aucune source (`apt-get indextargets --no-release-info`,
+   qui voit aussi une source dont le Release n'a jamais ete telecharge, et
+   `sources.list.d` vide); `APT::Periodic` a `0`; unites masquees; aucun snap
+   installe ou seede. `/etc/apt` et `/etc/cloud/cloud.cfg.d` sont en outre des
+   racines completes de l'inventaire. Toute derive empeche le demarrage du runner
+   ou l'admission du job.
+
+La validation n'instancie jamais Azure CLI (defaut 2) : elle compare la version du
+paquet dpkg et importe hors ligne `azure.cli.core.__version__`. Ses sondes tournent
+en mode bot, sans analytics ni telemetrie .NET. Dans AIB, la validation in-VM
+s'execute sous `unshare --net`.
 
 Rien n'est change cote Azure. Non couvert, par confiance dans la plateforme :
 l'agent Azure et les extensions sous `/var/lib/waagent` tournent en root; une
@@ -573,10 +583,9 @@ par dpkg.
    `check_connectivity`, soit un HEAD vers `azcliprod.blob.core.windows.net`.
    `AZURE_CORE_COLLECT_TELEMETRY=false` n'y change rien : la sentinelle a compte
    8 requetes DNS pour un seul `az version`. Le bootstrap legacy le declenchait
-   via `az version`. Corrige pendant l'installation : cache amorce hors ligne par
-   `_get_local_versions` d'Azure CLI dans un `AZURE_CONFIG_DIR` prive. A
-   l'execution, la validation de boot le declenche encore, reseau present, sans
-   ecriture de paquet.
+   via `az version`, et la validation de boot aussi. Corrige : pendant
+   l'installation, cache amorce hors ligne par `_get_local_versions` d'Azure CLI
+   dans un `AZURE_CONFIG_DIR` prive; la validation n'instancie plus Azure CLI.
 3. **Cout de l'inventaire.** L'ancien `inventory-toolchain.sh` lancait trois
    processus par fichier sur des dizaines de milliers de fichiers, au boot **et** a
    chaque job. Reecrit en lot, au meme format, avec un refus explicite des noms a
@@ -602,9 +611,14 @@ par dpkg.
    reecrit `bin/cache/engine.stamp` et `engine.realm` a **chaque** appel de
    `flutter` ou `dart`. Mesure : avec `bin/cache` en lecture seule, un utilisateur
    non root sort en « Permission denied », exit 1; root reussit. Le scellement
-   (`chmod -R a-w`, herite du prewarm) rend donc Flutter inutilisable par le
-   runner. C'est un defaut d'execution du canari, hors des points 1 a 3 : il
-   demande une decision de conception separee.
+   (`chmod -R a-w`, herite du prewarm) rend donc Flutter et Dart inutilisables par
+   le runner, et le hook de job, qui sonde `flutter --version` sous `runner`,
+   refuserait tous les jobs. **Defaut bloquant l'execution** : aucune garde ne
+   sera levee avant sa correction. Decision du 25/09 (option 1) : une PR separee
+   apres celle-ci fournira une copie de travail par job, a la demande (wrapper qui
+   la cree sur le disque temporaire au premier appel de `flutter`/`dart`),
+   detruite par `job-temp.sh`; le SDK atteste ne sera jamais ecrit, et `--job` ne
+   l'executera plus. Le banc garde ces sondes en rouge, avec leur raison exacte.
 
 ### Rejouer le consommateur sans modifier un runner
 
