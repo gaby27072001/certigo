@@ -293,6 +293,20 @@ test('identical findings in one file get distinct occurrences and duplicates col
   assert.equal(findings[0].fingerprint, findings[1].fingerprint);
 });
 
+test('a match nested in another match of the same rule is reported once', () => {
+  const rules = catalog();
+  const source = 'debugPrint(session.accessToken);\n';
+  const base = validateSemgrepOutput(output(), { targets, catalog: rules }).results[0];
+  const outer = { ...base, start: { line: 1, col: 12, offset: 11 }, end: { line: 1, col: 31, offset: 30 } };
+  const inner = { ...base, start: { line: 1, col: 12, offset: 11 }, end: { line: 1, col: 19, offset: 18 } };
+  const otherRule = { ...inner, rule: 'dart-sample-secret' };
+  const findings = buildFindings([inner, outer, otherRule], () => source, rules);
+  assert.deepEqual(
+    findings.map((finding) => [finding.rule, finding.start.offset, finding.end.offset]),
+    [['dart-sample-secret', 11, 18], ['dart-sample-logged', 11, 30]],
+  );
+});
+
 test('baseline entries must be dated, justified, unique and name known rules', () => {
   const rules = catalog();
   const baseline = { schema: BASELINE_SCHEMA, entries: [entry()] };

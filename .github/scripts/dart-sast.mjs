@@ -470,7 +470,15 @@ export function buildFindings(results, readSource, catalog) {
       unique.set(key, result);
     }
   }
-  const sorted = [...unique.values()].sort((left, right) => (
+  // One expression, one finding: `session.accessToken` must not also report `session`.
+  const outermost = [...unique.values()].filter((inner) => ![...unique.values()].some((outer) => (
+    outer !== inner
+    && outer.rule === inner.rule
+    && outer.path === inner.path
+    && outer.start.offset <= inner.start.offset
+    && inner.end.offset <= outer.end.offset
+  )));
+  const sorted = outermost.sort((left, right) => (
     left.path.localeCompare(right.path)
     || left.start.offset - right.start.offset
     || left.end.offset - right.end.offset
@@ -631,7 +639,7 @@ export function renderSummary({ label, targets, findings, comparison, problems, 
   const lines = [
     `## Dart/Flutter SAST — ${escapeMarkdown(label)}`,
     '',
-    `- Engine: Semgrep Community Edition ${escapeMarkdown(version)} (rules, scope and baseline from the base SHA)`,
+    `- Engine: Semgrep Community Edition ${escapeMarkdown(version)}`,
     `- Targets analysed: **${targets.length}**`,
     `- Findings: **${findings.length}** — baselined **${comparison.accepted.length}**, new **${comparison.fresh.length}**`,
     `- Stale baseline entries: **${comparison.stale.length}**`,
