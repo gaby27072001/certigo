@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Fixture for .github/sast/rules/mobile-platform.yaml: risky iOS settings. -->
+<plist version="1.0">
+<dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<!-- ruleid: mobile-ios-custom-url-scheme -->
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>certigo</string>
+			</array>
+		</dict>
+	</array>
+	<!-- ruleid: mobile-ios-flutter-deep-linking-enabled -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- ruleid: mobile-ios-ats-disabled -->
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>legacy.certigo.example</key>
+			<dict>
+				<!-- ruleid: mobile-ios-ats-disabled -->
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

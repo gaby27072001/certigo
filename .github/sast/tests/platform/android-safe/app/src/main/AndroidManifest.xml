@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fixture for .github/sast/rules/mobile-platform.yaml: the hardened counterpart. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ok: mobile-android-backup-enabled, mobile-android-debuggable, mobile-android-cleartext-traffic -->
+    <application
+        android:label="Fixture"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false">
+        <activity android:name=".MainActivity" android:exported="true">
+            <!-- ok: mobile-android-app-link-unverified -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <!-- ok: mobile-android-custom-scheme -->
+                <data android:scheme="https" android:host="links.certigo.example"/>
+            </intent-filter>
+        </activity>
+    </application>
+    <!-- ok: mobile-android-backup-enabled -->
+    <application android:dataExtractionRules="@xml/data_extraction_rules" android:fullBackupContent="@xml/backup_rules"/>
+</manifest>

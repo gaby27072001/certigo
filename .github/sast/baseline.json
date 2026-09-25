@@ -1,0 +1,16 @@
+{
+  "_comment": "Reviewed Dart/Flutter SAST findings accepted on main. Read from the pull request BASE SHA only: a pull request can never accept its own finding. Every entry is dated and justified; see docs/runbooks/DART_SAST.md.",
+  "schema": "certigo.dart-sast-baseline/v1",
+  "entries": [
+    {
+      "rule": "mobile-ios-custom-url-scheme",
+      "path": "apps/mobile/ios/Runner/Info.plist",
+      "fingerprint": "sha256:ae2a5c28af73ee7bf54cd16d7545a24cbd5a35ad9e310107bd4d9a7653f62087",
+      "occurrence": 1,
+      "classification": "accepted-risk",
+      "reviewedAt": "2026-09-25",
+      "justification": "Le schéma certigo:// est requis par le retour OIDC (ENTRA_REDIRECT_URI, verrouillé par apps/mobile/test/deep_link_config_test.dart). Inventaire du 2026-09-25 : ce retour ne passe pas par le routeur Flutter (iOS : ASWebAuthenticationSession ; Android : RedirectUriReceiverActivity d'AppAuth, MainActivity n'a aucun intent-filter VIEW) ; aucun lien universel ; le seul lien entrant produit par l'app est le lien de partage certigo://home?ref=…&share=… (daily_share_screen.dart), dont les paramètres ne sont pas lus ; les liens de notification passent par la liste blanche exacte notificationDestination. Risque résiduel accepté : sur iOS, Flutter 3.27 et plus pousse vers le routeur tout lien certigo:// ouvert par un tiers, donc n'importe quelle route, dont /account/delete (qui exige encore une réauthentification). Les identifiants de chemin d'API sont encodés et les segments . et .. refusés (PR #556).",
+      "revisitWhen": "Un schéma est ajouté ou retiré (nouvelle empreinte), FlutterDeepLinkingEnabled change, la garde des liens entrants (liste blanche de routes, en préparation, test iPhone requis) est fusionnée ou retirée, ou une route sensible devient ouvrable sans confirmation."
+    }
+  ]
+}

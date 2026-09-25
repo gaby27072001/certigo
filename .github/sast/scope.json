@@ -1,0 +1,34 @@
+{
+  "schema": "certigo.dart-sast-scope/v1",
+  "roots": [
+    "apps/mobile",
+    "packages"
+  ],
+  "everywhereExtensions": [
+    ".dart"
+  ],
+  "excludePrefixes": [
+    ".github/sast/tests/"
+  ],
+  "binaryExtensions": [
+    ".cer",
+    ".eot",
+    ".gif",
+    ".ico",
+    ".jar",
+    ".jpeg",
+    ".jpg",
+    ".jks",
+    ".keystore",
+    ".otf",
+    ".p12",
+    ".pdf",
+    ".pfx",
+    ".png",
+    ".ttf",
+    ".webp",
+    ".woff",
+    ".woff2",
+    ".zip"
+  ]
+}

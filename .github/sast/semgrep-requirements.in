@@ -1,0 +1,6 @@
+# Semgrep Community Edition for the Dart/Flutter SAST gate (docs/runbooks/DART_SAST.md).
+# Regenerate the hash-locked closure with:
+#   uv pip compile --python 3.12 --python-platform x86_64-manylinux_2_17 --generate-hashes \
+#     --no-emit-index-url --no-emit-find-links \
+#     --output-file .github/sast/semgrep-requirements.lock .github/sast/semgrep-requirements.in
+semgrep==1.178.0
