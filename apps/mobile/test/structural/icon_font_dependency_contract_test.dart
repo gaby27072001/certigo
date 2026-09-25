@@ -72,14 +72,49 @@ void main() {
     final String iosRelease = File('../../.github/workflows/release-ios.yml').readAsStringSync();
     final String codemagic = File('../../codemagic.yaml').readAsStringSync();
 
-    expect(ciMobile, contains('FLUTTER_VERSION: "3.44.4"'));
+    final RegExpMatch? mobileFlutterMatch =
+        RegExp(r'FLUTTER_VERSION: "([^"]+)"').firstMatch(ciMobile);
+    expect(mobileFlutterMatch, isNotNull);
+    final String referenceFlutterVersion = mobileFlutterMatch!.group(1)!;
+
+    expect(referenceFlutterVersion, '3.44.4');
+    expect(ciMobile, contains('FLUTTER_VERSION: "$referenceFlutterVersion"'));
     expect(ciMobile, contains('sdk: "3.12.2"'));
     expect(ciMobile, isNot(contains('FLUTTER_VERSION: "3.27.4"')));
     expect(ciMobile, isNot(contains('FLUTTER_VERSION: "3.44.5"')));
     expect(cortexParity, contains('sdk: "3.12.2"'));
-    expect(androidRelease, contains('FLUTTER_VERSION: "3.44.4"'));
-    expect(iosRelease, contains('FLUTTER_VERSION: "3.44.4"'));
-    expect('flutter: 3.44.4'.allMatches(codemagic), hasLength(3));
+    expect(androidRelease, contains('FLUTTER_VERSION: "$referenceFlutterVersion"'));
+    expect(iosRelease, contains('FLUTTER_VERSION: "$referenceFlutterVersion"'));
+
+    final Iterable<RegExpMatch> codemagicFlutterPins = RegExp(
+      r'^[ \t]+flutter:[ \t]*([^\s#]+)',
+      multiLine: true,
+    ).allMatches(codemagic);
+    final List<String> codemagicFlutterVersions =
+        codemagicFlutterPins.map((RegExpMatch match) => match.group(1)!).toList(growable: false);
+    expect(codemagicFlutterVersions, isNotEmpty);
+    expect(
+      codemagicFlutterVersions.where((String version) => version != referenceFlutterVersion),
+      isEmpty,
+      reason: 'All codemagic.yaml flutter pins must match $referenceFlutterVersion',
+    );
+    expect(
+      codemagicFlutterVersions,
+      everyElement(referenceFlutterVersion),
+    );
+
+    for (final String workflow in <String>[
+      'ios-release',
+      'ios-release-dry',
+      'ios-crash-smoke',
+    ]) {
+      final RegExpMatch? workflowBlock = RegExp(
+        '^  $workflow:\\n(?<body>(?: {4}.+\\n|\\s*\\n)+)',
+        multiLine: true,
+      ).firstMatch(codemagic);
+      expect(workflowBlock, isNotNull, reason: '$workflow must stay defined in codemagic.yaml');
+      expect(workflowBlock!.namedGroup('body'), contains('flutter: $referenceFlutterVersion'));
+    }
   });
 
   test('PR CI cannot access Sentry symbol upload credentials or commands', () {

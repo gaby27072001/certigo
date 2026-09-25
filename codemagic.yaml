@@ -241,6 +241,104 @@ definitions:
 workflows:
 
   # ===========================================================================
+  # mobile-integration-android : RELEASE_MOBILE §8 runtime-content integration
+  # tests on a Codemagic Linux Android emulator. Trigger: push to
+  # integration-tests/* only. No secrets, no signing, no publishing.
+  # ===========================================================================
+  mobile-integration-android:
+    name: Mobile integration tests - Android emulator
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      flutter: 3.44.4
+    cache: *cache
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: integration-tests/*
+          include: true
+      cancel_previous_builds: true
+    scripts:
+      - *step_pub_get
+      - name: Run Flutter integration tests on Android emulator
+        script: |
+          set -euo pipefail
+          flutter emulators
+          flutter emulators --launch emulator &
+          adb wait-for-device
+          until [ "$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do
+            sleep 2
+          done
+          adb -s emulator-5554 shell input keyevent 82 || true
+          flutter test integration_test -d emulator-5554
+        working_directory: apps/mobile
+
+  # ===========================================================================
+  # mobile-integration-ios : RELEASE_MOBILE §8 runtime-content integration tests
+  # on a Codemagic iOS simulator. Trigger: push to integration-tests/* only.
+  # No secrets, no signing, no publishing.
+  # ===========================================================================
+  mobile-integration-ios:
+    name: Mobile integration tests - iOS simulator
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: 3.44.4
+      # Epingle a 26.6 : voir la note Xcode complete du workflow ios-release
+      # ci-dessous (issue #461). Ne PAS remettre `latest` avant sa cloture.
+      xcode: "26.6"
+    cache: *cache
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: integration-tests/*
+          include: true
+      cancel_previous_builds: true
+    scripts:
+      - *step_pub_get
+      - name: Run Flutter integration tests on iOS simulator
+        script: |
+          set -euo pipefail
+          TEST_DEVICE="$(
+            python3 - <<'PY'
+          import json
+          import subprocess
+
+          runtimes = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "runtimes", "--json"]))
+          ios_runtimes = [
+              runtime["identifier"]
+              for runtime in runtimes["runtimes"]
+              if runtime.get("platform") == "iOS" and runtime.get("isAvailable", False)
+          ]
+          if not ios_runtimes:
+              raise SystemExit("No available iOS simulator runtime found")
+          runtime = ios_runtimes[-1]
+
+          device_types = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devicetypes", "--json"]))
+          identifiers = [device["identifier"] for device in device_types["devicetypes"]]
+          preferred = "com.apple.CoreSimulator.SimDeviceType.iPhone-16"
+          device_type = preferred if preferred in identifiers else next(
+              identifier for identifier in identifiers if ".iPhone-" in identifier
+          )
+
+          print(subprocess.check_output([
+              "xcrun",
+              "simctl",
+              "create",
+              "certigo-integration-test",
+              device_type,
+              runtime,
+          ]).decode().strip())
+          PY
+          )"
+          xcrun simctl boot "$TEST_DEVICE"
+          xcrun simctl bootstatus "$TEST_DEVICE" -b
+          flutter test integration_test -d "$TEST_DEVICE"
+        working_directory: apps/mobile
+
+  # ===========================================================================
   # ios-release : signed IPA + TestFlight upload. Trigger: git tag v*.
   # Production config (CERTIGO_ENV=prod, PROD_API_BASE_URL from the var group).
   # ===========================================================================
