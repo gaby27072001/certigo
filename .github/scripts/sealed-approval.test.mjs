@@ -19,6 +19,7 @@ import {
   validateSealedApprovals,
   verifySshSignature,
 } from './sealed-approval.mjs';
+import { importApproval } from './import-sealed-approval.mjs';
 
 // Ces tests tournent sur l'arbre de `main` à chaque PR : ils n'utilisent ni la clé enrôlée sur
 // `main`, ni la date du jour. Les vecteurs de fixtures/sealed-approval/ ont été produits par le vrai
@@ -329,6 +330,35 @@ test('every approved protected path must be changed exactly as approved, and eac
       change,
     ]));
     assert.deepEqual(judge(trees).errors, []);
+  });
+});
+
+test('imports a pasted approval, writes it once, and replays the CI judgement', () => {
+  withTrees((trees) => {
+    const key = makeKey();
+    setup(trees, key);
+    trees.write(trees.candidate, sealed, 'version: 2\n');
+    const change = { path: sealed, from: digest('version: 1\n'), to: digest('version: 2\n') };
+    const block = approval(key, [change]);
+    const comment = `Voici mon approbation :\r\n\r\n${block.replace(/\n/gu, '\r\n')}\r\nMerci`;
+
+    const imported = importApproval({ text: comment, pr: 12, candidateRoot: trees.candidate, trustedRoot: trees.base, now });
+    assert.equal(imported.relativePath, `${approvalsDirectory}/pr-12.approval`);
+    assert.deepEqual(imported.errors, []);
+    assert.equal(imported.approved[0].principal, 'gabriel@certigo-approval');
+    assert.equal(fs.readFileSync(path.join(trees.candidate, ...imported.relativePath.split('/')), 'utf8'), block);
+
+    // Réimporter le même bloc est sans effet ; un bloc différent n'écrase jamais l'existant.
+    assert.deepEqual(importApproval({ text: block, pr: 12, candidateRoot: trees.candidate, trustedRoot: trees.base, now }).errors, []);
+    assert.throws(
+      () => importApproval({ text: approval(key, [change], { expires: '2026-10-03' }), pr: 12, candidateRoot: trees.candidate, trustedRoot: trees.base, now }),
+      /already holds a different approval/,
+    );
+    assert.throws(() => importApproval({ text: block, pr: '12; rm', candidateRoot: trees.candidate, trustedRoot: trees.base, now }), /invalid pull request number/);
+
+    // Le rejeu local signale ce que la CI refusera : ici, une approbation d'une autre clé.
+    const rogue = importApproval({ text: approval(makeKey(), [change]), pr: 13, candidateRoot: trees.candidate, trustedRoot: trees.base, now });
+    assert.match(rogue.errors.join('\n'), /not an enrolled approver/);
   });
 });
 
