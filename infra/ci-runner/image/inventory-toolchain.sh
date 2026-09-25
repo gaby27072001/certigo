@@ -12,8 +12,17 @@ runner_home="${CERTIGO_RUNNER_HOME:-/opt/actions-runner}"
 azure_cli_root="${CERTIGO_AZURE_CLI_ROOT:-/opt/az}"
 roots=("${toolchain_root}" "${runner_home}" "${azure_cli_root}")
 entries=(
+  /etc/apt/apt.conf.d/20auto-upgrades
+  /etc/apt/apt.conf.d/99certigo-immutable-image
+  /etc/apt/sources.list
+  /etc/cloud/cloud.cfg.d/99-certigo-immutable-image.cfg
+  /etc/systemd/system/apt-daily-upgrade.service
+  /etc/systemd/system/apt-daily-upgrade.timer
+  /etc/systemd/system/apt-daily.service
+  /etc/systemd/system/apt-daily.timer
   /etc/systemd/system/certigo-job-temp-mount.service
   /etc/systemd/system/certigo-toolchain-validate.service
+  /etc/systemd/system/unattended-upgrades.service
   /usr/bin/az
   /usr/lib/systemd/system-generators/certigo-toolchain-guard
   /usr/local/bin/actionlint

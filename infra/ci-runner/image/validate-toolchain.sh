@@ -152,6 +152,40 @@ cmp --silent "${toolchain_inventory}" "${current_inventory}" ||
 rm -f "${current_inventory}"
 trap - EXIT
 
+# Guest patching (#341): the platform patch extension and unattended-upgrades
+# may install packages after boot. The image has no remote APT source, so they
+# resolve nothing; any package drift still fails closed here.
+dpkg_state="${image_root}/dpkg-state.tsv"
+[[ -r "${dpkg_state}" ]] || fail "missing attested package state"
+expected_dpkg_sha="$(jq -er '.dpkgStateSha256' "${attestation}")" ||
+  fail "attestation does not pin the package state"
+[[ "$(sha256sum "${dpkg_state}" | awk '{print $1}')" == "${expected_dpkg_sha}" ]] ||
+  fail "attested package state hash mismatch"
+current_dpkg="$(mktemp)"
+trap 'rm -f "${current_dpkg}"' EXIT
+dpkg-query -W -f='${Package}:${Architecture}\t${Version}\t${db:Status-Abbrev}\n' |
+  sed 's/[[:space:]]*$//' | LC_ALL=C sort >"${current_dpkg}" ||
+  fail "cannot read the installed package set"
+cmp --silent "${dpkg_state}" "${current_dpkg}" ||
+  fail "installed package set differs from the attested image"
+rm -f "${current_dpkg}"
+trap - EXIT
+apt_targets="$(apt-get indextargets --format '$(URI)')" || fail "cannot read APT sources"
+[[ -z "${apt_targets}" ]] || fail "a remote APT source is configured"
+for key in APT::Periodic::Update-Package-Lists APT::Periodic::Unattended-Upgrade; do
+  value="$(
+    apt-config dump | awk -v key="${key}" '$1 == key { value = $2 } END { gsub(/[";]/, "", value); print value }'
+  )"
+  [[ "${value}" == "0" ]] || fail "${key} is not disabled"
+done
+for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service \
+  apt-daily-upgrade.service unattended-upgrades.service; do
+  [[ "$(readlink "/etc/systemd/system/${unit}")" == /dev/null ]] || fail "${unit} is not masked"
+done
+if compgen -G '/var/lib/snapd/snaps/*.snap' >/dev/null; then
+  fail "a snap package is installed and would refresh itself"
+fi
+
 if [[ -f "${runner_home}/.runner" ]]; then
   state_seal="/etc/certigo-runner-state.sha256"
   [[ -r "${state_seal}" ]] || fail "registered runner state is not sealed"

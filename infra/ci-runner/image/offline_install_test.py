@@ -1,0 +1,310 @@
+"""Tests of the offline image installer, its closed artifact set and wheel lock (#341).
+
+The short tests run everywhere without root, network or large inputs. The
+execution tests rebuild nothing: they need a harness base produced by
+`offline_harness.py build-base` and the acquired closed store, and run the
+real installer as root in an empty network namespace through qemu-user.
+"""
+
+import copy
+import hashlib
+import io
+import json
+import os
+import shutil
+import socket
+import struct
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+import urllib.request
+from pathlib import Path
+from unittest import mock
+
+import image_artifacts
+import install_offline
+import lock_python
+from lock_inputs import ROOT, file_hash, read_json, write_json
+
+REPOSITORY = ROOT.parents[2]
+
+
+def small_item(name, content, kind="deb", size=True):
+    digest = hashlib.sha256(content).hexdigest()
+    return image_artifacts._artifact(kind, name, f"https://example.invalid/{name}", "sha256",
+                                     digest, len(content) if size else None, f"{name}.deb")
+
+
+class ClosedSetTests(unittest.TestCase):
+    def test_closed_set_is_exactly_the_non_bundled_locked_artifacts(self):
+        items = image_artifacts.closed_set()
+        kinds = {kind: sum(item["kind"] == kind for item in items)
+                 for kind in ("toolchain", "deb", "pub", "wheel")}
+        self.assertEqual(kinds, {"toolchain": 7, "deb": 9, "pub": 102, "wheel": 94})
+        self.assertEqual(len(items), 212)
+        flutter = read_json(ROOT / "flutter-engine-artifacts.lock.json")
+        bundled = {a["url"] for a in flutter["artifacts"] if a["cacheState"] == "bundled-current"}
+        self.assertEqual(len(bundled), 12)
+        self.assertFalse(bundled & {item["url"] for item in items})
+        for item in items:
+            self.assertTrue(item["url"].startswith("https://"), item["id"])
+        apt = read_json(ROOT / "apt-packages.lock.json")
+        self.assertEqual({i["id"] for i in items if i["kind"] == "deb"},
+                         {p["package"] for p in apt["packages"]})
+
+    def test_store_must_equal_the_closed_set(self):
+        items = [small_item("a", b"alpha"), small_item("b", b"bravo", size=False)]
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp)
+            for item, content in zip(items, (b"alpha", b"bravo")):
+                (store / image_artifacts.store_name(item)).write_bytes(content)
+            image_artifacts.verify_store(store, items)
+            first = store / image_artifacts.store_name(items[0])
+            cases = {
+                "addition": (lambda: (store / "extra").write_bytes(b"x"),
+                             lambda: (store / "extra").unlink(),
+                             "Unexpected file in the closed artifact store: extra"),
+                "alteration": (lambda: first.write_bytes(b"alphX"),
+                               lambda: first.write_bytes(b"alpha"), "Digest mismatch for deb:a"),
+                "resize": (lambda: first.write_bytes(b"alpha!"),
+                           lambda: first.write_bytes(b"alpha"), "Size mismatch for deb:a"),
+                "omission": (lambda: first.unlink(),
+                             lambda: first.write_bytes(b"alpha"), "Missing artifact deb:a"),
+            }
+            for name, (mutate, restore, message) in cases.items():
+                with self.subTest(mutation=name):
+                    mutate()
+                    with self.assertRaisesRegex(ValueError, message):
+                        image_artifacts.verify_store(store, items)
+                    restore()
+            target = store / "real"
+            first.rename(target)
+            first.symlink_to(target)
+            with self.assertRaisesRegex(ValueError, "Unexpected file|not a regular file"):
+                image_artifacts.verify_store(store, items)
+
+    def test_only_the_github_release_asset_hop_is_followed(self):
+        handler = image_artifacts.GithubReleaseRedirect()
+        release = "https://github.com/actions/runner/releases/download/v2.336.0/runner.tar.gz"
+
+        def attempt(source, target):
+            request = urllib.request.Request(source)
+            return handler.redirect_request(request, io.BytesIO(), 302, "Found", {}, target)
+
+        self.assertIsNotNone(attempt(release, "https://release-assets.githubusercontent.com/x?sig=1"))
+        for source, target in (
+            (release, "https://evil.invalid/runner.tar.gz"),
+            (release, "http://release-assets.githubusercontent.com/x"),
+            (release, "https://release-assets.githubusercontent.com:8443/x"),
+            ("https://github.com/actions/runner/archive/main.tar.gz",
+             "https://release-assets.githubusercontent.com/x"),
+            ("https://pub.dev/api/archives/args-2.7.0.tar.gz", "https://storage.googleapis.com/x"),
+            ("https://snapshot.ubuntu.com/ubuntu/x.deb", "https://archive.ubuntu.com/ubuntu/x.deb"),
+        ):
+            with self.subTest(source=source, target=target):
+                with self.assertRaisesRegex(ValueError, "Unexpected redirect"):
+                    attempt(source, target)
+
+    def test_proxy_environment_cannot_redirect_acquisition(self):
+        with mock.patch.dict(os.environ, {"https_proxy": "http://proxy.invalid:3128",
+                                          "HTTPS_PROXY": "http://proxy.invalid:3128"}):
+            handlers = image_artifacts.opener().handlers
+        proxies = [h for h in handlers if isinstance(h, urllib.request.ProxyHandler)]
+        self.assertEqual([h.proxies for h in proxies], [{}])
+
+    def test_fetch_publishes_only_verified_bytes(self):
+        class Response(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self.close()
+
+        payload = b"verified-bytes"
+        item = small_item("fetched", payload)
+        for served, message in ((payload, None), (payload + b"!", "Size mismatch"),
+                                (b"x" * len(payload), "Digest mismatch")):
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as tmp:
+                fake = mock.Mock()
+                fake.open.return_value = Response(served)
+                with mock.patch.object(image_artifacts, "opener", return_value=fake):
+                    if message is None:
+                        self.assertEqual(image_artifacts.fetch(item, tmp), "fetched")
+                        self.assertEqual((Path(tmp) / image_artifacts.store_name(item)).read_bytes(),
+                                         payload)
+                    else:
+                        with self.assertRaisesRegex(ValueError, message):
+                            image_artifacts.fetch(item, tmp)
+                        self.assertEqual(os.listdir(tmp), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / image_artifacts.store_name(item)).write_bytes(b"tampered")
+            with self.assertRaisesRegex(ValueError, "Existing store entry is altered"):
+                image_artifacts.fetch(item, tmp)
+
+
+class WheelLockTests(unittest.TestCase):
+    def test_committed_lock_reranks_offline(self):
+        lock = lock_python.verify()
+        self.assertEqual(len(lock["wheels"]), 94)
+        self.assertTrue(all(w["filename"].endswith(".whl") for w in lock["wheels"]))
+
+    def test_mutations_fail_for_their_reason(self):
+        original = read_json(lock_python.LOCK)
+        mutations = {
+            "omission": (lambda lock: lock["wheels"].pop(), "omission or addition"),
+            "addition": (lambda lock: lock["wheels"].append(copy.deepcopy(lock["wheels"][0])),
+                         "omission or addition"),
+            "redirection": (lambda lock: lock["wheels"][0].update(
+                url="https://example.invalid/" + lock["wheels"][0]["filename"]),
+                "Unexpected wheel origin"),
+            "alteration": (lambda lock: lock["wheels"][0].update(sha256="a" * 64),
+                           "Unauthorized artifact hash|best-ranked"),
+            "stale": (lambda lock: lock.update(requirementsSha256="b" * 64),
+                      "requirements lock changed"),
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            for name, (mutate, message) in mutations.items():
+                with self.subTest(mutation=name):
+                    changed = copy.deepcopy(original)
+                    mutate(changed)
+                    path = Path(tmp) / f"{name}.json"
+                    write_json(path, changed)
+                    with self.assertRaisesRegex(ValueError, message):
+                        lock_python.verify(path)
+
+    def test_selection_is_pip_ranked_and_never_ambiguous(self):
+        order = {"cp312-cp312-manylinux_2_28_x86_64": 0, "cp312-cp312-manylinux_2_17_x86_64": 1,
+                 "py3-none-any": 2}
+        requirement = {"version": "1.0", "hashes": {"a" * 64, "b" * 64, "c" * 64}}
+        candidates = [
+            {"filename": "demo-1.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+             "sha256": "a" * 64, "url": "u", "bytes": 1},
+            {"filename": "demo-1.0-cp312-cp312-manylinux_2_28_x86_64.whl", "sha256": "b" * 64,
+             "url": "u", "bytes": 1},
+            {"filename": "demo-1.0-cp312-cp312-win_amd64.whl", "sha256": "c" * 64,
+             "url": "u", "bytes": 1},
+        ]
+        selected, compatible = lock_python.select("demo", requirement, candidates, order)
+        self.assertEqual(selected["sha256"], "b" * 64)
+        self.assertEqual(len(compatible), 2)
+        twin = dict(candidates[1], filename="demo-1.0-1-cp312-cp312-manylinux_2_28_x86_64.whl",
+                    sha256="c" * 64)
+        with self.assertRaisesRegex(ValueError, "Ambiguous"):
+            lock_python.select("demo", requirement, [candidates[1], twin], order)
+        with self.assertRaisesRegex(ValueError, "Unauthorized"):
+            lock_python.select("demo", {"version": "1.0", "hashes": set()}, candidates, order)
+        with self.assertRaisesRegex(ValueError, "Unparsed or unpinned"):
+            lock_python.requirements("demo>=1.0\n")
+
+
+class SentinelTests(unittest.TestCase):
+    def test_dns_and_tcp_attempts_are_recorded_and_refused(self):
+        sentinel = install_offline.NetworkSentinel()
+        offset = 41000 + os.getpid() % 1000
+        sentinel.start(families=(socket.AF_INET,), port_offset=offset)
+        try:
+            query = (b"\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00" +
+                     b"\x03pub\x03dev\x00\x00\x01\x00\x01")
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
+                udp.settimeout(2)
+                udp.sendto(query, ("127.0.0.1", 53 + offset))
+                reply = udp.recv(512)
+            self.assertEqual(reply[:2], b"\x12\x34")
+            self.assertEqual(struct.unpack("!H", reply[2:4])[0] & 0x000F, 5)
+            with socket.create_connection(("127.0.0.1", 443 + offset), timeout=2):
+                pass
+            for _ in range(50):
+                events = sentinel.snapshot()
+                if len(events) >= 2:
+                    break
+                time.sleep(0.05)
+        finally:
+            events = sentinel.stop()
+        self.assertIn({"protocol": "dns/udp", "destination": "127.0.0.1", "query": "pub.dev"}, events)
+        self.assertIn({"protocol": "tcp", "destination": "127.0.0.1", "port": 443}, events)
+
+    def test_malformed_dns_is_recorded_without_name(self):
+        self.assertIsNone(install_offline.NetworkSentinel.query_name(b"\x00\x01"))
+        self.assertIsNone(install_offline.NetworkSentinel.query_name(b"\x00" * 12 + b"\xc0\x0c"))
+
+
+class InstallerTests(unittest.TestCase):
+    def inputs(self, tmp):
+        contract = read_json(ROOT / "image-build-contract.json")
+        directory = Path(tmp) / "inputs"
+        directory.mkdir()
+        shutil.copyfile(ROOT / "image-build-contract.json", directory / "image-build-contract.json")
+        for item in contract["inputs"]:
+            shutil.copyfile(REPOSITORY / item["path"], directory / item["destination"])
+        return directory
+
+    def installer(self, directory, digest=None):
+        return install_offline.Installer(directory, directory / "store",
+                                         digest or file_hash(directory / "image-build-contract.json"),
+                                         directory.parent)
+
+    def test_inputs_are_closed_and_cross_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = self.inputs(tmp)
+            self.installer(directory).verify_inputs()
+            with self.assertRaisesRegex(ValueError, "template contract digest"):
+                self.installer(directory, "0" * 64).verify_inputs()
+            bootstrap = directory / "bootstrap.sh"
+            original = bootstrap.read_bytes()
+            bootstrap.write_bytes(original + b"\n")
+            with self.assertRaisesRegex(ValueError, "Image input digest mismatch: bootstrap.sh"):
+                self.installer(directory).verify_inputs()
+            bootstrap.unlink()
+            with self.assertRaisesRegex(ValueError, "Missing or non-regular image input: bootstrap.sh"):
+                self.installer(directory).verify_inputs()
+            bootstrap.write_bytes(original)
+            (directory / "unexpected.sh").write_text("exit 0\n")
+            with self.assertRaisesRegex(ValueError, "Unexpected file in the image inputs"):
+                self.installer(directory).verify_inputs()
+
+    def test_resolver_overrides_are_refused_by_name(self):
+        for name in ("https_proxy", "HTTP_PROXY", "PIP_INDEX_URL", "PUB_HOSTED_URL",
+                     "FLUTTER_STORAGE_BASE_URL", "npm_config_registry", "APT_CONFIG",
+                     "GIT_CONFIG_GLOBAL", "NUGET_PACKAGES"):
+            self.assertTrue(install_offline.RESOLVER_OVERRIDES.match(name), name)
+        for name in ("PATH", "HOME", "LANG", "SUDO_USER"):
+            self.assertFalse(install_offline.RESOLVER_OVERRIDES.match(name), name)
+
+    def test_expected_package_states_come_from_the_lock(self):
+        installer = self.installer(Path(tempfile.gettempdir()) / "unused")
+        installer.apt = read_json(ROOT / "apt-packages.lock.json")
+        base = installer.expected_state(False)
+        final = installer.expected_state(True, held={"azure-cli"})
+        self.assertEqual((len(base), len(final)), (656, 665))
+        self.assertIn("azure-cli:amd64\t2.89.0-1~noble\thi", final)
+        self.assertLessEqual(set(base), set(final))
+        self.assertEqual(len(set(final) - set(base)), 9)
+
+    def test_precache_may_only_rewrite_identical_engine_stamps(self):
+        installer = self.installer(Path(tempfile.gettempdir()) / "unused")
+        before = {"bin/cache/engine.stamp": ("f", 41, "a"), "bin/cache/linux-sdk.stamp": ("f", 41, "b")}
+        installer.require_precache_noop(before, dict(before, **{"bin/cache/lockfile": ("f", 0, "c")}))
+        for after, reason in (
+            (dict(before, **{"bin/cache/downloads": ("d",)}), "bin/cache/downloads"),
+            (dict(before, **{"bin/cache/linux-sdk.stamp": ("f", 41, "z")}), "linux-sdk.stamp"),
+            ({"bin/cache/engine.stamp": ("f", 41, "a")}, "linux-sdk.stamp"),
+        ):
+            with self.subTest(reason=reason), self.assertRaisesRegex(ValueError, reason):
+                installer.require_precache_noop(before, after)
+
+
+@unittest.skipUnless(os.environ.get("CERTIGO_OFFLINE_ROOTFS"), "requires the qemu harness base")
+class OfflineExecutionTests(unittest.TestCase):
+    """Real installer runs; see offline_harness.py for the environment."""
+
+    def test_harness(self):
+        command = [sys.executable, str(ROOT / "offline_harness.py"), "run-suite",
+                   "--rootfs", os.environ["CERTIGO_OFFLINE_ROOTFS"],
+                   "--store", os.environ["CERTIGO_OFFLINE_STORE"]]
+        subprocess.run(command, check=True)
+
+
+if __name__ == "__main__":
+    unittest.main()
