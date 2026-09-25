@@ -199,9 +199,6 @@ public sealed class ApiSurfaceContractTests
             .ToArray();
 
         var publicFields = typeof(LessonCheck).GetProperties()
-            .Where(property => property.GetCustomAttributes(typeof(System.Text.Json.Serialization.JsonIgnoreAttribute), false)
-                .Cast<System.Text.Json.Serialization.JsonIgnoreAttribute>()
-                .All(attribute => attribute.Condition != System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull))
             .Select(property => JsonNamingPolicy.CamelCase.ConvertName(property.Name))
             .ToArray();
 
@@ -210,8 +207,14 @@ public sealed class ApiSurfaceContractTests
 
         contractFields.Should().BeEquivalentTo(
             publicFields,
-            "le schema public du contrat doit refleter les champs toujours presents de LessonCheck ; "
-            + "le corrige vit dans LessonAnswerKey, cote serveur, et n'est jamais envoye au client");
+            "le schema public du contrat doit refleter exactement LessonCheck ; le corrige vit "
+            + "dans LessonAnswerKey, cote serveur, et n'est jamais envoye au client");
+
+        // `matches` (colonne droite des matchPairs v5) est facultatif : omis quand il est nul,
+        // pour que les leçons existantes gardent exactement leur forme sur le fil.
+        journey.RootElement.GetProperty("components").GetProperty("schemas").GetProperty("LessonCheck")
+            .GetProperty("required").EnumerateArray().Select(value => value.GetString())
+            .Should().NotContain("matches");
 
         typeof(LessonCheck).GetProperty(nameof(LessonCheck.Matches))
             ?.GetCustomAttributes(typeof(System.Text.Json.Serialization.JsonIgnoreAttribute), false)

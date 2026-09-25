@@ -275,6 +275,11 @@
           "options": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/CheckOption" }
+          },
+          "matches": {
+            "type": "array",
+            "description": "Colonne droite d'un matchPairs (contrat des exercices v5). Absente pour les autres types : le serveur l'omet quand elle est nulle.",
+            "items": { "$ref": "#/components/schemas/CheckOption" }
           }
         },
         "additionalProperties": false
