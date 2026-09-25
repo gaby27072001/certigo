@@ -76,6 +76,18 @@ def run(args, **kwargs):
     return subprocess.run([str(a) for a in args], check=True, **kwargs)
 
 
+def acquire_base(store):
+    """Fetch the 656 reconstructed base archives with the installer's fetch policy."""
+    items = [image_artifacts._artifact("deb", p["package"], p["url"], "sha256", p["sha256"],
+                                       p["bytes"], p["sha256"] + ".deb") for p in base_packages()]
+    store.mkdir(parents=True, exist_ok=True)
+    for item in items:
+        image_artifacts.fetch(item, store)
+    for item in items:
+        checked_file(store / image_artifacts.store_name(item), item["digest"], item["bytes"])
+    print(f"Base archives verified: {len(items)}.")
+
+
 def base_packages():
     lock = read_json(APT_LOCK)
     base = [p for p in lock["snapshotResolvedPackages"] if p["origin"] == "reconstructed-base"]
@@ -531,6 +543,8 @@ def capture_python_tags(rootfs, store, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+    base = sub.add_parser("acquire-base")
+    base.add_argument("--store", type=Path, required=True)
     build = sub.add_parser("build-base")
     build.add_argument("--store", type=Path, required=True)
     build.add_argument("--apt-cache", type=Path, required=True)
@@ -549,7 +563,9 @@ def main():
     suite.add_argument("--legacy-inventory", type=Path,
                        help="Previous inventory-toolchain.sh, compared on the installed image")
     args = parser.parse_args()
-    if args.command == "build-base":
+    if args.command == "acquire-base":
+        acquire_base(args.store.resolve())
+    elif args.command == "build-base":
         build_base(args.store.resolve(), args.apt_cache.resolve(), args.rootfs.resolve())
     elif args.command == "finalize-base":
         finalize_base(args.rootfs.resolve())

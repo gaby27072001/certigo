@@ -1,10 +1,13 @@
 # Image runner immuable
 
 Ce dossier est un livrable **hors deploiement**, dont l'installation reste
-**bloquee**. Les archives principales de la toolchain sont epinglees, mais les
-entrees reseau transitives ne sont pas encore toutes verrouillees. Une attestation
-de fichiers installes ne prouve pas la reproductibilite des telechargements qui
-les ont produits. Les controles de boot prevus refusent un contenu different.
+**bloquee**. Toutes les entrees reseau de l'installation sont desormais
+verrouillees (APT, Flutter/Pub, roues Python, archives de toolchain) et consommees
+par un installateur hors ligne, execute localement sous qemu (voir « Consommateur
+hors ligne »). L'admission reste fermee par les gardes tant que relecture, CI et
+accord explicite ne l'ont pas levee. Une attestation de fichiers installes ne
+prouve pas a elle seule la reproductibilite des telechargements; les controles de
+boot refusent un contenu different.
 
 Il ne modifie aucun VMSS, SKU, capacite, label, binding, identite, route, IP
 publique, acces prive ou automate de lifecycle. `runner.bicep`, `pilot.bicep`, les
@@ -16,22 +19,28 @@ inventaires live et les IDs hors scope ne referencent pas cette image dans PR1.
 - `toolchain-sbom.cyclonedx.document` est le SBOM CycloneDX 1.6 de l'image, y compris
   chaque paquet transitif de l'environnement Python;
 - `toolchain-requirements.lock` verrouille avec hashes tout l'environnement
-  Checkov/PyYAML Python 3.12;
-- `prewarm-toolchain.sh` conserve le futur chemin d'installation des SDK, mais
-  refuse actuellement toute execution avant une ecriture ou un telechargement;
-- `validate-network-inputs.mjs` exige les deux vrais fichiers de lock et leurs
-  empreintes, puis refuse encore l'admission tant que le consommateur hors ligne
-  et ses preuves d'exhaustivite ne sont pas implementes;
+  Checkov/PyYAML Python 3.12; `python-wheels.lock.json` choisit la roue exacte de
+  chaque exigence pour la cible (`lock_python.py`, tags `python-target-tags.txt`);
+- `install_offline.py` est l'installateur hors ligne de l'image; il ne consomme que
+  les entrees verifiees et le store ferme produit par `image_artifacts.py`;
+- `prewarm-toolchain.sh` reste le chemin legacy, epingle par le lock APT : il
+  refuse toute execution avant une ecriture ou un telechargement;
+- `validate-network-inputs.mjs` exige les trois vrais fichiers de lock et leurs
+  empreintes, puis refuse encore l'admission : l'installateur existe mais n'est
+  pas admis;
 - `validate-toolchain.sh --boot` verifie manifest, SBOM, lock, attestation,
-  versions et l'inventaire exhaustif (fichiers, repertoires, liens, modes et
-  hashes) des toolchains, du runner et d'Azure CLI; tout ajout inattendu echoue;
+  versions, l'inventaire exhaustif (fichiers, repertoires, liens, modes et
+  hashes) des toolchains, du runner et d'Azure CLI, et l'etat dpkg atteste; tout
+  ajout inattendu echoue;
 - le generateur systemd ajoute `Requires=certigo-toolchain-validate.service` a
   l'unique service `actions.runner.*`: un mismatch empeche son demarrage;
 - `certigo-job-temp-mount.service` bind-monte le workspace runner reel sur le
   disque temporaire `/mnt/certigo-job`; `job-temp.sh` detruit ensuite workspace
   et caches NuGet/npm/pub/.NET au debut et a la fin de chaque job;
 - `measure-cold-start.sh` emet les timestamps monotoniques validation/runner du
-  futur canari.
+  futur canari;
+- `offline_harness.py` est l'outillage de test local (banc amd64 qemu), jamais une
+  entree de l'image; `transport/` contient les derives `gzip -n -9` embarques.
 
 Le controle d'admission suivant **doit echouer** dans cet etat du depot:
 
@@ -39,9 +48,10 @@ Le controle d'admission suivant **doit echouer** dans cet etat du depot:
 node infra/ci-runner/image/validate-network-inputs.mjs
 ```
 
-Ne pas executer le bootstrap existant pour contourner ce refus. Il reste le
-bootstrap mutable des runners actuels et appelle notamment
-`bin/installdependencies.sh`; il n'est pas un installateur d'image reproductible.
+Ne pas executer le bootstrap existant hors de l'installateur pour contourner ce
+refus. Seul, il reste le bootstrap mutable des runners actuels et appelle
+notamment `bin/installdependencies.sh`. L'installateur hors ligne l'execute
+confine, sans source APT, et ne lance jamais `installdependencies.sh`.
 
 L'image ne doit contenir ni `.runner`, ni token GitHub, ni secret, ni dependance
 du depot. L'enregistrement ulterieur doit copier les variables sans secret de
@@ -114,21 +124,22 @@ PR2 ajoute uniquement des ressources **nouvelles et desactivees par defaut**:
 - le contrat reste fail-closed avec `reproducibleInputsReady=false`: les trois
   Bicep ont aussi un garde de code `networkInstallerImplemented=false`, non
   exposable comme parametre. Ils ne peuvent creer aucune ressource, meme avec
-  `deploymentEnabled=true` et des drapeaux JSON falsifies, tant que
-  le consommateur exhaustif hors ligne et ses preuves ne sont pas implementes.
-  Les locks decrits plus bas ne suffisent pas a lever ce garde. PR2 n'assimile
+  `deploymentEnabled=true` et des drapeaux JSON falsifies, tant que ce garde
+  litteral n'est pas leve apres relecture, CI verte et accord explicite. Les locks
+  et l'installateur hors ligne ne suffisent pas a le lever. PR2 n'assimile
   jamais une version seule a une preuve de reproductibilite;
 - `image-build.bicep` declare la Gallery, la definition et le template Azure VM
   Image Builder. `deploymentEnabled=false` et `autoRun=Disabled`: compiler ou
   deployer le modele sans parametre explicite ne construit rien;
 - le build utilise une identite user-assigned dediee uniquement pour ecrire la
   nouvelle version Gallery. Cette identite n'entre pas dans l'image. Les
-  sources viennent du commit exact, AIB reverifie chaque hash, la validation
-  in-VM refuse `.runner`, credentials, cle privee, cache ou boot non conforme;
-- lorsque les locks seront complets dans une PR ulterieure, le tout premier
-  customizer bloque IMDS et en apporte la preuve avant les telechargements
-  necessaires. La validation finale et le bootstrap canari exigent aussi le
-  service actif, la regle iptables et un probe IMDS en echec;
+  entrees voyagent dans le template lui-meme (transport « (C') » plus bas), la VM
+  reverifie chaque hash avant usage, la validation in-VM refuse `.runner`,
+  credentials, cle privee, cache ou boot non conforme;
+- le tout premier customizer bloque IMDS et en apporte la preuve avant la seule
+  etape reseau (acquisition de l'ensemble ferme). La validation finale et le
+  bootstrap canari exigent aussi le service actif, la regle iptables et un probe
+  IMDS en echec;
 - `canary-main.bicep` cree conditionnellement le groupe runtime dedie et le
   marque avec le meme TTL que ses ressources; `canary.bicep` declare un reseau
   non peere et un VMSS neuf de capacite 1,
@@ -423,23 +434,131 @@ l'index Git qui commande le fallback moteur. Cet index et sa precondition
 ont ensuite ete ajoutes avec un test negatif. Aucun avis d'approbation global
 ni reproduction independante des mesures WSL n'est presume.
 
-**Reste obligatoire avant `locked` et installation :**
+### Consommateur hors ligne (#341, points 1 et 2)
 
-1. Remplacer ou confiner, dans le chemin image uniquement, tous les resolvers
-   reseau : bootstrap, `installdependencies.sh`, APT, pip et Flutter. Verifier
-   les octets avant execution et prouver l'installation sans reseau depuis
-   l'ensemble ferme d'artefacts approuve.
-2. Ajouter les tests d'execution de ce consommateur (alteration, omission,
-   redirection, telechargement imprevu), puis seulement retirer les gardes de
-   code. Les tests actuels portent sur l'integrite des fichiers et le **refus
-   d'admission** : des propositions redirigees ou ajoutees, meme rehashees, ne
-   peuvent rien activer. Ils ne pretendent pas valider un downloader inexistant.
-3. Traiter le patching invite de la plateforme : il peut installer ou mettre a
-   jour des paquets apres le boot. Le futur contrat devra soit le neutraliser
-   sur les nouveaux runners, soit l'assumer et le verifier au boot. Rien de
-   cela n'est modifie ici.
-4. Activer et epingler le signataire dans un changement separe approuve.
-   Aucun workflow actif ni le workflow signataire desactive n'est modifie ici.
+`install_offline.py` est le seul chemin d'installation de l'image. Il tourne en
+root dans `unshare --net` (aucune interface hors `lo`) et n'utilise que :
+
+- les entrees du contrat : digest du contrat fourni par le template, SHA-256 de
+  chaque entree, ensemble exact des fichiers (tout fichier en plus est refuse).
+  Les modules Python effectivement charges doivent etre ces memes entrees;
+- le store ferme de `image_artifacts.py`, adresse par digest, qui doit egaler
+  exactement l'ensemble derive des locks : 7 archives de toolchain, les 9 `.deb`
+  des transactions APT, 102 archives Pub et 94 roues Python, soit 212 artefacts.
+  Les 656 paquets de base viennent de l'image Marketplace; les 12 blobs
+  moteur/universels Flutter sont `bundled-current` dans l'archive SDK verifiee.
+
+`image_artifacts.py acquire` est la seule etape reseau : URL exactes des locks,
+HTTPS, variables proxy ignorees, aucune redirection sauf le saut documente
+`github.com/<owner>/<repo>/releases/download/...` vers
+`release-assets.githubusercontent.com` ou `objects.githubusercontent.com`,
+publication atomique apres verification du digest et de la taille. `verify` est
+hors ligne et exact. Une URL verrouillee disparue ou modifiee fait echouer
+l'acquisition (`Download failed`, `Digest mismatch`), sans substitution.
+
+Sentinelle : l'installateur ajoute des routes AnyIP (`local 0.0.0.0/0`, et
+`::/0` si IPv6 existe) sur `lo`, puis ecoute DNS UDP/TCP 53 et TCP 22, 80, 443,
+9418 et 11371. Une tentative est enregistree et fait echouer l'etape qui l'a
+provoquee, avant son code de retour. Un auto-test DNS et TCP prouve la sentinelle
+au demarrage. Hors de ces ports, une connexion echoue quand meme (aucune route
+externe) mais n'est pas nommee.
+
+| Resolveur du chemin image | Traitement |
+| --- | --- |
+| APT (bootstrap, prewarm, `installdependencies.sh`) | aucune source distante; les 9 `.deb` du lock installes transaction par transaction; etat dpkg egal aux 665 paquets du lock |
+| `bootstrap.sh` | octets inchanges et epingles; execute confine une fois paquets, runner et Azure CLI presents; doit s'arreter a « Base image prepared » sans changer dpkg |
+| `bin/installdependencies.sh` | jamais execute; digest egal a celui du lock, postconditions verifiees |
+| pip | `--no-index --find-links` sur les roues verifiees, `--require-hashes`, `--only-binary=:all:`, `PIP_CONFIG_FILE=/dev/null`; aucun paquet en plus hors `pip` |
+| Flutter/Pub | cache Pub prive (`dart pub cache preload` des 102 archives) puis `pub get --offline --enforce-lockfile`; `flutter config` et `flutter precache --linux` ne changent aucun octet du SDK (seul `bin/cache/lockfile` peut etre cree) |
+| Node/npm, .NET/NuGet, Bicep, actionlint, dart-formatter | archives verifiees seulement, aucune restauration; telemetrie et notifications coupees |
+| `contentTools.prewarmedProjectDependencies` | doit rester vide : verifie par l'installateur et au boot |
+| Azure CLI | `.deb` du lock; son controle de version a l'initialisation est neutralise pendant l'installation (defaut 2 ci-dessous) |
+| Mise a jour du runner | `--disableupdate` a l'enregistrement, hors installation |
+
+Un resolveur non liste fait echouer l'installation : sentinelle, etat dpkg ou
+inventaire.
+
+### Transport des entrees : option (C')
+
+Le depot est prive : un fetch anonyme de `raw.githubusercontent.com` rend 404, et
+la doc AIB exige pour le customizer `File` des fichiers publics ou un stockage
+Azure (#341, commentaire 5812238187). Le stockage (A') est ecarte pour cette
+tranche : MCAPSGovDeployPolicies force `publicNetworkAccess=Disabled`,
+`allowSharedKeyAccess=false` et `allowBlobPublicAccess=false` sur tout compte, ce
+qui imposerait endpoint prive, DNS prive, NAT et droits supplementaires. Aucune
+exemption par tag MCAPS n'est utilisee.
+
+Les entrees voyagent donc dans le template : `loadFileAsBase64` par fichier, puis
+decodage sous `/tmp`, verification du contrat contre le litteral
+`contractSha256`, verification de chaque entree contre le contrat (`jq` et
+`sha256sum --check --strict`), controle de l'ensemble exact, deplacement en
+`sudo`. `loadFileAsBase64` refuse plus de 96 Ko (BCP184 a 98 304 octets, mesure
+avec Bicep 0.44.1) et `loadTextContent` 131 072 caracteres : les deux gros locks
+voyagent en derives `gzip -n -9` sous `transport/`. La CI prouve que leur
+decompression redonne exactement les octets du lock et le SHA-256 du contrat;
+une recompression differente reste admise.
+
+`image-transport.test.mjs` evalue l'ARM compile, decode chaque entree, execute
+les lignes de decodage et de verification sous `/bin/sh` (une session par ligne)
+et prouve le refus d'une entree alteree, omise, ajoutee ou d'un contrat
+substitue. Sa garde de taille impose au moins 10 % de marge sous chaque limite
+documentee : template 4 Mo et ressource 1 Mo apres expansion (ARM « Template
+limits »), job 1 Mo compresse (ARM « job size exceeded »). Mesure du 25 septembre
+2026 : template 582 323 octets, 262 748 octets compresse. Aucune limite AIB sur
+les commandes inline ou `customization.log` n'est documentee : une limite cachee
+ferait echouer ferme le premier build, etape autorisee a part. Repli documente :
+(A') si une telle limite apparait.
+
+Toutes les lignes inline sont du sh POSIX et sortent en erreur d'elles-memes : la
+doc AIB ne precise pas le shell utilise, et le `dash` de Noble refuse `pipefail`
+(defaut 1). `packages.microsoft.com` reste mutable : si une URL verrouillee
+disparait, l'acquisition echoue fermee. Un futur miroir prive des 212 blobs
+verifies supprimerait cette dependance, mais demanderait les ressources de (A').
+
+### Patching invite de la plateforme (#341, point 3)
+
+Faits mesures (#341; `docs/CI_RUNNER_RESILIENCE.md`) :
+
+- le 15/09 a 08:06:24Z, l'automate MCAPSGovernance-AutomationApp (appid
+  `a1a9c5b6-7a4f-4288-89ab-6805873f65d1`, via Lighthouse) a bascule `patchSettings`
+  des VM PR de `ImageDefault` a `AutomaticByPlatform`, avec
+  `bypassPlatformSafetyChecksOnUserSchedule=true`; le modele VMSS reste `ImageDefault`;
+- le 19/09 a 08:05Z, la meme tentative a echoue sur les VM trusted (image de galerie
+  specialisee) : `PropertyChangeNotAllowed`, « Changing property 'osProfile' is not
+  allowed ». Une image generalisee (sortie AIB) aura un `osProfile` modifiable : le
+  canari doit supposer `AutomaticByPlatform`;
+- une evaluation tourne depuis chaque jour sur les VM PR (le 24/09 de 05:48:51 a
+  05:50:55Z) et lance `sudo apt-get -q update` ([LinuxPatchExtension @ 119f1101](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/package_managers/AptitudePackageManager.py#L51) :
+  `AptitudePackageManager.py` l. 51 et 98, `PatchAssessor.py` l. 64).
+  ConfigurePatching a installe `ubuntu-advantage-tools` le 19/09
+  (`UbuntuProClient.py` l. 28 a 40). Le meme code sait aussi installer `mokutil` et
+  `fwupd` (`AptitudePackageManager.py` l. 97 a 104);
+- aucune assignation de maintenance. MCAPSGovDeployPolicies ajoute une identite
+  managee aux VM sans identite (regle « modify »), aujourd'hui Compliant sur les
+  VM PR qui restent sans identite.
+
+Conception : la politique modifiant `osProfile`, l'image **assume** le patching
+mais le prive de tout effet, puis **verifie** au boot et a chaque job :
+
+1. aucune source APT distante : `apt-get update` ne rafraichit rien, la simulation
+   `dist-upgrade` ne trouve rien et toute installation demandee par l'extension
+   echoue (« Unable to locate package »);
+2. `APT::Periodic::*` a `0`; unites `apt-daily*`, `unattended-upgrades` et
+   `snapd.snap-repair*` masquees;
+3. cloud-init `preserve_sources_list: true` : cloud-init 26.1 (celui de la base) ne
+   regenere les sources que si ce drapeau est faux (`cc_apt_configure.py` l. 149);
+   `package_update` et `package_upgrade` a `false`;
+4. aucun snap : l'installateur refuse des le preflight un snap installe ou seede;
+5. `validate-toolchain.sh --boot|--job` compare l'etat dpkg complet (paquet,
+   architecture, version, etat) a `dpkg-state.tsv` atteste par `attestation.json`,
+   et refuse une source APT, un `APT::Periodic` actif ou une unite demasquee.
+   Toute derive empeche le demarrage du runner ou l'admission du job.
+
+Rien n'est change cote Azure. Non couvert, par confiance dans la plateforme :
+l'agent Azure et les extensions sous `/var/lib/waagent` tournent en root; une
+modification hors paquets et hors racines inventoriees ne serait pas vue. La mise
+a jour de certificats UEFI par `fwupd` (flux « cert » de l'extension) ne passe pas
+par dpkg.
 
 Les premiers tests compilent aussi les trois Bicep avec tous les drapeaux JSON
 forces sur `locked/true/active`, et verifient que chaque ressource reste sous le
