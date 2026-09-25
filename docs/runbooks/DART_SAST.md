@@ -78,7 +78,11 @@ dans `.github/sast/semgrep-requirements.lock` (généré par `uv pip compile --g
 commande en tête du fichier). L'installation CI utilise `--require-hashes --only-binary=:all:
 --no-deps --no-cache-dir --isolated` : aucune compilation, aucun code d'installation, aucun cache
 partagé sur les runners persistants. Le verrou contient les empreintes de toutes les roues
-publiées : la même commande fonctionne sur x86_64 (runners) et aarch64 (poste WSL).
+publiées : la même commande fonctionne sur x86_64 (runners) et aarch64 (poste WSL). Mesuré le
+2026-09-25 avec `pip download --platform … --abi cp312` : les 66 paquets ont une roue x86_64
+dont l'empreinte correspond ; celles de `semgrep` et `cryptography` exigent **glibc ≥ 2.34**
+(`manylinux_2_34`), ce que satisfont les runners Ubuntu 24.04 (`infra/ci-runner/README.md`). Une
+image de runner plus ancienne ferait échouer l'installation, jamais le scan en silence.
 
 Semgrep CE est publié sous LGPL-2.1 ; il est exécuté, pas redistribué. Aucune règle du registre
 Semgrep n'est chargée : tout est local, aucune donnée ne sort du runner pendant le scan.
