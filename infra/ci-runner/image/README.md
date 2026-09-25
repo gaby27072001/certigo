@@ -591,6 +591,44 @@ par dpkg.
    l'utilisateur `runner`, le cache est perime et le premier job relancerait un
    `pub get` en ligne dans un SDK en lecture seule. Corrige : cache Pub prive dans
    l'arbre toolchain, lisible par tous et verifie.
+5. **Propriete du depot Git Flutter.** `tar -xJf` en root conserve l'uid de
+   l'archive; `bin/flutter` lance `git rev-parse HEAD`, que git refuse
+   (« detected dubious ownership », exit 128, mesure dans le banc le 25/09). Le
+   prewarm legacy aurait echoue a son premier `flutter config`. Corrige :
+   extraction `--no-same-owner` et `safe.directory` limite a ce seul chemin dans
+   `/etc/gitconfig`, fichier atteste par l'inventaire.
+6. **SDK Flutter en lecture seule pour `runner` (non corrige ici).**
+   `bin/internal/update_engine_version.sh` (SHA-256 `6d71ef5d...`, lie par le lock)
+   reecrit `bin/cache/engine.stamp` et `engine.realm` a **chaque** appel de
+   `flutter` ou `dart`. Mesure : avec `bin/cache` en lecture seule, un utilisateur
+   non root sort en « Permission denied », exit 1; root reussit. Le scellement
+   (`chmod -R a-w`, herite du prewarm) rend donc Flutter inutilisable par le
+   runner. C'est un defaut d'execution du canari, hors des points 1 a 3 : il
+   demande une decision de conception separee.
+
+### Rejouer le consommateur sans modifier un runner
+
+Sous Linux amd64, ou ARM64 avec un binfmt `qemu-x86_64` enregistre (paquets
+`qemu-user` et `qemu-user-binfmt`), en root, avec `mmdebstrap`, overlayfs et
+`unshare`. Les caches restent hors depot :
+
+```bash
+IMAGE=infra/ci-runner/image
+S=/chemin/prive
+python3 -B "$IMAGE/image_artifacts.py" acquire --store "$S/closed-store"
+python3 -B "$IMAGE/offline_harness.py" acquire-base --store "$S/base-store"
+python3 -B "$IMAGE/lock_apt.py" restore-indexes --cache "$S/apt-cache"
+python3 -B "$IMAGE/offline_harness.py" build-base --store "$S/base-store" \
+  --apt-cache "$S/apt-cache" --rootfs "$S/base-rootfs"
+python3 -B "$IMAGE/offline_harness.py" run-suite --rootfs "$S/base-rootfs" \
+  --store "$S/closed-store" --report "$S/suite.json" \
+  --legacy-inventory /chemin/vers/ancien/inventory-toolchain.sh
+```
+
+`build-base` echoue si la base obtenue differe des 656 paquets reconstruits.
+`capture-python-tags` recalcule `python-target-tags.txt` avec le pip de la cible;
+`lock_python.py capture` recalcule ensuite le lock des roues, puis `verify` le
+rejoue hors ligne (execute par `validate.sh`).
 
 Les premiers tests compilent aussi les trois Bicep avec tous les drapeaux JSON
 forces sur `locked/true/active`, et verifient que chaque ressource reste sous le
