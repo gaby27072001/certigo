@@ -560,6 +560,38 @@ modification hors paquets et hors racines inventoriees ne serait pas vue. La mis
 a jour de certificats UEFI par `fwupd` (flux « cert » de l'extension) ne passe pas
 par dpkg.
 
+### Defauts latents mesures (masques jusqu'ici par les gardes)
+
+1. **`pipefail` sous dash.** `chroot <base Noble> dash -c 'set -o pipefail'` rend
+   « Illegal option -o pipefail » (dash `0.5.12-6ubuntu5`, 25/09/2026). Les
+   customizers AIB commencaient tous par `set -euo pipefail`, et la doc AIB ne dit
+   pas quel shell execute les lignes inline. Corrige : sh POSIX, sortie explicite.
+2. **Azure CLI contacte le reseau a chaque demarrage.** Avec un
+   `versionCheck.json` vide, Azure CLI 2.89.0 appelle, dans `AzCli.__init__` et
+   avant toute commande, `handle_version_update` (`core/__init__.py` l. 105,
+   `core/util.py` l. 1417) puis `get_cached_latest_versions` et
+   `check_connectivity`, soit un HEAD vers `azcliprod.blob.core.windows.net`.
+   `AZURE_CORE_COLLECT_TELEMETRY=false` n'y change rien : la sentinelle a compte
+   8 requetes DNS pour un seul `az version`. Le bootstrap legacy le declenchait
+   via `az version`. Corrige pendant l'installation : cache amorce hors ligne par
+   `_get_local_versions` d'Azure CLI dans un `AZURE_CONFIG_DIR` prive. A
+   l'execution, la validation de boot le declenche encore, reseau present, sans
+   ecriture de paquet.
+3. **Cout de l'inventaire.** L'ancien `inventory-toolchain.sh` lancait trois
+   processus par fichier sur des dizaines de milliers de fichiers, au boot **et** a
+   chaque job. Reecrit en lot, au meme format, avec un refus explicite des noms a
+   tabulation ou saut de ligne et des types speciaux. Un test le compare a une
+   reference Python independante.
+4. **Cache Pub sous `/root`.** Le prewarm legacy lance `flutter precache --linux`
+   en root sans `PUB_CACHE` : Pub prend alors `$HOME/.pub-cache`, soit
+   `/root/.pub-cache` (`pub.dart` l. 620, `_getPubCacheIfAvailable`), et
+   `package_config.json` de `flutter_tools` y pointe. `/root` est en `0700` dans la
+   base (mesure). Or `PubDependencies.isUpToDate` exige que chaque racine de paquet
+   soit lisible (`flutter_cache.dart` l. 113, sources epinglees) : pour
+   l'utilisateur `runner`, le cache est perime et le premier job relancerait un
+   `pub get` en ligne dans un SDK en lecture seule. Corrige : cache Pub prive dans
+   l'arbre toolchain, lisible par tous et verifie.
+
 Les premiers tests compilent aussi les trois Bicep avec tous les drapeaux JSON
 forces sur `locked/true/active`, et verifient que chaque ressource reste sous le
 garde literalement faux. Le controle de transition lit les fichiers de lock

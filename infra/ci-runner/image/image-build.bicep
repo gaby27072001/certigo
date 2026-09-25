@@ -30,7 +30,7 @@ var aptInputsReady = !empty(contract.reproducibility.aptSnapshot) && length(stri
 var flutterInputsReady = length(string(contract.reproducibility.flutterEngineArtifactLockSha256)) == 64
 var reproducibilityReady = contract.policy.reproducibleInputsReady && contract.reproducibility.status == 'locked' && aptInputsReady && flutterInputsReady
 var effectiveDeploymentEnabled = deploymentEnabled && reproducibilityReady && networkInstallerImplemented
-var contractSha256 = '8f519271224e67f3153223e8dce9d2ba1a4f955a6ca302f5725ff4d3468cf375'
+var contractSha256 = '5b0927cf767f1888de7b5301e95e82b191bb28b2f688689c2b97f87fb3f6b841'
 var galleryImageDefinitionId = resourceId(
   'Microsoft.Compute/galleries/images',
   contract.destination.galleryName,

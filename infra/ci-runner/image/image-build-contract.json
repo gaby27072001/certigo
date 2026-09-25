@@ -97,7 +97,7 @@
       "id": "inventory",
       "path": "infra/ci-runner/image/inventory-toolchain.sh",
       "destination": "inventory-toolchain.sh",
-      "sha256": "11234197e61b9486dd76f3aef80571da431f59899fbc409b57e09427607a604a"
+      "sha256": "ec7b25fba56f1e54e9d36cbff39dcb8acc99cbeb81c18a840c5f1dd68445f25b"
     },
     {
       "id": "seal-state",
@@ -145,7 +145,7 @@
       "id": "offline-installer",
       "path": "infra/ci-runner/image/install_offline.py",
       "destination": "install_offline.py",
-      "sha256": "c926bad3e72c7925be9985e2244d6d57c5e1632559f41d531f0e5aff80c8edfd"
+      "sha256": "38f63b3be7a012500cedd114daecc4d3af14b7155d56f92371e64c697509d801"
     },
     {
       "id": "artifact-set",

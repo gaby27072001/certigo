@@ -632,10 +632,16 @@ class Installer:
 
     def install_flutter(self):
         target = self.replace_directory(self.flutter_root())
-        self.run("flutter.extract", ["tar", "-xJf", self.artifact("toolchain", "flutter"),
-                                     "-C", target])
+        # Root-owned from the start: git refuses a repository owned by another uid.
+        self.run("flutter.extract", ["tar", "--no-same-owner", "-xJf",
+                                     self.artifact("toolchain", "flutter"), "-C", target])
         sdk = target / "flutter"
         self.verify_flutter_preconditions(sdk)
+        # bin/flutter runs `git rev-parse HEAD`; since git 2.35.2 a repository owned by
+        # another user is refused ("dubious ownership"). The runner user must run the
+        # root-owned SDK: trust exactly this path, system-wide, and attest the file.
+        self.run("flutter.git-safe-directory", ["git", "config", "--system", "--add",
+                                                "safe.directory", sdk])
         self.resolve_pub_offline(sdk, target / "pub-cache")
         before = self.sdk_snapshot(sdk)
         flutter = sdk / "bin/flutter"

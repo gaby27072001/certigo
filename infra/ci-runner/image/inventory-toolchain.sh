@@ -22,6 +22,7 @@ entries=(
   /etc/apt/apt.conf.d/99certigo-immutable-image
   /etc/apt/sources.list
   /etc/cloud/cloud.cfg.d/99-certigo-immutable-image.cfg
+  /etc/gitconfig
   /etc/systemd/system/apt-daily-upgrade.service
   /etc/systemd/system/apt-daily-upgrade.timer
   /etc/systemd/system/apt-daily.service
