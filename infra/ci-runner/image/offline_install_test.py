@@ -346,9 +346,12 @@ class InventoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             toolchains, runner, azure = root / "toolchains", root / "runner", root / "az"
+            apt, cloud = root / "apt", root / "cloud.cfg.d"
             for directory in (toolchains / "a" / "b", runner / "bin", runner / "_diag" / "x",
-                              runner / "_work" / "y", azure / "lib"):
+                              runner / "_work" / "y", azure / "lib", apt / "sources.list.d", cloud):
                 directory.mkdir(parents=True)
+            (apt / "sources.list").write_text("# no remote source\n")
+            (cloud / "99-certigo.cfg").write_text("apt:\n  preserve_sources_list: true\n")
             (toolchains / "a" / "file one.txt").write_bytes(b"alpha")
             executable = toolchains / "a" / "b" / "setuid-exec"
             executable.write_bytes(b"#!/bin/sh\n")
@@ -363,14 +366,21 @@ class InventoryTests(unittest.TestCase):
             (runner / ".runner.backup").write_text("not excluded")
             (runner / "_diag" / "x" / "log").write_text("log")
             (runner / "_work" / "y" / "w").write_text("work")
+            # A PR can leave any name in its pruned workspace: it must not deny the next job.
+            (runner / "_work" / "y" / "tab\tname").write_text("work")
             (azure / "lib" / "é-unicode").write_bytes(b"unicode")
             output = root / "inventory.tsv"
             environment = dict(os.environ, CERTIGO_TOOLCHAIN_ROOT=str(toolchains),
-                               CERTIGO_RUNNER_HOME=str(runner), CERTIGO_AZURE_CLI_ROOT=str(azure))
+                               CERTIGO_RUNNER_HOME=str(runner), CERTIGO_AZURE_CLI_ROOT=str(azure),
+                               CERTIGO_APT_ROOT=str(apt), CERTIGO_CLOUD_CONFIG_ROOT=str(cloud))
             script = str(ROOT / "inventory-toolchain.sh")
             subprocess.run(["bash", script, "--roots-only", str(output)], env=environment, check=True)
             self.assertEqual(output.read_text(encoding="utf-8"),
-                             self.reference((toolchains, runner, azure), runner))
+                             self.reference((toolchains, runner, azure, apt, cloud), runner))
+            (apt / "sources.list.d" / "added.sources").write_text("Types: deb\n")
+            subprocess.run(["bash", script, "--roots-only", str(output)], env=environment, check=True)
+            self.assertIn(f"{apt}/sources.list.d/added.sources\t", output.read_text(encoding="utf-8"))
+            (apt / "sources.list.d" / "added.sources").unlink()
             (toolchains / "a" / "tab\tname").write_text("ambiguous")
             result = subprocess.run(["bash", script, "--roots-only", str(output)], env=environment,
                                     capture_output=True, text=True)
@@ -389,8 +399,41 @@ class InventoryTests(unittest.TestCase):
         for unit in install_offline.APT_AUTOMATION_UNITS:
             self.assertIn(unit, validator)
             self.assertIn(f"/etc/systemd/system/{unit}\n", inventory)
+        roots = ('${CERTIGO_APT_ROOT:-/etc/apt}', '${CERTIGO_CLOUD_CONFIG_ROOT:-/etc/cloud/cloud.cfg.d}')
+        for root in roots:
+            self.assertIn(root, inventory)
         for path in install_offline.PATCHING_FILES:
-            self.assertIn(f"{path}\n", inventory)
+            self.assertTrue(str(path).startswith(("/etc/apt/", "/etc/cloud/cloud.cfg.d/")), path)
+        self.assertIn("--no-release-info", validator)
+        self.assertIn("/var/lib/snapd/seed/snaps/*.snap", validator)
+        self.assertNotIn("az version", validator)
+
+
+class ExecutionEvidenceTests(unittest.TestCase):
+    """The qemu suite cannot run on the persistent CI runners; its report is bound instead."""
+
+    def test_committed_execution_evidence_matches_the_current_inputs(self):
+        import offline_harness
+        evidence = read_json(ROOT / "offline-execution-evidence.json")
+        self.assertEqual(evidence["boundDigests"], offline_harness.bound_digests(),
+                         "Execution evidence is stale: rerun offline_harness.py run-suite, "
+                         "then offline_harness.py evidence")
+        names = [scenario["scenario"] for scenario in evidence["scenarios"]]
+        self.assertEqual(sorted(names), sorted(offline_harness.SCENARIOS))
+        self.assertTrue(all(scenario["passed"] for scenario in evidence["scenarios"]))
+        for scenario in evidence["scenarios"]:
+            if scenario["scenario"] == "positive":
+                continue
+            self.assertIsNotNone(scenario["observedReason"], scenario["scenario"])
+            if scenario["scenario"] == "unexpected-download":
+                self.assertRegex(scenario["observedReason"], scenario["expectedReason"])
+            else:
+                self.assertIn(scenario["expectedReason"], scenario["observedReason"])
+        positive = next(item for item in evidence["scenarios"] if item["scenario"] == "positive")
+        self.assertEqual(positive["dpkgPackages"], 665)
+        self.assertEqual(positive["attestation"]["networkAttempts"], [])
+        self.assertTrue(positive["inventoryEquivalence"]["identical"])
+        self.assertTrue(positive["runnerRuntime"].startswith("blocked by defect 6"))
 
 
 @unittest.skipUnless(os.environ.get("CERTIGO_OFFLINE_ROOTFS"), "requires the qemu harness base")
