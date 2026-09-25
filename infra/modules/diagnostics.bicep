@@ -1,7 +1,7 @@
 // Cost-bounded operational and security observability for the backend.
 //
 // Alerts are LOG-SEARCH alerts (Microsoft.Insights/scheduledQueryRules) over the
-// workspace-based Application Insights `AppRequests` table, NOT metric alerts on
+// workspace-based Application Insights request/exception tables, NOT metric alerts on
 // Microsoft.Web/sites. Rationale: the Function App runs on the Flex Consumption
 // plan (FC1), which does NOT expose the Http401/Http403/Http5xx platform metrics
 // — a metric alert referencing them fails to deploy ("Couldn't find a metric
@@ -360,12 +360,12 @@ var logAlerts = [
   }
   {
     name: 'http5xx-spike'
-    // Traffic is intentionally low, so one non-health 5xx in the window is
-    // actionable. Health failures have their own readiness/availability alerts.
-    query: 'AppRequests | where Url !endswith "/api/health/live" and Url !endswith "/api/health/ready" | where ResultCode matches regex "^5[0-9][0-9]$"'
+    // Preserve the rule/identity and group both signals into one stateful incident.
+    // No operation-name allowlist: new learner routes must be covered by default.
+    query: replace(loadTextContent('../queries/critical-failures.kql'), '__APP_INSIGHTS_RESOURCE_ID__', appInsights.id)
     threshold: 0
     severity: 1
-    desc: 'A non-health API request returned 5xx; inspect the failing operation and dependencies.'
+    desc: 'A non-health API request returned 5xx or an Error/Critical or unhandled exception was recorded. Investigate even if the alert resolves: no traffic is not proof of recovery. See docs/runbooks/OBSERVABILITY.md.'
   }
   {
     name: 'telemetry-absent'
