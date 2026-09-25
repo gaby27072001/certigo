@@ -883,7 +883,12 @@ function commandTestRules(args) {
   const summary = `Dart SAST rule tests (${label}): ${catalog.size} rules, ${targets.length} fixtures, `
     + `${annotations.expected.length} positive and ${annotations.forbidden.length} negative cases.`;
   if (failures.length > 0) {
-    process.stdout.write(`${summary}\n${failures.map((failure) => `FAIL ${failure}`).join('\n')}\n`);
+    const text = `${summary}\n${failures.map((failure) => `FAIL ${failure}`).join('\n')}\n`;
+    if (args.get('github')) {
+      printUntrusted(text);
+    } else {
+      process.stdout.write(text);
+    }
     throw new GateError(`Dart SAST rule tests (${label}): ${failures.length} failure(s).`, 1);
   }
   process.stdout.write(`${summary} All passed.\n`);
@@ -909,9 +914,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     main(process.argv.slice(2));
   } catch (error) {
     const exitCode = error instanceof GateError ? error.exitCode : 2;
-    process.stderr.write(`${error instanceof GateError ? error.message : error.stack}\n`);
+    const message = `${error instanceof GateError ? error.message : error.stack}\n`;
     if (process.argv.includes('--github')) {
+      // The message can quote scanner output about pull request files: never let it issue
+      // workflow commands.
+      printUntrusted(message);
       process.stdout.write(`::error title=Dart SAST::${exitCode === 1 ? 'New Dart SAST finding or failed rule test' : 'Dart SAST scan invalid or incomplete'} (see the job log).\n`);
+    } else {
+      process.stderr.write(message);
     }
     process.exitCode = exitCode;
   }
