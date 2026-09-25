@@ -15,6 +15,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -22,7 +23,9 @@ import tempfile
 from pathlib import Path
 
 from lock_apt import LOCK as APT_LOCK, load_indexes
-from lock_inputs import ROOT, checked_file, paragraphs, read_json, require, serialize
+from lock_inputs import (
+    ROOT, checked_file, file_hash, paragraphs, read_json, require, serialize, sha256, write_json,
+)
 
 REPOSITORY = ROOT.parents[2]
 INPUT_DIR = "/tmp/certigo-image-input"
@@ -114,9 +117,16 @@ def build_base(store, cache, rootfs):
              "--dpkgopt=force-unsafe-io",
              "--customize-hook=rm -f \"$1/etc/apt/sources.list\"",
              "noble", str(rootfs), f"deb [trusted=yes] copy://{repository} ./"])
-    expected = sorted(f"{p['package']}\t{p['version']}\tii " for p in base_packages())
+    finalize_base(rootfs)
+
+
+def finalize_base(rootfs):
+    """Verify the rebuilt base, drop harness-only settings, add Marketplace-like sources."""
+    expected = sorted(f"{p['package']}\t{p['version']}\tii" for p in base_packages())
     actual = dpkg_state(rootfs)
     require(actual == expected, "Harness base differs from the reconstructed base inventory")
+    for leftover in ("etc/apt/apt.conf.d/99mmdebstrap", "etc/dpkg/dpkg.cfg.d/99mmdebstrap"):
+        (rootfs / leftover).unlink(missing_ok=True)
     sources = rootfs / "etc/apt/sources.list.d"
     sources.mkdir(parents=True, exist_ok=True)
     for entry in sources.iterdir():
@@ -125,7 +135,20 @@ def build_base(store, cache, rootfs):
     (rootfs / "etc/apt/sources.list").write_text(
         "# Ubuntu sources have moved to /etc/apt/sources.list.d/ubuntu.sources\n",
         encoding="utf-8")
-    print(f"Harness base rebuilt: {len(actual)} packages equal the reconstructed base.")
+    state = "\n".join(actual) + "\n"
+    marker = {"packages": len(actual), "dpkgStateSha256": sha256(state.encode()),
+              "aptLockSha256": file_hash(APT_LOCK)}
+    write_json(rootfs.with_name(rootfs.name + ".verified.json"), marker)
+    print(f"Harness base verified: {len(actual)} packages equal the reconstructed base.")
+
+
+def verified_base(rootfs):
+    marker = read_json(rootfs.with_name(rootfs.name + ".verified.json"))
+    state = "\n".join(dpkg_state(rootfs)) + "\n"
+    require(marker["dpkgStateSha256"] == sha256(state.encode()) and
+            marker["aptLockSha256"] == file_hash(APT_LOCK),
+            "Harness base changed since its verification; rebuild it")
+    return rootfs
 
 
 @contextlib.contextmanager
@@ -178,6 +201,42 @@ def run_consumer(base, store, inputs, work, command, stdout):
         return process.returncode, merged
 
 
+def capture_python_tags(rootfs, store, output):
+    """Record the ordered tags supported by the target pip (maintenance step)."""
+    lock = read_json(APT_LOCK)
+    prewarm = next(t for t in lock["transactions"] if t["id"] == "prewarm")
+    packages = {p["package"]: p for p in lock["packages"]}
+    with tempfile.TemporaryDirectory(prefix="certigo-tags-", dir=rootfs.parent) as tmp:
+        with overlay(verified_base(rootfs), Path(tmp)) as (merged, _):
+            debs = merged / "tmp/certigo-tags"
+            debs.mkdir()
+            for name in prewarm["packages"]:
+                item = packages[name]
+                checked_file(store / f"sha256-{item['sha256']}", item["sha256"], item["bytes"])
+                shutil.copyfile(store / f"sha256-{item['sha256']}", debs / f"{item['sha256']}.deb")
+            script = ("set -eu; dpkg -i /tmp/certigo-tags/*.deb >/dev/null; "
+                      "python3.12 -m venv /tmp/certigo-tags/venv; "
+                      "/tmp/certigo-tags/venv/bin/python -m pip --version; "
+                      "/tmp/certigo-tags/venv/bin/python -m pip debug --verbose")
+            result = subprocess.run(["unshare", "--net", "--", "chroot", str(merged),
+                                     "/bin/sh", "-c", script],
+                                    env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+                                         "LANG": "C.UTF-8", "PIP_NO_INPUT": "1",
+                                         "PIP_DISABLE_PIP_VERSION_CHECK": "1"},
+                                    capture_output=True, text=True, check=True)
+    lines = result.stdout.splitlines()
+    version = lines[0]
+    header = next(i for i, line in enumerate(lines) if line.startswith("Compatible tags: "))
+    count = int(lines[header].split(": ", 1)[1])
+    tags = [line.strip() for line in lines[header + 1:header + 1 + count]]
+    require(len(tags) == count and all(re.fullmatch(r"[a-z0-9_.]+-[a-z0-9_.]+-[a-z0-9_.]+", t)
+                                       for t in tags), "Unexpected pip debug output")
+    require(version.startswith("pip 24.0 ") and "python 3.12" in version,
+            f"Unexpected target pip: {version}")
+    Path(output).write_text("\n".join(tags) + "\n", encoding="utf-8")
+    print(f"Captured {count} target tags from {version.split(' from ')[0]}.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -185,9 +244,19 @@ def main():
     build.add_argument("--store", type=Path, required=True)
     build.add_argument("--apt-cache", type=Path, required=True)
     build.add_argument("--rootfs", type=Path, required=True)
+    finalize = sub.add_parser("finalize-base")
+    finalize.add_argument("--rootfs", type=Path, required=True)
+    tags = sub.add_parser("capture-python-tags")
+    tags.add_argument("--rootfs", type=Path, required=True)
+    tags.add_argument("--store", type=Path, required=True)
+    tags.add_argument("--output", type=Path, default=ROOT / "python-target-tags.txt")
     args = parser.parse_args()
     if args.command == "build-base":
         build_base(args.store.resolve(), args.apt_cache.resolve(), args.rootfs.resolve())
+    elif args.command == "finalize-base":
+        finalize_base(args.rootfs.resolve())
+    elif args.command == "capture-python-tags":
+        capture_python_tags(args.rootfs.resolve(), args.store.resolve(), args.output)
 
 
 if __name__ == "__main__":

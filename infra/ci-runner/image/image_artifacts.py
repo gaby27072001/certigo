@@ -38,7 +38,7 @@ DIGEST_LENGTH = {"sha256": 64, "sha512": 128}
 GITHUB_RELEASE = re.compile(r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/releases/download/[^/]+/[^/]+")
 GITHUB_ASSET_HOSTS = frozenset({"release-assets.githubusercontent.com",
                                 "objects.githubusercontent.com"})
-SAFE_FILENAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+~-]*")
+SAFE_FILENAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._+~-]*")
 PARTIAL_PREFIX = ".partial-"
 
 
@@ -121,7 +121,8 @@ def verify_store(store, items):
     expected = {store_name(item): item for item in items}
     present = set(os.listdir(store))
     unexpected = sorted(present - expected.keys())
-    require(not unexpected, f"Unexpected file in the closed artifact store: {unexpected[0]}")
+    if unexpected:
+        raise ValueError(f"Unexpected file in the closed artifact store: {unexpected[0]}")
     for name, item in sorted(expected.items(), key=lambda entry: (entry[1]["kind"], entry[1]["id"])):
         label = f"{item['kind']}:{item['id']}"
         require(name in present, f"Missing artifact {label} ({item['url']})")

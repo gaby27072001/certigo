@@ -272,8 +272,8 @@ class Installer:
         require(release.get("ID") == "ubuntu" and release.get("VERSION_ID") == '"24.04"',
                 "The pinned runner image requires Ubuntu 24.04")
         overrides = sorted(name for name in os.environ if RESOLVER_OVERRIDES.match(name))
-        require(not overrides,
-                f"Resolver override present in the installer environment: {overrides[0]}")
+        if overrides:
+            raise ValueError(f"Resolver override present in the installer environment: {overrides[0]}")
         interfaces = [name for _, name in socket.if_nameindex()]
         require(interfaces == ["lo"],
                 "Offline installation must run in an empty network namespace (unshare --net)")
@@ -295,7 +295,8 @@ class Installer:
             expected.add(item["destination"])
         present = {entry.name for entry in self.inputs.iterdir()}
         unexpected = sorted(present - expected)
-        require(not unexpected, f"Unexpected file in the image inputs: {unexpected[0]}")
+        if unexpected:
+            raise ValueError(f"Unexpected file in the image inputs: {unexpected[0]}")
         loaded = [Path(__file__)] + [Path(sys.modules[name].__file__) for name in
                                      ("image_artifacts", "lock_flutter", "lock_inputs")]
         for path in loaded:
@@ -452,7 +453,8 @@ class Installer:
 
     def require_no_apt_source(self, when):
         targets = self.run("apt.indextargets", ["apt-get", "indextargets", "--format", "$(URI)"]).stdout
-        require(not targets.strip(), f"Remote APT source configured {when}: {targets.split()[0]}")
+        if targets.strip():
+            raise ValueError(f"Remote APT source configured {when}: {targets.split()[0]}")
 
     def install_debs(self):
         staged = self.stage("deb", "debs")
