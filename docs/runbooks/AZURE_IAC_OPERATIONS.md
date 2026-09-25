@@ -32,6 +32,9 @@ applicatifs. Il fournit un endpoint Blob unique, trois conteneurs et une UAMI
 reader que #304 doit attacher à la Function App. Son what-if, son futur lock
 WORM et son rollback sont décrits dans
 [`IMMUTABLE_CONTENT_STORAGE.md`](./IMMUTABLE_CONTENT_STORAGE.md).
+L'alignement LRS du contenu du 25 septembre et ses plans racine dédiés sont
+consignés dans « Alignement LRS du contenu » de ce runbook. Ils ne remplacent
+pas la preuve racine applicative/OIDC encore requise pour `wp-p1-12` / `wp-p1-13`.
 
 ## Diagnostics Azure read-only
 

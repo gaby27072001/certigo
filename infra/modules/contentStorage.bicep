@@ -21,7 +21,8 @@ param publicImmutabilityRetentionDays int
 param privateImmutabilityRetentionDays int
 param coolTierAfterDays int
 param softDeleteRetentionDays int
-param skuName string = 'Standard_GRS'
+// Keep direct module use aligned with the dedicated content stack's MCAPS baseline.
+param skuName string = 'Standard_LRS'
 param tags object = {}
 
 resource storage 'Microsoft.Storage/storageAccounts@2025-06-01' = {
