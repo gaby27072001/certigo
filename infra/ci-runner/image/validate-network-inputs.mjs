@@ -7,9 +7,12 @@ const imageRoot = fileURLToPath(new URL('./', import.meta.url));
 const locks = [
   ['aptPackageLockSha256', 'apt-packages.lock.json'],
   ['flutterEngineArtifactLockSha256', 'flutter-engine-artifacts.lock.json'],
+  ['pythonWheelLockSha256', 'python-wheels.lock.json'],
 ];
+// The offline consumer (install_offline.py) exists and is exercised by the qemu harness.
+// Admission still requires independent review, green CI and explicit approval.
 export const installationBlocker =
-  'Image installation blocked: exhaustive offline network input consumption is not implemented (#341).';
+  'Image installation blocked: the offline installer is not admitted until review, CI and explicit approval (#341).';
 
 // This is an integrity check, not evidence of dependency closure or offline
 // consumption. A later implementation must validate the complete lock schemas
@@ -40,7 +43,7 @@ export function verifyNetworkLockDigests(contract, root = imageRoot) {
 export function assertNetworkInputsReady(contract, root = imageRoot) {
   if (contract.policy?.reproducibleInputsReady !== true ||
       contract.reproducibility?.status !== 'locked') {
-    throw new Error('Image transition is blocked until APT and Flutter network artifacts are fully locked.');
+    throw new Error('Image transition is blocked until APT, Flutter and Python network artifacts are fully locked.');
   }
   if (typeof contract.reproducibility.aptSnapshot !== 'string' ||
       !/^https:\/\/snapshot\.ubuntu\.com\/ubuntu\/\d{8}T\d{6}Z\/?$/.test(
@@ -49,8 +52,8 @@ export function assertNetworkInputsReady(contract, root = imageRoot) {
     throw new Error('APT snapshot must be an exact immutable Ubuntu snapshot URL.');
   }
   verifyNetworkLockDigests(contract, root);
-  // Deliberately not a JSON flag: correct digests must not activate the existing
-  // unconstrained bootstrap/installdependencies.sh, APT, pip or Flutter paths.
+  // Deliberately not a JSON flag: correct digests must not admit the offline installer
+  // (install_offline.py) before independent review, green CI and explicit approval.
   throw new Error(installationBlocker);
 }
 

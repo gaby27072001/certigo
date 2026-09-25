@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -52,20 +52,24 @@ function fixture(t) {
   // never be confused with validated package closure or execution evidence.
   const apt = '{"packages":[{"name":"synthetic-only"}]}\n';
   const flutter = '{"artifacts":[{"url":"https://example.invalid/original"}]}\n';
+  const wheels = '{"wheels":[{"name":"synthetic-only"}]}\n';
   writeFileSync(join(directory, 'apt-packages.lock.json'), apt);
   writeFileSync(join(directory, 'flutter-engine-artifacts.lock.json'), flutter);
+  writeFileSync(join(directory, 'python-wheels.lock.json'), wheels);
   contract.reproducibility.aptPackageLockSha256 = hash(apt);
   contract.reproducibility.flutterEngineArtifactLockSha256 = hash(flutter);
+  contract.reproducibility.pythonWheelLockSha256 = hash(wheels);
   return { directory, contract };
 }
 
-test('real bytes, not hash-shaped strings, are required for both network locks', (t) => {
+test('real bytes, not hash-shaped strings, are required for every network lock', (t) => {
   const { directory, contract } = fixture(t);
   assert.doesNotThrow(() => verifyNetworkLockDigests(contract, directory));
   assert.throws(() => assertNetworkInputsReady(contract, directory), {
     message: installationBlocker,
   });
-  for (const field of ['aptPackageLockSha256', 'flutterEngineArtifactLockSha256']) {
+  for (const field of ['aptPackageLockSha256', 'flutterEngineArtifactLockSha256',
+    'pythonWheelLockSha256']) {
     for (const digest of [null, '', 'x'.repeat(64), 'a'.repeat(64)]) {
       const tampered = structuredClone(contract);
       tampered.reproducibility[field] = digest;
@@ -74,9 +78,15 @@ test('real bytes, not hash-shaped strings, are required for both network locks',
   }
 });
 
-test('either omitted or altered lock fails before readiness can be authorized', (t) => {
+test('the committed contract pins every committed network lock', () => {
+  assert.doesNotThrow(() => verifyNetworkLockDigests(original));
+  assert.throws(() => assertNetworkInputsReady(original), /fully locked/);
+});
+
+test('any omitted or altered lock fails before readiness can be authorized', (t) => {
   const { directory, contract } = fixture(t);
-  for (const name of ['apt-packages.lock.json', 'flutter-engine-artifacts.lock.json']) {
+  for (const name of ['apt-packages.lock.json', 'flutter-engine-artifacts.lock.json',
+    'python-wheels.lock.json']) {
     const path = join(directory, name);
     const content = readFileSync(path);
     writeFileSync(path, Buffer.concat([content, Buffer.from(' ')]));
@@ -141,7 +151,7 @@ test('the CLI refuses forged readiness with valid on-disk digests', (t) => {
   assert.equal(result.error, undefined);
   assert.equal(result.status, 1);
   assert.equal(result.stdout, '');
-  assert.match(result.stderr, /offline network input consumption is not implemented/);
+  assert.match(result.stderr, /the offline installer is not admitted until review, CI and explicit approval/);
 });
 
 test('direct prewarm refuses before invoking tools, creating paths or consuming a redirect', (t) => {
@@ -173,12 +183,14 @@ test('direct prewarm refuses before invoking tools, creating paths or consuming 
 });
 
 test('compiled ARM remains inert even after all JSON readiness and signer flags are forged', (t) => {
-  const { directory, contract } = fixture(t);
+  const { contract } = fixture(t);
+  // The image template embeds its inputs: compile a full copy, then forge the flags.
+  const workspace = mkdtempSync(join(tmpdir(), 'certigo-forged-arm-'));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  const directory = join(workspace, 'image');
+  cpSync(root, directory, { recursive: true });
+  copyFileSync(join(root, '..', 'bootstrap.sh'), join(workspace, 'bootstrap.sh'));
   const templates = ['image-build', 'canary', 'canary-main'];
-  for (const file of [...templates.map((name) => `${name}.bicep`),
-    'canary-contract.json', 'attestation-policy.json']) {
-    copyFileSync(join(root, file), join(directory, file));
-  }
   writeFileSync(join(directory, 'image-build-contract.json'), JSON.stringify(contract));
   const policy = JSON.parse(readFileSync(join(directory, 'attestation-policy.json'), 'utf8'));
   policy.activation.status = 'active';

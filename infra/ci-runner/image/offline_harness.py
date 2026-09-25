@@ -186,13 +186,22 @@ def overlay(base, work):
             subprocess.run(["umount", "--lazy", "--recursive", str(mount)], check=False)
 
 
+STUB_RESOLV_CONF = "nameserver 127.0.0.53\noptions edns0 trust-ad\nsearch .\n"
+
+
 def prepare_chroot(merged, store, inputs):
     real = merged / "usr/bin/systemctl.certigo-real"
     if not real.exists():
         os.rename(merged / "usr/bin/systemctl", real)
     (merged / "usr/bin/systemctl").write_text(SYSTEMCTL_RECORDER, encoding="utf-8")
     os.chmod(merged / "usr/bin/systemctl", 0o755)
-    shutil.copy2("/etc/resolv.conf", merged / "etc/resolv.conf", follow_symlinks=True)
+    # Keep the image's systemd-resolved stub link; /run is a fresh tmpfs here.
+    resolv = merged / "etc/resolv.conf"
+    if resolv.is_symlink():
+        target = Path(os.path.normpath(Path("/etc") / os.readlink(resolv)))
+        resolv = merged / target.relative_to("/")
+        resolv.parent.mkdir(parents=True, exist_ok=True)
+    resolv.write_text(STUB_RESOLV_CONF, encoding="utf-8")
     input_target = merged / INPUT_DIR.lstrip("/")
     store_target = merged / STORE_DIR.lstrip("/")
     shutil.copytree(inputs, input_target, symlinks=False)
@@ -342,17 +351,21 @@ def post_install_checks(merged, legacy_inventory):
         report["runtime"][name] = {"returncode": result.returncode,
                                    "output": (result.stdout + result.stderr)[-1500:]}
     if legacy_inventory:
+        # Same tree, same roots: the previous per-file implementation is the oracle.
         (merged / "tmp/legacy-inventory.sh").write_bytes(Path(legacy_inventory).read_bytes())
         outputs = {}
-        for name, script in (("legacy", "/tmp/legacy-inventory.sh"),
-                             ("batched", "/usr/local/sbin/certigo-inventory-toolchain")):
+        for name, command in (("legacy", ["bash", "/tmp/legacy-inventory.sh"]),
+                              ("batched", ["bash", "/usr/local/sbin/certigo-inventory-toolchain",
+                                           "--roots-only"])):
             started = time.monotonic()
-            result = chroot_run(merged, "bash", script, f"/tmp/inventory-{name}.tsv",
+            result = chroot_run(merged, *command, f"/tmp/inventory-{name}.tsv",
                                 env=chroot_env(LC_ALL="C"), timeout=14400)
             require(result.returncode == 0, f"{name} inventory failed: {result.stderr[-2000:]}")
+            lines = (merged / f"tmp/inventory-{name}.tsv").read_bytes().splitlines(keepends=True)
+            roots = (b"/opt/certigo/toolchains", b"/opt/actions-runner", b"/opt/az")
+            kept = [line for line in lines if line.split(b"\t")[3].startswith(roots)]
             outputs[name] = {"seconds": round(time.monotonic() - started, 1),
-                             "sha256": file_hash(merged / f"tmp/inventory-{name}.tsv"),
-                             "records": len((merged / f"tmp/inventory-{name}.tsv").read_text().splitlines())}
+                             "rootRecords": len(kept), "sha256": sha256(b"".join(kept))}
         outputs["identical"] = outputs["legacy"]["sha256"] == outputs["batched"]["sha256"]
         report["inventoryEquivalence"] = outputs
         require(outputs["identical"], "Batched inventory differs from the legacy inventory")

@@ -96,16 +96,18 @@ test('image builder is inert by default and distributes an explicit excluded ver
     (imageBuild.match(/if \(effectiveDeploymentEnabled\)/g) ?? []).length,
     3,
   );
+  const customizeBlock = imageBuild.slice(imageBuild.indexOf('customize: ['));
   assert.ok(
-    imageBuild.indexOf("name: 'block-imds-before-network'") <
-      imageBuild.lastIndexOf('inputCustomizers'),
+    customizeBlock.indexOf("name: 'block-imds-before-network'") <
+      customizeBlock.indexOf('acquireClosedArtifactSet'),
   );
   assert.match(imageBuild, /iptables -C OUTPUT -d 169\.254\.169\.254\/32 -j REJECT/);
   assert.match(imageBuild, /IMDS remained reachable before image network access/);
   assert.match(imageBuild, /Microsoft\.VirtualMachineImages\/imageTemplates@2025-10-01/);
   assert.match(imageBuild, /galleryImageId: galleryImageVersionId/);
   assert.match(imageBuild, /excludeFromLatest: true/);
-  assert.match(imageBuild, /sha256Checksum: input\.sha256/);
+  assert.match(imageBuild, /sha256sum --check --strict \.\.\/certigo-image-inputs\.sha256/);
+  assert.doesNotMatch(imageBuild, /type: 'File'|sourceUri|raw\.githubusercontent/);
   assert.match(imageBuild, /type: 'UserAssigned'/);
   assert.doesNotMatch(imageBuild, /clientSecret|passwordAuthentication|\/latest/i);
 });
@@ -771,7 +773,7 @@ test('release evidence requires cold/warm samples, attestations, and exact rollb
         targetImageId: evidence.imageBuild.galleryImageVersionId,
       },
     ),
-    /exhaustive offline network input consumption is not implemented/,
+    /the offline installer is not admitted until review, CI and explicit approval/,
   );
   const tampered = structuredClone(whatIf);
   tampered.changes[0].delta[0].after = `${imagePrefix}9.9.9`;

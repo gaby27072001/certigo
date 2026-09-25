@@ -248,6 +248,8 @@ class Installer:
             "DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE": "1",
             "DOTNET_GENERATE_ASPNET_CERTIFICATE": "false",
             "AZURE_CORE_COLLECT_TELEMETRY": "false",
+            # Seeded by seed_azure_cli_versions(): see its docstring.
+            "AZURE_CONFIG_DIR": str(self.work / "azure"),
             "NPM_CONFIG_UPDATE_NOTIFIER": "false",
         }
         base.update(extra)
@@ -495,6 +497,28 @@ class Installer:
         self.run("apt.check", ["apt-get", "check"])
         audit = self.run("dpkg.audit", ["dpkg", "--audit"]).stdout
         require(not audit.strip(), "dpkg reports half-installed packages")
+        self.seed_azure_cli_versions()
+
+    def seed_azure_cli_versions(self):
+        """Keep Azure CLI from checking its latest version during installation.
+
+        Azure CLI 2.89.0 runs handle_version_update() in AzCli.__init__, before any
+        command: with an empty versionCheck.json it sends a HEAD request to
+        azcliprod.blob.core.windows.net (util.py get_cached_latest_versions ->
+        check_connectivity), whatever the command and with telemetry disabled. The
+        installer's private configuration directory is seeded offline with the
+        locally installed versions, computed by Azure CLI's own code.
+        """
+        config = self.work / "azure"
+        config.mkdir(mode=0o700, exist_ok=True)
+        code = ("import datetime, json, sys\n"
+                "from azure.cli.core.util import _get_local_versions\n"
+                "versions = _get_local_versions()\n"
+                "assert versions['core']['local'], versions\n"
+                "json.dump({'versions': versions, 'update_time': str(datetime.datetime.now())},\n"
+                "          open(sys.argv[1], 'w'))\n")
+        self.run("azure-cli.version-cache", ["/opt/az/bin/python3", "-E", "-s", "-c", code,
+                                             config / "versionCheck.json"])
 
     # ------------------------------------------------------------------ runner
     def install_runner(self):
