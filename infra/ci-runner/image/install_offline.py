@@ -45,6 +45,7 @@ CHILD_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 RUNNER_LABELS = "certigo-pr-image-canary"
 SENTINEL_PROBE = "certigo-sentinel-self-test.invalid"
 TEST_NET = "192.0.2.1"
+TEST_NET6 = "2001:db8::1"
 APT_AUTOMATION_UNITS = (
     "apt-daily.timer", "apt-daily-upgrade.timer", "apt-daily.service",
     "apt-daily-upgrade.service", "unattended-upgrades.service",
@@ -83,19 +84,24 @@ PATCHING_FILES = {
 
 
 class NetworkSentinel:
-    """Record DNS queries and TCP connections attempted inside the namespace.
+    """Record every network attempt made inside the namespace.
 
-    With AnyIP routes, every IPv4/IPv6 destination is local to the namespace,
-    so connections reach these listeners instead of failing silently.
+    With AnyIP routes, every IPv4/IPv6 destination is local to the namespace:
+    connections reach these listeners (DNS names, TCP ports) instead of failing
+    silently. Connection-tracking counters on OUTPUT also count every NEW flow,
+    whatever the protocol or port (TCP, UDP/QUIC, ICMP, raw), IPv4 and IPv6.
     """
 
     TCP_PORTS = (22, 53, 80, 443, 9418, 11371)
+    CHAIN = "CERTIGO_ATTEMPTS"
+    COUNTED = {"iptables": ("tcp", "udp", "icmp"), "ip6tables": ("tcp", "udp", "ipv6-icmp")}
 
     def __init__(self):
         self.events = []
         self._lock = threading.Lock()
         self._sockets = []
         self._stopping = threading.Event()
+        self._counter_tools = []
 
     def record(self, **event):
         with self._lock:
@@ -108,6 +114,36 @@ class NetworkSentinel:
     def clear(self):
         with self._lock:
             self.events.clear()
+        for tool in self._counter_tools:
+            subprocess.run([tool, "-w", "-Z", self.CHAIN], check=True, capture_output=True)
+
+    def install_counters(self, ipv6):
+        for tool, protocols in self.COUNTED.items():
+            if tool == "ip6tables" and not ipv6:
+                continue
+            commands = [["-N", self.CHAIN],
+                        ["-A", "OUTPUT", "-m", "conntrack", "--ctstate", "NEW", "-j", self.CHAIN]]
+            commands += [["-A", self.CHAIN, "-p", protocol, "-j", "RETURN"] for protocol in protocols]
+            commands.append(["-A", self.CHAIN, "-j", "RETURN"])
+            for arguments in commands:
+                result = subprocess.run([tool, "-w", *arguments], capture_output=True, text=True)
+                require(result.returncode == 0,
+                        f"Network attempt counters unavailable ({tool}): {result.stderr.strip()}")
+            self._counter_tools.append(tool)
+
+    def counters(self):
+        """New flows per family and protocol since the last clear()."""
+        counts = {}
+        for tool in self._counter_tools:
+            output = subprocess.run([tool, "-w", "-L", self.CHAIN, "-n", "-v", "-x"],
+                                    check=True, capture_output=True, text=True).stdout
+            rules = [line.split() for line in output.splitlines()[2:] if line.strip()]
+            labels = [*self.COUNTED[tool], "other"]
+            require(len(rules) == len(labels), f"Unexpected {tool} counter chain")
+            family = "ipv6" if tool == "ip6tables" else "ipv4"
+            for label, fields in zip(labels, rules):
+                counts[f"{family}/{label}"] = int(fields[0])
+        return counts
 
     def _bind(self, family, kind, port):
         sock = socket.socket(family, kind)
@@ -223,6 +259,43 @@ class NetworkSentinel:
                     self.record(protocol="tcp", destination=destination, port=port)
 
 
+def self_test(sentinel, ipv6=True):
+    """Prove that names, listened ports and unlisted flows are observed, then reset."""
+    try:
+        socket.getaddrinfo(SENTINEL_PROBE, 443)
+    except socket.gaierror:
+        pass
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(2)
+        try:
+            probe.connect((TEST_NET, 443))
+        except OSError:
+            pass
+    # An unlisted UDP port, as QUIC or a custom protocol would use.
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        probe.sendto(b"certigo-sentinel", (TEST_NET, 4433))
+    counted_ipv6 = ipv6 and "ip6tables" in sentinel._counter_tools
+    if counted_ipv6:
+        with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as probe:
+            probe.sendto(b"certigo-sentinel", (TEST_NET6, 4433))
+    deadline = time.monotonic() + 5
+    while True:
+        events = sentinel.snapshot()
+        counts = sentinel.counters()
+        dns = any((event.get("query") or "").startswith(SENTINEL_PROBE) for event in events)
+        tcp = any(event.get("protocol") == "tcp" and event.get("destination") == TEST_NET
+                  for event in events)
+        flows = (counts.get("ipv4/udp", 0) >= 2 and counts.get("ipv4/tcp", 0) >= 1 and
+                 (not counted_ipv6 or counts.get("ipv6/udp", 0) >= 1))
+        if (dns and tcp and flows) or time.monotonic() > deadline:
+            break
+        time.sleep(0.1)
+    require(dns, "Network sentinel did not observe its DNS self-test")
+    require(tcp, "Network sentinel did not observe its TCP self-test")
+    require(flows, f"Network flow counters did not observe the self-test: {counts}")
+    sentinel.clear()
+
+
 class Installer:
     def __init__(self, inputs, store, contract_sha256, work):
         self.inputs = Path(inputs)
@@ -336,6 +409,7 @@ class Installer:
             (reproducibility["aptPackageLockSha256"], "apt-packages.lock.json"),
             (reproducibility["flutterEngineArtifactLockSha256"],
              "flutter-engine-artifacts.lock.json"),
+            (reproducibility["pythonWheelLockSha256"], "python-wheels.lock.json"),
         )
         for digest, name in checks:
             require(digest == file_hash(self.input(name)), f"Lock input is stale: {name}")
@@ -370,40 +444,27 @@ class Installer:
         self.run("network.loopback", ["ip", "link", "set", "lo", "up"])
         self.run("network.anyip4", ["ip", "route", "add", "local", "0.0.0.0/0", "dev", "lo"])
         families = [socket.AF_INET]
-        if Path("/proc/net/if_inet6").exists():
+        ipv6 = Path("/proc/net/if_inet6").exists()
+        if ipv6:
             self.run("network.anyip6", ["ip", "-6", "route", "add", "local", "::/0", "dev", "lo"])
             families.append(socket.AF_INET6)
-        self.sentinel = NetworkSentinel().start(families=families)
-        try:
-            socket.getaddrinfo(SENTINEL_PROBE, 443)
-        except socket.gaierror:
-            pass
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-            probe.settimeout(2)
-            try:
-                probe.connect((TEST_NET, 443))
-            except OSError:
-                pass
-        deadline = time.monotonic() + 5
-        while time.monotonic() < deadline:
-            events = self.sentinel.snapshot()
-            dns = any((e.get("query") or "").startswith(SENTINEL_PROBE) for e in events)
-            tcp = any(e.get("protocol") == "tcp" and e.get("destination") == TEST_NET
-                      for e in events)
-            if dns and tcp:
-                break
-            time.sleep(0.1)
-        require(dns, "Network sentinel did not observe its DNS self-test")
-        require(tcp, "Network sentinel did not observe its TCP self-test")
-        self.sentinel.clear()
+        sentinel = NetworkSentinel().start(families=families)
+        sentinel.install_counters(ipv6)
+        self_test(sentinel, ipv6)
+        self.sentinel = sentinel
 
     def assert_no_network_attempt(self, step):
-        events = self.sentinel.snapshot() if self.sentinel else []
+        if self.sentinel is None:
+            return
+        events = self.sentinel.snapshot()
+        counts = {name: count for name, count in self.sentinel.counters().items() if count}
         if events:
             first = events[0]
             target = first.get("query") or f"{first.get('destination')}:{first.get('port')}"
             raise ValueError(f"Unexpected network attempt during {step}: "
-                             f"{first['protocol']} {target} ({len(events)} recorded)")
+                             f"{first['protocol']} {target} ({len(events)} recorded, flows {counts})")
+        if counts:
+            raise ValueError(f"Unexpected network attempt during {step}: new flows {counts}")
 
     # --------------------------------------------------------------------- APT
     def dpkg_state(self):
@@ -469,9 +530,15 @@ class Installer:
         self.require_no_apt_source("after source removal")
 
     def require_no_apt_source(self, when):
-        targets = self.run("apt.indextargets", ["apt-get", "indextargets", "--format", "$(URI)"]).stdout
+        # --no-release-info: a source whose Release file was never fetched must
+        # already count, before any `apt-get update` could contact it.
+        targets = self.run("apt.indextargets", ["apt-get", "indextargets", "--no-release-info",
+                                                "--format", "$(URI)"]).stdout
         if targets.strip():
             raise ValueError(f"Remote APT source configured {when}: {targets.split()[0]}")
+        parts = Path("/etc/apt/sources.list.d")
+        if parts.exists() and any(parts.iterdir()):
+            raise ValueError(f"APT source file present {when}: {sorted(parts.iterdir())[0]}")
 
     def install_debs(self):
         staged = self.stage("deb", "debs")
@@ -841,7 +908,9 @@ class Installer:
             "closedArtifactSetSha256": closed_set_sha256(self.items),
             "offlineInstallerSha256": file_hash(self.input("install_offline.py")),
             "contractSha256": self.contract_sha256,
+            # Checked after every command: named DNS/TCP attempts and NEW-flow counters.
             "networkAttempts": [],
+            "networkFlowCounters": sorted(self.sentinel.counters()),
             "pythonPackageVersion": python_package,
             "installTimings": self.timings,
             "binarySha256": binaries,
@@ -876,6 +945,7 @@ class Installer:
         self.neutralize_guest_patching()
         self.seal_and_attest()
         self.validate()
+        self.assert_no_network_attempt("installation end")
         events = self.sentinel.stop()
         require(not events, f"Unexpected network attempts: {events[:3]}")
         print(f"Offline image installation completed: {len(self.items)} verified artifacts, "

@@ -260,19 +260,28 @@ def observe(merged, *command):
 
 OBSERVER = "/tmp/certigo-harness-observe.py"
 OBSERVER_SOURCE = f"""
-import json, socket, subprocess, sys, time
+import json, os, socket, subprocess, sys, time
 sys.path.insert(0, {INPUT_DIR!r})
-from install_offline import NetworkSentinel
+from install_offline import NetworkSentinel, self_test
 subprocess.run(["ip", "link", "set", "lo", "up"], check=True)
 subprocess.run(["ip", "route", "add", "local", "0.0.0.0/0", "dev", "lo"], check=True)
-sentinel = NetworkSentinel().start(families=(socket.AF_INET,))
+ipv6 = os.path.exists("/proc/net/if_inet6")
+families = [socket.AF_INET]
+if ipv6:
+    subprocess.run(["ip", "-6", "route", "add", "local", "::/0", "dev", "lo"], check=True)
+    families.append(socket.AF_INET6)
+sentinel = NetworkSentinel().start(families=families)
+sentinel.install_counters(ipv6)
+self_test(sentinel, ipv6)
 result = subprocess.run(sys.argv[1:], capture_output=True, text=True, errors="replace",
                         env={{"PATH": {CHILD_PATH!r}, "LANG": "C.UTF-8",
                              "DEBIAN_FRONTEND": "noninteractive"}})
 time.sleep(1)
+flows = {{name: count for name, count in sentinel.counters().items() if count}}
 events = sentinel.stop()
 print(json.dumps({{"returncode": result.returncode, "output": (result.stdout + result.stderr)[-3000:],
-                  "events": events[:20], "eventCount": len(events)}}))
+                  "events": events[:20], "eventCount": len(events), "flows": flows,
+                  "attempts": len(events) + sum(flows.values())}}))
 """
 DRIFT_PACKAGE = """Package: certigo-drift-probe
 Version: 1.0
@@ -281,27 +290,66 @@ Maintainer: Certigo harness <noreply@example.invalid>
 Description: Harness-only package simulating guest patching drift
 """
 CONTROL_SOURCE = "deb http://azure.archive.ubuntu.com/ubuntu/ noble main\n"
+# Flows the listeners cannot name: only the connection-tracking counters see them.
+SENTINEL_CONTROLS = {
+    "udp-quic-443": ["python3", "-c", "import socket; s = socket.socket(socket.AF_INET, "
+                     "socket.SOCK_DGRAM); s.sendto(b'x', ('198.51.100.7', 443))"],
+    "tcp-8443": ["python3", "-c", "import socket\ntry:\n socket.create_connection("
+                 "('198.51.100.7', 8443), timeout=2)\nexcept OSError:\n pass"],
+    "ipv6-tcp-443": ["python3", "-c", "import socket\ntry:\n socket.create_connection("
+                     "('2001:db8::7', 443), timeout=2)\nexcept OSError:\n pass"],
+    "icmp-echo": ["ping", "-c", "1", "-W", "1", "198.51.100.7"],
+}
 
 
 def validate_boot(merged):
-    return chroot_run(merged, "/usr/local/sbin/certigo-validate-toolchain", "--boot")
+    return observe(merged, "/usr/local/sbin/certigo-validate-toolchain", "--boot")
 
 
 def expect_validation(merged, message):
     result = validate_boot(merged)
-    output = result.stdout + result.stderr
+    output = result["output"]
+    require(result["attempts"] == 0,
+            f"Boot validation attempted network access: {result['events'][:3]} {result['flows']}")
     if message is None:
-        require(result.returncode == 0, f"Boot validation failed: {output[-2000:]}")
+        require(result["returncode"] == 0, f"Boot validation failed: {output[-2000:]}")
     else:
-        require(result.returncode != 0 and message in output,
+        require(result["returncode"] != 0 and message in output,
                 f"Boot validation did not refuse for the expected reason ({message}): {output[-2000:]}")
-    return {"returncode": result.returncode, "reason": message or "valid"}
+    return {"returncode": result["returncode"], "reason": message or "valid", "attempts": 0}
+
+
+RUNNER_ENV = ["HOME=/tmp/certigo-runner-home", "CI=true", "FLUTTER_ALREADY_LOCKED=true",
+              "FLUTTER_SUPPRESS_ANALYTICS=true", "DOTNET_CLI_HOME=/tmp/certigo-dotnet",
+              "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1", "DOTNET_NOLOGO=1", "DOTNET_CLI_TELEMETRY_OPTOUT=1"]
+# probe -> (command, expected output prefix or None for a known defect)
+RUNNER_PROBES = {
+    "dotnet": (["/usr/local/bin/dotnet", "--version"], "8.0.424"),
+    "node": (["/usr/local/bin/node", "--version"], "v20.20.2"),
+    "npm": (["/usr/local/bin/npm", "--version"], "10.8.2"),
+    "checkov": (["/usr/local/bin/checkov", "--version"], "3.2.495"),
+    "python3": (["/usr/local/bin/python3", "--version"], "Python 3.12.3"),
+    "bicep": (["/usr/local/bin/bicep", "--version"], "Bicep CLI version 0.44.1"),
+    "actionlint": (["/usr/local/bin/actionlint", "-version"], "1.7.12"),
+    "dart-format-3.6.0": (["/usr/local/bin/dart-format-3.6.0", "--version"], "Dart SDK version: 3.6.0"),
+}
+# Defect 6 (README): the sealed SDK is read-only for runner. Kept red on purpose, with
+# the exact failure, so that any other cause or a silent fix is noticed.
+KNOWN_DEFECT_6 = {
+    "flutter": (["/usr/local/bin/flutter", "--version"],
+                ("bin/cache/engine.stamp.tmp.", "Permission denied")),
+    "dart": (["/usr/local/bin/dart", "--version"],
+             ("bin/cache/engine.stamp.tmp.", "Permission denied")),
+    "validate-job": (["/usr/local/sbin/certigo-validate-toolchain", "--job"],
+                     ("Toolchain validation failed: flutter probe failed",)),
+}
 
 
 def post_install_checks(merged, legacy_inventory):
-    """Guest patching simulation, runtime measurements, then drift detection at boot."""
+    """Guest patching simulation, sentinel controls, runner probes, then drift at boot."""
     (merged / OBSERVER.lstrip("/")).write_text(OBSERVER_SOURCE, encoding="utf-8")
-    report = {"patching": {}, "drift": {}, "runtime": {}}
+    report = {"patching": {}, "sentinelControls": {}, "drift": {}, "runtime": {},
+              "knownDefects": {}}
     commands = {
         "lpe.refresh": ["apt-get", "-q", "update"],
         "lpe.assessment": ["apt-get", "-s", "dist-upgrade"],
@@ -311,7 +359,7 @@ def post_install_checks(merged, legacy_inventory):
     }
     for name, command in commands.items():
         report["patching"][name] = observe(merged, *command)
-        require(report["patching"][name]["eventCount"] == 0,
+        require(report["patching"][name]["attempts"] == 0,
                 f"{name} attempted network access in the final image")
     require(report["patching"]["lpe.refresh"]["returncode"] == 0, "apt-get update failed")
     require("0 upgraded, 0 newly installed" in report["patching"]["lpe.assessment"]["output"],
@@ -320,34 +368,47 @@ def post_install_checks(merged, legacy_inventory):
             "Unable to locate package ubuntu-advantage-tools" in
             report["patching"]["lpe.pro-client"]["output"],
             "The platform Pro client installation did not fail for lack of source")
+    for name, command in SENTINEL_CONTROLS.items():
+        control = observe(merged, *command)
+        report["sentinelControls"][name] = {"flows": control["flows"], "events": control["eventCount"]}
+        require(control["attempts"] > 0, f"Sentinel control not observed: {name}")
     report["drift"]["valid"] = expect_validation(merged, None)
-    runtime = {
-        "validate-job": ["/usr/local/sbin/certigo-validate-toolchain", "--job"],
-        "flutter": ["/usr/local/bin/flutter", "--version"],
-        "dart": ["/usr/local/bin/dart", "--version"],
-        "dotnet": ["/usr/local/bin/dotnet", "--version"],
-        "node": ["/usr/local/bin/node", "--version"],
-        "checkov": ["/usr/local/bin/checkov", "--version"],
-    }
-    for name, command in runtime.items():
-        result = chroot_run(merged, "runuser", "-u", "runner", "--", "env",
-                            "HOME=/tmp/certigo-runner-home", "CI=true",
-                            "FLUTTER_ALREADY_LOCKED=true", "DOTNET_CLI_HOME=/tmp/certigo-dotnet",
-                            "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1", "DOTNET_NOLOGO=1",
-                            "DOTNET_CLI_TELEMETRY_OPTOUT=1", *command, timeout=900)
-        report["runtime"][name] = {"returncode": result.returncode,
-                                   "output": (result.stdout + result.stderr)[-1500:]}
+    def as_runner(command):
+        result = chroot_run(merged, "runuser", "-u", "runner", "--", "env", *RUNNER_ENV, *command,
+                            timeout=1800)
+        output = (result.stdout + result.stderr).strip()
+        return result.returncode, output, {"returncode": result.returncode, "output": output[-1500:]}
+
+    for name, (command, expected) in RUNNER_PROBES.items():
+        returncode, output, entry = as_runner(command)
+        require(returncode == 0 and expected in output,
+                f"Runner probe {name} failed or reported an unexpected version: {output[-800:]}")
+        report["runtime"][name] = entry
+    for name, (command, markers) in KNOWN_DEFECT_6.items():
+        returncode, output, entry = as_runner(command)
+        require(returncode != 0 and all(marker in output for marker in markers),
+                f"{name}: known defect 6 changed, update the harness and README: {output[-800:]}")
+        report["knownDefects"][name] = entry
+    report["runnerRuntime"] = "blocked by defect 6: Flutter and Dart unusable by runner"
     control = merged / "etc/apt/sources.list.d/certigo-harness-control.list"
     control.write_text(CONTROL_SOURCE, encoding="utf-8")
+    # Refused BEFORE any refresh could contact the new source.
+    report["drift"]["remote-source-before-update"] = expect_validation(
+        merged, "a remote APT source is configured")
     report["patching"]["control.refresh-with-source"] = observe(merged, "apt-get", "-q", "update")
-    require(report["patching"]["control.refresh-with-source"]["eventCount"] > 0,
+    require(report["patching"]["control.refresh-with-source"]["attempts"] > 0,
             "Positive control failed: the sentinel missed a refresh with a remote source")
-    report["drift"]["remote-source"] = expect_validation(merged, "a remote APT source is configured")
     control.unlink()
     for entry in (merged / "var/lib/apt/lists").iterdir():
         if entry.is_file() and entry.name != "lock":
             entry.unlink()
     report["drift"]["valid-after-source-removal"] = expect_validation(merged, None)
+    seed = merged / "var/lib/snapd/seed/snaps"
+    seed.mkdir(parents=True, exist_ok=True)
+    (seed / "certigo-drift_1.snap").write_bytes(b"harness drift probe\n")
+    report["drift"]["seeded-snap"] = expect_validation(
+        merged, "a snap package is installed or seeded")
+    (seed / "certigo-drift_1.snap").unlink()
     unmask = chroot_run(merged, "systemctl", "unmask", "apt-daily.timer")
     require(unmask.returncode == 0, f"unmask failed: {unmask.stderr}")
     report["drift"]["unmasked-timer"] = expect_validation(merged, "apt-daily.timer is not masked")
@@ -488,9 +549,74 @@ def run_scenario(name, base, store, work_root, legacy_inventory):
     return outcome
 
 
+def bound_digests():
+    """Digests that a committed execution report must match to stay valid."""
+    contract = read_json(ROOT / CONTRACT)
+    inputs = [{key: item[key] for key in ("id", "path", "destination", "sha256")}
+              for item in contract["inputs"]]
+    canonical = json.dumps(inputs, sort_keys=True, separators=(",", ":")).encode()
+    return {
+        "contractInputsSha256": sha256(canonical),
+        "reproducibility": {key: contract["reproducibility"][key] for key in (
+            "aptPackageLockSha256", "flutterEngineArtifactLockSha256", "pythonWheelLockSha256")},
+        "closedArtifactSetSha256": image_artifacts.closed_set_sha256(closed_set()),
+        "harnessSha256": file_hash(Path(__file__).resolve()),
+    }
+
+
+def summarize(outcome):
+    summary = {key: outcome[key] for key in ("scenario", "passed", "returncode", "seconds",
+                                             "expectedReason")}
+    refusal = [line for line in outcome["output"].splitlines() if "refused:" in line]
+    summary["observedReason"] = refusal[0].split("refused: ", 1)[1] if refusal else None
+    post = outcome.get("postInstall")
+    if post:
+        summary["dpkgPackages"] = outcome["dpkgPackages"]
+        summary["attestation"] = {key: outcome["attestation"][key] for key in (
+            "dpkgStateSha256", "closedArtifactSetSha256", "networkAttempts",
+            "networkFlowCounters", "toolchainInventorySha256")}
+        summary["installSeconds"] = round(sum(t["seconds"] for t in
+                                              outcome["attestation"]["installTimings"]), 1)
+        summary["patching"] = {name: {"returncode": item["returncode"], "attempts": item["attempts"]}
+                               for name, item in post["patching"].items()}
+        summary["sentinelControls"] = post["sentinelControls"]
+        summary["drift"] = post["drift"]
+        summary["runtime"] = {name: item["output"].splitlines()[-1] if item["output"] else ""
+                              for name, item in post["runtime"].items()}
+        summary["knownDefects"] = {name: item["returncode"] for name, item in
+                                   post["knownDefects"].items()}
+        summary["runnerRuntime"] = post["runnerRuntime"]
+        summary["inventoryEquivalence"] = post.get("inventoryEquivalence")
+    if outcome.get("postInstallError"):
+        summary["postInstallError"] = outcome["postInstallError"][-800:]
+    return summary
+
+
+def write_evidence(reports, output):
+    current = bound_digests()
+    scenarios, environments = [], set()
+    for path in reports:
+        report = read_json(path)
+        require(report.get("boundDigests") == current,
+                f"Harness report {path} does not match the current inputs, locks or harness")
+        environments.add(report["qemu"])
+        scenarios.extend(summarize(result) for result in report["results"])
+    names = [scenario["scenario"] for scenario in scenarios]
+    require(sorted(names) == sorted(SCENARIOS), f"Evidence must cover every scenario once: {names}")
+    require(all(scenario["passed"] for scenario in scenarios), "A scenario did not pass")
+    write_json(output, {"schemaVersion": 1, "measuredAt": time.strftime("%Y-%m-%d", time.gmtime()),
+                        "environment": {"host": "WSL2 Ubuntu 26.04 ARM64, amd64 through qemu-user",
+                                        "qemu": sorted(environments)},
+                        "boundDigests": current,
+                        "scenarios": sorted(scenarios,
+                                            key=lambda item: list(SCENARIOS).index(item["scenario"]))})
+    print(f"Execution evidence written for {len(scenarios)} scenarios.")
+
+
 def run_suite(rootfs, store, report_path, scenarios, legacy_inventory):
     base = verified_base(rootfs)
     image_artifacts.verify_store(store, closed_set())
+    digests = bound_digests()
     results = []
     with tempfile.TemporaryDirectory(prefix="certigo-suite-", dir=rootfs.parent) as tmp:
         for name in scenarios:
@@ -500,7 +626,8 @@ def run_suite(rootfs, store, report_path, scenarios, legacy_inventory):
             print(f"=== {name}: {'PASS' if outcome['passed'] else 'FAIL'} "
                   f"(exit {outcome['returncode']}, {outcome['seconds']} s)", flush=True)
             write_json(report_path, {"measuredAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                                     "qemu": qemu_version(), "results": results})
+                                     "qemu": qemu_version(), "boundDigests": digests,
+                                     "results": results})
     require(all(result["passed"] for result in results), "At least one scenario failed")
     print(f"All {len(results)} scenarios passed.")
 
@@ -568,6 +695,9 @@ def main():
     suite.add_argument("--scenario", action="append", choices=sorted(SCENARIOS))
     suite.add_argument("--legacy-inventory", type=Path,
                        help="Previous inventory-toolchain.sh, compared on the installed image")
+    evidence = sub.add_parser("evidence")
+    evidence.add_argument("--report", type=Path, action="append", required=True)
+    evidence.add_argument("--output", type=Path, default=ROOT / "offline-execution-evidence.json")
     args = parser.parse_args()
     if args.command == "acquire-base":
         acquire_base(args.store.resolve())
@@ -580,6 +710,8 @@ def main():
     elif args.command == "run-suite":
         run_suite(args.rootfs.resolve(), args.store.resolve(), args.report.resolve(),
                   args.scenario or list(SCENARIOS), args.legacy_inventory)
+    elif args.command == "evidence":
+        write_evidence(args.report, args.output)
 
 
 if __name__ == "__main__":

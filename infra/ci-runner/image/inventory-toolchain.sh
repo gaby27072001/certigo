@@ -16,12 +16,12 @@ output="$1"
 toolchain_root="${CERTIGO_TOOLCHAIN_ROOT:-/opt/certigo/toolchains}"
 runner_home="${CERTIGO_RUNNER_HOME:-/opt/actions-runner}"
 azure_cli_root="${CERTIGO_AZURE_CLI_ROOT:-/opt/az}"
-roots=("${toolchain_root}" "${runner_home}" "${azure_cli_root}")
+# Whole trees, so any added APT source, preference, apt.conf fragment or
+# cloud-init override is seen, not only the files written by the installer.
+apt_root="${CERTIGO_APT_ROOT:-/etc/apt}"
+cloud_config_root="${CERTIGO_CLOUD_CONFIG_ROOT:-/etc/cloud/cloud.cfg.d}"
+roots=("${toolchain_root}" "${runner_home}" "${azure_cli_root}" "${apt_root}" "${cloud_config_root}")
 entries=(
-  /etc/apt/apt.conf.d/20auto-upgrades
-  /etc/apt/apt.conf.d/99certigo-immutable-image
-  /etc/apt/sources.list
-  /etc/cloud/cloud.cfg.d/99-certigo-immutable-image.cfg
   /etc/gitconfig
   /etc/systemd/system/apt-daily-upgrade.service
   /etc/systemd/system/apt-daily-upgrade.timer
@@ -104,7 +104,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
 
 # Records are tab separated: a tab or newline in a name would be ambiguous.
-unsafe="$(find "${roots[@]}" -xdev \( -name $'*\t*' -o -name $'*\n*' -o -lname $'*\t*' \
+unsafe="$(select_paths \( -name $'*\t*' -o -name $'*\n*' -o -lname $'*\t*' \
   -o -lname $'*\n*' \) -print -quit)"
 [[ -z "${unsafe}" ]] || {
   echo "Unsupported file name in immutable toolchain: ${unsafe}" >&2

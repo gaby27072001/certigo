@@ -87,10 +87,11 @@ test('image builder is inert by default and distributes an explicit excluded ver
   assert.match(imageBuild, /autoRun:\s*\{\s*state: 'Disabled'/s);
   assert.match(
     imageBuild,
-    /reproducibilityReady = contract\.policy\.reproducibleInputsReady && contract\.reproducibility\.status == 'locked' && aptInputsReady && flutterInputsReady/,
+    /reproducibilityReady = contract\.policy\.reproducibleInputsReady && contract\.reproducibility\.status == 'locked' && aptInputsReady && flutterInputsReady && pythonInputsReady/,
   );
   assert.match(imageBuild, /aptPackageLockSha256\)\) == 64/);
   assert.match(imageBuild, /flutterEngineArtifactLockSha256\)\) == 64/);
+  assert.match(imageBuild, /pythonWheelLockSha256\)\) == 64/);
   assert.match(imageBuild, /effectiveDeploymentEnabled = deploymentEnabled && reproducibilityReady && networkInstallerImplemented/);
   assert.equal(
     (imageBuild.match(/if \(effectiveDeploymentEnabled\)/g) ?? []).length,
@@ -121,7 +122,7 @@ test('canary is a new capacity-one PR-only boundary with no identity or IMDS', (
   assert.match(canary, /param deploymentEnabled bool = false/);
   assert.match(
     canary,
-    /reproducibleInputsReady = buildContract\.policy\.reproducibleInputsReady && buildContract\.reproducibility\.status == 'locked' && aptInputsReady && flutterInputsReady/,
+    /reproducibleInputsReady = buildContract\.policy\.reproducibleInputsReady && buildContract\.reproducibility\.status == 'locked' && aptInputsReady && flutterInputsReady && pythonInputsReady/,
   );
   assert.match(canary, /signerReady = attestationPolicy\.activation\.status == 'active'/);
   assert.match(
@@ -148,7 +149,7 @@ test('canary is a new capacity-one PR-only boundary with no identity or IMDS', (
   assert.match(canaryMain, /param deploymentEnabled bool = false/);
   assert.match(
     canaryMain,
-    /reproducibleInputsReady = buildContract\.policy\.reproducibleInputsReady && buildContract\.reproducibility\.status == 'locked' && aptInputsReady && flutterInputsReady/,
+    /reproducibleInputsReady = buildContract\.policy\.reproducibleInputsReady && buildContract\.reproducibility\.status == 'locked' && aptInputsReady && flutterInputsReady && pythonInputsReady/,
   );
   assert.match(canaryMain, /signerReady = attestationPolicy\.activation\.status == 'active'/);
   assert.match(

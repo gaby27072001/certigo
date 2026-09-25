@@ -28,9 +28,10 @@ var contract = loadJsonContent('image-build-contract.json')
 var networkInstallerImplemented = false
 var aptInputsReady = !empty(contract.reproducibility.aptSnapshot) && length(string(contract.reproducibility.aptPackageLockSha256)) == 64
 var flutterInputsReady = length(string(contract.reproducibility.flutterEngineArtifactLockSha256)) == 64
-var reproducibilityReady = contract.policy.reproducibleInputsReady && contract.reproducibility.status == 'locked' && aptInputsReady && flutterInputsReady
+var pythonInputsReady = length(string(contract.reproducibility.pythonWheelLockSha256)) == 64
+var reproducibilityReady = contract.policy.reproducibleInputsReady && contract.reproducibility.status == 'locked' && aptInputsReady && flutterInputsReady && pythonInputsReady
 var effectiveDeploymentEnabled = deploymentEnabled && reproducibilityReady && networkInstallerImplemented
-var contractSha256 = '5b0927cf767f1888de7b5301e95e82b191bb28b2f688689c2b97f87fb3f6b841'
+var contractSha256 = 'f76c34605bf7c9824a32157dfc1545fbc020cd050b0074031be3d1dbe0d57860'
 var galleryImageDefinitionId = resourceId(
   'Microsoft.Compute/galleries/images',
   contract.destination.galleryName,
@@ -203,7 +204,8 @@ resource imageTemplate 'Microsoft.VirtualMachineImages/imageTemplates@2025-10-01
           name: 'fail-closed-image-validation'
           inline: [
             'set -eu'
-            'sudo /usr/local/sbin/certigo-validate-toolchain --boot || exit 1'
+            // No network during validation: the validator must be provably offline.
+            'sudo unshare --net -- /usr/local/sbin/certigo-validate-toolchain --boot || exit 1'
             'sudo test ! -e /opt/actions-runner/.runner || exit 1'
             'sudo test ! -s /var/cache/certigo-runner/actions-runner-token || exit 1'
             'sudo systemctl is-enabled --quiet certigo-block-imds.service || exit 1'

@@ -129,7 +129,16 @@ expected_runner_version="$(
 expected_az_version="$(
   jq -er '.baseComponents[] | select(.id == "azure-cli") | .version' "${manifest}"
 )"
-[[ "$(az version --query '"azure-cli"' -o tsv 2>/dev/null)" == "${expected_az_version}" ]] ||
+expected_az_package="$(
+  jq -er '.baseComponents[] | select(.id == "azure-cli") | .packageVersion' "${manifest}"
+)"
+[[ "$(dpkg-query -W -f='${Version}' azure-cli 2>/dev/null)" == "${expected_az_package}" ]] ||
+  fail "Azure CLI package version mismatch"
+# Never instantiate AzCli here: its constructor checks the latest version online
+# (#341). Importing the version module stays offline.
+azure_cli_python="${CERTIGO_AZURE_CLI_ROOT:-/opt/az}/bin/python3"
+[[ "$("${azure_cli_python}" -E -s -c 'from azure.cli.core import __version__; print(__version__)' \
+  2>/dev/null)" == "${expected_az_version}" ]] ||
   fail "Azure CLI version mismatch"
 
 for field in manifestSha256 sbomSha256 pythonLockSha256 toolchainInventorySha256; do
@@ -143,15 +152,6 @@ for field in manifestSha256 sbomSha256 pythonLockSha256 toolchainInventorySha256
   [[ "$(sha256sum "${file}" | awk '{print $1}')" == "${expected}" ]] ||
     fail "${field} attestation mismatch"
 done
-current_inventory="$(mktemp)"
-trap 'rm -f "${current_inventory}"' EXIT
-/usr/local/sbin/certigo-inventory-toolchain "${current_inventory}" ||
-  fail "cannot inventory the installed toolchain"
-cmp --silent "${toolchain_inventory}" "${current_inventory}" ||
-  fail "complete toolchain inventory mismatch"
-rm -f "${current_inventory}"
-trap - EXIT
-
 # Guest patching (#341): the platform patch extension and unattended-upgrades
 # may install packages after boot. The image has no remote APT source, so they
 # resolve nothing; any package drift still fails closed here.
@@ -170,8 +170,14 @@ cmp --silent "${dpkg_state}" "${current_dpkg}" ||
   fail "installed package set differs from the attested image"
 rm -f "${current_dpkg}"
 trap - EXIT
-apt_targets="$(apt-get indextargets --format '$(URI)')" || fail "cannot read APT sources"
+# --no-release-info also lists sources whose Release file was never fetched, so a
+# regenerated source is refused before any `apt-get update` can contact it.
+apt_targets="$(apt-get indextargets --no-release-info --format '$(URI)')" ||
+  fail "cannot read APT sources"
 [[ -z "${apt_targets}" ]] || fail "a remote APT source is configured"
+if find /etc/apt/sources.list.d -mindepth 1 -print -quit | grep -q .; then
+  fail "a remote APT source is configured"
+fi
 for key in APT::Periodic::Update-Package-Lists APT::Periodic::Unattended-Upgrade; do
   value="$(
     apt-config dump | awk -v key="${key}" '$1 == key { value = $2 } END { gsub(/[";]/, "", value); print value }'
@@ -183,9 +189,19 @@ for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service \
   snapd.snap-repair.timer snapd.snap-repair.service; do
   [[ "$(readlink "/etc/systemd/system/${unit}")" == /dev/null ]] || fail "${unit} is not masked"
 done
-if compgen -G '/var/lib/snapd/snaps/*.snap' >/dev/null; then
-  fail "a snap package is installed and would refresh itself"
+if compgen -G '/var/lib/snapd/snaps/*.snap' >/dev/null ||
+  compgen -G '/var/lib/snapd/seed/snaps/*.snap' >/dev/null; then
+  fail "a snap package is installed or seeded and would refresh itself"
 fi
+
+current_inventory="$(mktemp)"
+trap 'rm -f "${current_inventory}"' EXIT
+/usr/local/sbin/certigo-inventory-toolchain "${current_inventory}" ||
+  fail "cannot inventory the installed toolchain"
+cmp --silent "${toolchain_inventory}" "${current_inventory}" ||
+  fail "complete toolchain inventory mismatch"
+rm -f "${current_inventory}"
+trap - EXIT
 
 if [[ -f "${runner_home}/.runner" ]]; then
   state_seal="/etc/certigo-runner-state.sha256"
@@ -205,10 +221,17 @@ done < <(jq -r '.binarySha256 | to_entries[] | [.key, .value] | @tsv' "${attesta
 while IFS=$'\t' read -r id command expected contains json_field; do
   command_name="${command%% *}"
   command -v "${command_name}" >/dev/null 2>&1 || fail "${id} is not installed"
+  # Probes must not phone home: bot mode (no Flutter version check), no analytics,
+  # no .NET telemetry or workload update check.
   output="$(
     LC_ALL=C \
+      CI=true \
+      FLUTTER_SUPPRESS_ANALYTICS=true \
       DOTNET_CLI_HOME=/run/certigo-dotnet \
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 \
+      DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+      DOTNET_NOLOGO=1 \
+      DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1 \
       FLUTTER_ALREADY_LOCKED=true \
       bash -c "${command}" 2>&1
   )" || fail "${id} probe failed"
@@ -229,6 +252,7 @@ done < <(
 )
 
 export DOTNET_CLI_UI_LANGUAGE=en
+export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1
 if dotnet workload list | awk '
   /^Installed Workload Id/ {list = 1; next}
   list && /^-+$/ {next}
