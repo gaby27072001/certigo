@@ -57,6 +57,24 @@ Côté client, `packages/data/lib/src/models/lesson.dart:146` ajoute une neuviè
 valeur, `unknown`, qui n'est **pas** un type publiable : c'est le repli de
 `itemTypeFrom` pour une valeur inconnue sur le fil.
 
+### Noms des types et issue #245
+
+Décision Q1 de l'orchestrateur du 2026-09-25 : les noms déjà utilisés sur le fil,
+dans le corpus, les clients installés et les tentatives stockées sont **gardés**.
+L'issue #245 employait d'autres noms ; voici la correspondance, reprise dans le
+[contrat des exercices v5](./contracts/exercise-items/v5/README.md) :
+
+| Nom dans #245 | `itemType` (fil, schéma, C#, Dart) |
+|---|---|
+| `mcq` | `mcq` |
+| `multiSelect` | `multi` |
+| `scenario` | `scenario` |
+| `spotIssue` | `spotTheIssue` |
+| `ordering` | `ordering` |
+| `fillBlank` | `cloze` |
+| `matching` | `matchPairs` |
+| — (absent de #245) | `applied` |
+
 ### Le contrat commun
 
 Le schéma donne **la même forme à tous les types** : `options` (2 à 6 paires

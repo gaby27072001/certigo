@@ -3,7 +3,7 @@
 | Champ | Valeur |
 |---|---|
 | **ADR** | 022 |
-| **Statut** | Proposé — trois décisions en attente (voir « Décisions à valider ») |
+| **Statut** | Accepté le 2026-09-25 — décisions Q1, Q2 et Q3 de l'orchestrateur, par délégation (voir « Décisions ») |
 | **Date** | 2026-09-23 |
 | **Lot** | `wp-p2-06` / #245 |
 | **Dépend de** | ADR-019 (releases runtime), `docs/GOVERNANCE.md` (expand / migrate / contract) |
@@ -58,9 +58,15 @@ manquants et des contraintes par type, sans nouveau champ côté client.
 |---|---|
 | `mcq`, `scenario`, `spotTheIssue` | `options[{id,label}]`, 2–8 |
 | `multi` | `options[{id,label}]`, 3–8 |
-| `ordering`, `applied` | `options[{id,label}]`, 2–8, publiés triés par `id` : l'ordre publié ne révèle pas la solution |
+| `ordering` | `options[{id,label}]`, 2–8, les éléments à ordonner |
+| `applied` | `options[{id,label}]`, 2–8, les étapes et d'éventuels distracteurs |
 | `cloze` | `prompt` avec N marqueurs `____` (4 soulignés ou plus, N de 1 à 6), `options[{id,label}]` = banque de mots, au moins N |
-| `matchPairs` | `options[{id,label}]` (colonne gauche) et `matches[{id,label}]` (colonne droite), même cardinal 2–8, publiés triés par `id` |
+| `matchPairs` | `options[{id,label}]` (colonne gauche) et `matches[{id,label}]` (colonne droite), même cardinal 2–8 |
+
+Pour `ordering`, `applied` et `matchPairs`, l'ordre publié ne doit pas donner la réponse
+(règles X8 et X9 du [contrat v5](../contracts/exercise-items/v5/README.md)). La première
+version de cet ADR prévoyait de publier les options « triées par `id` » : c'est écarté, car
+un tri par `id` révèle la réponse dès que les `id` encodent le rang.
 
 Aucune charge publique ne porte `correct*`, `answerKey`, `rationale`, `solution`,
 `explanation` ni `pairs`. C'est vérifié récursivement, comme en v4.
@@ -71,11 +77,14 @@ Aucune charge publique ne porte `correct*`, `answerKey`, `rationale`, `solution`
 |---|---|
 | `mcq`, `scenario`, `spotTheIssue` | exactement 1 id d'option (ensemble) |
 | `multi` | au moins 2 ids d'options (ensemble) |
-| `ordering`, `applied` | permutation de tous les ids d'options (séquence) |
+| `ordering` | permutation de tous les ids d'options (séquence) |
+| `applied` | au moins 2 ids d'options, dans l'ordre ; les options absentes sont des distracteurs (séquence) |
 | `cloze` | N ids d'options, un par marqueur, dans l'ordre des marqueurs (séquence) |
 | `matchPairs` | un jeton `"<leftId>:<rightId>"` par id de `options`, bijection vers `matches` (ensemble) |
 
-Le validateur contrôle ces contraintes par type. `rationale` reste commun.
+Le corrigé v5 porte aussi `itemType`, vérifié égal à celui de la question : le schéma seul
+impose alors les cardinalités et le motif des jetons. Le validateur contrôle les règles
+croisées question ↔ corrigé (X1 à X9 du contrat v5). `rationale` reste commun.
 
 ### 4. Soumission compatible et correction serveur autoritaire
 
@@ -102,24 +111,36 @@ un comparateur à tolérance mesurée (méthode de `manager_portal_test.dart`).
 
 ### 6. Séquence
 
-Elle suit `docs/GOVERNANCE.md` :
+Elle suit `docs/GOVERNANCE.md` et la garde `certigo-content#94` (« expand avant usage »),
+dans l'ordre imposé par la décision Q3 :
 
-1. **certigo-content — expand** : schémas canoniques v5, validateur et packager qui
-   acceptent v4 et v5.
-2. **Certigo — expand** : schémas embarqués v5, modèles C# et Dart, projection,
+1. **Spécification** : [contrat v5](../contracts/exercise-items/v5/README.md), schémas
+   proposés et exemples par type.
+2. **certigo-content — expand** : schémas canoniques v5, validateur et packager qui
+   acceptent v4 et v5, **sans contenu v5**.
+3. **Certigo — expand** : schémas embarqués v5, modèles C# et Dart, projection,
    correction par type, renderers et fallback, tests anti-fuite et goldens par type.
-   Déploiement dev puis staging, avant toute release v5.
-3. **certigo-content — migrate** : corpus migré type par type, sans perte.
-4. **contract** : retrait de v4 quand plus aucune release active ne le porte.
+   Déploiement dev, staging puis prod, avant toute release v5.
+4. **certigo-content** : resynchronisation de sa copie des schémas embarqués ; la garde
+   accepte alors v5.
+5. **certigo-content — migrate** : seulement ensuite, du contenu `ordering`, `cloze`,
+   `applied` ou `matchPairs` en v5, migré type par type sans perte.
+6. **contract** : retrait de v4 quand plus aucune release active ne le porte.
 
-## Décisions à valider
+## Décisions (2026-09-25)
 
-- **Q1** : noms sur le fil inchangés (§1).
-- **Q2** : correction serveur sensible à l'ordre pour `ordering`, `cloze` et `applied`
-  (§4). C'est un changement de notation (« Ask first ») : une réponse dans le mauvais
-  ordre, acceptée aujourd'hui, sera refusée.
-- **Q3** : répartition cross-repo (§6) entre la session Contenu (étapes 1 et 3) et
-  Certigo (étape 2).
+Décisions de l'orchestrateur, par délégation :
+
+- **Q1 — noms gardés** (§1). La correspondance avec les noms de #245 est documentée dans
+  `docs/EXERCICES.md` et dans le contrat v5.
+- **Q2 — correction serveur sensible à l'ordre** pour `ordering`, `cloze` et `applied`
+  (§4), à quatre conditions avant activation : (a) balayer tout le corpus (legacy de la
+  prod et release R2) et prouver qu'aucune réponse aujourd'hui juste ne devient fausse,
+  sinon corriger d'abord les corrigés ; (b) des vecteurs partagés Dart ↔ .NET vérifiés par
+  le job de parité existant ; (c) aucune tentative déjà stockée réécrite ; (d) une note
+  datée dans l'état du projet.
+- **Q3 — répartition** (§6) : Certigo écrit la spécification et la PR Certigo ; la session
+  Contenu écrit le schéma canonique et le packager.
 
 ## Conséquences
 
