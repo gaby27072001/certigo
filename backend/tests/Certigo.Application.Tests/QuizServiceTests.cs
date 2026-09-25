@@ -576,6 +576,68 @@ public sealed class QuizServiceTests
         rightOrder.Results.Should().ContainSingle().Which.Correct.Should().BeTrue();
     }
 
+    // Décision Q2 (c) du 2026-09-25 : la notation ordonnée ne réécrit aucune tentative stockée.
+    // Un rejeu du même clientAttemptId renvoie le verdict enregistré, même si la réponse
+    // rejouée serait notée autrement aujourd'hui.
+    [Theory]
+    [InlineData(ItemType.Ordering)]
+    [InlineData(ItemType.Cloze)]
+    [InlineData(ItemType.Applied)]
+    public async Task SubmitAsync_replay_returns_the_stored_verdict_without_regrading(ItemType type)
+    {
+        var h = new QuizServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        TestContent.AddTypedLesson(h.Content, "l4", type, ["a", "b", "c"]);
+        var service = h.Build();
+
+        var stored = await service.SubmitAsync(
+            "l4",
+            QuizServiceHarness.Request("stored-order", new AnswerDto("l4-i1", type, ["a", "b", "c"], 5_000)));
+        var xpAfterFirst = (await h.Users.GetAsync(h.UserId))!.Xp;
+        var replayed = await service.SubmitAsync(
+            "l4",
+            QuizServiceHarness.Request("stored-order", new AnswerDto("l4-i1", type, ["c", "b", "a"], 5_000)));
+
+        stored.Results.Should().ContainSingle().Which.Correct.Should().BeTrue();
+        replayed.AttemptId.Should().Be(stored.AttemptId);
+        replayed.Results.Should().ContainSingle().Which.Correct.Should().BeTrue();
+        (await h.Users.GetAsync(h.UserId))!.Xp.Should().Be(xpAfterFirst);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_keeps_a_legacy_attempt_graded_by_the_old_sorted_rule()
+    {
+        var h = new QuizServiceHarness();
+        h.Users.Seed(TestContent.NewProfile(h.UserId));
+        TestContent.AddTypedLesson(h.Content, "l4", ItemType.Ordering, ["a", "b", "c"]);
+        // Verdict produced before the switch: the sorted comparison accepted a wrong order.
+        var oldVerdict = new SubmitQuizResult(
+            "attempt-before-switch",
+            100,
+            [new ItemResultDto("l4-i1", true, "c1", ["a", "b", "c"], "Explanation", 0.1)],
+            new RewardsDto(10, 10, false, false, 6, []),
+            [],
+            null);
+        h.Attempts.Seed(new AttemptRecord(
+            "attempt::before-switch",
+            h.UserId,
+            "before-switch",
+            TestContent.TrackId,
+            "l4",
+            h.Clock.UtcNow.AddMinutes(-1),
+            h.Clock.UtcNow,
+            oldVerdict));
+        var service = h.Build();
+
+        var replayed = await service.SubmitAsync(
+            "l4",
+            QuizServiceHarness.Request("before-switch", new AnswerDto("l4-i1", ItemType.Ordering, ["c", "b", "a"], 5_000)));
+
+        replayed.Should().BeEquivalentTo(oldVerdict);
+        replayed.Results.Should().ContainSingle().Which.Correct.Should().BeTrue(
+            "the verdict stored before the switch is returned, not regraded");
+    }
+
     [Fact]
     public async Task SubmitAsync_grades_match_pairs_as_a_set_of_pair_tokens()
     {
