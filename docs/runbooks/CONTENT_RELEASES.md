@@ -369,7 +369,9 @@ backend.
 3. Faire approuver le what-if #290, puis provisionner uniquement
    `rg-certigo-content`: un StorageV2 `Standard_GRS`, OAuth-only, réseau public
    désactivé, trois containers, rétentions WORM `Unlocked` 90/30/90 et un seul
-   Private Endpoint Blob dans le subnet CI.
+   Private Endpoint Blob dans le subnet CI. La redondance réellement obtenue
+   diffère : voir « Note datée — redondance réelle du stockage (2026-09-25) »
+   dans [ADR-020](../adr/ADR-020-immutable-content-storage.md).
 4. Renseigner les valeurs de contenu (`contentBlobEndpoint`,
    `contentReaderClientId`, `contentReaderResourceId`) par l'un des deux
    chemins décrits en Préconditions — `infra/params/staging.bicepparam`, ou les

@@ -49,6 +49,9 @@ Créer un stack subscription-scoped indépendant sous `rg-certigo-content` :
 - une policy lifecycle de tiering Cool sur `manifests/` et `releases/`, sans
   suppression.
 
+> La redondance réellement obtenue diffère de ce choix : voir « Note datée — redondance réelle du
+> stockage (2026-09-25) » en fin de document.
+
 Le stack expose l'endpoint, les trois conteneurs et l'identité reader sous une
 forme directement mappable aux settings #304 :
 
@@ -105,3 +108,36 @@ déplace aucun alias Blob, ne réécrit aucun objet et ne modifie aucune policy.
   séparation en conteneurs conserve les frontières RBAC public/privé/release.
 - La preuve staging et l'ordre opératoire sont maintenus dans
   [`IMMUTABLE_CONTENT_STORAGE.md`](../runbooks/IMMUTABLE_CONTENT_STORAGE.md).
+
+## Note datée — redondance réelle du stockage (2026-09-25)
+
+Cette note ne modifie pas la décision ci-dessus. Elle consigne un écart mesuré et la façon de le
+traiter, décidée par l'orchestrateur le 2026-09-25, par délégation.
+
+- **Constat** (2026-09-25 à 10:03 UTC, `az storage account show` et
+  `az storage account blob-service-properties show`) : `stcertigocntz3wqbdww`
+  (`rg-certigo-content`, westeurope) est en `Standard_LRS`, **sans région secondaire**.
+  Versioning actif ; WORM version-level actif sur les trois conteneurs, policies `Unlocked` de
+  90, 30 et 90 jours.
+- **Cause** (journal d'activité du compte) : créé en `Standard_GRS` le 2026-09-04 à 17:35:15Z,
+  il a été repassé en `Standard_LRS` le 2026-09-05 à 00:55:33Z par l'automate de gouvernance MCAPS
+  (`MCAPSGovernance-AutomationApp`, appId `a1a9c5b6-7a4f-4288-89ab-6805873f65d1`, délégation Azure
+  Lighthouse). Le même automate agit sur les comptes applicatifs. Pour ceux-là, la contrainte est
+  acceptée et l'IaC alignée par #539 (`infra/main.bicep` épingle `Standard_LRS`). L'IaC de contenu
+  déclare encore `Standard_GRS` (`infra/params/content.bicepparam`, défaut de
+  `infra/content/main.bicep`) : un apply de `content-infra-apply.yml` écrirait GRS, puis
+  l'automate le défera la nuit suivante.
+- **Conséquence** : les releases publiées n'ont aucune copie géo-redondante. La perte de la région
+  westeurope les rendrait indisponibles.
+- **Atténuation prouvée** : une release se reconstruit à l'identique depuis `certigo-content`. La
+  révision `a433518` donne la release `sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946`
+  (manifestes public `sha256:11b297c7…` et privé `sha256:7781a6d3…`) aussi bien en construction
+  locale le 2026-09-23 que dans la publication du 2026-09-24
+  ([run 36018994442](https://github.com/gchambaud_microsoft/certigo-content/actions/runs/36018994442)).
+  Elle peut donc être republiée, octet pour octet, par le même workflow.
+- **Limite** : la rétention WORM et l'historique des versions de blobs ne survivent pas à la perte
+  de la région. Des blobs republiés sont de nouveaux objets : la reprise comprend la réimportation
+  des releases utiles, N **et** N-1 pour conserver le rollback. La preuve d'immuabilité antérieure
+  est perdue.
+- **Invalidation** : tout changement du SKU live (y compris une conversion en cours ou
+  interrompue), de la délégation ou de la politique MCAPS, ou de l'IaC de contenu.
