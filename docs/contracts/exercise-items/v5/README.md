@@ -115,9 +115,11 @@ La correction serveur fait autorité. Elle est identique à celle du client
 | séquence | `ordering`, `applied`, `cloze` | ids dans l'ordre choisi (pour `cloze`, l'ordre des trous) | même suite, élément par élément |
 | jetons | `matchPairs` | jetons `g:d` | même multiensemble de jetons |
 
-Les vecteurs partagés sont dans
-[`learning-journey/v1/answer-grading.vectors.json`](../../learning-journey/v1/answer-grading.vectors.json).
-Ils sont rejoués en C# et en Dart. Conditions posées par la décision Q2 avant d'activer
+Les vecteurs partagés sont le groupe `parity.answerGrading` de
+[`packages/cortex/test/golden/cortex_golden_vectors.json`](../../../../packages/cortex/test/golden/cortex_golden_vectors.json).
+Le job existant `ci-cortex-parity` les rejoue en C# (`CortexParityTests`) et en Dart
+(`cortex_golden_test.dart`, sur `isAnswerCorrect` de `package:cortex`, auquel le client
+délègue). Conditions posées par la décision Q2 avant d'activer
 cette notation : balayage du corpus, parité vérifiée par le job existant, aucune tentative
 stockée réécrite, note datée dans l'état du projet.
 

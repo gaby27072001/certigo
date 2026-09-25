@@ -94,20 +94,26 @@ La correction, elle, se répartit en **trois familles** côté client
 
 > ✅ **Écart client/serveur corrigé (`wp-p2-06`).** Jusqu'au 2026-09-23,
 > `QuizService` et `ExamService` triaient les deux listes avant de les comparer :
-> la correction serveur était insensible à l'ordre pour les huit types, et le
-> serveur, qui fait autorité, acceptait pour `ordering`, `cloze` et `applied` une
-> séquence dans le désordre que l'application refusait à l'écran.
+> la correction serveur, qui fait autorité, acceptait pour `ordering`, `cloze` et
+> `applied` une séquence dans le désordre. Le client ne note lui-même que le
+> contenu de démonstration embarqué (`EmbeddedKeyGrader`, `check_outcome.dart`),
+> et il le notait dans l'ordre. Pour le vrai contenu, l'app affiche le verdict
+> du serveur : l'écart n'y était donc pas visible.
 >
 > La comparaison passe désormais par une fonction de domaine unique,
-> `backend/src/Certigo.Domain/Content/AnswerGrading.cs`, avec les trois mêmes
-> familles que le client : séquence pour `ordering`, `cloze` et `applied`,
-> multiensemble pour les autres types (jetons `"gauche:droite"` pour
-> `matchPairs`). La parité est exécutable dans les deux langages sur les mêmes
-> vecteurs, `docs/contracts/learning-journey/v1/answer-grading.vectors.json`,
-> rejoués par `AnswerGradingVectorTests` (C#) et `answer_grading_vectors_test.dart`
-> (Dart). Ces vecteurs ont aussi révélé l'écart inverse, côté client : un `id` en
-> double remplaçait un `id` manquant. Le client compare maintenant des
-> multiensembles.
+> `backend/src/Certigo.Domain/Content/AnswerGrading.cs`, jumelle de
+> `isAnswerCorrect` dans `package:cortex`, à laquelle le client délègue
+> (`answer_grading.dart`). Les deux ont les mêmes familles : séquence pour
+> `ordering`, `cloze` et `applied`, multiensemble pour les autres types (jetons
+> `"gauche:droite"` pour `matchPairs`). La parité est vérifiée par le job existant
+> `ci-cortex-parity`, sur les vecteurs `parity.answerGrading` de
+> `packages/cortex/test/golden/cortex_golden_vectors.json`, rejoués par
+> `CortexParityTests` (C#) et `cortex_golden_test.dart` (Dart). Ces vecteurs ont
+> aussi révélé l'écart inverse, côté client : un `id` en double remplaçait un `id`
+> manquant. Le client compare maintenant des multiensembles.
+>
+> Le balayage du corpus exigé avant d'activer cette notation est consigné dans
+> `docs/ETAT_DU_PROJET.md`, « Journal d'évolution ».
 
 ### Aiguillage type → widget
 

@@ -2,9 +2,10 @@ namespace Certigo.Domain.Content;
 
 /// <summary>
 /// Authoritative comparison of a submitted answer with its answer key, per item type.
-/// It mirrors the client's <c>gradeSelection</c>
-/// (<c>apps/mobile/lib/features/lesson/application/answer_grading.dart</c>): for ordered
-/// types the list order is the answer; every other type is compared as a multiset.
+/// Its client twin is <c>isAnswerCorrect</c> in <c>package:cortex</c>
+/// (<c>packages/cortex/lib/src/answer_grading.dart</c>): for ordered types the list order
+/// is the answer; every other type is compared as a multiset. Parity is pinned by the
+/// shared golden vectors (<c>parity.answerGrading</c>) replayed by <c>ci-cortex-parity</c>.
 /// </summary>
 public static class AnswerGrading
 {

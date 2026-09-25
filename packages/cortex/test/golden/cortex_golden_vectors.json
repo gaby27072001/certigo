@@ -1,7 +1,28 @@
 {
-  "_comment": "Single source of truth for Cortex Dart <-> .NET parity. The 'parity' group is asserted IDENTICALLY by the Dart golden tests (packages/cortex/test/cortex_golden_test.dart) and the .NET CortexParityTests (backend/tests/Certigo.Domain.Tests/CortexParityTests.cs); any divergence fails the ci-cortex-parity gate. The 'cortexOnly' group covers the SessionPlanner, which has no .NET twin, so only Dart asserts it. See ADR-013.",
+  "_comment": "Single source of truth for Cortex Dart <-> .NET parity. The 'parity' group is asserted IDENTICALLY by the Dart golden tests (packages/cortex/test/cortex_golden_test.dart) and the .NET CortexParityTests (backend/tests/Certigo.Domain.Tests/CortexParityTests.cs); any divergence fails the ci-cortex-parity gate. parity.answerGrading pins the per-type answer comparison (Dart cortex isAnswerCorrect vs .NET AnswerGrading.IsCorrect): sequence for ordering, cloze and applied, multiset otherwise; ids are lowercase because case is not a parity axis. The 'cortexOnly' group covers the SessionPlanner, which has no .NET twin, so only Dart asserts it. See ADR-013.",
   "algoVersion": "1.0.0",
   "parity": {
+    "answerGrading": [
+      { "name": "mcq bonne option", "type": "mcq", "correct": ["b"], "selected": ["b"], "expected": true },
+      { "name": "mcq mauvaise option", "type": "mcq", "correct": ["b"], "selected": ["a"], "expected": false },
+      { "name": "mcq aucune sélection", "type": "mcq", "correct": ["b"], "selected": [], "expected": false },
+      { "name": "scenario bonne option", "type": "scenario", "correct": ["c"], "selected": ["c"], "expected": true },
+      { "name": "spotTheIssue bonne option", "type": "spotTheIssue", "correct": ["a"], "selected": ["a"], "expected": true },
+      { "name": "multi ordre indifférent", "type": "multi", "correct": ["a", "c"], "selected": ["c", "a"], "expected": true },
+      { "name": "multi incomplet", "type": "multi", "correct": ["a", "c"], "selected": ["a"], "expected": false },
+      { "name": "multi en trop", "type": "multi", "correct": ["a", "c"], "selected": ["a", "b", "c"], "expected": false },
+      { "name": "multi doublon", "type": "multi", "correct": ["a", "c"], "selected": ["a", "a"], "expected": false },
+      { "name": "ordering bon ordre", "type": "ordering", "correct": ["s1", "s2", "s3"], "selected": ["s1", "s2", "s3"], "expected": true },
+      { "name": "ordering mauvais ordre", "type": "ordering", "correct": ["s1", "s2", "s3"], "selected": ["s2", "s1", "s3"], "expected": false },
+      { "name": "ordering incomplet", "type": "ordering", "correct": ["s1", "s2", "s3"], "selected": ["s1", "s2"], "expected": false },
+      { "name": "applied bon ordre", "type": "applied", "correct": ["a", "b"], "selected": ["a", "b"], "expected": true },
+      { "name": "applied mauvais ordre", "type": "applied", "correct": ["a", "b"], "selected": ["b", "a"], "expected": false },
+      { "name": "cloze trous dans l'ordre", "type": "cloze", "correct": ["w-iaas", "w-paas"], "selected": ["w-iaas", "w-paas"], "expected": true },
+      { "name": "cloze trous inversés", "type": "cloze", "correct": ["w-iaas", "w-paas"], "selected": ["w-paas", "w-iaas"], "expected": false },
+      { "name": "matchPairs ordre des paires indifférent", "type": "matchPairs", "correct": ["l1:r2", "l2:r1"], "selected": ["l2:r1", "l1:r2"], "expected": true },
+      { "name": "matchPairs paires croisées", "type": "matchPairs", "correct": ["l1:r2", "l2:r1"], "selected": ["l1:r1", "l2:r2"], "expected": false },
+      { "name": "matchPairs paire manquante", "type": "matchPairs", "correct": ["l1:r2", "l2:r1"], "selected": ["l1:r2"], "expected": false }
+    ],
     "scheduler": [
       {
         "name": "fresh-good",
