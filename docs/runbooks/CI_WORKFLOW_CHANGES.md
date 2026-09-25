@@ -110,8 +110,18 @@ ne la retire pas (`--write` retire les approbations expirées et leurs propositi
 GitHub ne relance pas un contrôle vert parce que le temps passe : une PR B validée la veille de
 l'expiration reste fusionnable après, tant que `main` n'a pas bougé (avec `strict: true`, tout
 mouvement de `main` impose une mise à jour, donc un nouveau contrôle). Le contenu fusionné reste
-exactement celui qui a été approuvé ; seule la borne temporelle est lâche. La fermer exigerait une
-file de fusion (`merge_group`), c'est-à-dire un changement de réglage du dépôt.
+exactement celui qui a été approuvé ; seule la borne temporelle est lâche.
+
+**La file de fusion (merge queue), qui la fermerait, est impossible sur ce dépôt** (vérifié le
+2026-09-24). Source (`github/docs`, `data/reusables/gated-features/merge-queue.md`) : *« Pull
+request merge queues are available in any public repository owned by an organization, or in
+private repositories owned by organizations using GitHub Enterprise Cloud. »* Certigo est privé
+et appartient à un compte utilisateur (`owner.type: User`). Même dans une organisation, il
+faudrait ajouter `merge_group` à `codeql.yml` et `security-gate.yml`, figés à l'octet, et
+`merge_group` exécute le workflow du commit de la file, c'est-à-dire la version de la PR, à
+rebours de l'architecture `pull_request_target`. On garde donc `strict: true` et la fusion
+automatique. **Borne de l'écart** : ce qui fusionne après l'expiration est exactement le contenu
+approuvé, jamais un autre ; et l'écart se referme au premier mouvement de `main`.
 
 ## Règle pour les tests de `.github/scripts`
 
