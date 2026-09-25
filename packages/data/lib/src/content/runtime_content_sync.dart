@@ -7,6 +7,7 @@ import 'package:core/core.dart';
 import '../sync/sync_dispatcher.dart';
 import 'runtime_content.dart';
 import 'runtime_content_store.dart';
+import 'runtime_content_telemetry.dart';
 
 enum RuntimeContentPhase { idle, checking, downloading, activating, ready, rolledBack, failed }
 
@@ -138,16 +139,19 @@ class RuntimeContentSynchronizer {
     RuntimeContentPinRegistry? pins,
     this.limits = const RuntimeContentLimits(),
     Future<void> Function(Duration duration)? delay,
+    RuntimeContentTelemetry telemetry = const NoopRuntimeContentTelemetry(),
   })  : _source = source,
         _store = store,
         _pins = pins,
-        _delay = delay ?? Future<void>.delayed;
+        _delay = delay ?? Future<void>.delayed,
+        _telemetry = telemetry;
 
   final PublicContentSource _source;
   final RuntimeContentStore _store;
   final RuntimeContentPinRegistry? _pins;
   final RuntimeContentLimits limits;
   final Future<void> Function(Duration duration) _delay;
+  final RuntimeContentTelemetry _telemetry;
   final StreamController<RuntimeContentStatus> _statuses =
       StreamController<RuntimeContentStatus>.broadcast();
 
@@ -225,9 +229,17 @@ class RuntimeContentSynchronizer {
   }
 
   Future<RuntimeContentActivation?> _rollback(String ownerId) async {
+    final Stopwatch stopwatch = Stopwatch()..start();
     try {
       final RuntimeContentActivation? activation = await _store.rollback(
         runtimeContentScopeKey(ownerId),
+      );
+      _telemetry.rollbackFinished(
+        RuntimeContentRollbackEvent(
+          restored: activation != null,
+          durationMs: stopwatch.elapsedMilliseconds,
+          activeManifestId: activation?.activeManifestId,
+        ),
       );
       if (activation != null) {
         _emit(
@@ -240,6 +252,7 @@ class RuntimeContentSynchronizer {
       }
       return activation;
     } on FileSystemException catch (error) {
+      _reportRollbackFailure(stopwatch, 'storage');
       _failed(
         'La version précédente du contenu n\'a pas pu être restaurée.',
         _current.activeManifestId,
@@ -247,6 +260,7 @@ class RuntimeContentSynchronizer {
       );
       throw RuntimeContentSyncException(error.message);
     } on FormatException catch (error) {
+      _reportRollbackFailure(stopwatch, 'invalidContent');
       _failed(
         'La version précédente du contenu est invalide.',
         _current.activeManifestId,
@@ -254,6 +268,7 @@ class RuntimeContentSynchronizer {
       );
       throw RuntimeContentSyncException(error.message);
     } on StateError catch (error) {
+      _reportRollbackFailure(stopwatch, 'state');
       _failed(
         'La version précédente du contenu n\'a pas pu être restaurée.',
         _current.activeManifestId,
@@ -261,6 +276,17 @@ class RuntimeContentSynchronizer {
       );
       throw RuntimeContentSyncException(error.message);
     }
+  }
+
+  void _reportRollbackFailure(Stopwatch stopwatch, String failureKind) {
+    _telemetry.rollbackFinished(
+      RuntimeContentRollbackEvent(
+        restored: false,
+        durationMs: stopwatch.elapsedMilliseconds,
+        activeManifestId: _current.activeManifestId,
+        failureKind: failureKind,
+      ),
+    );
   }
 
   Future<T> _enqueueOperation<T>(Future<T> Function() operation) {
@@ -290,10 +316,61 @@ class RuntimeContentSynchronizer {
     required String ownerScope,
     required Set<String> pinnedManifestIds,
   }) async {
+    final Stopwatch stopwatch = Stopwatch()..start();
+    final _SyncProgress progress = _SyncProgress();
+    try {
+      final RuntimeContentSyncReport report = await _syncOnce(
+        ownerScope: ownerScope,
+        pinnedManifestIds: pinnedManifestIds,
+        progress: progress,
+      );
+      _telemetry.syncFinished(
+        RuntimeContentSyncEvent(
+          outcome: !report.changed
+              ? RuntimeContentSyncOutcome.unchanged
+              : report.downloadedFiles > 0
+                  ? RuntimeContentSyncOutcome.activated
+                  : RuntimeContentSyncOutcome.activatedFromCache,
+          durationMs: stopwatch.elapsedMilliseconds,
+          downloadedFiles: report.downloadedFiles,
+          reusedFiles: report.reusedFiles,
+          totalFiles: progress.totalFiles,
+          activeManifestId: report.activation.activeManifestId,
+          recoveredIncompleteActivation: progress.recovered,
+          canRollback: report.activation.previousManifestId != null,
+        ),
+      );
+      return report;
+    } on RuntimeContentSyncException catch (error) {
+      final Failure? failure = error.failure;
+      _telemetry.syncFinished(
+        RuntimeContentSyncEvent(
+          outcome: RuntimeContentSyncOutcome.failed,
+          durationMs: stopwatch.elapsedMilliseconds,
+          failureStage: progress.failureStage ?? progress.stage,
+          failureKind: failure == null ? progress.failureKind : runtimeContentFailureKind(failure),
+          downloadedFiles: progress.downloaded,
+          reusedFiles: progress.reused,
+          totalFiles: progress.totalFiles,
+          activeManifestId: _current.activeManifestId,
+          recoveredIncompleteActivation: progress.recovered,
+          canRollback: _current.canRollback,
+        ),
+      );
+      rethrow;
+    }
+  }
+
+  Future<RuntimeContentSyncReport> _syncOnce({
+    required String ownerScope,
+    required Set<String> pinnedManifestIds,
+    required _SyncProgress progress,
+  }) async {
     RuntimeContentActivation? activation;
     try {
       activation = await _store.readActivation(ownerScope);
     } on FormatException catch (error) {
+      progress.failureKind = 'invalidContent';
       _failed(
         'Le cache local du contenu est invalide.',
         null,
@@ -301,6 +378,7 @@ class RuntimeContentSynchronizer {
       );
       throw RuntimeContentSyncException(error.message);
     } on FileSystemException catch (error) {
+      progress.failureKind = 'storage';
       _failed(
         'Le cache local du contenu est indisponible.',
         null,
@@ -308,6 +386,7 @@ class RuntimeContentSynchronizer {
       );
       throw RuntimeContentSyncException(error.message);
     } on StateError catch (error) {
+      progress.failureKind = 'state';
       _failed(
         'Le cache local du contenu est indisponible.',
         null,
@@ -316,6 +395,7 @@ class RuntimeContentSynchronizer {
       throw RuntimeContentSyncException(error.message);
     }
     if (activation?.recovered ?? false) {
+      progress.recovered = true;
       _emit(
         RuntimeContentStatus(
           phase: RuntimeContentPhase.rolledBack,
@@ -331,6 +411,7 @@ class RuntimeContentSynchronizer {
       ),
     );
 
+    progress.stage = RuntimeContentFailureStage.manifest;
     try {
       final PublicManifestFetch fetched = await _retry<PublicManifestFetch>(
         () => _source.fetchActiveManifest(ifNoneMatch: activation?.etag, limits: limits),
@@ -384,6 +465,7 @@ class RuntimeContentSynchronizer {
       }
       final PublicContentManifest manifest = fetchedManifest;
       final String etag = fetched.etag;
+      progress.totalFiles = manifest.files.length;
       if (activation?.activeManifestId == manifest.manifestId) {
         if (activation!.activeReleaseId == null) {
           activation = await _store.activate(
@@ -408,6 +490,7 @@ class RuntimeContentSynchronizer {
         );
       }
       if (await _store.hasCompleteRelease(manifest)) {
+        progress.stage = RuntimeContentFailureStage.activation;
         activation = await _store.activate(
           ownerScope: ownerScope,
           manifest: manifest,
@@ -437,6 +520,7 @@ class RuntimeContentSynchronizer {
         );
       }
 
+      progress.stage = RuntimeContentFailureStage.download;
       await _store.ensureCapacity(
         ownerScope: ownerScope,
         target: manifest,
@@ -479,6 +563,9 @@ class RuntimeContentSynchronizer {
           reused++;
         }
         completed++;
+        progress
+          ..downloaded = downloaded
+          ..reused = reused;
         _emit(
           RuntimeContentStatus(
             phase: RuntimeContentPhase.downloading,
@@ -497,6 +584,7 @@ class RuntimeContentSynchronizer {
           activeManifestId: activation?.activeManifestId,
         ),
       );
+      progress.stage = RuntimeContentFailureStage.activation;
       activation = await _store.activate(ownerScope: ownerScope, manifest: manifest, etag: etag);
       await _store.cleanup(
         ownerScope: ownerScope,
@@ -528,6 +616,9 @@ class RuntimeContentSynchronizer {
       );
       rethrow;
     } on FormatException catch (error) {
+      progress
+        ..failureStage = RuntimeContentFailureStage.validation
+        ..failureKind = 'invalidContent';
       _failed(
         'Le contenu téléchargé est invalide.',
         activation?.activeManifestId,
@@ -535,6 +626,9 @@ class RuntimeContentSynchronizer {
       );
       throw RuntimeContentSyncException(error.message);
     } on FileSystemException catch (error) {
+      progress
+        ..failureStage = RuntimeContentFailureStage.storage
+        ..failureKind = 'storage';
       _failed(
         'Espace de stockage insuffisant ou indisponible.',
         activation?.activeManifestId,
@@ -542,6 +636,7 @@ class RuntimeContentSynchronizer {
       );
       throw RuntimeContentSyncException(error.message);
     } on StateError catch (error) {
+      progress.failureKind = 'state';
       _failed(
         'La mise à jour locale n\'a pas pu être activée.',
         activation?.activeManifestId,
@@ -640,4 +735,15 @@ class RuntimeContentSynchronizer {
     await _operationTail;
     await _statuses.close();
   }
+}
+
+/// Mutable, content-free progress of one attempt, read only by telemetry.
+class _SyncProgress {
+  RuntimeContentFailureStage stage = RuntimeContentFailureStage.localCache;
+  RuntimeContentFailureStage? failureStage;
+  String? failureKind;
+  int downloaded = 0;
+  int reused = 0;
+  int totalFiles = 0;
+  bool recovered = false;
 }
