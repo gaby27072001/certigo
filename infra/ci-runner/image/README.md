@@ -479,6 +479,27 @@ un compteur non nul fait echouer l'etape, avant son code de retour. Un auto-test
 Un resolveur non liste fait echouer l'installation : sentinelle, etat dpkg ou
 inventaire.
 
+### Tests d'execution (#341, point 2)
+
+`offline_harness.py` reconstruit la base Marketplace amd64 (656 `.deb` exacts,
+verifies par le lock APT et les index signes) avec mmdebstrap sous qemu-user, puis
+lance le vrai installateur dans `unshare --net` et un chroot, sur un overlay
+jetable. Ce n'est pas un boot : systemd n'est pas PID 1, et `systemctl` est
+remplace dans l'overlay par un enregistreur (operations de fichiers d'unite via
+`--root=/`, operations d'execution simulees). Chaque mutation doit echouer avec
+son message exact; le rapport compare le message obtenu a l'attendu.
+
+Mesures du 25 septembre 2026 (WSL2 ARM64, `qemu-x86_64 10.2.1`), code final :
+
+| Scenario | Raison exigee et obtenue | Duree |
+| --- | --- | ---: |
+| `resolver-override` (`PUB_HOSTED_URL`) | Resolver override present in the installer environment: PUB_HOSTED_URL | 4,1 s |
+| `lock-redirection` (URL d'une roue deplacee, contrat inchange) | Image input digest mismatch: python-wheels.lock.json | 4,9 s |
+| `contract-substitution` (meme lock, contrat recalcule) | The build contract does not match the template contract digest | 5,5 s |
+| `store-addition` | Unexpected file in the closed artifact store: sha256-000...0 | 4,7 s |
+| `store-omission` (archive actionlint) | Missing artifact toolchain:actionlint | 6,8 s |
+| `store-alteration` (un octet de `zip.deb`) | Digest mismatch for deb:zip:amd64 | 5,7 s |
+
 ### Transport des entrees : option (C')
 
 Le depot est prive : un fetch anonyme de `raw.githubusercontent.com` rend 404, et

@@ -84,25 +84,67 @@ PATCHING_FILES = {
 }
 
 
+def read_mib(snmp="/proc/net/snmp", snmp6="/proc/net/snmp6"):
+    """Per-namespace kernel MIB counters (IPv4 header/value line pairs, IPv6 pairs)."""
+    values = {}
+    lines = Path(snmp).read_text().splitlines()
+    for header, data in zip(lines[::2], lines[1::2]):
+        names, numbers = header.split(), data.split()
+        require(names[0] == numbers[0], f"Unexpected MIB layout: {names[0]}")
+        prefix = names[0].rstrip(":")
+        for name, number in zip(names[1:], numbers[1:]):
+            values[f"{prefix}.{name}"] = int(number)
+    if Path(snmp6).exists():
+        for line in Path(snmp6).read_text().splitlines():
+            if line.strip():
+                name, number = line.split()
+                values[name] = int(number)
+    return values
+
+
+def mib_flows(current, baseline, sentinel_replies):
+    """Attempts since the baseline, from namespace-wide MIB deltas.
+
+    TCP ActiveOpens counts every connect() (IPv4 and IPv6 share the TCP MIB). UDP
+    counts every sent datagram minus the sentinel's own DNS replies. ICMP counts
+    echo requests; kernel-generated errors are excluded. "other-ip" is every IP
+    packet sent by the namespace that no TCP, UDP or ICMP counter explains (raw
+    sockets, other protocols).
+    """
+    delta = lambda key: current.get(key, 0) - baseline.get(key, 0)
+    udp = sum(delta(key) for key in ("Udp.OutDatagrams", "UdpLite.OutDatagrams",
+                                     "Udp6OutDatagrams", "UdpLite6OutDatagrams"))
+    tcp_segments = delta("Tcp.OutSegs") + delta("Tcp.RetransSegs")
+    icmp_messages = delta("Icmp.OutMsgs") + delta("Icmp6OutMsgs")
+    ip_packets = delta("Ip.OutRequests") + delta("Ip6OutRequests")
+    return {
+        "tcp-connect": delta("Tcp.ActiveOpens"),
+        "udp-send": udp - sentinel_replies,
+        "icmp-echo": delta("Icmp.OutEchos") + delta("Icmp6OutEchos"),
+        "other-ip": ip_packets - tcp_segments - udp - icmp_messages,
+    }
+
+
 class NetworkSentinel:
     """Record every network attempt made inside the namespace.
 
     With AnyIP routes, every IPv4/IPv6 destination is local to the namespace:
     connections reach these listeners (DNS names, TCP ports) instead of failing
-    silently. Connection-tracking counters on OUTPUT also count every NEW flow,
-    whatever the protocol or port (TCP, UDP/QUIC, ICMP, raw), IPv4 and IPv6.
+    silently. Namespace MIB counters also count every attempt the listeners
+    cannot name: any TCP port, UDP (including QUIC), ICMP echo and other IP.
+    They are plain files, so they work natively and under qemu-user alike.
     """
 
     TCP_PORTS = (22, 53, 80, 443, 9418, 11371)
-    CHAIN = "CERTIGO_ATTEMPTS"
-    COUNTED = {"iptables": ("tcp", "udp", "icmp"), "ip6tables": ("tcp", "udp", "ipv6-icmp")}
 
     def __init__(self):
         self.events = []
         self._lock = threading.Lock()
         self._sockets = []
         self._stopping = threading.Event()
-        self._counter_tools = []
+        self._replies = 0
+        self._baseline = None
+        self._baseline_replies = 0
 
     def record(self, **event):
         with self._lock:
@@ -115,36 +157,16 @@ class NetworkSentinel:
     def clear(self):
         with self._lock:
             self.events.clear()
-        for tool in self._counter_tools:
-            subprocess.run([tool, "-w", "-Z", self.CHAIN], check=True, capture_output=True)
-
-    def install_counters(self, ipv6):
-        for tool, protocols in self.COUNTED.items():
-            if tool == "ip6tables" and not ipv6:
-                continue
-            commands = [["-N", self.CHAIN],
-                        ["-A", "OUTPUT", "-m", "conntrack", "--ctstate", "NEW", "-j", self.CHAIN]]
-            commands += [["-A", self.CHAIN, "-p", protocol, "-j", "RETURN"] for protocol in protocols]
-            commands.append(["-A", self.CHAIN, "-j", "RETURN"])
-            for arguments in commands:
-                result = subprocess.run([tool, "-w", *arguments], capture_output=True, text=True)
-                require(result.returncode == 0,
-                        f"Network attempt counters unavailable ({tool}): {result.stderr.strip()}")
-            self._counter_tools.append(tool)
+            self._baseline = read_mib()
+            self._baseline_replies = self._replies
 
     def counters(self):
-        """New flows per family and protocol since the last clear()."""
-        counts = {}
-        for tool in self._counter_tools:
-            output = subprocess.run([tool, "-w", "-L", self.CHAIN, "-n", "-v", "-x"],
-                                    check=True, capture_output=True, text=True).stdout
-            rules = [line.split() for line in output.splitlines()[2:] if line.strip()]
-            labels = [*self.COUNTED[tool], "other"]
-            require(len(rules) == len(labels), f"Unexpected {tool} counter chain")
-            family = "ipv6" if tool == "ip6tables" else "ipv4"
-            for label, fields in zip(labels, rules):
-                counts[f"{family}/{label}"] = int(fields[0])
-        return counts
+        """Attempts per kind since the last clear()."""
+        if self._baseline is None:
+            return {}
+        with self._lock:
+            replies = self._replies - self._baseline_replies
+        return mib_flows(read_mib(), self._baseline, replies)
 
     def _bind(self, family, kind, port):
         sock = socket.socket(family, kind)
@@ -231,6 +253,8 @@ class NetworkSentinel:
                         query=self.query_name(message))
             try:
                 sock.sendto(self.refused(message), peer)
+                with self._lock:
+                    self._replies += 1
             except OSError:
                 pass
 
@@ -261,7 +285,11 @@ class NetworkSentinel:
 
 
 def self_test(sentinel, ipv6=True):
-    """Prove that names, listened ports and unlisted flows are observed, then reset."""
+    """Prove that names, listened ports and unlisted flows are observed, then reset.
+
+    Also proves an idle namespace produces no attempt, so later counts are real.
+    """
+    sentinel.clear()
     try:
         socket.getaddrinfo(SENTINEL_PROBE, 443)
     except socket.gaierror:
@@ -275,10 +303,10 @@ def self_test(sentinel, ipv6=True):
     # An unlisted UDP port, as QUIC or a custom protocol would use.
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
         probe.sendto(b"certigo-sentinel", (TEST_NET, 4433))
-    counted_ipv6 = ipv6 and "ip6tables" in sentinel._counter_tools
-    if counted_ipv6:
+    if ipv6:
         with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as probe:
             probe.sendto(b"certigo-sentinel", (TEST_NET6, 4433))
+    expected_udp = 3 if ipv6 else 2
     deadline = time.monotonic() + 5
     while True:
         events = sentinel.snapshot()
@@ -286,14 +314,18 @@ def self_test(sentinel, ipv6=True):
         dns = any((event.get("query") or "").startswith(SENTINEL_PROBE) for event in events)
         tcp = any(event.get("protocol") == "tcp" and event.get("destination") == TEST_NET
                   for event in events)
-        flows = (counts.get("ipv4/udp", 0) >= 2 and counts.get("ipv4/tcp", 0) >= 1 and
-                 (not counted_ipv6 or counts.get("ipv6/udp", 0) >= 1))
+        flows = counts["tcp-connect"] >= 1 and counts["udp-send"] >= expected_udp
         if (dns and tcp and flows) or time.monotonic() > deadline:
             break
         time.sleep(0.1)
     require(dns, "Network sentinel did not observe its DNS self-test")
     require(tcp, "Network sentinel did not observe its TCP self-test")
-    require(flows, f"Network flow counters did not observe the self-test: {counts}")
+    require(flows, f"Network attempt counters did not observe the self-test: {counts}")
+    time.sleep(0.5)
+    sentinel.clear()
+    time.sleep(1)
+    idle = {name: count for name, count in sentinel.counters().items() if count}
+    require(not idle, f"Idle namespace reports network attempts: {idle}")
     sentinel.clear()
 
 
@@ -466,7 +498,6 @@ class Installer:
             self.run("network.anyip6", ["ip", "-6", "route", "add", "local", "::/0", "dev", "lo"])
             families.append(socket.AF_INET6)
         sentinel = NetworkSentinel().start(families=families)
-        sentinel.install_counters(ipv6)
         self_test(sentinel, ipv6)
         self.sentinel = sentinel
 

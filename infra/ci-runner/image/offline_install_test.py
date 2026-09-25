@@ -205,6 +205,33 @@ class WheelLockTests(unittest.TestCase):
 
 
 class SentinelTests(unittest.TestCase):
+    def test_mib_parsing_and_attempt_arithmetic(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            snmp, snmp6 = Path(tmp) / "snmp", Path(tmp) / "snmp6"
+            snmp.write_text("Ip: Forwarding OutRequests\nIp: 2 8\n"
+                            "Icmp: OutMsgs OutEchos\nIcmp: 1 1\n"
+                            "Tcp: ActiveOpens OutSegs RetransSegs\nTcp: 2 5 0\n"
+                            "Udp: OutDatagrams\nUdp: 3\nUdpLite: OutDatagrams\nUdpLite: 0\n")
+            snmp6.write_text("Ip6OutRequests 2\nIcmp6OutMsgs 0\nIcmp6OutEchos 0\n"
+                             "Udp6OutDatagrams 1\nUdpLite6OutDatagrams 0\n")
+            current = install_offline.read_mib(snmp, snmp6)
+        self.assertEqual(current["Tcp.ActiveOpens"], 2)
+        self.assertEqual(current["Udp6OutDatagrams"], 1)
+        zero = dict.fromkeys(current, 0)
+        # 2 connects, 4 datagrams of which 1 sentinel reply, 1 echo; the 10 IP packets
+        # are explained by 5 TCP segments, 4 UDP datagrams and 1 ICMP message.
+        self.assertEqual(install_offline.mib_flows(current, zero, 1),
+                         {"tcp-connect": 2, "udp-send": 3, "icmp-echo": 1, "other-ip": 0})
+        self.assertEqual(install_offline.mib_flows(current, current, 0),
+                         {"tcp-connect": 0, "udp-send": 0, "icmp-echo": 0, "other-ip": 0})
+        raw = dict(current, **{"Ip.OutRequests": current["Ip.OutRequests"] + 1})
+        self.assertEqual(install_offline.mib_flows(raw, current, 0)["other-ip"], 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            broken = Path(tmp) / "snmp"
+            broken.write_text("Ip: Forwarding\nTcp: 1\n")
+            with self.assertRaisesRegex(ValueError, "Unexpected MIB layout"):
+                install_offline.read_mib(broken, Path(tmp) / "absent")
+
     def start_sentinel(self):
         # Shared persistent runners: retry on another high port range if one is taken.
         for _ in range(8):
@@ -308,7 +335,7 @@ class InstallerTests(unittest.TestCase):
                 return []
 
             def counters(self):
-                return {"ipv4/udp": 0}
+                return {"tcp-connect": 0, "udp-send": 0, "icmp-echo": 0, "other-ip": 0}
 
         with tempfile.TemporaryDirectory() as tmp:
             installer = install_offline.Installer(Path(tmp), Path(tmp), "0" * 64, Path(tmp))

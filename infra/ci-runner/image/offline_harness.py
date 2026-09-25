@@ -271,7 +271,6 @@ if ipv6:
     subprocess.run(["ip", "-6", "route", "add", "local", "::/0", "dev", "lo"], check=True)
     families.append(socket.AF_INET6)
 sentinel = NetworkSentinel().start(families=families)
-sentinel.install_counters(ipv6)
 self_test(sentinel, ipv6)
 result = subprocess.run(sys.argv[1:], capture_output=True, text=True, errors="replace",
                         env={{"PATH": {CHILD_PATH!r}, "LANG": "C.UTF-8",
@@ -299,6 +298,8 @@ SENTINEL_CONTROLS = {
     "ipv6-tcp-443": ["python3", "-c", "import socket\ntry:\n socket.create_connection("
                      "('2001:db8::7', 443), timeout=2)\nexcept OSError:\n pass"],
     "icmp-echo": ["ping", "-c", "1", "-W", "1", "198.51.100.7"],
+    "raw-ip-253": ["python3", "-c", "import socket; s = socket.socket(socket.AF_INET, "
+                   "socket.SOCK_RAW, 253); s.sendto(b'x', ('198.51.100.7', 0))"],
 }
 
 

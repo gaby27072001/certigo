@@ -145,7 +145,7 @@
       "id": "offline-installer",
       "path": "infra/ci-runner/image/install_offline.py",
       "destination": "install_offline.py",
-      "sha256": "81127ed99cc0779c6c308b954aed0713051a6e8c0ef971c78cb4fe01fb0d9e49"
+      "sha256": "d40a4ec624e7263016c95a3476df00ac6543a0076f98f64d294f0b25c4194372"
     },
     {
       "id": "artifact-set",
