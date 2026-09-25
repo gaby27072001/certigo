@@ -6,6 +6,7 @@ import 'package:prism_ui/prism_ui.dart';
 
 import '../bootstrap/reduce_transparency_scope.dart';
 import '../features/profile/application/settings_preferences.dart';
+import 'external_link_guard.dart';
 import 'providers.dart';
 import 'router.dart';
 
@@ -32,22 +33,25 @@ class CertigoApp extends ConsumerWidget {
     // les retrouverait à chaque lancement de l'application.
     ref.watch(hapticsEnabledProvider);
 
-    return MaterialApp.router(
-      title: 'Certigo',
-      debugShowCheckedModeBanner: false,
-      theme: PrismTheme.light(),
-      darkTheme: PrismTheme.dark(),
-      themeMode: mode,
-      routerConfig: router,
-      builder: (BuildContext context, Widget? child) {
-        return ReduceTransparencyScope(child: child ?? const SizedBox.shrink());
-      },
-      supportedLocales: const <Locale>[Locale('fr'), Locale('en')],
-      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
+    return ExternalLinkScope(
+      router: router,
+      child: MaterialApp.router(
+        title: 'Certigo',
+        debugShowCheckedModeBanner: false,
+        theme: PrismTheme.light(),
+        darkTheme: PrismTheme.dark(),
+        themeMode: mode,
+        routerConfig: router,
+        builder: (BuildContext context, Widget? child) {
+          return ReduceTransparencyScope(child: child ?? const SizedBox.shrink());
+        },
+        supportedLocales: const <Locale>[Locale('fr'), Locale('en')],
+        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+      ),
     );
   }
 }

@@ -155,6 +155,9 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: Routes.splash,
+    // A link that cold-starts the app must not choose the first screen either:
+    // external links only reach the router through ExternalLinkGuard.
+    overridePlatformDefaultLocation: true,
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
       if (!AppEnv.accountDeletionEnabled && state.matchedLocation == Routes.accountDeletion) {
