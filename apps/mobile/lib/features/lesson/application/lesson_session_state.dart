@@ -11,8 +11,9 @@ bool isAnswerableCheck(QuizItem item) {
   if (!hasUniqueIds(item.options)) return false;
   switch (item.type) {
     case ItemType.ordering:
-    case ItemType.applied:
       return item.options.isNotEmpty;
+    case ItemType.applied:
+      return item.options.length >= 2;
     case ItemType.matchPairs:
       return item.options.isNotEmpty &&
           item.matches.length >= item.options.length &&
@@ -24,8 +25,9 @@ bool isAnswerableCheck(QuizItem item) {
     case ItemType.multi:
     case ItemType.scenario:
     case ItemType.spotTheIssue:
-    case ItemType.unknown:
       return item.options.isNotEmpty;
+    case ItemType.unknown:
+      return false;
   }
 }
 
@@ -91,7 +93,8 @@ class LessonSessionState {
   /// The single CTA is gated on this, so completeness is defined per exercise
   /// type instead of the naive "something is selected":
   ///
-  /// * ordering / applied / matchPairs — every slot filled (one token per item).
+  /// * ordering / matchPairs — every slot filled (one token per item).
+  /// * applied — at least two ordered actions; unplaced options are distractors.
   /// * cloze — every blank in the stem filled.
   /// * select family (mcq/multi/scenario/spotTheIssue) — at least one pick.
   bool get canSubmitCurrent {
@@ -99,8 +102,9 @@ class LessonSessionState {
     if (item == null || currentAnswered) return false;
     switch (item.type) {
       case ItemType.ordering:
-      case ItemType.applied:
         return item.options.isNotEmpty && selection.length == item.options.length;
+      case ItemType.applied:
+        return item.options.length >= 2 && selection.length >= 2;
       case ItemType.matchPairs:
         return item.options.isNotEmpty && selection.length == item.options.length;
       case ItemType.cloze:
@@ -110,8 +114,9 @@ class LessonSessionState {
       case ItemType.multi:
       case ItemType.scenario:
       case ItemType.spotTheIssue:
-      case ItemType.unknown:
         return selection.isNotEmpty;
+      case ItemType.unknown:
+        return false;
     }
   }
 

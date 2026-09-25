@@ -48,9 +48,14 @@ void main() {
       );
     });
 
-    test('applied: behaves like ordering (order-sensitive)', () {
+    test('applied: the exact placed sequence is required', () {
       expect(gradeSelection(ItemType.applied, <String>['a', 'b'], <String>['a', 'b']), isTrue);
       expect(gradeSelection(ItemType.applied, <String>['b', 'a'], <String>['a', 'b']), isFalse);
+      expect(
+        gradeSelection(ItemType.applied, <String>['a', 'b', 'distractor'], <String>['a', 'b']),
+        isFalse,
+      );
+      expect(gradeSelection(ItemType.applied, <String>['a'], <String>['a', 'b']), isFalse);
     });
   });
 

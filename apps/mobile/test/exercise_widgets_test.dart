@@ -1,5 +1,6 @@
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:certigo/features/lesson/application/check_outcome.dart';
 import 'package:certigo/features/lesson/presentation/widgets/check_step_widget.dart';
@@ -17,9 +18,12 @@ void main() {
   // Full-width, scrollable host: the shells are tall Columns, so vertical
   // scroll prevents height overflow. The width is the full 800px test surface
   // (the test font renders each glyph ~1em wide, so headers need the room).
-  Widget host(Widget child) => MaterialApp(
+  Widget host(Widget child, {TextScaler textScaler = TextScaler.noScaling}) => MaterialApp(
         theme: PrismTheme.light(),
-        home: Scaffold(body: SingleChildScrollView(child: child)),
+        home: MediaQuery(
+          data: MediaQueryData(textScaler: textScaler),
+          child: Scaffold(body: SingleChildScrollView(child: child)),
+        ),
       );
 
   group('OrderingStepWidget', () {
@@ -41,6 +45,7 @@ void main() {
             selection: const <String>[],
             outcome: null,
             onToggle: (String id) => toggled = id,
+            onMove: _noopMove,
           ),
         ),
       );
@@ -52,6 +57,143 @@ void main() {
       await tester.tap(find.text('Réseau'));
       await tester.pump();
       expect(toggled, 's1');
+    });
+
+    testWidgets('applied explains distractors and is accessible by semantics actions', (
+      tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final List<String> moves = <String>[];
+      String? removed;
+
+      await tester.pumpWidget(
+        host(
+          OrderingStepWidget(
+            item: const QuizItem(
+              id: 'a1',
+              conceptId: 'c-test',
+              type: ItemType.applied,
+              stem: 'Prépare le déploiement.',
+              options: <QuizOption>[
+                QuizOption(id: 's1', label: 'Planifier'),
+                QuizOption(id: 's2', label: 'Valider'),
+                QuizOption(id: 's3', label: 'Déployer'),
+                QuizOption(id: 'd1', label: 'Supprimer les sauvegardes'),
+              ],
+            ),
+            selection: const <String>['s1', 's2', 's3'],
+            outcome: null,
+            onToggle: (String id) => removed = id,
+            onMove: ({required int fromIndex, required int toIndex}) {
+              moves.add('$fromIndex>$toIndex');
+            },
+          ),
+        ),
+      );
+
+      expect(find.text('Construis la réponse appliquée'), findsOneWidget);
+      expect(
+        find.text(
+            'Choisis les bonnes actions et range-les dans l\'ordre. Certaines sont des pièges.'),
+        findsOneWidget,
+      );
+      expect(find.text('TES ÉTAPES, DANS L\'ORDRE'), findsOneWidget);
+      expect(find.text('ACTIONS DISPONIBLES'), findsOneWidget);
+
+      final SemanticsNode placed = tester.getSemantics(find.byKey(const Key('placed-step-s2')));
+      expect(placed.label, 'Étape 2 sur 3 : Valider');
+      final List<String?> actionLabels = placed
+          .getSemanticsData()
+          .customSemanticsActionIds!
+          .map((int id) => CustomSemanticsAction.getAction(id)?.label)
+          .toList();
+      expect(actionLabels, containsAll(<String>['Monter', 'Descendre', 'Retirer']));
+
+      final SemanticsOwner owner = tester.binding.pipelineOwner.semanticsOwner!;
+      owner.performAction(
+        placed.id,
+        SemanticsAction.customAction,
+        CustomSemanticsAction.getIdentifier(const CustomSemanticsAction(label: 'Monter')),
+      );
+      owner.performAction(
+        placed.id,
+        SemanticsAction.customAction,
+        CustomSemanticsAction.getIdentifier(const CustomSemanticsAction(label: 'Retirer')),
+      );
+      await tester.pump();
+
+      expect(moves, <String>['1>0']);
+      expect(removed, 's2');
+
+      final SemanticsNode available = tester.getSemantics(
+        find.byKey(const Key('available-action-d1')),
+      );
+      expect(
+        available.label,
+        'Action disponible : Supprimer les sauvegardes. Peut être ajoutée.',
+      );
+      handle.dispose();
+    });
+
+    testWidgets('applied chips keep accessible tap targets and contrast', (tester) async {
+      await tester.pumpWidget(
+        host(
+          const OrderingStepWidget(
+            item: QuizItem(
+              id: 'a2',
+              conceptId: 'c-test',
+              type: ItemType.applied,
+              stem: 'Range les actions.',
+              options: <QuizOption>[
+                QuizOption(id: 's1', label: 'Choisir la région'),
+                QuizOption(id: 's2', label: 'Créer le groupe'),
+                QuizOption(id: 'd1', label: 'Ouvrir tous les ports'),
+              ],
+            ),
+            selection: <String>['s1', 's2'],
+            outcome: null,
+            onToggle: _noop,
+            onMove: _noopMove,
+          ),
+        ),
+      );
+
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+    });
+
+    testWidgets('applied layout does not overflow at text scale 2.0', (tester) async {
+      tester.view.physicalSize = const Size(390, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        host(
+          const OrderingStepWidget(
+            item: QuizItem(
+              id: 'a3',
+              conceptId: 'c-test',
+              type: ItemType.applied,
+              stem: 'Choisis les actions de migration dans le bon ordre.',
+              options: <QuizOption>[
+                QuizOption(id: 's1', label: 'Évaluer les dépendances applicatives critiques'),
+                QuizOption(id: 's2', label: 'Planifier la fenêtre de bascule'),
+                QuizOption(id: 'd1', label: 'Supprimer la supervision temporairement'),
+              ],
+            ),
+            selection: <String>['s1', 's2'],
+            outcome: null,
+            onToggle: _noop,
+            onMove: _noopMove,
+          ),
+          textScaler: const TextScaler.linear(2),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
     });
   });
 
@@ -215,3 +357,5 @@ void main() {
 }
 
 void _noop(String _) {}
+
+void _noopMove({required int fromIndex, required int toIndex}) {}

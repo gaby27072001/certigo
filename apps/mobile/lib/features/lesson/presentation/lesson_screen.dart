@@ -102,6 +102,7 @@ class _LessonRunningView extends StatelessWidget {
       inner = StepRenderer(
         state: state,
         onToggleOption: controller.toggleOption,
+        onMoveOption: controller.movePlacedOption,
         onToggleMatch: controller.toggleMatch,
       );
     }
