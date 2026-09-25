@@ -299,7 +299,7 @@ def expect_validation(merged, message):
 
 
 def post_install_checks(merged, legacy_inventory):
-    """Guest patching simulation, drift detection at boot and runtime measurements."""
+    """Guest patching simulation, runtime measurements, then drift detection at boot."""
     (merged / OBSERVER.lstrip("/")).write_text(OBSERVER_SOURCE, encoding="utf-8")
     report = {"patching": {}, "drift": {}, "runtime": {}}
     commands = {
@@ -320,18 +320,34 @@ def post_install_checks(merged, legacy_inventory):
             "Unable to locate package ubuntu-advantage-tools" in
             report["patching"]["lpe.pro-client"]["output"],
             "The platform Pro client installation did not fail for lack of source")
+    report["drift"]["valid"] = expect_validation(merged, None)
+    runtime = {
+        "validate-job": ["/usr/local/sbin/certigo-validate-toolchain", "--job"],
+        "flutter": ["/usr/local/bin/flutter", "--version"],
+        "dart": ["/usr/local/bin/dart", "--version"],
+        "dotnet": ["/usr/local/bin/dotnet", "--version"],
+        "node": ["/usr/local/bin/node", "--version"],
+        "checkov": ["/usr/local/bin/checkov", "--version"],
+    }
+    for name, command in runtime.items():
+        result = chroot_run(merged, "runuser", "-u", "runner", "--", "env",
+                            "HOME=/tmp/certigo-runner-home", "CI=true",
+                            "FLUTTER_ALREADY_LOCKED=true", "DOTNET_CLI_HOME=/tmp/certigo-dotnet",
+                            "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1", "DOTNET_NOLOGO=1",
+                            "DOTNET_CLI_TELEMETRY_OPTOUT=1", *command, timeout=900)
+        report["runtime"][name] = {"returncode": result.returncode,
+                                   "output": (result.stdout + result.stderr)[-1500:]}
     control = merged / "etc/apt/sources.list.d/certigo-harness-control.list"
     control.write_text(CONTROL_SOURCE, encoding="utf-8")
     report["patching"]["control.refresh-with-source"] = observe(merged, "apt-get", "-q", "update")
     require(report["patching"]["control.refresh-with-source"]["eventCount"] > 0,
             "Positive control failed: the sentinel missed a refresh with a remote source")
-    report["drift"]["valid"] = expect_validation(merged, None)
     report["drift"]["remote-source"] = expect_validation(merged, "a remote APT source is configured")
     control.unlink()
-    for directory in ("var/lib/apt/lists",):
-        for entry in (merged / directory).iterdir():
-            if entry.is_file() and entry.name != "lock":
-                entry.unlink()
+    for entry in (merged / "var/lib/apt/lists").iterdir():
+        if entry.is_file() and entry.name != "lock":
+            entry.unlink()
+    report["drift"]["valid-after-source-removal"] = expect_validation(merged, None)
     unmask = chroot_run(merged, "systemctl", "unmask", "apt-daily.timer")
     require(unmask.returncode == 0, f"unmask failed: {unmask.stderr}")
     report["drift"]["unmasked-timer"] = expect_validation(merged, "apt-daily.timer is not masked")
@@ -347,21 +363,6 @@ def post_install_checks(merged, legacy_inventory):
     require(installed.returncode == 0, f"dpkg -i failed: {installed.stderr}")
     report["drift"]["installed-package"] = expect_validation(
         merged, "installed package set differs from the attested image")
-    runtime = {
-        "flutter": ["/usr/local/bin/flutter", "--version"],
-        "dart": ["/usr/local/bin/dart", "--version"],
-        "dotnet": ["/usr/local/bin/dotnet", "--version"],
-        "node": ["/usr/local/bin/node", "--version"],
-        "checkov": ["/usr/local/bin/checkov", "--version"],
-    }
-    for name, command in runtime.items():
-        result = chroot_run(merged, "runuser", "-u", "runner", "--", "env",
-                            "HOME=/tmp/certigo-runner-home", "CI=true",
-                            "FLUTTER_ALREADY_LOCKED=true", "DOTNET_CLI_HOME=/tmp/certigo-dotnet",
-                            "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1", "DOTNET_NOLOGO=1",
-                            "DOTNET_CLI_TELEMETRY_OPTOUT=1", *command, timeout=900)
-        report["runtime"][name] = {"returncode": result.returncode,
-                                   "output": (result.stdout + result.stderr)[-1500:]}
     if legacy_inventory:
         # Same tree, same roots: the previous per-file implementation is the oracle.
         (merged / "tmp/legacy-inventory.sh").write_bytes(Path(legacy_inventory).read_bytes())
@@ -399,7 +400,10 @@ def install(base, store, inputs, digest, work, extra_env=None, after=None):
             outcome["attestation"] = read_json(attestation)
             outcome["dpkgPackages"] = len(dpkg_state(merged))
             if after is not None:
-                outcome["postInstall"] = after(merged)
+                try:
+                    outcome["postInstall"] = after(merged)
+                except (ValueError, subprocess.TimeoutExpired) as error:
+                    outcome["postInstallError"] = str(error)[-3000:]
         return outcome
 
 
@@ -470,8 +474,10 @@ def run_scenario(name, base, store, work_root, legacy_inventory):
     after = (lambda merged: post_install_checks(merged, legacy_inventory)) if spec.get("positive") else None
     outcome = install(base, scenario_store, inputs, digest, work / "overlay", spec.get("env"), after)
     if spec.get("positive"):
-        passed = outcome["returncode"] == 0 and outcome["dpkgPackages"] == 665
-        reason = "installed offline, zero network attempt" if passed else outcome["output"][-600:]
+        passed = (outcome["returncode"] == 0 and outcome.get("dpkgPackages") == 665 and
+                  "postInstall" in outcome)
+        reason = ("installed offline, zero network attempt, patching and drift checks passed"
+                  if passed else outcome.get("postInstallError") or outcome["output"][-600:])
     else:
         expected = spec.get("expect")
         found = (expected in outcome["output"] if expected else

@@ -11,6 +11,7 @@ import hashlib
 import io
 import json
 import os
+import random
 import shutil
 import socket
 import stat
@@ -204,10 +205,19 @@ class WheelLockTests(unittest.TestCase):
 
 
 class SentinelTests(unittest.TestCase):
+    def start_sentinel(self):
+        # Shared persistent runners: retry on another high port range if one is taken.
+        for _ in range(8):
+            sentinel = install_offline.NetworkSentinel()
+            offset = random.randint(20000, 40000)
+            try:
+                return sentinel.start(families=(socket.AF_INET,), port_offset=offset), offset
+            except OSError:
+                sentinel.stop()
+        self.fail("No free port range for the sentinel test")
+
     def test_dns_and_tcp_attempts_are_recorded_and_refused(self):
-        sentinel = install_offline.NetworkSentinel()
-        offset = 41000 + os.getpid() % 1000
-        sentinel.start(families=(socket.AF_INET,), port_offset=offset)
+        sentinel, offset = self.start_sentinel()
         try:
             query = (b"\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00" +
                      b"\x03pub\x03dev\x00\x00\x01\x00\x01")
