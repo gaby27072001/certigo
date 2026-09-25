@@ -141,6 +141,12 @@ Décisions de l'orchestrateur, par délégation :
   datée dans l'état du projet.
 - **Q3 — répartition** (§6) : Certigo écrit la spécification et la PR Certigo ; la session
   Contenu écrit le schéma canonique et le packager.
+- **Q-G — `applied` garde ses distracteurs** (format « Build list and reorder » des examens
+  Microsoft). « Expand avant usage » côté app : tant que l'app ne valide pas une sélection
+  partielle, une garde provisoire du validateur legacy exige que `correct` cite toutes les
+  options. À l'étape 3, l'app valide une sélection d'au moins 2 étapes placées, avec un
+  réordonnancement accessible ; le serveur note l'ensemble et l'ordre. Levée de la garde :
+  `docs/EXERCICES.md`, « Garde provisoire sur les distracteurs d'`applied` ».
 
 ## Conséquences
 

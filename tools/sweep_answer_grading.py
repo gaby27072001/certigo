@@ -70,7 +70,9 @@ def check_item(item: dict[str, Any]) -> list[dict[str, str]]:
         if len(correct) < 2:
             add("error", "APPLIED_TOO_SHORT", f"key={len(correct)}")
         if len(correct) != len(options):
-            # The client only submits once every option is placed (canSubmitCurrent).
+            # The client only submits once every option is placed (canSubmitCurrent). Mirrors the
+            # provisional validate_content.mjs guard (decision Q-G); lift both together, see
+            # docs/EXERCICES.md "Garde provisoire sur les distracteurs d'applied".
             add("error", "APPLIED_UNSUBMITTABLE",
                 f"options={len(options)} key={len(correct)}: the right answer cannot be submitted")
     if item_type == "cloze":

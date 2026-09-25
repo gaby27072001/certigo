@@ -135,7 +135,10 @@ n'importerait pas. L'ordre est donc strict :
    `LessonCheck.Matches` (ajout), lecture de `matches` par le client runtime, règles du
    §5 dans `ContentContractVerifier`, anti-fuite par type, repli explicite pour un
    `itemType` inconnu (aujourd'hui rendu comme un QCM, `step_renderer.dart:97`), goldens par
-   type. Puis déploiement en dev, en staging et en prod.
+   type. Pour `applied` (décision Q-G du 2026-09-25) : l'app permet de valider une sélection
+   d'au moins 2 étapes placées, avec un réordonnancement accessible (VoiceOver, cibles de
+   44 pt, Dynamic Type) ; le serveur note l'ensemble **et** l'ordre. Puis déploiement en dev,
+   en staging et en prod.
 4. **`certigo-content`** : resynchronisation de sa copie des schémas embarqués. La garde
    accepte alors v5.
 5. **Contenu** : seulement ensuite, des questions `ordering`, `cloze`, `applied` ou
@@ -149,6 +152,10 @@ n'importerait pas. L'ordre est donc strict :
 - Un client antérieur à l'étape 3 ne lit pas `matches` : un `matchPairs` v5 y serait
   insoluble. En prod, l'app n'active pas le contenu runtime (`RUNTIME_CONTENT_MOBILE=false`).
   Le déploiement de l'étape 3 précède donc toute release v5.
+- De même, un `applied` avec distracteurs est insoluble tant que l'app exige que toutes
+  les options soient placées. Une garde provisoire l'empêche dans le corpus legacy, et
+  aucun contenu v5 de ce genre n'est publié avant l'étape 3. Conditions et procédure de
+  levée : `docs/EXERCICES.md`, « Garde provisoire sur les distracteurs d'`applied` ».
 - Le retrait de v4 (*contract*) est hors de ce lot. Il n'aura lieu que lorsque plus aucune
   release active ne la porte.
 

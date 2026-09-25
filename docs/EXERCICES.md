@@ -252,10 +252,41 @@ plus rien.
 
 #### `applied` — appliquer une procédure à un cas
 
-Même widget et même correction ordonnée qu'`ordering`, mais `correct` peut être
-un **sous-ensemble** des options : les options non citées sont des distracteurs,
-ce qu'`ordering` n'autorise pas. Au moins deux entrées — une seule n'a pas
-d'ordre.
+Même widget et même correction ordonnée qu'`ordering`. La cible est le format
+« Build list and reorder » des examens Microsoft : parmi une liste d'actions,
+choisir les bonnes et les ordonner, en laissant de côté des actions pièges.
+`correct` est donc, à terme, un **sous-ensemble ordonné** des options, et les
+options non citées sont des distracteurs, ce qu'`ordering` n'autorise pas. Au
+moins deux entrées : une seule n'a pas d'ordre.
+
+##### Garde provisoire sur les distracteurs d'`applied`
+
+Décision Q-G de l'orchestrateur, 2026-09-25 (« expand avant usage ») : **tant que
+l'app ne permet pas de valider une sélection partielle, aucun `applied` avec
+distracteurs n'est publiable.** Aujourd'hui, `canSubmitCurrent`
+(`lesson_session_state.dart`) n'active la validation qu'une fois **toutes** les
+options placées : un corrigé plus court que la liste des options serait
+impossible à réussir. Deux gardes l'empêchent, et aucun item du corpus n'est
+concerné (balayage du 2026-09-25) :
+
+* `tools/validate_content.mjs` rejette un `applied` dont `correct` ne cite pas
+  toutes les options (`APPLIED_DISTRACTORS_NOT_YET_SUPPORTED`) ;
+* `tools/sweep_answer_grading.py` signale le même cas (`APPLIED_UNSUBMITTABLE`).
+
+**Quand la lever** : quand ces trois conditions sont vraies, et pas avant.
+
+1. L'app permet de valider un `applied` dès qu'au moins 2 étapes sont placées,
+   avec un réordonnancement accessible (VoiceOver, cibles de 44 pt, Dynamic
+   Type). C'est l'étape 3 du [contrat v5](./contracts/exercise-items/v5/README.md).
+2. Cette version est la seule en circulation chez les apprenants : la dernière
+   build TestFlight distribuée, vérifiée dans App Store Connect.
+3. Les vecteurs de parité couvrent les sous-ensembles (`parity.answerGrading` :
+   cinq cas, du bon ordre au distracteur choisi). C'est déjà fait.
+
+**Comment la lever** : dans une même PR, retirer la règle
+`APPLIED_DISTRACTORS_NOT_YET_SUPPORTED` et inverser son test, remplacer
+`APPLIED_UNSUBMITTABLE` par la règle du nouveau `canSubmitCurrent` (au moins 2
+étapes), puis mettre à jour cette section.
 
 ```yaml
     type: applied
