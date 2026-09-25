@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Certigo.Domain.Content;
 
 /// A certification track: weighted exam domains plus the ordered units that make
@@ -46,7 +48,9 @@ public sealed record LessonCheck(
     string ConceptId,
     ItemType Type,
     string Stem,
-    IReadOnlyList<CheckOption> Options);
+    IReadOnlyList<CheckOption> Options,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<CheckOption>? Matches = null);
 
 /// One block of a lesson. Flattened (not polymorphic) so it round-trips cleanly
 /// through System.Text.Json and matches the Flutter `LessonBlock` 1:1: consumers
