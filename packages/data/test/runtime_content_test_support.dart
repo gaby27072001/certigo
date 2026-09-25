@@ -41,7 +41,13 @@ ContentFixture questionFixture(
   String certificationId = 'microsoft:az-900',
   String domainId = 'microsoft.az-900.domain.cloud-concepts',
   String conceptId = 'microsoft.az-900.concept.cloud-service-models',
+  String itemType = 'mcq',
   String? legacyId,
+  List<Map<String, String>> options = const <Map<String, String>>[
+    <String, String>{'id': 'a', 'label': 'A'},
+    <String, String>{'id': 'b', 'label': 'B'},
+  ],
+  List<Map<String, String>> matches = const <Map<String, String>>[],
 }) {
   return ContentFixture(
     id: id,
@@ -60,13 +66,11 @@ ContentFixture questionFixture(
         'domainId': domainId,
         'conceptId': conceptId,
       },
-      'itemType': 'mcq',
+      'itemType': itemType,
       'difficulty': 1,
       'prompt': prompt,
-      'options': <Map<String, String>>[
-        <String, String>{'id': 'a', 'label': 'A'},
-        <String, String>{'id': 'b', 'label': 'B'},
-      ],
+      'options': options,
+      if (matches.isNotEmpty) 'matches': matches,
     }),
   );
 }

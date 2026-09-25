@@ -259,6 +259,11 @@ class RuntimeContentLessonRepository implements LessonRepository {
               (dynamic value) => QuizOption.fromJson(Map<String, dynamic>.from(value as Map)),
             )
             .toList(growable: false),
+        matches: (question['matches'] as List<dynamic>? ?? <dynamic>[])
+            .map(
+              (dynamic value) => QuizOption.fromJson(Map<String, dynamic>.from(value as Map)),
+            )
+            .toList(growable: false),
       ),
     );
   }
