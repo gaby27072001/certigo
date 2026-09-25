@@ -192,11 +192,17 @@ param functionIntegrationSubnetPrefix string
 @description('Existing dedicated Flex Consumption integration subnet name.')
 param functionIntegrationSubnetName string
 
+@description('Existing MCAPS NSG in the application resource group for the Flex subnet. Empty means no association (dev default).')
+param functionIntegrationSubnetNsgName string = ''
+
 @description('Dedicated subnet for private endpoints.')
 param privateEndpointSubnetPrefix string
 
 @description('Existing dedicated subnet for private endpoints.')
 param privateEndpointSubnetName string
+
+@description('Existing MCAPS NSG in the application resource group for the private endpoint subnet. Empty means no association (dev default).')
+param privateEndpointSubnetNsgName string = ''
 
 @description('Existing Blob private endpoint name.')
 param storageBlobPrivateEndpointName string
@@ -285,7 +291,7 @@ var contentModeReady = contentRepositoryMode == 'legacy' || contentContractConfi
   : fail('contentRepositoryMode=versioned requires the complete PR #290 storage and reader outputs.')
 var effectiveContentBlobEndpoint = contentContractValid && contentModeReady ? contentBlobEndpoint : ''
 // Production-grade hardening is on for every non-dev environment: Cosmos RBAC-only
-// auth, Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
+// auth, Key Vault purge protection + 90-day soft delete, LRS + versioned
 // storage, and a locked-down CORS origin set.
 var hardened = env != 'dev'
 var publicWebOriginLower = toLower(publicWebOrigin)
@@ -476,7 +482,9 @@ module storage 'modules/storage.bicep' = {
     // Storage account names: 3-24 chars, lowercase alphanumeric only.
     accountName: toLower('st${appName}${env}${take(suffix, 8)}')
     location: location
-    skuName: hardened ? 'Standard_GRS' : 'Standard_LRS'
+    // MCAPS LRS accepted 2026-09-24: docs/migration/evidence/2026-09-24-mcaps-lrs.json.
+    // Local restore/versioning do not replace geo-redundancy during a regional loss.
+    skuName: 'Standard_LRS'
     // Azure Policy enables point-in-time restore on the live accounts. Restore
     // requires versioning and sufficient soft-delete retention, including dev.
     enableVersioning: true
@@ -530,8 +538,10 @@ module privateNetwork 'modules/privateNetwork.bicep' = {
     vnetAddressPrefix: vnetAddressPrefix
     functionIntegrationSubnetPrefix: functionIntegrationSubnetPrefix
     functionIntegrationSubnetName: functionIntegrationSubnetName
+    functionIntegrationSubnetNsgName: functionIntegrationSubnetNsgName
     privateEndpointSubnetPrefix: privateEndpointSubnetPrefix
     privateEndpointSubnetName: privateEndpointSubnetName
+    privateEndpointSubnetNsgName: privateEndpointSubnetNsgName
     storageAccountName: storage.outputs.accountName
     keyVaultName: vault.outputs.name
     cosmosAccountName: data.outputs.accountName

@@ -151,6 +151,59 @@ test('private endpoints and DNS cover every backend dependency', () => {
   );
 });
 
+test('application subnets adopt existing MCAPS NSGs without deploying their rules', () => {
+  const template = compileTemplate('infra/modules/privateNetwork.bicep');
+  const [vnet] = resourcesOfType(template, 'Microsoft.Network/virtualNetworks');
+  const root = compileTemplate('infra/main.bicep');
+  assert.equal(vnet.properties.subnets.length, 2);
+  assert.equal(
+    template.resources.some((resource) =>
+      resource.type.startsWith('Microsoft.Network/networkSecurityGroups'),
+    ),
+    false,
+  );
+
+  for (const [index, parameter] of [
+    [0, 'functionIntegrationSubnetNsgName'],
+    [1, 'privateEndpointSubnetNsgName'],
+  ]) {
+    assert.equal(template.parameters[parameter].defaultValue, '');
+    assert.equal(root.parameters[parameter].defaultValue, '');
+    assert.deepEqual(root.resources.privateNetwork.properties.parameters[parameter], {
+      value: `[parameters('${parameter}')]`,
+    });
+    assert.equal(
+      vnet.properties.subnets[index].properties.networkSecurityGroup,
+      `[if(empty(parameters('${parameter}')), null(), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', parameters('${parameter}'))))]`,
+    );
+  }
+
+  for (const environment of ['dev', 'staging', 'prod']) {
+    const compiled = JSON.parse(
+      execFileSync(
+        process.env.BICEP_CLI || 'bicep',
+        ['build-params', path.join(repositoryRoot, 'infra', 'params', `${environment}.bicepparam`), '--stdout'],
+        { encoding: 'utf8' },
+      ),
+    );
+    const parameters = JSON.parse(compiled.parametersJson).parameters;
+    if (environment === 'dev') {
+      assert.equal(parameters.functionIntegrationSubnetNsgName, undefined);
+      assert.equal(parameters.privateEndpointSubnetNsgName, undefined);
+    } else {
+      assert.equal(
+        parameters.functionIntegrationSubnetNsgName.value,
+        `vnet-certigo-${environment}-snet-func-flex-nsg-westeurope`,
+      );
+      const subnet = environment === 'staging' ? 'snet-kv-private-endpoint' : 'snet-private-endpoints';
+      assert.equal(
+        parameters.privateEndpointSubnetNsgName.value,
+        `vnet-certigo-${environment}-${subnet}-nsg-westeurope`,
+      );
+    }
+  }
+});
+
 test('application and CI virtual networks are peered in both directions', () => {
   const appTemplate = compileTemplate('infra/modules/privateNetwork.bicep');
   const [appPeering] = resourcesOfType(
@@ -266,6 +319,11 @@ test('deployment packages and release bundles expire through bounded lifecycle p
     releaseRule.definition.actions.version.delete.daysAfterCreationGreaterThan,
     90,
   );
+});
+
+test('application storage follows the accepted MCAPS LRS decision in every environment', () => {
+  const template = compileTemplate('infra/main.bicep');
+  assert.equal(template.resources.storage.properties.parameters.skuName.value, 'Standard_LRS');
 });
 
 test('storage protections remain compatible with policy-enforced point-in-time restore', () => {

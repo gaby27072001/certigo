@@ -284,7 +284,7 @@ work_packages:
     dod: "Les ressources hors-Bicep sont importées/décrites en IaC ; un what-if Bicep ne montre aucun drift non intentionnel ; procédure de détection de drift documentée et exécutable."
     rollback: "Abandon de la branche ; aucune modification appliquée aux ressources live (import descriptif uniquement)."
     status: blocked
-    notes: "Réconciliation du 2026-09-23 : voir « Réconciliation staging du 23 septembre 2026 » dans docs/runbooks/AZURE_IAC_OPERATIONS.md et la preuve JSON liée. PR #371 fusionnée, ancien blocage domaine levé. Conservation explicite de la restauration Blob corrigée et mesurée par what-if Provider ; clôture bloquée par le préflight racine avec secret autorisé et le delta Cosmos non classifié. Aucun apply ; tuteur LLM laissé désactivé. Runners et gouvernance hors périmètre."
+    notes: "Voir « Gouvernance MCAPS et LRS du 24 septembre 2026 » dans docs/runbooks/AZURE_IAC_OPERATIONS.md et sa preuve : LRS accepté, condition de dérive non intentionnelle levée ; alignement et inventaire attendent fusion explicite. Protections locales non équivalentes à une copie interrégionale. Aucune désactivation Cosmos durable observée après apply antérieur. Associations NSG historiques absentes au GET prod post-apply : causalité du seul run non prouvée, aucune règle personnalisée supprimée prouvée ; adoption IaC des associations existantes autorisée, aucun apply réseau et snet-seed hors code. Blocage exact : mode CD what-if seul OIDC/vrais secrets, sortie brute en artefact, sans apply, puis classification complète du plan racine staging. La session propriétaire des workflows livre ce mode."
 
   - id: wp-p1-13-staging-environment
     phase: 1
@@ -296,7 +296,7 @@ work_packages:
     dod: "Un environnement de staging est provisionnable par IaC (paramètres dédiés) et isolé de la prod ; un déploiement de staging réussit + /health vert."
     rollback: "Abandon de la modification ; si un changement approuvé a été appliqué, restaurer le template et les paramètres précédents en mode Incremental. Ne jamais supprimer le RG staging actif comme rollback générique ; prod inchangée."
     status: blocked
-    notes: "Réconciliation du 2026-09-23 : voir « Réconciliation staging du 23 septembre 2026 » dans docs/runbooks/AZURE_IAC_OPERATIONS.md. Domaine, déploiement staging et health vérifiés ; aucune configuration de domaine restante pour ce backend. Clôture bloquée par wp-p1-12, pas par Apple ni par le DNS Foundry du tuteur volontairement désactivé."
+    notes: "Voir « Gouvernance MCAPS et LRS du 24 septembre 2026 » dans docs/runbooks/AZURE_IAC_OPERATIONS.md. LRS accepté ; clôture toujours bloquée par wp-p1-12 : mode CD what-if seul autorisé OIDC/vrais secrets, brut en artefact, sans apply et classification du plan racine staging. Domaine, déploiement et santé historiquement prouvés ; ni Apple ni le DNS Foundry du tuteur volontairement désactivé ne sont le blocage."
 
   - id: wp-p1-14-opentelemetry-correlation
     phase: 1

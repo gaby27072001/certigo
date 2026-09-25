@@ -1,5 +1,5 @@
 // Staging environment parameters. Mirrors prod hardening (Cosmos RBAC-only,
-// Key Vault purge protection + 90-day soft delete, geo-redundant + versioned
+// Key Vault purge protection + 90-day soft delete, MCAPS LRS + versioned
 // storage, locked CORS) but is a safe pre-production target. Hardening turns on
 // automatically for any non-dev env (main.bicep), so staging is hardened by default.
 //
@@ -15,8 +15,10 @@ param ciDeploymentPrincipalId = '15d2b34a-c0a0-4b5d-8360-b895a8164706'
 param vnetAddressPrefix = '10.80.0.0/16'
 param functionIntegrationSubnetPrefix = '10.80.1.0/24'
 param functionIntegrationSubnetName = 'snet-func-flex'
+param functionIntegrationSubnetNsgName = 'vnet-certigo-staging-snet-func-flex-nsg-westeurope'
 param privateEndpointSubnetPrefix = '10.80.2.0/24'
 param privateEndpointSubnetName = 'snet-kv-private-endpoint'
+param privateEndpointSubnetNsgName = 'vnet-certigo-staging-snet-kv-private-endpoint-nsg-westeurope'
 param storageBlobPrivateEndpointName = 'pe-st-certigo-staging-blob'
 param storageQueuePrivateEndpointName = 'pe-st-certigo-staging-queue'
 param storageTablePrivateEndpointName = 'pe-st-certigo-staging-table'

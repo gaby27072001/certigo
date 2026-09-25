@@ -9,11 +9,11 @@
   },
   "head": "91cb0d4f56666bd381796bfb0c4fea5828334734",
   "checkpoint": {
-    "step": "domain-and-health-verified-iac-dependency-blocked",
-    "note": "Domaine, déploiement Bicep et santé remesurés ; voir docs/runbooks/AZURE_IAC_OPERATIONS.md, « Réconciliation staging du 23 septembre 2026 », et evidence/2026-09-23-staging-iac.json. Les variables de domaine ne sont plus un blocage. Statut blocked jusqu'à wp-p1-12 done : préflight racine complet et classification Cosmos encore requis. Aucun déploiement effectué.",
-    "at": "2026-09-23T19:24:33Z"
+    "step": "lrs-accepted-root-cd-preflight-dependency-blocked",
+    "note": "Voir « Gouvernance MCAPS et LRS du 24 septembre 2026 » dans docs/runbooks/AZURE_IAC_OPERATIONS.md. LRS accepté ; reste blocked jusqu'à wp-p1-12 done : mode CD what-if seul OIDC/vrais secrets, brut en artefact sans apply et classification racine staging. Le module Storage seul ne clôture pas ce lot. Domaine et santé historiquement prouvés ; aucun déploiement effectué ici.",
+    "at": "2026-09-24T15:39:31Z"
   },
-  "evidence_ref": "../evidence/2026-09-23-staging-iac.json",
-  "updated_at": "2026-09-23T19:24:33Z",
+  "evidence_ref": "../evidence/2026-09-24-mcaps-lrs.json",
+  "updated_at": "2026-09-24T15:39:31Z",
   "history_ref": "log.jsonl"
 }
