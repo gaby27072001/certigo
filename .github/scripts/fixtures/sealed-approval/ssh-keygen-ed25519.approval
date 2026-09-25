@@ -1,0 +1,11 @@
+certigo-sealed-approval-v1
+repository gchambaud_microsoft/Certigo
+expires 2026-10-01
+change .github/workflows/release-android.yml 0a78ee5b828939e605195c573716b675a481655fed797e7738c71bd337e7ac1a ffcf40a68124bfea1519190ae5b19c9d4a8be3c319dfd88e4e8e4ad21260d9f8
+change codemagic.yaml absent ffcf40a68124bfea1519190ae5b19c9d4a8be3c319dfd88e4e8e4ad21260d9f8
+-----BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgOt+K9KMHUrsEMibYcpaqviXizJ
+46Ko0Go26Fl/2Y45cAAAAaY2VydGlnby1zZWFsZWQtYXBwcm92YWwtdjEAAAAAAAAABnNo
+YTUxMgAAAFMAAAALc3NoLWVkMjU1MTkAAABAp3bIIqNVkSX7NXoITvMRgnPLPgBz3OAKz1
+RjkkDvGulEyVPDAz4zbR6XXE8NSZGLYGKI+Cdvyza+ANTSW0KKDw==
+-----END SSH SIGNATURE-----

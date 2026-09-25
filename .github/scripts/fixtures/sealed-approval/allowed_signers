@@ -1,0 +1,2 @@
+fixture-ecdsa@certigo namespaces="certigo-sealed-approval-v1" ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEzUaXBtVBDPPNFXEhb3Q5/nDp13fcaUiRWfwrunP+rL1xP23ReaVmgWInjn9SW3btNV0QBwSW3Dih6O/QdrsA4=
+fixture-ed25519@certigo namespaces="certigo-sealed-approval-v1" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDrfivSjB1K7BDIm2HKWqr4l4syeOiqNBqNuhZf9mOOX
