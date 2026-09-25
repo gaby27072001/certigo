@@ -160,9 +160,9 @@ un job requis ne peut alors être réparée que par une PR… jugée par l'étap
 ## Avant de fusionner A ou B : simuler l'arbre entier
 
 Depuis le 2026-09-24, le job `Candidate workflow security script tests` exécute les tests
-`.github/scripts` **de votre PR** sur son propre arbre. Tant qu'il est informatif (phase 1), il ne
-bloque pas la fusion : **ne fusionnez jamais une PR où il est rouge**. Il ne remplace pas la
-simulation ci-dessous pour une PR B, dont le workflow modifié ne s'exécute qu'après la fusion.
+`.github/scripts` **de votre PR** sur son propre arbre, et le contrôle requis
+`Validate workflow YAML` échoue s'ils échouent. Il ne remplace pas la simulation ci-dessous pour
+une PR B, dont le workflow modifié ne s'exécute qu'après la fusion.
 
 Le validateur seul ne suffit pas : c'est ainsi que l'ancien remède a paru sûr (#497). Pour chaque
 état de `main` que la séquence produit, monter **l'arbre entier** de la base en contrôle trusted et

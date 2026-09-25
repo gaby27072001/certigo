@@ -95,5 +95,58 @@ export function validateCandidateScriptTestsJob(text, label = 'lint-workflows.ym
       + '.untrusted-source, unconditionally',
     ));
   }
+  errors.push(...validateEnforcement(parsed.workflow?.jobs?.validate, label));
+  return errors;
+}
+
+export const enforcementStepName = "Enforce the candidate's own script tests";
+const enforcementResult = `\${{ needs.${candidateJobId}.result }}`;
+export const enforcementRun = [
+  'if [ "$CANDIDATE_TESTS_RESULT" != "success" ]; then',
+  '  echo "::error::The pull request\'s own .github/scripts tests did not pass '
+    + '(Candidate workflow security script tests: $CANDIDATE_TESTS_RESULT)."',
+  '  exit 1',
+  'fi',
+  '',
+].join('\n');
+
+// Le contrôle requis doit échouer quand les tests de la PR échouent. `always()` le garde actif :
+// sans lui, un échec du job candidat sauterait `validate`, et un contrôle requis sauté compte
+// comme vert.
+function validateEnforcement(validate, label) {
+  const problem = (detail) => `${label}: job validate ${detail}; "Validate workflow YAML" must `
+    + 'fail when the tests of the pull request fail (#497)';
+  if (!isPlainObject(validate)) {
+    return [problem('is missing')];
+  }
+  const errors = [];
+  const needs = Array.isArray(validate.needs) ? validate.needs : [validate.needs];
+  if (
+    !needs.includes('freshness')
+    || !needs.includes(candidateJobId)
+    || validate.if !== expectedCondition
+    || Object.hasOwn(validate, 'continue-on-error')
+  ) {
+    errors.push(problem(
+      `must need freshness and ${candidateJobId}, keep the standard always() condition and not `
+      + 'tolerate failures',
+    ));
+  }
+  const steps = Array.isArray(validate.steps) ? validate.steps : [];
+  const enforcement = steps.filter((step) => isPlainObject(step) && step.name === enforcementStepName);
+  const step = enforcement[0];
+  if (
+    enforcement.length !== 1
+    || Object.hasOwn(step, 'if')
+    || Object.hasOwn(step, 'continue-on-error')
+    || step.shell !== 'bash'
+    || !sameJson(step.env, { CANDIDATE_TESTS_RESULT: enforcementResult })
+    || step.run !== enforcementRun
+  ) {
+    errors.push(problem(
+      `must keep exactly one unconditional step "${enforcementStepName}" that exits 1 unless `
+      + `${enforcementResult} is success`,
+    ));
+  }
   return errors;
 }

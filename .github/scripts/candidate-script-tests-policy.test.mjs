@@ -6,6 +6,8 @@ import { stringify } from 'yaml';
 import {
   candidateJobId,
   candidateJobName,
+  enforcementRun,
+  enforcementStepName,
   validateCandidateScriptTestsJob,
 } from './candidate-script-tests-policy.mjs';
 
@@ -35,10 +37,35 @@ function job() {
   };
 }
 
-function workflowWith(mutate = () => {}) {
+function validate() {
+  return {
+    name: 'Validate workflow YAML',
+    needs: ['freshness', candidateJobId],
+    if: "${{ always() && needs.freshness.outputs.current != 'false' "
+      + '&& github.event.pull_request.head.repo.full_name == github.repository }}',
+    'runs-on': ['self-hosted', 'Linux', 'X64', 'certigo-pr'],
+    steps: [
+      { name: 'Test workflow security scripts', 'working-directory': '.trusted-control', run: 'node --test .github/scripts/*.test.mjs' },
+      {
+        name: enforcementStepName,
+        shell: 'bash',
+        env: { CANDIDATE_TESTS_RESULT: `\${{ needs.${candidateJobId}.result }}` },
+        run: enforcementRun,
+      },
+    ],
+  };
+}
+
+function workflowWith(mutate = () => {}, mutateValidate = () => {}) {
   const candidate = job();
+  const gate = validate();
   mutate(candidate);
-  return stringify({ name: 'lint', on: { pull_request_target: null }, jobs: { [candidateJobId]: candidate } });
+  mutateValidate(gate);
+  return stringify({
+    name: 'lint',
+    on: { pull_request_target: null },
+    jobs: { [candidateJobId]: candidate, validate: gate },
+  });
 }
 
 test('accepts the candidate script tests job', () => {
@@ -76,8 +103,36 @@ test('refuses every way of removing or neutralising the candidate tests', () => 
     assert.ok(errors.some((error) => expected.test(error)), `${expected}: ${errors.join(' | ')}`);
   }
   assert.match(
-    validateCandidateScriptTestsJob(stringify({ jobs: { validate: job() } }))[0],
+    validateCandidateScriptTestsJob(stringify({ jobs: { validate: validate() } }))[0],
     /job candidate-script-tests is missing/,
+  );
+});
+
+test('refuses every way of making "Validate workflow YAML" ignore the candidate tests', () => {
+  const cases = [
+    (gate) => { gate.needs = 'freshness'; },
+    (gate) => { gate.needs = ['freshness']; },
+    (gate) => { gate.if = "${{ needs.freshness.outputs.current != 'false' }}"; },
+    (gate) => { gate['continue-on-error'] = true; },
+    (gate) => { gate.steps.pop(); },
+    (gate) => { gate.steps[1].if = '${{ false }}'; },
+    (gate) => { gate.steps[1]['continue-on-error'] = true; },
+    (gate) => { gate.steps[1].env = { CANDIDATE_TESTS_RESULT: 'success' }; },
+    (gate) => { gate.steps[1].run = `exit 0\n${enforcementRun}`; },
+    (gate) => { gate.steps[1].run = enforcementRun.replace('exit 1', 'exit 0'); },
+    (gate) => { gate.steps[1].shell = 'pwsh'; },
+    (gate) => { gate.steps.push(structuredClone(gate.steps[1])); },
+  ];
+  for (const mutateValidate of cases) {
+    const errors = validateCandidateScriptTestsJob(workflowWith(() => {}, mutateValidate));
+    assert.ok(
+      errors.some((error) => /job validate .*must fail when the tests of the pull request fail/.test(error)),
+      `${mutateValidate}: ${errors.join(' | ')}`,
+    );
+  }
+  assert.match(
+    validateCandidateScriptTestsJob(stringify({ jobs: { [candidateJobId]: job() } }))[0],
+    /job validate is missing/,
   );
 });
 

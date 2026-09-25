@@ -79,7 +79,7 @@ jobs:
 
   validate:
     name: Validate workflow YAML
-    needs: freshness
+    needs: [freshness, candidate-script-tests]
     if: ${{ always() && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: [self-hosted, Linux, X64, certigo-pr]
     permissions:
@@ -171,3 +171,16 @@ jobs:
       - name: Test workflow security scripts
         working-directory: .trusted-control
         run: node --test .github/scripts/*.test.mjs
+
+      # Les tests de la PR elle-même (job candidate-script-tests) doivent aussi passer. Le
+      # `always()` de ce job le garde actif quand ils échouent : un contrôle requis sauté
+      # compterait comme vert.
+      - name: Enforce the candidate's own script tests
+        shell: bash
+        env:
+          CANDIDATE_TESTS_RESULT: ${{ needs.candidate-script-tests.result }}
+        run: |
+          if [ "$CANDIDATE_TESTS_RESULT" != "success" ]; then
+            echo "::error::The pull request's own .github/scripts tests did not pass (Candidate workflow security script tests: $CANDIDATE_TESTS_RESULT)."
+            exit 1
+          fi
