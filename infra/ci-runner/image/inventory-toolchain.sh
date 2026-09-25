@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export LC_ALL=C
 
+roots_only=false
+if (($# == 2)) && [[ "$1" == "--roots-only" ]]; then
+  roots_only=true
+  shift
+fi
 if (($# != 1)); then
-  echo "Usage: $0 <output-file>" >&2
+  echo "Usage: $0 [--roots-only] <output-file>" >&2
   exit 64
 fi
 
@@ -22,6 +28,8 @@ entries=(
   /etc/systemd/system/apt-daily.timer
   /etc/systemd/system/certigo-job-temp-mount.service
   /etc/systemd/system/certigo-toolchain-validate.service
+  /etc/systemd/system/snapd.snap-repair.service
+  /etc/systemd/system/snapd.snap-repair.timer
   /etc/systemd/system/unattended-upgrades.service
   /usr/bin/az
   /usr/lib/systemd/system-generators/certigo-toolchain-guard
@@ -49,6 +57,8 @@ optional_entries=(
   /etc/systemd/system/certigo-block-imds.service
   /usr/local/sbin/certigo-block-imds
 )
+# Mutable registration state is sealed separately by certigo-seal-runner-state.
+excluded_state=(.runner .credentials .credentials_rsaparams .service .env .path)
 
 for root in "${roots[@]}"; do
   [[ -d "${root}" ]] || {
@@ -57,24 +67,9 @@ for root in "${roots[@]}"; do
   }
 done
 
-is_mutable_runner_state() {
-  local path="$1"
-  [[ "${path}" == "${runner_home}/_diag" ||
-    "${path}" == "${runner_home}/_diag/"* ||
-    "${path}" == "${runner_home}/_work" ||
-    "${path}" == "${runner_home}/_work/"* ||
-    "${path}" == "${runner_home}/.runner" ||
-    "${path}" == "${runner_home}/.credentials" ||
-    "${path}" == "${runner_home}/.credentials_rsaparams" ||
-    "${path}" == "${runner_home}/.service" ||
-    "${path}" == "${runner_home}/.env" ||
-    "${path}" == "${runner_home}/.path" ]]
-}
-
 emit_entry() {
   local path="$1"
   local type mode owner payload
-  is_mutable_runner_state "${path}" && return
   mode="$(stat -c '%a' "${path}")"
   owner="$(stat -c '%u:%g' "${path}")"
   if [[ -L "${path}" ]]; then
@@ -93,18 +88,66 @@ emit_entry() {
   printf '%s\t%s\t%s\t%s\t%s\n' "${type}" "${mode}" "${owner}" "${path}" "${payload}"
 }
 
+# The same selection feeds metadata and hashing: runner _diag/_work subtrees
+# and registration state are never part of the immutable inventory.
+select_paths() {
+  local exclusions=(-path "${runner_home}/_diag" -o -path "${runner_home}/_work")
+  local name
+  for name in "${excluded_state[@]}"; do
+    exclusions+=(-o -path "${runner_home}/${name}")
+  done
+  find "${roots[@]}" -xdev \( "${exclusions[@]}" \) -prune -o "$@"
+}
+
+work="$(mktemp -d)"
+trap 'rm -rf "${work}"' EXIT
+
+# Records are tab separated: a tab or newline in a name would be ambiguous.
+unsafe="$(find "${roots[@]}" -xdev \( -name $'*\t*' -o -name $'*\n*' -o -lname $'*\t*' \
+  -o -lname $'*\n*' \) -print -quit)"
+[[ -z "${unsafe}" ]] || {
+  echo "Unsupported file name in immutable toolchain: ${unsafe}" >&2
+  exit 1
+}
+unsupported="$(select_paths ! \( -type f -o -type d -o -type l \) -print -quit)"
+[[ -z "${unsupported}" ]] || {
+  echo "Unsupported filesystem entry in immutable toolchain: ${unsupported}" >&2
+  exit 1
+}
+
+# One metadata pass and one batched hashing pass instead of several processes
+# per file: the toolchains hold tens of thousands of files.
+select_paths -printf '%p\t%y\t%m\t%U:%G\t%l\n' | sort -t $'\t' -k1,1 >"${work}/records"
+select_paths -type f -print0 | xargs -0 -r sha256sum --zero -- | tr '\0' '\n' |
+  sed -E 's/^([0-9a-f]{64})  /\1\t/' >"${work}/hashes"
+
 {
-  while IFS= read -r -d '' path; do
-    emit_entry "${path}"
-  done < <(find "${roots[@]}" -xdev -print0 | sort -z)
-  for path in "${entries[@]}"; do
-    [[ -e "${path}" || -L "${path}" ]] || {
-      echo "Expected toolchain link is missing: ${path}" >&2
-      exit 1
+  awk -F '\t' -v OFS='\t' '
+    FNR == NR { hash[$2] = $1; next }
+    $2 == "f" {
+      if (!($1 in hash)) { print "Unhashed file: " $1 > "/dev/stderr"; exit 1 }
+      print "f", $3, $4, $1, hash[$1]; next
     }
-    emit_entry "${path}"
-  done
-  for path in "${optional_entries[@]}"; do
-    [[ -e "${path}" || -L "${path}" ]] && emit_entry "${path}"
-  done
+    $2 == "l" { print "l", $3, $4, $1, $5; next }
+    $2 == "d" { print "d", $3, $4, $1, "-"; next }
+    { print "Unsupported filesystem entry in immutable toolchain: " $1 > "/dev/stderr"; exit 1 }
+  ' "${work}/hashes" "${work}/records"
+  if [[ "${roots_only}" == false ]]; then
+    for path in "${entries[@]}"; do
+      [[ -e "${path}" || -L "${path}" ]] || {
+        echo "Expected toolchain link is missing: ${path}" >&2
+        exit 1
+      }
+      emit_entry "${path}"
+    done
+    for path in "${optional_entries[@]}"; do
+      if [[ -e "${path}" || -L "${path}" ]]; then
+        emit_entry "${path}"
+      fi
+    done
+  fi
 } >"${output}"
+[[ "$(wc -l <"${work}/hashes")" == "$(awk -F '\t' '$2 == "f"' "${work}/records" | wc -l)" ]] || {
+  echo "Hashed file count differs from the inventoried file count." >&2
+  exit 1
+}

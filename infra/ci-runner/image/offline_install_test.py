@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 import socket
+import stat
 import struct
 import subprocess
 import sys
@@ -108,11 +109,14 @@ class ClosedSetTests(unittest.TestCase):
                     attempt(source, target)
 
     def test_proxy_environment_cannot_redirect_acquisition(self):
-        with mock.patch.dict(os.environ, {"https_proxy": "http://proxy.invalid:3128",
-                                          "HTTPS_PROXY": "http://proxy.invalid:3128"}):
+        proxy = "http://proxy.invalid:3128"
+        with mock.patch.dict(os.environ, {"https_proxy": proxy, "HTTPS_PROXY": proxy}):
+            default = urllib.request.build_opener().handlers
             handlers = image_artifacts.opener().handlers
-        proxies = [h for h in handlers if isinstance(h, urllib.request.ProxyHandler)]
-        self.assertEqual([h.proxies for h in proxies], [{}])
+        # Positive control: the default opener would route through the proxy.
+        self.assertIn({"https": proxy},
+                      [h.proxies for h in default if isinstance(h, urllib.request.ProxyHandler)])
+        self.assertEqual([h for h in handlers if isinstance(h, urllib.request.ProxyHandler)], [])
 
     def test_fetch_publishes_only_verified_bytes(self):
         class Response(io.BytesIO):
@@ -273,7 +277,7 @@ class InstallerTests(unittest.TestCase):
             self.assertFalse(install_offline.RESOLVER_OVERRIDES.match(name), name)
 
     def test_expected_package_states_come_from_the_lock(self):
-        installer = self.installer(Path(tempfile.gettempdir()) / "unused")
+        installer = self.installer(Path(tempfile.gettempdir()) / "unused", "0" * 64)
         installer.apt = read_json(ROOT / "apt-packages.lock.json")
         base = installer.expected_state(False)
         final = installer.expected_state(True, held={"azure-cli"})
@@ -282,8 +286,8 @@ class InstallerTests(unittest.TestCase):
         self.assertLessEqual(set(base), set(final))
         self.assertEqual(len(set(final) - set(base)), 9)
 
-    def test_precache_may_only_rewrite_identical_engine_stamps(self):
-        installer = self.installer(Path(tempfile.gettempdir()) / "unused")
+    def test_precache_and_config_may_only_create_the_lock_file(self):
+        installer = self.installer(Path(tempfile.gettempdir()) / "unused", "0" * 64)
         before = {"bin/cache/engine.stamp": ("f", 41, "a"), "bin/cache/linux-sdk.stamp": ("f", 41, "b")}
         installer.require_precache_noop(before, dict(before, **{"bin/cache/lockfile": ("f", 0, "c")}))
         for after, reason in (
@@ -295,14 +299,99 @@ class InstallerTests(unittest.TestCase):
                 installer.require_precache_noop(before, after)
 
 
+class InventoryTests(unittest.TestCase):
+    EXCLUDED = (".runner", ".credentials", ".credentials_rsaparams", ".service", ".env", ".path")
+
+    @staticmethod
+    def reference(roots, runner_home):
+        """Independent statement of the inventory format for the three roots."""
+        pruned = {runner_home / "_diag", runner_home / "_work"}
+        pruned |= {runner_home / name for name in InventoryTests.EXCLUDED}
+        paths = []
+
+        def walk(path):
+            if path in pruned:
+                return
+            paths.append(path)
+            if path.is_dir() and not path.is_symlink():
+                for child in path.iterdir():
+                    walk(child)
+
+        for root in roots:
+            walk(root)
+        lines = []
+        for path in sorted(paths, key=os.fsencode):
+            status = os.lstat(path)
+            prefix = f"{format(stat.S_IMODE(status.st_mode), 'o')}\t{status.st_uid}:{status.st_gid}"
+            if stat.S_ISLNK(status.st_mode):
+                lines.append(f"l\t{prefix}\t{path}\t{os.readlink(path)}\n")
+            elif stat.S_ISREG(status.st_mode):
+                lines.append(f"f\t{prefix}\t{path}\t{hashlib.sha256(path.read_bytes()).hexdigest()}\n")
+            else:
+                lines.append(f"d\t{prefix}\t{path}\t-\n")
+        return "".join(lines)
+
+    @unittest.skipUnless(sys.platform == "linux", "requires bash, GNU find and coreutils")
+    def test_batched_inventory_matches_an_independent_reference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            toolchains, runner, azure = root / "toolchains", root / "runner", root / "az"
+            for directory in (toolchains / "a" / "b", runner / "bin", runner / "_diag" / "x",
+                              runner / "_work" / "y", azure / "lib"):
+                directory.mkdir(parents=True)
+            (toolchains / "a" / "file one.txt").write_bytes(b"alpha")
+            executable = toolchains / "a" / "b" / "setuid-exec"
+            executable.write_bytes(b"#!/bin/sh\n")
+            os.chmod(executable, 0o4755)
+            (toolchains / "a" / "empty").write_bytes(b"")
+            (toolchains / "relative-link").symlink_to("a/file one.txt")
+            (toolchains / "dangling-link").symlink_to("missing")
+            (toolchains / "directory-link").symlink_to("a")
+            (runner / "bin" / "Runner.Listener").write_bytes(b"runner")
+            for name in self.EXCLUDED:
+                (runner / name).write_text("registration state")
+            (runner / ".runner.backup").write_text("not excluded")
+            (runner / "_diag" / "x" / "log").write_text("log")
+            (runner / "_work" / "y" / "w").write_text("work")
+            (azure / "lib" / "é-unicode").write_bytes(b"unicode")
+            output = root / "inventory.tsv"
+            environment = dict(os.environ, CERTIGO_TOOLCHAIN_ROOT=str(toolchains),
+                               CERTIGO_RUNNER_HOME=str(runner), CERTIGO_AZURE_CLI_ROOT=str(azure))
+            script = str(ROOT / "inventory-toolchain.sh")
+            subprocess.run(["bash", script, "--roots-only", str(output)], env=environment, check=True)
+            self.assertEqual(output.read_text(encoding="utf-8"),
+                             self.reference((toolchains, runner, azure), runner))
+            (toolchains / "a" / "tab\tname").write_text("ambiguous")
+            result = subprocess.run(["bash", script, "--roots-only", str(output)], env=environment,
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Unsupported file name in immutable toolchain", result.stderr)
+            (toolchains / "a" / "tab\tname").unlink()
+            os.mkfifo(toolchains / "a" / "fifo")
+            result = subprocess.run(["bash", script, "--roots-only", str(output)], env=environment,
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Unsupported filesystem entry in immutable toolchain", result.stderr)
+
+    def test_masked_units_are_attested_and_verified(self):
+        validator = (ROOT / "validate-toolchain.sh").read_text()
+        inventory = (ROOT / "inventory-toolchain.sh").read_text()
+        for unit in install_offline.APT_AUTOMATION_UNITS:
+            self.assertIn(unit, validator)
+            self.assertIn(f"/etc/systemd/system/{unit}\n", inventory)
+        for path in install_offline.PATCHING_FILES:
+            self.assertIn(f"{path}\n", inventory)
+
+
 @unittest.skipUnless(os.environ.get("CERTIGO_OFFLINE_ROOTFS"), "requires the qemu harness base")
 class OfflineExecutionTests(unittest.TestCase):
     """Real installer runs; see offline_harness.py for the environment."""
 
     def test_harness(self):
+        report = Path(tempfile.gettempdir()) / "certigo-offline-suite.json"
         command = [sys.executable, str(ROOT / "offline_harness.py"), "run-suite",
                    "--rootfs", os.environ["CERTIGO_OFFLINE_ROOTFS"],
-                   "--store", os.environ["CERTIGO_OFFLINE_STORE"]]
+                   "--store", os.environ["CERTIGO_OFFLINE_STORE"], "--report", str(report)]
         subprocess.run(command, check=True)
 
 

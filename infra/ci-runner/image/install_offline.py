@@ -48,6 +48,8 @@ TEST_NET = "192.0.2.1"
 APT_AUTOMATION_UNITS = (
     "apt-daily.timer", "apt-daily-upgrade.timer", "apt-daily.service",
     "apt-daily-upgrade.service", "unattended-upgrades.service",
+    # snap-repair fetches and runs vendor repair scripts from the network.
+    "snapd.snap-repair.timer", "snapd.snap-repair.service",
 )
 DPKG_LOCKS = (
     "/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock",
@@ -131,13 +133,14 @@ class NetworkSentinel:
 
     def stop(self):
         self._stopping.set()
+        events = self.snapshot()
         for sock in self._sockets:
             try:
                 sock.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
             sock.close()
-        return self.snapshot()
+        return events
 
     @staticmethod
     def question_end(message):
@@ -180,6 +183,9 @@ class NetworkSentinel:
                 message, ancillary, _, peer = sock.recvmsg(4096, socket.CMSG_SPACE(12))
             except OSError:
                 return
+            if self._stopping.is_set() or peer is None:
+                # A shut-down socket returns an empty datagram: not an attempt.
+                return
             destination = None
             for level, kind, data in ancillary:
                 if level == socket.IPPROTO_IP and kind == socket.IP_PKTINFO and len(data) >= 12:
@@ -196,6 +202,9 @@ class NetworkSentinel:
             try:
                 connection, _ = sock.accept()
             except OSError:
+                return
+            if self._stopping.is_set():
+                connection.close()
                 return
             with connection:
                 destination = connection.getsockname()[0]
@@ -255,6 +264,8 @@ class Installer:
             log.write(result.stdout)
             log.write(result.stderr)
         self.timings.append({"step": step, "seconds": round(time.monotonic() - started, 3)})
+        # A network attempt is the reported cause even when the tool then fails.
+        self.assert_no_network_attempt(step)
         if check and result.returncode != 0:
             tail = "\n".join((result.stdout + result.stderr).splitlines()[-25:])
             raise ValueError(f"{step} failed ({result.returncode}):\n{tail}")
@@ -277,6 +288,10 @@ class Installer:
         interfaces = [name for _, name in socket.if_nameindex()]
         require(interfaces == ["lo"],
                 "Offline installation must run in an empty network namespace (unshare --net)")
+        for directory in (Path("/var/lib/snapd/snaps"), Path("/var/lib/snapd/seed/snaps")):
+            found = sorted(directory.glob("*.snap")) if directory.exists() else []
+            if found:
+                raise ValueError(f"Snap package present; it would refresh from the network: {found[0]}")
 
     def verify_inputs(self):
         contract_path = self.input(CONTRACT)
@@ -597,8 +612,23 @@ class Installer:
                                      "-C", target])
         sdk = target / "flutter"
         self.verify_flutter_preconditions(sdk)
+        self.resolve_pub_offline(sdk, target / "pub-cache")
+        before = self.sdk_snapshot(sdk)
+        flutter = sdk / "bin/flutter"
+        flutter_env = self.env()
+        self.run("flutter.config", [flutter, "config", "--no-analytics"], env=flutter_env, cwd=sdk)
+        self.run("flutter.precache", [flutter, "precache", "--linux"], env=flutter_env, cwd=sdk)
+        self.require_precache_noop(before, self.sdk_snapshot(sdk))
+
+    def resolve_pub_offline(self, sdk, pub_cache):
+        """Fill a private Pub cache from the locked archives, then resolve offline.
+
+        The cache lives in the read-only toolchain tree. A cache under /root
+        (the SDK default when PUB_CACHE is unset) is unreadable by the runner
+        user, which would make PubDependencies stale and trigger an online
+        `pub get` on the first job.
+        """
         dart = sdk / "bin/cache/dart-sdk/bin/dart"
-        pub_cache = target / "pub-cache"
         pub_cache.mkdir(mode=0o755)
         archives = self.stage("pub", "pub")
         environment = self.pub_environment(sdk, pub_cache)
@@ -621,14 +651,6 @@ class Installer:
         self.verify_package_config(sdk, pub_cache, locked)
         version = json.loads((sdk / "bin/cache/flutter.version.json").read_text())
         (sdk / "packages/flutter_tools/.dart_tool/version").write_text(version["frameworkVersion"])
-        self.assert_no_network_attempt("offline Pub resolution")
-        before = self.cache_snapshot(sdk)
-        flutter = sdk / "bin/flutter"
-        flutter_env = self.env()
-        self.run("flutter.config", [flutter, "config", "--no-analytics"], env=flutter_env, cwd=sdk)
-        self.run("flutter.precache", [flutter, "precache", "--linux"], env=flutter_env, cwd=sdk)
-        self.assert_no_network_attempt("flutter precache --linux")
-        self.require_precache_noop(before, self.cache_snapshot(sdk))
 
     def verify_package_config(self, sdk, pub_cache, locked):
         config = json.loads((sdk / "packages/flutter_tools/.dart_tool/package_config.json").read_text())
@@ -643,20 +665,20 @@ class Installer:
             hosted.add(uri[len(prefix):].rstrip("/"))
         require(hosted == set(locked), "Flutter tool package configuration differs from the lock")
 
-    def cache_snapshot(self, sdk):
+    def sdk_snapshot(self, sdk):
+        """Type, size and digest of every SDK entry, Git metadata included."""
         snapshot = {}
-        for base in ("bin/cache", "packages/flutter_tools/.dart_tool", ".git"):
-            for current, dirs, names in os.walk(sdk / base):
-                for name in dirs + names:
-                    path = Path(current) / name
-                    relative = str(path.relative_to(sdk))
-                    status = os.lstat(path)
-                    if stat.S_ISREG(status.st_mode):
-                        snapshot[relative] = ("f", status.st_size, file_hash(path))
-                    elif stat.S_ISLNK(status.st_mode):
-                        snapshot[relative] = ("l", os.readlink(path))
-                    else:
-                        snapshot[relative] = ("d",)
+        for current, dirs, names in os.walk(sdk):
+            for name in dirs + names:
+                path = Path(current) / name
+                relative = str(path.relative_to(sdk))
+                status = os.lstat(path)
+                if stat.S_ISREG(status.st_mode):
+                    snapshot[relative] = ("f", status.st_size, file_hash(path))
+                elif stat.S_ISLNK(status.st_mode):
+                    snapshot[relative] = ("l", os.readlink(path))
+                else:
+                    snapshot[relative] = ("d",)
         return snapshot
 
     def require_precache_noop(self, before, after):
@@ -667,7 +689,7 @@ class Installer:
                 continue
             if path in created and path not in before:
                 continue
-            raise ValueError(f"flutter precache --linux changed the SDK cache: {path}")
+            raise ValueError(f"flutter config/precache changed the Flutter SDK: {path}")
 
     # ------------------------------------------------------------------ Python
     def install_python(self):
@@ -750,11 +772,6 @@ class Installer:
 
     # ------------------------------------------------------- guest patching (#341)
     def neutralize_guest_patching(self):
-        snaps = Path("/var/lib/snapd/snaps")
-        seeded = Path("/var/lib/snapd/seed/snaps")
-        for directory in (snaps, seeded):
-            found = sorted(directory.glob("*.snap")) if directory.exists() else []
-            require(not found, f"Snap package present; it would refresh itself: {found[0] if found else ''}")
         for path, content in PATCHING_FILES.items():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")

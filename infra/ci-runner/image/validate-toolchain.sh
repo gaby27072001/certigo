@@ -179,7 +179,8 @@ for key in APT::Periodic::Update-Package-Lists APT::Periodic::Unattended-Upgrade
   [[ "${value}" == "0" ]] || fail "${key} is not disabled"
 done
 for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service \
-  apt-daily-upgrade.service unattended-upgrades.service; do
+  apt-daily-upgrade.service unattended-upgrades.service \
+  snapd.snap-repair.timer snapd.snap-repair.service; do
   [[ "$(readlink "/etc/systemd/system/${unit}")" == /dev/null ]] || fail "${unit} is not masked"
 done
 if compgen -G '/var/lib/snapd/snaps/*.snap' >/dev/null; then

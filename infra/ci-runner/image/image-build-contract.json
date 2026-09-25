@@ -37,10 +37,11 @@
     },
     "aptPackageLockSha256": "3682ce190d65ee2680862f29562bdf3120c83452c022400620a4a857bb1ea69b",
     "flutterEngineArtifactLockSha256": "7bd761bd69be44f7f5c043d7da1b77f7accdbe99c4314c274c387392dcb730a1",
+    "pythonWheelLockSha256": "05c532bb537a44754cb1219284bca0426c47c24b8d05899fe34061e9fbc3e300",
     "blockedReasons": [
-      "APT and Flutter locks are captured and replayable, but the bootstrap (including installdependencies.sh), APT, pip and Flutter are not confined to verified offline artifacts.",
-      "The future consumer must enforce the Flutter entrypoint preconditions and prohibit online Pub metadata resolution.",
-      "Platform guest patching can mutate packages after boot and is not yet covered by the image installation and boot contract."
+      "The offline consumer (install_offline.py) and its execution tests exist, but the image stays blocked until independent review, green CI and explicit approval.",
+      "The template transport embeds the inputs (loadFileAsBase64); no Azure build has exercised it and Azure Image Builder documents no inline size limit.",
+      "Signer activation (#341 point 4) is excluded and still requires a workflow security policy decision."
     ]
   },
   "inputs": [
@@ -90,13 +91,13 @@
       "id": "validator",
       "path": "infra/ci-runner/image/validate-toolchain.sh",
       "destination": "validate-toolchain.sh",
-      "sha256": "0824a1f482fa8a38db2b506800dd414e9ba804b673e4e5b0507ee11a6021c952"
+      "sha256": "4e069d186a1ec1b3d7a2813ac09bf8a89e5729cc7462a500aa5d035088ffbf36"
     },
     {
       "id": "inventory",
       "path": "infra/ci-runner/image/inventory-toolchain.sh",
       "destination": "inventory-toolchain.sh",
-      "sha256": "adba5f0c1f7e1caa6e6543ddf3bc06fa98faa03d6c445058fef8d942f8673a39"
+      "sha256": "11234197e61b9486dd76f3aef80571da431f59899fbc409b57e09427607a604a"
     },
     {
       "id": "seal-state",
@@ -133,6 +134,36 @@
       "path": "infra/ci-runner/image/runner-ephemeral.conf",
       "destination": "runner-ephemeral.conf",
       "sha256": "b75d04cee8daf4fb592a79b1a1547aceeb7bf51b7d28634480310e68889b25aa"
+    },
+    {
+      "id": "python-wheel-lock",
+      "path": "infra/ci-runner/image/python-wheels.lock.json",
+      "destination": "python-wheels.lock.json",
+      "sha256": "05c532bb537a44754cb1219284bca0426c47c24b8d05899fe34061e9fbc3e300"
+    },
+    {
+      "id": "offline-installer",
+      "path": "infra/ci-runner/image/install_offline.py",
+      "destination": "install_offline.py",
+      "sha256": "146cff61ba4d448b6d93da3614e29fe78e978bb27b127a1fcbb3f8466df32897"
+    },
+    {
+      "id": "artifact-set",
+      "path": "infra/ci-runner/image/image_artifacts.py",
+      "destination": "image_artifacts.py",
+      "sha256": "e65c9b47a8aa07b195c1b6330c0996eeea746125e1ab3a0bb0435ece915cc30a"
+    },
+    {
+      "id": "flutter-graph",
+      "path": "infra/ci-runner/image/lock_flutter.py",
+      "destination": "lock_flutter.py",
+      "sha256": "d466e9882d5e80a72ed93dc0b14ac3adbad224687f06fd6e05762b706d9a4755"
+    },
+    {
+      "id": "lock-primitives",
+      "path": "infra/ci-runner/image/lock_inputs.py",
+      "destination": "lock_inputs.py",
+      "sha256": "f18e3ab1e57b8e798b863970c42b56edc3e7af6fe263f0797149b54d2c259044"
     }
   ]
 }
