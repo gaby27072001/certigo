@@ -69,12 +69,12 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 
 | Élément | Valeur |
 |---|---|
-| **VMSS live** | trusted `vmss-certigo-runner-zonal` (capacité 2, zones 1 et 2) + pilote PR `vmss-certigo-pr-pilot-z1` (zone 1, 4 instances utiles sur 11 présentes) |
-| **Capacité Azure live** | `f55d176e` (zone 2) et `be505fa1` (zone 1) trusted; `5275ea21`, `94bad106`, `1a6deaa2`, `6e3abce4` (zone 1) PR; 7 instances PR retirées (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2` désallouées, `a14700a3`, `bbf83c5c`, `d8d42366` en `Failed`) interdites; `4153d1dd` externe; `22f7fb52` et `4596a9d5` absentes/interdites |
+| **VMSS live** | trusted `vmss-certigo-runner-zonal` (capacité 2, zones 1 et 2) + pilote PR `vmss-certigo-pr-pilot-z1` (zone 1, capacité 4 : ses 4 instances utiles) |
+| **Capacité Azure live** | `f55d176e` (zone 2) et `be505fa1` (zone 1) trusted; `5275ea21`, `94bad106`, `1a6deaa2`, `6e3abce4` (zone 1) PR; les 7 instances PR retirées (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2`, `a14700a3`, `bbf83c5c`, `d8d42366`) ont été supprimées le 2026-09-25 et restent interdites; `4153d1dd` externe; `22f7fb52` et `4596a9d5` absentes/interdites |
 | **Resource group** | `RG-CERTIGO-CI` |
 | **Subscription** | `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**) |
 | **Runners GitHub live** | ID 27 `…_f55d176e-Certigo` et ID 29 `…_be505fa1-Certigo` **trusted**; ID 31 `certigo-prMVOC2P`, ID 32 `certigo-prTRHQEY`, ID 33 `certigo-pr7BZU76`, ID 34 `certigo-prUL1UCK` **pr** — labels disjoints |
-| **Classification contrôleur** | f55 + be5 + les 4 instances PR liées explicitement dans `capacity-controller.config.json` · les 7 instances PR retirées dans `forbiddenVirtualMachines` · `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit |
+| **Classification contrôleur** | f55 + be5 + les 4 instances PR liées explicitement dans `capacity-controller.config.json` · les 7 noms des instances PR supprimées dans `forbiddenVirtualMachines` · `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit |
 | **Identités** | f55/be5 : UAMI du VMSS zonal; pilote PR : aucune identité |
 | **Repo desservi** | `gchambaud_microsoft/Certigo` (les mêmes VMs hébergent aussi un agent pour `gchambaud_microsoft/certigo-content`) |
 
@@ -572,7 +572,9 @@ et content**. Le verrou transforme cette destruction silencieuse en échec immé
 > avec les trois suppressions refusées. Conséquences :
 > - retirer une instance = lever le verrou, supprimer **la VM exacte** (`az vm delete`), vérifier,
 >   remettre le verrou — jamais un scale-in. Toute suppression exige l'accord explicite de
->   Gabriel (procédure des sept instances retirées préparée le 2026-09-23, non exécutée) ;
+>   Gabriel. Appliqué le 2026-09-25 aux sept instances retirées : verrou levé 1 min 42 s, remis
+>   dans un bloc `finally` (voir « Suppression des sept instances retirées — 2026-09-25 » dans
+>   `docs/CI_RUNNER_RESILIENCE.md`) ;
 > - la règle d'autoscale « CPU < 20 % → −1 » du pool trusted était ce piège armé : elle a été
 >   retirée du live le 2026-09-23 à 18:01Z en appliquant `infra/ci-runner/capacity.bicep`
 >   (déploiement `certigo-ci-capacity-20260923180037`, what-if : 1 seul `Modify`, aucune

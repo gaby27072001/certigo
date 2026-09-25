@@ -268,7 +268,9 @@ GitHub/NuGet/pub.dev/npm fonctionnel. Le pilote ne crée volontairement aucun ru
 >   supprimé côté GitHub avant l'échec.
 >
 > Fin du drill : supprimer le runner (`gh api -X DELETE .../actions/runners/<ID>`), puis le
-> groupe de ressources, et prouver l'absence des deux.
+> groupe de ressources, et prouver l'absence des deux. Exécuté le 2026-09-25 : voir « Drill du
+> 2026-09-25 — reconstruction depuis la définition versionnée » dans
+> `docs/CI_RUNNER_RESILIENCE.md`.
 
 La sortie structurée de `register-pilot.ps1` fournit l'`id` et le `name` GitHub. Avant toute
 activation future du contrôleur, reporter ces deux valeurs avec le nom et l'ID ARM exacts de

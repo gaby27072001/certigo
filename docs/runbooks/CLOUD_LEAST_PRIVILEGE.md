@@ -61,7 +61,7 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 | Élément | État observé |
 |---|---|
 | Compute géré | `f55d176e` (zone 2) **et `be505fa1` (zone 1)** dans `vmss-certigo-runner-zonal`; pilotes `5275ea21`, `94bad106`, `1a6deaa2` **et `6e3abce4`** dans `vmss-certigo-pr-pilot-z1` zone 1 |
-| Inventaire Azure courant | les six instances gérées ci-dessus; 7 instances PR retirées et interdites (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2` désallouées; `a14700a3`, `bbf83c5c`, `d8d42366` en `Failed`); `4153d1dd` externe; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
+| Inventaire Azure courant | les six instances gérées ci-dessus; les 7 instances PR retirées (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2`, `a14700a3`, `bbf83c5c`, `d8d42366`) ont été supprimées le 2026-09-25 et restent interdites; `4153d1dd` externe; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
 | Scale-in | **retiré du live le 2026-09-23 à 18:01Z** (application de `capacity.bicep`) : la règle « CPU < 20 % pendant 45 min » ignorait les jobs GitHub et, sous le verrou `CanNotDelete`, laissait l'instance visée en `Failed` |
