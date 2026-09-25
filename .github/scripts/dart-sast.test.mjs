@@ -8,12 +8,15 @@ import { fileURLToPath } from 'node:url';
 
 import {
   BASELINE_SCHEMA,
+  DEFAULT_CONTROLS,
   GateError,
   buildFindings,
   compareWithBaseline,
   computeTargets,
   evaluateFixtures,
   fingerprintFor,
+  listFixtureFiles,
+  loadRuleCatalog,
   parseArguments,
   parseFixtureAnnotations,
   parseRuleCatalog,
@@ -96,6 +99,29 @@ function entry(overrides = {}) {
     ...overrides,
   };
 }
+
+test('the committed controls are consistent and every rule has both fixture kinds', () => {
+  const catalog = loadRuleCatalog(DEFAULT_CONTROLS.rules);
+  assert.ok(catalog.size >= 30, `only ${catalog.size} rules found`);
+  validateScope(JSON.parse(fs.readFileSync(DEFAULT_CONTROLS.scope, 'utf8')));
+  validateBaseline(JSON.parse(fs.readFileSync(DEFAULT_CONTROLS.baseline, 'utf8')), catalog);
+  assert.match(readPinnedVersion(DEFAULT_CONTROLS.lock), /^\d+\.\d+\.\d+$/);
+  assert.match(fs.readFileSync(DEFAULT_CONTROLS.lock, 'utf8'), /--hash=sha256:[0-9a-f]{64}/);
+
+  const annotations = { expected: [], forbidden: [] };
+  for (const file of listFixtureFiles(DEFAULT_CONTROLS.fixtures)) {
+    const text = fs.readFileSync(path.join(DEFAULT_CONTROLS.fixtures, file), 'utf8');
+    const parsed = parseFixtureAnnotations(file, text);
+    annotations.expected.push(...parsed.expected);
+    annotations.forbidden.push(...parsed.forbidden);
+  }
+  const named = new Set([...annotations.expected, ...annotations.forbidden].map((item) => item.rule));
+  assert.deepEqual([...named].filter((rule) => !catalog.has(rule)), []);
+  for (const rule of catalog.keys()) {
+    assert.ok(annotations.expected.some((item) => item.rule === rule), `${rule} has no ruleid fixture`);
+    assert.ok(annotations.forbidden.some((item) => item.rule === rule), `${rule} has no ok fixture`);
+  }
+});
 
 test('repository-relative paths are normalized and unsafe paths are refused', () => {
   assert.equal(safeRelativePath('./apps/mobile/lib/a.dart', 'p'), 'apps/mobile/lib/a.dart');

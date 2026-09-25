@@ -91,16 +91,15 @@ python3.12 -m venv /tmp/semgrep
   --require-hashes --only-binary=:all: --no-deps -r .github/sast/semgrep-requirements.lock
 
 # Les règles détectent-elles ce qu'elles doivent, et seulement cela ?
-node .github/scripts/dart-sast.mjs test-rules --semgrep /tmp/semgrep/bin/semgrep \
-  --lock .github/sast/semgrep-requirements.lock --rules .github/sast/rules \
-  --fixtures .github/sast/tests --state /tmp/dart-sast
+node .github/scripts/dart-sast.mjs test-rules --semgrep /tmp/semgrep/bin/semgrep --state /tmp/dart-sast
 
 # Le dépôt a-t-il une découverte hors baseline ?
-node .github/scripts/dart-sast.mjs check --semgrep /tmp/semgrep/bin/semgrep \
-  --lock .github/sast/semgrep-requirements.lock --rules .github/sast/rules \
-  --scope .github/sast/scope.json --baseline .github/sast/baseline.json \
-  --root . --state /tmp/dart-sast
+node .github/scripts/dart-sast.mjs check --semgrep /tmp/semgrep/bin/semgrep --root . --state /tmp/dart-sast
 ```
+
+Règles, périmètre, baseline, verrou et fixtures sont lus **à côté du script** (`--rules`,
+`--scope`, `--baseline`, `--lock` et `--fixtures` ne servent qu'aux tests) : exécuter la copie de
+base du script, c'est appliquer les contrôles de base.
 
 Codes de sortie : **0** rien de nouveau ; **1** découverte nouvelle ou test de règle en échec ;
 **2** scan invalide ou incomplet (outil en erreur, fichier non analysé, entrée malformée).

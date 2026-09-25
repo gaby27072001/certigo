@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Dart/Flutter SAST runner and gate (Semgrep Community Edition).
 //
-// CI runs this file, the rules, the scope, the baseline and the Semgrep lock from the
-// pull request BASE SHA (.trusted-control); the pull request tree is only ever read as
-// data. See docs/runbooks/DART_SAST.md.
+// The controls (rules, scope, baseline, Semgrep lock, fixtures) default to the files next to
+// this script, so running the BASE copy (.trusted-control) always applies the base controls;
+// the pull request tree is only ever read as data. See docs/runbooks/DART_SAST.md.
 //
 //   check       list the tracked targets, run Semgrep, enforce coverage and the baseline
 //   test-rules  run the rules on their annotated fixtures (ruleid:/ok: annotations)
@@ -22,6 +22,14 @@ export const FINGERPRINT_PREFIX = 'certigo-dart-sast-v1';
 export const SCOPE_SCHEMA = 'certigo.dart-sast-scope/v1';
 export const BASELINE_SCHEMA = 'certigo.dart-sast-baseline/v1';
 export const CLASSIFICATIONS = new Set(['false-positive', 'accepted-risk']);
+const CONTROL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+export const DEFAULT_CONTROLS = Object.freeze({
+  rules: path.join(CONTROL_ROOT, '.github', 'sast', 'rules'),
+  scope: path.join(CONTROL_ROOT, '.github', 'sast', 'scope.json'),
+  baseline: path.join(CONTROL_ROOT, '.github', 'sast', 'baseline.json'),
+  lock: path.join(CONTROL_ROOT, '.github', 'sast', 'semgrep-requirements.lock'),
+  fixtures: path.join(CONTROL_ROOT, '.github', 'sast', 'tests'),
+});
 const RULE_ID_PATTERN = /^(?:dart|mobile)-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RULE_ID_LINE = /^\s*-\s+id:\s*(\S+)\s*$/;
 const SEVERITIES = new Set(['ERROR', 'WARNING', 'INFO']);
@@ -647,6 +655,14 @@ function printUntrusted(text) {
 
 // ------------------------------------------------------------------ commands
 
+function controlPath(args, name) {
+  const value = args.get(name);
+  if (value !== undefined && (typeof value !== 'string' || value.length === 0)) {
+    throw new GateError(`--${name} expects a path`);
+  }
+  return path.resolve(value ?? DEFAULT_CONTROLS[name]);
+}
+
 function requireArgument(args, name) {
   const value = args.get(name);
   if (typeof value !== 'string' || value.length === 0) {
@@ -679,12 +695,12 @@ export function parseArguments(argv) {
 
 function scanTree(args) {
   const root = path.resolve(requireArgument(args, 'root'));
-  const rulesDir = path.resolve(requireArgument(args, 'rules'));
+  const rulesDir = controlPath(args, 'rules');
   const stateDir = path.resolve(requireArgument(args, 'state'));
   const label = args.get('label') ?? 'scan';
   const catalog = loadRuleCatalog(rulesDir);
-  const scope = validateScope(readJson(requireArgument(args, 'scope'), 'scope'));
-  const expectedVersion = readPinnedVersion(requireArgument(args, 'lock'));
+  const scope = validateScope(readJson(controlPath(args, 'scope'), 'scope'));
+  const expectedVersion = readPinnedVersion(controlPath(args, 'lock'));
   const targets = computeTargets(root, scope);
   const { output } = runSemgrep({
     semgrep: requireArgument(args, 'semgrep'),
@@ -705,7 +721,7 @@ function scanTree(args) {
 
 function commandCheck(args) {
   const scan = scanTree(args);
-  const baseline = validateBaseline(readJson(requireArgument(args, 'baseline'), 'baseline'), scan.catalog);
+  const baseline = validateBaseline(readJson(controlPath(args, 'baseline'), 'baseline'), scan.catalog);
   const comparison = compareWithBaseline(scan.findings, baseline);
   const report = renderReport({ ...scan, comparison });
   if (args.get('github')) {
@@ -816,7 +832,7 @@ export function evaluateFixtures({ catalog, annotations, results, problems }) {
   return failures;
 }
 
-function listFixtureFiles(fixturesDir) {
+export function listFixtureFiles(fixturesDir) {
   const files = [];
   const walk = (relative) => {
     const absolute = path.join(fixturesDir, relative);
@@ -839,11 +855,11 @@ function listFixtureFiles(fixturesDir) {
 }
 
 function commandTestRules(args) {
-  const rulesDir = path.resolve(requireArgument(args, 'rules'));
-  const fixturesDir = path.resolve(requireArgument(args, 'fixtures'));
+  const rulesDir = controlPath(args, 'rules');
+  const fixturesDir = controlPath(args, 'fixtures');
   const label = args.get('label') ?? 'rules';
   const catalog = loadRuleCatalog(rulesDir);
-  const expectedVersion = readPinnedVersion(requireArgument(args, 'lock'));
+  const expectedVersion = readPinnedVersion(controlPath(args, 'lock'));
   const targets = listFixtureFiles(fixturesDir);
   if (targets.length === 0) {
     throw new GateError(`${fixturesDir}: no fixture found`);
