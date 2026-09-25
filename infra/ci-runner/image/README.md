@@ -458,11 +458,17 @@ l'acquisition (`Download failed`, `Digest mismatch`), sans substitution.
 
 Sentinelle : l'installateur ajoute des routes AnyIP (`local 0.0.0.0/0`, et
 `::/0` si IPv6 existe) sur `lo`, ecoute DNS UDP/TCP 53 et TCP 22, 80, 443, 9418 et
-11371 pour **nommer** les tentatives, et compte **toute** nouvelle connexion
-IPv4/IPv6 (TCP, UDP dont QUIC, ICMP, autres protocoles) par des compteurs
-conntrack `NEW` sur `OUTPUT` dans le namespace. Apres chaque commande, un nom ou
-un compteur non nul fait echouer l'etape, avant son code de retour. Un auto-test
-(DNS, TCP 443, UDP 4433 en IPv4 et IPv6) prouve noms et compteurs au demarrage.
+11371 pour **nommer** les tentatives, et **compte** toutes les autres par les
+compteurs MIB du namespace (`/proc/net/snmp`, `/proc/net/snmp6`) : connexions TCP
+(`ActiveOpens`, IPv4 et IPv6), datagrammes UDP/UDP-Lite envoyes hors reponses de la
+sentinelle (dont QUIC), echos ICMP, et paquets IP qu'aucun de ces compteurs
+n'explique (sockets raw, autres protocoles). Apres chaque commande, et chaque
+seconde pendant son execution, un nom ou un compteur non nul fait echouer l'etape;
+le chien de garde tue alors son groupe de processus. Un auto-test (DNS, TCP 443,
+UDP 4433 en IPv4 et IPv6) prouve noms et compteurs, puis exige un namespace
+muet. Les compteurs netfilter ont ete ecartes : le `iptables` amd64 ne peut pas
+configurer netfilter sous qemu-user (« Failed to initialize nft: Protocol not
+supported », mesure du 25/09), alors que le chemin livre doit etre teste.
 
 | Resolveur du chemin image | Traitement |
 | --- | --- |
@@ -493,12 +499,12 @@ Mesures du 25 septembre 2026 (WSL2 ARM64, `qemu-x86_64 10.2.1`), code final :
 
 | Scenario | Raison exigee et obtenue | Duree |
 | --- | --- | ---: |
-| `resolver-override` (`PUB_HOSTED_URL`) | Resolver override present in the installer environment: PUB_HOSTED_URL | 4,1 s |
-| `lock-redirection` (URL d'une roue deplacee, contrat inchange) | Image input digest mismatch: python-wheels.lock.json | 4,9 s |
-| `contract-substitution` (meme lock, contrat recalcule) | The build contract does not match the template contract digest | 5,5 s |
-| `store-addition` | Unexpected file in the closed artifact store: sha256-000...0 | 4,7 s |
-| `store-omission` (archive actionlint) | Missing artifact toolchain:actionlint | 6,8 s |
-| `store-alteration` (un octet de `zip.deb`) | Digest mismatch for deb:zip:amd64 | 5,7 s |
+| `resolver-override` (`PUB_HOSTED_URL`) | Resolver override present in the installer environment: PUB_HOSTED_URL | 6,1 s |
+| `lock-redirection` (URL d'une roue deplacee, contrat inchange) | Image input digest mismatch: python-wheels.lock.json | 8,6 s |
+| `contract-substitution` (meme lock, contrat recalcule) | The build contract does not match the template contract digest | 5,7 s |
+| `store-addition` | Unexpected file in the closed artifact store: sha256-000...0 | 9,4 s |
+| `store-omission` (archive actionlint) | Missing artifact toolchain:actionlint | 7,4 s |
+| `store-alteration` (un octet de `zip.deb`) | Digest mismatch for deb:zip:amd64 | 5,6 s |
 
 ### Transport des entrees : option (C')
 
@@ -665,9 +671,56 @@ python3 -B "$IMAGE/offline_harness.py" run-suite --rootfs "$S/base-rootfs" \
 `lock_python.py capture` recalcule ensuite le lock des roues, puis `verify` le
 rejoue hors ligne (execute par `validate.sh`).
 
+### Preuve d'execution versionnee
+
+Le banc exige root, qemu et 2,4 Go d'entrees : il ne peut pas tourner sur les
+runners CI persistants, ou aucun paquet systeme ne doit etre installe. Chaque
+rapport du banc enregistre donc les empreintes qu'il a testees (liste des entrees
+du contrat, digests des trois locks, ensemble ferme, `offline_harness.py`), et
+`offline_harness.py evidence --report ...` n'ecrit `offline-execution-evidence.json`
+que si tous les rapports correspondent aux empreintes courantes et que chaque
+scenario a reussi. En CI, `offline_install_test.py` echoue si cette preuve manque
+ou ne correspond plus : tout changement d'entree, de lock ou du banc impose un
+nouveau run avant fusion. Le champ `contractCommit` n'entre pas dans ces empreintes.
+
+### Relecture independante (points 1 a 3)
+
+Relecture `rubber-duck`, agent `6b42d212-bb3e-4af7-9376-6b13e1ac8e25`,
+25 septembre 2026, sur le consommateur, le transport, le patching, l'inventaire,
+les Bicep et les tests : **2 bloquants, 5 majeurs, 1 mineur**, tous retenus.
+
+- Bloquant : la validation in-VM d'AIB instanciait Azure CLI avec le reseau.
+  Corrige : version par dpkg et import hors ligne, sondes en mode bot sans
+  telemetrie, validation AIB sous `unshare --net`, validation du banc sous
+  sentinelle a zero tentative.
+- Bloquant : `apt-get indextargets` sans `--no-release-info` ignore une source dont
+  le Release n'a jamais ete telecharge (reproduit : 0 cible au lieu de 112 sur la
+  base). Corrige, plus `sources.list.d` vide, `/etc/apt` et `cloud.cfg.d` en racines
+  d'inventaire, controles avant l'inventaire, et refus prouve **avant** tout update.
+- Majeurs : sondes runner non verifiees (desormais strictes, defaut 6 garde en
+  rouge avec sa raison exacte); sentinelle aveugle hors des ports ecoutes
+  (compteurs MIB et chien de garde); suite d'execution absente de la CI (preuve
+  versionnee liee aux empreintes); snaps seedes non verifies au boot; readiness
+  Python absente des trois graphes Bicep.
+- Mineur : le scan des noms a tabulation parcourait les `_work`/`_diag` elagues.
+
 Les premiers tests compilent aussi les trois Bicep avec tous les drapeaux JSON
 forces sur `locked/true/active`, et verifient que chaque ressource reste sous le
 garde literalement faux. Le controle de transition lit les fichiers de lock
 avant les attestations et tout appel Azure; le validateur de release applique
 le meme refus. Le prewarm direct et le customizer AIB refusent eux aussi avant
-le bootstrap mutable. Un digest correct est necessaire, jamais suffisant.
+l'installation. Un digest correct est necessaire, jamais suffisant.
+
+**Reste obligatoire avant `locked` et installation :**
+
+1. Corriger le defaut 6 (SDK Flutter inutilisable par `runner`) dans la PR
+   separee decidee le 25/09, avec sa propre preuve.
+2. Activer et epingler le signataire (#341, point 4) : il faut d'abord une
+   decision sur la politique de securite des workflows.
+3. Ne lever `networkInstallerImplemented`, `reproducibleInputsReady` et
+   `reproducibility.status` qu'apres les points 1 et 2, une relecture independante
+   sans bloquant, une CI verte et un accord explicite.
+4. Premier build AIB, etape live autorisee a part : il validera ce que le banc ne
+   peut pas prouver (limites AIB non documentees des lignes inline, shell reel,
+   absence de snap seede dans l'image Marketplace, inventaire de base encore
+   `reconstructed-not-independent`, boot systemd reel).
