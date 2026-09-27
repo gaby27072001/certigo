@@ -71,6 +71,16 @@ Il échoue ensuite si Semgrep n'a pas rendu **chaque** fichier comme analysé, s
 moindre erreur (analyse syntaxique, délai dépassé), s'il analyse un fichier non demandé, ou si sa
 version diffère du verrou.
 
+Le validateur des workflows impose ces propriétés au workflow **et à sa proposition de
+pré-approbation** (`.github/scripts/dart-sast-workflow-policy.mjs`, appelé par
+`validate-workflow-security.mjs`) : le job `scan` exécute la copie de base de `dart-sast.mjs`
+sans `--rules`/`--scope`/`--baseline`/`--lock`/`--fixtures`, installe Semgrep depuis le verrou
+de base avec `--require-hashes --only-binary=:all: --no-deps`, ne lit l'arbre de la PR que par
+`--root`, et le job agrégé `Dart SAST / Security gate` ne reçoit aucune permission, ne lit
+aucune source PR et tourne sur `certigo-trusted`, comme tous les gates agrégés
+(`docs/runbooks/CI_RUNNERS.md` §10). Un affaiblissement de ces points est donc refusé dès la
+PR de pré-approbation.
+
 ## Chaîne d'approvisionnement
 
 `semgrep==1.178.0` et ses **65 dépendances** sont verrouillés **avec leurs empreintes SHA-256**
@@ -107,6 +117,20 @@ base du script, c'est appliquer les contrôles de base.
 
 Codes de sortie : **0** rien de nouveau ; **1** découverte nouvelle ou test de règle en échec ;
 **2** scan invalide ou incomplet (outil en erreur, fichier non analysé, entrée malformée).
+
+## Tri initial des découvertes (mesuré le 2026-09-25, `main` `653e9112`)
+
+Les premières versions des règles ont produit **3 faux positifs**, corrigés dans les règles ;
+la version livrée trouve **10 découvertes** sur **523 fichiers**.
+
+| Règle | Où | Verdict | Suite |
+|---|---|---|---|
+| `dart-hardcoded-credential` | `apps/mobile/test/auth_controller_test.dart:687` (`refreshToken: 'refresh-email-2'`), `apps/mobile/test/get_started_sheet_survives_authloading_test.dart:218` (`kPassword`) | **Faux positif** : valeurs factices de tests, jamais livrées | Règle restreinte au code livré (`paths.exclude`) ; les secrets du dépôt entier restent couverts par *secret scanning* |
+| `dart-api-path-unencoded-interpolation` | `packages/data/lib/src/content/api_public_content_source.dart:24` (`'/$kActivePublicManifestRoute'`) | **Faux positif** : constante de compilation (`const String`, préfixe `k`), jamais contrôlable | Les identifiants `k[A-Z]…` sont exclus de la règle |
+| `dart-insecure-random` ×5 | identifiants d'idempotence (quiz, leçon, examen, boutique) et de corrélation | Vrai problème (durcissement : `Random()` amorcé sur 32 bits) | Corrigé par #550 |
+| `dart-api-path-unencoded-interpolation` ×3 | `/quiz/$lessonId/submit` (en ligne et file hors ligne), `/friends/$friendId` | Vrai problème (redirection de requête authentifiée) | Corrigé par #556, avec refus des segments `.`/`..` dans `ApiClient` |
+| `mobile-android-backup-enabled` | `AndroidManifest.xml` | Vrai problème (jetons dans la sauvegarde Google) | Corrigé par #557 |
+| `mobile-ios-custom-url-scheme` | `ios/Runner/Info.plist` (`certigo://`) | Risque accepté (schéma requis par le retour OIDC) | Baseline justifiée ; garde des liens entrants dans #564 (test iPhone requis) |
 
 ## Que faire devant une découverte
 
@@ -155,7 +179,7 @@ Les workflows ne se modifient que par pré-approbation (`CI_WORKFLOW_CHANGES.md`
 1. **PR 0** — outillage seul : règles, fixtures, périmètre, baseline, verrou, `dart-sast.mjs`,
    tests, ce runbook. Aucun workflow.
 2. **PR A** — pré-approbation de `.github/workflows/dart-sast.yml` (non privilégié : lecture
-   seule, aucun secret, runner `certigo-pr`).
+   seule, aucun secret ; scans sur `certigo-pr`, job agrégé sur `certigo-trusted`).
 3. **PR B** — activation du workflow. Le contexte `Dart SAST / Security gate` n'est **pas**
    requis à ce stade ; le rendre requis passe ensuite par la protection de branche, puis
    `branch-protection-main.json` et la liste des contextes stables du validateur.
