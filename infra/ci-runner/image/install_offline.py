@@ -507,6 +507,10 @@ class Installer:
             return None
         events = self.sentinel.snapshot()
         counts = {name: count for name, count in self.sentinel.counters().items() if count}
+        if counts and not events:
+            # A counted packet may not be recorded by its listener yet: prefer its name.
+            time.sleep(0.5)
+            events = self.sentinel.snapshot()
         if events:
             first = events[0]
             target = first.get("query") or f"{first.get('destination')}:{first.get('port')}"

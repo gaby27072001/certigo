@@ -322,8 +322,10 @@ def expect_validation(merged, message):
 
 RUNNER_ENV = ["HOME=/tmp/certigo-runner-home", "CI=true", "FLUTTER_ALREADY_LOCKED=true",
               "FLUTTER_SUPPRESS_ANALYTICS=true", "DOTNET_CLI_HOME=/tmp/certigo-dotnet",
-              "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1", "DOTNET_NOLOGO=1", "DOTNET_CLI_TELEMETRY_OPTOUT=1"]
-# probe -> (command, expected output prefix or None for a known defect)
+              "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1", "DOTNET_NOLOGO=1", "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+              "NPM_CONFIG_UPDATE_NOTIFIER=false", "CKV_SKIP_PACKAGE_UPDATE_CHECK=true",
+              "PYTHONDONTWRITEBYTECODE=1"]
+# probe -> (command, expected output fragment)
 RUNNER_PROBES = {
     "dotnet": (["/usr/local/bin/dotnet", "--version"], "8.0.424"),
     "node": (["/usr/local/bin/node", "--version"], "v20.20.2"),
@@ -333,6 +335,9 @@ RUNNER_PROBES = {
     "bicep": (["/usr/local/bin/bicep", "--version"], "Bicep CLI version 0.44.1"),
     "actionlint": (["/usr/local/bin/actionlint", "-version"], "1.7.12"),
     "dart-format-3.6.0": (["/usr/local/bin/dart-format-3.6.0", "--version"], "Dart SDK version: 3.6.0"),
+    # --job verifies the attested Flutter SDK bytes without executing it.
+    "validate-job": (["/usr/local/sbin/certigo-validate-toolchain", "--job"],
+                     "Immutable Certigo toolchain valid for job admission."),
 }
 # Defect 6 (README): the sealed SDK is read-only for runner. Kept red on purpose, with
 # the exact failure, so that any other cause or a silent fix is noticed.
@@ -341,9 +346,78 @@ KNOWN_DEFECT_6 = {
                 ("bin/cache/engine.stamp.tmp.", "Permission denied")),
     "dart": (["/usr/local/bin/dart", "--version"],
              ("bin/cache/engine.stamp.tmp.", "Permission denied")),
-    "validate-job": (["/usr/local/sbin/certigo-validate-toolchain", "--job"],
-                     ("Toolchain validation failed: flutter probe failed",)),
 }
+LEGACY_ROOTS = ("opt/certigo/toolchains", "opt/actions-runner", "opt/az")
+INVENTORY_ROOTS = {"CERTIGO_TOOLCHAIN_ROOT": "opt/certigo/toolchains",
+                   "CERTIGO_RUNNER_HOME": "opt/actions-runner", "CERTIGO_AZURE_CLI_ROOT": "opt/az",
+                   "CERTIGO_APT_ROOT": "etc/apt", "CERTIGO_CLOUD_CONFIG_ROOT": "etc/cloud/cloud.cfg.d"}
+
+
+def gnu_coreutils_path(directory):
+    """PATH preferring GNU coreutils: the host defaults to uutils, the image uses GNU."""
+    listing = subprocess.run(["dpkg-query", "-L", "gnu-coreutils"], capture_output=True, text=True,
+                             check=True).stdout.split()
+    directory.mkdir()
+    for path in listing:
+        name = Path(path).name
+        if path.startswith("/usr/bin/gnu") and len(name) > 3 and Path(path).is_file():
+            (directory / name[3:]).symlink_to(path)
+    require((directory / "stat").exists() and (directory / "sha256sum").exists(),
+            "GNU coreutils are required on the harness host (package gnu-coreutils)")
+    return f"{directory}:{os.environ['PATH']}"
+
+
+def inventory_equivalence(merged, legacy_inventory, work):
+    """Compare the batched inventory with the previous per-file one on the installed tree.
+
+    The per-file version spawns several processes per file: hours under qemu. Both
+    run natively with GNU coreutils against the installed overlay; a third, in-image
+    run of the batched version proves that the image's own tools agree.
+    """
+    legacy = work / "legacy-inventory-roots-only.sh"
+    text = Path(legacy_inventory).read_text(encoding="utf-8")
+    for loop in ('for path in "${entries[@]}"; do', 'for path in "${optional_entries[@]}"; do'):
+        require(text.count(loop) == 1, f"Unexpected legacy inventory shape: {loop}")
+        text = text.replace(loop, "for path in; do")  # fixed entries are outside the roots
+    legacy.write_text(text, encoding="utf-8")
+    env = dict(os.environ, LC_ALL="C", PATH=gnu_coreutils_path(work / "gnu"),
+               **{name: str(merged / relative) for name, relative in INVENTORY_ROOTS.items()})
+    outputs, timings = {}, {}
+    for name, command in (("legacy-native", ["bash", str(legacy)]),
+                          ("batched-native", ["bash", str(ROOT / "inventory-toolchain.sh"),
+                                              "--roots-only"])):
+        started = time.monotonic()
+        target = work / f"{name}.tsv"
+        result = subprocess.run([*command, str(target)], env=env, capture_output=True, text=True,
+                                timeout=14400)
+        require(result.returncode == 0, f"{name} inventory failed: {result.stderr[-2000:]}")
+        timings[name] = round(time.monotonic() - started, 1)
+        outputs[name] = target.read_bytes().splitlines(keepends=True)
+    started = time.monotonic()
+    result = chroot_run(merged, "bash", "/usr/local/sbin/certigo-inventory-toolchain", "--roots-only",
+                        "/tmp/inventory-batched-image.tsv", env=chroot_env(LC_ALL="C"), timeout=14400)
+    require(result.returncode == 0, f"in-image inventory failed: {result.stderr[-2000:]}")
+    timings["batched-image"] = round(time.monotonic() - started, 1)
+    outputs["batched-image"] = (merged / "tmp/inventory-batched-image.tsv").read_bytes().splitlines(
+        keepends=True)
+    prefix = str(merged).encode()
+    legacy_roots = tuple(prefix + b"/" + root.encode() for root in LEGACY_ROOTS)
+    in_legacy_roots = [line for line in outputs["batched-native"]
+                       if any(line.split(b"\t")[3] == root or line.split(b"\t")[3].startswith(root + b"/")
+                              for root in legacy_roots)]
+    unprefixed = [b"\t".join(fields[:3] + [fields[3][len(prefix):]] + fields[4:])
+                  for fields in (line.split(b"\t") for line in outputs["batched-native"])]
+    comparison = {
+        "legacyRecords": len(outputs["legacy-native"]),
+        "batchedRecords": len(outputs["batched-native"]),
+        "legacyEqualsBatchedOnLegacyRoots": outputs["legacy-native"] == in_legacy_roots,
+        "imageToolsEqualHostGnuTools": outputs["batched-image"] == unprefixed,
+        "seconds": timings,
+    }
+    comparison["identical"] = (comparison["legacyEqualsBatchedOnLegacyRoots"] and
+                               comparison["imageToolsEqualHostGnuTools"])
+    require(comparison["identical"], f"Batched inventory differs: {comparison}")
+    return comparison
 
 
 def post_install_checks(merged, legacy_inventory):
@@ -426,28 +500,12 @@ def post_install_checks(merged, legacy_inventory):
     report["drift"]["installed-package"] = expect_validation(
         merged, "installed package set differs from the attested image")
     if legacy_inventory:
-        # Same tree, same roots: the previous per-file implementation is the oracle.
-        (merged / "tmp/legacy-inventory.sh").write_bytes(Path(legacy_inventory).read_bytes())
-        outputs = {}
-        for name, command in (("legacy", ["bash", "/tmp/legacy-inventory.sh"]),
-                              ("batched", ["bash", "/usr/local/sbin/certigo-inventory-toolchain",
-                                           "--roots-only"])):
-            started = time.monotonic()
-            result = chroot_run(merged, *command, f"/tmp/inventory-{name}.tsv",
-                                env=chroot_env(LC_ALL="C"), timeout=14400)
-            require(result.returncode == 0, f"{name} inventory failed: {result.stderr[-2000:]}")
-            lines = (merged / f"tmp/inventory-{name}.tsv").read_bytes().splitlines(keepends=True)
-            roots = (b"/opt/certigo/toolchains", b"/opt/actions-runner", b"/opt/az")
-            kept = [line for line in lines if line.split(b"\t")[3].startswith(roots)]
-            outputs[name] = {"seconds": round(time.monotonic() - started, 1),
-                             "rootRecords": len(kept), "sha256": sha256(b"".join(kept))}
-        outputs["identical"] = outputs["legacy"]["sha256"] == outputs["batched"]["sha256"]
-        report["inventoryEquivalence"] = outputs
-        require(outputs["identical"], "Batched inventory differs from the legacy inventory")
+        with tempfile.TemporaryDirectory(prefix="certigo-inventory-", dir=merged.parent.parent) as tmp:
+            report["inventoryEquivalence"] = inventory_equivalence(merged, legacy_inventory, Path(tmp))
     return report
 
 
-def install(base, store, inputs, digest, work, extra_env=None, after=None):
+def install(base, store, inputs, digest, work, extra_env=None, after=None, keep=None):
     with overlay(base, work) as (merged, mounts):
         mounts.append(prepare_chroot(merged, store, inputs))
         started = time.monotonic()
@@ -461,6 +519,9 @@ def install(base, store, inputs, digest, work, extra_env=None, after=None):
             attestation = merged / "opt/certigo/runner-image/attestation.json"
             outcome["attestation"] = read_json(attestation)
             outcome["dpkgPackages"] = len(dpkg_state(merged))
+            if keep is not None:
+                # Development aid only: evidence always comes from one complete run.
+                run(["cp", "-a", "--", str(work / "upper"), str(keep)])
             if after is not None:
                 try:
                     outcome["postInstall"] = after(merged)
@@ -516,12 +577,12 @@ SCENARIOS = {
     "store-alteration": {"store": "store-alteration", "expect": "Digest mismatch for deb:zip:amd64"},
     "positive": {"positive": True},
     "unexpected-download": {"inputs": skip_offline_pub, "rebind": True,
-                            "expect_pattern": r"Unexpected network attempt during flutter\.precache: "
+                            "expect_pattern": r"Unexpected network attempt during flutter\.(config|precache): "
                                               r"dns/(udp|tcp) pub\.dev"},
 }
 
 
-def run_scenario(name, base, store, work_root, legacy_inventory):
+def run_scenario(name, base, store, work_root, legacy_inventory, keep=None):
     spec = SCENARIOS[name]
     work = work_root / name
     work.mkdir()
@@ -534,7 +595,8 @@ def run_scenario(name, base, store, work_root, legacy_inventory):
         digest = template_digest
     scenario_store = mutated_store(store, work, spec["store"]) if "store" in spec else store
     after = (lambda merged: post_install_checks(merged, legacy_inventory)) if spec.get("positive") else None
-    outcome = install(base, scenario_store, inputs, digest, work / "overlay", spec.get("env"), after)
+    outcome = install(base, scenario_store, inputs, digest, work / "overlay", spec.get("env"), after,
+                      keep if spec.get("positive") else None)
     if spec.get("positive"):
         passed = (outcome["returncode"] == 0 and outcome.get("dpkgPackages") == 665 and
                   "postInstall" in outcome)
@@ -614,7 +676,41 @@ def write_evidence(reports, output):
     print(f"Execution evidence written for {len(scenarios)} scenarios.")
 
 
-def run_suite(rootfs, store, report_path, scenarios, legacy_inventory):
+def check_installed(rootfs, store, installed, report_path, legacy_inventory):
+    """Development aid: rerun the post-install checks on a kept installation."""
+    base = verified_base(rootfs)
+    with tempfile.TemporaryDirectory(prefix="certigo-installed-", dir=rootfs.parent) as tmp:
+        work = Path(tmp)
+        run(["cp", "-a", "--", str(installed), str(work / "upper")])
+        (work / "work").mkdir()
+        (work / "merged").mkdir()
+        run(["mount", "-t", "overlay", "overlay", "-o",
+             f"lowerdir={base},upperdir={work / 'upper'},workdir={work / 'work'}", work / "merged"])
+        merged = work / "merged"
+        mounts = [merged]
+        try:
+            for source, target, options in (("proc", "proc", ["-t", "proc"]),
+                                            ("sysfs", "sys", ["-t", "sysfs", "-o", "ro"]),
+                                            ("/dev", "dev", ["--rbind"]), ("tmpfs", "run", ["-t", "tmpfs"])):
+                run(["mount", *options, source, merged / target])
+                mounts.append(merged / target)
+            store_target = merged / STORE_DIR.lstrip("/")
+            store_target.mkdir(parents=True, exist_ok=True)
+            run(["mount", "--bind", "-o", "ro", store, store_target])
+            mounts.append(store_target)
+            try:
+                report = {"postInstall": post_install_checks(merged, legacy_inventory)}
+            except (ValueError, subprocess.TimeoutExpired) as error:
+                report = {"postInstallError": str(error)[-3000:]}
+        finally:
+            for mount in reversed(mounts):
+                subprocess.run(["umount", "--lazy", "--recursive", str(mount)], check=False)
+    # Deliberately not a run-suite report: `evidence` refuses it.
+    write_json(report_path, {"developmentOnly": True, **report})
+    print("post-install checks:", "PASS" if "postInstall" in report else "FAIL")
+
+
+def run_suite(rootfs, store, report_path, scenarios, legacy_inventory, keep=None):
     base = verified_base(rootfs)
     image_artifacts.verify_store(store, closed_set())
     digests = bound_digests()
@@ -622,7 +718,7 @@ def run_suite(rootfs, store, report_path, scenarios, legacy_inventory):
     with tempfile.TemporaryDirectory(prefix="certigo-suite-", dir=rootfs.parent) as tmp:
         for name in scenarios:
             print(f"=== scenario {name}", flush=True)
-            outcome = run_scenario(name, base, store, Path(tmp), legacy_inventory)
+            outcome = run_scenario(name, base, store, Path(tmp), legacy_inventory, keep)
             results.append(outcome)
             print(f"=== {name}: {'PASS' if outcome['passed'] else 'FAIL'} "
                   f"(exit {outcome['returncode']}, {outcome['seconds']} s)", flush=True)
@@ -696,6 +792,14 @@ def main():
     suite.add_argument("--scenario", action="append", choices=sorted(SCENARIOS))
     suite.add_argument("--legacy-inventory", type=Path,
                        help="Previous inventory-toolchain.sh, compared on the installed image")
+    suite.add_argument("--keep-installed", type=Path,
+                       help="Development aid: copy the positive installation's overlay here")
+    checked = sub.add_parser("check-installed")
+    checked.add_argument("--rootfs", type=Path, required=True)
+    checked.add_argument("--store", type=Path, required=True)
+    checked.add_argument("--installed", type=Path, required=True)
+    checked.add_argument("--report", type=Path, required=True)
+    checked.add_argument("--legacy-inventory", type=Path)
     evidence = sub.add_parser("evidence")
     evidence.add_argument("--report", type=Path, action="append", required=True)
     evidence.add_argument("--output", type=Path, default=ROOT / "offline-execution-evidence.json")
@@ -710,7 +814,11 @@ def main():
         capture_python_tags(args.rootfs.resolve(), args.store.resolve(), args.output)
     elif args.command == "run-suite":
         run_suite(args.rootfs.resolve(), args.store.resolve(), args.report.resolve(),
-                  args.scenario or list(SCENARIOS), args.legacy_inventory)
+                  args.scenario or list(SCENARIOS), args.legacy_inventory,
+                  args.keep_installed.resolve() if args.keep_installed else None)
+    elif args.command == "check-installed":
+        check_installed(args.rootfs.resolve(), args.store.resolve(), args.installed.resolve(),
+                        args.report.resolve(), args.legacy_inventory)
     elif args.command == "evidence":
         write_evidence(args.report, args.output)
 

@@ -92,7 +92,7 @@
       "id": "validator",
       "path": "infra/ci-runner/image/validate-toolchain.sh",
       "destination": "validate-toolchain.sh",
-      "sha256": "0df7c372e8b31ba4fc65fd894c7bc133f16e877801c7346e93eb0fc0fb2ee298"
+      "sha256": "1dafd48ee06a262874d3249d9e413e8540f8e574cb1d2c3fa08618c1d0523375"
     },
     {
       "id": "inventory",
@@ -146,7 +146,7 @@
       "id": "offline-installer",
       "path": "infra/ci-runner/image/install_offline.py",
       "destination": "install_offline.py",
-      "sha256": "d40a4ec624e7263016c95a3476df00ac6543a0076f98f64d294f0b25c4194372"
+      "sha256": "bc9f259032b4f0aeb623d8401e824217d75b555564e91dbb38c37aaef2a374b9"
     },
     {
       "id": "artifact-set",

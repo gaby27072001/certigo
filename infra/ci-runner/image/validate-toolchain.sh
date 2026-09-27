@@ -135,9 +135,10 @@ expected_az_package="$(
 [[ "$(dpkg-query -W -f='${Version}' azure-cli 2>/dev/null)" == "${expected_az_package}" ]] ||
   fail "Azure CLI package version mismatch"
 # Never instantiate AzCli here: its constructor checks the latest version online
-# (#341). Importing the version module stays offline.
+# (#341). Importing the version module stays offline; -B writes no bytecode into
+# the inventoried /opt/az tree.
 azure_cli_python="${CERTIGO_AZURE_CLI_ROOT:-/opt/az}/bin/python3"
-[[ "$("${azure_cli_python}" -E -s -c 'from azure.cli.core import __version__; print(__version__)' \
+[[ "$("${azure_cli_python}" -E -s -B -c 'from azure.cli.core import __version__; print(__version__)' \
   2>/dev/null)" == "${expected_az_version}" ]] ||
   fail "Azure CLI version mismatch"
 
@@ -218,13 +219,36 @@ while IFS=$'\t' read -r binary expected_hash; do
     fail "${binary} binary hash mismatch"
 done < <(jq -r '.binarySha256 | to_entries[] | [.key, .value] | @tsv' "${attestation}")
 
-while IFS=$'\t' read -r id command expected contains json_field; do
+flutter_install_path="$(jq -er '.tools[] | select(.id == "flutter") | .installPath' "${manifest}")" ||
+  fail "manifest does not locate the Flutter SDK"
+flutter_probe_root=""
+if [[ "${mode}" == "--boot" ]]; then
+  # bin/flutter and bin/dart rewrite bin/cache/engine.stamp on every call, even as
+  # root (new inode, mode 0644 instead of the attested 0444): the functional probe
+  # runs on a disposable copy so the attested SDK is never written (#341).
+  flutter_probe_root="$(mktemp -d /var/tmp/certigo-flutter-probe.XXXXXX)"
+  trap 'rm -rf "${flutter_probe_root}"' EXIT
+  cp -a "${flutter_install_path}/flutter" "${flutter_probe_root}/flutter" ||
+    fail "cannot copy the Flutter SDK for its functional probe"
+fi
+
+# Unit separator, not tab: bash `read` merges consecutive IFS whitespace, which
+# shifted every field after an empty one (flutter jsonField, bicep contains).
+while IFS=$'\x1f' read -r id command expected contains json_field install_path; do
+  probe_path="${PATH}"
+  if [[ "${install_path}" == "${flutter_install_path}" ]]; then
+    # --job: the inventory already proved every SDK byte, mode and owner.
+    [[ "${mode}" == "--boot" ]] || continue
+    probe_path="${flutter_probe_root}/flutter/bin:${PATH}"
+  fi
   command_name="${command%% *}"
   command -v "${command_name}" >/dev/null 2>&1 || fail "${id} is not installed"
-  # Probes must not phone home: bot mode (no Flutter version check), no analytics,
-  # no .NET telemetry or workload update check.
+  # Probes must not phone home or write into inventoried trees: bot mode (no
+  # Flutter version check), no analytics or telemetry, no .NET workload or npm
+  # update check, no Checkov PyPI update check, no Python bytecode.
   output="$(
-    LC_ALL=C \
+    PATH="${probe_path}" \
+      LC_ALL=C \
       CI=true \
       FLUTTER_SUPPRESS_ANALYTICS=true \
       DOTNET_CLI_HOME=/run/certigo-dotnet \
@@ -232,6 +256,9 @@ while IFS=$'\t' read -r id command expected contains json_field; do
       DOTNET_CLI_TELEMETRY_OPTOUT=1 \
       DOTNET_NOLOGO=1 \
       DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1 \
+      NPM_CONFIG_UPDATE_NOTIFIER=false \
+      CKV_SKIP_PACKAGE_UPDATE_CHECK=true \
+      PYTHONDONTWRITEBYTECODE=1 \
       FLUTTER_ALREADY_LOCKED=true \
       bash -c "${command}" 2>&1
   )" || fail "${id} probe failed"
@@ -248,8 +275,12 @@ while IFS=$'\t' read -r id command expected contains json_field; do
 done < <(
   jq -r '.tools[] |
     [.id, .probe.command, (.probe.expected // ""), (.probe.contains // ""),
-      (.probe.jsonField // "")] | @tsv' "${manifest}"
+      (.probe.jsonField // ""), .installPath] | join("\u001f")' "${manifest}"
 )
+if [[ -n "${flutter_probe_root}" ]]; then
+  rm -rf "${flutter_probe_root}"
+  trap - EXIT
+fi
 
 export DOTNET_CLI_UI_LANGUAGE=en
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1

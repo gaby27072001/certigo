@@ -12,6 +12,8 @@ import io
 import json
 import os
 import random
+import re
+import shlex
 import shutil
 import socket
 import stat
@@ -458,6 +460,31 @@ class InventoryTests(unittest.TestCase):
         self.assertIn("--no-release-info", validator)
         self.assertIn("/var/lib/snapd/seed/snaps/*.snap", validator)
         self.assertNotIn("az version", validator)
+        for setting in ("CKV_SKIP_PACKAGE_UPDATE_CHECK=true", "PYTHONDONTWRITEBYTECODE=1",
+                        "NPM_CONFIG_UPDATE_NOTIFIER=false", "FLUTTER_SUPPRESS_ANALYTICS=true",
+                        "DOTNET_CLI_TELEMETRY_OPTOUT=1"):
+            self.assertIn(setting, validator)
+
+    @unittest.skipUnless(shutil.which("jq") and shutil.which("bash"), "requires jq and bash")
+    def test_validator_reads_every_probe_field_even_when_one_is_empty(self):
+        validator = (ROOT / "validate-toolchain.sh").read_text()
+        read = "while IFS=$'\\x1f' read -r id command expected contains json_field install_path; do"
+        self.assertIn(read, validator)
+        self.assertNotIn("(.probe.jsonField // \"\")] | @tsv", validator)
+        expression = re.search(r"jq -r '(\.tools\[\] \|.*?join\(\"\\u001f\"\))'", validator, re.S)
+        self.assertIsNotNone(expression)
+        script = (read + '\n  printf "%s|%s|%s|%s|%s\\n" "$id" "$expected" "$contains" '
+                  '"$json_field" "$install_path"\ndone < <(jq -r ' +
+                  shlex.quote(expression[1]) + ' "$1")\n')
+        output = subprocess.run(["bash", "-c", script, "probe-test", str(ROOT / "toolchain-manifest.json")],
+                                capture_output=True, text=True, check=True).stdout
+        rows = {line.split("|")[0]: line.split("|")[1:] for line in output.splitlines()}
+        self.assertEqual(rows["bicep"][:3], ["", "0.44.1", ""])
+        self.assertEqual(rows["actionlint"][:3], ["", "1.7.12", ""])
+        self.assertEqual(rows["flutter"][:3], ["3.44.4", "", "frameworkVersion"])
+        self.assertEqual(rows["dart"][3], rows["flutter"][3], "dart shares the Flutter install path")
+        self.assertIn("flutter_probe_root}/flutter/bin", validator)
+        self.assertIn('[[ "${mode}" == "--boot" ]] || continue', validator)
 
 
 class ExecutionEvidenceTests(unittest.TestCase):

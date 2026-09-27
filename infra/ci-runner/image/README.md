@@ -644,8 +644,31 @@ par dpkg.
    sera levee avant sa correction. Decision du 25/09 (option 1) : une PR separee
    apres celle-ci fournira une copie de travail par job, a la demande (wrapper qui
    la cree sur le disque temporaire au premier appel de `flutter`/`dart`),
-   detruite par `job-temp.sh`; le SDK atteste ne sera jamais ecrit, et `--job` ne
-   l'executera plus. Le banc garde ces sondes en rouge, avec leur raison exacte.
+   detruite par `job-temp.sh`; le SDK atteste ne sera jamais ecrit. La partie
+   « `--job` sans executer Flutter » est deja appliquee ici (defaut 9). Le banc
+   garde `flutter` et `dart` sous `runner` en rouge, avec leur raison exacte.
+7. **Sondes du validateur mal lues (present sur main).** La boucle des sondes lisait
+   le manifeste avec `IFS=$'\t' read`; bash fusionne les tabulations consecutives,
+   donc un champ vide decalait les suivants. Mesure du 27/09 sur le manifeste
+   reel : pour `flutter`, `jsonField` devenait `contains` (JSON jamais analyse);
+   pour `bicep` et `actionlint`, `contains` devenait `expected`. La validation de
+   boot ne pouvait donc jamais reussir. Corrige : separateur `\x1f`.
+8. **Checkov interroge PyPI a chaque lancement.** `checkov/main.py` importe
+   `common/util/banner.py`, qui appelle `check_for_update` au chargement du
+   module, donc aussi pour `--version`, sauf si `CKV_SKIP_PACKAGE_UPDATE_CHECK`
+   est vrai (checkov 3.2.495, roue verrouillee). Corrige dans les sondes, avec
+   `PYTHONDONTWRITEBYTECODE=1` et `NPM_CONFIG_UPDATE_NOTIFIER=false`. npm, lui,
+   ne verifie pas les mises a jour quand `CI` est defini (`update-notifier.js`).
+9. **La validation de boot reecrivait le SDK atteste.** Meme en root,
+   `update_engine_version.sh` remplace `bin/cache/engine.stamp` par un nouveau
+   fichier : mesure, mode `444` devenu `644` et nouvel inode. Chaque validation
+   qui lancait `flutter` ou `dart` faisait donc echouer l'inventaire de la
+   suivante. Corrige selon la decision du 25/09 (precision 2), avancee ici
+   parce qu'elle conditionne la validation : au boot, la sonde fonctionnelle
+   tourne sur une copie jetable du SDK sous `/var/tmp`; `--job` ne lance plus
+   Flutter ni Dart et s'appuie sur l'inventaire, qui verifie chaque octet, mode et
+   proprietaire du SDK. Le wrapper par job et le releve des ecritures restent pour
+   la PR de suivi du defaut 6.
 
 ### Rejouer le consommateur sans modifier un runner
 
