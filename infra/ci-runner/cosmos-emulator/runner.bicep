@@ -25,8 +25,8 @@ param location string = resourceGroup().location
 ])
 param availabilityZone string = '1'
 
-@description('VM size. The Cosmos emulator and .NET test run concurrently.')
-param vmSize string = 'Standard_D4s_v5'
+@description('VM size. The Cosmos emulator (3 vCPU, 8 GiB cap) and the .NET tests run concurrently. Standard_D4s_v5 is NotAvailableForSubscription in westeurope (measured 2026-09-25); Dadsv6 is the family of the existing runner pool.')
+param vmSize string = 'Standard_D4ads_v6'
 
 @description('Dedicated VNet address space. The template creates no peering or private endpoint.')
 param vnetAddressPrefix string = '10.43.0.0/28'
@@ -53,7 +53,7 @@ param tags object = {
 var bootstrapContent = loadTextContent('bootstrap.sh')
 // infra/ci-runner/cosmos-emulator/validate.test.mjs keeps this immutable value
 // synchronized with the exact customData payload.
-var bootstrapSha256 = '58ca31d2b99576e68554ce2e2eeabd605d82e9206ad23c29763de001b6a2e43a'
+var bootstrapSha256 = '3fdf60eb6c075025cf99a8fc27bba6f53904103fa89e7e4cc385ad899835eb63'
 var pinnedImageVersion = toLower(imageVersion) == 'latest'
   ? 'mutable-latest-is-not-allowed'
   : imageVersion
@@ -114,6 +114,10 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2024-07-01' = {
   location: location
   tags: effectiveTags
   properties: {
+    // No AzurePlatformIMDS deny at creation: Azure provisioning needs IMDS, and five
+    // runner creations out of five failed with that rule active (docs/CI_RUNNER_RESILIENCE.md,
+    // measured 2026-09-11/14). The bootstrap blocks IMDS on the host before any job, and
+    // the runbook adds the NSG deny after registration, before the single dispatch.
     securityRules: [
       {
         name: 'DenyAllInbound'
@@ -125,19 +129,6 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2024-07-01' = {
           sourceAddressPrefix: '*'
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
-          destinationPortRange: '*'
-        }
-      }
-      {
-        name: 'DenyImdsOutbound'
-        properties: {
-          priority: 100
-          access: 'Deny'
-          direction: 'Outbound'
-          protocol: '*'
-          sourceAddressPrefix: '*'
-          sourcePortRange: '*'
-          destinationAddressPrefix: 'AzurePlatformIMDS'
           destinationPortRange: '*'
         }
       }
@@ -275,6 +266,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-11-01' = {
       }
     }
     storageProfile: {
+      diskControllerType: 'NVMe'
       imageReference: {
         publisher: 'Canonical'
         offer: 'ubuntu-24_04-lts'

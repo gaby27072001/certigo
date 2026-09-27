@@ -56,9 +56,10 @@ un groupe de ressources jetable dédié :
 2. une NAT Gateway pour l'egress explicite ;
 3. un VNet `/28` sans peering, service endpoint ou private endpoint ;
 4. un sous-réseau privé avec `defaultOutboundAccess=false` ;
-5. un NSG qui autorise l'egress Internet TCP/443, refuse le reste d'Internet,
-   refuse `VirtualNetwork` en sortie et refuse le service tag
-   `AzurePlatformIMDS` ;
+5. un NSG qui autorise l'egress Internet TCP/443, refuse le reste d'Internet et
+   refuse `VirtualNetwork` en sortie ; le refus du service tag
+   `AzurePlatformIMDS` est ajouté **après l'enregistrement** (voir « IMDS : deux
+   barrières, posées au bon moment ») ;
 6. une NIC privée sans IP publique ;
 7. une VM Trusted Launch sans managed identity, avec VM Agent uniquement pour
    recevoir la registration protégée hors IaC.
@@ -74,6 +75,43 @@ Azure/managed identity est présente. `allowExtensionOperations=true` est limit�
 au canal control-plane Managed Run Command : aucune extension n'est déclarée dans
 l'IaC, le Run Command temporaire est supprimé avant le job et le job ne possède
 aucun credential pour en créer un.
+
+### IMDS : deux barrières, posées au bon moment
+
+> **Fait daté.** Mesuré sur le pool PR du 2026-09-11 au 2026-09-14
+> (`docs/CI_RUNNER_RESILIENCE.md`, « Cause racine des instances PR mortes ») : les cinq
+> créations faites avec un refus `AzurePlatformIMDS` actif ont échoué en provisionnement.
+> **Invalidé si** Azure cesse d'exiger IMDS pendant le provisionnement Linux.
+
+Le provisionnement Azure a besoin d'IMDS. Un refus NSG présent **dès la création** fait
+donc échouer la VM avant tout bootstrap. Le template ne le porte plus ; les deux barrières
+sont posées dans cet ordre :
+
+1. **Hôte, avant l'enregistrement.** Le bootstrap installe `certigo-block-imds` (chaînes
+   `OUTPUT` et `DOCKER-USER`) avant d'écrire la sentinelle `bootstrap-complete`, que
+   l'enregistrement attend. Aucun token GitHub n'entre donc dans une VM où IMDS répond
+   encore.
+2. **NSG, après l'enregistrement et avant le `workflow_dispatch`.** L'opérateur ajoute le
+   refus, qu'Azure n'accepte qu'en `Deny` et avec la source `*` :
+
+   ```bash
+   az network nsg rule create \
+     --resource-group rg-certigo-ci-cosmos-validation \
+     --nsg-name "${RUNNER_NAME}-nsg" \
+     --name DenyImdsOutbound \
+     --priority 100 \
+     --direction Outbound \
+     --access Deny \
+     --protocol '*' \
+     --source-address-prefixes '*' \
+     --source-port-ranges '*' \
+     --destination-address-prefixes AzurePlatformIMDS \
+     --destination-port-ranges '*'
+   ```
+
+   puis vérifie `provisioningState=Succeeded` sur la règle.
+
+La sonde IMDS du script de gate reste le dernier contrôle, dans le job lui-même.
 
 ### Pourquoi ni clé SSH opérateur, ni Serial Console
 
@@ -109,6 +147,29 @@ view et permet de supprimer immédiatement l'enfant Run Command.
 
 Toute rotation met à jour le binaire ou l'image, son digest, le runbook et les
 tests dans le même commit.
+
+### Défauts trouvés avant la première création réelle
+
+> **Fait daté.** Mesuré le 2026-09-25 depuis le poste opérateur et l'abonnement
+> `MCAPS-Hybrid-REQ-150432-2026-gchambaud`. **Invalidé si** l'image, la taille ou le
+> NSG du template changent, ou si Azure change la disponibilité d'une taille ou d'un
+> miroir.
+
+Le modèle n'avait jamais été créé. Relu contre la réalité, il aurait échoué pour trois
+raisons indépendantes :
+
+| Défaut | Mesure | Correction |
+| --- | --- | --- |
+| Le miroir de l'image Azure, `azure.archive.ubuntu.com`, ne sert pas HTTPS ; le NSG n'autorise que TCP/443 | TCP 443 : délai dépassé ; `archive.ubuntu.com` et `security.ubuntu.com` rendent 200 en HTTPS ; HTTP 80 du miroir Azure rend 200 | le bootstrap réécrit les sources vers `https://archive.ubuntu.com/ubuntu/` et `https://security.ubuntu.com/ubuntu/`, puis échoue fermé si une source reste en HTTP ; vérifié dans `ubuntu:24.04` amd64 : `apt-get update` et l'installation réussissent en HTTPS seul |
+| `Standard_D4s_v5` est `NotAvailableForSubscription` en `westeurope` | `az vm list-skus` : restriction sur les trois zones | `Standard_D4ads_v6` (4 vCPU, 16 Gio), famille du pool existant, avec `diskControllerType: 'NVMe'` exigé par les tailles v6 ; quota Dadv6 : 12/100 |
+| Le refus NSG `AzurePlatformIMDS` à la création empêche le provisionnement | 5 créations sur 5 en échec sur le pool PR | refus posé après l'enregistrement, voir « IMDS : deux barrières, posées au bon moment » |
+
+Contrôles complémentaires du même jour : les SHA-256 épinglés de Docker `29.7.2` et du
+runner `2.336.0` correspondent aux archives téléchargées ; les options Docker du
+bootstrap (`userland-proxy=false`, `icc=false`, `bip`) servent bien un port publié sur
+`127.0.0.1` (Docker `29.8.1` en Docker-in-Docker). Les timers `apt-daily` sont désactivés
+et `apt-get` attend les verrous (`DPkg::Lock::Timeout=60`, huit essais bornés) : une
+évaluation de correctifs Azure concurrente ne fait plus échouer le bootstrap.
 
 ## Validation de PR — what-if uniquement
 
@@ -218,7 +279,8 @@ Après fusion de la présente PR, alors que le gate et la feature restent off :
    de peering, de private endpoint et d'ingress ;
 8. exécuter le script de registration, vérifier immédiatement que le runner est
    online, non busy et porte uniquement le label custom
-   `certigo-cosmos-emulator` ;
+   `certigo-cosmos-emulator`, puis ajouter le refus NSG `AzurePlatformIMDS`
+   (voir « IMDS : deux barrières, posées au bon moment ») ;
 9. définir la variable à `true`, puis lancer **une seule fois**
    `workflow_dispatch` depuis `main` avant l'expiration de 45 minutes du listener ;
 10. accepter comme preuve uniquement un job sur le SHA `main` attendu dont le résumé
