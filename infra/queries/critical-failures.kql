@@ -1,0 +1,30 @@
+union
+    (AppRequests
+    | where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
+    | where ResultCode matches regex "^5[0-9][0-9]$"
+    | extend RequestPath = tostring(parse_url(Url).Path)
+    | where RequestPath !in~ ("/api/health/live", "/api/health/ready")
+    // Temporary until #307: only a proven disabled-feature GET may be suppressed.
+    // Missing telemetry/correlation keeps the alert; never suppress by route + 503 alone.
+    | extend DisabledInvocationId = iff(
+        Name == "GetAccountDeletion" and ResultCode == "503"
+        and RequestPath == "/api/account/deletion" and tostring(Properties.HttpMethod) == "GET",
+        tostring(Properties.InvocationId), "")
+    | join kind=leftanti (
+        AppExceptions
+        | where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
+        | where ExceptionType == "Certigo.Application.Abstractions.AccountDeletionDisabledException"
+        | where SeverityLevel == 2 and HandledAt !~ "Unhandled"
+        | where tostring(Properties.CategoryName) == "Certigo.Api.Middleware.ExceptionMiddleware"
+        | where tostring(Properties.FunctionName) == "GetAccountDeletion"
+        | where tostring(Properties.OriginalFormat) == "Account deletion is disabled in function {FunctionName}, invocation {InvocationId}."
+        | project OperationId, DisabledInvocationId = tostring(Properties.InvocationId)
+        | where isnotempty(OperationId) and isnotempty(DisabledInvocationId)
+    ) on OperationId, DisabledInvocationId
+    | project TimeGenerated),
+    (AppExceptions
+    | where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
+    // Worker middleware exceptions have empty OperationName and HandledAt.
+    // Error/Critical also covers the worker and host unhandled-exception logs.
+    | where SeverityLevel >= 3 or HandledAt =~ "Unhandled"
+    | project TimeGenerated)

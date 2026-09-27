@@ -52,7 +52,9 @@ param softDeleteRetentionDays int = 30
   'Standard_GRS'
   'Standard_GZRS'
 ])
-param storageSkuName string = 'Standard_GRS'
+// MCAPS LRS accepted 2026-09-25: docs/migration/evidence/2026-09-25-content-lrs.json.
+// WORM/versioning do not replace geo-redundancy during a regional loss.
+param storageSkuName string = 'Standard_LRS'
 
 @description('Existing subscription custom role created by the governance bootstrap.')
 param contentPublisherRoleDefinitionGuid string = 'c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de'

@@ -84,7 +84,7 @@ reste un pool éphémère. Un même runner ne doit jamais porter à la fois `cer
 | Propriété | Valeur épinglée |
 | --- | --- |
 | VMSS | `vmss-certigo-pr-pilot-z1`, Flexible, zone 1 ; capacité : paramètre obligatoire `capacity`, sans défaut (voir « Vérifier aussi la capacité ») |
-| Taille / disque | `Standard_D2ads_v6` / Premium SSD LRS 128 Gio |
+| Taille / disque | `Standard_D2ads_v6` / Premium SSD LRS 128 Gio demandé ; en service : `Standard_LRS`, rétrogradé par l'automate MCAPS le 2026-09-15 (voir `docs/CI_RUNNER_RESILIENCE.md`) |
 | Image | `Canonical:ubuntu-24_04-lts:server:24.04.202608070` |
 | Sécurité | Trusted Launch, Secure Boot, vTPM, chiffrement hôte |
 | Réseau | `10.43.0.0/16`, sous-réseau privé `10.43.1.0/24`, NAT dédié, aucun peering |
@@ -243,6 +243,34 @@ Terminer avec `pilot-health.sh` comme Managed Run Command sans secret et vérifi
 l'API GitHub : runner `online`, labels exacts, service actif, IMDS inaccessible et egress
 GitHub/NuGet/pub.dev/npm fonctionnel. Le pilote ne crée volontairement aucun runner dans
 `certigo-content`.
+
+> 🧪 **Drill de reconstruction : un runner qui ne peut prendre aucun job réel.** Pour prouver
+> la reconstruction sans exposer de vraie PR, déployer `pilot.bicep` dans le groupe dédié
+> `rg-certigo-ci-rebuild-drill`, avec `runnerScaleSetName=vmss-certigo-pr-rebuild-drill`,
+> `nsgName=nsg-certigo-pr-rebuild-drill` et des noms et plages réseau neufs. Puis enregistrer
+> avec `-RebuildDrill` :
+>
+> ```powershell
+> .\infra\ci-runner\register-pilot.ps1 `
+>   -SubscriptionId <SUBSCRIPTION_ID> -VmName <DRILL_VM_NAME> -RebuildDrill `
+>   -ResourceGroupName rg-certigo-ci-rebuild-drill `
+>   -ScaleSetName vmss-certigo-pr-rebuild-drill `
+>   -NetworkSecurityGroupName nsg-certigo-pr-rebuild-drill
+> ```
+>
+> Le script remplace l'unique ligne `registration_mode='production'` de `pilot-register.sh`.
+> Le runner s'enregistre alors avec `--no-default-labels --labels certigo-rebuild-drill` :
+> un seul label, qu'aucun workflow ne cible (garde de `validate.sh`), sans `self-hosted`,
+> `Linux` ni `X64`. Garde-fous :
+> - `-RebuildDrill` est refusé hors de ces trois noms ;
+> - sans `-RebuildDrill`, ces noms sont refusés ;
+> - si le runner de la VM (nom = `computerName`) apparaît avec d'autres labels, il est
+>   supprimé côté GitHub avant l'échec.
+>
+> Fin du drill : supprimer le runner (`gh api -X DELETE .../actions/runners/<ID>`), puis le
+> groupe de ressources, et prouver l'absence des deux. Exécuté le 2026-09-25 : voir « Drill du
+> 2026-09-25 — reconstruction depuis la définition versionnée » dans
+> `docs/CI_RUNNER_RESILIENCE.md`.
 
 La sortie structurée de `register-pilot.ps1` fournit l'`id` et le `name` GitHub. Avant toute
 activation future du contrôleur, reporter ces deux valeurs avec le nom et l'ID ARM exacts de

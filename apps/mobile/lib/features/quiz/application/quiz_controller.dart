@@ -458,7 +458,7 @@ class QuizController extends ChangeNotifier {
 
   static String _newAttemptId() {
     final int micros = DateTime.now().microsecondsSinceEpoch;
-    final int rand = Random().nextInt(0x7fffffff);
+    final int rand = Random.secure().nextInt(0x7fffffff);
     return '${micros.toRadixString(16)}-${rand.toRadixString(16)}';
   }
 

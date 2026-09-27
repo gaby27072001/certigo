@@ -43,7 +43,8 @@ class OfflineQuizRepository implements QuizRepository {
     if (ownerId != null && classifyFailure(failure) == SyncDispatch.retryable) {
       await _engine.enqueue(
         kind: kQuizSubmitKind,
-        endpoint: '/quiz/$lessonId/submit',
+        // Same route as RemoteQuizRepository.submit: the queue replays it verbatim.
+        endpoint: '/quiz/${Uri.encodeComponent(lessonId)}/submit',
         payload: request.toJson(),
         idempotencyKey: request.clientAttemptId,
         ownerId: ownerId,

@@ -18,9 +18,11 @@ typedef CorrelationIdGenerator = String Function();
 ///
 /// The shape matches the backend's `Guid.NewGuid().ToString("n")` (32 hex chars,
 /// no dashes) so the same id is visually identical on both sides of the wire and
-/// in App Insights. Pure Dart — no `uuid` dependency required.
+/// in App Insights. Pure Dart — no `uuid` dependency required. The default source
+/// is [Random.secure]: an unseeded `Random()` is seeded from 32 bits, so every id
+/// it produced came from at most 2^32 distinct sequences despite its 128-bit look.
 String generateCorrelationId([Random? random]) {
-  final rng = random ?? Random();
+  final rng = random ?? Random.secure();
   const hex = '0123456789abcdef';
   final buffer = StringBuffer();
   for (var i = 0; i < 32; i++) {

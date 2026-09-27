@@ -1,15 +1,16 @@
 {
   "id": "wp-p1-12-iac-drift-import",
   "status": "blocked",
-  "session_id": "121bb363-116e-49c5-860c-59d0035db30c",
-  "branch": "gchambaud-microsoft-phase-1-staging-et-iac",
-  "pr": 371,
+  "session_id": "1face3e0-a405-47c2-a982-a10f4a9c407c",
+  "branch": "gchambaud-microsoft-gouvernance-mcaps-stockage-lrs",
+  "pr": 539,
   "checkpoint": {
-    "step": "domain-unblocked-bounded-preflight-root-secret-blocked",
-    "note": "Voir docs/runbooks/AZURE_IAC_OPERATIONS.md, « Réconciliation staging du 23 septembre 2026 », et evidence/2026-09-23-staging-iac.json. PR #371 fusionnée ; domaine et santé vérifiés. Dérive restauration Blob corrigée et what-if Provider rejoué. Préflight racine non lancé faute de clé réelle autorisée (ForbiddenByRbac) ; delta Cosmos enablePartitionKeyMonitor non classifié. Aucun apply, aucun changement RBAC, tuteur désactivé.",
-    "at": "2026-09-23T19:24:33Z"
+    "step": "lrs-accepted-root-cd-what-if-only-blocked",
+    "note": "Voir « Gouvernance MCAPS et LRS du 24 septembre 2026 » dans docs/runbooks/AZURE_IAC_OPERATIONS.md. LRS accepté, non compté comme dérive non intentionnelle ; protections locales non équivalentes à une copie interrégionale. Inventaire MCAPS borné et what-if Storage/réseau staging consignés. Adoption IaC des associations NSG existing autorisée, sans écriture de règles ; absence post-apply prod constatée sans causalité du seul run prouvée. Pas de désactivation Cosmos durable observée après apply antérieur. Blocage : mode CD what-if seul autorisé OIDC/vrais secrets, sortie brute en artefact, sans apply, puis classification du plan racine staging ; réalisation par propriétaire workflows. Aucun apply ici ; fusion explicite requise.",
+    "at": "2026-09-24T16:16:27Z"
   },
-  "evidence_ref": "../evidence/2026-09-23-staging-iac.json",
-  "updated_at": "2026-09-23T19:24:33Z",
+  "evidence_ref": "../evidence/2026-09-24-mcaps-lrs.json",
+  "updated_at": "2026-09-24T16:16:27Z",
+  "network_follow_up": "GET prod 16:16:27Z : deux associations NSG retablies automatiquement apres absence a 16:06:02Z ; requetes attribuees a MCAPS a 16:13:55/57Z. Details et statuts distincts dans productionReassociationObservations de la preuve. Aucune mutation manuelle ni cadence garantie deduite.",
   "history_ref": "log.jsonl"
 }

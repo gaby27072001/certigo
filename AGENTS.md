@@ -50,9 +50,12 @@ credentials. Do not run it unless the user asks for a real data upload.
   `dotnet test backend\tests\Certigo.Domain.Tests\Certigo.Domain.Tests.csproj`.
 - One xUnit test:
   `dotnet test backend\tests\Certigo.Domain.Tests\Certigo.Domain.Tests.csproj --filter "FullyQualifiedName~ReadinessCalculatorTests"`.
-- Prism renderer goldens use Flutter 3.44.5 in CI:
+- Prism renderer goldens:
   `flutter test test\rendering\renderer_golden_test.dart` from
-  `packages\prism_ui`.
+  `packages\prism_ui`. CI runs them, like the app tests, with the Flutter
+  release pinned by `FLUTTER_VERSION` in `.github\workflows\ci-mobile.yml`;
+  read the version there rather than copying it. Regenerate goldens only with
+  that release: CI judges them with it, not with your local Flutter.
 
 Run the smallest relevant test first. Before completing changes, run the
 matching format/analyze/build gate used by `.github\workflows`.

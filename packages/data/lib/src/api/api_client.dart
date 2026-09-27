@@ -116,7 +116,7 @@ class ApiClient {
     T Function(Map<String, dynamic> json) parse, {
     Map<String, dynamic>? query,
   }) async {
-    return _guard(() async {
+    return _guard(path, () async {
       final Response<dynamic> res = await _dio.get<dynamic>(path, queryParameters: query);
       return parse(_asMap(res.data));
     });
@@ -127,7 +127,7 @@ class ApiClient {
     T Function(Map<String, dynamic> json, Headers headers) parse, {
     Map<String, dynamic>? query,
   }) async {
-    return _guard(() async {
+    return _guard(path, () async {
       final Response<dynamic> res = await _dio.get<dynamic>(path, queryParameters: query);
       return parse(_asMap(res.data), res.headers);
     });
@@ -139,7 +139,7 @@ class ApiClient {
     Map<String, dynamic>? query,
     Map<String, dynamic>? headers,
   }) async {
-    return _guard(() async {
+    return _guard(path, () async {
       final Response<dynamic> res = await _dio.get<dynamic>(
         path,
         queryParameters: query,
@@ -165,7 +165,7 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? headers,
   }) async {
-    return _guard(() async {
+    return _guard(path, () async {
       final Response<dynamic> res = await _dio.get<dynamic>(
         path,
         options: Options(
@@ -198,7 +198,7 @@ class ApiClient {
     T Function(Map<String, dynamic> json) parse, {
     Map<String, dynamic>? headers,
   }) async {
-    return _guard(() async {
+    return _guard(path, () async {
       final Response<dynamic> res = await _dio.post<dynamic>(
         path,
         data: body,
@@ -209,7 +209,7 @@ class ApiClient {
   }
 
   Future<Result<T>> deleteJson<T>(String path, T Function(Map<String, dynamic> json) parse) async {
-    return _guard(() async {
+    return _guard(path, () async {
       final Response<dynamic> res = await _dio.delete<dynamic>(path);
       return parse(_asMap(res.data));
     });
@@ -234,7 +234,7 @@ class ApiClient {
     Map<String, dynamic> body, {
     required bool Function(int status) acceptStatus,
   }) async {
-    return _guard(() async {
+    return _guard(path, () async {
       final Response<dynamic> res = await _dio.post<dynamic>(
         path,
         data: body,
@@ -259,7 +259,16 @@ class ApiClient {
   }
 
   /// Runs [action], converting any exception into a typed [Failure].
-  Future<Result<T>> _guard<T>(Future<T> Function() action) async {
+  ///
+  /// [path] is refused before any request when one of its segments is `.` or
+  /// `..`, literal or percent-encoded: [Uri] normalization, and the server, would
+  /// drop it and send the authenticated request to a parent route. Encoding ids
+  /// with `Uri.encodeComponent` cannot prevent this, because `.` is unreserved
+  /// and stays unencoded.
+  Future<Result<T>> _guard<T>(String path, Future<T> Function() action) async {
+    if (_hasDotSegment(path)) {
+      return const Err(ParseFailure("Chemin d'API invalide."));
+    }
     try {
       return Success<T>(await action());
     } on DioException catch (e) {
@@ -269,6 +278,17 @@ class ApiClient {
     } catch (_) {
       return const Err(UnknownFailure());
     }
+  }
+
+  static final RegExp _queryOrFragment = RegExp('[?#]');
+  static final RegExp _encodedDot = RegExp('%2[eE]');
+
+  static bool _hasDotSegment(String path) {
+    final String route = path.split(_queryOrFragment).first;
+    return route.split('/').any((String segment) {
+      final String decoded = segment.replaceAll(_encodedDot, '.');
+      return decoded == '.' || decoded == '..';
+    });
   }
 
   Map<String, dynamic> _asMap(dynamic data) {

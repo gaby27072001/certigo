@@ -146,6 +146,38 @@ if grep -Eq -- '--token([ =]|$)' "${register_pilot}"; then
   exit 1
 fi
 
+# Rebuild drill: the drill runner must never be able to pick up a real job.
+if [[ "$(grep -cF "registration_mode='production'" "${pilot_register}")" != 1 ]]; then
+  echo "pilot-register.sh must contain exactly one production registration-mode line." >&2
+  exit 1
+fi
+grep -F '"${label_arguments[@]}"' "${pilot_register}" >/dev/null
+grep -F '[switch] $RebuildDrill' "${register_pilot}" >/dev/null
+if grep -rFq 'certigo-rebuild-drill' "${root}/.github/workflows"; then
+  echo "No workflow may target the rebuild-drill runner label." >&2
+  exit 1
+fi
+label_block="$(sed -n "/^registration_mode='production'\$/,/^esac\$/p" "${pilot_register}")"
+print_labels=$'\nprintf "%s " "${label_arguments[@]}"'
+production_labels="$(RUNNER_LABELS='certigo-pr,certigo-pr-pilot' bash -c "${label_block}${print_labels}")"
+if [[ "${production_labels}" != '--labels certigo-pr,certigo-pr-pilot ' ]]; then
+  echo "Production registration must keep the PR labels, got: ${production_labels}" >&2
+  exit 1
+fi
+drill_block="$(printf '%s\n' "${label_block}" |
+  sed "s/^registration_mode='production'\$/registration_mode='rebuild-drill'/")"
+drill_labels="$(RUNNER_LABELS='certigo-pr,certigo-pr-pilot' bash -c "${drill_block}${print_labels}")"
+if [[ "${drill_labels}" != '--no-default-labels --labels certigo-rebuild-drill ' ]]; then
+  echo "Drill registration must carry only the drill label, got: ${drill_labels}" >&2
+  exit 1
+fi
+unknown_block="$(printf '%s\n' "${label_block}" |
+  sed "s/^registration_mode='production'\$/registration_mode='other'/")"
+if bash -c "${unknown_block}" >/dev/null 2>&1; then
+  echo "An unknown registration mode must be refused." >&2
+  exit 1
+fi
+
 preflight_cloud_init_line="$(grep -nF 'cloud-init status --wait' "${pilot_preflight}" | cut -d: -f1)"
 preflight_imds_line="$(grep -nF 'http://169.254.169.254/metadata/instance' "${pilot_preflight}" | cut -d: -f1)"
 preflight_health_line="$(grep -nF 'https://api.github.com/meta' "${pilot_preflight}" | cut -d: -f1)"
@@ -184,17 +216,28 @@ python3 -B "${image_dir}/lock_python.py" verify
 node "${image_dir}/validate-canary-evidence.mjs" --plan
 canary_transition_ps="${canary_transition}"
 canary_cleanup_ps="${canary_cleanup}"
+register_pilot_ps="${register_pilot}"
 if command -v cygpath >/dev/null 2>&1; then
   canary_transition_ps="$(cygpath -w "${canary_transition}")"
   canary_cleanup_ps="$(cygpath -w "${canary_cleanup}")"
+  register_pilot_ps="$(cygpath -w "${register_pilot}")"
 elif command -v wslpath >/dev/null 2>&1 &&
   grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
   canary_transition_ps="$(wslpath -w "${canary_transition}")"
   canary_cleanup_ps="$(wslpath -w "${canary_cleanup}")"
+  register_pilot_ps="$(wslpath -w "${register_pilot}")"
 fi
 if command -v pwsh >/dev/null 2>&1; then
   pwsh -NoProfile -NonInteractive -Command \
     "\$errors = \$null; [System.Management.Automation.Language.Parser]::ParseFile('${canary_transition_ps}', [ref]\$null, [ref]\$errors) > \$null; if (\$errors.Count -ne 0) { \$errors | Out-String | Write-Error; exit 1 }; \$errors = \$null; [System.Management.Automation.Language.Parser]::ParseFile('${canary_cleanup_ps}', [ref]\$null, [ref]\$errors) > \$null; if (\$errors.Count -ne 0) { \$errors | Out-String | Write-Error; exit 1 }"
+  # The drill interlock must refuse before any Azure or GitHub call.
+  drill_on_production="$(pwsh -NoProfile -NonInteractive -File "${register_pilot_ps}" \
+    -SubscriptionId 00000000-0000-0000-0000-000000000000 -VmName drill -RebuildDrill 2>&1 || true)"
+  grep -F 'The rebuild drill registers only on' <<<"${drill_on_production}" >/dev/null
+  production_on_drill="$(pwsh -NoProfile -NonInteractive -File "${register_pilot_ps}" \
+    -SubscriptionId 00000000-0000-0000-0000-000000000000 -VmName drill \
+    -ResourceGroupName rg-certigo-ci-rebuild-drill 2>&1 || true)"
+  grep -F 'Drill resources must be registered with -RebuildDrill' <<<"${production_on_drill}" >/dev/null
 else
   echo "PowerShell parser unavailable; Node contract tests enforce script guards."
 fi

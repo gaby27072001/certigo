@@ -12,11 +12,17 @@ param functionIntegrationSubnetPrefix string
 @description('Existing dedicated Flex Consumption integration subnet name.')
 param functionIntegrationSubnetName string
 
+@description('Existing NSG name in this resource group; empty means no association. Rules remain owned by MCAPS.')
+param functionIntegrationSubnetNsgName string = ''
+
 @description('Dedicated private endpoint subnet prefix.')
 param privateEndpointSubnetPrefix string
 
 @description('Existing dedicated private endpoint subnet name.')
 param privateEndpointSubnetName string
+
+@description('Existing NSG name in this resource group; empty means no association. Private endpoint policies remain disabled.')
+param privateEndpointSubnetNsgName string = ''
 
 @description('Storage account protected by blob, queue, and table private endpoints.')
 param storageAccountName string
@@ -103,6 +109,14 @@ resource ciVnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: ciVnetName
 }
 
+resource functionNsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' existing = {
+  name: functionIntegrationSubnetNsgName
+}
+
+resource privateEndpointNsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' existing = {
+  name: privateEndpointSubnetNsgName
+}
+
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
   name: vnetName
   location: location
@@ -118,6 +132,9 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
         name: functionIntegrationSubnetName
         properties: {
           addressPrefix: functionIntegrationSubnetPrefix
+          networkSecurityGroup: empty(functionIntegrationSubnetNsgName) ? null : {
+            id: functionNsg.id
+          }
           delegations: [
             {
               name: 'flex-consumption'
@@ -132,6 +149,9 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
         name: privateEndpointSubnetName
         properties: {
           addressPrefix: privateEndpointSubnetPrefix
+          networkSecurityGroup: empty(privateEndpointSubnetNsgName) ? null : {
+            id: privateEndpointNsg.id
+          }
           privateEndpointNetworkPolicies: 'Disabled'
         }
       }

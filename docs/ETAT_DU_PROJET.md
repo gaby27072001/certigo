@@ -37,16 +37,16 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 
 | Fait observable | Valeur générée |
 |---|---|
-| Date de référence analysée | **2026-09-24** |
-| Commit de référence analysé | `a1b61af80e8c2839fffd51a2195c6cd80b433a8c` |
+| Date de référence analysée | **2026-09-25** |
+| Commit de référence analysé | `e2a4bd64a77b835c0fddeee1d42a2ac91cf457ea` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
-| Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `78bfa72c62371cd206d1f2c2cfa8e0a38fa22540` du **2026-09-05** |
-| Package public actif | **1735 fichiers** — `sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f` |
-| Package privé actif (`answerKey`) | **812 fichiers** — `sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` |
+| Contenu actif | `gchambaud_microsoft/certigo-content@main` — révision `a433518a649a74a33ecdc8874a99685fc125b9ea` du **2026-09-23** |
+| Package public actif | **1622 fichiers** — `sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb` |
+| Package privé actif (`answerKey`) | **714 fichiers** — `sha256:7781a6d36add31223ea234c60808ded367d283c0d1f4a9a042cb1cdad71f9055` |
 | Workflows GitHub Actions | **31** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `ciam-posture-monitor.yml`, `codeql.yml`, `content-infra-apply.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `post-merge-cosmos-account-deletion.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **299 fichiers** — .NET : 4 projets / 117 fichiers ; Flutter/Dart : 6 racines / 173 fichiers ; Python : 1 racine / 9 fichier |
+| Tests découverts | **301 fichiers** — .NET : 4 projets / 118 fichiers ; Flutter/Dart : 6 racines / 174 fichiers ; Python : 1 racine / 9 fichier |
 | Corpus **historique** local | **91 pistes**, **147 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
@@ -186,6 +186,10 @@ de `certigo-content@main`. Reconstruire ce `main` (`npm ci` puis `npm run packag
 valeurs effectivement épinglées. `python tools/project_state.py --validate-active-content
 <clone packagé>` répond `Active content reference is current.` et sort en 0.
 
+**Pin rafraîchi le 2026-09-24** sur la release R2 publiée par le run `publish-content-azure`
+`36018994442` de `certigo-content`. Les valeurs courantes du pin ne sont écrites qu'à un seul
+endroit : le tableau « État technique généré » en tête de ce document.
+
 Ce pin avait pris du retard depuis le 2026-08-14 (`55a5128`, 146 fichiers) et n'a pu être
 rafraîchi qu'après la montée du contrat consommateur : le paquet amont déclare
 `certigo.content.package-manifest/v3` alors que le dépôt épinglait `v1`, et
@@ -278,6 +282,30 @@ Identité auto-vérifiante du publieur, recomputée à la main : `1 202 + 534 = 
 depuis le blob distant et **identique octet pour octet** au descripteur construit localement
 (`contentMd5` et taille de 410 octets concordants). **0 retry** sur ~9 750 appels : l'échec de la
 tentative 4 n'était donc pas transitoire.
+
+**État des conteneurs mesuré au 2026-09-24 après publication de R2**, par le workflow
+d'inspection en lecture seule de `certigo-content` (run `36028240566`, 16:33:48Z), après le run
+de publication `36018994442` (15:16:46Z → 16:32:18Z, quatre jobs en succès). Pour l'état
+courant, ce relevé remplace celui du 2026-09-05 ci-dessus, qui reste exact à sa date. Chaque
+appel `az` a retourné un code de sortie `0` explicite.
+
+| Conteneur | Blobs | dont R1 (`sha256:7675aee4…`) | dont R2 (`sha256:95c69c30…`) |
+|---|---:|---:|---:|
+| `content-public-releases` | **3 359** | 1 736 | 1 623 |
+| `content-private-releases` | **1 528** | 813 | 715 |
+| `content-release-descriptors` | **2** | 1 | 1 |
+
+Identité auto-vérifiante du publieur pour R2 : `0 + 1 623 = 1 623`, `0 + 715 = 715`,
+`0 + 1 = 1`, avec **0 retry**. Chaque blob a été relu et comparé en SHA-256, et le descripteur a
+été écrit **en dernier** : `publish-release` a démarré à 16:31:47Z, après la fin de
+`publish-public` à 16:31:44Z. Le descripteur R2 relu fait 410 octets, avec rétention WORM
+jusqu'au 2026-12-23T16:32:10Z.
+
+> **Ce qui périmerait ces chiffres :** toute publication ultérieure, qu'elle aboutisse ou
+> échoue ; le stockage est en création seule, donc les décomptes ne peuvent que croître.
+> **Publier n'est pas activer** : ce run n'a rien importé ni promu, et `CONTENT_REPOSITORY_MODE`
+> valait `legacy` en staging et en prod au 2026-09-24T15:50:46Z
+> (`az functionapp config appsettings list`).
 
 **La publication fonctionne — et ce que ce succès ne prouve pas.** Le run `33965259786`
 (12:09:47Z → 13:11:01Z) a terminé ses quatre jobs en succès, `publish-release` compris pour la
@@ -533,14 +561,10 @@ Les PR éditoriales, la validation des schémas et la publication du manifeste s
 `gchambaud_microsoft/certigo-content`. Le dossier `content/` de ce monorepo ne doit plus être
 présenté ni utilisé comme source éditoriale active.
 
-Référence active vérifiée : `certigo-content@main`
-`78bfa72c62371cd206d1f2c2cfa8e0a38fa22540`, commit du
-`2026-09-05T08:54:33Z`.
-
-| Canal / artefact actif | Nombre de fichiers | Manifest ID |
-|---|---:|---|
-| `public/public` | **1 735** | `sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f` |
-| `answerKey/private` | **812** | `sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793` |
+Référence active : elle n'est écrite qu'à un seul endroit, le tableau « État technique généré »
+en tête de ce document (lignes « Contenu actif », « Package public actif » et « Package privé
+actif »), régénéré depuis `docs/active-content-reference.json` par `tools/project_state.py`. Le
+canal `public` correspond à l'artefact `public`, le canal `answerKey` à l'artefact `private`.
 
 Le contrat `certigo.content.package-manifest/v3` utilise `sha256` et la sérialisation
 `json-sorted-keys-compact-utf8-lf`. Le corps canonique contient uniquement `schema`, `channel`,
@@ -699,6 +723,8 @@ déclarée est dans `codemagic.yaml`.
 
 | Date | Évolution |
 |---|---|
+| 2026‑09‑24 | 🚀 **Prod backend promue, les quiz remarchent** : promotion `promote-backend` [36022032292](https://github.com/gchambaud_microsoft/Certigo/actions/runs/36022032292) (source [35904765679](https://github.com/gchambaud_microsoft/Certigo/actions/runs/35904765679), commit `43e06a5f`, paquet `sha256:cd7a4ea4…`), avec « Prepare infrastructure » et « Deploy verified backend » exécutés. Déploiement actif Azure `f65efda9-5f15-40ae-95ce-1ca943a6929a` reçu à 15:46:58Z, à la place de `f66a2ee7…` du 2026‑09‑09. Embarque #462 (agrégat Cosmos de `SubmitQuiz`), #511 (catalogue `lifecycle.transition`) et #512 (audience CIAM v2). `SubmitQuiz` : 3 × 200 entre 15:56 et 15:57Z, 0 exception, contre 7 × 500 et aucun succès sur les 30 jours précédents. Surveillance d'une heure après bascule (15:48→16:48Z) : aucun critère de retour arrière atteint, 0 réponse 5xx hors le 503 voulu de `GetAccountDeletion` (fonctionnalité désactivée), 0 exception. Le 2026‑09‑24, de 15:44:13Z à 16:13:58Z, les associations NSG des 2 sous-réseaux de `vnet-certigo-prod` ont été retirées par la promotion (template antérieur à #539), puis rétablies par MCAPS. NSG sans règle personnalisée (6 règles par défaut, relevé du 2026‑09‑25 à 10:15Z), aucun effet mesuré. Corrigé par #539. Preuve : Resource Graph `resourcechanges`. Relevé du 2026‑09‑24 à 16:53Z ; **invalidé par toute promotion ou tout rollback prod ultérieur, y compris un run échoué à mi-parcours** : l'état courant se lit par `GET …/sites/func-certigo-prod-izfhvvxjdxc2k/deployments`. |
+| 2026‑09‑24 | 📦 **Contenu R2 publié puis déclaré** : release `sha256:95c69c30…` publiée depuis `certigo-content` `a433518` (run `36018994442`, 33 certifications revérifiées le 2026‑09‑23), pin rafraîchi. Publication seule : aucun import ni aucune promotion, `CONTENT_REPOSITORY_MODE` reste `legacy` en staging et en prod. |
 | 2026‑08‑21 | 📬 **Fermeture des races métriques/offboarding** : outbox transactionnel avec processing lease CAS, TimerTrigger strictement inerte en `off`, replay historique avant facts, retry purge autorisé, 30 partitions receipt directes et cohorte privacy stable inter-cycles. |
 | 2026‑08‑21 | 🧱 **Refonte structurelle métriques entreprise** : lease serveur unique par sujet/cycle, faits exclusivement serveur, receipts isolés dans un conteneur jour×128 shards, buckets quotidiens non différenciables, activité préagrégée, worker/retry de purge et rejoins versionnés. Feature toujours strictement `off`. |
 | 2026‑08‑21 | 🛡️ **Hardening métriques entreprise** : watermark monotone par session, receipts immuables, 128 shards/jour, consolidation bornée/backoff, TTL depuis le jour métrique, seuil fail-closed de cinq contributeurs et offboarding revoke-first avec tombstone/purge paginée reprenable. Feature toujours strictement `off`. |
@@ -809,7 +835,7 @@ et la capability Apple, puis une validation sur iPhone.
   puis livrer séparément le resolver autoritaire `resolve`. Les endpoints/UI `link` restent hors
   périmètre jusqu'à validation des cohortes et de la suppression multi-identités.
 - ✅ **Anti‑triche en mode sanction** pour les signaux durs (horloge falsifiée, vitesse) — `Reject` supprime les récompenses, câblé pour quiz et examens (§8). La **cadence** (débit XP/tentatives sur 1 h) reste **volontairement** en détection pure : sa contribution au score de risque est plafonnée sous le seuil de `Reject`, seule ou combinée aux deux signaux de cadence entre eux, pour ne jamais punir un apprenant assidu. Bascule future de la cadence en sanction : **différée**, nécessite au préalable un feature flag de configuration (kill switch), une alerte sur le volume de `Reject`, et une revue de télémétrie réelle avant tout changement de seuil.
-- ✅ **Tests d'intégration Cosmos exécutés sur émulateur réel** (le projet `Certigo.Infrastructure.Tests` est gated `CERTIGO_COSMOS_TESTS=1`). Les **6 cas ont tourné** (0 ignoré) contre l'émulateur Docker `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (ARM64, HTTPS) : **5/6 verts**. Le 6e — `Attempt_recent_activity_aggregates_count_and_xp_within_window` (`CosmosAttemptRepository.GetRecentActivityAsync`, agrégat `COUNT(1)`/`SUM` projeté en objet `VALUE { … }`) — échoue **uniquement** sur l'émulateur _vnext-preview_ (back‑end PostgreSQL) avec `RewrittenAggregateProjections was not an array for a value aggregate query`. **Ce n'est pas un bug de production** : la requête est valide contre Cosmos réel et l'émulateur classic ; on **ne réécrit pas** la requête pour contourner une limite de l'émulateur preview. L'émulateur **classic amd64** est **inutilisable sur cet hôte ARM64** (`exec format error` sans QEMU ; `segfault signal 11` même avec QEMU x86_64 binfmt installé), d'où la cible 6/6 hors de portée localement — à confirmer en CI/Cosmos réel.
+- ✅ **Tests d'intégration Cosmos exécutés sur émulateur réel** (le projet `Certigo.Infrastructure.Tests` est gated `CERTIGO_COSMOS_TESTS=1`). Les **6 cas ont tourné** (0 ignoré) contre l'émulateur Docker `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (ARM64, HTTPS) : **5/6 verts**. Le 6e — `Attempt_recent_activity_aggregates_count_and_xp_within_window` (`CosmosAttemptRepository.GetRecentActivityAsync`, agrégat `COUNT(1)`/`SUM` projeté en objet `VALUE { … }`) — échoue **uniquement** sur l'émulateur _vnext-preview_ (back‑end PostgreSQL) avec `RewrittenAggregateProjections was not an array for a value aggregate query`. ~~**Ce n'est pas un bug de production** : la requête est valide contre Cosmos réel et l'émulateur classic ; on **ne réécrit pas** la requête pour contourner une limite de l'émulateur preview.~~ **Réfuté** (constat du 2026‑09‑24, App Insights prod) : Cosmos réel rejette la même forme (`Compositions of aggregates and other expressions are not allowed`). `SubmitQuiz` a rendu 7 × 500 sans aucun succès sur 30 jours, jusqu'au correctif #462 (`SELECT COUNT(1) AS attempts, SUM(…) AS xp`, gardé à chaque build par `CosmosQueryShapeTests`), promu en prod le 2026‑09‑24 (voir « Journal d'évolution »). L'émulateur **classic amd64** est **inutilisable sur cet hôte ARM64** (`exec format error` sans QEMU ; `segfault signal 11` même avec QEMU x86_64 binfmt installé), d'où la cible 6/6 hors de portée localement — à confirmer en CI/Cosmos réel.
   - _Relancer la suite_ : `docker run -d --name cosmos-emulator -p 8081:8081 -p 1234:1234 -e PROTOCOL=https mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview` (attendre `PostgreSQL=OK, Gateway=OK, Explorer=OK` dans `docker logs`), puis exporter `CERTIGO_COSMOS_TESTS=1`, `COSMOS_EMULATOR_ENDPOINT=https://localhost:8081`, `COSMOS_EMULATOR_KEY=<clé publique émulateur>` et lancer `dotnet test backend\tests\Certigo.Infrastructure.Tests`.
 - ✅ **Couverture HTTP/middleware Functions complétée** : tests ajoutés pour les **15 Functions** jusque‑là non couvertes (User, Tutor, Streak, Shop, ShareCard, Season, Recommendation, Quest, Path, Notification, Lesson, Leaderboard, Friend, Exam, Achievement) via le harness maison (`FunctionTestHost` + faux services dans `Fakes.Functions.cs`) — happy‑path authentifié (200 + service appelé 1×) et garde non‑authentifié. **Suite globale `dotnet test backend\Certigo.sln` : 496 verts, 0 échec** (6 cas Cosmos `Skipped` proprement quand le gate est off).
 - 🤖 **Tuteur IA — décision prod actée, dev verrouillé documenté** : le provider Azure OpenAI / Foundry (`gpt-5.4-mini`, surface **v1**, auth **Entra ID**) est **câblé, compilé et couvert par tests unitaires** (`AzureOpenAiTutorCompletionTests`). Décision prod : ADR-O-01 (Option B, repli déterministe, `TUTOR_LLM_ENABLED=false`) — **aucun changement**. État **dev** clarifié (le commentaire précédent de `infra/params/dev.bicepparam` affirmait à tort que le rôle RBAC était accordé et le flag actif) : le flag est **`false`** depuis #181 (échec réel de déploiement `DeploymentModelNotSupported` sur `gpt-5.4-mini`) et le module IaC d'adoption (`infra/modules/openai.bicep`, RBAC _Cognitive Services OpenAI User_) **n'a plus été redéployé depuis** — RBAC et compatibilité du modèle sont donc **non revérifiés dans la forme IaC actuelle**. Un **appel réel de validation** (register/login → JWT → `POST /api/tutor/explain` → 200 + `source:"ai"`) reste nécessaire avant toute bascule ; il ne peut être exécuté que par un humain disposant d'un accès Azure réel (agent sans accès à la souscription/tenant Certigo). Outillage prêt pour cette validation : test gated `CERTIGO_TUTOR_LLM_LIVE_TESTS=1` (`backend/tests/Certigo.Api.Tests/TutorLlmLiveEndToEndTests.cs`, skip par défaut) lancé via `backend/run-tutor-llm-live-gate.ps1` ; procédure complète dans `docs/deployment-runbook.md` §T0.5 "Chemin 3".

@@ -1,0 +1,3065 @@
+{
+  "schemaVersion": 1,
+  "scope": "Read-only root infra/content/main.bicep, rg-certigo-content. NOT application subscription root; NOT OIDC workflow proof.",
+  "decision": "Explicit orchestrator acceptance of content LRS on 2026-09-25; no Azure apply authorized.",
+  "tools": {
+    "bicep": "0.44.1 (28275db947)",
+    "validationLevel": "Provider",
+    "azureCli": "2.89.1",
+    "timeoutSecondsPerAzureCommand": 180,
+    "timeoutSecondsPerWhatIf": 240
+  },
+  "redaction": "Account GET allowlist excludes key timestamps/endpoints/free text; what-if tag values redacted. No tokens, credentials or full activity claims collected into this evidence. All 19 what-if entries/deltas retained.",
+  "live": {
+    "context": {
+      "startedAt": "2026-09-25T10:19:41.805111+00:00",
+      "completedAt": "2026-09-25T10:19:42.881626+00:00",
+      "command": [
+        "az",
+        "account",
+        "show",
+        "--subscription",
+        "b8952c8c-8f72-469d-99cd-ac906da4e2fc",
+        "--query",
+        "{tenantId:tenantId,id:id}"
+      ],
+      "result": {
+        "id": "b8952c8c-8f72-469d-99cd-ac906da4e2fc",
+        "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3"
+      }
+    },
+    "gets": [
+      {
+        "startedAt": "2026-09-25T10:19:42.881626+00:00",
+        "completedAt": "2026-09-25T10:19:44.661334+00:00",
+        "command": [
+          "az",
+          "rest",
+          "--method",
+          "get",
+          "--url",
+          "https://management.azure.com/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww?api-version=2025-06-01",
+          "--query",
+          "{id:id,sku:sku,properties:properties}"
+        ],
+        "result": {
+          "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+          "properties": {
+            "allowBlobPublicAccess": false,
+            "allowCrossTenantReplication": false,
+            "allowSharedKeyAccess": false,
+            "defaultToOAuthAuthentication": true,
+            "encryption": {
+              "keySource": "Microsoft.Storage",
+              "requireInfrastructureEncryption": true,
+              "services": {
+                "blob": {
+                  "enabled": true,
+                  "keyType": "Account",
+                  "lastEnabledTime": "2026-09-04T17:35:15.6324631Z"
+                },
+                "file": {
+                  "enabled": true,
+                  "keyType": "Account",
+                  "lastEnabledTime": "2026-09-04T17:35:15.6324631Z"
+                }
+              }
+            },
+            "isHnsEnabled": false,
+            "isLocalUserEnabled": false,
+            "isNfsV3Enabled": false,
+            "isSftpEnabled": false,
+            "minimumTlsVersion": "TLS1_2",
+            "networkAcls": {
+              "bypass": "AzureServices",
+              "defaultAction": "Deny",
+              "ipRules": [],
+              "ipv6Rules": [],
+              "resourceAccessRules": [
+                {
+                  "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Security/datascanners/storageDataScanner",
+                  "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3"
+                }
+              ],
+              "virtualNetworkRules": []
+            },
+            "publicNetworkAccess": "Disabled",
+            "supportsHttpsTrafficOnly": true,
+            "provisioningState": "Succeeded"
+          },
+          "sku": {
+            "name": "Standard_LRS",
+            "tier": "Standard"
+          }
+        }
+      },
+      {
+        "startedAt": "2026-09-25T10:19:44.662325+00:00",
+        "completedAt": "2026-09-25T10:19:46.295644+00:00",
+        "command": [
+          "az",
+          "rest",
+          "--method",
+          "get",
+          "--url",
+          "https://management.azure.com/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default?api-version=2025-06-01",
+          "--query",
+          "{id:id,properties:properties}"
+        ],
+        "result": {
+          "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default",
+          "properties": {
+            "changeFeed": {
+              "enabled": false
+            },
+            "containerDeleteRetentionPolicy": {
+              "days": 30,
+              "enabled": true
+            },
+            "cors": {
+              "corsRules": []
+            },
+            "deleteRetentionPolicy": {
+              "allowPermanentDelete": false,
+              "days": 30,
+              "enabled": true
+            },
+            "isVersioningEnabled": true,
+            "restorePolicy": {
+              "enabled": false
+            },
+            "staticWebsite": {
+              "enabled": false
+            }
+          }
+        }
+      },
+      {
+        "startedAt": "2026-09-25T10:19:46.295644+00:00",
+        "completedAt": "2026-09-25T10:19:48.272075+00:00",
+        "command": [
+          "az",
+          "rest",
+          "--method",
+          "get",
+          "--url",
+          "https://management.azure.com/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/managementPolicies/default?api-version=2025-06-01",
+          "--query",
+          "{id:id,properties:properties}"
+        ],
+        "result": {
+          "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/managementPolicies/default",
+          "properties": {
+            "lastModifiedTime": "2026-09-04T17:35:36.1919516Z",
+            "policy": {
+              "rules": [
+                {
+                  "definition": {
+                    "actions": {
+                      "baseBlob": {
+                        "tierToCool": {
+                          "daysAfterCreationGreaterThan": 30.0
+                        }
+                      }
+                    },
+                    "filters": {
+                      "blobTypes": [
+                        "blockBlob"
+                      ],
+                      "prefixMatch": [
+                        "content-public-releases/manifests/",
+                        "content-private-releases/manifests/"
+                      ]
+                    }
+                  },
+                  "enabled": true,
+                  "name": "tier-content-manifests-to-cool",
+                  "type": "Lifecycle"
+                },
+                {
+                  "definition": {
+                    "actions": {
+                      "baseBlob": {
+                        "tierToCool": {
+                          "daysAfterCreationGreaterThan": 30.0
+                        }
+                      }
+                    },
+                    "filters": {
+                      "blobTypes": [
+                        "blockBlob"
+                      ],
+                      "prefixMatch": [
+                        "content-release-descriptors/releases/"
+                      ]
+                    }
+                  },
+                  "enabled": true,
+                  "name": "tier-release-descriptors-to-cool",
+                  "type": "Lifecycle"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "startedAt": "2026-09-25T10:19:48.272075+00:00",
+        "completedAt": "2026-09-25T10:19:50.093569+00:00",
+        "command": [
+          "az",
+          "rest",
+          "--method",
+          "get",
+          "--url",
+          "https://management.azure.com/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors?api-version=2025-06-01",
+          "--query",
+          "{id:id,properties:properties}"
+        ],
+        "result": {
+          "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors",
+          "properties": {
+            "defaultEncryptionScope": "$account-encryption-key",
+            "deleted": false,
+            "denyEncryptionScopeOverride": true,
+            "hasImmutabilityPolicy": true,
+            "hasLegalHold": false,
+            "immutabilityPolicy": {
+              "etag": "\"8df0aaaf228f68a\"",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 90,
+                "state": "Unlocked"
+              },
+              "updateHistory": [
+                {
+                  "allowProtectedAppendWrites": false,
+                  "allowProtectedAppendWritesAll": false,
+                  "immutabilityPeriodSinceCreationInDays": 90,
+                  "objectIdentifier": "d7eb21fb-cd0d-4f4e-beaa-f12f0930e3af",
+                  "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3",
+                  "timestamp": "2026-09-04T17:35:43.3591943Z",
+                  "update": "put"
+                }
+              ]
+            },
+            "immutableStorageWithVersioning": {
+              "enabled": true
+            },
+            "lastModifiedTime": "2026-09-04T17:35:43.0000000Z",
+            "leaseState": "Available",
+            "leaseStatus": "Unlocked",
+            "legalHold": {
+              "hasLegalHold": false,
+              "tags": []
+            },
+            "publicAccess": "None",
+            "remainingRetentionDays": 0
+          }
+        }
+      },
+      {
+        "startedAt": "2026-09-25T10:19:50.093569+00:00",
+        "completedAt": "2026-09-25T10:19:51.974165+00:00",
+        "command": [
+          "az",
+          "rest",
+          "--method",
+          "get",
+          "--url",
+          "https://management.azure.com/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/immutabilityPolicies/default?api-version=2025-06-01",
+          "--query",
+          "{id:id,properties:properties}"
+        ],
+        "result": {
+          "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/immutabilityPolicies/default",
+          "properties": {
+            "allowProtectedAppendWrites": false,
+            "allowProtectedAppendWritesAll": false,
+            "immutabilityPeriodSinceCreationInDays": 90,
+            "state": "Unlocked"
+          }
+        }
+      },
+      {
+        "startedAt": "2026-09-25T10:19:51.974165+00:00",
+        "completedAt": "2026-09-25T10:19:53.559301+00:00",
+        "command": [
+          "az",
+          "rest",
+          "--method",
+          "get",
+          "--url",
+          "https://management.azure.com/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases?api-version=2025-06-01",
+          "--query",
+          "{id:id,properties:properties}"
+        ],
+        "result": {
+          "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases",
+          "properties": {
+            "defaultEncryptionScope": "$account-encryption-key",
+            "deleted": false,
+            "denyEncryptionScopeOverride": true,
+            "hasImmutabilityPolicy": true,
+            "hasLegalHold": false,
+            "immutabilityPolicy": {
+              "etag": "\"8df0aaaf0d324ad\"",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 30,
+                "state": "Unlocked"
+              },
+              "updateHistory": [
+                {
+                  "allowProtectedAppendWrites": false,
+                  "allowProtectedAppendWritesAll": false,
+                  "immutabilityPeriodSinceCreationInDays": 30,
+                  "objectIdentifier": "d7eb21fb-cd0d-4f4e-beaa-f12f0930e3af",
+                  "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3",
+                  "timestamp": "2026-09-04T17:35:41.1088671Z",
+                  "update": "put"
+                }
+              ]
+            },
+            "immutableStorageWithVersioning": {
+              "enabled": true
+            },
+            "lastModifiedTime": "2026-09-04T17:35:41.0000000Z",
+            "leaseState": "Available",
+            "leaseStatus": "Unlocked",
+            "legalHold": {
+              "hasLegalHold": false,
+              "tags": []
+            },
+            "publicAccess": "None",
+            "remainingRetentionDays": 0
+          }
+        }
+      },
+      {
+        "startedAt": "2026-09-25T10:19:53.559301+00:00",
+        "completedAt": "2026-09-25T10:19:54.967519+00:00",
+        "command": [
+          "az",
+          "rest",
+          "--method",
+          "get",
+          "--url",
+          "https://management.azure.com/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/immutabilityPolicies/default?api-version=2025-06-01",
+          "--query",
+          "{id:id,properties:properties}"
+        ],
+        "result": {
+          "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/immutabilityPolicies/default",
+          "properties": {
+            "allowProtectedAppendWrites": false,
+            "allowProtectedAppendWritesAll": false,
+            "immutabilityPeriodSinceCreationInDays": 30,
+            "state": "Unlocked"
+          }
+        }
+      },
+      {
+        "startedAt": "2026-09-25T10:19:54.968522+00:00",
+        "completedAt": "2026-09-25T10:19:56.501461+00:00",
+        "command": [
+          "az",
+          "rest",
+          "--method",
+          "get",
+          "--url",
+          "https://management.azure.com/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases?api-version=2025-06-01",
+          "--query",
+          "{id:id,properties:properties}"
+        ],
+        "result": {
+          "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases",
+          "properties": {
+            "defaultEncryptionScope": "$account-encryption-key",
+            "deleted": false,
+            "denyEncryptionScopeOverride": true,
+            "hasImmutabilityPolicy": true,
+            "hasLegalHold": false,
+            "immutabilityPolicy": {
+              "etag": "\"8df0aaaefaa763b\"",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 90,
+                "state": "Unlocked"
+              },
+              "updateHistory": [
+                {
+                  "allowProtectedAppendWrites": false,
+                  "allowProtectedAppendWritesAll": false,
+                  "immutabilityPeriodSinceCreationInDays": 90,
+                  "objectIdentifier": "d7eb21fb-cd0d-4f4e-beaa-f12f0930e3af",
+                  "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3",
+                  "timestamp": "2026-09-04T17:35:39.1630289Z",
+                  "update": "put"
+                }
+              ]
+            },
+            "immutableStorageWithVersioning": {
+              "enabled": true
+            },
+            "lastModifiedTime": "2026-09-04T17:35:39.0000000Z",
+            "leaseState": "Available",
+            "leaseStatus": "Unlocked",
+            "legalHold": {
+              "hasLegalHold": false,
+              "tags": []
+            },
+            "publicAccess": "None",
+            "remainingRetentionDays": 0
+          }
+        }
+      },
+      {
+        "startedAt": "2026-09-25T10:19:56.501461+00:00",
+        "completedAt": "2026-09-25T10:19:58.973600+00:00",
+        "command": [
+          "az",
+          "rest",
+          "--method",
+          "get",
+          "--url",
+          "https://management.azure.com/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/immutabilityPolicies/default?api-version=2025-06-01",
+          "--query",
+          "{id:id,properties:properties}"
+        ],
+        "result": {
+          "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/immutabilityPolicies/default",
+          "properties": {
+            "allowProtectedAppendWrites": false,
+            "allowProtectedAppendWritesAll": false,
+            "immutabilityPeriodSinceCreationInDays": 90,
+            "state": "Unlocked"
+          }
+        }
+      }
+    ]
+  },
+  "whatIf": {
+    "baseline": {
+      "startedAt": "2026-09-25T10:20:01.779097+00:00",
+      "completedAt": "2026-09-25T10:20:24.941306+00:00",
+      "command": [
+        "az",
+        "deployment",
+        "group",
+        "what-if",
+        "--subscription",
+        "b8952c8c-8f72-469d-99cd-ac906da4e2fc",
+        "--resource-group",
+        "rg-certigo-content",
+        "--name",
+        "content-lrs-baseline-20260925",
+        "--template-file",
+        "<ARTIFACT_DIR>\\content-baseline.json",
+        "--parameters",
+        "@<ARTIFACT_DIR>\\content-baseline.parameters.json",
+        "--validation-level",
+        "Provider",
+        "--result-format",
+        "FullResourcePayloads",
+        "--no-pretty-print"
+      ],
+      "result": {
+        "changes": [
+          {
+            "after": {
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.EventGrid/systemTopics/stcertigocntz3wqbdww-328b4e94-ffe1-45c2-b704-fe2c3cde2328",
+              "location": "westeurope",
+              "name": "stcertigocntz3wqbdww-328b4e94-ffe1-45c2-b704-fe2c3cde2328",
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.EventGrid/systemTopics"
+            },
+            "before": {
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.EventGrid/systemTopics/stcertigocntz3wqbdww-328b4e94-ffe1-45c2-b704-fe2c3cde2328",
+              "location": "westeurope",
+              "name": "stcertigocntz3wqbdww-328b4e94-ffe1-45c2-b704-fe2c3cde2328",
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.EventGrid/systemTopics"
+            },
+            "changeType": "Ignore",
+            "delta": null,
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.EventGrid/systemTopics/stcertigocntz3wqbdww-328b4e94-ffe1-45c2-b704-fe2c3cde2328",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/networkInterfaces/pe-stcertigocntz3wqbdww-blob.nic.bb79c678-528a-4d1c-b05e-0a58e456fd27",
+              "location": "westeurope",
+              "managedBy": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob",
+              "name": "pe-stcertigocntz3wqbdww-blob.nic.bb79c678-528a-4d1c-b05e-0a58e456fd27",
+              "resourceGroup": "rg-certigo-content",
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Network/networkInterfaces"
+            },
+            "before": {
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/networkInterfaces/pe-stcertigocntz3wqbdww-blob.nic.bb79c678-528a-4d1c-b05e-0a58e456fd27",
+              "location": "westeurope",
+              "managedBy": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob",
+              "name": "pe-stcertigocntz3wqbdww-blob.nic.bb79c678-528a-4d1c-b05e-0a58e456fd27",
+              "resourceGroup": "rg-certigo-content",
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Network/networkInterfaces"
+            },
+            "changeType": "Ignore",
+            "delta": null,
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/networkInterfaces/pe-stcertigocntz3wqbdww-blob.nic.bb79c678-528a-4d1c-b05e-0a58e456fd27",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2024-05-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob",
+              "location": "westeurope",
+              "name": "pe-stcertigocntz3wqbdww-blob",
+              "properties": {
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "stcertigocntz3wqbdww-blob",
+                    "properties": {
+                      "groupIds": [
+                        "blob"
+                      ],
+                      "privateLinkServiceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww"
+                    }
+                  }
+                ],
+                "subnet": {
+                  "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners",
+                  "resourceGroup": "rg-certigo-ci"
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Network/privateEndpoints"
+            },
+            "before": {
+              "apiVersion": "2024-05-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob",
+              "location": "westeurope",
+              "name": "pe-stcertigocntz3wqbdww-blob",
+              "properties": {
+                "isIPv6EnabledPrivateEndpoint": false,
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "stcertigocntz3wqbdww-blob",
+                    "properties": {
+                      "groupIds": [
+                        "blob"
+                      ],
+                      "privateLinkServiceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww"
+                    }
+                  }
+                ],
+                "subnet": {
+                  "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners",
+                  "resourceGroup": "rg-certigo-ci"
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Network/privateEndpoints"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": null,
+                "before": false,
+                "children": null,
+                "path": "properties.isIPv6EnabledPrivateEndpoint",
+                "propertyChangeType": "Delete"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2024-05-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob/privateDnsZoneGroups/default",
+              "name": "default",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "blob",
+                    "properties": {
+                      "privateDnsZoneId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net"
+                    }
+                  }
+                ]
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups"
+            },
+            "before": {
+              "apiVersion": "2024-05-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob/privateDnsZoneGroups/default",
+              "name": "default",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "etag": "W/\"1f28fb4f-43fa-4058-b7f2-eb076fc41da5\"",
+                    "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob/privateDnsZoneGroups/default/privateDnsZoneConfigs/blob",
+                    "name": "blob",
+                    "properties": {
+                      "privateDnsZoneId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net",
+                      "provisioningState": "Succeeded"
+                    },
+                    "resourceGroup": "rg-certigo-content",
+                    "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups/privateDnsZoneConfigs"
+                  }
+                ]
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": null,
+                "before": null,
+                "children": [
+                  {
+                    "after": null,
+                    "before": null,
+                    "children": [
+                      {
+                        "after": null,
+                        "before": "W/\"1f28fb4f-43fa-4058-b7f2-eb076fc41da5\"",
+                        "children": null,
+                        "path": "etag",
+                        "propertyChangeType": "Delete"
+                      },
+                      {
+                        "after": null,
+                        "before": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob/privateDnsZoneGroups/default/privateDnsZoneConfigs/blob",
+                        "children": null,
+                        "path": "id",
+                        "propertyChangeType": "Delete"
+                      },
+                      {
+                        "after": null,
+                        "before": "Succeeded",
+                        "children": null,
+                        "path": "properties.provisioningState",
+                        "propertyChangeType": "Delete"
+                      },
+                      {
+                        "after": null,
+                        "before": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups/privateDnsZoneConfigs",
+                        "children": null,
+                        "path": "type",
+                        "propertyChangeType": "Delete"
+                      }
+                    ],
+                    "path": "0",
+                    "propertyChangeType": "Modify"
+                  }
+                ],
+                "path": "properties.privateDnsZoneConfigs",
+                "propertyChangeType": "Array"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob/privateDnsZoneGroups/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+              "kind": "StorageV2",
+              "location": "westeurope",
+              "name": "stcertigocntz3wqbdww",
+              "properties": {
+                "accessTier": "Hot",
+                "allowBlobPublicAccess": false,
+                "allowCrossTenantDelegationSas": false,
+                "allowCrossTenantReplication": false,
+                "allowSharedKeyAccess": false,
+                "defaultToOAuthAuthentication": true,
+                "encryption": {
+                  "keySource": "Microsoft.Storage",
+                  "requireInfrastructureEncryption": true
+                },
+                "isHnsEnabled": false,
+                "isLocalUserEnabled": false,
+                "isNfsV3Enabled": false,
+                "isSftpEnabled": false,
+                "minimumTlsVersion": "TLS1_2",
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "Deny",
+                  "resourceAccessRules": [
+                    {
+                      "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Security/datascanners/storageDataScanner",
+                      "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3"
+                    }
+                  ]
+                },
+                "publicNetworkAccess": "Disabled",
+                "routingPreference": {
+                  "publishInternetEndpoints": false,
+                  "publishMicrosoftEndpoints": false,
+                  "routingChoice": "MicrosoftRouting"
+                },
+                "supportsHttpsTrafficOnly": true
+              },
+              "resourceGroup": "rg-certigo-content",
+              "sku": {
+                "name": "Standard_GRS"
+              },
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Storage/storageAccounts"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+              "kind": "StorageV2",
+              "location": "westeurope",
+              "name": "stcertigocntz3wqbdww",
+              "properties": {
+                "accessTier": "Hot",
+                "allowBlobPublicAccess": false,
+                "allowCrossTenantDelegationSas": false,
+                "allowCrossTenantReplication": false,
+                "allowSharedKeyAccess": false,
+                "defaultToOAuthAuthentication": true,
+                "encryption": {
+                  "keySource": "Microsoft.Storage",
+                  "requireInfrastructureEncryption": true
+                },
+                "isHnsEnabled": false,
+                "isLocalUserEnabled": false,
+                "isNfsV3Enabled": false,
+                "isSftpEnabled": false,
+                "minimumTlsVersion": "TLS1_2",
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "Deny",
+                  "resourceAccessRules": [
+                    {
+                      "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Security/datascanners/storageDataScanner",
+                      "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3"
+                    }
+                  ]
+                },
+                "publicNetworkAccess": "Disabled",
+                "routingPreference": {
+                  "publishInternetEndpoints": false,
+                  "publishMicrosoftEndpoints": false,
+                  "routingChoice": "MicrosoftRouting"
+                },
+                "supportsHttpsTrafficOnly": true
+              },
+              "resourceGroup": "rg-certigo-content",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Storage/storageAccounts"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "Standard_GRS",
+                "before": "Standard_LRS",
+                "children": null,
+                "path": "sku.name",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": {
+                  "blob": {
+                    "enabled": true,
+                    "keyType": "Account"
+                  }
+                },
+                "before": null,
+                "children": null,
+                "path": "properties.encryption.services",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default",
+              "name": "default",
+              "properties": {
+                "changeFeed": {
+                  "enabled": false
+                },
+                "containerDeleteRetentionPolicy": {
+                  "days": 30,
+                  "enabled": true
+                },
+                "deleteRetentionPolicy": {
+                  "days": 30,
+                  "enabled": true
+                },
+                "isVersioningEnabled": true,
+                "restorePolicy": {
+                  "enabled": false
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default",
+              "name": "default",
+              "properties": {
+                "changeFeed": {
+                  "enabled": false
+                },
+                "containerDeleteRetentionPolicy": {
+                  "days": 30,
+                  "enabled": true
+                },
+                "deleteRetentionPolicy": {
+                  "allowPermanentDelete": false,
+                  "days": 30,
+                  "enabled": true
+                },
+                "isVersioningEnabled": true,
+                "restorePolicy": {
+                  "enabled": false
+                },
+                "staticWebsite": {
+                  "enabled": false
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": null,
+                "before": false,
+                "children": null,
+                "path": "properties.deleteRetentionPolicy.allowPermanentDelete",
+                "propertyChangeType": "Delete"
+              },
+              {
+                "after": null,
+                "before": {
+                  "enabled": false
+                },
+                "children": null,
+                "path": "properties.staticWebsite",
+                "propertyChangeType": "Delete"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases",
+              "name": "content-private-releases",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases",
+              "name": "content-private-releases",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 90
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 90
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/immutabilityPolicies/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/4650a8a8-685a-53e7-aec4-f5d2b5a46f31",
+              "name": "4650a8a8-685a-53e7-aec4-f5d2b5a46f31",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-answer-key', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/4650a8a8-685a-53e7-aec4-f5d2b5a46f31",
+              "name": "4650a8a8-685a-53e7-aec4-f5d2b5a46f31",
+              "properties": {
+                "principalId": "dab3f3d3-c9ee-4aff-a09c-7e93a49cf939",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-answer-key', '2024-11-30').principalId]",
+                "before": "dab3f3d3-c9ee-4aff-a09c-7e93a49cf939",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/4650a8a8-685a-53e7-aec4-f5d2b5a46f31",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/669d910d-ddba-5fa8-974b-a6cda76a3232",
+              "name": "669d910d-ddba-5fa8-974b-a6cda76a3232",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/669d910d-ddba-5fa8-974b-a6cda76a3232",
+              "name": "669d910d-ddba-5fa8-974b-a6cda76a3232",
+              "properties": {
+                "principalId": "82008151-887e-44df-8cde-675f771f2c20",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "before": "82008151-887e-44df-8cde-675f771f2c20",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/669d910d-ddba-5fa8-974b-a6cda76a3232",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases",
+              "name": "content-public-releases",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases",
+              "name": "content-public-releases",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 30
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 30
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/immutabilityPolicies/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/0791c777-c081-59b8-93e9-a6f232b14d7d",
+              "name": "0791c777-c081-59b8-93e9-a6f232b14d7d",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-public', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/0791c777-c081-59b8-93e9-a6f232b14d7d",
+              "name": "0791c777-c081-59b8-93e9-a6f232b14d7d",
+              "properties": {
+                "principalId": "764d7afb-88b7-4744-bbdb-dea4eb552c16",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-public', '2024-11-30').principalId]",
+                "before": "764d7afb-88b7-4744-bbdb-dea4eb552c16",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/0791c777-c081-59b8-93e9-a6f232b14d7d",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/350b735a-6bf0-5a0a-8386-a686d20cb235",
+              "name": "350b735a-6bf0-5a0a-8386-a686d20cb235",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/350b735a-6bf0-5a0a-8386-a686d20cb235",
+              "name": "350b735a-6bf0-5a0a-8386-a686d20cb235",
+              "properties": {
+                "principalId": "82008151-887e-44df-8cde-675f771f2c20",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "before": "82008151-887e-44df-8cde-675f771f2c20",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/350b735a-6bf0-5a0a-8386-a686d20cb235",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors",
+              "name": "content-release-descriptors",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors",
+              "name": "content-release-descriptors",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 90
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 90
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/immutabilityPolicies/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/8b31e915-3aea-5fd7-9e2e-131246b52df8",
+              "name": "8b31e915-3aea-5fd7-9e2e-131246b52df8",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-release', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/8b31e915-3aea-5fd7-9e2e-131246b52df8",
+              "name": "8b31e915-3aea-5fd7-9e2e-131246b52df8",
+              "properties": {
+                "principalId": "aed89ef9-49f9-4790-a446-6f1c1ee74a8f",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-release', '2024-11-30').principalId]",
+                "before": "aed89ef9-49f9-4790-a446-6f1c1ee74a8f",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/8b31e915-3aea-5fd7-9e2e-131246b52df8",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/f942565c-749d-55f3-bde2-c19c10b29b4f",
+              "name": "f942565c-749d-55f3-bde2-c19c10b29b4f",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/f942565c-749d-55f3-bde2-c19c10b29b4f",
+              "name": "f942565c-749d-55f3-bde2-c19c10b29b4f",
+              "properties": {
+                "principalId": "82008151-887e-44df-8cde-675f771f2c20",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "before": "82008151-887e-44df-8cde-675f771f2c20",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/f942565c-749d-55f3-bde2-c19c10b29b4f",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/managementPolicies/default",
+              "name": "DefaultManagementPolicy",
+              "properties": {
+                "policy": {
+                  "rules": [
+                    {
+                      "definition": {
+                        "actions": {
+                          "baseBlob": {
+                            "tierToCool": {
+                              "daysAfterCreationGreaterThan": 30.0
+                            }
+                          }
+                        },
+                        "filters": {
+                          "blobTypes": [
+                            "blockBlob"
+                          ],
+                          "prefixMatch": [
+                            "content-public-releases/manifests/",
+                            "content-private-releases/manifests/"
+                          ]
+                        }
+                      },
+                      "enabled": true,
+                      "name": "tier-content-manifests-to-cool",
+                      "type": "Lifecycle"
+                    },
+                    {
+                      "definition": {
+                        "actions": {
+                          "baseBlob": {
+                            "tierToCool": {
+                              "daysAfterCreationGreaterThan": 30.0
+                            }
+                          }
+                        },
+                        "filters": {
+                          "blobTypes": [
+                            "blockBlob"
+                          ],
+                          "prefixMatch": [
+                            "content-release-descriptors/releases/"
+                          ]
+                        }
+                      },
+                      "enabled": true,
+                      "name": "tier-release-descriptors-to-cool",
+                      "type": "Lifecycle"
+                    }
+                  ]
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/managementPolicies"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/managementPolicies/default",
+              "name": "DefaultManagementPolicy",
+              "properties": {
+                "policy": {
+                  "rules": [
+                    {
+                      "definition": {
+                        "actions": {
+                          "baseBlob": {
+                            "tierToCool": {
+                              "daysAfterCreationGreaterThan": 30.0
+                            }
+                          }
+                        },
+                        "filters": {
+                          "blobTypes": [
+                            "blockBlob"
+                          ],
+                          "prefixMatch": [
+                            "content-public-releases/manifests/",
+                            "content-private-releases/manifests/"
+                          ]
+                        }
+                      },
+                      "enabled": true,
+                      "name": "tier-content-manifests-to-cool",
+                      "type": "Lifecycle"
+                    },
+                    {
+                      "definition": {
+                        "actions": {
+                          "baseBlob": {
+                            "tierToCool": {
+                              "daysAfterCreationGreaterThan": 30.0
+                            }
+                          }
+                        },
+                        "filters": {
+                          "blobTypes": [
+                            "blockBlob"
+                          ],
+                          "prefixMatch": [
+                            "content-release-descriptors/releases/"
+                          ]
+                        }
+                      },
+                      "enabled": true,
+                      "name": "tier-release-descriptors-to-cool",
+                      "type": "Lifecycle"
+                    }
+                  ]
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/managementPolicies"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/managementPolicies/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          }
+        ],
+        "diagnostics": null,
+        "error": null,
+        "potentialChanges": null,
+        "status": "Succeeded"
+      },
+      "templateSha256": "39602ec509c748781deedc3a67444b4612c03fd2ef58b441a85b6e7b7009a53a",
+      "effectiveParameters": {
+        "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {
+          "location": {
+            "value": "westeurope"
+          },
+          "ciVnetResourceGroupName": {
+            "value": "rg-certigo-ci"
+          },
+          "ciVnetName": {
+            "value": "vnet-certigo-ci"
+          },
+          "ciRunnerSubnetName": {
+            "value": "snet-runners"
+          },
+          "contentIdentityResourceGroupName": {
+            "value": "rg-certigo-identities"
+          },
+          "descriptorContainerName": {
+            "value": "content-release-descriptors"
+          },
+          "publicContainerName": {
+            "value": "content-public-releases"
+          },
+          "privateContainerName": {
+            "value": "content-private-releases"
+          },
+          "descriptorImmutabilityRetentionDays": {
+            "value": 90
+          },
+          "publicImmutabilityRetentionDays": {
+            "value": 30
+          },
+          "privateImmutabilityRetentionDays": {
+            "value": 90
+          },
+          "coolTierAfterDays": {
+            "value": 30
+          },
+          "softDeleteRetentionDays": {
+            "value": 30
+          },
+          "storageSkuName": {
+            "value": "Standard_GRS"
+          },
+          "contentPublisherRoleDefinitionGuid": {
+            "value": "c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+          }
+        }
+      },
+      "sourceCommit": "803205f1536d14da6952b55943f611d7078836a2",
+      "sourceFiles": {
+        "infra/content/main.bicep": {
+          "gitBlob": "816b7cde1c2fe0f5cac6e5349db3f012726148c9",
+          "sha256GitBytes": "2dc28375ec2a30c6c235bff92a93d4b1109df46930548c1bb9be7037af7e638c"
+        },
+        "infra/modules/contentStorage.bicep": {
+          "gitBlob": "0a1ad3b01554e7aaa45711cc4573da5060c98f96",
+          "sha256GitBytes": "98490ec836dd5b52243dbf540a84c1a94e1c9ca2b40f587f5eb8c1338da0200c"
+        },
+        "infra/modules/contentPrivateEndpoints.bicep": {
+          "gitBlob": "b4e0b516ef128dc46bf5e94b38b84df3f9abf577",
+          "sha256GitBytes": "fa72e2ed1c5622b83b09b72251c3d024312329facc10832d248fc35ef7ef7e2a"
+        },
+        "infra/params/content.bicepparam": {
+          "gitBlob": "0bdf118193b716e20797688bb94ccbf6962f94f0",
+          "sha256GitBytes": "830e80a3088d795d16311bc12b3c76fb09f56551e3fb7e9856e66aa3077c048e"
+        }
+      },
+      "capturedOutputSha256": "8625c3aeb5a5dd7bda61cc1f5526ddb1bba21b86927b80492836b41a41f2e0f8"
+    },
+    "candidate": {
+      "startedAt": "2026-09-25T10:22:33.971407+00:00",
+      "completedAt": "2026-09-25T10:22:53.545362+00:00",
+      "command": [
+        "az",
+        "deployment",
+        "group",
+        "what-if",
+        "--subscription",
+        "b8952c8c-8f72-469d-99cd-ac906da4e2fc",
+        "--resource-group",
+        "rg-certigo-content",
+        "--name",
+        "content-lrs-candidate-20260925",
+        "--template-file",
+        "<ARTIFACT_DIR>\\content-candidate.json",
+        "--parameters",
+        "@<ARTIFACT_DIR>\\content-candidate.parameters.json",
+        "--validation-level",
+        "Provider",
+        "--result-format",
+        "FullResourcePayloads",
+        "--no-pretty-print"
+      ],
+      "result": {
+        "changes": [
+          {
+            "after": {
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.EventGrid/systemTopics/stcertigocntz3wqbdww-328b4e94-ffe1-45c2-b704-fe2c3cde2328",
+              "location": "westeurope",
+              "name": "stcertigocntz3wqbdww-328b4e94-ffe1-45c2-b704-fe2c3cde2328",
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.EventGrid/systemTopics"
+            },
+            "before": {
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.EventGrid/systemTopics/stcertigocntz3wqbdww-328b4e94-ffe1-45c2-b704-fe2c3cde2328",
+              "location": "westeurope",
+              "name": "stcertigocntz3wqbdww-328b4e94-ffe1-45c2-b704-fe2c3cde2328",
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.EventGrid/systemTopics"
+            },
+            "changeType": "Ignore",
+            "delta": null,
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.EventGrid/systemTopics/stcertigocntz3wqbdww-328b4e94-ffe1-45c2-b704-fe2c3cde2328",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/networkInterfaces/pe-stcertigocntz3wqbdww-blob.nic.bb79c678-528a-4d1c-b05e-0a58e456fd27",
+              "location": "westeurope",
+              "managedBy": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob",
+              "name": "pe-stcertigocntz3wqbdww-blob.nic.bb79c678-528a-4d1c-b05e-0a58e456fd27",
+              "resourceGroup": "rg-certigo-content",
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Network/networkInterfaces"
+            },
+            "before": {
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/networkInterfaces/pe-stcertigocntz3wqbdww-blob.nic.bb79c678-528a-4d1c-b05e-0a58e456fd27",
+              "location": "westeurope",
+              "managedBy": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob",
+              "name": "pe-stcertigocntz3wqbdww-blob.nic.bb79c678-528a-4d1c-b05e-0a58e456fd27",
+              "resourceGroup": "rg-certigo-content",
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Network/networkInterfaces"
+            },
+            "changeType": "Ignore",
+            "delta": null,
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/networkInterfaces/pe-stcertigocntz3wqbdww-blob.nic.bb79c678-528a-4d1c-b05e-0a58e456fd27",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2024-05-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob",
+              "location": "westeurope",
+              "name": "pe-stcertigocntz3wqbdww-blob",
+              "properties": {
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "stcertigocntz3wqbdww-blob",
+                    "properties": {
+                      "groupIds": [
+                        "blob"
+                      ],
+                      "privateLinkServiceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww"
+                    }
+                  }
+                ],
+                "subnet": {
+                  "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners",
+                  "resourceGroup": "rg-certigo-ci"
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Network/privateEndpoints"
+            },
+            "before": {
+              "apiVersion": "2024-05-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob",
+              "location": "westeurope",
+              "name": "pe-stcertigocntz3wqbdww-blob",
+              "properties": {
+                "isIPv6EnabledPrivateEndpoint": false,
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "stcertigocntz3wqbdww-blob",
+                    "properties": {
+                      "groupIds": [
+                        "blob"
+                      ],
+                      "privateLinkServiceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww"
+                    }
+                  }
+                ],
+                "subnet": {
+                  "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/virtualNetworks/vnet-certigo-ci/subnets/snet-runners",
+                  "resourceGroup": "rg-certigo-ci"
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Network/privateEndpoints"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": null,
+                "before": false,
+                "children": null,
+                "path": "properties.isIPv6EnabledPrivateEndpoint",
+                "propertyChangeType": "Delete"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2024-05-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob/privateDnsZoneGroups/default",
+              "name": "default",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "blob",
+                    "properties": {
+                      "privateDnsZoneId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net"
+                    }
+                  }
+                ]
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups"
+            },
+            "before": {
+              "apiVersion": "2024-05-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob/privateDnsZoneGroups/default",
+              "name": "default",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "etag": "W/\"1f28fb4f-43fa-4058-b7f2-eb076fc41da5\"",
+                    "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob/privateDnsZoneGroups/default/privateDnsZoneConfigs/blob",
+                    "name": "blob",
+                    "properties": {
+                      "privateDnsZoneId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-ci/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net",
+                      "provisioningState": "Succeeded"
+                    },
+                    "resourceGroup": "rg-certigo-content",
+                    "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups/privateDnsZoneConfigs"
+                  }
+                ]
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": null,
+                "before": null,
+                "children": [
+                  {
+                    "after": null,
+                    "before": null,
+                    "children": [
+                      {
+                        "after": null,
+                        "before": "W/\"1f28fb4f-43fa-4058-b7f2-eb076fc41da5\"",
+                        "children": null,
+                        "path": "etag",
+                        "propertyChangeType": "Delete"
+                      },
+                      {
+                        "after": null,
+                        "before": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob/privateDnsZoneGroups/default/privateDnsZoneConfigs/blob",
+                        "children": null,
+                        "path": "id",
+                        "propertyChangeType": "Delete"
+                      },
+                      {
+                        "after": null,
+                        "before": "Succeeded",
+                        "children": null,
+                        "path": "properties.provisioningState",
+                        "propertyChangeType": "Delete"
+                      },
+                      {
+                        "after": null,
+                        "before": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups/privateDnsZoneConfigs",
+                        "children": null,
+                        "path": "type",
+                        "propertyChangeType": "Delete"
+                      }
+                    ],
+                    "path": "0",
+                    "propertyChangeType": "Modify"
+                  }
+                ],
+                "path": "properties.privateDnsZoneConfigs",
+                "propertyChangeType": "Array"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Network/privateEndpoints/pe-stcertigocntz3wqbdww-blob/privateDnsZoneGroups/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+              "kind": "StorageV2",
+              "location": "westeurope",
+              "name": "stcertigocntz3wqbdww",
+              "properties": {
+                "accessTier": "Hot",
+                "allowBlobPublicAccess": false,
+                "allowCrossTenantDelegationSas": false,
+                "allowCrossTenantReplication": false,
+                "allowSharedKeyAccess": false,
+                "defaultToOAuthAuthentication": true,
+                "encryption": {
+                  "keySource": "Microsoft.Storage",
+                  "requireInfrastructureEncryption": true
+                },
+                "isHnsEnabled": false,
+                "isLocalUserEnabled": false,
+                "isNfsV3Enabled": false,
+                "isSftpEnabled": false,
+                "minimumTlsVersion": "TLS1_2",
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "Deny",
+                  "resourceAccessRules": [
+                    {
+                      "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Security/datascanners/storageDataScanner",
+                      "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3"
+                    }
+                  ]
+                },
+                "publicNetworkAccess": "Disabled",
+                "routingPreference": {
+                  "publishInternetEndpoints": false,
+                  "publishMicrosoftEndpoints": false,
+                  "routingChoice": "MicrosoftRouting"
+                },
+                "supportsHttpsTrafficOnly": true
+              },
+              "resourceGroup": "rg-certigo-content",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Storage/storageAccounts"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+              "kind": "StorageV2",
+              "location": "westeurope",
+              "name": "stcertigocntz3wqbdww",
+              "properties": {
+                "accessTier": "Hot",
+                "allowBlobPublicAccess": false,
+                "allowCrossTenantDelegationSas": false,
+                "allowCrossTenantReplication": false,
+                "allowSharedKeyAccess": false,
+                "defaultToOAuthAuthentication": true,
+                "encryption": {
+                  "keySource": "Microsoft.Storage",
+                  "requireInfrastructureEncryption": true
+                },
+                "isHnsEnabled": false,
+                "isLocalUserEnabled": false,
+                "isNfsV3Enabled": false,
+                "isSftpEnabled": false,
+                "minimumTlsVersion": "TLS1_2",
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "Deny",
+                  "resourceAccessRules": [
+                    {
+                      "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Security/datascanners/storageDataScanner",
+                      "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3"
+                    }
+                  ]
+                },
+                "publicNetworkAccess": "Disabled",
+                "routingPreference": {
+                  "publishInternetEndpoints": false,
+                  "publishMicrosoftEndpoints": false,
+                  "routingChoice": "MicrosoftRouting"
+                },
+                "supportsHttpsTrafficOnly": true
+              },
+              "resourceGroup": "rg-certigo-content",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "tags": {
+                "managedBy": "[redacted]",
+                "product": "[redacted]",
+                "workload": "[redacted]"
+              },
+              "type": "Microsoft.Storage/storageAccounts"
+            },
+            "changeType": "NoChange",
+            "delta": [
+              {
+                "after": {
+                  "blob": {
+                    "enabled": true,
+                    "keyType": "Account"
+                  }
+                },
+                "before": null,
+                "children": null,
+                "path": "properties.encryption.services",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default",
+              "name": "default",
+              "properties": {
+                "changeFeed": {
+                  "enabled": false
+                },
+                "containerDeleteRetentionPolicy": {
+                  "days": 30,
+                  "enabled": true
+                },
+                "deleteRetentionPolicy": {
+                  "days": 30,
+                  "enabled": true
+                },
+                "isVersioningEnabled": true,
+                "restorePolicy": {
+                  "enabled": false
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default",
+              "name": "default",
+              "properties": {
+                "changeFeed": {
+                  "enabled": false
+                },
+                "containerDeleteRetentionPolicy": {
+                  "days": 30,
+                  "enabled": true
+                },
+                "deleteRetentionPolicy": {
+                  "allowPermanentDelete": false,
+                  "days": 30,
+                  "enabled": true
+                },
+                "isVersioningEnabled": true,
+                "restorePolicy": {
+                  "enabled": false
+                },
+                "staticWebsite": {
+                  "enabled": false
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": null,
+                "before": false,
+                "children": null,
+                "path": "properties.deleteRetentionPolicy.allowPermanentDelete",
+                "propertyChangeType": "Delete"
+              },
+              {
+                "after": null,
+                "before": {
+                  "enabled": false
+                },
+                "children": null,
+                "path": "properties.staticWebsite",
+                "propertyChangeType": "Delete"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases",
+              "name": "content-private-releases",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases",
+              "name": "content-private-releases",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 90
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 90
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/immutabilityPolicies/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/4650a8a8-685a-53e7-aec4-f5d2b5a46f31",
+              "name": "4650a8a8-685a-53e7-aec4-f5d2b5a46f31",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-answer-key', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/4650a8a8-685a-53e7-aec4-f5d2b5a46f31",
+              "name": "4650a8a8-685a-53e7-aec4-f5d2b5a46f31",
+              "properties": {
+                "principalId": "dab3f3d3-c9ee-4aff-a09c-7e93a49cf939",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-answer-key', '2024-11-30').principalId]",
+                "before": "dab3f3d3-c9ee-4aff-a09c-7e93a49cf939",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/4650a8a8-685a-53e7-aec4-f5d2b5a46f31",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/669d910d-ddba-5fa8-974b-a6cda76a3232",
+              "name": "669d910d-ddba-5fa8-974b-a6cda76a3232",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/669d910d-ddba-5fa8-974b-a6cda76a3232",
+              "name": "669d910d-ddba-5fa8-974b-a6cda76a3232",
+              "properties": {
+                "principalId": "82008151-887e-44df-8cde-675f771f2c20",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "before": "82008151-887e-44df-8cde-675f771f2c20",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-private-releases/providers/Microsoft.Authorization/roleAssignments/669d910d-ddba-5fa8-974b-a6cda76a3232",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases",
+              "name": "content-public-releases",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases",
+              "name": "content-public-releases",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 30
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 30
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/immutabilityPolicies/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/0791c777-c081-59b8-93e9-a6f232b14d7d",
+              "name": "0791c777-c081-59b8-93e9-a6f232b14d7d",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-public', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/0791c777-c081-59b8-93e9-a6f232b14d7d",
+              "name": "0791c777-c081-59b8-93e9-a6f232b14d7d",
+              "properties": {
+                "principalId": "764d7afb-88b7-4744-bbdb-dea4eb552c16",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-public', '2024-11-30').principalId]",
+                "before": "764d7afb-88b7-4744-bbdb-dea4eb552c16",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/0791c777-c081-59b8-93e9-a6f232b14d7d",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/350b735a-6bf0-5a0a-8386-a686d20cb235",
+              "name": "350b735a-6bf0-5a0a-8386-a686d20cb235",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/350b735a-6bf0-5a0a-8386-a686d20cb235",
+              "name": "350b735a-6bf0-5a0a-8386-a686d20cb235",
+              "properties": {
+                "principalId": "82008151-887e-44df-8cde-675f771f2c20",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "before": "82008151-887e-44df-8cde-675f771f2c20",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-public-releases/providers/Microsoft.Authorization/roleAssignments/350b735a-6bf0-5a0a-8386-a686d20cb235",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors",
+              "name": "content-release-descriptors",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors",
+              "name": "content-release-descriptors",
+              "properties": {
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": true,
+                "immutableStorageWithVersioning": {
+                  "enabled": true
+                },
+                "publicAccess": "None"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 90
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/immutabilityPolicies/default",
+              "name": "default",
+              "properties": {
+                "allowProtectedAppendWrites": false,
+                "allowProtectedAppendWritesAll": false,
+                "immutabilityPeriodSinceCreationInDays": 90
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/immutabilityPolicies/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/8b31e915-3aea-5fd7-9e2e-131246b52df8",
+              "name": "8b31e915-3aea-5fd7-9e2e-131246b52df8",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-release', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/8b31e915-3aea-5fd7-9e2e-131246b52df8",
+              "name": "8b31e915-3aea-5fd7-9e2e-131246b52df8",
+              "properties": {
+                "principalId": "aed89ef9-49f9-4790-a446-6f1c1ee74a8f",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-release', '2024-11-30').principalId]",
+                "before": "aed89ef9-49f9-4790-a446-6f1c1ee74a8f",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/8b31e915-3aea-5fd7-9e2e-131246b52df8",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/f942565c-749d-55f3-bde2-c19c10b29b4f",
+              "name": "f942565c-749d-55f3-bde2-c19c10b29b4f",
+              "properties": {
+                "principalId": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "before": {
+              "apiVersion": "2022-04-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/f942565c-749d-55f3-bde2-c19c10b29b4f",
+              "name": "f942565c-749d-55f3-bde2-c19c10b29b4f",
+              "properties": {
+                "principalId": "82008151-887e-44df-8cde-675f771f2c20",
+                "roleDefinitionId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Authorization/roleAssignments"
+            },
+            "changeType": "Modify",
+            "delta": [
+              {
+                "after": "[reference('/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-certigo-content-reader', '2024-11-30').principalId]",
+                "before": "82008151-887e-44df-8cde-675f771f2c20",
+                "children": null,
+                "path": "properties.principalId",
+                "propertyChangeType": "Modify"
+              },
+              {
+                "after": "ServicePrincipal",
+                "before": null,
+                "children": null,
+                "path": "properties.principalType",
+                "propertyChangeType": "NoEffect"
+              }
+            ],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/blobServices/default/containers/content-release-descriptors/providers/Microsoft.Authorization/roleAssignments/f942565c-749d-55f3-bde2-c19c10b29b4f",
+            "symbolicName": null,
+            "unsupportedReason": null
+          },
+          {
+            "after": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/managementPolicies/default",
+              "name": "DefaultManagementPolicy",
+              "properties": {
+                "policy": {
+                  "rules": [
+                    {
+                      "definition": {
+                        "actions": {
+                          "baseBlob": {
+                            "tierToCool": {
+                              "daysAfterCreationGreaterThan": 30.0
+                            }
+                          }
+                        },
+                        "filters": {
+                          "blobTypes": [
+                            "blockBlob"
+                          ],
+                          "prefixMatch": [
+                            "content-public-releases/manifests/",
+                            "content-private-releases/manifests/"
+                          ]
+                        }
+                      },
+                      "enabled": true,
+                      "name": "tier-content-manifests-to-cool",
+                      "type": "Lifecycle"
+                    },
+                    {
+                      "definition": {
+                        "actions": {
+                          "baseBlob": {
+                            "tierToCool": {
+                              "daysAfterCreationGreaterThan": 30.0
+                            }
+                          }
+                        },
+                        "filters": {
+                          "blobTypes": [
+                            "blockBlob"
+                          ],
+                          "prefixMatch": [
+                            "content-release-descriptors/releases/"
+                          ]
+                        }
+                      },
+                      "enabled": true,
+                      "name": "tier-release-descriptors-to-cool",
+                      "type": "Lifecycle"
+                    }
+                  ]
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/managementPolicies"
+            },
+            "before": {
+              "apiVersion": "2025-06-01",
+              "id": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/managementPolicies/default",
+              "name": "DefaultManagementPolicy",
+              "properties": {
+                "policy": {
+                  "rules": [
+                    {
+                      "definition": {
+                        "actions": {
+                          "baseBlob": {
+                            "tierToCool": {
+                              "daysAfterCreationGreaterThan": 30.0
+                            }
+                          }
+                        },
+                        "filters": {
+                          "blobTypes": [
+                            "blockBlob"
+                          ],
+                          "prefixMatch": [
+                            "content-public-releases/manifests/",
+                            "content-private-releases/manifests/"
+                          ]
+                        }
+                      },
+                      "enabled": true,
+                      "name": "tier-content-manifests-to-cool",
+                      "type": "Lifecycle"
+                    },
+                    {
+                      "definition": {
+                        "actions": {
+                          "baseBlob": {
+                            "tierToCool": {
+                              "daysAfterCreationGreaterThan": 30.0
+                            }
+                          }
+                        },
+                        "filters": {
+                          "blobTypes": [
+                            "blockBlob"
+                          ],
+                          "prefixMatch": [
+                            "content-release-descriptors/releases/"
+                          ]
+                        }
+                      },
+                      "enabled": true,
+                      "name": "tier-release-descriptors-to-cool",
+                      "type": "Lifecycle"
+                    }
+                  ]
+                }
+              },
+              "resourceGroup": "rg-certigo-content",
+              "type": "Microsoft.Storage/storageAccounts/managementPolicies"
+            },
+            "changeType": "NoChange",
+            "delta": [],
+            "deploymentId": null,
+            "extension": null,
+            "identifiers": null,
+            "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww/managementPolicies/default",
+            "symbolicName": null,
+            "unsupportedReason": null
+          }
+        ],
+        "diagnostics": null,
+        "error": null,
+        "potentialChanges": null,
+        "status": "Succeeded"
+      },
+      "templateSha256": "2b3d2a798bc733a166db131cc170ed5a5020b25a02c8fe81a5777c3febdd4d5c",
+      "effectiveParameters": {
+        "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {
+          "location": {
+            "value": "westeurope"
+          },
+          "ciVnetResourceGroupName": {
+            "value": "rg-certigo-ci"
+          },
+          "ciVnetName": {
+            "value": "vnet-certigo-ci"
+          },
+          "ciRunnerSubnetName": {
+            "value": "snet-runners"
+          },
+          "contentIdentityResourceGroupName": {
+            "value": "rg-certigo-identities"
+          },
+          "descriptorContainerName": {
+            "value": "content-release-descriptors"
+          },
+          "publicContainerName": {
+            "value": "content-public-releases"
+          },
+          "privateContainerName": {
+            "value": "content-private-releases"
+          },
+          "descriptorImmutabilityRetentionDays": {
+            "value": 90
+          },
+          "publicImmutabilityRetentionDays": {
+            "value": 30
+          },
+          "privateImmutabilityRetentionDays": {
+            "value": 90
+          },
+          "coolTierAfterDays": {
+            "value": 30
+          },
+          "softDeleteRetentionDays": {
+            "value": 30
+          },
+          "storageSkuName": {
+            "value": "Standard_LRS"
+          },
+          "contentPublisherRoleDefinitionGuid": {
+            "value": "c8a9d1bb-39d7-4f4f-9a4c-17b4c81aa5de"
+          }
+        }
+      },
+      "sourceCommit": "65364d2c1f5bddb749e91cdba1b1857d3ac14e5a",
+      "sourceFiles": {
+        "infra/content/main.bicep": {
+          "gitBlob": "703d07a19ff321216a59b1a4dceef457a905ff24",
+          "sha256GitBytes": "c869aa4575864868af9a0dd9e4cb3f3b6ec64e3f6c495331990d1378215432a1"
+        },
+        "infra/modules/contentStorage.bicep": {
+          "gitBlob": "b18502792d70d38fc60f35c5cbca29c337d91996",
+          "sha256GitBytes": "3e56bbbf3fc310d3a390928865328bbcb2417531966d23f4d133949680f5dd9d"
+        },
+        "infra/modules/contentPrivateEndpoints.bicep": {
+          "gitBlob": "b4e0b516ef128dc46bf5e94b38b84df3f9abf577",
+          "sha256GitBytes": "fa72e2ed1c5622b83b09b72251c3d024312329facc10832d248fc35ef7ef7e2a"
+        },
+        "infra/params/content.bicepparam": {
+          "gitBlob": "2e6c151890f701402b90ff80dbb3f4eeb5e3e080",
+          "sha256GitBytes": "6448cc83e6b5e02f074ee3f9c52266f1af8d043292329f2a7b4e53100c8a1af4"
+        }
+      },
+      "capturedOutputSha256": "b55ee79ca9571d44acd55f807179a7593bacad60eff1c69ce4e0500541a33513"
+    }
+  },
+  "comparison": {
+    "entriesEach": 19,
+    "differentResourceCount": 1,
+    "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+    "onlyDifferences": [
+      "after.sku.name: Standard_GRS -> Standard_LRS",
+      "changeType: Modify -> NoChange",
+      "remove delta sku.name Standard_LRS -> Standard_GRS"
+    ],
+    "allOtherEntriesExactlyEqual": true,
+    "noResourceCreatesOrDeletes": true,
+    "baselineCounts": {
+      "Modify": 10,
+      "NoChange": 7,
+      "Ignore": 2
+    },
+    "candidateCounts": {
+      "Modify": 9,
+      "NoChange": 8,
+      "Ignore": 2
+    },
+    "residuals": "Existing drift to analyze before ANY future apply: six unresolved principalId expressions; PE IPv6 property Delete; DNS config array; Blob allowPermanentDelete/staticWebsite property Delete. Ignore is not NoChange."
+  },
+  "activityLog": {
+    "start": "2026-08-26T10:00:00Z",
+    "end": "2026-09-25T10:25:00Z",
+    "pages": [
+      {
+        "startedAt": "2026-09-25T10:26:28.431543+00:00",
+        "completedAt": "2026-09-25T10:26:31.957764+00:00",
+        "count": 128,
+        "hasNextLink": true
+      },
+      {
+        "startedAt": "2026-09-25T10:26:31.961529+00:00",
+        "completedAt": "2026-09-25T10:26:35.031487+00:00",
+        "count": 11,
+        "hasNextLink": false
+      }
+    ],
+    "eventsRead": 139,
+    "appid": "a1a9c5b6-7a4f-4288-89ab-6805873f65d1",
+    "objectId": "da847d8c-ee71-44de-b462-6775e7d649a7",
+    "matchedEvents": [
+      {
+        "eventDataId": "e82aec9a-4eaf-4ac4-bf02-693a51ea4935",
+        "eventTimestamp": "2026-09-05T01:06:37.2020467Z",
+        "correlationId": "739b430a-69f7-48a7-801a-d37512ec873d",
+        "operationName": {
+          "localizedValue": "'auditIfNotExists' Policy action.",
+          "value": "Microsoft.Authorization/policies/auditIfNotExists/action"
+        },
+        "status": {
+          "localizedValue": "Succeeded",
+          "value": "Succeeded"
+        },
+        "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+        "requestSku": null
+      },
+      {
+        "eventDataId": "71ae36b1-d16f-46dc-b252-3c53aa4defab",
+        "eventTimestamp": "2026-09-05T01:06:33.1690836Z",
+        "correlationId": "739b430a-69f7-48a7-801a-d37512ec873d",
+        "operationName": {
+          "localizedValue": "'auditIfNotExists' Policy action.",
+          "value": "Microsoft.Authorization/policies/auditIfNotExists/action"
+        },
+        "status": {
+          "localizedValue": "Succeeded",
+          "value": "Succeeded"
+        },
+        "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+        "requestSku": null
+      },
+      {
+        "eventDataId": "4e7acf1f-f7fa-4d74-a40c-ab7a2411aa81",
+        "eventTimestamp": "2026-09-05T01:06:32.856553Z",
+        "correlationId": "739b430a-69f7-48a7-801a-d37512ec873d",
+        "operationName": {
+          "localizedValue": "'auditIfNotExists' Policy action.",
+          "value": "Microsoft.Authorization/policies/auditIfNotExists/action"
+        },
+        "status": {
+          "localizedValue": "Succeeded",
+          "value": "Succeeded"
+        },
+        "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+        "requestSku": null
+      },
+      {
+        "eventDataId": "05b26cf4-b166-4e45-8d3a-10bfb166fdcd",
+        "eventTimestamp": "2026-09-05T01:06:19.7554701Z",
+        "correlationId": "739b430a-69f7-48a7-801a-d37512ec873d",
+        "operationName": {
+          "localizedValue": "'auditIfNotExists' Policy action.",
+          "value": "Microsoft.Authorization/policies/auditIfNotExists/action"
+        },
+        "status": {
+          "localizedValue": "Succeeded",
+          "value": "Succeeded"
+        },
+        "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+        "requestSku": null
+      },
+      {
+        "eventDataId": "3a024d90-49ba-43a2-b98c-5793ea7f60d9",
+        "eventTimestamp": "2026-09-05T01:06:12.7534525Z",
+        "correlationId": "739b430a-69f7-48a7-801a-d37512ec873d",
+        "operationName": {
+          "localizedValue": "'auditIfNotExists' Policy action.",
+          "value": "Microsoft.Authorization/policies/auditIfNotExists/action"
+        },
+        "status": {
+          "localizedValue": "Succeeded",
+          "value": "Succeeded"
+        },
+        "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+        "requestSku": null
+      },
+      {
+        "eventDataId": "4ebeed54-a91b-4846-a936-dcc44af4e790",
+        "eventTimestamp": "2026-09-05T01:06:00.0902514Z",
+        "correlationId": "739b430a-69f7-48a7-801a-d37512ec873d",
+        "operationName": {
+          "localizedValue": "'auditIfNotExists' Policy action.",
+          "value": "Microsoft.Authorization/policies/auditIfNotExists/action"
+        },
+        "status": {
+          "localizedValue": "Succeeded",
+          "value": "Succeeded"
+        },
+        "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+        "requestSku": null
+      },
+      {
+        "eventDataId": "b625da29-9ca6-4fb4-9e8a-0076f2a7fa5a",
+        "eventTimestamp": "2026-09-05T01:05:38.2746615Z",
+        "correlationId": "739b430a-69f7-48a7-801a-d37512ec873d",
+        "operationName": {
+          "localizedValue": "Create/Update Storage Account",
+          "value": "Microsoft.Storage/storageAccounts/write"
+        },
+        "status": {
+          "localizedValue": "Succeeded",
+          "value": "Succeeded"
+        },
+        "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourcegroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+        "requestSku": null
+      },
+      {
+        "eventDataId": "c99e0c55-b18c-4b56-bdaa-f6d732bc14a3",
+        "eventTimestamp": "2026-09-05T00:55:36.6955298Z",
+        "correlationId": "739b430a-69f7-48a7-801a-d37512ec873d",
+        "operationName": {
+          "localizedValue": "Create/Update Storage Account",
+          "value": "Microsoft.Storage/storageAccounts/write"
+        },
+        "status": {
+          "localizedValue": "Succeeded",
+          "value": "Succeeded"
+        },
+        "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+        "requestSku": null
+      },
+      {
+        "eventDataId": "b0273641-a6ec-44a1-b31a-73e8396452c0",
+        "eventTimestamp": "2026-09-05T00:55:36.6486485Z",
+        "correlationId": "739b430a-69f7-48a7-801a-d37512ec873d",
+        "operationName": {
+          "localizedValue": "'auditIfNotExists' Policy action.",
+          "value": "Microsoft.Authorization/policies/auditIfNotExists/action"
+        },
+        "status": {
+          "localizedValue": "Started",
+          "value": "Started"
+        },
+        "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+        "requestSku": null
+      },
+      {
+        "eventDataId": "c0ebc294-1351-4c92-81fa-1f5972b98630",
+        "eventTimestamp": "2026-09-05T00:55:33.8048598Z",
+        "correlationId": "739b430a-69f7-48a7-801a-d37512ec873d",
+        "operationName": {
+          "localizedValue": "Create/Update Storage Account",
+          "value": "Microsoft.Storage/storageAccounts/write"
+        },
+        "status": {
+          "localizedValue": "Started",
+          "value": "Started"
+        },
+        "resourceId": "/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww",
+        "requestSku": {
+          "name": "Standard_LRS"
+        }
+      }
+    ]
+  },
+  "resourceGraph": {
+    "startedAt": "2026-09-25T10:21:46.871324+00:00",
+    "completedAt": "2026-09-25T10:21:48.933207+00:00",
+    "command": [
+      "az",
+      "rest",
+      "--method",
+      "post",
+      "--url",
+      "https://management.azure.com/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01",
+      "--body",
+      "@<ARTIFACT_DIR>\\content-graph-request.json"
+    ],
+    "result": {
+      "count": 0,
+      "data": [],
+      "facets": [],
+      "resultTruncated": "false",
+      "totalRecords": 0
+    },
+    "request": {
+      "subscriptions": [
+        "b8952c8c-8f72-469d-99cd-ac906da4e2fc"
+      ],
+      "query": "resourcechanges\n| where properties.targetResourceId =~ '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/resourceGroups/rg-certigo-content/providers/Microsoft.Storage/storageAccounts/stcertigocntz3wqbdww'\n| where todatetime(properties.changeAttributes.timestamp) between (datetime(2026-09-11T00:00:00Z) .. datetime(2026-09-25T10:30:00Z))\n| project id, properties\n| order by id asc",
+      "options": {
+        "$top": 1000
+      }
+    }
+  },
+  "attributionLimits": "Activity log requested Standard_LRS on 2026-09-05, same correlation succeeded; not a before/after diff. Resource Graph returned 0 rows for 2026-09-11..25; this does not cover the September 5 event or prove absence of earlier changes.",
+  "workflowRisk": {
+    "sourceCommit": "803205f1536d14da6952b55943f611d7078836a2",
+    "checkedAt": "2026-09-25T10:30:59.090563+00:00",
+    "apply": {
+      "file": ".github/workflows/content-infra-apply.yml",
+      "state": "active",
+      "trigger": "repository_dispatch type content-infra-apply only; refs/heads/main",
+      "payload": "exact keys confirm=apply-content-infrastructure and expected_template_sha256 (root Bicep ONLY, not modules/parameters)",
+      "guards": [
+        "azure-content-infra-plan environment variables and OIDC",
+        "tenant/subscription equality",
+        "what-if scope rg-certigo-content",
+        "no resource Delete",
+        "no after.properties.state Locked"
+      ],
+      "runCount": 1,
+      "latestRun": 33965256349,
+      "latestCreatedAt": "2026-09-05T12:09:42Z",
+      "latestEvent": "push",
+      "latestStatus": "completed",
+      "latestConclusion": "failure",
+      "latestJobs": [],
+      "note": "Historical failed push is not a current trigger; no pending run observed."
+    },
+    "plan": {
+      "file": ".github/workflows/content-infra-what-if.yml",
+      "trigger": "push main, infra/content/**, infra/modules/contentPrivateEndpoints.bicep, infra/modules/contentStorage.bicep, infra/params/content.bicepparam or this workflow",
+      "condition": "vars.CERTIGO_CONTENT_INFRA_WHAT_IF_ENABLED == 'true'",
+      "latestRun": 34134842584,
+      "latestStatus": "completed",
+      "latestConclusion": "skipped",
+      "latestCreatedAt": "2026-09-07T14:47:05Z",
+      "canDeploy": false
+    },
+    "configuration": "GET environment variables returned []; repository variable names did not contain CERTIGO_CONTENT_INFRA_WHAT_IF_ENABLED. Organization-level variables not enumerated; not a claim of current OIDC/RBAC readiness.",
+    "risk": "No automatic apply trigger. Manual authorized dispatch could reassert GRS before correction; cannot infer deployment readiness from old failures."
+  },
+  "invalidation": "Any change to templates, effective parameters, measured resources, policies, deployment or workflow configuration/runs requires fresh measurement. Historical log evidence remains bounded and subject to late ingestion."
+}

@@ -25,6 +25,7 @@ namespace Certigo.Infrastructure.Tests;
 /// One <see cref="CosmosEmulatorFixture"/> (one ephemeral database) is shared by the
 /// whole class; every test uses freshly-generated ids, so they never collide.
 /// </summary>
+[Trait(CosmosEmulatorFixture.TraitName, CosmosEmulatorFixture.TraitValue)]
 public sealed class CosmosRepositoriesIntegrationTests(CosmosEmulatorFixture fixture)
     : IClassFixture<CosmosEmulatorFixture>
 {

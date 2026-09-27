@@ -12,7 +12,11 @@ param(
   [string] $ScaleSetName = 'vmss-certigo-pr-pilot-z1',
   [string] $NetworkSecurityGroupName = 'nsg-certigo-pr-pilot',
   [string] $Location = 'westeurope',
-  [string] $Repository = 'gchambaud_microsoft/Certigo'
+  [string] $Repository = 'gchambaud_microsoft/Certigo',
+
+  # Registers the runner of the rebuild drill with the single label certigo-rebuild-drill and
+  # no default labels, so that no workflow can target it. Allowed only on the drill resources.
+  [switch] $RebuildDrill
 )
 
 Set-StrictMode -Version Latest
@@ -20,6 +24,25 @@ $ErrorActionPreference = 'Stop'
 $apiVersion = '2024-11-01'
 $armHeaders = $null
 $registrationToken = $null
+$drillLabel = 'certigo-rebuild-drill'
+$registrationModeLine = "registration_mode='production'"
+
+$targetsDrillResources = (
+  $ResourceGroupName -eq 'rg-certigo-ci-rebuild-drill' -or
+  $ScaleSetName -eq 'vmss-certigo-pr-rebuild-drill' -or
+  $NetworkSecurityGroupName -eq 'nsg-certigo-pr-rebuild-drill'
+)
+$allDrillResources = (
+  $ResourceGroupName -eq 'rg-certigo-ci-rebuild-drill' -and
+  $ScaleSetName -eq 'vmss-certigo-pr-rebuild-drill' -and
+  $NetworkSecurityGroupName -eq 'nsg-certigo-pr-rebuild-drill'
+)
+if ($RebuildDrill -and -not $allDrillResources) {
+  throw 'The rebuild drill registers only on rg-certigo-ci-rebuild-drill, vmss-certigo-pr-rebuild-drill and nsg-certigo-pr-rebuild-drill.'
+}
+if (-not $RebuildDrill -and $targetsDrillResources) {
+  throw 'Drill resources must be registered with -RebuildDrill, so that no workflow can target the runner.'
+}
 
 function Invoke-NativeText {
   param(
@@ -150,6 +173,12 @@ $identityProperty = $vm.PSObject.Properties['identity']
 if ($null -ne $identityProperty -and $null -ne $identityProperty.Value) {
   throw 'The PR-only pilot VM must not have a managed identity.'
 }
+if ($RebuildDrill) {
+  $osProfileProperty = $vm.PSObject.Properties['osProfile']
+  if ($null -eq $osProfileProperty -or [string]::IsNullOrWhiteSpace($vm.osProfile.computerName)) {
+    throw 'The drill VM must expose its computer name, which becomes the runner name.'
+  }
+}
 
 $nicReferences = Invoke-NativeText -FilePath 'az' -ArgumentList @(
   'vm', 'nic', 'list',
@@ -239,6 +268,13 @@ try {
   $registerScript = Get-Content `
     -LiteralPath (Join-Path $PSScriptRoot 'pilot-register.sh') `
     -Raw
+  $modeLineCount = [regex]::Matches($registerScript, [regex]::Escape($registrationModeLine)).Count
+  if ($modeLineCount -ne 1) {
+    throw "pilot-register.sh must contain exactly one line $registrationModeLine (found $modeLineCount)."
+  }
+  if ($RebuildDrill) {
+    $registerScript = $registerScript.Replace($registrationModeLine, "registration_mode='rebuild-drill'")
+  }
   $registrationOutput = Invoke-ManagedRunCommand `
     -Name 'certigo-pr-secure-register' `
     -Script $registerScript `
@@ -260,12 +296,25 @@ do {
       'api', "repos/$Repository/actions/runners?per_page=100"
     ) | ConvertFrom-Json
   ).runners
-  $pilot = @(
-    $runners | Where-Object {
-      $_.id -notin $runnerIdsBefore -and
-      $_.labels.name -contains 'certigo-pr-pilot'
+  $newRunners = @($runners | Where-Object { $_.id -notin $runnerIdsBefore })
+  if ($RebuildDrill) {
+    # Only the runner of this VM is considered: its name is the VM computer name.
+    $ownRunners = @($newRunners | Where-Object { $_.name -eq $vm.osProfile.computerName })
+    $pilot = @($ownRunners | Where-Object { (@($_.labels.name) -join ',') -eq $drillLabel })
+    $unexpected = @($ownRunners | Where-Object { (@($_.labels.name) -join ',') -ne $drillLabel })
+    if ($unexpected.Count -gt 0) {
+      # A drill runner with any other label could pick up a real job: remove it before failing.
+      foreach ($runner in $unexpected) {
+        $null = Invoke-NativeText -FilePath 'gh' -ArgumentList @(
+          'api', '--method', 'DELETE', "repos/$Repository/actions/runners/$($runner.id)"
+        )
+      }
+      throw "The drill runner registered with labels other than exactly '$drillLabel'; it was removed."
     }
-  )
+  }
+  else {
+    $pilot = @($newRunners | Where-Object { $_.labels.name -contains 'certigo-pr-pilot' })
+  }
   if ($pilot.Count -eq 1 -and $pilot[0].status -eq 'online') {
     break
   }

@@ -66,6 +66,11 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
         }
         catch (AccountDeletionDisabledException ex)
         {
+            logger.LogWarning(
+                ex,
+                "Account deletion is disabled in function {FunctionName}, invocation {InvocationId}.",
+                context.FunctionDefinition.Name,
+                context.InvocationId);
             await WriteProblemAsync(
                 context,
                 HttpStatusCode.ServiceUnavailable,

@@ -41,13 +41,15 @@ VM `4153d1dd` restent **hors scope**; `4596a9d5` reste interdite. Toute VM du VM
 binding est **non classée** et bloque le plan — c'est précisément le contrôle qui manquait
 à `be505fa1` avant le 4 septembre 2026.
 
-> 📅 **État au 2026-09-23 — le pool PR a été reconstruit.** Mesuré par `az vm list -g
-> rg-certigo-ci -d` et `gh api .../actions/runners` : le pool PR compte quatre instances
-> utiles (`5275ea21`/ID 31, `94bad106`/ID 32, `1a6deaa2`/ID 33, `6e3abce4`/ID 34, créées
-> le 2026-09-14) et sept instances retirées sans runner GitHub (`2c1eeb41`, `3601055e`,
-> `765cf6af`, `7d3001c2` désallouées; `a14700a3`, `bbf83c5c`, `d8d42366` en `Failed`). Les
-> six instances utiles sont liées dans `managedRunnerBindings`; les sept retirées sont dans
-> `forbiddenVirtualMachines` en attendant leur suppression. Le tableau ci-dessus reste
+> 📅 **État au 2026-09-25 — le pool PR ne compte plus que ses quatre instances utiles.**
+> Mesuré par `az vm list -g rg-certigo-ci -d` et `gh api .../actions/runners` :
+> `5275ea21`/ID 31, `94bad106`/ID 32, `1a6deaa2`/ID 33, `6e3abce4`/ID 34, créées le
+> 2026-09-14, liées dans `managedRunnerBindings` avec les deux instances trusted. Les sept
+> instances retirées sans runner GitHub (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2`,
+> `a14700a3`, `bbf83c5c`, `d8d42366`) ont été **supprimées le 2026-09-25**, avec leurs disques
+> et leurs cartes réseau (voir « Suppression des sept instances retirées — 2026-09-25 »). Leurs
+> noms restent dans `forbiddenVirtualMachines` : inoffensifs une fois absents, ils empêchent
+> qu'une instance du même nom soit un jour reprise sans revue. Le tableau ci-dessus reste
 > l'état du 4 septembre. Invalidé par tout ajout, remplacement ou suppression d'instance.
 
 > 🔒 **Le pool trusted n'est pas seulement « celui qui exécute les gates ».**
@@ -514,9 +516,11 @@ possible, à deux conditions opérationnelles qui ne sont pas des faiblesses de 
 jobs : retirer la règle NSG IMDS pendant le seul provisionnement (aucun runner n'est enregistré
 à ce moment, donc aucun code de PR ne s'exécute ; le VMSS n'a pas d'identité, donc l'IMDS ne
 délivre aucun jeton ; `pilot-register.sh` refuse l'enregistrement tant que l'IMDS répond), et
-enregistrer le runner par `register-pilot.ps1` avec un jeton éphémère. Elle n'est pas prouvée
-pour le `pilot.bicep` actuel : la dernière reconstruction réelle (2026-09-14) est partie du
-modèle live, qui a dérivé (paragraphe suivant). Ce qui reste non résolu par conception : une
+enregistrer le runner par `register-pilot.ps1` avec un jeton éphémère. Elle a été **prouvée**
+le 2026-09-25 pour le `pilot.bicep` de `main`, dans une pile réseau neuve, sans toucher au pool
+en service (voir « Drill du 2026-09-25 — reconstruction depuis la définition versionnée »). La
+reconstruction réelle précédente (2026-09-14) était partie du modèle live, qui a dérivé
+(paragraphe suivant). Ce qui reste non résolu par conception : une
 instance neuve ne s'enregistre pas seule, faute de credential GitHub dans Azure (option écartée
 plus haut). La cible durable est l'image immuable préchauffée (`infra/ci-runner/image/`, #341).
 
@@ -574,17 +578,62 @@ sans `Requested-By`. **Auteur** : l'extension Azure `LinuxPatchExtension`, déma
 exécute exactement cette commande (`UbuntuProClient.install_or_update_pro`,
 [source, lignes 28 à 40](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/package_managers/UbuntuProClient.py#L28-L40) ;
 version déployée sur la VM non relevée). Un job PR ne pouvait pas l'exécuter (sudoers
-ci-dessus), et l'Activity Log ne montre aucun Run Command ce jour-là. **Conséquences** :
-1. la plateforme peut lancer apt sur un runner à tout moment. Un job qui lance
-   `sudo apt-get install` au même instant peut échouer sur le verrou dpkg : risque déduit,
-   aucune occurrence observée (voir `runbooks/CI_RUNNERS.md` §7) ;
-2. une image immuable « sans artefact non listé » devra soit neutraliser ce patching
-   invité sur les VM runners, soit le vérifier au boot (#341).
+ci-dessus), et l'Activity Log ne montre aucun Run Command ce jour-là.
+
+**Qui a activé ce patching : l'automate de gouvernance MCAPS — mesuré le 2026-09-24.**
+- Le modèle du VMSS PR déclare `patchMode` et `assessmentMode` à `ImageDefault`, et les
+  instances en ont hérité à leur création, le 2026-09-14.
+- L'historique des changements de propriétés d'Azure Resource Graph (`resourcechanges`,
+  conservé 14 jours) montre leur passage à `AutomaticByPlatform`, avec
+  `bypassPlatformSafetyChecksOnUserSchedule: true`, le **2026-09-15 à 08:06:24Z**. L'auteur
+  est une écriture PowerShell de **MCAPSGovernance-AutomationApp** (appid
+  `a1a9c5b6-7a4f-4288-89ab-6805873f65d1`, délégation Lighthouse). C'est le même automate qui
+  désalloue les VM chaque nuit et remet les comptes de stockage en LRS.
+- D'après l'Activity Log (écritures `virtualMachines/write` réussies depuis le 2026-09-14 à
+  09:00Z), c'est la seule écriture hors plateforme sur les instances PR. Elle a touché les 6
+  instances PR créées le 2026-09-14, dont 2 des instances retirées, entre 08:06:25 et
+  08:06:27Z.
+- Le `ConfigurePatching` du 2026-09-19 (12:52:41Z) suit de 46 s un démarrage manuel de la VM
+  (12:51:55Z).
+- Sur les instances **trusted**, la même écriture a **échoué** le 2026-09-19 à 08:05Z :
+  `PropertyChangeNotAllowed`, « Changing property 'osProfile' is not allowed ». Une image de
+  galerie spécialisée n'a pas d'`osProfile` modifiable. Le pool trusted n'a ni
+  `patchSettings`, ni évaluation de correctifs.
+
+**Conséquences** :
+1. une évaluation des correctifs tourne chaque jour sur les runners PR : le 2026-09-24,
+   entre 05:48:51 et 05:50:55Z sur les 4 instances. Elle commence par `sudo apt-get -q update`
+   ([`AptitudePackageManager.py` ligne 51](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/package_managers/AptitudePackageManager.py#L51),
+   appelée par [`PatchAssessor.py` ligne 64](https://github.com/Azure/LinuxPatchExtension/blob/119f1101f927096e5c25ed3b4463ac8306fdd0a3/src/core/src/core_logic/PatchAssessor.py#L64)).
+   Un job qui lance `sudo apt-get update` ou `install` au même instant peut échouer sur un
+   verrou APT ou dpkg. C'est un risque déduit : aucune occurrence n'a été observée. Mesuré le
+   2026-09-24 : les seuls appels apt des jobs sont les étapes « Ensure CI prerequisites »
+   (`ci-mobile.yml` ×3, `ci-cortex-parity.yml` ×1). Elles ne lancent apt que si `unzip`,
+   `zip`, `jq` ou `xz` manque. Sur les runs 35983554193 et 35920190487, les 10 étapes ont
+   affiché « All prerequisites already present. », sans aucune sortie apt. Le risque ne
+   concerne donc qu'un runner auquel il manquerait un outil. Recommandation et extrait prêt
+   à l'emploi dans `runbooks/CI_RUNNERS.md` §7 ;
+2. aucune installation automatique n'a été observée à ce jour. Aucune configuration de
+   maintenance n'est assignée. Le 2026-09-24, l'évaluation comptait encore, selon
+   l'instance, 35 ou 99 correctifs critiques ou de sécurité en attente. Les journaux APT
+   relevés le 2026-09-23 sur le runner 31 ne contiennent, après le bootstrap, que la
+   transaction du 19/09 (oracle de #533) ;
+3. remettre `ImageDefault` dans nos templates ne protégerait pas durablement : l'automate
+   agit sur les instances après leur création, et on ne connaît pas sa fréquence ;
+4. une image immuable « sans artefact non listé » devra soit neutraliser ce patching invité
+   sur les VM runners, soit le vérifier au boot (#341). Une image **spécialisée** y échappe
+   (mesuré sur le pool trusted). Une image **généralisée**, comme celle que produit Azure
+   Image Builder, a un `osProfile` et subira cette écriture.
 
 > ⏱️ **Durée mesurée d'un démarrage PR.** Un `start` depuis `deallocated` dure ~1 min pour
 > une instance trusted et **~7 min 30 s pour une instance PR** (2026-09-11 : 7 min 32 s et
 > 8 min 01 s ; 2026-09-23 : 7 min 32 s). Hypothèse cohérente mais non prouvée : l'agent invité
-> attend l'IMDS, bloqué sur le sous-réseau PR, avant de signaler l'état prêt. La reprise en
+> attend l'IMDS, bloqué sur le sous-réseau PR, avant de signaler l'état prêt. Le type de
+> disque n'explique pas l'écart : le 2026-09-24, les 6 disques OS en service, PR comme
+> trusted, sont en `Standard_LRS` à 60 Mo/s. `pilot.bicep` demande `Premium_LRS`, mais
+> l'automate MCAPS a rétrogradé les 6 disques PR créés le 2026-09-14 (les 4 en service et
+> 2 des instances retirées). Resource Graph date ce changement du 2026-09-15, entre
+> 00:56:04 et 01:06:09Z. La reprise en
 > tient compte (aucun délai de vérification n'est déclenché avant la fin des démarrages).
 
 ### Verrou de suppression sur `rg-certigo-ci`
@@ -619,6 +668,33 @@ pose un verrou `CanNotDelete` au scope du resource group. Il protège aussi les 
 > dans la zone verrouillée et **échouera** tant que le verrou est en place. C'est la propriété
 > recherchée : une suppression délibérée doit passer par une levée délibérée. Procédure de
 > levée et de remise en place : [`runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) §11.
+
+#### Suppression des sept instances retirées — 2026-09-25
+
+Accord explicite de Gabriel, relayé par l'orchestrateur, exécuté après la fin de la promotion
+prod, sans autre déploiement sur le groupe pendant la fenêtre. Script à deux modes
+(`DryRun` puis `Execute`), testé d'abord hors ligne avec de faux `az` et `gh` sur quatre
+scénarios : succès, échec d'une suppression, remise du verrou refusée deux fois, verrou absent
+au départ. Le verrou est remis dans un bloc `finally`, avec plusieurs essais et une vérification
+du niveau et des notes. Relevé Activity Log et `az` du 2026-09-25 :
+
+| Heure (UTC) | Événement |
+|---|---|
+| 08:48:16 | préconditions OK : 7 cibles présentes, aucune ne porte de runner GitHub (nom d'hôte absent de l'API), `deleteOption: Delete` sur chaque disque et chaque carte réseau, aucun disque de données, aucun déploiement en cours, 6 runners online, verrou `CanNotDelete` |
+| 08:48:22 | `locks/delete` `certigo-ci-cannot-delete` |
+| 08:48:22 → 08:49:57 | `az vm delete` des sept VM, une par une ; Azure supprime ensuite chaque disque OS et chaque carte réseau (`disks/delete`, `networkInterfaces/delete` Succeeded, une ligne par ressource) |
+| 08:50:03 | `locks/write` : verrou remis, **même niveau, mêmes notes** ; levé pendant 1 min 42 s |
+| 08:52:35 | relevé final : les 7 VM, leurs 7 disques et leurs 7 cartes réseau sont introuvables ; les 6 instances gérées sont inchangées (`Succeeded`, `running`) ; le Logic App de reprise n'a pas changé (même `changedTime`, même empreinte de définition) ; les empreintes des enregistrements et des liens des 5 zones DNS privées sont identiques ; capacité trusted inchangée (2) |
+
+Constats :
+- `sku.capacity` du VMSS PR est passé de 8 à **4**, égal au nombre réel d'instances. C'est
+  cohérent avec l'hypothèse du point 3 de « Cause racine des instances PR mortes » : les trois
+  instances visées par les scale-in refusés du 2026-09-11 n'étaient déjà plus comptées. La
+  valeur a été notée, jamais « corrigée » par un scale ;
+- le prévol `evaluate-lifecycle.mjs`, rejoué vers 08:55Z avec les données live, ne garde plus
+  qu'une raison : « capacity controller feature flag is off », qui est voulue ;
+- économie : 7 disques `Standard_LRS` de 128 Gio (S10), à 5,888 USD/mois chacun au tarif
+  retail West Europe relu le 2026-09-25, soit **41,22 USD/mois**.
 
 La release Android reste volontairement sur `certigo-trusted`. Elle peut
 utiliser l'identité managée Azure du runner pour lire Key Vault.
@@ -1006,7 +1082,7 @@ ne représentent plus le live. Préconditions d'un drill, et leur état mesuré 
 |---|---|---|
 | 1 | le what-if puis l'application approuvée de `capacity.bicep` ont retiré le scale-in CPU | ✅ appliqué à 18:01:06Z (`certigo-ci-capacity-20260923180037`, what-if : 1 `Modify`, 0 création/suppression) |
 | 2 | `be505fa1` possède une classification et une décision de lifecycle documentées | ✅ liée dans `managedRunnerBindings` depuis le 2026-09-04 |
-| 3 | `lifecycle-preflight.sh` est vert tout en gardant le contrôleur `enabled=false` | ⚠️ impossible au sens strict : `evaluate-lifecycle.mjs` ajoute toujours la raison « capacity controller feature flag is off » quand `enabled=false`. Hors cette raison, une seule reste à 19:05Z : « forbidden Azure VMs are present » (les sept instances PR retirées, en attente de suppression). Tout le reste est conforme : 0 runner double label, 0 VM non classée, 0 binding incohérent, capacité utilisable 4 PR + 2 trusted. |
+| 3 | `lifecycle-preflight.sh` est vert tout en gardant le contrôleur `enabled=false` | ⚠️ impossible au sens strict : `evaluate-lifecycle.mjs` ajoute toujours la raison « capacity controller feature flag is off » quand `enabled=false`. Hors cette raison, une seule restait à 19:05Z : « forbidden Azure VMs are present » (les sept instances PR retirées). Elle a disparu le 2026-09-25 après leur suppression (voir « Suppression des sept instances retirées — 2026-09-25 »). Tout le reste est conforme : 0 runner double label, 0 VM non classée, 0 binding incohérent, capacité utilisable 4 PR + 2 trusted. |
 
 Le ticket de drill doit ensuite nommer l'ID ARM exact de l'instance PR, prouver
 `busy=false` et zéro job en file, définir la fenêtre et le rollback, puis recevoir
@@ -1049,7 +1125,8 @@ environnements n'ont pas été modifiés.
 > d'identité managée (mesuré le 2026-09-23) ; l'IMDS ne livrerait que des métadonnées.
 >
 > Deux façons de reconstruire :
-> - **sans compromis (recommandée, jamais exécutée)** : déployer le nouveau VMSS dans une
+> - **sans compromis (recommandée ; exécutée le 2026-09-25, voir la section suivante)** :
+>   déployer le nouveau VMSS dans une
 >   **pile réseau neuve**. `pilot.bicep` paramètre déjà `vnetName`, `subnetName`, `nsgName`,
 >   `natGatewayName`, `natPublicIpName` et les plages d'adresses : la nouvelle instance a
 >   donc son propre NSG, levé puis reposé sans jamais toucher la règle du pool en service.
@@ -1065,6 +1142,68 @@ environnements n'ont pas été modifiés.
 > refuse tant que l'IMDS répond depuis l'instance. Ce drill n'a exécuté aucune
 > reconstruction : la dernière réelle date du 2026-09-14 (quatre instances, Activity Log, avec
 > le compromis) ; celle du 2026-08-06 (run `31090379901`) visait les anciennes VM.
+
+### Drill du 2026-09-25 — reconstruction depuis la définition versionnée
+
+Accordé par l'orchestrateur par délégation de Gabriel le 2026-09-24, exécuté après la fin de la
+promotion prod et après la suppression des sept instances retirées. Conditions : le runner
+temporaire ne doit pouvoir prendre aucun job réel ; il est retiré côté GitHub et le groupe dédié
+est supprimé à la fin, avec preuves ; durée d'au plus 4 h et coût inférieur à 1 USD.
+
+**Entrées.**
+- `infra/ci-runner/pilot.bicep` et `bootstrap.sh` de `main` (`4d9db321` ; `bootstrap.sh` =
+  blob `43686478`, SHA-256 `16e12b8b…` ; tag `bootstrapSha256` `6e798d4e…`). Une enveloppe
+  d'abonnement, non versionnée, crée uniquement le groupe `rg-certigo-ci-rebuild-drill` et y
+  déploie ce module tel quel.
+- VMSS `vmss-certigo-pr-rebuild-drill` : capacité 1, zone 1, `Standard_D2ads_v6`, image
+  `24.04.202608070`.
+- **Pile réseau neuve** `10.44.0.0/16` : VNet, NSG, NAT et IP dédiés, aucun peering. Le pool
+  en service et sa règle IMDS n'ont jamais été touchés.
+- Clé SSH : la clé publique déjà présente dans le modèle live, donc aucun nouveau credential ;
+  SSH n'a jamais été utilisé.
+
+| Heure (UTC) | Événement |
+|---|---|
+| 08:57:30 → 08:57:49 | what-if d'abonnement avec `blockImdsAtNsg=false` : exactement 6 `Create` (groupe, VMSS, NAT, NSG, IP, VNet), aucun `Modify` ni `Delete`, rien hors du groupe dédié |
+| 08:57:49 → 08:59:01 | déploiement `certigo-rebuild-drill-20260925085730` `Succeeded` en 1 min 04 s ; instance `vmss-certigo-pr-rebuild-drill_92b77e8a` (`certigo-prUBLL6E`) créée à 08:58:24, `provisioningState: Succeeded` |
+| 09:42:15 | contrôles : aucune identité, aucune IP publique, Trusted Launch, aucun peering, aucun verrou ; NSG encore sans règle IMDS (attendu à ce stade) |
+| 09:42:39 → 09:43:12 | `pilot-preflight.sh` par Run Command, sans jeton : marqueur `pre-registration preflight passed` |
+| 09:43:31 → 09:43:50 | what-if avec `blockImdsAtNsg=true` : seul vrai changement, la création de `deny-imds-outbound` ; le reste est le bruit connu (valeurs injectées par Azure, expressions que le what-if n'évalue pas) |
+| 09:44:17 → 09:44:53 | déploiement : `deny-imds-outbound` en `Deny`, `Outbound`, `AzurePlatformIMDS`, source `*`, priorité 100 ; VMSS resté en `Manual`, capacité 1 |
+| 09:44:59 → 09:45:31 | preflight rejoué : vert |
+| 09:45:55 | preuve de non-ciblage : sur 649 refs (toutes les branches d'origin et tous les `refs/pull/*/head`), 0 workflow cite `certigo-rebuild-drill` ; les 4 `runs-on` de `main` exigent tous `self-hosted` ; aucun `runs-on` dynamique |
+| 09:46:13 → 09:46:59 | `register-pilot.ps1 -RebuildDrill` : runner **35** `certigo-prUBLL6E` online, avec un **seul label**, `certigo-rebuild-drill` (type `custom`). GitHub affiche `os=unknown` faute de labels par défaut. Aucune ressource Run Command résiduelle |
+| 09:47:19 → 09:47:52 | `pilot-health.sh` vert : un seul service runner, actif ; IMDS injoignable ; outils et egress GitHub, NuGet, pub.dev et npm OK |
+| 09:48:17 → 10:03:30 | observation : runner 35 `online`, `busy=false` aux 15 sondages, pendant que les 4 runners `certigo-pr`, puis aussi un runner trusted, exécutaient de vrais jobs |
+| 10:05:07 | bilan : 47 runs et 133 jobs créés depuis l'enregistrement dans les deux dépôts ; 94 jobs affectés, tous aux 6 runners habituels, **0 au runner 35**. 9 jobs `certigo-pr` attendaient en file alors que le runner 35 était libre |
+| 10:05:29 | runner 35 supprimé côté GitHub ; `GET .../runners/35` rend 404 |
+| 10:05:53 → 10:13:30 | contrôle du groupe (tag `purpose=wp-p2-07-rebuild-drill`, 8 ressources, toutes du drill, aucun verrou), puis `az group delete` en 7 min 38 s ; `az group show` rend `ResourceGroupNotFound` ; les 6 runners d'origine sont toujours online |
+
+**Résultat.** Une instance PR neuve, construite uniquement depuis la définition versionnée
+de `main`, a passé le preflight et la santé, puis s'est enregistrée. Elle respectait
+l'isolation attendue : pas d'identité, pas d'IP publique, IMDS bloqué par l'OS puis par le
+NSG, pile réseau non appairée. La reconstruction depuis la définition versionnée est donc
+**prouvée**, sans compromis sur le pool en service.
+
+**Coût et durée.** Les ressources ont existé environ 1 h 16 min, pour **au plus 0,28 USD**.
+Tarifs retail West Europe relus le 2026-09-25 : VM D2ads v6 à 0,138 USD/h, IP à 0,005 USD/h,
+disque P10 à 21,68 USD/mois. Le NAT Gateway n'est pas rendu par l'API : majorant retenu de
+0,05 USD/h. Les opérations mesurées (déploiement, preflights, règle NSG, enregistrement)
+totalisent environ 3 min 30 s.
+
+**Bornes.**
+- La durée du bootstrap n'est pas mesurée : le premier preflight a été lancé 43 min après la
+  création de l'instance, à cause d'une interruption de session, et cloud-init était terminé
+  depuis longtemps.
+- Une instance, une zone, une image, un instant.
+- Par condition, le runner n'a exécuté aucun job. L'exécution de jobs réels reste prouvée par
+  le pool en service, qui exécute un autre bootstrap (voir « Les runners PR exécutent un
+  bootstrap jamais revu »).
+- Le pool PR en service n'a pas été remplacé. Le reconstruire sous un nom neuf, depuis cette
+  définition, demande une décision séparée.
+- L'enregistrement reste manuel, par conception : aucun credential GitHub dans Azure.
+- Les deux déploiements d'abonnement `certigo-rebuild-drill-*` restent dans l'historique
+  comme trace ; ils ne coûtent rien.
 
 ## Résilience exclusivement Azure
 

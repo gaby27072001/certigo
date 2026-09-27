@@ -32,6 +32,36 @@ function resourcesOfType(template, type) {
   return template.resources.filter((resource) => resource.type === type);
 }
 
+test('content parameters and both template defaults preserve the accepted LRS baseline', () => {
+  const compiled = JSON.parse(
+    execFileSync(
+      process.env.BICEP_CLI || 'bicep',
+      ['build-params', path.join(repositoryRoot, 'infra/params/content.bicepparam'), '--stdout'],
+      { encoding: 'utf8' },
+    ),
+  );
+  const parameters = JSON.parse(compiled.parametersJson).parameters;
+  assert.equal(parameters.storageSkuName.value, 'Standard_LRS');
+  assert.equal(parameters.softDeleteRetentionDays.value, 30);
+  assert.equal(parameters.descriptorImmutabilityRetentionDays.value, 90);
+  assert.equal(parameters.publicImmutabilityRetentionDays.value, 30);
+  assert.equal(parameters.privateImmutabilityRetentionDays.value, 90);
+  assert.equal(parameters.coolTierAfterDays.value, 30);
+
+  const root = compileTemplate('infra/content/main.bicep');
+  assert.equal(root.parameters.storageSkuName.defaultValue, 'Standard_LRS');
+  const [storageDeployment] = resourcesOfType(root, 'Microsoft.Resources/deployments')
+    .filter(({ name }) => name === 'content-storage');
+  assert.equal(
+    storageDeployment.properties.parameters.skuName.value,
+    "[parameters('storageSkuName')]",
+  );
+  const storage = compileTemplate('infra/modules/contentStorage.bicep');
+  assert.equal(storage.parameters.skuName.defaultValue, 'Standard_LRS');
+  const [account] = resourcesOfType(storage, 'Microsoft.Storage/storageAccounts');
+  assert.equal(account.sku.name, "[parameters('skuName')]");
+});
+
 test('content storage matches the single-endpoint runtime contract', () => {
   const template = compileTemplate('infra/modules/contentStorage.bicep');
   const [account] = resourcesOfType(
@@ -46,6 +76,8 @@ test('content storage matches the single-endpoint runtime contract', () => {
   assert.equal(account.properties.networkAcls.defaultAction, 'Deny');
   assert.equal(account.properties.networkAcls.bypass, 'AzureServices');
   assert.equal(account.properties.encryption.requireInfrastructureEncryption, true);
+  assert.equal(account.properties.allowCrossTenantReplication, false);
+  assert.equal(account.properties.supportsHttpsTrafficOnly, true);
 
   const [blobService] = resourcesOfType(
     template,
@@ -54,6 +86,10 @@ test('content storage matches the single-endpoint runtime contract', () => {
   assert.equal(blobService.properties.isVersioningEnabled, true);
   assert.equal(blobService.properties.deleteRetentionPolicy.enabled, true);
   assert.equal(blobService.properties.containerDeleteRetentionPolicy.enabled, true);
+  assert.equal(blobService.properties.deleteRetentionPolicy.days, "[parameters('softDeleteRetentionDays')]");
+  assert.equal(blobService.properties.containerDeleteRetentionPolicy.days, "[parameters('softDeleteRetentionDays')]");
+  assert.equal(blobService.properties.changeFeed.enabled, false);
+  assert.equal(blobService.properties.restorePolicy.enabled, false);
 
   const containers = resourcesOfType(
     template,
@@ -85,6 +121,15 @@ test('all three containers have unlocked WORM defaults and no lifecycle deletion
     'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies',
   );
   assert.equal(policies.length, 3);
+  assert.deepEqual(
+    policies.map((policy) => policy.properties.immutabilityPeriodSinceCreationInDays).sort(),
+    [
+      "[parameters('descriptorImmutabilityRetentionDays')]",
+      "[parameters('privateImmutabilityRetentionDays')]",
+      "[parameters('publicImmutabilityRetentionDays')]",
+    ].sort(),
+  );
+  assert.ok(policies.every((policy) => policy.properties.state === undefined));
   assert.ok(
     policies.every(
       (policy) =>
@@ -218,7 +263,7 @@ test('outputs map exactly to PR 304 runtime settings and current publisher chann
       descriptorContainerName: 'content-release-descriptors',
       privateContainerName: 'content-private-releases',
       publicContainerName: 'content-public-releases',
-      storageSkuName: 'Standard_GRS',
+      storageSkuName: 'Standard_LRS',
     },
   );
 

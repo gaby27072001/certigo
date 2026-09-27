@@ -8,7 +8,7 @@ aucune policy WORM et ne manipule aucun secret.
 
 | Surface | #290 après réconciliation | Propriétaire restant |
 |---|---|---|
-| Compte | un StorageV2 GRS dédié dans `rg-certigo-content` | #290 |
+| Compte | un StorageV2 LRS dédié dans `rg-certigo-content` (alignement MCAPS, voir « Alignement LRS du contenu ») | #290 |
 | Conteneurs | `content-release-descriptors`, `content-public-releases`, `content-private-releases` | #290 |
 | Chemins | `releases/<releaseId>/release.json`; `manifests/<manifestId>/...` | publication `certigo-content` |
 | Versioning/WORM | versioning actif, version-level WORM actif, defaults temporels `Unlocked` | #290 ; lock OPS séparé |
@@ -79,9 +79,153 @@ des chaînes informatives, pas des app settings appliqués.
 
 ## Coût et bornes du pilote
 
-Le compte Storage n'a pas de coût fixe : la facture dépend de la capacité GRS,
-des opérations, du trafic et du Private Endpoint. GRS est conservé pour la
-durabilité décidée ; le tiering Cool limite la capacité chaude, mais toute
+### Alignement LRS du contenu
+
+**Décision du 25 septembre 2026 :** aligner le SKU déclaré sur le compte live
+`stcertigocntz3wqbdww`, en `Standard_LRS`, selon la même convention que
+l'alignement applicatif #539. La
+[preuve datée et expurgée](../migration/evidence/2026-09-25-content-lrs.json)
+conserve les GET, les deux sorties what-if, les paramètres effectifs et leurs
+empreintes. Ce changement n'autorise **aucun apply**, aucune publication ni
+aucune modification des identités, droits, réseaux ou workflows.
+
+**Compromis accepté, pas équivalence :** LRS ne conserve pas de copie dans une
+autre région. Une perte régionale peut donc entraîner perte de données ou
+indisponibilité. WORM, versioning et soft-delete protègent contre d'autres
+risques et **ne remplacent pas la géoredondance**. Les GET ARM `2025-06-01`
+du 25 septembre, entre 10:19:42 et 10:20:00 UTC, confirment :
+versioning actif ; soft-delete Blob et conteneurs 30 jours ; version-level
+immutability sur les trois conteneurs ; policies **Unlocked** de 90/30/90 jours
+(descripteurs/public/privé), sans append protégé ; aucun lifecycle delete ;
+réseau public, accès anonyme et Shared Key désactivés ; TLS 1.2 et chiffrement
+d'infrastructure conservés. `Unlocked` n'est pas une policy verrouillée.
+Change feed et restauration ponctuelle Blob sont **désactivés** dans ce stack,
+avant comme après : ne pas lui attribuer la restauration 29 jours du stockage
+applicatif.
+
+**Attribution bornée :** Activity Log du `2026-08-26T10:00:00Z` au
+`2026-09-25T10:25:00Z`, filtre serveur `rg-certigo-content`, deux pages suivies
+jusqu'à absence de `nextLink`, 139 événements lus. Dix événements du compte
+correspondent simultanément aux claims MCAPS
+`appid=a1a9c5b6-7a4f-4288-89ab-6805873f65d1` et
+`objectidentifier=da847d8c-ee71-44de-b462-6775e7d649a7`.
+Le 5 septembre à 00:55:33 UTC, le corps demandé contient
+`sku.name=Standard_LRS` ; des succès Storage suivent sous la même corrélation
+`739b430a-69f7-48a7-801a-d37512ec873d`. Les événements policy
+`auditIfNotExists` ne sont pas comptés comme écritures Storage.
+Ce corps demandé n'est **pas** un diff avant/après. Resource Graph
+`resourcechanges` renvoie zéro ligne entre le 11 septembre à 00:00 et le
+25 septembre à 10:30 UTC ; cette fenêtre ne couvre pas l'écriture du 5.
+Il ne prouve donc ni l'ancien SKU ni l'absence de changements antérieurs.
+
+#### Prévol racine contenu, sans mutation
+
+Les deux plans évaluent **toute la racine `infra/content/main.bicep`**,
+pas uniquement son module Storage. Ils ne couvrent **pas** la racine
+abonnement applicative `infra/main.bicep` et ne débloquent pas `wp-p1-12` /
+`wp-p1-13`, dont la preuve OIDC et vrais secrets reste à produire.
+Azure CLI et Bicep 0.44.1, validation `Provider`, identité CLI locale autorisée :
+ce n'est pas une preuve de fonctionnement du workflow OIDC.
+
+| Plan du 25 septembre UTC | Révision source | Modify | NoChange | Ignore |
+|---|---|---:|---:|---:|
+| Référence GRS, 10:20:01–10:20:24 | `803205f1536d14da6952b55943f611d7078836a2` | 10 | 7 | 2 |
+| Candidat LRS, 10:22:33–10:22:53 | `65364d2c1f5bddb749e91cdba1b1857d3ac14e5a` | 9 | 8 | 2 |
+
+SHA-256 des templates ARM compilés, respectivement :
+`39602ec509c748781deedc3a67444b4612c03fd2ef58b441a85b6e7b7009a53a` et
+`2b3d2a798bc733a166db131cc170ed5a5020b25a02c8fe81a5777c3febdd4d5c`.
+Les SHA des sources, paramètres effectifs et commandes figurent dans la preuve.
+Les deux compilations précèdent le commit du candidat ; les fichiers Bicep et
+paramètres capturés sont identiques à ceux de cette révision, après rebase sur #549.
+
+Comparaison exacte des **19 entrées** : seul le compte Storage diffère.
+Son `after.sku.name` devient LRS, le delta `sku.name` LRS→GRS disparaît,
+et son état passe de `Modify` à `NoChange`. Aucun autre delta n'est ajouté
+ou modifié. Aucune création ou suppression de **ressource** dans les deux plans.
+Les trois conteneurs, leurs trois policies WORM et le lifecycle sont `NoChange`.
+Les deux `Ignore` (Event Grid system topic et NIC du private endpoint) restent
+**non analysés**, jamais assimilés à `NoChange`.
+
+**Dérive existante à analyser avant tout futur apply :** les neuf ressources
+`Modify` restantes sont strictement identiques dans les deux plans :
+
+| Ressources | Écart résiduel |
+|---|---|
+| Six role assignments | `principalId` comparé à une expression `reference(...)` non résolue ; `principalType` est `NoEffect` |
+| Private Endpoint Blob | propriété `isIPv6EnabledPrivateEndpoint=false` annoncée `Delete` |
+| Private DNS zone group | tableau de config DNS : retraits annoncés de `etag`, `id`, `properties.provisioningState`, `type` |
+| Blob service | retraits annoncés de `deleteRetentionPolicy.allowPermanentDelete=false` et `staticWebsite.enabled=false` |
+
+Ces suppressions de **propriétés** ne sont pas un feu vert et ne sont pas
+qualifiées de bruit inoffensif. La comparaison autorise la correction déclarative
+du SKU, **pas** le déploiement global. Aucun rôle ni autre propriété n'est
+« corrigé » opportunément.
+
+Pour reproduire depuis un worktree isolé à chacune des révisions ci-dessus,
+compiler avec Bicep 0.44.1, garder la sortie hors du dépôt, puis exécuter
+uniquement le what-if (aucun secret ni paramètre factice requis) :
+
+```powershell
+$subscription = 'b8952c8c-8f72-469d-99cd-ac906da4e2fc'
+$tenant = '16b3c013-d300-468d-ac64-7eda0820b6d3'
+$context = az account show --subscription $subscription -o json | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0 -or $context.tenantId -ne $tenant -or $context.id -ne $subscription) {
+  throw 'Contexte Azure non autorise'
+}
+# $out est un repertoire local de preuves existant, hors du depot.
+bicep build infra\content\main.bicep --outfile "$out\content.json"
+bicep build-params infra\params\content.bicepparam --outfile "$out\content.parameters.json"
+Get-FileHash "$out\content.json" -Algorithm SHA256
+az deployment group what-if --subscription $subscription `
+  --resource-group rg-certigo-content --name content-lrs-readonly `
+  --template-file "$out\content.json" --parameters "@$out\content.parameters.json" `
+  --validation-level Provider --result-format FullResourcePayloads `
+  --no-pretty-print --output json > "$out\what-if.json"
+```
+
+Appliquer une borne de temps par processus (collecte présente : 180 secondes
+pour chaque GET, 240 secondes par what-if). En cas de refus RBAC, conserver
+l'erreur exacte et arrêter la preuve concernée, sans changer de principal ni
+de niveau de validation pour contourner le refus. Relire les URL GET de
+`live.gets[].command` dans la preuve : compte, Blob service, lifecycle, trois
+conteneurs et leurs policies. Relever les mêmes protections, sans endpoint
+data-plane, liste de clés ou contenu Blob. Conserver les sorties localement ;
+avant versionnement, retirer secrets, claims complets, identifiants personnels,
+valeurs de tags et texte libre non nécessaire.
+
+#### Risque de remise en GRS par un workflow
+
+À la mesure datée dans `workflowRisk` de la preuve, aucun run apply en cours :
+le seul run [33965256349](https://github.com/gchambaud_microsoft/Certigo/actions/runs/33965256349)
+est un échec historique du 5 septembre, événement `push`, sans job ; il ne
+décrit **pas** le déclencheur actuel. Le workflow actuel est actif mais
+**uniquement manuel via `repository_dispatch`**, avec payload exact et
+garde `refs/heads/main` ; aucun push, cron ou `workflow_dispatch` n'applique.
+Son hash approuvé ne couvre que la racine Bicep, pas modules/paramètres.
+
+Le workflow what-if réagit aux pushs main ciblant `infra/content/**`, les deux
+modules contenu, `infra/params/content.bicepparam` ou son propre YAML, sous
+condition opt-in `CERTIGO_CONTENT_INFRA_WHAT_IF_ENABLED == 'true'`. Il ne peut
+pas déployer ; son dernier run
+[34134842584](https://github.com/gchambaud_microsoft/Certigo/actions/runs/34134842584)
+est `skipped`. L'environnement `azure-content-infra-plan` ne renvoyait aucune
+variable ; la variable opt-in n'apparaissait pas au niveau repository.
+Les variables d'organisation n'ont pas été inventoriées. Cela ne prouve pas
+la disponibilité actuelle OIDC/RBAC. Un dispatch autorisé avant correction
+pourrait réaffirmer GRS s'il franchissait toutes les gardes ; aucun
+redéploiement automatique imminent n'est observé.
+
+Toute modification des templates, paramètres effectifs, ressources, policies,
+déploiements ou configuration/runs des workflows invalide cette photographie.
+Les traces historiques restent bornées à leurs fenêtres et peuvent être
+complétées par une ingestion tardive.
+
+### Estimation du coût
+
+Le compte Storage n'a pas de coût fixe : la facture dépend de la capacité LRS,
+des opérations, du trafic et du Private Endpoint. LRS est le compromis de
+durabilité documenté sous « Alignement LRS du contenu » ; le tiering Cool limite la capacité chaude, mais toute
 version reste facturable jusqu'à la fin de sa rétention et le Cool applique sa
 propre durée minimale. Le versioning, le soft delete et WORM interdisent donc
 d'utiliser une estimation fondée uniquement sur la taille du dernier manifeste.
@@ -95,7 +239,7 @@ Bornes du pilote staging :
 - revue du coût réel après chaque release, puis arrêt de publication si le
   plafond FinOps approuvé est dépassé.
 
-Avant production, OPS chiffre séparément capacité Hot/Cool GRS, opérations,
+Avant production, OPS chiffre séparément capacité Hot/Cool LRS, opérations,
 Private Link et éventuel egress à partir des tarifs Azure du jour. Une alerte de
 budget est portée par le stack FinOps existant, pas par #290, afin de ne pas
 étendre le scope de ce déploiement de contenu.
@@ -149,6 +293,8 @@ checkov --directory infra --framework bicep --compact --quiet \
 Le workflow `Content infrastructure what-if` :
 
 - est déclenché uniquement après un push sur `main` ;
+- seulement pour les chemins contenu énumérés dans le workflow ; le job exige
+  aussi `CERTIGO_CONTENT_INFRA_WHAT_IF_ENABLED == 'true'` et reste sinon ignoré ;
 - checkout explicitement `refs/heads/main` ;
 - utilise uniquement `az deployment group what-if` sur `rg-certigo-content` ;
 - refuse toute suppression ;
@@ -161,8 +307,9 @@ Le workflow `Content infrastructure apply` applique le même template :
   car `validate-workflow-security.mjs` interdit `workflow_dispatch` sur un
   workflow `certigo-trusted` ;
 - refuse toute exécution hors `refs/heads/main` ;
-- exige dans son payload le SHA-256 exact de `infra/content/main.bicep`, ce qui
-  interdit d'appliquer autre chose que le template approuvé ;
+- exige dans son payload le SHA-256 exact de `infra/content/main.bicep` ;
+  ce hash ne couvre **pas** les modules ni le fichier de paramètres, qui doivent
+  également être revus au SHA du checkout avant toute autorisation ;
 - vérifie le tenant et la subscription réellement obtenus après login ;
 - rejoue le what-if et ses garde-fous avant d'appliquer, et échoue en plus si le
   plan verrouillerait une policy d'immuabilité ;

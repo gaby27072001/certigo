@@ -2,9 +2,9 @@
   "schema": "certigo.active-content-reference/v1",
   "repository": "gchambaud_microsoft/certigo-content",
   "branch": "main",
-  "revision": "78bfa72c62371cd206d1f2c2cfa8e0a38fa22540",
-  "date": "2026-09-05",
-  "committedAt": "2026-09-05T08:54:33Z",
+  "revision": "a433518a649a74a33ecdc8874a99685fc125b9ea",
+  "date": "2026-09-23",
+  "committedAt": "2026-09-23T19:28:45Z",
   "packageContract": {
     "schema": "certigo.content.package-manifest/v3",
     "algorithm": "sha256",
@@ -28,17 +28,17 @@
       "path": "dist/public/manifest.json",
       "channel": "public",
       "artifact": "public",
-      "manifestId": "sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f",
-      "fileCount": 1735,
-      "fileSha256": "ecd64189192d46d2fd0a1e3c3c37ccf6ccaaba8105df2b6f8b81dd4308d9e979"
+      "manifestId": "sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb",
+      "fileCount": 1622,
+      "fileSha256": "71e280e0ab23c757e51db1646b5c4fbf3baaca60271a4cfa07e7f4ace8650799"
     },
     "private": {
       "path": "dist/private/manifest.json",
       "channel": "answerKey",
       "artifact": "private",
-      "manifestId": "sha256:65b1914f4cbeb87d7be9cd939a7cd3d03deb344b408b6ef6de91e0346410f793",
-      "fileCount": 812,
-      "fileSha256": "14ebb7a83fc76bb1ffdc1e46c051a9b3f6639fa5985003fffd0210249e9b2114"
+      "manifestId": "sha256:7781a6d36add31223ea234c60808ded367d283c0d1f4a9a042cb1cdad71f9055",
+      "fileCount": 714,
+      "fileSha256": "17605aee74cfa32e1c17646eb0107c7780b0ed14406ce029b2618adafb8a68e2"
     }
   }
 }

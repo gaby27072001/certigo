@@ -4,6 +4,7 @@ using Certigo.Api.Http;
 using Certigo.Api.Middleware;
 using Certigo.Application.Abstractions;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -129,12 +130,14 @@ public sealed class ExceptionMiddlewareTests
     [Fact]
     public async Task AccountDeletionDisabledException_MapsTo503_ProblemDetails()
     {
-        var middleware = CreateMiddleware();
+        var logger = new CapturingLogger();
+        var middleware = new ExceptionMiddleware(logger);
         var invocation = FunctionTestHarness.CreateHttp();
+        var exception = new AccountDeletionDisabledException();
 
         await middleware.Invoke(
             invocation.Context,
-            _ => throw new AccountDeletionDisabledException());
+            _ => throw exception);
 
         invocation.Response.Should().NotBeNull();
         invocation.Response!.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
@@ -142,6 +145,46 @@ public sealed class ExceptionMiddlewareTests
         var problem = await invocation.ReadProblemAsync();
         problem!.Status.Should().Be(503);
         problem.Title.Should().Be("Account deletion unavailable");
+        var entry = logger.Entries.Should().ContainSingle().Subject;
+        entry.Level.Should().Be(LogLevel.Warning);
+        entry.Exception.Should().BeSameAs(exception);
+        entry.Properties["FunctionName"].Should().Be(invocation.Context.FunctionDefinition.Name);
+        entry.Properties["InvocationId"].Should().Be(invocation.Context.InvocationId);
+        entry.Properties["{OriginalFormat}"].Should().Be(
+            "Account deletion is disabled in function {FunctionName}, invocation {InvocationId}.");
+    }
+
+    [Fact]
+    public async Task UnexpectedException_DoesNotEmitDisabledAccountDeletionMarker()
+    {
+        var logger = new CapturingLogger();
+        var middleware = new ExceptionMiddleware(logger);
+        var invocation = FunctionTestHarness.CreateHttp();
+
+        await middleware.Invoke(invocation.Context, _ => throw new InvalidOperationException("failure"));
+
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        logger.Entries.Should().ContainSingle()
+            .Which.Level.Should().Be(LogLevel.Error);
+        logger.Entries.Should().NotContain(entry => entry.Exception is AccountDeletionDisabledException);
+    }
+
+    private sealed class CapturingLogger : ILogger<ExceptionMiddleware>
+    {
+        public List<(LogLevel Level, Exception? Exception, Dictionary<string, object?> Properties)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add((logLevel, exception, properties));
+        }
     }
 
     [Fact]

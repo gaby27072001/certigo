@@ -1,6 +1,6 @@
 // Production environment parameters. Hardening is on automatically for any non-dev
 // env (Cosmos RBAC-only auth, Key Vault purge protection + 90-day soft delete,
-// geo-redundant + versioned storage, CORS locked to []).
+// MCAPS LRS + versioned storage, CORS locked to []).
 //
 // Entra is wired to the certigoapp CIAM tenant (authority) and the backend
 // "Certigo API" app registration (audience). No placeholder left to fill.
@@ -20,8 +20,10 @@ param ciDeploymentPrincipalId = '15d2b34a-c0a0-4b5d-8360-b895a8164706'
 param vnetAddressPrefix = '10.100.0.0/16'
 param functionIntegrationSubnetPrefix = '10.100.1.0/24'
 param functionIntegrationSubnetName = 'snet-func-flex'
+param functionIntegrationSubnetNsgName = 'vnet-certigo-prod-snet-func-flex-nsg-westeurope'
 param privateEndpointSubnetPrefix = '10.100.2.0/24'
 param privateEndpointSubnetName = 'snet-private-endpoints'
+param privateEndpointSubnetNsgName = 'vnet-certigo-prod-snet-private-endpoints-nsg-westeurope'
 param storageBlobPrivateEndpointName = 'pe-st-certigo-prod-blob'
 param storageQueuePrivateEndpointName = 'pe-st-certigo-prod-queue'
 param storageTablePrivateEndpointName = 'pe-st-certigo-prod-table'

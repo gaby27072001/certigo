@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -163,7 +165,7 @@ test('registration uses one protected Run Command and removes it', () => {
   );
 });
 
-test('emulator gate uses only the pinned local image and account-deletion test', () => {
+test('emulator gate runs the whole pinned-image suite, account deletion included', () => {
   const bootstrapImage = bootstrap.match(/^COSMOS_IMAGE="([^"]+)"$/m)?.[1];
   const gateImage = gate.match(/^image="([^"]+)"$/m)?.[1];
   assert.equal(gateImage, bootstrapImage);
@@ -181,11 +183,12 @@ test('emulator gate uses only the pinned local image and account-deletion test',
       'http://169.254.169.254/metadata/instance',
       'CERTIGO_COSMOS_TESTS=1',
       'COSMOS_EMULATOR_ENDPOINT=https://127.0.0.1:8081',
+      "--filter 'Category=CosmosEmulator'",
+      "'^[[:space:]]*\\[CosmosEmulatorFact([](,]|$)'",
       'CosmosRepositoriesIntegrationTests.Account_deletion_removes_user_partitions_and_keeps_only_pseudonymous_tombstone',
-      "--logger 'trx;LogFileName=account-deletion.trx'",
+      "--logger 'trx;LogFileName=cosmos-emulator.trx'",
       'timeout --signal=TERM --kill-after=30s 1200 dotnet test',
-      'Expected exactly one account-deletion test result',
-      `'outcome="Passed"'`,
+      'GITHUB_STEP_SUMMARY',
       '--cleanup-only',
       'docker rm --force',
     ],
@@ -193,6 +196,127 @@ test('emulator gate uses only the pinned local image and account-deletion test',
   );
   assert.doesNotMatch(gate, /microsoft\.azure\.com|documents\.azure\.com|secrets\./i);
   assert.doesNotMatch(gate, /docker logs/);
+  assert.doesNotMatch(gate, /FullyQualifiedName~/);
+});
+
+test('gate trait filter matches the C# emulator suite contract', () => {
+  const support = fs.readFileSync(
+    path.join(root, 'backend', 'tests', 'Certigo.Infrastructure.Tests', 'CosmosEmulatorSupport.cs'),
+    'utf8',
+  );
+  const name = support.match(/public const string TraitName = "([^"]+)";/)?.[1];
+  const value = support.match(/public const string TraitValue = "([^"]+)";/)?.[1];
+  assert.equal(`${name}=${value}`, 'Category=CosmosEmulator');
+  assert.ok(
+    fs.existsSync(path.join(
+      root,
+      'backend',
+      'tests',
+      'Certigo.Infrastructure.Tests',
+      'CosmosEmulatorSuiteContractTests.cs',
+    )),
+    'the reflection guard keeping every [CosmosEmulatorFact] inside the trait must exist',
+  );
+});
+
+function gateAnalysis() {
+  const match = gate.match(/python3 -P - <<'PY'\n([\s\S]*?)\nPY\n?/);
+  assert.ok(match, 'run-account-deletion.sh must analyse the TRX with an inline safe-path python3 block');
+  return match[1];
+}
+
+function pythonCommand() {
+  for (const candidate of ['python3', 'python']) {
+    const probe = spawnSync(
+      candidate,
+      ['-c', 'import sys; print(int(sys.version_info >= (3, 11)))'],
+      { encoding: 'utf8' },
+    );
+    if (probe.status === 0 && probe.stdout.trim() === '1') {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+const requiredGateTest = 'Certigo.Infrastructure.Tests.CosmosRepositoriesIntegrationTests.'
+  + 'Account_deletion_removes_user_partitions_and_keeps_only_pseudonymous_tombstone';
+
+function trx(results) {
+  const rows = results.map(([name, outcome]) => (
+    `    <UnitTestResult executionId="${crypto.randomUUID()}" testId="${crypto.randomUUID()}" `
+    + `testName="${name}" computerName="runner" duration="00:00:00.1000000" `
+    + `testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="${outcome}" />`
+  ));
+  return '<?xml version="1.0" encoding="utf-8"?>\n'
+    + '<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">\n'
+    + `  <Results>\n${rows.join('\n')}\n  </Results>\n</TestRun>\n`;
+}
+
+test('gate analysis fails closed on skipped, missing, extra, or failed emulator tests', (t) => {
+  const python = pythonCommand();
+  if (!python) {
+    if (process.env.CI) {
+      assert.fail('python3 is required in CI to exercise the emulator gate analysis');
+    }
+    t.skip('python3 is not available on this workstation');
+    return;
+  }
+  const analysis = gateAnalysis();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-gate-analysis-'));
+  const other = 'Certigo.Infrastructure.Tests.CosmosRepositoriesIntegrationTests.Other_test';
+  const run = (results, { expected = results.length, testExit = '0' } = {}) => {
+    const resultFile = path.join(directory, `${crypto.randomUUID()}.trx`);
+    const summaryFile = path.join(directory, `${crypto.randomUUID()}.md`);
+    fs.writeFileSync(resultFile, trx(results));
+    const outcome = spawnSync(python, ['-P', '-'], {
+      input: analysis,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        EXPECTED_TESTS: String(expected),
+        REQUIRED_TEST: requiredGateTest,
+        RESULT_FILE: resultFile,
+        TEST_EXIT: testExit,
+        GITHUB_STEP_SUMMARY: summaryFile,
+      },
+    });
+    return {
+      status: outcome.status,
+      stderr: outcome.stderr,
+      summary: fs.existsSync(summaryFile) ? fs.readFileSync(summaryFile, 'utf8') : '',
+    };
+  };
+
+  try {
+    const green = run([[requiredGateTest, 'Passed'], [other, 'Passed']]);
+    assert.equal(green.status, 0, green.stderr);
+    assert.match(green.summary, /\*\*2\/2\*\* passed; account deletion \*\*passed\*\*/);
+    assert.match(green.summary, /`CosmosRepositoriesIntegrationTests\.Other_test` \| Passed/);
+
+    const skipped = run([[requiredGateTest, 'Passed'], [other, 'NotExecuted']]);
+    assert.equal(skipped.status, 1);
+    assert.match(skipped.stderr, /skipped or failed: .*Other_test \(NotExecuted\)/);
+
+    const failed = run([[requiredGateTest, 'Failed'], [other, 'Passed']]);
+    assert.equal(failed.status, 1);
+    assert.match(failed.stderr, /account-deletion test was skipped, renamed, or did not pass/);
+
+    const missing = run([[other, 'Passed']], { expected: 2 });
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /expected 2 Cosmos emulator results .*found 1/);
+    assert.match(missing.stderr, /account-deletion test was skipped, renamed, or did not pass/);
+
+    const duplicated = run([[requiredGateTest, 'Passed'], [requiredGateTest, 'Passed']]);
+    assert.equal(duplicated.status, 1);
+    assert.match(duplicated.stderr, /reported more than once/);
+
+    const crashed = run([[requiredGateTest, 'Passed']], { testExit: '124' });
+    assert.equal(crashed.status, 1);
+    assert.match(crashed.stderr, /dotnet test exited with 124/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('workflow is available, activation-gated, and can consume only merged main', () => {

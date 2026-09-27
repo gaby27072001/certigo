@@ -33,6 +33,23 @@ source /etc/certigo-runner-bootstrap.env
 [[ "${RUNNER_LABELS}" == 'certigo-pr,certigo-pr-pilot' ]]
 [[ "${RUNNER_VERSION}" == '2.336.0' ]]
 
+# register-pilot.ps1 -RebuildDrill rewrites this exact line, and only on the dedicated drill
+# resources. A drill runner carries one label that no workflow targets and no default labels,
+# so it can never pick up a real job.
+registration_mode='production'
+case "${registration_mode}" in
+  production)
+    label_arguments=(--labels "${RUNNER_LABELS}")
+    ;;
+  rebuild-drill)
+    label_arguments=(--no-default-labels --labels 'certigo-rebuild-drill')
+    ;;
+  *)
+    echo "Unknown registration mode." >&2
+    exit 64
+    ;;
+esac
+
 runner_home="/opt/actions-runner"
 runner_user="runner"
 runner_name="$(hostname)"
@@ -53,7 +70,7 @@ runuser -u "${runner_user}" -- "${runner_home}/config.sh" \
   --url "${GITHUB_URL}" \
   --token "${registration_token}" \
   --name "${runner_name}" \
-  --labels "${RUNNER_LABELS}" \
+  "${label_arguments[@]}" \
   --work "_work" \
   --disableupdate
 
@@ -65,4 +82,4 @@ rm -f "${preflight_attestation}"
   ./svc.sh install "${runner_user}"
   ./svc.sh start
 )
-echo "Runner ${runner_name} registered and started."
+echo "Runner ${runner_name} registered and started (mode ${registration_mode})."

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
+import { validateCandidateScriptTestsJob } from './candidate-script-tests-policy.mjs';
 import { validateBackendDeployWorkspace } from './backend-deploy-workflow-policy.mjs';
 import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
@@ -1188,6 +1189,7 @@ function validateRepositoryInvariants() {
   ) {
     errors.push('lint-workflows.yml: workflow security script tests are not enforced');
   }
+  errors.push(...validateCandidateScriptTestsJob(lint));
   for (const marker of [
     'pull_request_target:',
     prLinuxRunner,
