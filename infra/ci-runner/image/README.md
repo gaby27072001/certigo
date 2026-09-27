@@ -493,7 +493,12 @@ lance le vrai installateur dans `unshare --net` et un chroot, sur un overlay
 jetable. Ce n'est pas un boot : systemd n'est pas PID 1, et `systemctl` est
 remplace dans l'overlay par un enregistreur (operations de fichiers d'unite via
 `--root=/`, operations d'execution simulees). Chaque mutation doit echouer avec
-son message exact; le rapport compare le message obtenu a l'attendu.
+son message exact; le rapport compare le message obtenu a l'attendu. Le `/dev`
+de l'hote est un montage partage (systemd) : sa copie `--rbind` dans le chroot
+est rendue esclave (`--make-rslave`), et le banc echoue si un demontage modifie
+les montages `/dev` de l'hote. Sans cela, le demontage recursif se propage et
+retire `/dev/pts` et `/dev/shm` de l'hote (mesure du 27/09 : WSL ne pouvait plus
+lancer aucune commande).
 
 Mesures du 25 septembre 2026 (WSL2 ARM64, `qemu-x86_64 10.2.1`), code final :
 

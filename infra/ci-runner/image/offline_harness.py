@@ -173,29 +173,54 @@ def verified_base(rootfs):
     return rootfs
 
 
+def host_dev_mounts():
+    """Mount points under the host /dev, as seen by PID 1."""
+    lines = Path("/proc/1/mountinfo").read_text().splitlines()
+    return sorted(line.split()[4] for line in lines
+                  if line.split()[4] == "/dev" or line.split()[4].startswith("/dev/"))
+
+
+def mount_chroot_filesystems(merged, mounts):
+    for source, target, options in (
+        ("proc", "proc", ["-t", "proc"]),
+        ("sysfs", "sys", ["-t", "sysfs", "-o", "ro"]),
+        ("/dev", "dev", ["--rbind"]),
+        ("tmpfs", "run", ["-t", "tmpfs"]),
+    ):
+        destination = merged / target
+        destination.mkdir(exist_ok=True)
+        run(["mount", *options, source, destination])
+        mounts.append(destination)
+        if target == "dev":
+            # The host /dev is a shared mount (systemd): without this, unmounting the
+            # chroot copy recursively propagates and unmounts the host's /dev/pts and
+            # /dev/shm (measured 27/09: WSL could no longer start any command).
+            run(["mount", "--make-rslave", destination])
+
+
+def unmount_chroot(mounts, host_dev_before):
+    for mount in reversed(mounts):
+        subprocess.run(["umount", "--lazy", "--recursive", str(mount)], check=False)
+    after = host_dev_mounts()
+    if after != host_dev_before:
+        raise RuntimeError(f"Harness teardown changed the host /dev mounts: "
+                           f"{sorted(set(host_dev_before) ^ set(after))}")
+
+
 @contextlib.contextmanager
 def overlay(base, work):
     upper, workdir, merged = work / "upper", work / "work", work / "merged"
     for path in (upper, workdir, merged):
         path.mkdir(parents=True)
+    host_dev_before = host_dev_mounts()
     run(["mount", "-t", "overlay", "overlay", "-o",
          f"lowerdir={base},upperdir={upper},workdir={workdir}", merged])
     mounts = [merged]
     try:
-        for source, target, options in (
-            ("proc", "proc", ["-t", "proc"]),
-            ("sysfs", "sys", ["-t", "sysfs", "-o", "ro"]),
-            ("/dev", "dev", ["--rbind"]),
-            ("tmpfs", "run", ["-t", "tmpfs"]),
-        ):
-            destination = merged / target
-            destination.mkdir(exist_ok=True)
-            run(["mount", *options, source, destination])
-            mounts.append(destination)
+        mount_chroot_filesystems(merged, mounts)
         yield merged, mounts
     finally:
-        for mount in reversed(mounts):
-            subprocess.run(["umount", "--lazy", "--recursive", str(mount)], check=False)
+        unmount_chroot(mounts, host_dev_before)
 
 
 STUB_RESOLV_CONF = "nameserver 127.0.0.53\noptions edns0 trust-ad\nsearch .\n"
@@ -682,6 +707,7 @@ def check_installed(rootfs, store, installed, report_path, legacy_inventory):
     with tempfile.TemporaryDirectory(prefix="certigo-installed-", dir=rootfs.parent) as tmp:
         work = Path(tmp)
         run(["cp", "-a", "--", str(installed), str(work / "upper")])
+        host_dev_before = host_dev_mounts()
         (work / "work").mkdir()
         (work / "merged").mkdir()
         run(["mount", "-t", "overlay", "overlay", "-o",
@@ -689,11 +715,7 @@ def check_installed(rootfs, store, installed, report_path, legacy_inventory):
         merged = work / "merged"
         mounts = [merged]
         try:
-            for source, target, options in (("proc", "proc", ["-t", "proc"]),
-                                            ("sysfs", "sys", ["-t", "sysfs", "-o", "ro"]),
-                                            ("/dev", "dev", ["--rbind"]), ("tmpfs", "run", ["-t", "tmpfs"])):
-                run(["mount", *options, source, merged / target])
-                mounts.append(merged / target)
+            mount_chroot_filesystems(merged, mounts)
             store_target = merged / STORE_DIR.lstrip("/")
             store_target.mkdir(parents=True, exist_ok=True)
             run(["mount", "--bind", "-o", "ro", store, store_target])
@@ -703,8 +725,7 @@ def check_installed(rootfs, store, installed, report_path, legacy_inventory):
             except (ValueError, subprocess.TimeoutExpired) as error:
                 report = {"postInstallError": str(error)[-3000:]}
         finally:
-            for mount in reversed(mounts):
-                subprocess.run(["umount", "--lazy", "--recursive", str(mount)], check=False)
+            unmount_chroot(mounts, host_dev_before)
     # Deliberately not a run-suite report: `evidence` refuses it.
     write_json(report_path, {"developmentOnly": True, **report})
     print("post-install checks:", "PASS" if "postInstall" in report else "FAIL")
