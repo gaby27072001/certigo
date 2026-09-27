@@ -151,7 +151,11 @@ class RemoteQuizRepository implements QuizRepository {
     required String lessonId,
     required SubmitQuizRequest request,
   }) =>
-      _api.postJson('/quiz/$lessonId/submit', request.toJson(), SubmitQuizResult.fromJson);
+      _api.postJson(
+        '/quiz/${Uri.encodeComponent(lessonId)}/submit',
+        request.toJson(),
+        SubmitQuizResult.fromJson,
+      );
 }
 
 class RemoteLeaderboardRepository implements LeaderboardRepository, LeagueResolutionRepository {
@@ -283,7 +287,7 @@ class RemoteFriendRepository implements FriendRepository {
 
   @override
   Future<Result<FriendActionResult>> removeFriend(String friendId) =>
-      _api.deleteJson('/friends/$friendId', FriendActionResult.fromJson);
+      _api.deleteJson('/friends/${Uri.encodeComponent(friendId)}', FriendActionResult.fromJson);
 
   @override
   Future<Result<FriendLeaderboard>> getFriendLeaderboard() =>
