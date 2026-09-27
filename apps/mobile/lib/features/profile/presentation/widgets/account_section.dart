@@ -1,10 +1,10 @@
 import 'package:data/data.dart';
-import 'package:core/core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prism_ui/prism_ui.dart';
 
+import '../../../../app/providers.dart';
 import '../../../../app/router.dart';
 import '../../application/settings_preferences.dart';
 import 'profile_sheets.dart';
@@ -76,7 +76,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
             trailing: handle.isEmpty ? null : '@$handle',
             onTap: _editHandle,
           ),
-          if (AppEnv.accountDeletionEnabled) ...<Widget>[
+          if (ref.watch(accountDeletionEnabledProvider)) ...<Widget>[
             Divider(color: p.border, height: 24),
             TappableRow(
               icon: Icons.delete_outline_rounded,

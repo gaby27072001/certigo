@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:certigo/app/account_deletion_resume_scope.dart';
 import 'package:certigo/app/active_track_store.dart';
 import 'package:certigo/app/offline/prefs_sync_store.dart';
 import 'package:certigo/app/providers.dart';
@@ -96,10 +97,14 @@ class _DeletionRepository implements AccountDeletionRepository {
   Result<AccountDeletion> requestResult;
   final Future<Result<AccountDeletion>> Function()? request;
   int requestCalls = 0;
+  int statusCalls = 0;
   String? proofToken;
 
   @override
-  Future<Result<AccountDeletion>> getStatus() async => Success<AccountDeletion>(status);
+  Future<Result<AccountDeletion>> getStatus() async {
+    statusCalls++;
+    return Success<AccountDeletion>(status);
+  }
 
   @override
   Future<Result<AccountDeletion>> requestDeletion({String? reauthenticationToken}) async {
@@ -573,5 +578,146 @@ void main() {
     await tester.pump();
     button = tester.widget<FilledButton>(find.byKey(const Key('account-deletion-confirm')));
     expect(button.onPressed, isNotNull);
+  });
+
+  const AuthSession appleSession = AuthSession(
+    accessToken: 'apple-access',
+    userId: 'user-1',
+    idToken: 'fresh-apple-id-token',
+    refreshToken: 'apple-refresh',
+    provider: AuthProvider.apple,
+  );
+
+  Future<ProviderContainer> completedDeletionFor(AuthSession session) async {
+    final _DeletionRepository repository = _DeletionRepository(
+      status: notRequested,
+      requestResult: const Success<AccountDeletion>(completed),
+    );
+    final ProviderContainer container = containerFor(
+      repository: repository,
+      store: _SessionStore(session),
+      purger: _Purger(),
+      sync: syncEngine(),
+      reauthenticatedSession: session,
+    );
+    container.read(authControllerProvider);
+    await settle();
+    await settle();
+    await settle();
+    await container
+        .read(accountDeletionControllerProvider.notifier)
+        .start(expectedUserId: 'user-1');
+    return container;
+  }
+
+  test('completion remembers an Apple sign-in once the session is cleared', () async {
+    final ProviderContainer container = await completedDeletionFor(appleSession);
+
+    final AuthState state = container.read(authControllerProvider);
+    expect(state, isA<AccountDeletionCompleted>());
+    expect((state as AccountDeletionCompleted).provider, AuthProvider.apple);
+  });
+
+  testWidgets('Apple accounts are told how to revoke Certigo from their Apple Account', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = await tester.runAsync(
+      () => completedDeletionFor(appleSession),
+    ) as ProviderContainer;
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AccountDeletionCompletedScreen()),
+      ),
+    );
+
+    expect(find.byKey(const Key('account-deletion-apple-revocation')), findsOneWidget);
+    expect(find.textContaining('Touchez « Se connecter avec Apple »'), findsOneWidget);
+    expect(find.textContaining('touchez « Supprimer »'), findsOneWidget);
+    expect(find.textContaining('account.apple.com'), findsOneWidget);
+  });
+
+  testWidgets('other accounts complete without an Apple step', (WidgetTester tester) async {
+    final ProviderContainer container = await tester.runAsync(
+      () => completedDeletionFor(socialSession()),
+    ) as ProviderContainer;
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AccountDeletionCompletedScreen()),
+      ),
+    );
+
+    expect(find.text('Compte supprimé'), findsOneWidget);
+    expect(find.byKey(const Key('account-deletion-apple-revocation')), findsNothing);
+  });
+
+  testWidgets('Apple accounts are warned of the Apple step before confirming', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          authGatewayProvider.overrideWithValue(_AuthGateway(appleSession)),
+          credentialsGatewayProvider.overrideWithValue(_CredentialsGateway(appleSession)),
+          sessionStoreProvider.overrideWithValue(_SessionStore(appleSession)),
+          authRequiredProvider.overrideWithValue(true),
+          authConfiguredProvider.overrideWithValue(true),
+          accountDeletionRepositoryProvider.overrideWithValue(_DeletionRepository(
+            status: notRequested,
+            requestResult: const Success<AccountDeletion>(pending),
+          )),
+          localAccountDataPurgerProvider.overrideWithValue(_Purger()),
+          syncEngineProvider.overrideWithValue(syncEngine()),
+        ],
+        child: const MaterialApp(home: AccountDeletionScreen(expectedUserId: 'user-1')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('account-deletion-apple-notice')), findsOneWidget);
+    expect(find.byKey(const Key('account-deletion-password')), findsNothing);
+  });
+
+  group('deletion recovery probe', () {
+    Future<_DeletionRepository> pumpScope(WidgetTester tester, {required bool enabled}) async {
+      final _DeletionRepository repository = _DeletionRepository(
+        status: notRequested,
+        requestResult: const Success<AccountDeletion>(notRequested),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: <Override>[
+            accountDeletionEnabledProvider.overrideWithValue(enabled),
+            accountDeletionRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: const MaterialApp(
+            home: AccountDeletionResumeScope(child: Text('shell')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return repository;
+    }
+
+    testWidgets('a build without account deletion never calls the deletion API', (
+      WidgetTester tester,
+    ) async {
+      final _DeletionRepository repository = await pumpScope(tester, enabled: false);
+
+      expect(repository.statusCalls, 0);
+      expect(find.text('shell'), findsOneWidget);
+    });
+
+    testWidgets('a build with account deletion checks for a durable request once', (
+      WidgetTester tester,
+    ) async {
+      final _DeletionRepository repository = await pumpScope(tester, enabled: true);
+
+      expect(repository.statusCalls, 1);
+      expect(find.text('shell'), findsOneWidget);
+    });
   });
 }

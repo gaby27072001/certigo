@@ -151,9 +151,59 @@ permissions, bornes et preuves de destruction sont détaillés dans
 ### Validation Apple restante après déploiement
 
 Effectuer un test réel avec un compte Apple sacrifiable : créer la connexion via
-`susi_certigo`, supprimer le compte dans Certigo, puis vérifier que
-l’association Apple n’existe plus ou est révoquée. C’est la seule validation
-Apple encore ouverte pour ce flux.
+`susi_certigo`, supprimer le compte dans Certigo, suivre les étapes Apple affichées,
+puis vérifier que l’association Apple n’existe plus ou est révoquée : Certigo
+n’apparaît plus dans « Se connecter avec Apple » du compte Apple. C’est la seule
+validation Apple encore ouverte pour ce flux.
+
+### Révocation « Sign in with Apple » : Certigo ne détient aucun jeton Apple
+
+> **Fait daté.** Sources officielles consultées le 2026-09-24 et le 2026-09-25.
+> **Invalidé si** Certigo cesse de passer par Entra External ID pour Apple (connexion
+> Apple native), si Microsoft documente un transfert du jeton Apple pour les tenants
+> externes, ou si Apple modifie TN3194.
+
+Apple demande de révoquer les jetons de l’utilisateur par l’API REST
+(`POST https://appleid.apple.com/auth/revoke`), qui exige un refresh token ou un access
+token Apple : « either a valid refresh token or access token for invalidation is
+required » ([TN3194](https://developer.apple.com/documentation/technotes/tn3194-handling-account-deletions-and-revoking-tokens-for-sign-in-with-apple)).
+
+Certigo n’en détient aucun. Entra External ID fédère Apple et n’émet vers l’app et
+l’API que ses propres jetons ; la page Microsoft
+[Add Apple as an identity provider](https://learn.microsoft.com/entra/external-id/customers/how-to-apple-federation-customers)
+ne prévoit aucun transfert du jeton Apple, et le seul mécanisme de ce type
+([`idp_access_token`](https://learn.microsoft.com/azure/active-directory-b2c/idp-pass-through-user-flow))
+appartient à Azure AD B2C et exclut Apple (« For all other identity providers, the
+claim is returned blank »). `revokeSignInSessions` et `DELETE /users/{id}` n’agissent
+que sur l’annuaire Entra.
+
+Certigo applique donc la voie qu’Apple prescrit pour ce cas (TN3194) : « If you don’t
+have the user’s refresh token, access token, or authorization code, you must still
+fulfill the user’s account deletion request […] Delete the user’s account data from
+your systems. Direct the user to manually revoke access for your client. »
+
+| Exigence TN3194 | Mise en œuvre |
+| --- | --- |
+| Supprimer les données du compte | étapes serveur ci-dessus, puis purge locale après `completed` |
+| Diriger l’utilisateur vers la révocation manuelle | pour une session Apple : avis avant confirmation, puis étapes à l’écran « Compte supprimé », au texte de l’article Apple [102571](https://support.apple.com/fr-fr/102571) (Réglages > votre nom > Se connecter avec Apple > Supprimer ; ou account.apple.com) |
+| Revenir à un état non authentifié | session et jetons locaux effacés avant l’écran final |
+
+Le fournisseur de la session est conservé dans l’état `AccountDeletionCompleted`
+uniquement pour choisir ce texte ; aucune donnée ne survit à l’effacement local.
+
+Une variante qui révoquerait sans l’utilisateur existe : une connexion Apple native au
+moment de la suppression, dont le code serait échangé puis révoqué par le backend. Elle
+exige une nouvelle dépendance, une clé Apple `.p8` côté serveur et un second
+identifiant client Apple. Elle ne couvre pas Android. Et rien ne garantit, mot pour mot,
+qu’elle retire le lien créé par le Services ID de CIAM. Elle n’est pas retenue tant que
+l’App Review ne la réclame pas.
+
+### Aucun appel de suppression quand la fonction est désactivée
+
+Un build compilé avec `ACCOUNT_DELETION_ENABLED=false` n’appelle plus
+`GET /api/account/deletion` au démarrage. Le backend désactivé répond `503` à cet appel,
+que l’alerte 5xx doit ensuite exclure. Les versions déjà installées continuent de
+l’appeler jusqu’à leur remplacement.
 
 L'URL publique de suppression de compte reste volontairement non configurée.
 Elle ne peut être publiée ou inscrite dans Play Console qu'après satisfaction du

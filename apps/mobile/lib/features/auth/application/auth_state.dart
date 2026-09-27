@@ -245,6 +245,13 @@ class Unauthenticated extends AuthState {
 /// The server confirmed irreversible deletion and local credentials are gone.
 /// Kept distinct from [Unauthenticated] long enough to show an explicit final
 /// confirmation instead of silently dropping the learner on the sign-in screen.
+///
+/// [provider] survives the cleared session only to tailor that confirmation:
+/// Certigo never holds a Sign in with Apple token (Entra External ID brokers the
+/// federation), so Apple's documented fallback applies and the learner is told
+/// how to revoke Certigo from their Apple Account (Apple TN3194).
 class AccountDeletionCompleted extends AuthState {
-  const AccountDeletionCompleted();
+  const AccountDeletionCompleted({this.provider});
+
+  final AuthProvider? provider;
 }

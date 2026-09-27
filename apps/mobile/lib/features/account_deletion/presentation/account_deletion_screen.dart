@@ -31,6 +31,7 @@ class _AccountDeletionScreenState extends ConsumerState<AccountDeletionScreen> {
     final AccountDeletionState state = ref.watch(accountDeletionControllerProvider);
     final AuthState auth = ref.watch(authControllerProvider);
     final bool emailAccount = auth is Authenticated && auth.session.provider == AuthProvider.email;
+    final bool appleAccount = auth is Authenticated && auth.session.provider == AuthProvider.apple;
     final bool locked = state.requestRecorded || state.busy;
 
     return PopScope(
@@ -56,6 +57,14 @@ class _AccountDeletionScreenState extends ConsumerState<AccountDeletionScreen> {
                 'Les sauvegardes techniques Azure suivent leur cycle de rétention '
                 'et ne sont pas utilisées pour restaurer un compte supprimé.',
               ),
+              if (appleAccount) ...<Widget>[
+                const SizedBox(height: PrismSpacing.sm),
+                const Text(
+                  'Vous vous connectez avec Apple : à la fin, Certigo vous indiquera '
+                  'comment retirer son accès à votre compte Apple.',
+                  key: Key('account-deletion-apple-notice'),
+                ),
+              ],
               const SizedBox(height: PrismSpacing.lg),
               if (state.stage == AccountDeletionStage.loading)
                 const Center(child: CircularProgressIndicator())
@@ -192,12 +201,15 @@ class AccountDeletionCompletedScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final AuthState auth = ref.watch(authControllerProvider);
+    final bool appleAccount =
+        auth is AccountDeletionCompleted && auth.provider == AuthProvider.apple;
     return PopScope(
       canPop: false,
       child: Scaffold(
         body: SafeArea(
           child: Center(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(PrismSpacing.lg),
               child: Semantics(
                 liveRegion: true,
@@ -213,6 +225,10 @@ class AccountDeletionCompletedScreen extends ConsumerWidget {
                       'La session et les données locales de cet appareil ont été effacées.',
                       textAlign: TextAlign.center,
                     ),
+                    if (appleAccount) ...<Widget>[
+                      const SizedBox(height: PrismSpacing.lg),
+                      const _AppleRevocationSteps(),
+                    ],
                     const SizedBox(height: PrismSpacing.lg),
                     FilledButton(
                       key: const Key('account-deletion-finish'),
@@ -225,6 +241,43 @@ class AccountDeletionCompletedScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Apple's documented fallback when the app holds no Sign in with Apple token
+/// (TN3194): delete the data, then direct the user to revoke the app. Wording
+/// follows Apple support article 102571 (fr-fr, published 2026-09-22).
+class _AppleRevocationSteps extends StatelessWidget {
+  const _AppleRevocationSteps();
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    return PrismCard(
+      key: const Key('account-deletion-apple-revocation'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('Dernière étape : votre compte Apple', style: text.titleMedium),
+          const SizedBox(height: PrismSpacing.sm),
+          const Text(
+            'Certigo ne peut pas retirer lui-même son accès à votre compte Apple. '
+            'Pour arrêter d’utiliser « Se connecter avec Apple » avec Certigo :',
+          ),
+          const SizedBox(height: PrismSpacing.sm),
+          const Text(
+            '1. Ouvrez l’app Réglages, puis touchez votre nom.\n'
+            '2. Touchez « Se connecter avec Apple ».\n'
+            '3. Sélectionnez Certigo, puis touchez « Supprimer ».',
+          ),
+          const SizedBox(height: PrismSpacing.sm),
+          const Text(
+            'Sans iPhone : connectez-vous sur account.apple.com, ouvrez « Connexion et '
+            'sécurité », puis « Se connecter avec Apple ».',
+          ),
+        ],
       ),
     );
   }

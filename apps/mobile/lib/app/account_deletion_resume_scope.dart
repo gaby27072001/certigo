@@ -31,6 +31,9 @@ class _AccountDeletionResumeScopeState extends ConsumerState<AccountDeletionResu
   Future<void> _resumeIfNeeded() async {
     if (_checked) return;
     _checked = true;
+    // A build without account deletion cannot route to the deletion screen, and
+    // its backend counterpart answers 503: probing would only add noise.
+    if (!ref.read(accountDeletionEnabledProvider)) return;
     final Result<AccountDeletion> result =
         await ref.read(accountDeletionRepositoryProvider).getStatus();
     result.when(

@@ -498,7 +498,7 @@ class AuthController extends Notifier<AuthState> {
     if (!await _clearPersistedSession(revision)) {
       throw StateError('Authenticated session changed during account deletion.');
     }
-    state = const AccountDeletionCompleted();
+    state = AccountDeletionCompleted(provider: current.session.provider);
   }
 
   void finishAccountDeletion() {

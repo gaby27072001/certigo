@@ -49,6 +49,13 @@ final accountDeletionRepositoryProvider = Provider<AccountDeletionRepository>(
   (Ref ref) => RemoteAccountDeletionRepository(ref.watch(apiClientProvider)),
 );
 
+/// Compile-time account-deletion switch, exposed as a provider so widget tests
+/// can exercise both builds. While it is `false`, the app never calls the
+/// deletion API: a disabled backend answers those calls with 503.
+final accountDeletionEnabledProvider = Provider<bool>(
+  (Ref ref) => AppEnv.accountDeletionEnabled,
+);
+
 final pathRepositoryProvider = Provider<PathRepository>(
   (Ref ref) => RemotePathRepository(ref.watch(apiClientProvider)),
 );

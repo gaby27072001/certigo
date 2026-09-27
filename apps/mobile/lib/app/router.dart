@@ -157,7 +157,8 @@ final routerProvider = Provider<GoRouter>((Ref ref) {
     initialLocation: Routes.splash,
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
-      if (!AppEnv.accountDeletionEnabled && state.matchedLocation == Routes.accountDeletion) {
+      if (!ref.read(accountDeletionEnabledProvider) &&
+          state.matchedLocation == Routes.accountDeletion) {
         return Routes.profile;
       }
       final AuthState auth = ref.read(authControllerProvider);
