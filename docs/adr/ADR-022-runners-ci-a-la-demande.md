@@ -42,9 +42,14 @@ Trois pièces, chacune sans credential GitHub :
    pas imiter : un `Runner.Worker` **enfant du vrai listener**, c'est-à-dire du `Runner.Listener`
    petit-enfant du processus principal que systemd attribue au service runner
    (`runsvc.sh` → `node` → `Runner.Listener`, mesuré sur les deux pools le 2026-09-30) — un nom
-   de processus se choisit, une filiation depuis ce MainPID non —, ou apt/dpkg **exécuté par
-   root**. Jamais d'extinction entre 01:15 et 01:50 UTC (reprise), ni
-   d'une machine sans service runner (provisionnement). Sur les instances PR, l'installateur
+   de processus se choisit, une filiation depuis ce MainPID non —, ou une maintenance de paquets
+   **exécutée par root** (UID effectif 0 : `apt`, `apt-get`, `dpkg` ou une exécution
+   d'`unattended-upgrade`). Le veilleur permanent
+   `unattended-upgrade-shutdown --wait-for-signal`, présent sur toutes les VM Ubuntu et que le
+   noyau nomme lui aussi `unattended-upgr`, n'en est pas une : il est reconnu à sa ligne de
+   commande (compté à tort, il empêchait toute extinction, mesuré le 2026-09-30 sur le canari).
+   Jamais d'extinction entre 01:15 et 01:50 UTC (reprise), ni d'une machine sans service runner
+   (provisionnement). Sur les instances PR, l'installateur
    ordonne aussi `certigo-block-imds.service` avant `cloud-init-local.service` : l'IMDS est
    refusé dès le début du boot au lieu d'être attendu cinq minutes.
 2. **Azure désalloue ce qui est déjà arrêté** (`logic-certigo-ci-runner-idle-deallocation`,

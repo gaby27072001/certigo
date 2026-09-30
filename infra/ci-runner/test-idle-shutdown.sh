@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests hors ligne de infra/ci-runner/idle-shutdown.sh : systemctl, pgrep, l'horloge et
+# Tests hors ligne de infra/ci-runner/idle-shutdown.sh : systemctl, /proc, l'horloge et
 # l'uptime sont simulés ; aucune commande n'est jamais envoyée au système hôte.
 set -euo pipefail
 
@@ -10,24 +10,9 @@ trap 'rm -rf "${work_dir}"' EXIT
 bin_dir="${work_dir}/bin"
 mkdir -p "${bin_dir}"
 
-# pgrep is only used for package maintenance: apt/dpkg run as root when ${FAKE_DIR}/apt-root
-# exists and as the runner account when ${FAKE_DIR}/apt-user exists.
-cat > "${bin_dir}/pgrep" <<'EOF'
-#!/usr/bin/env bash
-pattern="${*: -1}"
-case "${pattern}" in
-  *dpkg*)
-    if [[ " $* " == *" -u root "* ]]; then
-      [[ -e "${FAKE_DIR}/apt-root" ]]
-    else
-      [[ -e "${FAKE_DIR}/apt-root" || -e "${FAKE_DIR}/apt-user" ]]
-    fi
-    ;;
-  *) exit 1 ;;
-esac
-EOF
 # systemctl: records every call. Two active runner units, as on a trusted VM, whose main
-# processes are 100 and 110. `stop` can start package maintenance (the final-guard case).
+# processes are 100 and 110. `stop` can start package maintenance (the final-guard case): a
+# root apt-get appears in the fake /proc.
 cat > "${bin_dir}/systemctl" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${FAKE_DIR}/systemctl.log"
@@ -49,7 +34,12 @@ case "$1" in
     esac
     ;;
   stop)
-    [[ -e "${FAKE_DIR}/apt-after-stop" ]] && touch "${FAKE_DIR}/apt-root"
+    if [[ -e "${FAKE_DIR}/apt-after-stop" ]]; then
+      mkdir -p "${FAKE_DIR}/proc/800"
+      printf '800 (apt-get) S 1 800 800 0 -1\n' > "${FAKE_DIR}/proc/800/stat"
+      printf 'Name:\tapt-get\nUid:\t0\t0\t0\t0\n' > "${FAKE_DIR}/proc/800/status"
+      printf '%s\0' /usr/bin/apt-get -y install foo > "${FAKE_DIR}/proc/800/cmdline"
+    fi
     exit "${FAKE_STOP_RC:-0}"
     ;;
   poweroff) exit "${FAKE_POWEROFF_RC:-0}" ;;
@@ -57,23 +47,38 @@ case "$1" in
   *) exit 0 ;;
 esac
 EOF
-chmod +x "${bin_dir}/pgrep" "${bin_dir}/systemctl"
+chmod +x "${bin_dir}/systemctl"
 
-# process <pid> <ppid> <command>: one entry of the fake /proc.
+# process <pid> <ppid> <command> [uid [argument...]]: one entry of the fake /proc, with its
+# stat, its status (real, effective, saved and filesystem uid) and its NUL-separated cmdline.
 process() {
-  mkdir -p "${FAKE_DIR}/proc/$1"
-  printf '%s (%s) S %s %s %s 0 -1\n' "$1" "$3" "$2" "$1" "$1" > "${FAKE_DIR}/proc/$1/stat"
+  local pid="$1" ppid="$2" command="$3" uid="${4:-1000}"
+  shift $(( $# < 4 ? $# : 4 ))
+  mkdir -p "${FAKE_DIR}/proc/${pid}"
+  printf '%s (%s) S %s %s %s 0 -1\n' "${pid}" "${command}" "${ppid}" "${pid}" "${pid}" \
+    > "${FAKE_DIR}/proc/${pid}/stat"
+  printf 'Name:\t%s\nUid:\t%s\t%s\t%s\t%s\n' "${command}" "${uid}" "${uid}" "${uid}" "${uid}" \
+    > "${FAKE_DIR}/proc/${pid}/status"
+  if (( $# == 0 )); then
+    set -- "${command}"
+  fi
+  printf '%s\0' "$@" > "${FAKE_DIR}/proc/${pid}/cmdline"
 }
 
-# The measured service tree: runsvc.sh (MainPID) -> node -> Runner.Listener, per unit.
+# The measured service tree: runsvc.sh (MainPID) -> node -> Runner.Listener, per unit. Every
+# Ubuntu runner also keeps the unattended-upgrades shutdown helper, a root process whose kernel
+# name is that of an upgrade run (measured 2026-09-30 on both pools): every case that expects a
+# poweroff proves that it is not taken for package maintenance.
 runner_services() {
-  process 1 0 systemd
+  process 1 0 systemd 0
   process 100 1 runsvc.sh
   process 200 100 node
   process 300 200 Runner.Listener
   process 110 1 runsvc.sh
   process 210 110 node
   process 310 210 Runner.Listener
+  process 759 1 unattended-upgr 0 /usr/bin/python3 \
+    /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal
 }
 epoch() { date -u -d "$1" +%s; }
 afternoon="$(epoch '2026-09-30T14:00:00Z')"
@@ -92,16 +97,19 @@ fresh_case() {
 
 run_check() {
   local now="$1"
-  CERTIGO_IDLE_NOW="${now}" \
-    CERTIGO_IDLE_CONFIG_FILE="${FAKE_DIR}/config" \
+  CERTIGO_IDLE_NOW="${now}" run_agent check
+}
+
+run_agent() {
+  CERTIGO_IDLE_CONFIG_FILE="${FAKE_DIR}/config" \
     CERTIGO_IDLE_STATE_DIR="${FAKE_DIR}/state" \
     CERTIGO_IDLE_HOLD_FILE="${FAKE_DIR}/hold" \
     CERTIGO_IDLE_SYSTEMCTL="${bin_dir}/systemctl" \
-    CERTIGO_IDLE_PGREP="${bin_dir}/pgrep" \
     CERTIGO_IDLE_PROC_ROOT="${FAKE_DIR}/proc" \
     CERTIGO_IDLE_UPTIME_FILE="${FAKE_DIR}/uptime" \
+    CERTIGO_IDLE_UNIT_DIR="${FAKE_DIR}/units" \
     CERTIGO_IDLE_DRAIN_SECONDS="${FAKE_DRAIN_SECONDS:-1}" \
-    bash "${agent}" check
+    bash "${agent}" "$@"
 }
 
 fail() {
@@ -165,23 +173,56 @@ run_check "$(( afternoon + 120 ))" >/dev/null
 assert_no_poweroff reset
 [[ "$(cat "${FAKE_DIR}/state/guards")" == 0 ]] || fail "reset: guards must restart from 0"
 
-# 6. Package maintenance by root counts as activity.
-fresh_case apt
-touch "${FAKE_DIR}/apt-root"
+# 6. Package maintenance by root counts as activity: an upgrade run, which the kernel names like
+#    the shutdown helper, and apt/dpkg. The effective uid decides, as for `pgrep -u`.
+for maintenance in 'unattended-upgr 0 /usr/bin/python3 /usr/bin/unattended-upgrade' \
+  'dpkg 0 /usr/bin/dpkg --configure -a' 'apt-get 0 /usr/bin/apt-get -y upgrade' \
+  'apt 0 apt full-upgrade'; do
+  fresh_case apt
+  read -r -a words <<<"${maintenance}"
+  process 700 1 "${words[@]}"
+  run_check "${afternoon}" >/dev/null
+  run_check "$(( afternoon + 60 ))" >/dev/null
+  assert_no_poweroff "apt (${words[0]})"
+  [[ "$(cat "${FAKE_DIR}/state/last-activity")" == "$(( afternoon + 60 ))" ]] ||
+    fail "apt (${words[0]}): activity not recorded"
+  grep -qx 'activity=package-maintenance' <<<"$(run_agent status)" ||
+    fail "apt (${words[0]}): status must name the activity"
+done
+fresh_case apt-setuid
+process 700 1 dpkg 0 /usr/bin/dpkg --configure -a
+printf 'Name:\tdpkg\nUid:\t1000\t0\t0\t0\n' > "${FAKE_DIR}/proc/700/status"
 run_check "${afternoon}" >/dev/null
 run_check "$(( afternoon + 60 ))" >/dev/null
-assert_no_poweroff apt
+assert_no_poweroff apt-setuid
+
+# 6a. The permanent unattended-upgrades shutdown helper alone is not activity: the status says
+#     so, and the machine idles out (the helper is part of every fake machine).
+fresh_case helper
+grep -qx 'activity=none' <<<"$(run_agent status)" || fail "helper: status must report no activity"
+process 400 300 Runner.Worker
+grep -qx 'activity=job' <<<"$(run_agent status)" || fail "helper: status must report the job"
+rm -r "${FAKE_DIR}/proc/400"
+run_check "${afternoon}" >/dev/null
+run_check "$(( afternoon + 60 ))" >/dev/null
+assert_poweroff helper
 
 # 6b. Signals that job code can fake are not activity: a Runner.Worker left behind (reparented
 #     to init), a renamed pair "Runner.Listener" -> "Runner.Worker" outside the service tree,
-#     and an apt/dpkg process run by the runner account.
+#     apt/dpkg or an upgrade run by the runner account, a root helper look-alike whose effective
+#     uid is the runner's, and a maintenance process that has gone (no status any more).
 fresh_case spoof
 process 901 1 Runner.Worker
 process 910 1 Runner.Listener
 process 911 910 Runner.Worker
 process 920 400 Runner.Listener
 process 921 920 Runner.Worker
-touch "${FAKE_DIR}/apt-user"
+process 930 400 apt-get 1000 /usr/bin/apt-get -y install foo
+process 931 400 unattended-upgr 1000 /usr/bin/python3 /usr/bin/unattended-upgrade
+process 932 400 dpkg 0 /usr/bin/dpkg -i foo.deb
+printf 'Name:\tdpkg\nUid:\t0\t1000\t1000\t1000\n' > "${FAKE_DIR}/proc/932/status"
+process 940 1 dpkg 0 /usr/bin/dpkg --configure -a
+rm "${FAKE_DIR}/proc/940/status" "${FAKE_DIR}/proc/940/cmdline"
 printf '%s\n' "$(( afternoon - 900 ))" > "${FAKE_DIR}/state/last-activity"
 run_check "${afternoon}" >/dev/null
 run_check "$(( afternoon + 60 ))" >/dev/null

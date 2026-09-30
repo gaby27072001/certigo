@@ -27,8 +27,9 @@
 # que le code d'une PR ne peut pas imiter : un `Runner.Worker` enfant du VRAI listener, c'est-à-
 # dire du `Runner.Listener` petit-enfant du processus principal que systemd attribue au service
 # `actions.runner.*` (runsvc.sh -> node -> Runner.Listener -> Runner.Worker, mesuré le
-# 2026-09-30) ; ou apt/dpkg exécuté par root. Un nom de processus se choisit librement, une
-# filiation depuis le MainPID systemd, non.
+# 2026-09-30) ; ou apt/dpkg/unattended-upgrade exécuté par root, hors du veilleur permanent
+# `unattended-upgrade-shutdown --wait-for-signal` qui porte le même nom noyau. Un nom de
+# processus se choisit librement, une filiation depuis le MainPID systemd, non.
 #
 # Limite assumée : un job attribué par GitHub dans la fraction de seconde entre la dernière
 # lecture et l'arrêt du listener est annulé par cet arrêt, et aucune relecture ne peut le
@@ -56,7 +57,6 @@ CONFIG_FILE="${CERTIGO_IDLE_CONFIG_FILE:-/etc/certigo-idle-shutdown.env}"
 STATE_DIR="${CERTIGO_IDLE_STATE_DIR:-/run/certigo-idle-shutdown}"
 HOLD_FILE="${CERTIGO_IDLE_HOLD_FILE:-/etc/certigo-idle-shutdown.hold}"
 SYSTEMCTL="${CERTIGO_IDLE_SYSTEMCTL:-/usr/bin/systemctl}"
-PGREP="${CERTIGO_IDLE_PGREP:-/usr/bin/pgrep}"
 PROC_ROOT="${CERTIGO_IDLE_PROC_ROOT:-/proc}"
 UPTIME_FILE="${CERTIGO_IDLE_UPTIME_FILE:-/proc/uptime}"
 
@@ -193,9 +193,38 @@ genuine_listeners() {
   done < <(active_runner_units)
 }
 
-# A job in progress is the only reason a runner VM must stay up. Package maintenance by root is
-# activity too, so that an OS update is never cut in the middle; the runner account cannot
-# start a root apt/dpkg beyond its sudo allow-list.
+# Package maintenance by root is activity, so that an OS update is never cut in the middle; the
+# runner account cannot start a root apt/dpkg beyond its sudo allow-list. The kernel names a
+# script after its file, cut to 15 characters: an upgrade run (/usr/bin/unattended-upgrade) and
+# the helper `unattended-upgrade-shutdown --wait-for-signal`, which unattended-upgrades.service
+# keeps running on every Ubuntu runner, are both `unattended-upgr`. The helper only waits for a
+# shutdown; counting it kept every runner up (measured 2026-09-30 on both pools), so its command
+# line tells it apart. Reads the table filled by load_process_table.
+package_maintenance_running() {
+  local pid key real effective rest argument
+  local -a arguments
+  for pid in "${!COMMAND_OF[@]}"; do
+    case "${COMMAND_OF[${pid}]}" in
+      apt|apt-get|dpkg|unattended-upgr) ;;
+      *) continue ;;
+    esac
+    effective=''
+    while read -r key real effective rest; do
+      [[ "${key}" == 'Uid:' ]] && break
+      effective=''
+    done 2>/dev/null < "${PROC_ROOT}/${pid}/status" || continue
+    [[ "${effective}" == 0 ]] || continue
+    arguments=()
+    mapfile -d '' -t arguments 2>/dev/null < "${PROC_ROOT}/${pid}/cmdline" || continue
+    for argument in "${arguments[@]}"; do
+      [[ "${argument##*/}" == 'unattended-upgrade-shutdown' ]] && continue 2
+    done
+    return 0
+  done
+  return 1
+}
+
+# A job in progress is the only reason a runner VM must stay up, with package maintenance.
 activity_description() {
   load_process_table
   local listener pid
@@ -209,7 +238,7 @@ activity_description() {
       return 0
     fi
   done
-  if "${PGREP}" -u root -x 'apt|apt-get|dpkg|unattended-upgr' >/dev/null 2>&1; then
+  if package_maintenance_running; then
     printf 'package-maintenance\n'
     return 0
   fi
@@ -333,7 +362,8 @@ check() {
   if any_worker_present; then
     log "a Runner.Worker process is still present after ${DRAIN_SECONDS}s; halting anyway"
   fi
-  if "${PGREP}" -u root -x 'apt|apt-get|dpkg|unattended-upgr' >/dev/null 2>&1; then
+  load_process_table
+  if package_maintenance_running; then
     restart_runner_units "${units[@]}"
     record_activity "${now}"
     log "package maintenance started during the final guard; runners restarted, shutdown abandoned"
@@ -436,7 +466,7 @@ uninstall_agent() {
 }
 
 status() {
-  local sha='absent'
+  local sha='absent' activity
   if [[ -f "${INSTALL_PATH}" ]]; then
     sha="$(sha256sum "${INSTALL_PATH}" | awk '{ print $1 }')"
   fi
@@ -448,6 +478,9 @@ status() {
     printf 'config=absent\n'
   fi
   printf 'hold=%s\n' "$([[ -e "${HOLD_FILE}" ]] && echo present || echo absent)"
+  # What the next check sees, so that a machine that never idles out shows why.
+  activity="$(activity_description 2>/dev/null)" || activity='none'
+  printf 'activity=%s\n' "${activity}"
   printf 'last_activity=%s\n' "$(read_integer_file "${STATE_DIR}/last-activity" 0)"
   printf 'guards=%s\n' "$(read_integer_file "${STATE_DIR}/guards" 0)"
   printf 'imds_drop_in=%s\n' "$([[ -f "${UNIT_DIR}/${IMDS_UNIT}.d/${IMDS_DROP_IN_NAME}" ]] && echo present || echo absent)"
