@@ -206,6 +206,64 @@ fifth of the whole fleet's compute, for machines that never served a job. A stop
 instance is not a free instance. They cannot be deleted while the lock stands, so
 removing them is a deliberate act that must lift the lock first.
 
+### On-demand runners (ADR-022), measured and projected on 2026-09-30
+
+> Volatile facts, dated and bounded. Measured **2026-09-30**. Invalidated by any change of pool
+> size, quiet period, runner VM size, or of the nightly recovery schedule; re-measure rather than
+> amend. Decision and residual risks: `docs/adr/ADR-022-runners-ci-a-la-demande.md`; operations:
+> `docs/runbooks/CI_RUNNERS.md` §13.
+
+**Before.** The 30-day Cost Management audit of 2026-09-30 puts `rg-certigo-ci` at ≈ 555 USD
+(65% of the Certigo bill): trusted pool ≈ 265 (VM 172, Defender 32, NAT 40, disks 12, IP 7) and
+PR pool ≈ 279 (VM 156, disks 36, NAT 52, Defender 28, IP 4). That 30-day window understates the
+current rate: since the recovery started enumerating the scale sets on 2026-09-23, all six
+instances are started every night and run ≈ 23.2 h/day, i.e. **≈ 139 VM-hours/day ≈ 19.2 USD/day
+of compute (≈ 577 USD/30 d)**, plus Defender for Servers at the measured ≈ 0.025 USD/VM-hour.
+
+**Work actually done in that time**, from the GitHub API over both repositories,
+2026-09-24 12:00 → 2026-09-30 11:00 UTC: 1,860 `certigo-pr` jobs for **2.14 busy runner-hours/day**
+and 531 `certigo-trusted`/`certigo-ci` jobs for **0.95 busy runner-hours/day**, all between 08:00
+and 18:00 UTC, in 21 bursts separated by more than 20 minutes. **The fleet was powered ≈ 45 times
+longer than it worked.** This is the standing-compute row of the table above, now quantified.
+
+**Mechanism.** Each runner VM powers itself off after a resettable quiet period without a job
+(900 s PR, 1,200 s trusted, two guards, final guard), a Logic App deallocates VMs whose OS has
+stopped, and a `workflow_job` webhook starts the pool again when a job queues. Capacity
+(`sku.capacity`, autoscale minimum 2) is unchanged; only powered hours drop.
+
+**Projection** — a replay of those 1,860 + 531 real jobs (whole pool woken per job, 1.5-minute cold
+start, nightly recovery at 01:30 UTC included), not a measurement:
+
+| Pool | Before (VM-h/day) | After, replay (VM-h/day) | Queue wait added (replay) |
+| --- | ---: | ---: | --- |
+| PR, 4 instances, 900 s | 93 | ≈ 7.0 | p50 14 s, p90 87 s, 18% of jobs > 60 s |
+| Trusted, 2 instances, 1,200 s | 46 | ≈ 5.2 | p50 0 s, p90 13 s, 7% of jobs > 60 s |
+
+At 0.138 USD/VM-hour that is ≈ 51 USD/30 d of compute and ≈ 9 USD/30 d of Defender for Servers,
+plus the two Logic Apps (≈ 5–10 USD/30 d at ≈ 400 queued jobs/day). **Projected saving:
+≈ 320 USD/30 d against the audit's 30-day actuals (VM 328 + Defender 60), ≈ 610 USD/30 d against
+the current run rate.** What does not move is the network and storage floor — two NAT gateways
+(≈ 92 including data processing), the six 128 GiB OS disks (≈ 35, still billed when deallocated), public IPs (≈ 11) — so `rg-certigo-ci`
+should settle near **≈ 220 USD/30 d**, under its 375 USD budget. Read the first days of Cost
+Management data as provisional (see "Cost data is provisional and is restated" above).
+
+**The PR cold start depended on a boot defect, fixed by the same change.** The live PR instances
+load their OS-level IMDS block only after cloud-init, whose Azure datasource then waits 10 × 30 s
+on packets the NSG drops: measured on `6e3abce4`, boot 01:31:31, runner started 01:36:44. The
+agent installer orders `certigo-block-imds.service` before `cloud-init-local.service`, which
+turns those waits into immediate refusals and closes IMDS earlier in boot.
+
+**After activation** (to be measured over the first full working days, from the Activity Log
+power operations and the GitHub API; not yet recorded):
+
+| Measure | Before | After |
+| --- | ---: | ---: |
+| Powered VM-hours/day, PR | 93 | *pending* |
+| Powered VM-hours/day, trusted | 46 | *pending* |
+| Queue wait p50 / p90, `certigo-pr` | 19 s / 125 s | *pending* |
+| Queue wait p50 / p90, `certigo-trusted` | 2 s / 6 s | *pending* |
+| Wake runs failed / deallocation runs failed | n/a | *pending* |
+
 ## Guardrails
 
 `infra/finops/main.bicep` is an opt-in subscription deployment. Its default

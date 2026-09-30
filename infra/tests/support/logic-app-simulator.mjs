@@ -193,6 +193,13 @@ class ArmExpressionEvaluator {
       case 'guid': return `guid(${args.join(',')})`;
       case 'uniqueString': return `uni${Math.abs(String(args.join('|')).split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0)).toString(36)}`;
       case 'take': return String(args[0]).slice(0, Number(args[1]));
+      case 'range': return Array.from({ length: Number(args[1]) }, (_value, offset) => Number(args[0]) + offset);
+      case 'reduce': return args[0].reduce((accumulator, item) => this.invokeLambdaWith(args[2], [accumulator, item]), args[1]);
+      case 'length': return Array.isArray(args[0]) || typeof args[0] === 'string' ? args[0].length : Object.keys(args[0]).length;
+      case 'equals': return stableString(args[0]) === stableString(args[1]);
+      case 'add': return Number(args[0]) + Number(args[1]);
+      case 'sub': return Number(args[0]) - Number(args[1]);
+      case 'mul': return Number(args[0]) * Number(args[1]);
       default: throw new Error(`unsupported ARM function ${name}`);
     }
   }
@@ -204,8 +211,17 @@ class ArmExpressionEvaluator {
 
   invokeLambda(lambda, item, index) {
     if (!lambda?.__lambda) throw new Error('expected lambda');
-    const locals = new Map([[lambda.name, item], [`${lambda.name}Index`, index]]);
+    // A two-parameter lambda given to map/toObject receives (item, index).
+    if (lambda.names) return this.invokeLambdaWith(lambda, [item, index]);
+    const locals = new Map([...(lambda.closure ?? []), [lambda.name, item], [`${lambda.name}Index`, index]]);
     return this.evalExpression(lambda.expression, locals);
+  }
+
+  invokeLambdaWith(lambda, values) {
+    if (!lambda?.__lambda) throw new Error('expected lambda');
+    const names = lambda.names ?? [lambda.name];
+    if (names.length !== values.length) throw new Error(`lambda expects ${names.length} arguments, got ${values.length}`);
+    return this.evalExpression(lambda.expression, new Map([...(lambda.closure ?? []), ...names.map((name, position) => [name, values[position]])]));
   }
 }
 
@@ -280,7 +296,10 @@ class ArmParser {
       this.index += 1;
       if (ident === 'lambda') {
         const parts = splitArguments(body);
-        return { __lambda: true, name: this.evaluator.evalExpression(parts[0], this.locals), expression: parts[1] };
+        const names = parts.slice(0, -1).map((part) => this.evaluator.evalExpression(part, this.locals));
+        // A nested lambda closes over the variables of the lambdas that enclose it.
+        if (names.length === 1) return { __lambda: true, name: names[0], expression: parts.at(-1), closure: this.locals };
+        return { __lambda: true, names, expression: parts.at(-1), closure: this.locals };
       }
       const args = splitArguments(body).map((part) => this.evaluator.evalExpression(part, this.locals));
       return this.evaluator.call(ident, args, this.locals);
@@ -345,11 +364,33 @@ export function expandRecoveryWorkflow(parentTemplate, options = {}) {
   };
 }
 
+// Expands every Microsoft.Logic/workflows resource of a nested module deployment, keyed by
+// workflow name, with the parameters the composition passes to that module.
+export function expandModuleWorkflows(parentTemplate, deploymentName, options = {}) {
+  const parent = new ArmExpressionEvaluator(parentTemplate, options.compositionParameters ?? {});
+  const nested = resources(parentTemplate).find((resource) => resource.type === 'Microsoft.Resources/deployments' && resource.name === deploymentName);
+  if (!nested) throw new Error(`nested deployment ${deploymentName} not found`);
+  if (nested.properties?.expressionEvaluationOptions?.scope !== 'inner') throw new Error('nested deployment must use inner expression evaluation');
+  const nestedParameters = {};
+  for (const [name, parameter] of Object.entries(nested.properties.parameters ?? {})) nestedParameters[name] = parent.evalValue(parameter.value);
+  Object.assign(nestedParameters, options.moduleParameters ?? {});
+  const child = new ArmExpressionEvaluator(nested.properties.template, nestedParameters);
+  const workflows = {};
+  for (const workflow of resources(nested.properties.template).filter((resource) => resource.type === 'Microsoft.Logic/workflows')) {
+    workflows[child.evalValue(workflow.name)] = {
+      definition: child.evalValue(workflow.properties.definition),
+      accessControl: workflow.properties.accessControl === undefined ? undefined : child.evalValue(workflow.properties.accessControl),
+    };
+  }
+  return { workflows, moduleTemplate: nested.properties.template, nestedParameters };
+}
+
 class LogicExpressionEvaluator {
-  constructor(parameters, actions, frames = {}) {
+  constructor(parameters, actions, frames = {}, trigger = {}) {
     this.parameters = parameters;
     this.actions = actions;
     this.frames = frames;
+    this.trigger = trigger;
   }
 
   evalTemplate(value) {
@@ -370,6 +411,9 @@ class LogicExpressionEvaluator {
   call(name, args) {
     switch (name) {
       case 'body': return this.actions.get(args[0])?.body ?? null;
+      case 'triggerBody': return clone(this.trigger.body) ?? null;
+      case 'triggerOutputs': return { headers: clone(this.trigger.headers) ?? {}, body: clone(this.trigger.body) ?? null };
+      case 'intersection': return args[0].filter((item) => args.slice(1).every((other) => other.some((candidate) => stableString(candidate) === stableString(item))));
       case 'items': return this.frames.loops?.[args[0]] ?? null;
       case 'item': return this.frames.item ?? null;
       case 'parameters': return this.parameters[args[0]];
@@ -506,14 +550,32 @@ function evaluateCondition(condition, evaluator) {
 
 export class MockArm {
   constructor(options = {}) {
-    this.vms = (options.vms ?? []).map((vm) => ({ ...vm }));
+    this.vms = (options.vms ?? []).map((vm) => ({ ...vm, timeline: [...(vm.timeline ?? [])] }));
     this.failListScaleSets = new Set(options.failListScaleSets ?? []);
     this.nextLinkScaleSets = new Set(options.nextLinkScaleSets ?? []);
     this.requests = [];
+    this.clockSeconds = 0;
   }
 
   startedNames() {
-    return this.requests.filter((request) => request.method === 'POST').map((request) => request.name);
+    return this.requests.filter((request) => request.method === 'POST' && request.operation !== 'deallocate').map((request) => request.name);
+  }
+
+  deallocatedNames() {
+    return this.requests.filter((request) => request.method === 'POST' && request.operation === 'deallocate').map((request) => request.name);
+  }
+
+  powerOf(name) {
+    return this.vms.find((vm) => vm.name === name)?.power;
+  }
+
+  // Scripted transitions: `timeline: [{ at: <seconds>, power: '<state>' }]`, e.g. an OS that
+  // halts itself (running -> stopped) while a workflow is waiting.
+  async advance(seconds) {
+    this.clockSeconds += seconds;
+    for (const vm of this.vms) {
+      while (vm.timeline.length > 0 && vm.timeline[0].at <= this.clockSeconds) vm.power = vm.timeline.shift().power;
+    }
   }
 
   async request(method, uri) {
@@ -522,6 +584,14 @@ export class MockArm {
     const apiVersion = url.searchParams.get('api-version');
     if (!apiVersion) return { status: 400, body: { error: 'missing api-version' } };
     const vmCollection = `/subscriptions/${deploymentContext.subscriptionId}/resourceGroups/${deploymentContext.resourceGroupName}/providers/Microsoft.Compute/virtualMachines`.toLowerCase();
+    if (method === 'GET' && url.pathname.toLowerCase().startsWith(`${vmCollection}/`)) {
+      const name = decodeURIComponent(url.pathname.slice(vmCollection.length + 1));
+      if (name.includes('/')) return { status: 404, body: { error: 'unknown get path' } };
+      if (url.searchParams.get('$expand') !== 'instanceView') return { status: 400, body: { error: 'missing $expand=instanceView' } };
+      const vm = this.vms.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
+      if (!vm) return { status: 404, body: { error: 'unknown VM' } };
+      return { status: 200, body: this.toArmVm(vm) };
+    }
     if (method === 'GET') {
       if (url.pathname.toLowerCase() !== vmCollection) return { status: 404, body: { error: 'unknown list path' } };
       if (url.searchParams.get('$expand') !== 'instanceView') return { status: 400, body: { error: 'missing $expand=instanceView' } };
@@ -540,16 +610,28 @@ export class MockArm {
       return { status: 200, body };
     }
     if (method === 'POST') {
-      const match = /\/virtualMachines\/([^/]+)\/start$/i.exec(url.pathname);
+      const match = /\/virtualMachines\/([^/]+)\/(start|deallocate)$/i.exec(url.pathname);
       if (!match) return { status: 404, body: { error: 'unknown post path' } };
       const name = decodeURIComponent(match[1]);
+      const operation = match[2].toLowerCase();
       this.requests.at(-1).name = name;
+      this.requests.at(-1).operation = operation;
       const vm = this.vms.find((candidate) => candidate.name === name);
       if (!vm) return { status: 404, body: { error: 'unknown VM' } };
-      // Starts complete synchronously in the simulator; real ARM may return 202 and finish later.
+      if (operation === 'deallocate') {
+        if (vm.onDeallocate === 'fail') return { status: 500, body: { error: 'deallocate failed' } };
+        if (vm.power === 'starting' || vm.power === 'deallocating') return { status: 409, body: { error: 'OperationNotAllowed' } };
+        vm.power = 'deallocated';
+        return { status: 200, body: { status: 'deallocated' } };
+      }
+      // Starts complete synchronously in the simulator unless the VM declares `startsInto`;
+      // real ARM returns 202 and finishes later.
       if (vm.onStart === 'fail') return { status: 500, body: { error: 'start failed' } };
-      vm.power = 'running';
-      return { status: 200, body: { status: 'started' } };
+      if (vm.onStart === 'forbidden') return { status: 403, body: { error: 'AuthorizationFailed' } };
+      if (vm.onStart === 'throttled') return { status: 429, body: { error: 'TooManyRequests' } };
+      if (vm.power === 'deallocating') return { status: 409, body: { error: 'OperationNotAllowed' } };
+      vm.power = vm.startsInto ?? 'running';
+      return { status: vm.startsInto ? 202 : 200, body: { status: 'started' } };
     }
     return { status: 405, body: { error: 'unsupported method' } };
   }
@@ -577,7 +659,7 @@ export async function runWorkflow(definition, arm, options = {}) {
   Object.assign(parameters, options.parameters ?? {});
   const actions = new Map();
   const branches = new Map();
-  const termination = await runActions(definition.actions ?? {}, { parameters, arm, actions, branches, loops: {} });
+  const termination = await runActions(definition.actions ?? {}, { parameters, arm, actions, branches, loops: {}, trigger: options.trigger ?? {} });
   if (termination) return { status: termination.status, error: termination.error, actions, branches, requests: arm.requests };
 
   const successors = new Map();
@@ -607,6 +689,25 @@ export async function runWorkflow(definition, arm, options = {}) {
   return { status: failed ? 'Failed' : 'Succeeded', actions, branches, requests: arm.requests };
 }
 
+function effectiveBranchStatus(actionObject, actionStates) {
+  const successors = new Set();
+  for (const action of Object.values(actionObject)) for (const predecessor of Object.keys(action.runAfter ?? {})) successors.add(predecessor);
+  const memo = new Map();
+  const effective = (name) => {
+    if (memo.has(name)) return memo.get(name);
+    const status = actionStates.get(name)?.status ?? 'Skipped';
+    if (status !== 'Skipped') {
+      memo.set(name, status);
+      return status;
+    }
+    const predecessors = Object.keys(actionObject[name]?.runAfter ?? {});
+    const result = predecessors.some((predecessor) => effective(predecessor) === 'Failed') ? 'Failed' : 'Skipped';
+    memo.set(name, result);
+    return result;
+  };
+  return Object.keys(actionObject).filter((name) => !successors.has(name)).some((leaf) => effective(leaf) === 'Failed') ? 'Failed' : 'Succeeded';
+}
+
 async function runActions(actionObject, context) {
   const pending = new Set(Object.keys(actionObject));
   while (pending.size > 0) {
@@ -632,7 +733,7 @@ async function runActions(actionObject, context) {
 }
 
 async function runAction(name, action, context) {
-  const evaluator = new LogicExpressionEvaluator(context.parameters, context.actions, { loops: context.loops, item: context.item });
+  const evaluator = new LogicExpressionEvaluator(context.parameters, context.actions, { loops: context.loops, item: context.item }, context.trigger);
   switch (action.type) {
     case 'Http': {
       const response = await context.arm.request(action.inputs.method, evaluator.evalTemplate(action.inputs.uri));
@@ -641,13 +742,13 @@ async function runAction(name, action, context) {
     }
     case 'Query': {
       const from = evaluator.evalTemplate(action.inputs.from);
-      const body = from.filter((item) => new LogicExpressionEvaluator(context.parameters, context.actions, { ...context, item }).evalTemplate(action.inputs.where));
+      const body = from.filter((item) => new LogicExpressionEvaluator(context.parameters, context.actions, { ...context, item }, context.trigger).evalTemplate(action.inputs.where));
       context.actions.set(name, { status: 'Succeeded', body });
       return null;
     }
     case 'Select': {
       const from = evaluator.evalTemplate(action.inputs.from);
-      const body = from.map((item) => new LogicExpressionEvaluator(context.parameters, context.actions, { ...context, item }).evalTemplate(action.inputs.select));
+      const body = from.map((item) => new LogicExpressionEvaluator(context.parameters, context.actions, { ...context, item }, context.trigger).evalTemplate(action.inputs.select));
       context.actions.set(name, { status: 'Succeeded', body });
       return null;
     }
@@ -667,15 +768,21 @@ async function runAction(name, action, context) {
       context.actions.set(name, { status: failed ? 'Failed' : 'Succeeded', body: null });
       return null;
     }
-    case 'Wait':
+    case 'Wait': {
+      const interval = action.inputs?.interval ?? {};
+      const unitSeconds = { Second: 1, Minute: 60, Hour: 3600 }[interval.unit] ?? 0;
+      // The mock clock advances so that scripted power-state transitions can happen mid-run.
+      await context.arm.advance?.(Number(interval.count ?? 0) * unitSeconds);
       context.actions.set(name, { status: 'Succeeded', body: null });
       return null;
+    }
     case 'If': {
       const condition = evaluateCondition(action.expression, evaluator);
       context.branches.set(name, condition ? 'then' : 'else');
       const branchActions = condition ? (action.actions ?? {}) : (action.else?.actions ?? {});
       const termination = await runActions(branchActions, context);
-      context.actions.set(name, { status: termination ? termination.status : 'Succeeded', body: null });
+      // Like the engine, a branch with an unhandled failed action fails its condition.
+      context.actions.set(name, { status: termination ? termination.status : effectiveBranchStatus(branchActions, context.actions), body: null });
       return termination;
     }
     case 'Terminate': {

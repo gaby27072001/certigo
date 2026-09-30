@@ -11,6 +11,10 @@ register_pilot="${root}/infra/ci-runner/register-pilot.ps1"
 canary_transition="${root}/infra/ci-runner/image/canary-transition.ps1"
 canary_cleanup="${root}/infra/ci-runner/image/canary-cleanup.ps1"
 test_health="${root}/infra/ci-runner/test-health-probe.sh"
+idle_shutdown="${root}/infra/ci-runner/idle-shutdown.sh"
+test_idle_shutdown="${root}/infra/ci-runner/test-idle-shutdown.sh"
+install_idle_shutdown="${root}/infra/ci-runner/install-idle-shutdown.ps1"
+register_wake_webhooks="${root}/infra/ci-runner/register-wake-webhooks.ps1"
 lifecycle_preflight="${root}/infra/ci-runner/lifecycle-preflight.sh"
 capacity_plan="${root}/infra/ci-runner/capacity-plan.sh"
 validate="${root}/infra/ci-runner/validate.sh"
@@ -26,6 +30,8 @@ for script in \
   "${pilot_preflight}" \
   "${pilot_register}" \
   "${test_health}" \
+  "${idle_shutdown}" \
+  "${test_idle_shutdown}" \
   "${lifecycle_preflight}" \
   "${capacity_plan}" \
   "${image_dir}/prewarm-toolchain.sh" \
@@ -200,6 +206,30 @@ if ! (( preflight_cloud_init_line < preflight_imds_line &&
 fi
 
 bash "${test_health}"
+bash "${test_idle_shutdown}"
+# The idle agent holds no identity and calls nothing: it only stops the local runner services
+# and halts the OS. Deallocation and wake-up live in Azure (on-demand.bicep).
+for forbidden in '169.254.169.254' 'management.azure.com' 'api.github.com' 'curl ' 'wget '; do
+  if grep -Fq -- "${forbidden}" "${idle_shutdown}"; then
+    echo "idle-shutdown.sh must not call ${forbidden}." >&2
+    exit 1
+  fi
+done
+grep -F 'readonly REQUIRED_GUARDS=2' "${idle_shutdown}" >/dev/null
+grep -F 'readonly MINIMUM_QUIET_PERIOD_SECONDS=300' "${idle_shutdown}" >/dev/null
+# Action Run Commands only: a managed runCommands child resource could not be deleted under the
+# rg-certigo-ci CanNotDelete lock and would accumulate.
+grep -F "'run-command', 'invoke'" "${install_idle_shutdown}" >/dev/null
+if grep -Fq 'runCommands/' "${install_idle_shutdown}"; then
+  echo "install-idle-shutdown.ps1 must not create managed Run Command resources." >&2
+  exit 1
+fi
+# The signed trigger URL is a bearer secret: sent to GitHub on stdin, never printed.
+grep -F "'--input', '-'" "${register_wake_webhooks}" >/dev/null
+if grep -Eq 'Write-(Host|Output|Verbose|Information)[^#]*\$callbackUrl' "${register_wake_webhooks}"; then
+  echo "register-wake-webhooks.ps1 must never print the signed trigger URL." >&2
+  exit 1
+fi
 node --test "${root}/infra/ci-runner/evaluate-lifecycle.test.mjs"
 node --test "${root}/infra/ci-runner/capacity-controller.test.mjs"
 node --check "${root}/infra/ci-runner/scale-in-safety.mjs"
@@ -214,19 +244,29 @@ node "${image_dir}/validate-canary-evidence.mjs" --plan
 canary_transition_ps="${canary_transition}"
 canary_cleanup_ps="${canary_cleanup}"
 register_pilot_ps="${register_pilot}"
+install_idle_shutdown_ps="${install_idle_shutdown}"
+register_wake_webhooks_ps="${register_wake_webhooks}"
 if command -v cygpath >/dev/null 2>&1; then
   canary_transition_ps="$(cygpath -w "${canary_transition}")"
   canary_cleanup_ps="$(cygpath -w "${canary_cleanup}")"
   register_pilot_ps="$(cygpath -w "${register_pilot}")"
+  install_idle_shutdown_ps="$(cygpath -w "${install_idle_shutdown}")"
+  register_wake_webhooks_ps="$(cygpath -w "${register_wake_webhooks}")"
 elif command -v wslpath >/dev/null 2>&1 &&
   grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
   canary_transition_ps="$(wslpath -w "${canary_transition}")"
   canary_cleanup_ps="$(wslpath -w "${canary_cleanup}")"
   register_pilot_ps="$(wslpath -w "${register_pilot}")"
+  install_idle_shutdown_ps="$(wslpath -w "${install_idle_shutdown}")"
+  register_wake_webhooks_ps="$(wslpath -w "${register_wake_webhooks}")"
 fi
 if command -v pwsh >/dev/null 2>&1; then
   pwsh -NoProfile -NonInteractive -Command \
     "\$errors = \$null; [System.Management.Automation.Language.Parser]::ParseFile('${canary_transition_ps}', [ref]\$null, [ref]\$errors) > \$null; if (\$errors.Count -ne 0) { \$errors | Out-String | Write-Error; exit 1 }; \$errors = \$null; [System.Management.Automation.Language.Parser]::ParseFile('${canary_cleanup_ps}', [ref]\$null, [ref]\$errors) > \$null; if (\$errors.Count -ne 0) { \$errors | Out-String | Write-Error; exit 1 }"
+  for operator_script in "${install_idle_shutdown_ps}" "${register_wake_webhooks_ps}"; do
+    pwsh -NoProfile -NonInteractive -Command \
+      "\$errors = \$null; [System.Management.Automation.Language.Parser]::ParseFile('${operator_script}', [ref]\$null, [ref]\$errors) > \$null; if (\$errors.Count -ne 0) { \$errors | Out-String | Write-Error; exit 1 }"
+  done
   # The drill interlock must refuse before any Azure or GitHub call.
   drill_on_production="$(pwsh -NoProfile -NonInteractive -File "${register_pilot_ps}" \
     -SubscriptionId 00000000-0000-0000-0000-000000000000 -VmName drill -RebuildDrill 2>&1 || true)"

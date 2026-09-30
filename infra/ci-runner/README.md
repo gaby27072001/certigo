@@ -52,7 +52,7 @@ Passerelle NAT nat-vm-certigo-runner-2
 
 ## Périmètre IaC
 
-Quatre modèles complémentaires sont versionnés :
+Six modèles complémentaires sont versionnés :
 
 - `network.bicep` référence l'IP, la NAT, le NSG et le VNet en `existing`,
   applique leurs tags par des extensions `Microsoft.Resources/tags` isolées et
@@ -63,7 +63,13 @@ Quatre modèles complémentaires sont versionnés :
   C'est un modèle historique de reconstruction, pas le modèle du compute live ;
 - `pilot.bicep` crée un VMSS Flexible PR-only dans un VNet dédié non appairé, avec son
   propre NAT/NSG. Il n'accorde aucune identité, IP publique, route privée applicative ou
-  label trusted.
+  label trusted ;
+- `auto-recovery.bicep` rallume chaque nuit à 01:30 UTC toutes les instances non exclues des
+  deux scale sets (identité lire + démarrer) ;
+- `on-demand.bicep` désalloue les instances dont l'OS s'est arrêté (identité lire +
+  désallouer) et les redémarre sur webhook `workflow_job` (identité lire + démarrer), avec
+  l'agent VM `idle-shutdown.sh` installé par `install-idle-shutdown.ps1` et les webhooks posés
+  par `register-wake-webhooks.ps1`.
 
 `runner.bicep` sert à créer une nouvelle instance ou à reconstruire une instance
 préalablement supprimée. **Ne pas l'appliquer au nom d'une VM vivante** : les propriétés
@@ -284,6 +290,15 @@ membres du scale set depuis le 2026-09-23. Un nom de runner Flexible diffère du
 sans binding explicite, le contrôleur doit rester bloqué. Ne jamais réutiliser le binding d'une
 instance pilote remplacée ni retirer les exclusions du runner 26 et de la VM `4153d1dd`.
 
+Dernière étape, depuis le 2026-09-30 : installer l'agent d'extinction sur la nouvelle instance,
+une fois le runner `online`, sinon elle reste allumée en permanence. Les deux Logic Apps de
+`on-demand.bicep` la prennent en charge sans redéploiement, puisqu'ils énumèrent le scale set ;
+`-RebuildDrill` n'en a pas besoin (instance supprimée à la fin du drill).
+
+```powershell
+.\infra\ci-runner\install-idle-shutdown.ps1 -SubscriptionId <SUBSCRIPTION_ID> -VmName <NEW_FLEX_VM_NAME>
+```
+
 ### Coût retail estimé
 
 Estimation Azure Retail Prices du 2026-08-20, West Europe, Linux PAYG, 730 h/mois,
@@ -376,6 +391,14 @@ création Azure Compute Gallery, le `what-if` relu et le canari appartiennent
 explicitement à une PR2 séparée.
 
 ## Capacité et cycle de vie
+
+> ⏻ **Depuis le 2026-09-30, les runners sont à la demande** (ADR-022,
+> [`docs/runbooks/CI_RUNNERS.md`](../../docs/runbooks/CI_RUNNERS.md) §13) : chaque VM s'éteint
+> elle-même après une période calme sans job (`idle-shutdown.sh`, PR 900 s, trusted 1 200 s,
+> deux gardes, garde finale), `on-demand.bicep` désalloue les VM dont l'OS est arrêté et les
+> redémarre sur webhook `workflow_job`. Pools, labels de réveil et périodes calmes :
+> `on-demand.config.json`. La capacité (`sku.capacity`) ne change pas : aucune instance n'est
+> créée ni supprimée, seules les heures allumées baissent.
 
 Les deux VMSS live sont `Standard_D2ads_v6`. L'autoscale legacy est min 2 /
 défaut 2 / max 4. Son scale-out CPU (`> 70 %` pendant 10 minutes) est conservé
