@@ -49,6 +49,12 @@ Trois pièces, chacune sans credential GitHub :
    `unattended-upgrade-shutdown --wait-for-signal`, présent sur toutes les VM Ubuntu et que le
    noyau nomme lui aussi `unattended-upgr`, n'en est pas une : il est reconnu à sa ligne de
    commande (compté à tort, il empêchait toute extinction, mesuré le 2026-09-30 sur le canari).
+   L'évaluation périodique des correctifs Azure (`MsftLinuxPatchAutoAssess.service`, 15 min
+   après chaque boot puis toutes les heures, imposée par la politique de patch de l'abonnement)
+   n'en est pas une non plus : elle ne fait que rafraîchir les listes de paquets
+   (`apt-get -q update`), l'interrompre est sans effet, et la compter relançait la période calme
+   15 min après chaque réveil ; elle est reconnue à son cgroup. L'installation de correctifs par
+   l'agent de VM compte toujours.
    Jamais d'extinction entre 01:15 et 01:50 UTC (reprise), ni d'une machine sans service runner
    (provisionnement). Sur les instances PR, l'installateur ordonne aussi
    `certigo-block-imds.service` avant `cloud-init-local.service` (l'IMDS est refusé dès le début

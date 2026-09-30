@@ -59,6 +59,7 @@ process() {
     > "${FAKE_DIR}/proc/${pid}/stat"
   printf 'Name:\t%s\nUid:\t%s\t%s\t%s\t%s\n' "${command}" "${uid}" "${uid}" "${uid}" "${uid}" \
     > "${FAKE_DIR}/proc/${pid}/status"
+  printf '0::/system.slice/certigo-test.service\n' > "${FAKE_DIR}/proc/${pid}/cgroup"
   if (( $# == 0 )); then
     set -- "${command}"
   fi
@@ -236,6 +237,22 @@ printf '%s\n' "$(( afternoon - 3600 ))" > "${FAKE_DIR}/state/last-activity"
 run_check "${afternoon}" >/dev/null
 run_check "$(( afternoon + 60 ))" >/dev/null
 assert_no_poweroff no-runner
+
+# 6d. Azure's periodic patch assessment, a read-only `apt-get -q update` in its own service
+#     cgroup, is not activity; a patch installation run by the VM agent still is.
+fresh_case assessment
+process 720 719 apt-get 0 apt-get -q update
+printf '0::/system.slice/MsftLinuxPatchAutoAssess.service\n' > "${FAKE_DIR}/proc/720/cgroup"
+grep -qx 'activity=none' <<<"$(run_agent status)" || fail "assessment: status must report no activity"
+run_check "${afternoon}" >/dev/null
+run_check "$(( afternoon + 60 ))" >/dev/null
+assert_poweroff assessment
+fresh_case patch-installation
+process 730 729 apt-get 0 apt-get -y install openssl
+printf '0::/azure.slice/walinuxagent.service\n' > "${FAKE_DIR}/proc/730/cgroup"
+run_check "${afternoon}" >/dev/null
+run_check "$(( afternoon + 60 ))" >/dev/null
+assert_no_poweroff patch-installation
 
 # 7. The hold file suspends every shutdown.
 fresh_case hold

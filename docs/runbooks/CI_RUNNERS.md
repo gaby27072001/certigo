@@ -690,7 +690,8 @@ journalctl -u certigo-idle-shutdown.service --since '-1h'   # décisions de l'ag
 L'agent ne journalise rien tant qu'il voit une activité ou que la période calme court. Pour
 savoir pourquoi une VM reste allumée, lire `activity=` dans la sortie de `-Action status` :
 `job` (un `Runner.Worker` du vrai listener), `package-maintenance` (apt, apt-get, dpkg ou
-`unattended-upgrade` exécuté par root) ou `none` (la VM s'éteindra à la fin de la période
+`unattended-upgrade` exécuté par root, hors évaluation périodique des correctifs Azure) ou
+`none` (la VM s'éteindra à la fin de la période
 calme, `last_activity` + `QUIET_PERIOD_SECONDS`). Un `package-maintenance` qui dure sans mise à
 jour en cours désigne un processus root de ce nom : `ps -eo pid,user,comm,args` le montre.
 

@@ -28,8 +28,9 @@
 # dire du `Runner.Listener` petit-enfant du processus principal que systemd attribue au service
 # `actions.runner.*` (runsvc.sh -> node -> Runner.Listener -> Runner.Worker, mesuré le
 # 2026-09-30) ; ou apt/dpkg/unattended-upgrade exécuté par root, hors du veilleur permanent
-# `unattended-upgrade-shutdown --wait-for-signal` qui porte le même nom noyau. Un nom de
-# processus se choisit librement, une filiation depuis le MainPID systemd, non.
+# `unattended-upgrade-shutdown --wait-for-signal` qui porte le même nom noyau et hors de
+# l'évaluation périodique des correctifs Azure (MsftLinuxPatchAutoAssess.service, lecture seule).
+# Un nom de processus se choisit librement, une filiation depuis le MainPID systemd, non.
 #
 # Limite assumée : un job attribué par GitHub dans la fraction de seconde entre la dernière
 # lecture et l'arrêt du listener est annulé par cet arrêt, et aucune relecture ne peut le
@@ -201,9 +202,14 @@ genuine_listeners() {
 # the helper `unattended-upgrade-shutdown --wait-for-signal`, which unattended-upgrades.service
 # keeps running on every Ubuntu runner, are both `unattended-upgr`. The helper only waits for a
 # shutdown; counting it kept every runner up (measured 2026-09-30 on both pools), so its command
-# line tells it apart. Reads the table filled by load_process_table.
+# line tells it apart. Azure's periodic patch assessment, MsftLinuxPatchAutoAssess.service
+# (OnBootSec=15m then hourly, imposed by the subscription's patch policy), only refreshes the
+# package lists (`apt-get -q update`, measured 2026-09-30): interrupting it is harmless, and
+# counting it restarted the quiet period 15 minutes after every boot, so its cgroup tells it
+# apart. Patch installation runs from the VM agent's cgroup and still counts. Reads the table
+# filled by load_process_table.
 package_maintenance_running() {
-  local pid key real effective rest argument
+  local pid key real effective rest argument line
   local -a arguments
   for pid in "${!COMMAND_OF[@]}"; do
     case "${COMMAND_OF[${pid}]}" in
@@ -216,6 +222,9 @@ package_maintenance_running() {
       effective=''
     done 2>/dev/null < "${PROC_ROOT}/${pid}/status" || continue
     [[ "${effective}" == 0 ]] || continue
+    while IFS= read -r line; do
+      [[ "${line##*/}" == 'MsftLinuxPatchAutoAssess.service' ]] && continue 2
+    done 2>/dev/null < "${PROC_ROOT}/${pid}/cgroup" || true
     arguments=()
     mapfile -d '' -t arguments 2>/dev/null < "${PROC_ROOT}/${pid}/cmdline" || continue
     for argument in "${arguments[@]}"; do
