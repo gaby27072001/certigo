@@ -220,6 +220,10 @@ grep -F 'readonly MINIMUM_QUIET_PERIOD_SECONDS=300' "${idle_shutdown}" >/dev/nul
 # Action Run Commands only: a managed runCommands child resource could not be deleted under the
 # rg-certigo-ci CanNotDelete lock and would accumulate.
 grep -F "'run-command', 'invoke'" "${install_idle_shutdown}" >/dev/null
+# The extension inserts `export arg1=...` into the script it runs: the agent travels as a
+# base64 payload so that the installed file keeps the versioned SHA-256.
+grep -F 'base64 -d' "${install_idle_shutdown}" >/dev/null
+grep -F 'payload_sha256=$agentSha256' "${install_idle_shutdown}" >/dev/null
 if grep -Fq 'runCommands/' "${install_idle_shutdown}"; then
   echo "install-idle-shutdown.ps1 must not create managed Run Command resources." >&2
   exit 1

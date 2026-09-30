@@ -46,11 +46,30 @@ if ($All) {
 }
 if ($VmName.Count -eq 0) { throw 'Name at least one VM with -VmName, or use -All.' }
 
-# The agent is sent with LF line endings whatever the checkout, and never modified here.
-$agentSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'idle-shutdown.sh')).Replace("`r`n", "`n")
+# The Run Command extension rewrites the script it receives: it inserts
+# `export arg1=... arg2=...` after the first line (measured on 2026-09-30). The agent therefore
+# travels as a base64 payload inside a small POSIX wrapper, so that the file installed on the VM
+# is byte-for-byte the versioned agent and its SHA-256 can be verified. LF endings whatever the
+# checkout.
+$agentBytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes(
+  [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'idle-shutdown.sh')).Replace("`r`n", "`n"))
+$sha = [System.Security.Cryptography.SHA256]::Create()
+try { $agentSha256 = (-join ($sha.ComputeHash($agentBytes) | ForEach-Object { $_.ToString('x2') })) }
+finally { $sha.Dispose() }
+$payload = [Convert]::ToBase64String($agentBytes, [Base64FormattingOptions]::InsertLineBreaks).Replace("`r`n", "`n")
+$wrapper = @"
+#!/bin/sh
+set -eu
+agent="`$(mktemp /tmp/certigo-idle-shutdown.XXXXXX)"
+trap 'rm -f "`$agent"' EXIT
+base64 -d > "`$agent" <<'CERTIGO_AGENT_PAYLOAD'
+$payload
+CERTIGO_AGENT_PAYLOAD
+printf 'payload_sha256=%s\n' "`$(sha256sum "`$agent" | cut -d ' ' -f 1)"
+/bin/bash "`$agent" "`$@"
+"@
 $agentFile = Join-Path ([IO.Path]::GetTempPath()) ("certigo-idle-shutdown-{0}.sh" -f [guid]::NewGuid())
-[IO.File]::WriteAllText($agentFile, $agentSource, (New-Object System.Text.UTF8Encoding($false)))
-$agentSha256 = (Get-FileHash -Algorithm SHA256 -Path $agentFile).Hash.ToLowerInvariant()
+[IO.File]::WriteAllText($agentFile, $wrapper.Replace("`r`n", "`n"), (New-Object System.Text.UTF8Encoding($false)))
 
 $results = @()
 try {
@@ -87,7 +106,7 @@ try {
       'uninstall' { 'certigo-idle-shutdown uninstalled' }
       'status' { 'script_sha256=' }
     }
-    $succeeded = $message.Contains($expected)
+    $succeeded = $message.Contains($expected) -and $message.Contains("payload_sha256=$agentSha256")
     if ($Action -eq 'install') {
       $succeeded = $succeeded -and
         $message.Contains("script_sha256=$agentSha256") -and
