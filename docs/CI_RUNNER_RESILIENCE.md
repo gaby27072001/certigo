@@ -387,8 +387,9 @@ désalloue les VM dont l'OS est arrêté, `logic-certigo-ci-runner-wake` les red
   **toutes** les instances de son pool, donc les deux zones trusted. La reprise continue
   d'exiger `minimumOnlineByTrust` instances `running` par pool chaque nuit.
 - **`runner-health.yml` ne prouve plus que la reprise a tourné** : son job réveille désormais
-  lui-même le pool trusted. L'échec de la reprise reste signalé par son alerte ; son absence
-  totale n'a plus d'effet sur la disponibilité.
+  lui-même le pool trusted. L'échec de la reprise reste signalé par son alerte ; son absence n'a
+  plus d'effet immédiat sur la disponibilité, mais au-delà de 14 jours sans reprise, un pool resté
+  sans job perdrait ses enregistrements runner (voir le premier point).
 - **Un job long n'est jamais coupé par l'extinction locale** : le worker du vrai listener du
   service runner est une activité, quelle que soit la durée de la publication. Seul le teardown MCAPS de 00:46 UTC peut
   encore l'interrompre, comme avant.

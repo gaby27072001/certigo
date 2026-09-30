@@ -129,19 +129,30 @@ un credential GitHub dans Azure (décision contraire du dépôt) et un état per
 4. **Fuite de l'URL signée.** Elle ne permet que de démarrer des VM existantes (coût borné au
    régime actuel) et de consommer des exécutions Logic Apps, depuis les seules plages GitHub.
    Remède : régénérer les clés d'accès du Logic App puis relancer `register-wake-webhooks.ps1`.
-5. **Démarrage à froid.** Premier job d'une rafale : ≈ 1 minute côté trusted ; côté PR ≈ 1 minute
-   une fois l'ordre IMDS corrigé, ≈ 6 minutes sans. Simulation sur les jobs réels (démarrage de
-   1,5 min) : attente p90 ≈ 90 s pour le pool PR.
+5. **Démarrage à froid.** Premier job d'une rafale, pool entièrement désalloué (mesuré le
+   2026-09-30 sur de vrais jobs) : 35 à 59 s d'attente côté PR, 51 à 55 s côté trusted. Côté PR,
+   cela suppose le réglage cloud-init posé par l'installateur ; sans lui, ≈ 6 minutes (cloud-init
+   attend 300 s un IMDS bloqué, que l'ordre de `certigo-block-imds.service` ne raccourcit pas).
+   Projection avant activation (démarrage de 1,5 min) : attente p90 ≈ 90 s pour le pool PR.
 6. **Instances futures.** Une instance créée ou reconstruite n'a pas l'agent tant que
    `install-idle-shutdown.ps1` n'a pas été exécuté : elle reste allumée comme aujourd'hui (coût,
    pas panne). L'étape est dans la procédure d'ajout d'instance.
 7. **Teardown MCAPS de 00:46 UTC** : inchangé ; il peut toujours interrompre un job long.
+8. **La reprise nocturne devient porteuse.** GitHub supprime un runner persistant resté plus de
+   14 jours sans connexion
+   ([Removing self-hosted runners](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/remove-runners)) ;
+   `be505fa1` a déjà perdu ainsi son enregistrement (panne du 1er septembre,
+   `docs/CI_RUNNER_RESILIENCE.md`). Allumées presque en permanence, les instances restaient
+   connectées ; à la demande, un pool sans job ne se reconnecte plus qu'à la reprise de
+   01:30 UTC, qui rallume chaque instance chaque nuit. Son échec déclenche
+   `alert-certigo-ci-runner-recovery-failed` (sév. 1). La supprimer ou l'espacer demanderait un
+   autre réveil de chaque instance au moins une fois par semaine.
 
 ## Effet attendu
 
 Rejeu des 6 jours de jobs réels (réveil de tout le pool, démarrage de 1,5 min, reprise de
 01:30 incluse) : pool PR ≈ 7 VM-h/jour au lieu de 96 ; pool trusted ≈ 5 VM-h/jour au lieu de 48.
-Chiffrage et mesures après activation : `docs/FINOPS.md`, « Runners à la demande ».
+Chiffrage et mesures après activation : `docs/FINOPS.md`, section « On-demand runners (ADR-022) ».
 
 ## Mise en service et retour arrière
 

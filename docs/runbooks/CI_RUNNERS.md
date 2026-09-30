@@ -437,7 +437,13 @@ l'échec de l'un n'empêche pas de rallumer l'autre) :
 > ⏱️ **Durée mesurée d'un démarrage depuis `deallocated`** : ~1 min pour une instance trusted,
 > **~7 min 30 s pour une instance PR** (2026-09-11 : `a14700a3` 7 min 32 s, `bbf83c5c` 8 min 01 s ;
 > 2026-09-23 drill : `6e3abce4` 7 min 32 s). Un run complet dure donc ~8 min ; un runner PR
-> n'est pas en ligne avant ~01:38 UTC.
+> n'est pas en ligne avant ~01:38 UTC. Depuis le réglage cloud-init du 2026-09-30 (§13), un
+> runner PR est en ligne ≈ 45 s après le début du démarrage (mesuré sur `6e3abce4`).
+
+> 🔗 **Depuis le 2026-09-30 (§13), cette reprise garde aussi les runners enregistrés.** Un pool
+> sans job reste désalloué, et GitHub supprime un runner persistant resté plus de 14 jours sans
+> connexion (c'est la panne du 1er septembre). Ne pas désactiver ni espacer cette reprise sans
+> un autre réveil de chaque instance au moins une fois par semaine (ADR-022, risque 8).
 
 ### Vérifier que la reprise a bien tourné
 
@@ -626,9 +632,10 @@ Labels → pool (versionné dans `infra/ci-runner/on-demand.config.json`, testé
 Un label PR ne réveille jamais le pool trusted.
 
 **Ce que voit un développeur.** Premier job d'une rafale après une période calme : le job reste
-`Queued` le temps du démarrage (≈ 1 min ; ≈ 6 min pour une instance PR dont l'ordre IMDS n'a pas
-été corrigé par l'installateur). Les jobs suivants partent aussitôt. Un runner `offline` côté
-GitHub n'est **plus** une anomalie en soi : c'est l'état normal d'un pool au repos.
+`Queued` le temps du démarrage (35 à 59 s mesurés le 2026-09-30 ; ≈ 6 min pour une instance PR
+sans le réglage cloud-init posé par l'installateur, `cloud_init_boot_refresh=new-instance-only`).
+Les jobs suivants partent aussitôt. Un runner `offline` côté GitHub n'est **plus** une anomalie
+en soi : c'est l'état normal d'un pool au repos.
 
 ### Déployer (depuis `main`, what-if d'abord)
 
