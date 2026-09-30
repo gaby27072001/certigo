@@ -109,7 +109,8 @@ foreach ($repository in $repositories) {
     throw "$repository : webhook $hookId was not stored as requested."
   }
   $null = Invoke-Native -FilePath 'gh' -Arguments @('api', '--method', 'POST', "repos/$repository/hooks/$hookId/pings")
-  Write-Host "$repository : wake webhook $hookId $($method -eq 'POST' ? 'created' : 'updated') -> $($endpoint.Host) (workflow_job, json, TLS verified); ping sent"
+  $verb = if ($method -eq 'POST') { 'created' } else { 'updated' }
+  Write-Host "$repository : wake webhook $hookId $verb -> $($endpoint.Host) (workflow_job, json, TLS verified); ping sent"
 }
 
 if (-not $Remove) {

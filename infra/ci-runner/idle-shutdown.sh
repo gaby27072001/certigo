@@ -16,20 +16,24 @@
 #      comptée depuis max(démarrage, dernière activité, installation) ;
 #   2. deux gardes : deux passages consécutifs du timer (15 s) toujours inactifs ;
 #   3. garde finale : les services `actions.runner.*` sont arrêtés (le listener ferme sa session,
-#      GitHub cesse de lui attribuer des jobs), puis l'absence de job est relue ; un job apparu
+#      GitHub cesse de lui attribuer des jobs), puis la machine attend, au plus
+#      DRAIN_SECONDS, qu'aucun `Runner.Worker` ne subsiste ; une maintenance de paquets apparue
 #      entre-temps annule l'extinction et relance les services ;
 #   4. jamais d'extinction dans la fenêtre de la reprise nocturne (01:15-01:50 UTC par défaut),
 #      pour que la vérification de power state de la reprise ne puisse pas être faussée ;
 #   5. jamais d'extinction d'une machine sans service `actions.runner.*` (provisionnement ou
 #      réenregistrement en cours).
 # Toute activité remet la période calme et les gardes à zéro. N'est une activité qu'un signal
-# que le code d'une PR ne peut pas imiter : un `Runner.Worker` dont le parent est un
-# `Runner.Listener` (le listener est le seul à lancer un worker), ou apt/dpkg exécuté par root.
+# que le code d'une PR ne peut pas imiter : un `Runner.Worker` enfant du VRAI listener, c'est-à-
+# dire du `Runner.Listener` petit-enfant du processus principal que systemd attribue au service
+# `actions.runner.*` (runsvc.sh -> node -> Runner.Listener -> Runner.Worker, mesuré le
+# 2026-09-30) ; ou apt/dpkg exécuté par root. Un nom de processus se choisit librement, une
+# filiation depuis le MainPID systemd, non.
 #
 # Limite assumée : un job attribué par GitHub dans la fraction de seconde entre la dernière
-# lecture et l'arrêt du listener est annulé par cet arrêt. GitHub ne garantit pas l'absence
-# d'attribution à un runner persistant qui s'arrête ; seuls des runners éphémères l'éliminent
-# (ADR-018). Estimation et mesure : docs/adr/ADR-022-runners-ci-a-la-demande.md.
+# lecture et l'arrêt du listener est annulé par cet arrêt, et aucune relecture ne peut le
+# sauver. GitHub ne garantit pas l'absence d'attribution à un runner persistant qui s'arrête ;
+# seuls des runners éphémères l'éliminent (ADR-018). Estimation : docs/adr/ADR-022-runners-ci-a-la-demande.md.
 if [ -z "${BASH_VERSION:-}" ]; then
   exec /bin/bash "$0" "$@"
 fi
@@ -44,6 +48,9 @@ readonly IMDS_DROP_IN_NAME='10-certigo-before-cloud-init.conf'
 readonly MINIMUM_QUIET_PERIOD_SECONDS=300
 readonly REQUIRED_GUARDS=2
 readonly DEFAULT_NO_SHUTDOWN_WINDOW_UTC='0115-0150'
+# A cancelled worker gets 30 s from the service wrapper before its listener is killed; the
+# drain bound covers that and the cancellation report, and is never a reason to stay up.
+readonly DRAIN_SECONDS="${CERTIGO_IDLE_DRAIN_SECONDS:-90}"
 
 CONFIG_FILE="${CERTIGO_IDLE_CONFIG_FILE:-/etc/certigo-idle-shutdown.env}"
 STATE_DIR="${CERTIGO_IDLE_STATE_DIR:-/run/certigo-idle-shutdown}"
@@ -147,33 +154,74 @@ uptime_seconds() {
   printf '%s\n' "${uptime}"
 }
 
-parent_command_of() {
-  local stat rest ppid
-  stat="$(cat "${PROC_ROOT}/$1/stat" 2>/dev/null)" || return 1
-  # The command name is parenthesised and may itself contain spaces or parentheses.
-  rest="${stat##*) }"
-  ppid="$(awk '{ print $2 }' <<<"${rest}")"
-  is_non_negative_integer "${ppid}" || return 1
-  cat "${PROC_ROOT}/${ppid}/comm" 2>/dev/null
+# Reads every /proc/<pid>/stat once: PARENT_OF[pid] and COMMAND_OF[pid]. The command name is
+# parenthesised and may itself contain spaces or parentheses, hence the last-')' split.
+declare -A PARENT_OF=()
+declare -A COMMAND_OF=()
+load_process_table() {
+  PARENT_OF=()
+  COMMAND_OF=()
+  local stat_file stat pid head rest
+  # Parameter expansion only, no subprocess: this runs every 15 seconds over every process.
+  for stat_file in "${PROC_ROOT}"/[0-9]*/stat; do
+    { IFS= read -r stat < "${stat_file}"; } 2>/dev/null || continue
+    pid="${stat%% *}"
+    is_non_negative_integer "${pid}" || continue
+    head="${stat%) *}"
+    rest="${stat##*) }"
+    rest="${rest#* }"
+    COMMAND_OF["${pid}"]="${head#*(}"
+    PARENT_OF["${pid}"]="${rest%% *}"
+  done
 }
 
-# A job in progress is the only reason a runner VM must stay up. Only the listener spawns a
-# worker, so a `Runner.Worker` process left behind by job code (reparented, or merely renamed)
-# is not activity. Package maintenance by root is activity too, so that an OS update is never
-# cut in the middle; the runner account cannot start a root apt/dpkg beyond its sudo allow-list.
+# The genuine listeners are the grandchildren of the main process systemd assigns to an active
+# runner unit. Job code cannot become a child of a listener it did not spawn, nor a child of
+# the wrapper that systemd started.
+genuine_listeners() {
+  local unit main pid
+  while read -r unit; do
+    [[ -n "${unit}" ]] || continue
+    main="$("${SYSTEMCTL}" show -p MainPID --value "${unit}" 2>/dev/null)"
+    [[ "${main}" =~ ^[1-9][0-9]*$ ]] || continue
+    for pid in "${!COMMAND_OF[@]}"; do
+      if [[ "${COMMAND_OF[${pid}]}" == 'Runner.Listener' &&
+        "${PARENT_OF[${PARENT_OF[${pid}]:-0}]:-0}" == "${main}" ]]; then
+        printf '%s\n' "${pid}"
+      fi
+    done
+  done < <(active_runner_units)
+}
+
+# A job in progress is the only reason a runner VM must stay up. Package maintenance by root is
+# activity too, so that an OS update is never cut in the middle; the runner account cannot
+# start a root apt/dpkg beyond its sudo allow-list.
 activity_description() {
-  local pid
-  while read -r pid; do
-    [[ -n "${pid}" ]] || continue
-    if [[ "$(parent_command_of "${pid}")" == 'Runner.Listener' ]]; then
+  load_process_table
+  local listener pid
+  local -A listeners=()
+  while read -r listener; do
+    [[ -n "${listener}" ]] && listeners["${listener}"]=1
+  done < <(genuine_listeners)
+  for pid in "${!COMMAND_OF[@]}"; do
+    if [[ "${COMMAND_OF[${pid}]}" == 'Runner.Worker' && -n "${listeners[${PARENT_OF[${pid}]:-0}]:-}" ]]; then
       printf 'job\n'
       return 0
     fi
-  done < <("${PGREP}" -x 'Runner\.Worker' 2>/dev/null || true)
+  done
   if "${PGREP}" -u root -x 'apt|apt-get|dpkg|unattended-upgr' >/dev/null 2>&1; then
     printf 'package-maintenance\n'
     return 0
   fi
+  return 1
+}
+
+any_worker_present() {
+  load_process_table
+  local pid
+  for pid in "${!COMMAND_OF[@]}"; do
+    [[ "${COMMAND_OF[${pid}]}" == 'Runner.Worker' ]] && return 0
+  done
   return 1
 }
 
@@ -265,8 +313,9 @@ check() {
     return 0
   fi
 
-  # Final guard: close every runner session first, so that GitHub stops assigning jobs, then
-  # re-read the job state. Only an idle machine with no listener left is powered off.
+  # Final guard: close every runner session first, so that GitHub stops assigning jobs. A job
+  # assigned in the instant before this stop is cancelled by it (see the header); its worker is
+  # given DRAIN_SECONDS to report the cancellation before the machine halts.
   local -a units=()
   mapfile -t units < <(active_runner_units)
   log "idle for ${idle}s after ${guards} guards; stopping ${#units[@]} runner unit(s)"
@@ -276,10 +325,18 @@ check() {
     log "could not stop the runner units; shutdown abandoned"
     return 1
   fi
-  if activity="$(activity_description)"; then
+  local waited=0
+  while any_worker_present && (( waited < DRAIN_SECONDS )); do
+    sleep 1
+    waited=$(( waited + 1 ))
+  done
+  if any_worker_present; then
+    log "a Runner.Worker process is still present after ${DRAIN_SECONDS}s; halting anyway"
+  fi
+  if "${PGREP}" -u root -x 'apt|apt-get|dpkg|unattended-upgr' >/dev/null 2>&1; then
     restart_runner_units "${units[@]}"
     record_activity "${now}"
-    log "${activity} appeared during the final guard; runners restarted, shutdown abandoned"
+    log "package maintenance started during the final guard; runners restarted, shutdown abandoned"
     return 0
   fi
 

@@ -158,7 +158,13 @@ test('no GitHub credential exists in Azure and every ARM call uses a managed ide
   ]) {
     assert.ok(!serialized.includes(marker), `forbidden marker in the on-demand module: ${marker}`);
   }
-  assert.ok(!serialized.includes('@secure()') && !module.parameters.githubToken);
+  // A secure parameter would be the only way to hand a credential to this module; the pattern
+  // is shown able to match both secure types, so the loop below is not vacuous.
+  assert.ok(['securestring', 'secureObject'].every((type) => /^secure(string|object)$/i.test(type)));
+  for (const [name, parameter] of Object.entries(module.parameters)) {
+    assert.ok(!/^secure(string|object)$/i.test(parameter.type), `${name} must not be a secure parameter`);
+  }
+  assert.equal(module.parameters.githubToken, undefined);
   // The signed trigger URL is a bearer secret: it must never become a deployment output.
   for (const output of Object.keys(module.outputs)) assert.doesNotMatch(output, /url|callback|sig/i);
   for (const output of Object.keys(compileTemplate(composition).outputs)) {

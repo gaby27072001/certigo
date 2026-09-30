@@ -10,16 +10,12 @@ trap 'rm -rf "${work_dir}"' EXIT
 bin_dir="${work_dir}/bin"
 mkdir -p "${bin_dir}"
 
-# pgrep: prints the PIDs listed in ${FAKE_DIR}/workers for Runner.Worker; apt/dpkg run as root
-# when .../apt-root exists and as the runner account when .../apt-user exists.
+# pgrep is only used for package maintenance: apt/dpkg run as root when ${FAKE_DIR}/apt-root
+# exists and as the runner account when ${FAKE_DIR}/apt-user exists.
 cat > "${bin_dir}/pgrep" <<'EOF'
 #!/usr/bin/env bash
 pattern="${*: -1}"
 case "${pattern}" in
-  *Runner*)
-    [[ -s "${FAKE_DIR}/workers" ]] || exit 1
-    cat "${FAKE_DIR}/workers"
-    ;;
   *dpkg*)
     if [[ " $* " == *" -u root "* ]]; then
       [[ -e "${FAKE_DIR}/apt-root" ]]
@@ -30,8 +26,8 @@ case "${pattern}" in
   *) exit 1 ;;
 esac
 EOF
-# systemctl: records every call; `stop` can make a listener-spawned job appear (the final-guard
-# race); list-unit-files reports the runner units unless ${FAKE_DIR}/no-units exists.
+# systemctl: records every call. Two active runner units, as on a trusted VM, whose main
+# processes are 100 and 110. `stop` can start package maintenance (the final-guard case).
 cat > "${bin_dir}/systemctl" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${FAKE_DIR}/systemctl.log"
@@ -45,13 +41,15 @@ case "$1" in
     printf 'actions.runner.gchambaud_microsoft-Certigo.pr1.service enabled enabled\n'
     printf 'actions.runner.gchambaud_microsoft-certigo-content.pr1.service enabled enabled\n'
     ;;
+  show)
+    case "${*: -1}" in
+      *-Certigo.*) echo 100 ;;
+      *-certigo-content.*) echo 110 ;;
+      *) echo 0 ;;
+    esac
+    ;;
   stop)
-    if [[ -e "${FAKE_DIR}/worker-after-stop" ]]; then
-      mkdir -p "${FAKE_DIR}/proc/777" "${FAKE_DIR}/proc/700"
-      printf '777 (Runner.Worker) S 700 777 777 0 -1\n' > "${FAKE_DIR}/proc/777/stat"
-      printf 'Runner.Listener\n' > "${FAKE_DIR}/proc/700/comm"
-      printf '777\n' >> "${FAKE_DIR}/workers"
-    fi
+    [[ -e "${FAKE_DIR}/apt-after-stop" ]] && touch "${FAKE_DIR}/apt-root"
     exit "${FAKE_STOP_RC:-0}"
     ;;
   poweroff) exit "${FAKE_POWEROFF_RC:-0}" ;;
@@ -61,16 +59,22 @@ esac
 EOF
 chmod +x "${bin_dir}/pgrep" "${bin_dir}/systemctl"
 
-# add_worker <pid> <parent command>: a Runner.Worker process and the command of its parent.
-add_worker() {
-  local pid="$1" parent_command="$2" ppid=$(( $1 + 1000 ))
-  mkdir -p "${FAKE_DIR}/proc/${pid}" "${FAKE_DIR}/proc/${ppid}"
-  printf '%s (Runner.Worker) S %s %s %s 0 -1\n' "${pid}" "${ppid}" "${pid}" "${pid}" \
-    > "${FAKE_DIR}/proc/${pid}/stat"
-  printf '%s\n' "${parent_command}" > "${FAKE_DIR}/proc/${ppid}/comm"
-  printf '%s\n' "${pid}" >> "${FAKE_DIR}/workers"
+# process <pid> <ppid> <command>: one entry of the fake /proc.
+process() {
+  mkdir -p "${FAKE_DIR}/proc/$1"
+  printf '%s (%s) S %s %s %s 0 -1\n' "$1" "$3" "$2" "$1" "$1" > "${FAKE_DIR}/proc/$1/stat"
 }
 
+# The measured service tree: runsvc.sh (MainPID) -> node -> Runner.Listener, per unit.
+runner_services() {
+  process 1 0 systemd
+  process 100 1 runsvc.sh
+  process 200 100 node
+  process 300 200 Runner.Listener
+  process 110 1 runsvc.sh
+  process 210 110 node
+  process 310 210 Runner.Listener
+}
 epoch() { date -u -d "$1" +%s; }
 afternoon="$(epoch '2026-09-30T14:00:00Z')"
 recovery_time="$(epoch '2026-09-30T01:30:00Z')"
@@ -79,6 +83,7 @@ fresh_case() {
   export FAKE_DIR="${work_dir}/case-$1"
   rm -rf "${FAKE_DIR}"
   mkdir -p "${FAKE_DIR}/state" "${FAKE_DIR}/proc"
+  runner_services
   printf 'QUIET_PERIOD_SECONDS=900\nNO_SHUTDOWN_WINDOW_UTC=0115-0150\n' > "${FAKE_DIR}/config"
   # Up for 2 hours by default: the boot itself is long past the quiet period.
   printf '7200.42 1000.00\n' > "${FAKE_DIR}/uptime"
@@ -95,6 +100,7 @@ run_check() {
     CERTIGO_IDLE_PGREP="${bin_dir}/pgrep" \
     CERTIGO_IDLE_PROC_ROOT="${FAKE_DIR}/proc" \
     CERTIGO_IDLE_UPTIME_FILE="${FAKE_DIR}/uptime" \
+    CERTIGO_IDLE_DRAIN_SECONDS="${FAKE_DRAIN_SECONDS:-1}" \
     bash "${agent}" check
 }
 
@@ -115,10 +121,10 @@ assert_poweroff() {
 
 # 1. A running job is activity: it is recorded and nothing is stopped.
 fresh_case busy
-add_worker 4242 'Runner.Listener'
+process 400 300 Runner.Worker
 run_check "${afternoon}" >/dev/null
 [[ "$(cat "${FAKE_DIR}/state/last-activity")" == "${afternoon}" ]] || fail "busy: activity not recorded"
-[[ ! -s "${FAKE_DIR}/systemctl.log" ]] || fail "busy: systemctl must not be called"
+! grep -Eq '^(stop|start|poweroff)' "${FAKE_DIR}/systemctl.log" || fail "busy: no runner or power action may be taken"
 
 # 2. The quiet period counts from the last activity, and resets the guards.
 fresh_case quiet
@@ -152,9 +158,9 @@ assert_poweroff idle
 fresh_case reset
 printf '%s\n' "$(( afternoon - 900 ))" > "${FAKE_DIR}/state/last-activity"
 run_check "${afternoon}" >/dev/null
-add_worker 4242 'Runner.Listener'
+process 410 310 Runner.Worker
 run_check "$(( afternoon + 60 ))" >/dev/null
-rm "${FAKE_DIR}/workers"
+rm -r "${FAKE_DIR}/proc/410"
 run_check "$(( afternoon + 120 ))" >/dev/null
 assert_no_poweroff reset
 [[ "$(cat "${FAKE_DIR}/state/guards")" == 0 ]] || fail "reset: guards must restart from 0"
@@ -166,10 +172,15 @@ run_check "${afternoon}" >/dev/null
 run_check "$(( afternoon + 60 ))" >/dev/null
 assert_no_poweroff apt
 
-# 6b. Signals that job code can fake are not activity: a Runner.Worker whose parent is not a
-#     listener (left behind or renamed), and an apt/dpkg process run by the runner account.
+# 6b. Signals that job code can fake are not activity: a Runner.Worker left behind (reparented
+#     to init), a renamed pair "Runner.Listener" -> "Runner.Worker" outside the service tree,
+#     and an apt/dpkg process run by the runner account.
 fresh_case spoof
-add_worker 5151 'bash'
+process 901 1 Runner.Worker
+process 910 1 Runner.Listener
+process 911 910 Runner.Worker
+process 920 400 Runner.Listener
+process 921 920 Runner.Worker
 touch "${FAKE_DIR}/apt-user"
 printf '%s\n' "$(( afternoon - 900 ))" > "${FAKE_DIR}/state/last-activity"
 run_check "${afternoon}" >/dev/null
@@ -205,17 +216,27 @@ run_check "${after_window}" >/dev/null
 run_check "$(( after_window + 60 ))" >/dev/null
 assert_poweroff "after window"
 
-# 9. A job that lands during the final guard cancels the shutdown and restarts the runners.
-fresh_case race
+# 9. After the stop, a worker still reporting a cancellation is given the drain bound, then the
+#    machine halts anyway: the bound is never a reason to stay up.
+fresh_case drain
 printf '%s\n' "$(( afternoon - 900 ))" > "${FAKE_DIR}/state/last-activity"
-touch "${FAKE_DIR}/worker-after-stop"
+run_check "${afternoon}" >/dev/null
+process 950 1 Runner.Worker
+output="$(run_check "$(( afternoon + 60 ))")"
+grep -F 'still present after 1s' <<<"${output}" >/dev/null || fail "drain: the bounded wait is not reported"
+assert_poweroff drain
+
+# 9b. Package maintenance that starts during the final guard cancels the shutdown.
+fresh_case apt-during-guard
+printf '%s\n' "$(( afternoon - 900 ))" > "${FAKE_DIR}/state/last-activity"
+touch "${FAKE_DIR}/apt-after-stop"
 run_check "${afternoon}" >/dev/null
 output="$(run_check "$(( afternoon + 60 ))")"
-assert_no_poweroff race
+assert_no_poweroff apt-during-guard
 grep -q '^start actions.runner.gchambaud_microsoft-Certigo.pr1.service actions.runner.gchambaud_microsoft-certigo-content.pr1.service$' \
-  "${FAKE_DIR}/systemctl.log" || fail "race: runners must be restarted"
-grep -F 'appeared during the final guard' <<<"${output}" >/dev/null || fail "race: not reported"
-
+  "${FAKE_DIR}/systemctl.log" || fail "apt-during-guard: runners must be restarted"
+grep -F 'package maintenance started during the final guard' <<<"${output}" >/dev/null ||
+  fail "apt-during-guard: not reported"
 # 10. A failed poweroff restarts the runners and fails the check.
 fresh_case poweroff-failure
 printf '%s\n' "$(( afternoon - 900 ))" > "${FAKE_DIR}/state/last-activity"

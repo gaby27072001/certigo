@@ -389,8 +389,8 @@ désalloue les VM dont l'OS est arrêté, `logic-certigo-ci-runner-wake` les red
 - **`runner-health.yml` ne prouve plus que la reprise a tourné** : son job réveille désormais
   lui-même le pool trusted. L'échec de la reprise reste signalé par son alerte ; son absence
   totale n'a plus d'effet sur la disponibilité.
-- **Un job long n'est jamais coupé par l'extinction locale** : un `Runner.Worker` vivant est une
-  activité, quelle que soit la durée de la publication. Seul le teardown MCAPS de 00:46 UTC peut
+- **Un job long n'est jamais coupé par l'extinction locale** : le worker du vrai listener du
+  service runner est une activité, quelle que soit la durée de la publication. Seul le teardown MCAPS de 00:46 UTC peut
   encore l'interrompre, comme avant.
 - **Une instance sans agent reste allumée** : c'est l'état antérieur (coût), pas une panne.
   Toute instance ajoutée ou reconstruite doit recevoir l'agent (`install-idle-shutdown.ps1`).

@@ -37,9 +37,13 @@ Trois pièces, chacune sans credential GitHub :
    calme réinitialisable de **900 s pour le pool PR et 1 200 s pour le pool trusted** (≥ les
    300 s du contrat du contrôleur, et PR avant trusted comme `scaleInOrder`), puis deux gardes,
    puis une garde finale : arrêt des services `actions.runner.*` (le listener ferme sa session),
-   relecture de l'activité, `systemctl poweroff`. N'est une activité qu'un signal que le code
-   d'une PR ne peut pas imiter : un `Runner.Worker` **enfant d'un `Runner.Listener`**, ou
-   apt/dpkg **exécuté par root**. Jamais d'extinction entre 01:15 et 01:50 UTC (reprise), ni
+   attente bornée (90 s) de la fin de tout `Runner.Worker`, relecture de la maintenance de
+   paquets, `systemctl poweroff`. N'est une activité qu'un signal que le code d'une PR ne peut
+   pas imiter : un `Runner.Worker` **enfant du vrai listener**, c'est-à-dire du `Runner.Listener`
+   petit-enfant du processus principal que systemd attribue au service runner
+   (`runsvc.sh` → `node` → `Runner.Listener`, mesuré sur les deux pools le 2026-09-30) — un nom
+   de processus se choisit, une filiation depuis ce MainPID non —, ou apt/dpkg **exécuté par
+   root**. Jamais d'extinction entre 01:15 et 01:50 UTC (reprise), ni
    d'une machine sans service runner (provisionnement). Sur les instances PR, l'installateur
    ordonne aussi `certigo-block-imds.service` avant `cloud-init-local.service` : l'IMDS est
    refusé dès le début du boot au lieu d'être attendu cinq minutes.
@@ -92,7 +96,9 @@ un credential GitHub dans Azure (décision contraire du dépôt) et un état per
 
 1. **Attribution pendant l'arrêt.** GitHub ne garantit pas qu'un runner persistant qui s'arrête
    ne reçoive plus de job ; seuls des runners éphémères l'éliminent (ADR-018). Un job attribué
-   dans la fraction de seconde entre la dernière lecture et l'arrêt du listener est annulé. Estimé
+   dans la fraction de seconde entre la dernière lecture et l'arrêt du listener est annulé par cet
+   arrêt (le listener annule son job en s'arrêtant) : aucune relecture ne peut le sauver, l'agent
+   laisse seulement au worker jusqu'à 90 s pour rendre compte de l'annulation. Estimé
    sur les mesures du 2026-09-30 (≈ 3,5 rafales/jour, ≈ 24 extinctions/jour, fenêtre ≈ 0,2 s) :
    de l'ordre d'un job tous les dix ans. Le job annulé se relance à la main.
 2. **Livraison de webhook perdue.** GitHub ne relivre pas automatiquement. Un job dont tous les
