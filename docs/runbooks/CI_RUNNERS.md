@@ -671,9 +671,13 @@ La VM doit être `running`. L'installation passe par une Run Command *action* (a
 enfant, donc rien d'accumulé sous le verrou du §12), prend la période calme de son pool dans
 `on-demand.config.json`, vérifie l'empreinte SHA-256 de l'agent installé et que le timer est
 actif. Sur une instance PR, elle ordonne aussi `certigo-block-imds.service` avant
-`cloud-init-local.service` (fin des cinq minutes d'attente IMDS au boot). **Toute instance
-ajoutée ou reconstruite doit recevoir l'agent** après son enregistrement ; sans lui, elle reste
-allumée comme avant (coût, pas panne).
+`cloud-init-local.service` et limite le rafraîchissement des métadonnées de cloud-init à une
+nouvelle instance (`/etc/cloud/cloud.cfg.d/91-certigo-imds-blocked.cfg`) : sans ce réglage,
+cloud-init attend 300 s à chaque boot un IMDS bloqué, et le runner n'est en ligne que ≈ 6 min
+après le réveil au lieu de 45 s. `-Action status` affiche alors `imds_drop_in=present` et
+`cloud_init_boot_refresh=new-instance-only` ; une désinstallation garde ces deux réglages. **Toute
+instance ajoutée ou reconstruite doit recevoir l'agent** après son enregistrement ; sans lui,
+elle reste allumée comme avant (coût, pas panne).
 
 ### Suspendre l'extinction sur une VM (maintenance)
 

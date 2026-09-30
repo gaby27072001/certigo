@@ -126,6 +126,13 @@ try {
     if (-not $succeeded) {
       throw "$Action did not report success on $name; see the Run Command output above."
     }
+    # PR instances block IMDS: without both boot settings, a wake takes about 6 minutes instead
+    # of 45 seconds (cloud-init waits 300 s for IMDS at every boot).
+    if ($Action -eq 'install' -and $pool[0].trustClass -eq 'certigo-pr' -and -not (
+        $message.Contains('imds_drop_in=present') -and
+        $message.Contains('cloud_init_boot_refresh=new-instance-only'))) {
+      throw "$name is a PR instance without the IMDS boot settings (is certigo-block-imds.service missing?): the agent is installed, but its wake-up will be slow."
+    }
   }
 }
 finally {

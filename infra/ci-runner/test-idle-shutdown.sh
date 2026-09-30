@@ -108,6 +108,7 @@ run_agent() {
     CERTIGO_IDLE_PROC_ROOT="${FAKE_DIR}/proc" \
     CERTIGO_IDLE_UPTIME_FILE="${FAKE_DIR}/uptime" \
     CERTIGO_IDLE_UNIT_DIR="${FAKE_DIR}/units" \
+    CERTIGO_IDLE_CLOUD_CFG_DIR="${FAKE_DIR}/cloud.cfg.d" \
     CERTIGO_IDLE_DRAIN_SECONDS="${FAKE_DRAIN_SECONDS:-1}" \
     bash "${agent}" "$@"
 }

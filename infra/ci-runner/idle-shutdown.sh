@@ -46,6 +46,7 @@ readonly TIMER_NAME='certigo-idle-shutdown.timer'
 readonly UNIT_DIR="${CERTIGO_IDLE_UNIT_DIR:-/etc/systemd/system}"
 readonly IMDS_UNIT='certigo-block-imds.service'
 readonly IMDS_DROP_IN_NAME='10-certigo-before-cloud-init.conf'
+readonly CLOUD_INIT_CFG_NAME='91-certigo-imds-blocked.cfg'
 readonly MINIMUM_QUIET_PERIOD_SECONDS=300
 readonly REQUIRED_GUARDS=2
 readonly DEFAULT_NO_SHUTDOWN_WINDOW_UTC='0115-0150'
@@ -56,6 +57,7 @@ readonly DRAIN_SECONDS="${CERTIGO_IDLE_DRAIN_SECONDS:-90}"
 CONFIG_FILE="${CERTIGO_IDLE_CONFIG_FILE:-/etc/certigo-idle-shutdown.env}"
 STATE_DIR="${CERTIGO_IDLE_STATE_DIR:-/run/certigo-idle-shutdown}"
 HOLD_FILE="${CERTIGO_IDLE_HOLD_FILE:-/etc/certigo-idle-shutdown.hold}"
+CLOUD_CFG_DIR="${CERTIGO_IDLE_CLOUD_CFG_DIR:-/etc/cloud/cloud.cfg.d}"
 SYSTEMCTL="${CERTIGO_IDLE_SYSTEMCTL:-/usr/bin/systemctl}"
 PROC_ROOT="${CERTIGO_IDLE_PROC_ROOT:-/proc}"
 UPTIME_FILE="${CERTIGO_IDLE_UPTIME_FILE:-/proc/uptime}"
@@ -406,10 +408,14 @@ EOF
 
 # PR runners block IMDS twice: the NSG drops the packets, and certigo-block-imds.service
 # rejects them in the OS. Instances created before the current bootstrap load that unit only
-# after cloud-init, whose Azure datasource then waits 10 x 30 s on the dropped packets at
-# every boot (measured 2026-09-30: runner online 5 min 13 s after boot). Ordering the OS
-# block before cloud-init makes those requests fail at once and closes IMDS earlier in boot.
-harden_imds_boot_order() {
+# after cloud-init; ordering it before cloud-init-local.service closes IMDS from early boot.
+# That alone does not shorten the boot: cloud-init's Azure datasource refreshes its metadata
+# at every boot and retries IMDS until a 300 s deadline, refused or dropped (measured
+# 2026-09-30 with cloud-init 26.1: runner online 5 min 14 s after the start). IMDS can never
+# answer there, so the refresh is limited to a new instance. The network configuration
+# rendered before stays; it matches the NIC by MAC, which deallocation keeps (a single MAC in
+# every boot logged). Measured with it: runner online 45 s after the job was queued.
+harden_imds_boot() {
   if [[ ! -f "${UNIT_DIR}/${IMDS_UNIT}" ]]; then
     return 0
   fi
@@ -423,6 +429,18 @@ Wants=network-pre.target
 EOF
   chmod 0644 "${UNIT_DIR}/${IMDS_UNIT}.d/${IMDS_DROP_IN_NAME}"
   log "IMDS block ordered before cloud-init-local.service"
+  if [[ -d "${CLOUD_CFG_DIR}" ]]; then
+    cat > "${CLOUD_CFG_DIR}/${CLOUD_INIT_CFG_NAME}" <<'EOF'
+# Certigo PR runner: IMDS is blocked (NSG and certigo-block-imds.service). The Azure
+# datasource refreshes its metadata on every boot by default and then waits 300 s for an
+# IMDS that cannot answer; network config is only rendered for a new instance.
+updates:
+  network:
+    when: ['boot-new-instance']
+EOF
+    chmod 0644 "${CLOUD_CFG_DIR}/${CLOUD_INIT_CFG_NAME}"
+    log "cloud-init metadata refresh limited to a new instance"
+  fi
 }
 
 install_agent() {
@@ -443,7 +461,7 @@ NO_SHUTDOWN_WINDOW_UTC=${DEFAULT_NO_SHUTDOWN_WINDOW_UTC}
 EOF
   chmod 0644 "${CONFIG_FILE}"
   write_units
-  harden_imds_boot_order
+  harden_imds_boot
   "${SYSTEMCTL}" daemon-reload
   ensure_state_dir
   # Installing counts as activity: an agent installed on a machine that has been up and idle
@@ -460,8 +478,8 @@ uninstall_agent() {
   rm -f "${UNIT_DIR}/${SERVICE_NAME}" "${UNIT_DIR}/${TIMER_NAME}" "${CONFIG_FILE}" "${INSTALL_PATH}"
   rm -rf "${STATE_DIR}"
   "${SYSTEMCTL}" daemon-reload
-  # The IMDS boot-order drop-in is deliberately kept: it is a hardening, not part of the
-  # shutdown mechanism.
+  # The IMDS boot-order drop-in and the cloud-init setting are deliberately kept: they harden
+  # and shorten the boot of a PR runner, they are not part of the shutdown mechanism.
   echo "certigo-idle-shutdown uninstalled"
 }
 
@@ -484,6 +502,7 @@ status() {
   printf 'last_activity=%s\n' "$(read_integer_file "${STATE_DIR}/last-activity" 0)"
   printf 'guards=%s\n' "$(read_integer_file "${STATE_DIR}/guards" 0)"
   printf 'imds_drop_in=%s\n' "$([[ -f "${UNIT_DIR}/${IMDS_UNIT}.d/${IMDS_DROP_IN_NAME}" ]] && echo present || echo absent)"
+  printf 'cloud_init_boot_refresh=%s\n' "$([[ -f "${CLOUD_CFG_DIR}/${CLOUD_INIT_CFG_NAME}" ]] && echo new-instance-only || echo default)"
   printf 'uptime_seconds=%s\n' "$(uptime_seconds)"
 }
 

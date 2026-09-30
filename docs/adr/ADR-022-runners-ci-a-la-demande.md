@@ -19,11 +19,12 @@
   VM-heures/jour, pour **2,14 runner-heures/jour de travail PR et 0,95 de travail trusted**
   (1 860 et 531 jobs du 2026-09-24 12:00 au 2026-09-30 11:00 UTC, API GitHub des deux dépôts).
   L'activité tient entre 08:00 et 18:00 UTC, en 21 rafales séparées par plus de 20 minutes.
-- Au démarrage d'une instance PR, cloud-init interroge l'IMDS dix fois avec 30 s de délai : le
-  NSG jette les paquets et l'ancienne unité `certigo-block-imds.service` de ces instances ne
-  s'applique qu'après cloud-init. Mesuré le 2026-09-30 sur `6e3abce4` : boot 01:31:31, dernier
+- Au démarrage d'une instance PR, la datasource Azure de cloud-init rafraîchit ses métadonnées à
+  chaque boot et réessaie l'IMDS jusqu'à une échéance de 300 s ; l'IMDS y est bloqué (NSG et
+  `certigo-block-imds.service`). Mesuré le 2026-09-30 sur `6e3abce4` : boot 01:31:31, dernier
   essai IMDS 01:36:43, runner démarré 01:36:44, soit **5 min 13 s perdues à chaque boot** (et
-  ~7 min 30 s d'opération `start`, voir `docs/runbooks/CI_RUNNERS.md` §11).
+  ~7 min 30 s d'opération `start`, voir `docs/runbooks/CI_RUNNERS.md` §11). Des refus immédiats
+  au lieu de paquets jetés n'y changent rien : même échéance, 5 min 14 s (16:02:05 → 16:07:19).
 - Décisions du dépôt à respecter : aucun credential GitHub dans Azure ; aucune identité
   d'automatisation avec `runCommand` ; la reprise ne peut pas désallouer ; les deux pools
   restent disjoints ; un scale-in sous le verrou tue les instances visées.
@@ -49,9 +50,12 @@ Trois pièces, chacune sans credential GitHub :
    noyau nomme lui aussi `unattended-upgr`, n'en est pas une : il est reconnu à sa ligne de
    commande (compté à tort, il empêchait toute extinction, mesuré le 2026-09-30 sur le canari).
    Jamais d'extinction entre 01:15 et 01:50 UTC (reprise), ni d'une machine sans service runner
-   (provisionnement). Sur les instances PR, l'installateur
-   ordonne aussi `certigo-block-imds.service` avant `cloud-init-local.service` : l'IMDS est
-   refusé dès le début du boot au lieu d'être attendu cinq minutes.
+   (provisionnement). Sur les instances PR, l'installateur ordonne aussi
+   `certigo-block-imds.service` avant `cloud-init-local.service` (l'IMDS est refusé dès le début
+   du boot) et limite le rafraîchissement des métadonnées de cloud-init à une nouvelle instance
+   (`updates.network.when: [boot-new-instance]`) : la configuration réseau déjà rendue reste
+   (elle reconnaît la carte par son adresse MAC, que la désallocation conserve), et le runner est
+   en ligne 45 s après la mise en file du job au lieu de 6 min (mesuré le 2026-09-30).
 2. **Azure désalloue ce qui est déjà arrêté** (`logic-certigo-ci-runner-idle-deallocation`,
    toutes les 5 minutes de 02:00 à 23:55 UTC, jamais pendant le teardown MCAPS ni la reprise).
    Il ne désalloue que les instances non exclues dont le power state est exactement

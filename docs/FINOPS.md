@@ -247,11 +247,16 @@ the current run rate.** What does not move is the network and storage floor — 
 should settle near **≈ 220 USD/30 d**, under its 375 USD budget. Read the first days of Cost
 Management data as provisional (see "Cost data is provisional and is restated" above).
 
-**The PR cold start depended on a boot defect, fixed by the same change.** The live PR instances
-load their OS-level IMDS block only after cloud-init, whose Azure datasource then waits 10 × 30 s
-on packets the NSG drops: measured on `6e3abce4`, boot 01:31:31, runner started 01:36:44. The
-agent installer orders `certigo-block-imds.service` before `cloud-init-local.service`, which
-turns those waits into immediate refusals and closes IMDS earlier in boot.
+**The PR cold start depended on a boot defect, fixed by the same change.** cloud-init's Azure
+datasource refreshes its metadata at every boot and retries IMDS until a 300 s deadline, and
+IMDS is blocked on PR instances. Measured on `6e3abce4`: boot 01:31:31, runner started 01:36:44
+(packets dropped by the NSG); after ordering `certigo-block-imds.service` before
+`cloud-init-local.service`, 16:02:05 → 16:07:19 (connections refused at once, same deadline).
+The agent installer therefore also limits that refresh to a new instance
+(`updates.network.when: [boot-new-instance]`); the network configuration already rendered stays,
+and it matches the NIC by a MAC address that deallocation keeps. Measured on 2026-09-30 from a
+deallocated `6e3abce4`: job queued 16:20:43, VM starting +14 s, running +37 s, **runner online
++45 s** (instead of ≈ 6 min).
 
 **After activation** (to be measured over the first full working days, from the Activity Log
 power operations and the GitHub API; not yet recorded):

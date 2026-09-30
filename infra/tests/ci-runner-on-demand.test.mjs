@@ -378,3 +378,20 @@ test('the VM-side quiet periods honour the controller contract', () => {
     assert.ok(!agent.includes(marker), `the idle agent must not call ${marker.trim()}`);
   }
 });
+
+test('PR instances skip the per-boot IMDS refresh that can never succeed', () => {
+  const agent = readFileSync(path.join(repositoryRoot, 'infra', 'ci-runner', 'idle-shutdown.sh'), 'utf8');
+  const functionBody = (name) => agent.match(new RegExp(`^${name}\\(\\) \\{\\n([\\s\\S]*?)^\\}$`, 'm'))?.[1] ?? '';
+  const harden = functionBody('harden_imds_boot');
+  // Only the instances that block IMDS in the OS, the PR pool, change their cloud-init setting.
+  const gate = harden.indexOf('if [[ ! -f "${UNIT_DIR}/${IMDS_UNIT}" ]]; then\n    return 0');
+  const cloudConfig = harden.indexOf('> "${CLOUD_CFG_DIR}/${CLOUD_INIT_CFG_NAME}"');
+  assert.ok(gate >= 0 && cloudConfig > gate, 'the cloud-init setting must sit behind the IMDS unit gate');
+  // Network configuration is rendered for a new instance only: the per-boot refresh is what
+  // waits 300 s on the blocked IMDS (measured 2026-09-30).
+  assert.match(harden, /\nupdates:\n {2}network:\n {4}when: \['boot-new-instance'\]\nEOF\n/);
+  assert.match(agent, /^readonly CLOUD_INIT_CFG_NAME='91-certigo-imds-blocked\.cfg'$/m);
+  assert.match(functionBody('install_agent'), /^ {2}harden_imds_boot$/m);
+  // A rollback of the shutdown agent keeps the boot hardening.
+  assert.ok(!functionBody('uninstall_agent').includes('CLOUD_INIT_CFG_NAME'));
+});
