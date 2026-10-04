@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractCommit": "f4e4001b17d22454e036c3c055fdd68cadb0b9b5",
+  "contractCommit": "9208e0e0c5563cf7bdcc6b18d0e99ec44109c581",
   "toolchainOriginCommit": "f8e23b2952e8ca39c59f30081b8950170abb701a",
   "repository": "gchambaud_microsoft/Certigo",
   "baseImage": {
@@ -35,8 +35,8 @@
       "path": "infra/ci-runner/image/base-image-evidence/base-image-reconstruction.json",
       "sha256": "a79b48083f5d31ac04b6a0bc850583e085b830df5de51c1e0cd2350f5b118c48"
     },
-    "aptPackageLockSha256": "3682ce190d65ee2680862f29562bdf3120c83452c022400620a4a857bb1ea69b",
-    "flutterEngineArtifactLockSha256": "7bd761bd69be44f7f5c043d7da1b77f7accdbe99c4314c274c387392dcb730a1",
+    "aptPackageLockSha256": "58aa9cfd76556e580d18bca57ea23f08d9128e43688bf371fa5be77f281fee62",
+    "flutterEngineArtifactLockSha256": "c96f91d96caaec30ab3653fb695fabe4d0069d119684aaddd6ff01c8e8b625c7",
     "blockedReasons": [
       "APT and Flutter locks are captured and replayable, but the bootstrap (including installdependencies.sh), APT, pip and Flutter are not confined to verified offline artifacts.",
       "The future consumer must enforce the Flutter entrypoint preconditions and prohibit online Pub metadata resolution.",
@@ -48,13 +48,13 @@
       "id": "apt-lock",
       "path": "infra/ci-runner/image/apt-packages.lock.json",
       "destination": "apt-packages.lock.json",
-      "sha256": "3682ce190d65ee2680862f29562bdf3120c83452c022400620a4a857bb1ea69b"
+      "sha256": "58aa9cfd76556e580d18bca57ea23f08d9128e43688bf371fa5be77f281fee62"
     },
     {
       "id": "flutter-lock",
       "path": "infra/ci-runner/image/flutter-engine-artifacts.lock.json",
       "destination": "flutter-engine-artifacts.lock.json",
-      "sha256": "7bd761bd69be44f7f5c043d7da1b77f7accdbe99c4314c274c387392dcb730a1"
+      "sha256": "c96f91d96caaec30ab3653fb695fabe4d0069d119684aaddd6ff01c8e8b625c7"
     },
     {
       "id": "bootstrap",
@@ -66,7 +66,7 @@
       "id": "toolchain-manifest",
       "path": "infra/ci-runner/image/toolchain-manifest.json",
       "destination": "toolchain-manifest.json",
-      "sha256": "bdae8e2d435734875efa5f2decd2a1932d46ba7385271cce765bcbfb42404525"
+      "sha256": "f7b7b9984bacda5b8c38cded87316612558a9b681a52120fa6437d7c3e457a1a"
     },
     {
       "id": "toolchain-sbom",
