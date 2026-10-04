@@ -38,7 +38,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-10-04** |
-| Commit de référence analysé | `d3cee47bb258664730b9816e09a14da3794664fd` |
+| Commit de référence analysé | `4b2a1b93c4aef9ddb246befc4da4eeaab2d02b79` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -723,6 +723,7 @@ déclarée est dans `codemagic.yaml`.
 
 | Date | Évolution |
 |---|---|
+| 2026‑09‑25 | ✅ **`wp-p2-04` clos : rollback N-1 des releases de contenu prouvé en staging** : drill `tools/content_release_drill.py` de 12:16 à 12:18Z, 17 contrôles (imports idempotents de R1 et R2, 428 et 412, première activation, promotion de R2, rollback avec R1 servie sans clé de corrigé, second rollback 409, retour sur R2, 304). Il a tourné avec l'identité opérateur `Content.Release.Admin` réelle : jeton CIAM v2 accepté grâce à #512 ; attribution temporaire, puis retirée ; profil isolé supprimé. App Insights concorde (`content.release.import` ×4, `promoted` ×3, `rolled_back` ×1, 0 exception). Preuve : `docs/migration/evidence/2026-09-25-content-release-drill.json`. Relevé du 2026‑09‑25 à 12:22Z ; **invalidé par tout import, toute promotion ou tout rollback de contenu ultérieur en staging, même partiel, et par tout redéploiement du backend staging**. Le staging reste en `CONTENT_REPOSITORY_MODE=legacy` : ses apprenants ne voient pas ce pointeur. |
 | 2026‑09‑24 | 🚀 **Prod backend promue, les quiz remarchent** : promotion `promote-backend` [36022032292](https://github.com/gchambaud_microsoft/Certigo/actions/runs/36022032292) (source [35904765679](https://github.com/gchambaud_microsoft/Certigo/actions/runs/35904765679), commit `43e06a5f`, paquet `sha256:cd7a4ea4…`), avec « Prepare infrastructure » et « Deploy verified backend » exécutés. Déploiement actif Azure `f65efda9-5f15-40ae-95ce-1ca943a6929a` reçu à 15:46:58Z, à la place de `f66a2ee7…` du 2026‑09‑09. Embarque #462 (agrégat Cosmos de `SubmitQuiz`), #511 (catalogue `lifecycle.transition`) et #512 (audience CIAM v2). `SubmitQuiz` : 3 × 200 entre 15:56 et 15:57Z, 0 exception, contre 7 × 500 et aucun succès sur les 30 jours précédents. Surveillance d'une heure après bascule (15:48→16:48Z) : aucun critère de retour arrière atteint, 0 réponse 5xx hors le 503 voulu de `GetAccountDeletion` (fonctionnalité désactivée), 0 exception. Le 2026‑09‑24, de 15:44:13Z à 16:13:58Z, les associations NSG des 2 sous-réseaux de `vnet-certigo-prod` ont été retirées par la promotion (template antérieur à #539), puis rétablies par MCAPS. NSG sans règle personnalisée (6 règles par défaut, relevé du 2026‑09‑25 à 10:15Z), aucun effet mesuré. Corrigé par #539. Preuve : Resource Graph `resourcechanges`. Relevé du 2026‑09‑24 à 16:53Z ; **invalidé par toute promotion ou tout rollback prod ultérieur, y compris un run échoué à mi-parcours** : l'état courant se lit par `GET …/sites/func-certigo-prod-izfhvvxjdxc2k/deployments`. |
 | 2026‑09‑24 | 📦 **Contenu R2 publié puis déclaré** : release `sha256:95c69c30…` publiée depuis `certigo-content` `a433518` (run `36018994442`, 33 certifications revérifiées le 2026‑09‑23), pin rafraîchi. Publication seule : aucun import ni aucune promotion, `CONTENT_REPOSITORY_MODE` reste `legacy` en staging et en prod. |
 | 2026‑08‑21 | 📬 **Fermeture des races métriques/offboarding** : outbox transactionnel avec processing lease CAS, TimerTrigger strictement inerte en `off`, replay historique avant facts, retry purge autorisé, 30 partitions receipt directes et cohorte privacy stable inter-cycles. |
@@ -828,8 +829,9 @@ et la capability Apple, puis une validation sur iPhone.
     staging, même sur une route learner. Correctif de code le même jour : le backend accepte
     les deux écritures de la même app, émetteur, signature et expiration restant stricts ;
     déploiement dev puis staging avec le même run, la prod suivant son propre plan. Le drill de
-    rollback de contenu en staging prouvera ce chemin avec un jeton applicatif ; la preuve
-    avec un **vrai compte utilisateur sur iPhone** reste à faire. À revérifier si la version
+    rollback de contenu en staging l'a prouvé le 2026‑09‑25 avec un jeton applicatif (voir
+    « Journal d'évolution ») ; la preuve avec un **vrai compte utilisateur sur iPhone** reste
+    à faire. À revérifier si la version
     de jeton de l'app, `ENTRA_AUDIENCE`, `ENTRA_AUTHORITY` ou le validateur changent.
 - 🪪 **Person / LinkedIdentity — prochain lot** : observer le mode `shadow`, traiter toute collision,
   puis livrer séparément le resolver autoritaire `resolve`. Les endpoints/UI `link` restent hors

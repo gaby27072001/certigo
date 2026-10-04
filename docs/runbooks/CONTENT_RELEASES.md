@@ -316,6 +316,9 @@ durées, états successifs du pointeur et identités de manifeste : jamais le je
 un en-tête de requête ni un corps de réponse hors champs du pointeur. Le drill est
 rejouable : sur un environnement déjà sur N, il réactive N-1 puis refait le cycle.
 
+Dernière exécution en staging, avec l'identité opérateur réelle : voir
+[`docs/migration/evidence/2026-09-25-content-release-drill.json`](../migration/evidence/2026-09-25-content-release-drill.json).
+
 ## Identité opérateur `Content.Release.Admin`
 
 - Le rôle applicatif existe sur « Certigo API » (`12910b8e-6c75-4d51-91d8-4d5fb8a6e915`,

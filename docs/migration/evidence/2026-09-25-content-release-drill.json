@@ -1,0 +1,425 @@
+{
+  "schemaVersion": 1,
+  "lot": "wp-p2-04",
+  "measuredAtUtc": "2026-09-25T12:22:47Z",
+  "decision": "Rollback N-1 des releases de contenu prouvé en staging, avec l'identité opérateur Content.Release.Admin réelle (DoD de wp-p2-04).",
+  "invalidation": "Invalidé par tout import, toute promotion ou tout rollback de release de contenu en staging postérieur, même partiel ou échoué à mi-parcours, et par tout redéploiement du backend staging.",
+  "tool": {
+    "path": "tools/content_release_drill.py",
+    "mainRevision": "653e9112",
+    "gitBlob": "a1d9c5874011a66322288ea6cbfc2f3d1be66a75",
+    "wrapper": "script de session drill-staging.ps1 (pré-contrôles, identité temporaire, nettoyage indépendant)"
+  },
+  "target": {
+    "environment": "staging",
+    "functionApp": "func-certigo-staging-hwbsyiwa7tqnw",
+    "activeDeployment": "62eeba4f-afba-4a4f-b15e-495fd9d4bf2a",
+    "settings": {
+      "CONTENT_REPOSITORY_MODE": "legacy",
+      "CONTENT_ADMIN_ALLOW_DEV": "false",
+      "AUTH_MODE": "prod",
+      "ENTRA_AUDIENCE": "api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915"
+    },
+    "healthBefore": {
+      "live": 200,
+      "ready": 200,
+      "at": "2026-09-25T12:15:15Z"
+    },
+    "healthAfter": {
+      "live": 200,
+      "ready": 200,
+      "at": "2026-09-25T12:20:01Z",
+      "deploymentUnchanged": true,
+      "settingsUnchanged": true
+    }
+  },
+  "identity": {
+    "tenant": "af721be8-5901-422a-b299-b9c57847b968",
+    "resource": {
+      "displayName": "Certigo API",
+      "appId": "12910b8e-6c75-4d51-91d8-4d5fb8a6e915",
+      "servicePrincipalId": "31458fff-2110-4d64-8055-1b155a1bdaab",
+      "appRoleId": "8bf21569-a9aa-41db-b8a9-debd6d89619d",
+      "appRole": "Content.Release.Admin",
+      "registrationModified": false
+    },
+    "testApplication": {
+      "displayName": "Certigo Content Release Drill (temporaire 2026-09-23)",
+      "appId": "046951da-a7c8-479b-b81f-42974308424b",
+      "objectId": "cba83ea6-8a09-4393-a10f-a8503caf80a9",
+      "servicePrincipalId": "cc283e13-36b6-4b79-8bb5-da0705cd3760",
+      "restoredFromDeletedItemsAt": "2026-09-25T12:15:38Z",
+      "credentialsBefore": 0
+    },
+    "roleAssignment": {
+      "id": "Ez4ozLY2eUuLtdoHBc03YCz113EdJdJDmo9ushsx6jE",
+      "addedAt": "2026-09-25T12:15:42Z",
+      "removedAt": "2026-09-25T12:18:06Z"
+    },
+    "secret": {
+      "keyId": "03302f68-3898-4cf7-8d65-f566115e8acf",
+      "createdAt": "2026-09-25T12:15:43Z",
+      "removedAt": "2026-09-25T12:16:04Z",
+      "endDateTime": "2026-09-25T13:15:42Z",
+      "valueRecorded": false
+    },
+    "token": {
+      "iss": "https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0",
+      "aud": "12910b8e-6c75-4d51-91d8-4d5fb8a6e915",
+      "roles": [
+        "Content.Release.Admin"
+      ],
+      "exp": "2026-09-25T13:16:06Z",
+      "valueRecorded": false
+    },
+    "cleanup": {
+      "applicationDeletedAt": "2026-09-25T12:18:07Z",
+      "remainingTestIdentities": 0,
+      "remainingContentReleaseAdminAssignments": 0,
+      "azLogout": "aucun compte restant",
+      "profileFolderDeleted": true,
+      "profileRechecks": [
+        "2026-09-25T12:18:45Z",
+        "2026-09-25T12:19:00Z",
+        "2026-09-25T12:19:16Z"
+      ],
+      "defaultProfileIntact": "16b3c013-d300-468d-ac64-7eda0820b6d3"
+    }
+  },
+  "drill": {
+    "schema": "certigo.content-release-drill/v1",
+    "api": "https://func-certigo-staging-hwbsyiwa7tqnw.azurewebsites.net/api",
+    "previousReleaseId": "sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035",
+    "latestReleaseId": "sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946",
+    "startedAt": "2026-09-25T12:16:04Z",
+    "finalPointer": {
+      "activeReleaseId": "sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946",
+      "activePublicManifestId": "sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb",
+      "previousReleaseId": "sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035",
+      "previousPublicManifestId": "sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f",
+      "updatedAt": "2026-09-25T12:18:08.2098383+00:00",
+      "etag": "\"0300ddc0-0000-0c00-0000-6ab666800000\""
+    },
+    "result": "passed",
+    "finishedAt": "2026-09-25T12:18:06Z",
+    "steps": [
+      {
+        "name": "import N-1",
+        "method": "POST",
+        "path": "content/admin/releases/sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035/import",
+        "status": 201,
+        "expected": [
+          200,
+          201
+        ],
+        "durationMs": 59562,
+        "detail": {}
+      },
+      {
+        "name": "import N-1 replay is idempotent",
+        "method": "POST",
+        "path": "content/admin/releases/sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035/import",
+        "status": 200,
+        "expected": [
+          200
+        ],
+        "durationMs": 1703,
+        "detail": {}
+      },
+      {
+        "name": "import N",
+        "method": "POST",
+        "path": "content/admin/releases/sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946/import",
+        "status": 201,
+        "expected": [
+          200,
+          201
+        ],
+        "durationMs": 54266,
+        "detail": {}
+      },
+      {
+        "name": "import N replay is idempotent",
+        "method": "POST",
+        "path": "content/admin/releases/sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946/import",
+        "status": 200,
+        "expected": [
+          200
+        ],
+        "durationMs": 516,
+        "detail": {}
+      },
+      {
+        "name": "promotion without If-Match is refused",
+        "method": "POST",
+        "path": "content/admin/releases/sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035/promote",
+        "status": 428,
+        "expected": [
+          428
+        ],
+        "durationMs": 297,
+        "detail": {}
+      },
+      {
+        "name": "promotion with a stale ETag is refused",
+        "method": "POST",
+        "path": "content/admin/releases/sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035/promote",
+        "status": 412,
+        "expected": [
+          412
+        ],
+        "durationMs": 328,
+        "detail": {}
+      },
+      {
+        "name": "initial pointer",
+        "method": "GET",
+        "path": "content/admin/releases/pointer",
+        "status": 503,
+        "expected": [
+          200,
+          503
+        ],
+        "durationMs": 234,
+        "detail": {
+          "pointer": null
+        }
+      },
+      {
+        "name": "activate N-1 (first activation)",
+        "method": "POST",
+        "path": "content/admin/releases/sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035/promote",
+        "status": 200,
+        "expected": [
+          200
+        ],
+        "durationMs": 563,
+        "detail": {
+          "etag": "\"0300d5c0-0000-0c00-0000-6ab6667d0000\"",
+          "pointer": {
+            "activeReleaseId": "sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035",
+            "activePublicManifestId": "sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f",
+            "previousReleaseId": null,
+            "previousPublicManifestId": null,
+            "updatedAt": "2026-09-25T12:18:05.0781354+00:00",
+            "etag": "\"0300d5c0-0000-0c00-0000-6ab6667d0000\""
+          }
+        }
+      },
+      {
+        "name": "promote N",
+        "method": "POST",
+        "path": "content/admin/releases/sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946/promote",
+        "status": 200,
+        "expected": [
+          200
+        ],
+        "durationMs": 625,
+        "detail": {
+          "etag": "\"0300d8c0-0000-0c00-0000-6ab6667d0000\"",
+          "pointer": {
+            "activeReleaseId": "sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946",
+            "activePublicManifestId": "sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb",
+            "previousReleaseId": "sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035",
+            "previousPublicManifestId": "sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f",
+            "updatedAt": "2026-09-25T12:18:05.7798482+00:00",
+            "etag": "\"0300d8c0-0000-0c00-0000-6ab6667d0000\""
+          }
+        }
+      },
+      {
+        "name": "rollback with a stale ETag is refused",
+        "method": "POST",
+        "path": "content/admin/releases/rollback",
+        "status": 412,
+        "expected": [
+          412
+        ],
+        "durationMs": 343,
+        "detail": {}
+      },
+      {
+        "name": "rollback to N-1",
+        "method": "POST",
+        "path": "content/admin/releases/rollback",
+        "status": 200,
+        "expected": [
+          200
+        ],
+        "durationMs": 391,
+        "detail": {
+          "etag": "\"0300dbc0-0000-0c00-0000-6ab6667e0000\"",
+          "pointer": {
+            "activeReleaseId": "sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035",
+            "activePublicManifestId": "sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f",
+            "previousReleaseId": null,
+            "previousPublicManifestId": null,
+            "updatedAt": "2026-09-25T12:18:06.5551715+00:00",
+            "etag": "\"0300dbc0-0000-0c00-0000-6ab6667e0000\""
+          }
+        }
+      },
+      {
+        "name": "N-1 is served after rollback",
+        "method": "GET",
+        "path": "content/releases/active/manifest",
+        "status": 200,
+        "expected": [
+          200
+        ],
+        "durationMs": 703,
+        "detail": {
+          "etag": "\"sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f\"",
+          "x-content-release-id": "sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035",
+          "x-content-manifest-id": "sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f",
+          "forbiddenKeys": []
+        }
+      },
+      {
+        "name": "second rollback without promotion is refused",
+        "method": "POST",
+        "path": "content/admin/releases/rollback",
+        "status": 409,
+        "expected": [
+          409
+        ],
+        "durationMs": 500,
+        "detail": {}
+      },
+      {
+        "name": "promote N again (final state)",
+        "method": "POST",
+        "path": "content/admin/releases/sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946/promote",
+        "status": 200,
+        "expected": [
+          200
+        ],
+        "durationMs": 484,
+        "detail": {
+          "etag": "\"0300ddc0-0000-0c00-0000-6ab666800000\"",
+          "pointer": {
+            "activeReleaseId": "sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946",
+            "activePublicManifestId": "sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb",
+            "previousReleaseId": "sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035",
+            "previousPublicManifestId": "sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f",
+            "updatedAt": "2026-09-25T12:18:08.2098383+00:00",
+            "etag": "\"0300ddc0-0000-0c00-0000-6ab666800000\""
+          }
+        }
+      },
+      {
+        "name": "N is served at the end",
+        "method": "GET",
+        "path": "content/releases/active/manifest",
+        "status": 200,
+        "expected": [
+          200
+        ],
+        "durationMs": 438,
+        "detail": {
+          "etag": "\"sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb\"",
+          "x-content-release-id": "sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946",
+          "x-content-manifest-id": "sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb",
+          "forbiddenKeys": []
+        }
+      },
+      {
+        "name": "active manifest honors If-None-Match",
+        "method": "GET",
+        "path": "content/releases/active/manifest",
+        "status": 304,
+        "expected": [
+          304
+        ],
+        "durationMs": 484,
+        "detail": {
+          "etag": "\"sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb\"",
+          "x-content-release-id": "sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946",
+          "x-content-manifest-id": "sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb"
+        }
+      },
+      {
+        "name": "final pointer",
+        "method": "GET",
+        "path": "content/admin/releases/pointer",
+        "status": 200,
+        "expected": [
+          200,
+          503
+        ],
+        "durationMs": 281,
+        "detail": {
+          "etag": "\"0300ddc0-0000-0c00-0000-6ab666800000\"",
+          "pointer": {
+            "activeReleaseId": "sha256:95c69c30daf77df89f4438d8d662203ef5bf9f2d5eac9eabac139e495627a946",
+            "activePublicManifestId": "sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb",
+            "previousReleaseId": "sha256:7675aee4c6ea0bb3200925bc1c7b8f2d600f9ede8202138cc1b58281c1693035",
+            "previousPublicManifestId": "sha256:0a7f04486ddce1983bdc3bdd8580befbbc867b6c25a5da7f55a68c63cbbe6c7f",
+            "updatedAt": "2026-09-25T12:18:08.2098383+00:00",
+            "etag": "\"0300ddc0-0000-0c00-0000-6ab666800000\""
+          }
+        }
+      }
+    ]
+  },
+  "appInsights": {
+    "appId": "aafc85e7-88b5-420b-8d40-14f13c0de926",
+    "since": "2026-09-25T12:15:15Z",
+    "requests": {
+      "ImportContentRelease": {
+        "201": 2,
+        "200": 2
+      },
+      "PromoteContentRelease": {
+        "428": 1,
+        "412": 1,
+        "200": 3
+      },
+      "RollbackContentRelease": {
+        "412": 1,
+        "200": 1,
+        "409": 1
+      },
+      "GetContentReleasePointer": {
+        "503": 1,
+        "200": 1
+      },
+      "GetActivePublicContentManifest": {
+        "200": 2,
+        "304": 1
+      }
+    },
+    "customEvents": {
+      "content.release.import": 4,
+      "content.release.promoted": 3,
+      "content.release.rolled_back": 1
+    },
+    "exceptions": 0,
+    "fiveXx": [
+      {
+        "name": "GetContentReleasePointer",
+        "code": 503,
+        "count": 1,
+        "expected": "pointeur initial absent avant la première activation (ContentUnavailableException)"
+      }
+    ]
+  },
+  "devSafetyNet": [
+    {
+      "environment": "dev",
+      "startedAt": "2026-09-25T08:52:30Z",
+      "finishedAt": "2026-09-25T08:53:34Z",
+      "result": "passed",
+      "steps": 16,
+      "path": "pointeur existant sur N-1"
+    },
+    {
+      "environment": "dev",
+      "startedAt": "2026-09-25T09:45:36Z",
+      "finishedAt": "2026-09-25T09:45:44Z",
+      "result": "passed",
+      "steps": 17,
+      "path": "simulation complète du script, pointeur existant sur N"
+    }
+  ]
+}

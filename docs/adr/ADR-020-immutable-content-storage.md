@@ -124,9 +124,9 @@ traiter, décidée par l'orchestrateur le 2026-09-25, par délégation.
   (`MCAPSGovernance-AutomationApp`, appId `a1a9c5b6-7a4f-4288-89ab-6805873f65d1`, délégation Azure
   Lighthouse). Le même automate agit sur les comptes applicatifs. Pour ceux-là, la contrainte est
   acceptée et l'IaC alignée par #539 (`infra/main.bicep` épingle `Standard_LRS`). L'IaC de contenu
-  déclare encore `Standard_GRS` (`infra/params/content.bicepparam`, défaut de
-  `infra/content/main.bicep`) : un apply de `content-infra-apply.yml` écrirait GRS, puis
-  l'automate le défera la nuit suivante.
+  l'est aussi depuis #554 (fusionnée le 2026-09-25 à 10:51Z : `Standard_LRS` dans
+  `infra/params/content.bicepparam` et par défaut dans `infra/content/main.bicep`). Un apply de
+  `content-infra-apply.yml` ne réécrit donc plus GRS.
 - **Conséquence** : les releases publiées n'ont aucune copie géo-redondante. La perte de la région
   westeurope les rendrait indisponibles.
 - **Atténuation prouvée** : une release se reconstruit à l'identique depuis `certigo-content`. La
