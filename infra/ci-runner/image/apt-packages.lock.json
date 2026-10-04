@@ -34,7 +34,7 @@
   "inputs": {
     "bootstrapSha256": "16e12b8bf058f77fc1dab47be25016f4961de9d0f80440dd284fc58296dc14d8",
     "prewarmSha256": "b6bcfa4ddab4ea3ba2a6187dfc7f55c3524162e8084fe2bc0a3a4de86193a96a",
-    "manifestSha256": "bdae8e2d435734875efa5f2decd2a1932d46ba7385271cce765bcbfb42404525",
+    "manifestSha256": "f7b7b9984bacda5b8c38cded87316612558a9b681a52120fa6437d7c3e457a1a",
     "runnerArchiveSha256": "04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d",
     "runnerDependencyScriptSha256": "dbc825434c2f8d618519d135ec5fcdcfb492064f5d907e184207b4a0571acd96",
     "dpkgLogSha256": "c33525f13bb1ad5bc4f459d45bbe22e8578410205dd7107f93cb7f7fd6bb1c39",

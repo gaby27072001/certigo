@@ -170,7 +170,7 @@
   ],
   "contentTools": {
     "nodeLockfile": "../../../package-lock.json",
-    "nodeLockfileSha256": "4e7e68d10b9f5a7a2485622b26411a99c9a1498ad66f351221522034b7c1bc5e",
+    "nodeLockfileSha256": "c3669f60eb1175ed85f27a48ac2836650af26f93e29094fdad6a84ca313ff2d0",
     "entryPoints": [
       "../../../tools/validate_content.mjs",
       "../../../tools/seed_content.py",
