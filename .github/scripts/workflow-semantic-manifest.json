@@ -101,5 +101,10 @@
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
   },
-  "preApproved": {}
+  "preApproved": {
+    ".github/workflows/dart-sast.yml": {
+      "digest": "3f6b3e79c69cfc3422ff6d40ac57c271fb7915c9a7a2dc09867afa82cff0971c",
+      "expires": "2026-10-25"
+    }
+  }
 }

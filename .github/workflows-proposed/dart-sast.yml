@@ -1,0 +1,260 @@
+name: dart-sast
+
+# Static application security testing of the Dart/Flutter code (finding D10) with Semgrep
+# Community Edition: CodeQL cannot analyse Dart. The verdict is computed by the BASE copy of
+# .github/scripts/dart-sast.mjs, which reads its rules, scope, baseline and Semgrep lock next to
+# itself; the pull request tree is only read as data. A second job runs the pull request's own
+# controls on its own tree, so that a rule, baseline or script change cannot land broken.
+# Read-only token, no secret, no upload: a new finding fails the job and is described in the
+# step summary. The aggregate gate never reads pull request source and runs on the trusted pool,
+# like every aggregate gate (docs/runbooks/CI_RUNNERS.md §10). See docs/runbooks/DART_SAST.md.
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    branches: [main]
+  schedule:
+    - cron: "37 3 * * 0"
+
+concurrency:
+  group: dart-sast-${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && (github.event.action == 'opened' || github.event.action == 'synchronize') && github.run_attempt == 1 && github.event.pull_request.number > 0 && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}-{2}', github.event_name, github.run_id, github.run_attempt) }}
+  cancel-in-progress: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.run_attempt == 1 && github.event.pull_request.number > 0 && github.event.after != '' }}
+
+permissions: {}
+
+jobs:
+  freshness:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+    uses: ./.github/workflows/pr-head-freshness.yml
+    with:
+      pull-request-number: ${{ github.event.pull_request.number }}
+      event-head-sha: ${{ github.event.pull_request.head.sha }}
+    permissions:
+      pull-requests: read
+
+  scan:
+    name: Dart SAST (base controls)
+    needs: freshness
+    if: ${{ always() && (github.event_name != 'pull_request_target' || (needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository)) }}
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
+      SAST_STATE_DIR: ${{ github.workspace }}/.dart-sast-state
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Enforce initial PR freshness validation
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        shell: bash
+        env:
+          FRESHNESS_RESULT: ${{ needs.freshness.result }}
+        run: |
+          if [ "$FRESHNESS_RESULT" != "success" ]; then
+            echo "::error::Initial PR head freshness validation did not succeed."
+            exit 1
+          fi
+      - name: Recheck current PR head after assignment
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
+      - name: Reset isolated scanner state
+        run: |
+          /usr/bin/rm -rf -- "$SAST_STATE_DIR"
+          /usr/bin/mkdir -p -- "$SAST_STATE_DIR"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+
+      - name: Checkout immutable trusted controls
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}
+          path: .trusted-control
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+
+      - name: Install hash-locked Semgrep from trusted controls
+        run: |
+          set -euo pipefail
+          python -m venv "$SAST_STATE_DIR/venv"
+          "$SAST_STATE_DIR/venv/bin/python" -m pip install --isolated --no-cache-dir \
+            --disable-pip-version-check --require-hashes --only-binary=:all: --no-deps \
+            --index-url https://pypi.org/simple \
+            -r "$TRUSTED_CONTROL_DIR/.github/sast/semgrep-requirements.lock"
+
+      - name: Scan the source tree with trusted controls
+        run: |
+          node "$TRUSTED_CONTROL_DIR/.github/scripts/dart-sast.mjs" check \
+            --semgrep "$SAST_STATE_DIR/venv/bin/semgrep" \
+            --root "$UNTRUSTED_SOURCE_DIR" \
+            --state "$SAST_STATE_DIR/scan" \
+            --label "base controls" \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --github
+
+      - name: Remove isolated scanner state
+        if: ${{ always() }}
+        run: /usr/bin/rm -rf -- "$SAST_STATE_DIR"
+
+  candidate:
+    name: Dart SAST (pull request controls)
+    needs: freshness
+    if: ${{ always() && github.event_name == 'pull_request_target' && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      SAST_STATE_DIR: ${{ github.workspace }}/.dart-sast-candidate-state
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Enforce initial PR freshness validation
+        shell: bash
+        env:
+          FRESHNESS_RESULT: ${{ needs.freshness.result }}
+        run: |
+          if [ "$FRESHNESS_RESULT" != "success" ]; then
+            echo "::error::Initial PR head freshness validation did not succeed."
+            exit 1
+          fi
+      - name: Recheck current PR head after assignment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
+      - name: Reset isolated scanner state
+        run: |
+          /usr/bin/rm -rf -- "$SAST_STATE_DIR"
+          /usr/bin/mkdir -p -- "$SAST_STATE_DIR"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+
+      # From here on, pull request code runs: same regime as every certigo-pr job (read-only
+      # token, no secret). Nothing below can influence the base-controls scan above.
+      - name: Install the pull request's hash-locked Semgrep
+        run: |
+          set -euo pipefail
+          python -m venv "$SAST_STATE_DIR/venv"
+          "$SAST_STATE_DIR/venv/bin/python" -m pip install --isolated --no-cache-dir \
+            --disable-pip-version-check --require-hashes --only-binary=:all: --no-deps \
+            --index-url https://pypi.org/simple \
+            -r "$UNTRUSTED_SOURCE_DIR/.github/sast/semgrep-requirements.lock"
+
+      - name: Test the pull request's rules on their fixtures
+        run: |
+          node "$UNTRUSTED_SOURCE_DIR/.github/scripts/dart-sast.mjs" test-rules \
+            --semgrep "$SAST_STATE_DIR/venv/bin/semgrep" \
+            --state "$SAST_STATE_DIR/rules" \
+            --label "pull request rules" \
+            --github
+
+      - name: Scan the pull request tree with its own controls
+        run: |
+          node "$UNTRUSTED_SOURCE_DIR/.github/scripts/dart-sast.mjs" check \
+            --semgrep "$SAST_STATE_DIR/venv/bin/semgrep" \
+            --root "$UNTRUSTED_SOURCE_DIR" \
+            --state "$SAST_STATE_DIR/scan" \
+            --label "pull request controls" \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --github
+
+      - name: Remove isolated scanner state
+        if: ${{ always() }}
+        run: /usr/bin/rm -rf -- "$SAST_STATE_DIR"
+
+  gate:
+    name: Dart SAST / Security gate
+    needs: [freshness, scan, candidate]
+    if: ${{ always() && (github.event_name != 'pull_request_target' || (needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository)) }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Enforce Dart SAST results
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          FRESHNESS_RESULT: ${{ needs.freshness.result }}
+          FRESHNESS_CURRENT: ${{ needs.freshness.outputs.current }}
+          SCAN_RESULT: ${{ needs.scan.result }}
+          CANDIDATE_RESULT: ${{ needs.candidate.result }}
+        run: |
+          set -euo pipefail
+          case "$EVENT_NAME" in
+            pull_request_target)
+              expected_freshness="success"
+              expected_candidate="success"
+              if [ "$FRESHNESS_CURRENT" != "true" ]; then
+                echo "::error::PR head freshness validation did not confirm the current head."
+                exit 1
+              fi
+              ;;
+            push|schedule)
+              expected_freshness="skipped"
+              expected_candidate="skipped"
+              ;;
+            *)
+              echo "::error::Unsupported Dart SAST gate event '$EVENT_NAME'."
+              exit 1
+              ;;
+          esac
+          if [ "$FRESHNESS_RESULT" != "$expected_freshness" ]; then
+            echo "::error::Dart SAST freshness result was '$FRESHNESS_RESULT'; expected '$expected_freshness'."
+            exit 1
+          fi
+          if [ "$SCAN_RESULT" != "success" ]; then
+            echo "::error::Dart SAST scan with base controls was '$SCAN_RESULT'; expected 'success'."
+            exit 1
+          fi
+          if [ "$CANDIDATE_RESULT" != "$expected_candidate" ]; then
+            echo "::error::Dart SAST pull request controls were '$CANDIDATE_RESULT'; expected '$expected_candidate'."
+            exit 1
+          fi
