@@ -205,3 +205,14 @@ test('ordered types need an order, single-select types need a single answer', ()
   assert.deepEqual(validateItemTypeShape('f.yaml', item({ type: 'multi', correct: ['a', 'b'] }), ['a', 'b']), []);
   assert.deepEqual(validateItemTypeShape('f.yaml', item({ type: 'spotTheIssue' }), ['a', 'b']), []);
 });
+
+test('applied with distractors is held back until the app can submit a partial selection', () => {
+  const withDistractor = item({ type: 'applied', correct: ['a', 'b'] });
+
+  assert.ok(
+    validateItemTypeShape('f.yaml', withDistractor, ['a', 'b', 'c']).some(({ message }) =>
+      message.startsWith('APPLIED_DISTRACTORS_NOT_YET_SUPPORTED'),
+    ),
+  );
+  assert.deepEqual(validateItemTypeShape('f.yaml', withDistractor, ['a', 'b']), []);
+});

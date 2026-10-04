@@ -57,6 +57,24 @@ Côté client, `packages/data/lib/src/models/lesson.dart:146` ajoute une neuviè
 valeur, `unknown`, qui n'est **pas** un type publiable : c'est le repli de
 `itemTypeFrom` pour une valeur inconnue sur le fil.
 
+### Noms des types et issue #245
+
+Décision Q1 de l'orchestrateur du 2026-09-25 : les noms déjà utilisés sur le fil,
+dans le corpus, les clients installés et les tentatives stockées sont **gardés**.
+L'issue #245 employait d'autres noms ; voici la correspondance, reprise dans le
+[contrat des exercices v5](./contracts/exercise-items/v5/README.md) :
+
+| Nom dans #245 | `itemType` (fil, schéma, C#, Dart) |
+|---|---|
+| `mcq` | `mcq` |
+| `multiSelect` | `multi` |
+| `scenario` | `scenario` |
+| `spotIssue` | `spotTheIssue` |
+| `ordering` | `ordering` |
+| `fillBlank` | `cloze` |
+| `matching` | `matchPairs` |
+| — (absent de #245) | `applied` |
+
 ### Le contrat commun
 
 Le schéma donne **la même forme à tous les types** : `options` (2 à 6 paires
@@ -74,26 +92,28 @@ La correction, elle, se répartit en **trois familles** côté client
 | ensembliste | `mcq`, `multi`, `scenario`, `spotTheIssue` | ensemble d'`id`, ordre indifférent |
 | paires | `matchQPairs` → `matchPairs` | ensemble de jetons `"gauche:droite"` |
 
-> ⚠️ **Écart client/serveur mesuré.** Le serveur ne connaît pas ces familles.
-> `Certigo.Application/Services/QuizService.cs:616` trie les deux listes avant
-> de les comparer :
+> ✅ **Écart client/serveur corrigé (`wp-p2-06`).** Jusqu'au 2026-09-23,
+> `QuizService` et `ExamService` triaient les deux listes avant de les comparer :
+> la correction serveur, qui fait autorité, acceptait pour `ordering`, `cloze` et
+> `applied` une séquence dans le désordre. Le client ne note lui-même que le
+> contenu de démonstration embarqué (`EmbeddedKeyGrader`, `check_outcome.dart`),
+> et il le notait dans l'ordre. Pour le vrai contenu, l'app affiche le verdict
+> du serveur : l'écart n'y était donc pas visible.
 >
-> ```csharp
-> var expected = item.Correct.OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
-> var actual   = answer.Selected.OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
-> return expected.SequenceEqual(actual, StringComparer.OrdinalIgnoreCase);
-> ```
+> La comparaison passe désormais par une fonction de domaine unique,
+> `backend/src/Certigo.Domain/Content/AnswerGrading.cs`, jumelle de
+> `isAnswerCorrect` dans `package:cortex`, à laquelle le client délègue
+> (`answer_grading.dart`). Les deux ont les mêmes familles : séquence pour
+> `ordering`, `cloze` et `applied`, multiensemble pour les autres types (jetons
+> `"gauche:droite"` pour `matchPairs`). La parité est vérifiée par le job existant
+> `ci-cortex-parity`, sur les vecteurs `parity.answerGrading` de
+> `packages/cortex/test/golden/cortex_golden_vectors.json`, rejoués par
+> `CortexParityTests` (C#) et `cortex_golden_test.dart` (Dart). Ces vecteurs ont
+> aussi révélé l'écart inverse, côté client : un `id` en double remplaçait un `id`
+> manquant. Le client compare maintenant des multiensembles.
 >
-> La correction serveur est donc **insensible à l'ordre pour les huit types**.
-> Pour `ordering`, `cloze` et `applied`, le serveur — qui fait autorité —
-> accepte une séquence dans le désordre, alors que l'application la refuse à
-> l'écran. Le commentaire d'en-tête de `answer_grading.dart` affirme pourtant
-> que ce module « lets P0 (offline) and P1 (server) grade identically » : cette
-> affirmation est **fausse** pour ces trois types.
->
-> L'écart est épinglé, exécutable, par le groupe « familles de correction —
-> parité client/serveur » de `apps/mobile/test/exercise_variety_render_test.dart`.
-> Le corriger relève du backend (`QuizService`), hors du périmètre de ce travail.
+> Le balayage du corpus exigé avant d'activer cette notation est consigné dans
+> `docs/ETAT_DU_PROJET.md`, « Journal d'évolution ».
 
 ### Aiguillage type → widget
 
@@ -232,10 +252,41 @@ plus rien.
 
 #### `applied` — appliquer une procédure à un cas
 
-Même widget et même correction ordonnée qu'`ordering`, mais `correct` peut être
-un **sous-ensemble** des options : les options non citées sont des distracteurs,
-ce qu'`ordering` n'autorise pas. Au moins deux entrées — une seule n'a pas
-d'ordre.
+Même widget et même correction ordonnée qu'`ordering`. La cible est le format
+« Build list and reorder » des examens Microsoft : parmi une liste d'actions,
+choisir les bonnes et les ordonner, en laissant de côté des actions pièges.
+`correct` est donc, à terme, un **sous-ensemble ordonné** des options, et les
+options non citées sont des distracteurs, ce qu'`ordering` n'autorise pas. Au
+moins deux entrées : une seule n'a pas d'ordre.
+
+##### Garde provisoire sur les distracteurs d'`applied`
+
+Décision Q-G de l'orchestrateur, 2026-09-25 (« expand avant usage ») : **tant que
+l'app ne permet pas de valider une sélection partielle, aucun `applied` avec
+distracteurs n'est publiable.** Aujourd'hui, `canSubmitCurrent`
+(`lesson_session_state.dart`) n'active la validation qu'une fois **toutes** les
+options placées : un corrigé plus court que la liste des options serait
+impossible à réussir. Deux gardes l'empêchent, et aucun item du corpus n'est
+concerné (balayage du 2026-09-25) :
+
+* `tools/validate_content.mjs` rejette un `applied` dont `correct` ne cite pas
+  toutes les options (`APPLIED_DISTRACTORS_NOT_YET_SUPPORTED`) ;
+* `tools/sweep_answer_grading.py` signale le même cas (`APPLIED_UNSUBMITTABLE`).
+
+**Quand la lever** : quand ces trois conditions sont vraies, et pas avant.
+
+1. L'app permet de valider un `applied` dès qu'au moins 2 étapes sont placées,
+   avec un réordonnancement accessible (VoiceOver, cibles de 44 pt, Dynamic
+   Type). C'est l'étape 3 du [contrat v5](./contracts/exercise-items/v5/README.md).
+2. Cette version est la seule en circulation chez les apprenants : la dernière
+   build TestFlight distribuée, vérifiée dans App Store Connect.
+3. Les vecteurs de parité couvrent les sous-ensembles (`parity.answerGrading` :
+   cinq cas, du bon ordre au distracteur choisi). C'est déjà fait.
+
+**Comment la lever** : dans une même PR, retirer la règle
+`APPLIED_DISTRACTORS_NOT_YET_SUPPORTED` et inverser son test, remplacer
+`APPLIED_UNSUBMITTABLE` par la règle du nouveau `canSubmitCurrent` (au moins 2
+étapes), puis mettre à jour cette section.
 
 ```yaml
     type: applied
@@ -321,7 +372,8 @@ minimum, `spotTheIssue` à une seule, `matchPairs` refusé avec sa raison.
 Exécuté par `ci-mobile.yml` (`flutter test --coverage`). Il fait passer la
 charge utile **publique** de chaque type dans le vrai `StepRenderer` et vérifie
 que chacun atteint le widget attendu, qu'il est répondable, que `matchPairs`
-publié ne l'est pas — et il épingle l'écart de correction client/serveur du §2.
+publié ne l'est pas — et il épingle les familles de correction du client, dont la
+parité avec le serveur est prouvée par les vecteurs partagés du §2.
 
 ### Preuve que les cliquets mordent
 Mesuré le 2026-09-11, chaque mutation accompagnée de l'empreinte SHA-256 du

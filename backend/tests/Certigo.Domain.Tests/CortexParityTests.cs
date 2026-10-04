@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Certigo.Domain.Content;
 using Certigo.Domain.Progress;
 using Certigo.Domain.Readiness;
 using FluentAssertions;
@@ -13,7 +14,9 @@ namespace Certigo.Domain.Tests;
 /// Flutter client (<c>packages/cortex/test/cortex_golden_test.dart</c>): the exact
 /// same JSON (<c>packages/cortex/test/golden/cortex_golden_vectors.json</c>) is
 /// asserted on both sides, and the <c>ci-cortex-parity</c> workflow fails if the
-/// Dart and .NET implementations diverge. The <c>cortexOnly</c> vectors cover the
+/// Dart and .NET implementations diverge. <c>parity.answerGrading</c> pins the
+/// per-type answer comparison (<see cref="AnswerGrading"/> vs the Dart
+/// <c>isAnswerCorrect</c> of <c>package:cortex</c>). The <c>cortexOnly</c> vectors cover the
 /// SessionPlanner, which has no .NET twin, so only Dart asserts them.
 /// </summary>
 public sealed class CortexParityTests
@@ -141,6 +144,31 @@ public sealed class CortexParityTests
                 .Be(v.GetProperty("expectedTrackScore").GetInt32(), "track [{0}]", name);
         }
     }
+
+    [Fact]
+    public void AnswerGrading_matches_the_shared_golden_vectors()
+    {
+        foreach (var v in Parity.GetProperty("answerGrading").EnumerateArray())
+        {
+            var name = v.GetProperty("name").GetString()!;
+            var type = Enum.Parse<ItemType>(v.GetProperty("type").GetString()!, ignoreCase: true);
+
+            AnswerGrading.IsCorrect(type, Strings(v.GetProperty("correct")), Strings(v.GetProperty("selected")))
+                .Should().Be(v.GetProperty("expected").GetBoolean(), "answerGrading [{0}]", name);
+        }
+    }
+
+    [Fact]
+    public void AnswerGrading_vectors_cover_every_item_type()
+    {
+        Parity.GetProperty("answerGrading").EnumerateArray()
+            .Select(v => Enum.Parse<ItemType>(v.GetProperty("type").GetString()!, ignoreCase: true))
+            .ToHashSet()
+            .Should().BeEquivalentTo(Enum.GetValues<ItemType>());
+    }
+
+    private static string[] Strings(JsonElement array)
+        => array.EnumerateArray().Select(item => item.GetString()!).ToArray();
 
     private static ReviewGrade GradeFromName(string name) => name switch
     {

@@ -214,6 +214,19 @@ export function validateItemTypeShape(file, item, optionIds) {
             `2 correct ids (got ${correctCount}). Use "mcq" or "scenario" for a single answer.`,
         );
       }
+      // Provisional "expand before use" guard (orchestrator decision Q-G, 2026-09-25).
+      // `applied` is a "build list and reorder" item whose unlisted options are
+      // distractors, but the app cannot submit a partial selection yet
+      // (`canSubmitCurrent` requires every option placed): a shorter answer would be
+      // impossible to get right. How and when to lift it: docs/EXERCICES.md,
+      // "Garde provisoire sur les distracteurs d'applied".
+      if (correctCount !== optionIds.length) {
+        add(
+          `APPLIED_DISTRACTORS_NOT_YET_SUPPORTED: item "${item.id}" lists ${correctCount} of ` +
+            `${optionIds.length} options. Until the app can submit a partial ordered selection, ` +
+            'an applied answer must place every option. See docs/EXERCICES.md.',
+        );
+      }
       break;
 
     case 'multi':
