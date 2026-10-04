@@ -30,7 +30,11 @@ Le module `infra/modules/diagnostics.bicep` ajoute ou ajuste :
   `immediatePurgeDataOn30Days`, afin de conserver les logs de suppression ; le
   sampling adaptatif reste borne a 5 elements par seconde. Les requetes et
   exceptions restent exemptes afin que les alertes demeurent fiables au faible
-  volume observe.
+  volume observe ;
+- en staging seulement (profil `nonProduction`), les cinq alertes de journaux
+  sont evaluees toutes les 15 minutes sur 15 minutes et les journaux data-plane
+  du stockage ne gardent que `StorageDelete` ; les tests de disponibilite ne
+  changent pas. Voir « Profil de cout hors production ».
 
 Le workflow runner quotidien publie dans son Step Summary des metriques de
 lifecycle, attente du run courant, taille agregee des caches locaux, latence
@@ -204,6 +208,8 @@ severite 1, son identite, ses droits, son action group et `autoMitigate=true`.
 Seuls son KQL, son seuil (`Count > 1`), sa fenetre (`PT10M`) et sa cadence
 (`PT1M`) changent. Les autres regles, dont 5xx + exceptions, restent inchangees.
 La cadence plus rapide augmente les evaluations de cette seule regle.
+En staging (profil `nonProduction`), la meme regle tourne toutes les 15 minutes
+sur 15 minutes, avec le meme KQL et le meme seuil.
 
 Deux requetes non-200 observees dans la fenetre suffisent, meme si des 200
 s'intercalent ou si les echecs viennent de deux instances/regions differentes :
@@ -459,6 +465,98 @@ requetes synthetiques ajoutent un faible volume d'ingestion variable, facture
 au tarif d'ingestion du contrat. La retention 90 jours hors dev est conservee :
 aucune economie de retention n'est creditee. Budget arrondi vers le haut pour
 les meters fixes : **11 EUR/mois par environnement**, **22 EUR/mois au total**.
+
+### Profil de cout hors production (decide le 2026-10-04)
+
+> Faits volatils, dates et bornes : mesures du **2026-10-04** (table `Usage` des
+> workspaces, Cost Management `ActualCost` par meter sur 2026-09-24 -> 2026-10-03,
+> definitions relues dans Azure). Invalides par un changement d'hebergement des
+> Functions, de compte de stockage, de tarif Log Analytics ou de cadence des
+> alertes : remesurer plutot que corriger.
+
+Decision de Gabriel transmise par l'orchestrateur le 2026-10-04 : reduire le cout
+de l'observabilite hors production, **production inchangee**.
+`infra/modules/diagnostics.bicep` recoit `costProfile` (`production` par defaut ;
+`infra/main.bicep` le derive de `env`, prod reste toujours `production`, staging
+recoit `nonProduction`). Le module n'etant pas deploye en dev,
+`infra/modules/devObservability.bicep` reprend en IaC les ressources que dev avait
+recues a la main le 2026-08-15 (tag `managedBy: manual-hardening`).
+
+| Environnement | Change | Ne change pas |
+| --- | --- | --- |
+| prod | rien | tout ; le template compile resout exactement les valeurs precedentes (`infra/tests/observability-cost-profile.test.mjs`) |
+| staging | 5 alertes de journaux : `PT15M`/`PT15M` ; Blob/Queue/Table : `StorageDelete` seul | requetes, seuils, severites, action group, Function App/Cosmos/Key Vault en `allLogs`, **les deux tests de disponibilite (300 s, 2 localisations)** |
+| dev | 3 alertes HTTP : `PT15M`/`PT15M` ; Blob/Queue/Table : `StorageDelete` seul | requetes, seuil 25, severite 2, **aucun action group** (comme avant : elles ne notifient personne), reglages de diagnostic Function App/Cosmos/Key Vault |
+
+**Pourquoi seulement les suppressions dans les journaux de stockage.**
+`StorageBlobLogs` representait plus de la moitie de l'ingestion : 2,21 Go/30 j en
+dev, 2,30 en staging (2,14 en prod, inchangee). Sur 7 jours, 81-83 % sont des
+lectures et 17-19 % des ecritures, presque toutes du runtime Functions lui-meme
+(`GetBlob`, `GetBlobProperties`, `ListContainers`, `RenewBlobLease`) ; les
+suppressions pesaient 0 Mo. Aucune alerte, aucun test, aucun workbook ni runbook
+ne lit `StorageBlobLogs`/`StorageQueueLogs`/`StorageTableLogs`. Garder
+`StorageDelete` conserve la piste d'audit des suppressions, comme la retention
+ci-dessus. Aucune politique ne recree ces reglages : sur les 20 affectations qui
+couvrent l'abonnement (764 definitions lues), aucune ne deploie ni n'audite un
+reglage de diagnostic de stockage ; temoin positif, la politique MCAPS
+`AzTB 17 - Configure Diagnostics Setting for Function apps` est bien detectee
+(elle ecrit `setByPolicy-MCAPSGovernance` sur les Function Apps, non touche ici).
+
+**Pourquoi 15 minutes pour les alertes.** Une regle de journaux coute selon sa
+cadence (meter `Alerts System Log Monitored at 5 Minute Frequency` :
+0,48 USD/10 j par regle, soit 1,45 USD/30 j ; environ trois fois moins a
+15 minutes). Fenetre = cadence : couverture continue sans recouvrement, seuils
+inchanges. Readiness garde le KQL et le seuil de #568 (au moins deux echecs dans la
+fenetre). `telemetry-absent` reste coherente : les sondes a 300 s de deux
+localisations donnent au moins quatre requetes par fenetre de 15 minutes.
+
+**Pourquoi les tests de disponibilite de staging restent tels quels.** Le moniteur
+de promotion de #577 exige des `AppAvailabilityResults` : aucun resultat apres
+10 minutes de surveillance, ou un resultat le plus recent plus vieux que
+15 minutes, bloque definitivement la promotion. A 600 ou 900 s, une phase
+defavorable plus le delai d'ingestion produit ce blocage meme avec une
+application saine (analyse du proprietaire de #577). Supprimer les tests casserait
+la baseline. Cout conserve : 20 USD/30 j (10 368 executions sur 10 jours). Option
+validee sur le principe par l'orchestrateur, **apres** ce profil et dans une PR
+separee limitee a staging : supprimer seulement le test `-live` et son alerte
+(compatibilite #577 confirmee par son proprietaire), puis capturer une nouvelle
+baseline du moniteur.
+
+**Economie attendue** (meters mesures) : journaux de stockage
+4,5 Go/30 j x 2,99 USD/Go = **13,4 USD/30 j** ; alertes, 8 regles x environ
+0,97 USD = **7,8 USD/30 j** ; total **environ 21 USD/30 j**.
+
+**Application.** Dev : automatique, `cd-backend` deploie `infra/main.bicep` a chaque
+fusion sur `main`. Staging : uniquement par la promotion normale `cd-backend`,
+apres la promotion de production du 2026-10-05 et sur creneau de l'orchestrateur,
+jamais par `deployment create` manuel. Prod : rien a appliquer.
+
+**Verifier apres application** (lecture seule) :
+
+```powershell
+$rg = 'rg-certigo-staging'   # puis rg-certigo-dev
+$sub = az account show --query id -o tsv
+# Pas `az monitor scheduled-query list` : extension preview, liste incomplete mesuree le 2026-10-04.
+az rest --method get `
+  --url "https://management.azure.com/subscriptions/$sub/resourceGroups/$rg/providers/Microsoft.Insights/scheduledQueryRules?api-version=2023-12-01" `
+  --query "value[].{name:name, every:properties.evaluationFrequency, window:properties.windowSize, enabled:properties.enabled}" -o table
+$account = az storage account list -g $rg --query "[?tags.product=='Certigo'].name | [0]" -o tsv
+foreach ($service in 'blobServices', 'queueServices', 'tableServices') {
+  az monitor diagnostic-settings list `
+    --resource "$(az storage account show -n $account -g $rg --query id -o tsv)/$service/default" `
+    --query "[].{name:name, logs:logs[?enabled].category}" -o json
+}
+```
+
+Attendus : `PT15M`/`PT15M` sur chaque regle (prod : inchangee, `PT5M`/`PT15M` et
+readiness `PT1M`/`PT10M`) ; `["StorageDelete"]` sur les trois services. Le
+lendemain, `StorageBlobLogs` doit tomber pres de zero dans la table `Usage` du
+workspace. En staging, capturer une nouvelle baseline du moniteur de #577 avant la
+promotion suivante.
+
+**Retour arriere** : PR de revert, puis meme chemin d'application. Pour staging
+seul, `costProfile: 'production'` dans `infra/main.bicep` suffit. Ne pas modifier
+ces regles dans le portail : le prochain deploiement les reecrirait.
 
 ## Validation sans mutation
 

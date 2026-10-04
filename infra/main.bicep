@@ -734,6 +734,22 @@ module diagnostics 'modules/diagnostics.bicep' = if (env != 'dev') {
     blobServiceDiagnosticSettingName: blobServiceDiagnosticSettingName
     queueServiceDiagnosticSettingName: queueServiceDiagnosticSettingName
     tableServiceDiagnosticSettingName: tableServiceDiagnosticSettingName
+    // Prod is always production; the module is not deployed in dev, so this selects staging.
+    costProfile: env == 'prod' ? 'production' : 'nonProduction'
+    tags: effectiveTags
+  }
+}
+
+// Development observability, cost-bounded: the three HTTP log alerts and the storage deletion
+// audit, adopted from the manual hardening of 2026-08-15 (the diagnostics module above is not
+// deployed in dev). See docs/runbooks/OBSERVABILITY.md, "Profil de cout hors production".
+module devObservability 'modules/devObservability.bicep' = if (env == 'dev') {
+  scope: rg
+  name: 'dev-observability'
+  params: {
+    storageAccountName: storage.outputs.accountName
+    workspaceId: monitoring.outputs.workspaceId
+    location: location
     tags: effectiveTags
   }
 }

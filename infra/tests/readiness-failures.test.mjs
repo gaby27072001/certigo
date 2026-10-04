@@ -99,9 +99,9 @@ test('ARM changes only readiness query/threshold/cadence/window, preserving rout
   assert.match(ready.query, /Microsoft\.Insights\/components/);
   const rule = template.resources.find((r) => r.type === 'Microsoft.Insights/scheduledQueryRules');
   assert.equal(rule.properties.evaluationFrequency,
-    "[if(equals(variables('logAlerts')[copyIndex()].name, 'readiness-failure'), 'PT1M', 'PT5M')]");
+    "[if(variables('nonProduction'), 'PT15M', if(equals(variables('logAlerts')[copyIndex()].name, 'readiness-failure'), 'PT1M', 'PT5M'))]");
   assert.equal(rule.properties.windowSize,
-    "[if(equals(variables('logAlerts')[copyIndex()].name, 'readiness-failure'), 'PT10M', 'PT15M')]");
+    "[if(variables('nonProduction'), 'PT15M', if(equals(variables('logAlerts')[copyIndex()].name, 'readiness-failure'), 'PT10M', 'PT15M'))]");
   assert.equal(rule.properties.autoMitigate, true);
   assert.equal(rule.properties.criteria.allOf[0].timeAggregation, 'Count');
   assert.equal(rule.properties.criteria.allOf[0].operator, 'GreaterThan');

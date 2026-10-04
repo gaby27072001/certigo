@@ -50,7 +50,26 @@ param queueServiceDiagnosticSettingName string = 'security-to-law'
 @description('Existing Table service diagnostic setting name.')
 param tableServiceDiagnosticSettingName string = 'security-to-law'
 
+@description('Observability cost profile, chosen in infra/main.bicep from env (prod is always production). production keeps every signal at its production cadence. nonProduction (staging) evaluates every log-search alert every 15 minutes over 15 minutes and keeps only deletions in the storage data-plane logs; availability tests are unchanged. See docs/runbooks/OBSERVABILITY.md, "Profil de cout hors production".')
+@allowed([
+  'production'
+  'nonProduction'
+])
+param costProfile string = 'production'
+
 param tags object = {}
+
+var nonProduction = costProfile == 'nonProduction'
+
+// Storage data-plane logs. Production keeps every category for audit. Outside production only
+// deletions are kept: reads and writes are the Functions host's own blob traffic (GetBlob,
+// GetBlobProperties, RenewBlobLease, ListContainers), about 2.3 GB per 30 days in staging,
+// read by no alert, test, workbook or runbook; deletions are rare and keep the audit trail.
+var storageServiceLogs = nonProduction ? [
+  { category: 'StorageDelete', enabled: true }
+] : [
+  { categoryGroup: 'allLogs', enabled: true }
+]
 
 resource functionApp 'Microsoft.Web/sites@2023-12-01' existing = {
   name: functionAppName
@@ -144,7 +163,7 @@ resource blobServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-previ
   name: blobServiceDiagnosticSettingName
   properties: {
     workspaceId: workspaceId
-    logs: [ { categoryGroup: 'allLogs', enabled: true } ]
+    logs: storageServiceLogs
     metrics: [ { category: 'Transaction', enabled: true } ]
   }
 }
@@ -154,7 +173,7 @@ resource queueServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-prev
   name: queueServiceDiagnosticSettingName
   properties: {
     workspaceId: workspaceId
-    logs: [ { categoryGroup: 'allLogs', enabled: true } ]
+    logs: storageServiceLogs
     metrics: [ { category: 'Transaction', enabled: true } ]
   }
 }
@@ -164,7 +183,7 @@ resource tableServiceDiag 'Microsoft.Insights/diagnosticSettings@2021-05-01-prev
   name: tableServiceDiagnosticSettingName
   properties: {
     workspaceId: workspaceId
-    logs: [ { categoryGroup: 'allLogs', enabled: true } ]
+    logs: storageServiceLogs
     metrics: [ { category: 'Transaction', enabled: true } ]
   }
 }
@@ -349,7 +368,7 @@ var logAlerts = [
     query: replace(loadTextContent('../queries/readiness-failures.kql'), '__APP_INSIGHTS_RESOURCE_ID__', appInsights.id)
     threshold: 1
     severity: 1
-    desc: 'At least two readiness requests failed within 10 minutes. Repeated or partial failure, not necessarily a continuous outage; inspect Cosmos, Storage and Key Vault. See docs/runbooks/OBSERVABILITY.md.'
+    desc: 'At least two readiness requests failed within ${nonProduction ? 15 : 10} minutes. Repeated or partial failure, not necessarily a continuous outage; inspect Cosmos, Storage and Key Vault. See docs/runbooks/OBSERVABILITY.md.'
   }
   {
     name: 'http403-spike'
@@ -394,8 +413,11 @@ resource httpAlerts 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = [ for 
     enabled: true
     // Scope on the workspace (App Insights is workspace-based -> AppRequests).
     scopes: [ workspaceId ]
-    evaluationFrequency: a.name == 'readiness-failure' ? 'PT1M' : 'PT5M'
-    windowSize: a.name == 'readiness-failure' ? 'PT10M' : 'PT15M'
+    // Production: readiness every minute over 10 minutes, the others every 5 minutes over 15.
+    // Outside production every rule runs every 15 minutes over the last 15 minutes: contiguous
+    // windows, unchanged thresholds, a third of the 5-minute price.
+    evaluationFrequency: nonProduction ? 'PT15M' : (a.name == 'readiness-failure' ? 'PT1M' : 'PT5M')
+    windowSize: nonProduction ? 'PT15M' : (a.name == 'readiness-failure' ? 'PT10M' : 'PT15M')
     autoMitigate: true
     criteria: {
       allOf: [
