@@ -479,6 +479,8 @@ supported », mesure du 25/09), alors que le chemin livre doit etre teste.
 | Flutter/Pub | cache Pub prive (`dart pub cache preload` des 102 archives) puis `pub get --offline --enforce-lockfile`; `flutter config` et `flutter precache --linux` ne changent aucun octet du SDK (seul `bin/cache/lockfile` peut etre cree) |
 | Node/npm, .NET/NuGet, Bicep, actionlint, dart-formatter | archives verifiees seulement, aucune restauration; telemetrie et notifications coupees |
 | `contentTools.prewarmedProjectDependencies` | doit rester vide : verifie par l'installateur et au boot |
+| Agent d'extinction a la demande (ADR-022) | `idle-shutdown.sh` versionne, entree du contrat, installe par son propre `install` hors reseau; jamais par Run Command sur une image (ci-dessous) |
+| Lock npm du depot (`package-lock.json`) | hors du contrat d'image : l'image ne restaure aucune dependance de projet (decision du 04/10, ci-dessous) |
 | Azure CLI | `.deb` du lock; son controle de version a l'initialisation est neutralise pendant l'installation (defaut 2 ci-dessous) |
 | Mise a jour du runner | `--disableupdate` a l'enregistrement, hors installation |
 
@@ -602,6 +604,90 @@ modification hors paquets et hors racines inventoriees ne serait pas vue. La mis
 a jour de certificats UEFI par `fwupd` (flux « cert » de l'extension) ne passe pas
 par dpkg.
 
+### Agent d'extinction a la demande dans l'image (ADR-022)
+
+Depuis le 30/09, les runners fonctionnent a la demande (ADR-022, #570 a #576) :
+`idle-shutdown.sh` eteint l'OS apres 900 s d'inactivite cote PR, une Logic App
+desalloue les VM arretees et une autre les demarre sur `workflow_job`. Sur les
+pools actuels, l'agent est pose par `install-idle-shutdown.ps1` (Run Command). Sur
+l'image, ce chemin est impossible : `/etc/cloud/cloud.cfg.d` et les autres racines
+sont inventoriees en entier, donc des fichiers ajoutes apres coup feraient refuser
+la validation de boot, et le runner ne demarrerait plus.
+
+L'image installe donc l'agent elle-meme, sans exemption :
+
+- l'entree `idle-shutdown-agent` du contrat est `infra/ci-runner/idle-shutdown.sh`,
+  octet pour octet (SHA-256 lie au contrat, embarque par `loadFileAsBase64` comme
+  les autres entrees);
+- l'installateur hors ligne lance son propre `install <periode>` apres le
+  bootstrap confine, qui a cree `certigo-block-imds.service`. Il exige ce service
+  d'abord : sans lui, l'agent ne poserait ni l'ordre IMDS ni le reglage cloud-init,
+  et chaque reveil couterait environ 6 min (#574);
+- la periode calme est `idleShutdown.quietPeriodSeconds` du contrat (900 s). Un
+  test CI exige qu'elle egale celle de tous les pools `certigo-pr` de
+  `on-demand.config.json`;
+- postconditions verifiees : script installe egal a l'entree,
+  `QUIET_PERIOD_SECONDS=900`, service et timer, drop-in
+  `certigo-block-imds.service.d/10-certigo-before-cloud-init.conf`,
+  `cloud.cfg.d/91-certigo-imds-blocked.cfg` avec `when: ['boot-new-instance']`,
+  timer `enabled`. La validation AIB exige en plus le timer `is-enabled` et
+  `is-active`;
+- attestation : l'inventaire liste le script, `/etc/certigo-idle-shutdown.env`, le
+  service, le timer et son lien `timers.target.wants`. Le repertoire
+  `certigo-block-imds.service.d` devient une racine complete : un drop-in ajoute
+  pour defaire l'ordre IMDS change l'inventaire (teste).
+  `91-certigo-imds-blocked.cfg` est deja sous la racine `cloud.cfg.d`. Restent hors
+  inventaire, par conception : l'etat de l'agent sous `/run/certigo-idle-shutdown`
+  (tmpfs, reecrit toutes les 15 s) et le fichier de suspension operateur
+  `/etc/certigo-idle-shutdown.hold`.
+
+La VM de build AIB ne risque rien : `check` n'eteint jamais une machine sans unite
+`actions.runner.*` configuree (`idle-shutdown.sh` l. 337 a 341), et l'image n'en
+a aucune avant l'enregistrement.
+
+Le banc prouve, dans le chroot : `certigo-idle-shutdown status` (empreinte du
+script, periode, `imds_drop_in=present`, `cloud_init_boot_refresh=new-instance-only`,
+`hold=absent`); une periode modifiee dans `/etc/certigo-idle-shutdown.env` est
+refusee au boot (« complete toolchain inventory mismatch »); un fichier de
+suspension present laisse la validation verte.
+
+Couplage, convenu le 04/10 avec la session proprietaire du fonctionnement a la
+demande :
+
+- les pools image sont exclus des deploiements de l'agent par Run Command. La PR du
+  canari fera refuser par `install-idle-shutdown.ps1` les actions `install` **et**
+  `uninstall` (qui supprimerait des fichiers attestes) sur un pool image, avec
+  `-All` comme avec `-VmName`; `status`, en lecture seule, reste autorise;
+- toute modification de `idle-shutdown.sh` ou de la periode calme PR impose un
+  rafraichissement du contrat, un nouveau run du banc et une nouvelle version
+  d'image : la CI echoue sinon (empreinte d'entree, test de la periode, preuve
+  d'execution liee);
+- preuve attendue sur le canari : demarrage, puis runner en ligne en environ 45 s,
+  comme le pool PR actuel.
+
+### Lock npm hors du contrat d'image (decision du 04/10)
+
+Avant, `contentTools.nodeLockfileSha256` liait `package-lock.json` au manifeste,
+donc aux deux locks (`manifestSha256`), au contrat et au litteral `contractSha256`
+du template. Chaque correctif npm parcourait toute la chaine (#578 : 9208e0e0, puis
+2e368963), alors que l'image ne restaure aucune dependance de projet. Desormais :
+
+- `contentTools` ne garde que la politique `prewarmedProjectDependencies: []`,
+  verifiee par l'installateur et au boot. `nodeLockfile`, `nodeLockfileSha256` et
+  `entryPoints` (quatre chemins d'outils du depot, jamais lus) sont retires. Rien
+  n'est hache partiellement : le contrat d'image n'atteste que ce que l'image
+  installe;
+- `validate-toolchain.sh --contract` ne lit plus `package-lock.json`;
+- les deux locks sont relies au nouveau manifeste (seul `manifestSha256` change).
+  Preuve du 04/10, hors reseau : `lock_flutter.py verify` (114 artefacts) et
+  `lock_apt.py verify` (7 transactions, comparaison exacte) regenerent ces octets;
+- `toolchain-contract.test.mjs` prouve qu'aucun fichier lie a l'image (manifeste,
+  deux locks, contrat, template) ne mentionne ni n'epingle `package-lock.json`, et
+  que le manifeste ne pointe pas hors du repertoire image.
+
+`package-lock.json` reste gouverne par ses propres regles (`docs/GOVERNANCE.md` :
+`npm ci`, inventaire des locks, scan OSV).
+
 ### Defauts latents mesures (masques jusqu'ici par les gardes)
 
 1. **`pipefail` sous dash.** `chroot <base Noble> dash -c 'set -o pipefail'` rend
@@ -674,6 +760,17 @@ par dpkg.
    Flutter ni Dart et s'appuie sur l'inventaire, qui verifie chaque octet, mode et
    proprietaire du SDK. Le wrapper par job et le releve des ecritures restent pour
    la PR de suivi du defaut 6.
+10. **`python3` hors du venv (present sur main).** Le prewarm legacy
+    (`prewarm-toolchain.sh` l. 211) fait de `/usr/local/bin/python3` un lien
+    symbolique vers `python-3.12.3/bin/python` du venv. CPython cherche
+    `pyvenv.cfg` a cote du chemin par lequel il est lance : via le lien, il
+    tourne avec le prefixe `/usr` et les paquets systeme. Mesure sous qemu : la
+    sonde du manifeste `python3 -c "import yaml; print(yaml.__version__)"` rendait
+    6.0.1 (paquet Ubuntu) au lieu de 6.0.2 (roue verrouillee), et la validation de
+    boot echouait (run positif du 27/09), alors qu'un `exec` ou le chemin du venv
+    voit le venv. Corrige : `python3` devient un script `exec` vers le chemin du
+    venv; le banc ajoute une sonde `runner` qui exige ce venv et PyYAML 6.0.2.
+    `checkov` n'est pas concerne : son shebang pointe deja le chemin du venv.
 
 ### Rejouer le consommateur sans modifier un runner
 
