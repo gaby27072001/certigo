@@ -3,6 +3,9 @@ targetScope = 'subscription'
 @description('Opt-in switch. False performs no budget write and is the repository default.')
 param enableBudgets bool = false
 
+@description('Explicit opt-in for budget emails, independent of budget deployment. False preserves silent cost tracking.')
+param enableBudgetNotifications bool = false
+
 @description('First day of the first budget month in ISO 8601 format.')
 @minLength(10)
 param budgetStartDate string
@@ -70,6 +73,7 @@ module ciBudget 'budget.bicep' = if (enableBudgets) {
   name: 'finops-budget-ci'
   params: {
     alertEmail: alertEmail
+    enableBudgetNotifications: enableBudgetNotifications
     budgetName: 'budget-certigo-ci-monthly'
     endDate: budgetEndDate
     monthlyBudgetAmount: ciMonthlyBudgetUsd
@@ -82,6 +86,7 @@ module stagingBudget 'budget.bicep' = if (enableBudgets) {
   name: 'finops-budget-staging'
   params: {
     alertEmail: alertEmail
+    enableBudgetNotifications: enableBudgetNotifications
     budgetName: 'budget-certigo-staging-monthly'
     endDate: budgetEndDate
     monthlyBudgetAmount: stagingMonthlyBudgetUsd
@@ -94,6 +99,7 @@ module prodBudget 'budget.bicep' = if (enableBudgets) {
   name: 'finops-budget-prod'
   params: {
     alertEmail: alertEmail
+    enableBudgetNotifications: enableBudgetNotifications
     budgetName: 'budget-certigo-prod-monthly'
     endDate: budgetEndDate
     monthlyBudgetAmount: prodMonthlyBudgetUsd
@@ -106,6 +112,7 @@ module devBudget 'budget.bicep' = if (enableBudgets) {
   name: 'finops-budget-dev'
   params: {
     alertEmail: alertEmail
+    enableBudgetNotifications: enableBudgetNotifications
     budgetName: 'budget-certigo-dev-monthly'
     endDate: budgetEndDate
     monthlyBudgetAmount: devMonthlyBudgetUsd
@@ -118,6 +125,7 @@ module contentBudget 'budget.bicep' = if (enableBudgets) {
   name: 'finops-budget-content'
   params: {
     alertEmail: alertEmail
+    enableBudgetNotifications: enableBudgetNotifications
     budgetName: 'budget-certigo-content-monthly'
     endDate: budgetEndDate
     monthlyBudgetAmount: contentMonthlyBudgetUsd

@@ -36,7 +36,7 @@ function compileParameters(relativePath) {
   return JSON.parse(output.parametersJson);
 }
 
-test('monthly budget alerts on forecast acceleration and on a confirmed overrun', () => {
+test('monthly budget tracks costs silently and retains opt-in overrun thresholds', () => {
   const template = compileTemplate('infra/finops/budget.bicep');
   const [budget] = template.resources.filter(
     (resource) => resource.type === 'Microsoft.Consumption/budgets',
@@ -45,6 +45,16 @@ test('monthly budget alerts on forecast acceleration and on a confirmed overrun'
   assert.equal(budget.apiVersion, '2023-11-01');
   assert.equal(budget.properties.category, 'Cost');
   assert.equal(budget.properties.timeGrain, 'Monthly');
+  assert.equal(budget.name, "[parameters('budgetName')]");
+  assert.equal(budget.condition, undefined);
+  assert.equal(budget.properties.amount, "[parameters('monthlyBudgetAmount')]");
+  assert.deepEqual(budget.properties.timePeriod, {
+    startDate: "[parameters('startDate')]",
+    endDate: "[parameters('endDate')]",
+  });
+  assert.equal(template.parameters.enableBudgetNotifications.type, 'bool');
+  assert.equal(template.parameters.enableBudgetNotifications.defaultValue, false);
+  assert.equal(template.parameters.alertEmail.type, 'securestring');
 
   const notifications = Object.values(budget.properties.notifications);
   assert.equal(notifications.length, 3);
@@ -69,9 +79,10 @@ test('monthly budget alerts on forecast acceleration and on a confirmed overrun'
   assert.ok(
     notifications.every(
       (notification) =>
-        notification.enabled === true &&
+        notification.enabled === "[parameters('enableBudgetNotifications')]" &&
         ['GreaterThan', 'GreaterThanOrEqualTo'].includes(notification.operator) &&
-        notification.contactEmails.length === 1,
+        notification.contactEmails.length === 1 &&
+        notification.contactEmails[0] === "[parameters('alertEmail')]",
     ),
   );
 });
@@ -87,6 +98,7 @@ test('default preview evaluates to zero budget writes', () => {
   assert.equal(template.parameters.alertEmail.type, 'securestring');
   assert.equal(template.parameters.alertEmail.defaultValue, '');
   assert.equal(parameters.parameters.enableBudgets.value, false);
+  assert.equal(parameters.parameters.enableBudgetNotifications.value, false);
   assert.equal(parameters.parameters.alertEmail, undefined);
   assert.equal(deployments.length, 5);
   assert.ok(
@@ -94,6 +106,52 @@ test('default preview evaluates to zero budget writes', () => {
       (deployment) => deployment.condition === "[parameters('enableBudgets')]",
     ),
   );
+});
+
+test('all five budget deployments propagate false by default and explicit true independently of tracking', () => {
+  const template = compileTemplate('infra/finops/main.bicep');
+  assert.equal(template.parameters.enableBudgetNotifications.type, 'bool');
+  assert.equal(template.parameters.enableBudgetNotifications.defaultValue, false);
+
+  const deployments = template.resources.filter(
+    (resource) => resource.type === 'Microsoft.Resources/deployments',
+  );
+  assert.equal(deployments.length, 5);
+  assert.deepEqual(
+    deployments.map((deployment) => deployment.name).sort(),
+    ['ci', 'content', 'dev', 'prod', 'staging'].map((scope) => `finops-budget-${scope}`),
+  );
+  for (const deployment of deployments) {
+    assert.equal(deployment.condition, "[parameters('enableBudgets')]");
+    const parameters = deployment.properties.parameters;
+    assert.equal(
+      parameters.enableBudgetNotifications.value,
+      "[parameters('enableBudgetNotifications')]",
+    );
+    const nested = deployment.properties.template;
+    assert.equal(nested.parameters.enableBudgetNotifications.defaultValue, false);
+    const [budget] = nested.resources;
+    assert.equal(nested.resources.length, 1);
+    assert.equal(budget.type, 'Microsoft.Consumption/budgets');
+    assert.equal(budget.condition, undefined);
+    const scope = deployment.name.replace('finops-budget-', '');
+    assert.equal(deployment.resourceGroup, `[parameters('${scope}ResourceGroupName')]`);
+    assert.equal(parameters.budgetName.value, `budget-certigo-${scope}-monthly`);
+    assert.equal(parameters.monthlyBudgetAmount.value, `[parameters('${scope}MonthlyBudgetUsd')]`);
+    assert.equal(parameters.startDate.value, "[parameters('budgetStartDate')]");
+    assert.equal(parameters.endDate.value, "[parameters('budgetEndDate')]");
+    assert.equal(parameters.alertEmail.value, "[parameters('alertEmail')]");
+
+    // Resolve the exact parameter references asserted above and below, not an ARM evaluator.
+    for (const override of [undefined, true]) {
+      const enabled = override ?? template.parameters.enableBudgetNotifications.defaultValue;
+      const resolved = Object.values(budget.properties.notifications).map((notification) => {
+        assert.equal(notification.enabled, "[parameters('enableBudgetNotifications')]");
+        return enabled;
+      });
+      assert.deepEqual(resolved, override === true ? [true, true, true] : [false, false, false]);
+    }
+  }
 });
 
 test('budget deployment is opt-in and uses the documented 30-day baselines', () => {
