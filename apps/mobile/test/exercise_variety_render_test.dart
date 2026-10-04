@@ -120,6 +120,7 @@ void main() {
             index: checkIndex,
           ),
           onToggleOption: (_) {},
+          onMoveOption: ({required int fromIndex, required int toIndex}) {},
           onToggleMatch: (_, __) {},
         ),
       ),
@@ -148,6 +149,27 @@ void main() {
         ItemType.values.toSet()..remove(ItemType.unknown),
         reason: 'Un ItemType a été ajouté ou retiré sans décider de son widget.',
       );
+    });
+
+    group('type inconnu — repli explicite', () {
+      testWidgets('affiche un message de compatibilité sans QCM', (WidgetTester tester) async {
+        final QuizItem unknown = published(
+          ItemType.unknown,
+          stem: 'Question future.',
+          labels: <String>['Réponse A', 'Réponse B'],
+        );
+
+        await tester.pumpWidget(host(unknown));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(CheckStepWidget), findsNothing);
+        expect(find.text('Exercice non pris en charge'), findsOneWidget);
+        expect(
+          find.text('Cet exercice n\'est pas encore pris en charge par cette version de l\'app.'),
+          findsOneWidget,
+        );
+        expect(isAnswerableCheck(unknown), isFalse);
+      });
     });
 
     for (final MapEntry<ItemType, QuizItem> entry in authored.entries) {

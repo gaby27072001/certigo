@@ -7,6 +7,7 @@ import 'package:certigo/features/lesson/application/lesson_args.dart';
 import 'package:certigo/features/lesson/application/lesson_controller.dart';
 import 'package:certigo/features/lesson/application/lesson_feedback.dart';
 import 'package:certigo/features/lesson/application/lesson_session_state.dart';
+import 'package:certigo/features/lesson/application/lesson_step.dart';
 
 /// Repositories that always fail so tests enter explicit demo mode.
 class _OfflineLessonRepo implements LessonRepository {
@@ -190,6 +191,37 @@ void main() {
       expect(read().canSubmitCurrent, isFalse, reason: '3 of 4 placed');
       controller.toggleOption('s4');
       expect(read().canSubmitCurrent, isTrue);
+    });
+
+    test('applied is submittable from two placed steps and keeps distractors out', () {
+      const QuizItem item = QuizItem(
+        id: 'applied-1',
+        conceptId: 'concept',
+        type: ItemType.applied,
+        stem: 'Range les actions utiles.',
+        options: <QuizOption>[
+          QuizOption(id: 's1', label: 'Diagnostiquer'),
+          QuizOption(id: 's2', label: 'Corriger'),
+          QuizOption(id: 'd1', label: 'Ignorer l\'alerte'),
+        ],
+      );
+      const LessonSessionState oneStep = LessonSessionState(
+        lesson: Lesson(
+          id: 'lesson',
+          trackId: 'track',
+          unitId: 'unit',
+          domainId: 'domain',
+          title: 'Lesson',
+          estMinutes: 1,
+          blocks: <LessonBlock>[],
+        ),
+        steps: <LessonStep>[LessonStep(kind: LessonStepKind.check, index: 0, item: item)],
+        selection: <String>['s1'],
+      );
+
+      expect(oneStep.canSubmitCurrent, isFalse);
+      expect(oneStep.copyWith(selection: const <String>['s1', 's2']).canSubmitCurrent, isTrue);
+      expect(oneStep.copyWith(selection: const <String>['s1', 'd1']).canSubmitCurrent, isTrue);
     });
 
     test('cloze is submittable only when every blank is filled', () async {

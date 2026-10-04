@@ -19,11 +19,13 @@ class StepRenderer extends StatelessWidget {
     super.key,
     required this.state,
     required this.onToggleOption,
+    required this.onMoveOption,
     required this.onToggleMatch,
   });
 
   final LessonSessionState state;
   final void Function(String optionId) onToggleOption;
+  final void Function({required int fromIndex, required int toIndex}) onMoveOption;
   final void Function(String leftId, String rightId) onToggleMatch;
 
   @override
@@ -75,6 +77,7 @@ class StepRenderer extends StatelessWidget {
           selection: state.selection,
           outcome: state.currentOutcome,
           onToggle: onToggleOption,
+          onMove: onMoveOption,
         );
       case ItemType.cloze:
         return ClozeStepWidget(
@@ -94,13 +97,27 @@ class StepRenderer extends StatelessWidget {
       case ItemType.multi:
       case ItemType.scenario:
       case ItemType.spotTheIssue:
-      case ItemType.unknown:
         return CheckStepWidget(
           item: item,
           selection: state.selection,
           outcome: state.currentOutcome,
           onToggle: onToggleOption,
         );
+      case ItemType.unknown:
+        return const _UnsupportedCheckFallback();
     }
+  }
+}
+
+class _UnsupportedCheckFallback extends StatelessWidget {
+  const _UnsupportedCheckFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return const CalloutBlock(
+      kind: CalloutKind.info,
+      title: 'Exercice non pris en charge',
+      text: 'Cet exercice n\'est pas encore pris en charge par cette version de l\'app.',
+    );
   }
 }

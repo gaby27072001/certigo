@@ -210,6 +210,17 @@ public sealed class ApiSurfaceContractTests
             "le schema public du contrat doit refleter exactement LessonCheck ; le corrige vit "
             + "dans LessonAnswerKey, cote serveur, et n'est jamais envoye au client");
 
+        // `matches` (colonne droite des matchPairs v5) est facultatif : omis quand il est nul,
+        // pour que les leçons existantes gardent exactement leur forme sur le fil.
+        journey.RootElement.GetProperty("components").GetProperty("schemas").GetProperty("LessonCheck")
+            .GetProperty("required").EnumerateArray().Select(value => value.GetString())
+            .Should().NotContain("matches");
+
+        typeof(LessonCheck).GetProperty(nameof(LessonCheck.Matches))
+            ?.GetCustomAttributes(typeof(System.Text.Json.Serialization.JsonIgnoreAttribute), false)
+            .Cast<System.Text.Json.Serialization.JsonIgnoreAttribute>()
+            .Single().Condition.Should().Be(System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull);
+
         var answerKeyOnly = typeof(AnswerKeyItem).GetProperties()
             .Select(property => JsonNamingPolicy.CamelCase.ConvertName(property.Name))
             .Where(name => name is "correct" or "explanation")

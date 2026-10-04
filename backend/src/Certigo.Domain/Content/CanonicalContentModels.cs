@@ -92,7 +92,8 @@ public sealed record CanonicalQuestion(
     ItemType ItemType,
     int Difficulty,
     string Prompt,
-    IReadOnlyList<CheckOption> Options);
+    IReadOnlyList<CheckOption> Options,
+    IReadOnlyList<CheckOption>? Matches = null);
 
 public sealed record CanonicalSolution(
     string Id,

@@ -39,6 +39,34 @@ internal static class TestContent
         return repo;
     }
 
+    /// Adds a one-check lesson whose answer key is an ordered or paired answer.
+    public static void AddTypedLesson(
+        InMemoryContentRepository repo,
+        string lessonId,
+        ItemType type,
+        IReadOnlyList<string> correct)
+    {
+        var check = new LessonCheck(
+            Id: $"{lessonId}-i1",
+            ConceptId: "c1",
+            Type: type,
+            Stem: "Remettez dans l'ordre.",
+            Options: new[] { new CheckOption("a", "A"), new CheckOption("b", "B"), new CheckOption("c", "C") });
+        repo.AddLesson(new Lesson(
+            Id: lessonId,
+            TrackId: TrackId,
+            UnitId: "u1",
+            DomainId: "d-concepts",
+            Title: "Typed",
+            EstMinutes: 4,
+            Blocks: new[] { new LessonBlock("check", "c1", Check: check) }));
+        repo.AddAnswerKey(new LessonAnswerKey(
+            LessonId: lessonId,
+            TrackId: TrackId,
+            DomainId: "d-concepts",
+            Items: new[] { new AnswerKeyItem($"{lessonId}-i1", "c1", type, 1, correct, "Ordre attendu.") }));
+    }
+
     private static void AddLesson(InMemoryContentRepository repo, string lessonId, string unitId, string domainId, string title, string conceptId)
     {
         var check = new LessonCheck(

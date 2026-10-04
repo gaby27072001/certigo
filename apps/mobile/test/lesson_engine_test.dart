@@ -42,6 +42,70 @@ class _NoCheckLessonRepo implements LessonRepository {
   }
 }
 
+class _AppliedLessonRepo implements LessonRepository {
+  @override
+  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) async {
+    return Success<Lesson>(
+      Lesson(
+        id: lessonId,
+        trackId: trackId,
+        unitId: 'unit',
+        domainId: 'domain',
+        title: 'Applied',
+        estMinutes: 2,
+        blocks: const <LessonBlock>[
+          LessonBlock(
+            type: BlockType.check,
+            conceptId: 'concept',
+            check: QuizItem(
+              id: 'applied-check',
+              conceptId: 'concept',
+              type: ItemType.applied,
+              stem: 'Choisis les bonnes actions.',
+              options: <QuizOption>[
+                QuizOption(id: 's1', label: 'Diagnostiquer'),
+                QuizOption(id: 's2', label: 'Corriger'),
+                QuizOption(id: 'd1', label: 'Ignorer'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnknownCheckLessonRepo implements LessonRepository {
+  @override
+  Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) async {
+    return Success<Lesson>(
+      Lesson(
+        id: lessonId,
+        trackId: trackId,
+        unitId: 'unit',
+        domainId: 'domain',
+        title: 'Type futur',
+        estMinutes: 1,
+        blocks: const <LessonBlock>[
+          LessonBlock(
+            type: BlockType.check,
+            conceptId: 'concept',
+            check: QuizItem(
+              id: 'future-check',
+              conceptId: 'concept',
+              type: ItemType.unknown,
+              stem: 'Question future.',
+              options: <QuizOption>[
+                QuizOption(id: 'a', label: 'A'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _UnusableCheckLessonRepo implements LessonRepository {
   @override
   Future<Result<Lesson>> getLesson({required String trackId, required String lessonId}) async {
@@ -104,6 +168,34 @@ class _OfflineQuizRepo implements QuizRepository {
   }) async {
     calls++;
     return const Err<SubmitQuizResult>(NetworkFailure());
+  }
+}
+
+class _RecordingQuizRepo implements QuizRepository {
+  SubmitQuizRequest? lastRequest;
+
+  @override
+  Future<Result<SubmitQuizResult>> submit({
+    required String lessonId,
+    required SubmitQuizRequest request,
+  }) async {
+    lastRequest = request;
+    return const Success<SubmitQuizResult>(
+      SubmitQuizResult(
+        attemptId: 'attempt',
+        scorePct: 100,
+        results: <ItemResult>[],
+        rewards: QuizRewards(
+          xpEarned: 0,
+          newXp: 0,
+          levelUp: false,
+          streakExtended: false,
+          gemsEarned: 0,
+          achievementsUnlocked: <String>[],
+        ),
+        weakConcepts: <String>[],
+      ),
+    );
   }
 }
 
@@ -328,6 +420,32 @@ void main() {
       expect(state.lesson?.id, 'certigo-demo');
     });
 
+    test('loads an unknown check as read-only and submits no answer for it', () async {
+      final _RecordingQuizRepo recordingQuiz = _RecordingQuizRepo();
+      final ProviderContainer unknownContainer = ProviderContainer(
+        overrides: <Override>[
+          lessonRepositoryProvider.overrideWithValue(_UnknownCheckLessonRepo()),
+          quizRepositoryProvider.overrideWithValue(recordingQuiz),
+          lessonFeedbackProvider.overrideWithValue(const SilentLessonFeedback()),
+        ],
+      );
+      addTearDown(unknownContainer.dispose);
+      final LessonController controller = unknownContainer.read(
+        lessonControllerProvider(args).notifier,
+      );
+      LessonSessionState readUnknown() => unknownContainer.read(lessonControllerProvider(args));
+
+      await controller.load();
+      expect(readUnknown().status, LessonStatus.ready);
+      await controller.advance();
+      expect(readUnknown().currentItem?.type, ItemType.unknown);
+      expect(readUnknown().canSubmitCurrent, isFalse);
+      await controller.advance();
+
+      expect(recordingQuiz.lastRequest, isNotNull);
+      expect(recordingQuiz.lastRequest!.answers, isEmpty);
+    });
+
     test('starts bundled content only through explicit demo mode', () async {
       final LessonController controller = notifier();
       await controller.load();
@@ -357,6 +475,34 @@ void main() {
       expect(state.status, LessonStatus.graded);
       expect(state.currentAnswered, isTrue);
       expect(state.currentOutcome?.correct, isTrue);
+    });
+
+    test('submits only the placed applied sequence, in learner order', () async {
+      final _RecordingQuizRepo recordingQuiz = _RecordingQuizRepo();
+      final ProviderContainer appliedContainer = ProviderContainer(
+        overrides: <Override>[
+          lessonRepositoryProvider.overrideWithValue(_AppliedLessonRepo()),
+          quizRepositoryProvider.overrideWithValue(recordingQuiz),
+          lessonFeedbackProvider.overrideWithValue(const SilentLessonFeedback()),
+        ],
+      );
+      addTearDown(appliedContainer.dispose);
+      final LessonController controller = appliedContainer.read(
+        lessonControllerProvider(args).notifier,
+      );
+      LessonSessionState readApplied() => appliedContainer.read(lessonControllerProvider(args));
+
+      await controller.load();
+      await controller.advance();
+      controller.toggleOption('s2');
+      expect(readApplied().canSubmitCurrent, isFalse);
+      controller.toggleOption('s1');
+      expect(readApplied().canSubmitCurrent, isTrue);
+      controller.submitCheck();
+      await controller.advance();
+
+      expect(recordingQuiz.lastRequest, isNotNull);
+      expect(recordingQuiz.lastRequest!.answers.single.selected, <String>['s2', 's1']);
     });
 
     test('completes demo locally without submission or rewards', () async {

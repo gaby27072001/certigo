@@ -67,7 +67,7 @@ matching format/analyze/build gate used by `.github\workflows`.
 - `packages\core` - dependency-free Dart primitives such as `Result`, failures,
   and environment configuration.
 - `packages\cortex` - pure-Dart mastery, FSRS-style scheduling, session planning,
-  and readiness calculations.
+  readiness calculations, and per-type answer grading.
 - `packages\data` - DTOs, API client, repositories, cache, and offline sync.
 - `packages\prism_ui` - Prism design tokens, themes, reusable components, lesson
   rendering, and visual golden tests.

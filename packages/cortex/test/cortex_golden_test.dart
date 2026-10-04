@@ -10,8 +10,9 @@ import 'package:test/test.dart';
 /// The `parity` vectors are the single source of truth shared with the backend
 /// (`backend/tests/Certigo.Domain.Tests/CortexParityTests.cs`): the exact same
 /// JSON is asserted on both sides, and the `ci-cortex-parity` workflow fails if
-/// Dart and .NET diverge. The `cortexOnly` vectors cover the SessionPlanner,
-/// which has no .NET twin, so only Dart asserts them.
+/// Dart and .NET diverge. `parity.answerGrading` pins the per-type answer
+/// comparison ([isAnswerCorrect] vs the server's `AnswerGrading`). The `cortexOnly`
+/// vectors cover the SessionPlanner, which has no .NET twin, so only Dart asserts them.
 ///
 /// Hermetic by construction — no Flutter, no fonts, no network: it reads the
 /// JSON off disk and exercises pure `package:cortex/src/...` math.
@@ -31,6 +32,38 @@ void main() {
   });
 
   final Map<String, dynamic> parity = vectors['parity'] as Map<String, dynamic>;
+
+  group('parity/answerGrading', () {
+    final List<dynamic> cases = parity['answerGrading'] as List<dynamic>;
+    for (final dynamic raw in cases) {
+      final Map<String, dynamic> v = raw as Map<String, dynamic>;
+      test(v['name'] as String, () {
+        expect(
+          isAnswerCorrect(
+            v['type'] as String,
+            (v['correct'] as List<dynamic>).cast<String>(),
+            (v['selected'] as List<dynamic>).cast<String>(),
+          ),
+          v['expected'] as bool,
+        );
+      });
+    }
+
+    test('covers every item type', () {
+      final Set<String> covered =
+          cases.map((dynamic raw) => (raw as Map<String, dynamic>)['type'] as String).toSet();
+      expect(covered, <String>{
+        'mcq',
+        'multi',
+        'scenario',
+        'spotTheIssue',
+        'ordering',
+        'cloze',
+        'applied',
+        'matchPairs',
+      });
+    });
+  });
 
   group('parity/scheduler', () {
     for (final dynamic raw in parity['scheduler'] as List<dynamic>) {

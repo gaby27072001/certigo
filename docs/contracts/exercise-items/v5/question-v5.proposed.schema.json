@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://certigo.microsoft.com/schemas/proposed/question-v5.schema.json",
+  "title": "Certigo public question v5 (proposition)",
+  "description": "Proposed $defs.v5 for question.schema.json. Discriminated on itemType; answer-bearing keys are forbidden by additionalProperties: false. Cross-file rules X1-X9 are in README.md section 5.",
+  "$ref": "#/$defs/v5",
+  "$defs": {
+    "runtimeMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "certification", "blueprintVersion", "objective", "domainId", "conceptId"],
+      "properties": {
+        "provider": { "enum": ["aws", "gcp", "microsoft"] },
+        "certification": { "type": "string", "pattern": "^(aws|gcp|microsoft):[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "blueprintVersion": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+        "objective": { "type": "string", "pattern": "^(domain|section)-[1-9][0-9]*$" },
+        "domainId": {
+          "type": "string",
+          "pattern": "^(aws|gcp|microsoft)\\.[a-z0-9]+(?:-[a-z0-9]+)*\\.domain\\.[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "conceptId": {
+          "type": "string",
+          "pattern": "^(aws|gcp|microsoft)\\.[a-z0-9]+(?:-[a-z0-9]+)*\\.concept\\.[a-z0-9]+(?:-[a-z0-9]+)*$"
+        }
+      }
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    },
+    "optionList": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/option" }
+    },
+    "v5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "schemaVersion", "kind", "metadata", "itemType", "difficulty", "prompt", "options"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(aws|gcp|microsoft)\\.[a-z0-9]+(?:-[a-z0-9]+)*\\.[a-z0-9]+(?:-[a-z0-9]+)*\\.[a-z0-9]+(?:-[a-z0-9]+)*\\.[0-9]{3}$"
+        },
+        "legacyId": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "schemaVersion": { "const": "v5" },
+        "kind": { "const": "public" },
+        "metadata": { "$ref": "#/$defs/runtimeMetadata" },
+        "itemType": {
+          "enum": ["mcq", "multi", "scenario", "spotTheIssue", "ordering", "applied", "cloze", "matchPairs"]
+        },
+        "difficulty": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "prompt": { "type": "string", "minLength": 1 },
+        "options": { "$ref": "#/$defs/optionList" },
+        "matches": { "$ref": "#/$defs/optionList" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "itemType": { "const": "matchPairs" } }, "required": ["itemType"] },
+          "then": { "properties": { "matches": { "$ref": "#/$defs/optionList" } }, "required": ["matches"] },
+          "else": { "properties": { "matches": false } }
+        },
+        {
+          "if": { "properties": { "itemType": { "const": "multi" } }, "required": ["itemType"] },
+          "then": { "properties": { "options": { "type": "array", "minItems": 3 } } }
+        },
+        {
+          "if": { "properties": { "itemType": { "const": "cloze" } }, "required": ["itemType"] },
+          "then": { "properties": { "prompt": { "type": "string", "pattern": "_{4,}" } } }
+        }
+      ]
+    }
+  }
+}

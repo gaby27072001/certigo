@@ -219,6 +219,7 @@ void main() {
                     index: steps.indexWhere((LessonStep s) => s.isCheck),
                   ),
                   onToggleOption: (_) {},
+                  onMoveOption: ({required int fromIndex, required int toIndex}) {},
                   onToggleMatch: (_, __) {},
                 ),
               ),

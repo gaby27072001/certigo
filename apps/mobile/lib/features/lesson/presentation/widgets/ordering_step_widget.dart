@@ -1,5 +1,6 @@
 import 'package:data/data.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../application/check_outcome.dart';
@@ -18,12 +19,14 @@ class OrderingStepWidget extends StatelessWidget {
     required this.selection,
     required this.outcome,
     required this.onToggle,
+    required this.onMove,
   });
 
   final QuizItem item;
   final List<String> selection;
   final CheckOutcome? outcome;
   final void Function(String optionId) onToggle;
+  final void Function({required int fromIndex, required int toIndex}) onMove;
 
   bool get _graded => outcome != null;
 
@@ -48,68 +51,96 @@ class OrderingStepWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final PrismColorScheme p = context.prism;
     final TextTheme text = Theme.of(context).textTheme;
+    final bool applied = item.type == ItemType.applied;
     final List<QuizOption> bank =
         item.options.where((QuizOption o) => !selection.contains(o.id)).toList();
+    final String title = applied ? 'Construis la réponse appliquée' : 'Mets dans le bon ordre';
+    final String instruction = applied
+        ? 'Choisis les bonnes actions et range-les dans l\'ordre. Certaines sont des pièges.'
+        : 'Place chaque élément dans le bon ordre.';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Icon(Icons.format_list_numbered_rounded, color: p.primary, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              'Mets dans le bon ordre',
-              style: text.labelLarge?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
+            const SizedBox(width: PrismSpacing.xs),
+            Flexible(
+              child: Text(
+                title,
+                style: text.labelLarge?.copyWith(color: p.primary, fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: PrismSpacing.sm),
         Text(item.stem, style: text.titleLarge?.copyWith(height: 1.3)),
-        const SizedBox(height: 18),
-        _SectionLabel(text: 'Ta séquence', color: p.textSecondary),
-        const SizedBox(height: 10),
+        const SizedBox(height: PrismSpacing.xs),
+        Text(instruction, style: text.bodyMedium?.copyWith(color: p.textSecondary, height: 1.35)),
+        if (applied && !_graded) ...<Widget>[
+          const SizedBox(height: PrismSpacing.xs),
+          Text(
+            selection.length < 2
+                ? 'Place au moins 2 étapes pour valider.'
+                : '${selection.length} étapes placées : tu peux valider ou continuer à ajuster.',
+            style: text.bodySmall?.copyWith(
+              color: selection.length < 2 ? p.textSecondary : p.success,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+        const SizedBox(height: PrismSpacing.lg),
+        _SectionLabel(text: 'Tes étapes, dans l\'ordre', color: p.textSecondary),
+        const SizedBox(height: PrismSpacing.xs),
         _AnswerTray(
           empty: selection.isEmpty,
           child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: PrismSpacing.xs,
+            runSpacing: PrismSpacing.xs,
             children: <Widget>[
               for (int i = 0; i < selection.length; i++)
-                AnswerChip(
+                _PlacedStepChip(
+                  key: Key('placed-step-${selection[i]}'),
                   label: _labelFor(selection[i]),
-                  order: i + 1,
+                  position: i + 1,
+                  total: selection.length,
                   state: _placedState(i, selection[i]),
-                  onTap: _graded ? null : () => onToggle(selection[i]),
+                  enabled: !_graded,
+                  onRemove: () => onToggle(selection[i]),
+                  onMoveUp: i == 0 ? null : () => onMove(fromIndex: i, toIndex: i - 1),
+                  onMoveDown:
+                      i == selection.length - 1 ? null : () => onMove(fromIndex: i, toIndex: i + 1),
                 ),
             ],
           ),
         ),
         if (bank.isNotEmpty && !_graded) ...<Widget>[
-          const SizedBox(height: 18),
-          _SectionLabel(text: 'À placer', color: p.textSecondary),
-          const SizedBox(height: 10),
+          const SizedBox(height: PrismSpacing.lg),
+          _SectionLabel(text: 'Actions disponibles', color: p.textSecondary),
+          const SizedBox(height: PrismSpacing.xs),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: PrismSpacing.xs,
+            runSpacing: PrismSpacing.xs,
             children: <Widget>[
               for (final QuizOption o in bank)
-                AnswerChip(
+                _AvailableActionChip(
+                  key: Key('available-action-${o.id}'),
                   label: o.label,
-                  state: QuizOptionState.idle,
-                  onTap: () => onToggle(o.id),
+                  onAdd: () => onToggle(o.id),
                 ),
             ],
           ),
         ],
         if (_graded) ...<Widget>[
           if (!outcome!.correct) ...<Widget>[
-            const SizedBox(height: 18),
+            const SizedBox(height: PrismSpacing.lg),
             _SectionLabel(text: 'Ordre attendu', color: p.success),
-            const SizedBox(height: 10),
+            const SizedBox(height: PrismSpacing.xs),
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: PrismSpacing.xs,
+              runSpacing: PrismSpacing.xs,
               children: <Widget>[
                 for (int i = 0; i < outcome!.correctAnswer.length; i++)
                   AnswerChip(
@@ -120,10 +151,93 @@ class OrderingStepWidget extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 20),
+          const SizedBox(height: PrismSpacing.gutter),
           AnswerFeedbackCard(correct: outcome!.correct, explanation: outcome!.explanation),
         ],
       ],
+    );
+  }
+}
+
+class _PlacedStepChip extends StatelessWidget {
+  const _PlacedStepChip({
+    super.key,
+    required this.label,
+    required this.position,
+    required this.total,
+    required this.state,
+    required this.enabled,
+    required this.onRemove,
+    required this.onMoveUp,
+    required this.onMoveDown,
+  });
+
+  final String label;
+  final int position;
+  final int total;
+  final QuizOptionState state;
+  final bool enabled;
+  final VoidCallback onRemove;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+
+  @override
+  Widget build(BuildContext context) {
+    final Map<CustomSemanticsAction, VoidCallback> actions =
+        <CustomSemanticsAction, VoidCallback>{};
+    if (enabled) {
+      if (onMoveUp != null) {
+        actions[const CustomSemanticsAction(label: 'Monter')] = onMoveUp!;
+      }
+      if (onMoveDown != null) {
+        actions[const CustomSemanticsAction(label: 'Descendre')] = onMoveDown!;
+      }
+      actions[const CustomSemanticsAction(label: 'Retirer')] = onRemove;
+    }
+
+    return Semantics(
+      button: enabled,
+      selected: true,
+      label: 'Étape $position sur $total : $label',
+      onTap: enabled ? onRemove : null,
+      customSemanticsActions: actions,
+      child: ExcludeSemantics(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: AnswerChip(
+            label: label,
+            order: position,
+            state: state,
+            onTap: enabled ? onRemove : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AvailableActionChip extends StatelessWidget {
+  const _AvailableActionChip({super.key, required this.label, required this.onAdd});
+
+  final String label;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Action disponible : $label. Peut être ajoutée.',
+      onTap: onAdd,
+      child: ExcludeSemantics(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: AnswerChip(
+            label: label,
+            state: QuizOptionState.idle,
+            onTap: onAdd,
+          ),
+        ),
+      ),
     );
   }
 }
