@@ -584,6 +584,24 @@ export function scopeIntegrityProblems(trackedFiles, scope) {
     .map((file) => `${file} would let a path dependency load code the scan excludes`);
 }
 
+const strictUtf8 = new TextDecoder('utf-8', { fatal: true });
+
+// Every target that is not binary by extension must read as text. Dart compiles a file that
+// holds a NUL or invalid UTF-8 in a comment; failing here keeps such a file from depending on
+// how a given Semgrep version happens to parse it.
+export function textTargetProblems(file, bytes) {
+  if (bytes.includes(0)) {
+    return [`${file} contains a NUL byte; a text target must not hide content from the scan `
+      + '(list its extension in binaryExtensions if the file is really binary)'];
+  }
+  try {
+    strictUtf8.decode(bytes);
+  } catch {
+    return [`${file} is not valid UTF-8; a text target must not hide content from the scan`];
+  }
+  return [];
+}
+
 // ------------------------------------------------------------------ Semgrep
 
 export function semgrepArguments({ rulesDir, output, targets }) {
@@ -750,10 +768,19 @@ export function normalizeSnippet(lines) {
   return lines.map((line) => line.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ');
 }
 
+// The fingerprint covers every line of the finding: an edit anywhere in a baselined region
+// (for example `return false;` turned into `return true;` deep in a reviewed callback) must
+// produce a new finding. Only the displayed snippet is shortened.
+export function fingerprintTextFor(sourceText, startLine, endLine) {
+  const lines = sourceText.split(/\r?\n/);
+  return normalizeSnippet(lines.slice(startLine - 1, Math.min(endLine, lines.length)));
+}
+
 export function snippetFor(sourceText, startLine, endLine) {
   const lines = sourceText.split(/\r?\n/);
   const last = Math.min(endLine, startLine + MAX_SNIPPET_LINES - 1, lines.length);
-  return normalizeSnippet(lines.slice(startLine - 1, last));
+  const shown = normalizeSnippet(lines.slice(startLine - 1, last));
+  return last < Math.min(endLine, lines.length) ? `${shown} …` : shown;
 }
 
 export function fingerprintFor(rule, file, snippet) {
@@ -791,8 +818,13 @@ export function buildFindings(results, readSource, catalog) {
     if (!sources.has(result.path)) {
       sources.set(result.path, readSource(result.path));
     }
-    const snippet = snippetFor(sources.get(result.path), result.start.line, result.end.line);
-    const fingerprint = fingerprintFor(result.rule, result.path, snippet);
+    const source = sources.get(result.path);
+    const snippet = snippetFor(source, result.start.line, result.end.line);
+    const fingerprint = fingerprintFor(
+      result.rule,
+      result.path,
+      fingerprintTextFor(source, result.start.line, result.end.line),
+    );
     const occurrence = (occurrences.get(fingerprint) ?? 0) + 1;
     occurrences.set(fingerprint, occurrence);
     return {
@@ -988,6 +1020,11 @@ export function parseArguments(argv) {
       throw new GateError(`unexpected argument ${JSON.stringify(key)}`);
     }
     const name = key.slice(2);
+    // A repeated option would silently replace the first one (a second `--root` pointing at
+    // the base tree, for instance): refuse it instead.
+    if (args.has(name)) {
+      throw new GateError(`--${name} is given more than once`);
+    }
     if (name === 'github') {
       args.set(name, true);
       continue;
@@ -1011,16 +1048,15 @@ function scanTree(args) {
   const scope = validateScope(readJson(controlPath(args, 'scope'), 'scope'));
   const expectedVersion = readPinnedVersion(controlPath(args, 'lock'));
   const { targets, tracked } = computeTargets(root, scope);
-  const evasion = [
-    ...scopeIntegrityProblems(tracked, scope),
-    ...targets
-      .filter((file) => path.posix.extname(file).toLowerCase() === '.dart')
-      .flatMap((file) => directiveProblems(
-        file,
-        fs.readFileSync(regularFileInside(root, file, 'directive scan'), 'utf8'),
-        scope,
-      )),
-  ];
+  const evasion = [...scopeIntegrityProblems(tracked, scope)];
+  for (const file of targets) {
+    const bytes = fs.readFileSync(regularFileInside(root, file, 'text check'));
+    const textProblems = textTargetProblems(file, bytes);
+    evasion.push(...textProblems);
+    if (textProblems.length === 0 && path.posix.extname(file).toLowerCase() === '.dart') {
+      evasion.push(...directiveProblems(file, bytes.toString('utf8'), scope));
+    }
+  }
   const { output } = runSemgrep({
     semgrep: requireArgument(args, 'semgrep'),
     rulesDir,

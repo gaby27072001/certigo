@@ -18,6 +18,7 @@ import {
   directiveProblems,
   evaluateFixtures,
   fingerprintFor,
+  fingerprintTextFor,
   listFixtureFiles,
   loadRuleCatalog,
   parseArguments,
@@ -33,6 +34,7 @@ import {
   semgrepArguments,
   semgrepEnvironment,
   snippetFor,
+  textTargetProblems,
   validateBaseline,
   validateScope,
   validateSemgrepOutput,
@@ -284,6 +286,26 @@ test('fingerprints survive line shifts and reformatting but change with the code
   assert.equal(snippetFor('a\r\n  b  \r\nc', 1, 2), 'a b');
 });
 
+test('the fingerprint covers the whole finding, even past the shortened snippet', () => {
+  const rules = catalog();
+  const body = Array.from({ length: 30 }, (_, index) => `  check${index}();`);
+  const source = ['bool onBadCertificate() {', ...body, '  return false;', '}'].join('\n');
+  const edited = source.replace('  return false;', '  return true;');
+  const base = validateSemgrepOutput(output(), { targets, catalog: rules }).results[0];
+  const span = [{ ...base, start: { line: 1, col: 1, offset: 0 }, end: { line: 33, col: 2, offset: 0 } }];
+  const [original] = buildFindings(span, () => source, rules);
+  const [changed] = buildFindings(span, () => edited, rules);
+  assert.notEqual(changed.fingerprint, original.fingerprint);
+  assert.equal(changed.snippet, original.snippet);
+  assert.ok(original.snippet.endsWith('check18(); …'), original.snippet);
+  assert.equal(
+    original.fingerprint,
+    fingerprintFor('dart-sample-logged', 'apps/mobile/lib/a.dart', fingerprintTextFor(source, 1, 33)),
+  );
+  assert.equal(fingerprintTextFor('a\n  b\nc', 1, 9), 'a b c');
+  assert.equal(snippetFor('a\nb', 1, 2), 'a b');
+});
+
 test('identical findings in one file get distinct occurrences and duplicates collapse', () => {
   const rules = catalog();
   const source = 'print(token);\nprint(token);\n';
@@ -454,6 +476,9 @@ test('command-line arguments are strict key/value pairs', () => {
   assert.throws(() => parseArguments(['root']), /unexpected argument/);
   assert.throws(() => parseArguments(['--root']), /expects a value/);
   assert.throws(() => parseArguments(['--root', '--rules', 'x']), /expects a value/);
+  // A repeated option would silently replace the first one, a second --root for instance.
+  assert.throws(() => parseArguments(['--root', 'pr', '--root', 'base']), /--root is given more than once/);
+  assert.throws(() => parseArguments(['--github', '--github']), /--github is given more than once/);
 });
 
 function git(cwd, args) {
@@ -496,6 +521,24 @@ test('targets come from tracked files only and binaries are recognised by extens
   ]);
   assert.ok(tracked.includes('backend/src/x.cs'));
   assert.ok(!tracked.includes('apps/mobile/lib/untracked.dart'));
+});
+
+test('a text target must be valid UTF-8 without NUL bytes', () => {
+  assert.deepEqual(textTargetProblems('a.dart', Buffer.from('void a() {} // é ✓ 🔒\n', 'utf8')), []);
+  assert.deepEqual(textTargetProblems('a.dart', Buffer.from('\ufeffvoid a() {}\n', 'utf8')), []);
+  assert.match(
+    textTargetProblems('n.dart', Buffer.from('void a() {}\n// \u0000\nvoid b() {}\n', 'utf8')).join(),
+    /^n\.dart contains a NUL byte/u,
+  );
+  const invalid = {
+    latin1: [0x2f, 0x2f, 0x20, 0x63, 0x61, 0x66, 0xe9, 0x0a],
+    truncated: [0x2f, 0x2f, 0x20, 0xe2, 0x9c],
+    overlong: [0x2f, 0x2f, 0xc0, 0xaf],
+    surrogate: [0x2f, 0x2f, 0xed, 0xa0, 0x80],
+  };
+  for (const [name, bytes] of Object.entries(invalid)) {
+    assert.match(textTargetProblems(`${name}.dart`, Buffer.from(bytes)).join(), /is not valid UTF-8/u, name);
+  }
 });
 
 test('directives are read whatever their spelling, as Dart reads them', () => {
@@ -733,6 +776,30 @@ test('check exits 2 when a Dart directive loads code the scan cannot see', { ski
     /INCOMPLETE apps\/mobile\/lib\/a\.dart:1: import "\.\.\/assets\/logo\.png" loads Dart code from a file the scan does not analyse as Dart/u,
   );
   assert.match(evaded.stdout, /::error title=Dart SAST::Dart SAST scan invalid or incomplete/u);
+});
+
+test('check exits 2 when a text target holds a NUL byte or invalid UTF-8', { skip: process.platform === 'win32' }, (context) => {
+  // Measured: Dart 3.12 compiles both files, and the code after the bad byte runs.
+  const hidden = 'void b(String token) {\n  print(token);\n}\n';
+  const cases = [
+    ['nul.dart', Buffer.from(`void a() {}\n// \u0000\n${hidden}`, 'utf8'), /contains a NUL byte/u],
+    ['latin1.dart', Buffer.concat([Buffer.from('// caf'), Buffer.from([0xe9]), Buffer.from(`\n${hidden}`)]), /is not valid UTF-8/u],
+  ];
+  for (const [name, bytes, problem] of cases) {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'dart-sast-e2e-'));
+    context.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+    const tree = path.join(workspace, 'tree');
+    fs.mkdirSync(path.join(tree, 'apps/mobile/lib'), { recursive: true });
+    fs.writeFileSync(path.join(tree, 'apps/mobile/lib', name), bytes);
+    git(tree, ['init', '-q']);
+    git(tree, ['add', '-A']);
+    writeControls(workspace);
+
+    const result = runCheck(workspace, fakeSemgrep(context, FAKE_SEMGREP), ['--github']);
+    assert.equal(result.status, 2, result.stdout + result.stderr);
+    assert.match(result.stdout, new RegExp(`INCOMPLETE apps/mobile/lib/${name.replace('.', '\\.')} ${problem.source}`, 'u'));
+    assert.match(result.stdout, /::error title=Dart SAST::Dart SAST scan invalid or incomplete/u);
+  }
 });
 
 test('check exits 2 when Semgrep fails, omits a target or reports an error', { skip: process.platform === 'win32' }, (context) => {
