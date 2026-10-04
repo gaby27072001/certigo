@@ -26,7 +26,8 @@ is what lets `forecast100` mean "25% above a normal month" rather than "some lev
 effective margins differ from 1.25 only by the rounding to the nearest 5, except
 `rg-certigo-content` at ×1.54: that scope had no August cost at all, so its baseline is
 a September run rate of 16.23 USD/month and the rounding to 25 is proportionally larger
-on a small number. Read its first alert as a calibration signal, not an overrun.
+on a small number. Read its first measured threshold crossing as a calibration
+signal, not an overrun.
 
 
 The subscription also carries `mcapsgovernance` (14.37 then 15.05) and a small
@@ -206,6 +207,69 @@ fifth of the whole fleet's compute, for machines that never served a job. A stop
 instance is not a free instance. They cannot be deleted while the lock stands, so
 removing them is a deliberate act that must lift the lock first.
 
+### On-demand runners (ADR-022), measured and projected on 2026-09-30
+
+> Volatile facts, dated and bounded. Measured **2026-09-30**. Invalidated by any change of pool
+> size, quiet period, runner VM size, or of the nightly recovery schedule; re-measure rather than
+> amend. Decision and residual risks: `docs/adr/ADR-022-runners-ci-a-la-demande.md`; operations:
+> `docs/runbooks/CI_RUNNERS.md` §13.
+
+**Before.** The 30-day Cost Management audit of 2026-09-30 puts `rg-certigo-ci` at ≈ 555 USD
+(65% of the Certigo bill): trusted pool ≈ 265 (VM 172, Defender 32, NAT 40, disks 12, IP 7) and
+PR pool ≈ 279 (VM 156, disks 36, NAT 52, Defender 28, IP 4). That 30-day window understates the
+current rate: since the recovery started enumerating the scale sets on 2026-09-23, all six
+instances are started every night and run ≈ 23.2 h/day, i.e. **≈ 139 VM-hours/day ≈ 19.2 USD/day
+of compute (≈ 577 USD/30 d)**, plus Defender for Servers at the measured ≈ 0.025 USD/VM-hour.
+
+**Work actually done in that time**, from the GitHub API over both repositories,
+2026-09-24 12:00 → 2026-09-30 11:00 UTC: 1,860 `certigo-pr` jobs for **2.14 busy runner-hours/day**
+and 531 `certigo-trusted`/`certigo-ci` jobs for **0.95 busy runner-hours/day**, all between 08:00
+and 18:00 UTC, in 21 bursts separated by more than 20 minutes. **The fleet was powered ≈ 45 times
+longer than it worked.** This is the standing-compute row of the table above, now quantified.
+
+**Mechanism.** Each runner VM powers itself off after a resettable quiet period without a job
+(900 s PR, 1,200 s trusted, two guards, final guard), a Logic App deallocates VMs whose OS has
+stopped, and a `workflow_job` webhook starts the pool again when a job queues. Capacity
+(`sku.capacity`, autoscale minimum 2) is unchanged; only powered hours drop.
+
+**Projection** — a replay of those 1,860 + 531 real jobs (whole pool woken per job, 1.5-minute cold
+start, nightly recovery at 01:30 UTC included), not a measurement:
+
+| Pool | Before (VM-h/day) | After, replay (VM-h/day) | Queue wait added (replay) |
+| --- | ---: | ---: | --- |
+| PR, 4 instances, 900 s | 93 | ≈ 7.0 | p50 14 s, p90 87 s, 18% of jobs > 60 s |
+| Trusted, 2 instances, 1,200 s | 46 | ≈ 5.2 | p50 0 s, p90 13 s, 7% of jobs > 60 s |
+
+At 0.138 USD/VM-hour that is ≈ 51 USD/30 d of compute and ≈ 9 USD/30 d of Defender for Servers,
+plus the two Logic Apps (≈ 5–10 USD/30 d at ≈ 400 queued jobs/day). **Projected saving:
+≈ 320 USD/30 d against the audit's 30-day actuals (VM 328 + Defender 60), ≈ 610 USD/30 d against
+the current run rate.** What does not move is the network and storage floor — two NAT gateways
+(≈ 92 including data processing), the six 128 GiB OS disks (≈ 35, still billed when deallocated), public IPs (≈ 11) — so `rg-certigo-ci`
+should settle near **≈ 220 USD/30 d**, under its 375 USD budget. Read the first days of Cost
+Management data as provisional (see "Cost data is provisional and is restated" above).
+
+**The PR cold start depended on a boot defect, fixed by the same change.** cloud-init's Azure
+datasource refreshes its metadata at every boot and retries IMDS until a 300 s deadline, and
+IMDS is blocked on PR instances. Measured on `6e3abce4`: boot 01:31:31, runner started 01:36:44
+(packets dropped by the NSG); after ordering `certigo-block-imds.service` before
+`cloud-init-local.service`, 16:02:05 → 16:07:19 (connections refused at once, same deadline).
+The agent installer therefore also limits that refresh to a new instance
+(`updates.network.when: [boot-new-instance]`); the network configuration already rendered stays,
+and it matches the NIC by a MAC address that deallocation keeps. Measured on 2026-09-30 from a
+deallocated `6e3abce4`: job queued 16:20:43, VM starting +14 s, running +37 s, **runner online
++45 s** (instead of ≈ 6 min).
+
+**After activation** (to be measured over the first full working days, from the Activity Log
+power operations and the GitHub API; not yet recorded):
+
+| Measure | Before | After |
+| --- | ---: | ---: |
+| Powered VM-hours/day, PR | 93 | *pending* |
+| Powered VM-hours/day, trusted | 46 | *pending* |
+| Queue wait p50 / p90, `certigo-pr` | 19 s / 125 s | *pending* |
+| Queue wait p50 / p90, `certigo-trusted` | 2 s / 6 s | *pending* |
+| Wake runs failed / deallocation runs failed | n/a | *pending* |
+
 ## Guardrails
 
 `infra/finops/main.bicep` is an opt-in subscription deployment. Its default
@@ -213,11 +277,37 @@ removing them is a deliberate act that must lift the lock first.
 `infra/tests/finops-guardrails.test.mjs` keep that default. Enabling it is a
 command-line override, never a repository change.
 
-Budgets notify only; they do not stop resources or consumption. Cost data can
-lag 8-24 hours and Azure evaluates budgets daily.
+### No budget emails — decision of 2026-09-27
 
-Each budget carries three notifications, and each threshold is chosen against a
-mechanism rather than a convention:
+Gabriel requested **no budget emails on 2026-09-27**. Agents follow costs through
+Cost Management and the monthly cost-SLO review; email is not the monitoring
+mechanism. Budget resources, amounts, periods, and thresholds remain in place.
+`enableBudgetNotifications = false` is the default in the subscription entry
+point, the resource-group module, and the committed parameter file. It disables
+all three notification rules without disabling budget tracking.
+
+`enableBudgets` controls budget **writes**, not whether existing budgets track
+cost. Leaving it false does not disable, delete, or update an existing budget.
+When deliberately deploying with `enableBudgets=true`, notifications remain
+disabled unless the owner separately approves the explicit
+`enableBudgetNotifications=true` override. Never re-enable emails just because
+a measured cost crosses a threshold.
+
+**Read-back on 2026-09-27 at 16:57:59 UTC:** the operational session verified
+15 disabled notification rules on five distinct Certigo budgets after conditional
+GET/PUT-with-ETag/GET updates. Source: private operation
+`budget-notifications-disabled-20260927T165650Z`, sanitized `verified-report.json`
+(`distinctBudgets=5`, `disabledNotifications=15`, `protectedBudgetUnchanged=true`).
+No raw Azure responses or contacts are published here. This snapshot is invalidated
+by any subsequent budget creation, deletion, or update; re-read before relying on
+the live state. The pre-existing `FDPOAzureBudget` and `AGOwner` are outside this
+change and must not be modified.
+
+Budgets do not stop resources or consumption, even with notifications enabled.
+Cost data can lag 8-24 hours and Azure evaluates budgets daily.
+
+Each budget retains three **disabled-by-default** notifications. The following
+describes their behavior only after explicit opt-in:
 
 | Notification | Type | Threshold | What constrains it |
 | --- | --- | ---: | --- |
@@ -233,13 +323,16 @@ returns the whole mechanism to the state it was meant to leave.
 
 The criterion discriminates in both directions, which is what makes it a
 criterion: a normal +16% month (the measured July-to-August CI variation)
-projects to 92% of budget and stays silent, while the measured September rate
-projects to 135-224% and fires.
+projects to 92% of budget and stays below threshold, while the measured September
+rate projects to 135-224% and exceeds it. Neither sends email with the default
+notification setting.
 
 ### Deploying the budgets
 
-The recipient is never committed, never written to a repository file, and never
-passed literally on a command line. Inject it from the environment:
+This is an owner-run procedure, not a CI deployment. The existing recipient
+contract is unchanged: a recipient is required even for disabled rules. It is
+never committed, written to a repository file, or passed literally on a command
+line. Inject it from the environment; do not print it:
 
 ```powershell
 if ([string]::IsNullOrWhiteSpace($env:ALERT_EMAIL)) {
@@ -250,14 +343,17 @@ az deployment sub what-if `
   --name certigo-finops-activation-preview `
   --location westeurope `
   --subscription <subscription-id> `
-  --template-file infra/finops/main.bicep `
-  --parameters infra/params/finops.bicepparam `
-  --parameters enableBudgets=true alertEmail=$env:ALERT_EMAIL
+  --template-file infra\finops\main.bicep `
+  --parameters infra\params\finops.bicepparam `
+  --parameters enableBudgets=true enableBudgetNotifications=false alertEmail=$env:ALERT_EMAIL
 ```
 
-Review the scopes, amounts, thresholds, and dates, then replace `what-if` with
-`create` and use a dated deployment name. `alertEmail` is a `securestring`, so
-the value appears in neither the what-if output nor the deployment history.
+Review the scopes, amounts, thresholds, notification flags, and dates, then
+replace `what-if` with `create` and use a dated deployment name.
+Re-enabling emails requires separate owner approval and the explicit
+`enableBudgetNotifications=true` override; it is not the normal deployment.
+`alertEmail` is a `securestring`, protecting the parameter in deployment history,
+but budget resource reads can expose contacts. Keep raw responses private.
 
 ### Verifying the budgets exist
 
@@ -268,12 +364,15 @@ happen. Always re-read the deployed state through an independent request:
 
 ```powershell
 az rest --method get --output json `
-  --url "https://management.azure.com/subscriptions/<subscription-id>/resourceGroups/rg-certigo-ci/providers/Microsoft.Consumption/budgets/budget-certigo-ci-monthly?api-version=2023-11-01"
+  --url "https://management.azure.com/subscriptions/<subscription-id>/resourceGroups/rg-certigo-ci/providers/Microsoft.Consumption/budgets/budget-certigo-ci-monthly?api-version=2024-08-01" `
+  --query "{id:id,amount:properties.amount,category:properties.category,timeGrain:properties.timeGrain,timePeriod:properties.timePeriod,actualEnabled:properties.notifications.actual100.enabled,forecast100Enabled:properties.notifications.forecast100.enabled,forecast200Enabled:properties.notifications.forecast200.enabled,currentSpend:properties.currentSpend,forecastSpend:properties.forecastSpend}"
 ```
 
-Compare `properties.amount`, every `properties.notifications.*` threshold and
-`thresholdType`, and confirm `contactEmails` holds exactly one entry. Compare
-that entry by hash rather than printing it.
+Compare amount, category, monthly period, dates, and all three `enabled` values
+(normally false). In a private comparison, also check each notification's
+threshold, `thresholdType`, operator, and that `contactEmails` retains exactly
+one entry; compare the contact by hash rather than printing it. Disabled
+notifications are intentional, not evidence that cost tracking is broken.
 
 Pair the read with a negative witness through the same invocation and options —
 request a budget name that does not exist, and list budgets on
@@ -283,10 +382,29 @@ when the instrument has been shown able to return a presence.**
 `currentSpend` and `forecastSpend` are populated by Cost Management on its own
 cycle and are empty on a freshly created budget. Re-read them within 48 hours:
 if `currentSpend` is still zero while a Cost Management query reports non-zero
-cost for that scope, the budget exists but is not evaluating, and the alert is
-not connected.
+cost for that scope, investigate whether budget evaluation is working rather
+than enabling notifications.
+
+### Inventory: repeated IDs are not duplicate budgets
+
+In the 2026-09-27 inventory referenced in "No budget emails — decision of
+2026-09-27", the subscription listing
+`/subscriptions/<subscription-id>/providers/Microsoft.Consumption/budgets?api-version=2024-08-01`
+already returned the Certigo budget IDs containing
+`/resourceGroups/rg-certigo-*/`. Listing those resource groups returned the
+**same IDs**, not another set of resources: five unique Certigo budgets, not
+ten. The list endpoint is not the resource's scope; the full ARM `id` is.
+
+When combining paginated subscription and resource-group lists, deduplicate by
+the full ARM ID (case-insensitively), not by list origin or display name. A
+subscription-scoped budget would have a different ID without the
+`/resourceGroups/<name>` segment. Do not delete anything to fix this repeated
+display. Exclude `FDPOAzureBudget` and `AGOwner` from Certigo budget operations.
 
 ### Removing the budgets
+
+Removal is not how to stop budget emails and is not part of the 2026-09-27
+decision. Use only for an explicitly approved retirement of a budget scope.
 
 ```powershell
 az consumption budget delete --budget-name budget-certigo-ci-monthly `
@@ -299,68 +417,31 @@ resource.
 
 ### Why this is not deployed by a workflow
 
-It must not be, and the repository makes it impossible.
+Repository inspection on 2026-09-27 at base `3d2bd54f` establishes the deployment
+path, not the identity of a historical Azure caller:
 
-1. **A new privileged workflow is refused.** Any workflow that authenticates to
-   Azure needs `azure/login@`, `secrets.`, or `id-token: write`, each of which
-   makes it privileged under `privilegedWorkflow` in
-   `.github/scripts/backend-deploy-workflow-policy.mjs`. That file then rejects
-   any new or changed privileged workflow outside `cd-backend.yml` with
-   `changed or new privileged capability is forbidden outside cd-backend.yml`.
-2. **Folding it into `cd-backend.yml` would leak the recipient.** It would have
-   to become a CI secret and transit CI logs and deployment history — exactly
-   the exposure the `securestring` parameter exists to prevent.
-3. **Budget amounts are a calibration decision, not a per-commit artefact.**
-   Re-asserting them on every backend deployment would silently revert any
-   deliberate adjustment.
+| Repository evidence | What it establishes |
+| --- | --- |
+| `.github/workflows/ci-infra.yml`, "Compile all Bicep templates and parameters" and "Validate FinOps guardrails"; `infra/validate.sh` | FinOps templates are compiled and tested, not deployed. |
+| `.github/workflows/cd-backend.yml`, `--template-file infra/main.bicep` | Backend deployment does not invoke FinOps. |
+| `.github/workflows/content-infra-apply.yml` and `content-infra-what-if.yml`, `--template-file infra/content/main.bicep` | Content deployment/preview does not invoke FinOps. |
+| `infra/finops/main.bicep` and `infra/params/finops.bicepparam` | Dedicated opt-in entry point; five resource-group modules, no application dependency. |
+| This document at commit `aa5726f9` (2026-09-11, #491), "Deploying the budgets" and "Arming `enableBudgets`..." | Records an owner-run `az deployment sub create` on 2026-09-11 with out-of-band recipient injection and independent read-back. |
 
-The cost of deploying manually is that it can be forgotten. That is bounded by
-the read-back command above, which answers "do the budgets exist" in one
-request, and belongs to the monthly cost-SLO review below.
+A search of `.github`, `tools`, and `infra` found no budget deployment script or
+workflow caller; the operational entry point is the manual procedure above.
+Recheck this conclusion whenever a deployment workflow, script, or module graph
+changes. Repository history records the procedure and the reported activation;
+it does not independently prove Azure deployment provenance. Attribute a
+historical Azure write using deployment operations or Activity Log evidence,
+not merely the existence of a template.
 
-### Arming `enableBudgets` in the repository still protects nothing — but five budgets are deployed
-
-> **Five resource-group budgets exist in Azure and were verified on 2026-09-11** by
-> re-reading each one through an independent REST request: amount, `timeGrain`,
-> category, all three thresholds and their `thresholdType`, and a single contact
-> entry compared by hash. Zero deviations. Two negative witnesses, through the same
-> invocation and options, confirmed the reader can return an absence. **This section
-> is about the repository flag, not about whether Certigo is protected — it is.**
-
-> Volatile facts, dated and bounded. Measured **2026-09-11**. Each claim below carries
-> its own condition. **Any one of them changing invalidates the section as a whole**,
-> which must then be re-read in full rather than amended in place — a section that can
-> half-expire is a section whose remaining half is trusted for the wrong reason.
-
-Three measurements, to be set against any proposal to flip `enableBudgets = true` in a
-committed parameter file:
-
-1. **No workflow deploys this template.** `git grep -- "--template-file" .github/workflows`
-   returns only `infra/main.bicep` (`cd-backend.yml`) and `infra/content/main.bicep`
-   (`content-infra-apply.yml`, `content-infra-what-if.yml`). The single `finops`
-   occurrence in the workflows is `node --test infra/tests/finops-guardrails.test.mjs`
-   (`ci-infra.yml`). Flipping the parameter in the repository therefore creates **no
-   budget in Azure**; it creates only the belief that a budget exists.
-   *Still true on 2026-09-11, and deliberately so — see "Why this is not deployed by a
-   workflow".*
-2. **Three assertions lock it to `false`** in `infra/tests/finops-guardrails.test.mjs`
-   (template default, `.bicepparam` value, and the literal `param enableBudgets = false`
-   pattern). Flipping it turns `ci-infra` red while protecting nothing more.
-   *Still true on 2026-09-11; the deployment used a command-line override and left all
-   three assertions untouched.*
-3. **A recipient is established out-of-band, and is still not committable.** `alertEmail`
-   remains a `securestring` defaulting to the empty string, and this document still
-   forbids committing a personal address. The deployed budgets carry a reachable contact
-   that was injected at deployment time and exists in no repository file.
-   *Changed on 2026-09-11: a recipient now exists. What has not changed is that it must
-   never be committed.*
-
-**The gesture that actually protects money is therefore not a pull request.** It is an
-out-of-band `az deployment sub create` with `ALERT_EMAIL` injected, decided by a human
-owner, and verified by re-reading budget state rather than by trusting the return code —
-an Azure Policy with a `modify` effect can return success having rewritten the values.
-**That gesture was performed on 2026-09-11**, and the read-back above is its evidence.
-
+Budget amounts are a calibration decision, not a per-commit setting to reassert
+on every backend deployment. No workflow change is needed for this policy.
+Changing the committed `enableBudgets` flag would still deploy nothing and
+would fail the guardrail tests. The monthly review must verify that budgets
+exist and evaluate costs; silence is now the intended notification behavior,
+not proof that costs are under budget.
 
 ## Cost-allocation tag contract
 
@@ -431,10 +512,11 @@ observability owner.
 
 Review rules:
 
-1. Explain any 20% month-over-month increase or any budget alert.
+1. Agents explain any 20% month-over-month increase or measured budget overrun
+   in the review, without budget emails.
 2. Confirm the five budgets still exist, using the read-back command above. A
-   budget that was deleted or rewritten reports nothing, exactly like a budget
-   that never fired.
+   budget that was deleted or rewritten can stop evaluating costs. Verify
+   notification flags remain false unless the owner explicitly opted in.
 3. Treat CI as fixed only while daily cost stays near its idle floor; the
    2026-09 measurement shows it does not always. Do not reserve or upscale from
    cost alone.

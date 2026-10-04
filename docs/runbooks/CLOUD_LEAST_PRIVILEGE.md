@@ -813,6 +813,16 @@ Le listener `workflow_job` final doit être un webhook/GitHub App vers un contr�
 externe. Il ne doit pas être un workflow auto-déclenché par `workflow_job`, afin d'éviter
 qu'un job du contrôleur génère lui-même une nouvelle boucle d'événements.
 
+> ⏻ **Mis en œuvre autrement le 2026-09-30 (ADR-022).** La désallocation et le réveil tournent
+> sans contrôleur central ni credential GitHub : la VM décide elle-même de son inactivité
+> (quiet period ≥ 5 min resettable, deux gardes, garde finale, là où `busy` est exact), un Logic
+> App ne désalloue que les VM dont l'OS est déjà arrêté (`read` + `deallocate/action`), un second
+> les redémarre sur webhook `workflow_job` (`read` + `start/action`). Deux identités distinctes,
+> au scope `rg-certigo-ci` (les membres d'un VMSS Flexible sont des VM du resource group). Le
+> lease et le compare-and-swap des points 4 et 6 ne sont pas nécessaires : aucune désallocation ne
+> peut viser une VM dont l'OS tourne encore. Tableau d'équivalence et risques résiduels :
+> `docs/adr/ADR-022-runners-ci-a-la-demande.md`. Le contrôleur versionné reste `enabled=false`.
+
 | Mode | Condition | Capacité agrégée cible |
 |---|---|---:|
 | `idle` | file vide, zéro actif, aucun runner `busy` | 0 PR + 0 trusted |

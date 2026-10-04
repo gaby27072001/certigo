@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup rules for Android 11 (API 30) and lower. Android 12+ reads
+  data_extraction_rules.xml instead; keep both files identical in intent.
+
+  Only the flutter_secure_storage 9.x files are excluded: they hold the OIDC
+  session (tokens), and are encrypted with keys that stay in this device's
+  Android Keystore. Restored elsewhere they would be unreadable
+  ("InvalidKeyException: Failed to unwrap key", plugin README), and tokens must
+  never leave the device. Everything else keeps the default backup.
+    - FlutterSecureStorage.xml     FlutterSecureStorage.java SHARED_PREFERENCES_NAME
+    - FlutterSecureKeyStorage.xml  StorageCipher18Implementation.java SHARED_PREFERENCES_NAME
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+    <exclude domain="sharedpref" path="FlutterSecureKeyStorage.xml" />
+</full-backup-content>

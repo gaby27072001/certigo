@@ -1,0 +1,11 @@
+AppRequests
+| where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
+| where tostring(parse_url(Url).Path) =~ "/api/health/ready"
+| where ResultCode != "200"
+// Count observed requests, never the sampling weight or a shared retry OperationId.
+// Id is the request/span identity. Missing ids use observed event identity;
+// identical incomplete events collapse conservatively, even on an unnamed host.
+| extend RequestIdentity = iff(isnotempty(Id), strcat("id:", Id),
+    strcat("event:", TimeGenerated, "|", OperationId, "|", AppRoleInstance))
+| summarize TimeGenerated = min(TimeGenerated) by RequestIdentity
+| project TimeGenerated

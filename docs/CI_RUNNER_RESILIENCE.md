@@ -367,6 +367,35 @@ soit un **contrôle** et non un rapport.
 Le mode dégradé manuel reste valable et documenté dans
 [`docs/runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) §4.
 
+### Runners à la demande — depuis le 2026-09-30
+
+Décision : [`docs/adr/ADR-022-runners-ci-a-la-demande.md`](./adr/ADR-022-runners-ci-a-la-demande.md) ;
+exploitation : [`runbooks/CI_RUNNERS.md`](./runbooks/CI_RUNNERS.md) §13. Chaque VM de runner
+s'éteint seule après une période calme sans job, `logic-certigo-ci-runner-idle-deallocation`
+désalloue les VM dont l'OS est arrêté, `logic-certigo-ci-runner-wake` les redémarre sur webhook
+`workflow_job`. Ce que cela change pour la résilience décrite ici :
+
+- **La disponibilité du matin ne dépend plus de la reprise.** Le premier job qui attend réveille
+  son pool, à toute heure. La reprise de 01:30 UTC reste active et inchangée : elle rallume encore
+  toutes les instances (qui se rééteignent après leur période calme), ce qui garde chaque
+  enregistrement runner connecté au moins une fois par jour et bien en deçà des quatorze jours de
+  la panne du 1er septembre. L'agent n'éteint jamais une VM entre 01:15 et 01:50 UTC, et la
+  désallocation ne tourne pas de 00:00 à 01:59 UTC : ni l'un ni l'autre ne peut fausser la
+  vérification de power state de la reprise.
+- **Le plancher de redondance vaut pour un pool réveillé.** Un pool au repos est à zéro par
+  construction (mode `idle` du contrôleur, `0 PR + 0 trusted`) ; un job en file réveille
+  **toutes** les instances de son pool, donc les deux zones trusted. La reprise continue
+  d'exiger `minimumOnlineByTrust` instances `running` par pool chaque nuit.
+- **`runner-health.yml` ne prouve plus que la reprise a tourné** : son job réveille désormais
+  lui-même le pool trusted. L'échec de la reprise reste signalé par son alerte ; son absence n'a
+  plus d'effet immédiat sur la disponibilité, mais au-delà de 14 jours sans reprise, un pool resté
+  sans job perdrait ses enregistrements runner (voir le premier point).
+- **Un job long n'est jamais coupé par l'extinction locale** : le worker du vrai listener du
+  service runner est une activité, quelle que soit la durée de la publication. Seul le teardown MCAPS de 00:46 UTC peut
+  encore l'interrompre, comme avant.
+- **Une instance sans agent reste allumée** : c'est l'état antérieur (coût), pas une panne.
+  Toute instance ajoutée ou reconstruite doit recevoir l'agent (`install-idle-shutdown.ps1`).
+
 #### Historique : la liste d'instances figée (jusqu'au 2026-09-23)
 
 > Section historique. Depuis le 2026-09-23 la reprise n'a plus de liste d'instances : voir

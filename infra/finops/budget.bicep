@@ -21,6 +21,9 @@ param endDate string
 @minLength(3)
 param alertEmail string
 
+@description('Explicit opt-in for budget emails. False keeps cost tracking and thresholds without sending notifications.')
+param enableBudgetNotifications bool = false
+
 resource monthlyBudget 'Microsoft.Consumption/budgets@2023-11-01' = {
   name: budgetName
   properties: {
@@ -37,7 +40,7 @@ resource monthlyBudget 'Microsoft.Consumption/budgets@2023-11-01' = {
     // on observed variation and still fire on a measured acceleration.
     notifications: {
       forecast100: {
-        enabled: true
+        enabled: enableBudgetNotifications
         operator: 'GreaterThan'
         threshold: 100
         thresholdType: 'Forecasted'
@@ -46,7 +49,7 @@ resource monthlyBudget 'Microsoft.Consumption/budgets@2023-11-01' = {
         ]
       }
       forecast200: {
-        enabled: true
+        enabled: enableBudgetNotifications
         operator: 'GreaterThan'
         threshold: 200
         thresholdType: 'Forecasted'
@@ -55,7 +58,7 @@ resource monthlyBudget 'Microsoft.Consumption/budgets@2023-11-01' = {
         ]
       }
       actual100: {
-        enabled: true
+        enabled: enableBudgetNotifications
         operator: 'GreaterThanOrEqualTo'
         threshold: 100
         thresholdType: 'Actual'

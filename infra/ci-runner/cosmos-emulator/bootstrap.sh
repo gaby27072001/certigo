@@ -54,22 +54,70 @@ if [[ "${ID:-}" != "ubuntu" || "${VERSION_ID:-}" != "24.04" ]]; then
   exit 1
 fi
 
+APT_SOURCE_FILES=(
+  /etc/apt/sources.list
+  /etc/apt/sources.list.d/*.list
+  /etc/apt/sources.list.d/*.sources
+)
+
+# The NSG permits only HTTPS egress, and the Azure mirror configured by the image
+# (azure.archive.ubuntu.com) does not serve HTTPS: measured 2026-09-25, TCP 443
+# times out while archive.ubuntu.com and security.ubuntu.com answer 200 over HTTPS.
+normalize_apt_sources() {
+  local sources
+  for sources in "$@"; do
+    [[ -f "${sources}" ]] || continue
+    sed -i -E \
+      -e 's#http://([a-z0-9-]+\.)*archive\.ubuntu\.com/ubuntu(/?)([[:space:]]|$)#https://archive.ubuntu.com/ubuntu/\3#g' \
+      -e 's#http://security\.ubuntu\.com/ubuntu(/?)([[:space:]]|$)#https://security.ubuntu.com/ubuntu/\2#g' \
+      "${sources}"
+  done
+}
+
+# Fail closed instead of letting apt time out on a clear-text source.
+assert_https_apt_sources() {
+  local sources
+  for sources in "$@"; do
+    [[ -f "${sources}" ]] || continue
+    if grep -qE '^[[:space:]]*(URIs:|deb|deb-src)[[:space:]].*http://' "${sources}"; then
+      echo "${sources} still uses a clear-text HTTP apt source; the NSG allows only HTTPS." >&2
+      return 1
+    fi
+  done
+}
+
+# Bounded retries cover a concurrent apt run holding the locks and transient
+# mirror errors: at most 8 attempts of up to 60 s lock wait plus 15 s pause.
+apt_get() {
+  local attempt
+  for attempt in 1 2 3 4 5 6 7 8; do
+    if apt-get -o DPkg::Lock::Timeout=60 -o Acquire::Retries=3 "$@"; then
+      return 0
+    fi
+    echo "apt-get $* failed (attempt ${attempt}/8); retrying in 15 seconds." >&2
+    sleep 15
+  done
+  return 1
+}
+
 prepare_host() {
 install -d -m 0755 "${CACHE_DIR}" /usr/local/sbin
 if [[ "$(readlink -f "$0")" != "/usr/local/sbin/certigo-cosmos-runner-bootstrap" ]]; then
   install -m 0755 "$0" /usr/local/sbin/certigo-cosmos-runner-bootstrap
 fi
 
-# The NSG permits only HTTPS egress. Normalize the pinned image's Ubuntu mirrors
-# before apt is used so bootstrap never requires clear-text HTTP.
-if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
-  sed -i 's|URIs: http://|URIs: https://|g' /etc/apt/sources.list.d/ubuntu.sources
-fi
+# This VM lives for one job: background package maintenance must not race the
+# bootstrap for the apt and dpkg locks. Running units are left to finish; apt_get
+# waits for their locks instead of interrupting dpkg.
+systemctl disable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
+
+normalize_apt_sources "${APT_SOURCE_FILES[@]}"
+assert_https_apt_sources "${APT_SOURCE_FILES[@]}"
 
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y --no-install-recommends \
-  ca-certificates curl git iptables openssl tar
+apt_get update
+apt_get install -y --no-install-recommends \
+  ca-certificates curl git iptables openssl python3 tar
 
 if ! id "${RUNNER_USER}" >/dev/null 2>&1; then
   useradd --create-home --shell /bin/bash "${RUNNER_USER}"
@@ -212,7 +260,17 @@ if [[ "${installed_runner_version}" != "${RUNNER_VERSION}" ]]; then
   printf '%s  %s\n' "${RUNNER_SHA256}" "${runner_archive}" |
     sha256sum --check --strict
   tar --extract --gzip --file "${runner_archive}" --directory "${RUNNER_HOME}"
-  "${RUNNER_HOME}/bin/installdependencies.sh"
+  # installdependencies.sh calls apt itself, without lock waits: retry it.
+  for attempt in 1 2 3 4 5 6; do
+    if "${RUNNER_HOME}/bin/installdependencies.sh"; then
+      break
+    fi
+    if (( attempt == 6 )); then
+      echo "The runner dependency installer failed 6 times." >&2
+      exit 1
+    fi
+    sleep 20
+  done
   chown -R "${RUNNER_USER}:${RUNNER_USER}" "${RUNNER_HOME}"
 fi
 

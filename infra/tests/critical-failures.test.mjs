@@ -63,8 +63,10 @@ test('one event fires one existing stateful incident with no high-cardinality di
   assert.equal(rule.name, "[format('alert-certigo-{0}', variables('logAlerts')[copyIndex()].name)]");
   assert.equal(rule.properties.enabled, true);
   assert.equal(rule.properties.autoMitigate, true);
-  assert.equal(rule.properties.evaluationFrequency, 'PT5M');
-  assert.equal(rule.properties.windowSize, 'PT15M');
+  assert.equal(rule.properties.evaluationFrequency,
+    "[if(equals(variables('logAlerts')[copyIndex()].name, 'readiness-failure'), 'PT1M', 'PT5M')]");
+  assert.equal(rule.properties.windowSize,
+    "[if(equals(variables('logAlerts')[copyIndex()].name, 'readiness-failure'), 'PT10M', 'PT15M')]");
   assert.equal(rule.properties.muteActionsDuration, undefined);
   const [condition] = rule.properties.criteria.allOf;
   assert.equal(condition.timeAggregation, 'Count');

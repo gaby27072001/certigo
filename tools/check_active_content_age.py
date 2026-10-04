@@ -9,13 +9,26 @@ not detect upstream drift, it detects an un-refreshed pin.
 
 Deux limites de ce budget, mesurées le 2026-09-11, à lire avant de l'ajuster.
 
-1. **Le nombre de jours ne porte aucune borne.** Aucune expiration de jeton, de lock ni
-   de fenêtre de validité ne contraint `DEFAULT_MAX_AGE_DAYS` : rien dans le dépôt ne
-   justifie 14 plutôt que 10 ou 30. Au sens de docs/GOVERNANCE.md, section « Un nombre
-   qui décide s'écrit avec le mécanisme qui le contraint », c'est donc une *préférence*
-   et non une *contrainte* — et une préférence se simplifie sous la main d'un lecteur
-   pressé. Quiconque ajuste cette valeur ne franchit aucune borne connue ; qu'il
-   documente ici la raison retenue, ou laisse cette note en place.
+1. **Le budget suit la cadence de revérification amont (révisé le 2026-09-24).** Jusqu'au
+   2026-09-24, il valait 14 jours sans aucune borne : rien ne justifiait 14 plutôt que 10
+   ou 30. Il est désormais aligné, au sens de docs/GOVERNANCE.md, section « Un nombre qui
+   décide s'écrit avec le mécanisme qui le contraint », sur les trois éléments suivants.
+   - **Borne respectée** : un pin ne peut avancer qu'après une publication de
+     `certigo-content` (point 2 ci-dessous). Or une publication suit une campagne de
+     revérification des sources, et ces campagnes sont espacées d'au plus
+     `freshness.maxAgeDays` = 30 jours : au-delà, `npm run catalog:freshness` fait échouer
+     la CI de `certigo-content`. Ce budget doit donc couvrir au moins cet intervalle, sinon
+     il expire entre deux publications légitimes. Mesuré le 2026-09-23 : avec 14 jours, la
+     release R2 (commit du 2026-09-23T19:28:45Z) expirait le 2026-10-07, soit deux semaines
+     avant la campagne suivante, prévue le 2026-10-21.
+   - **Marge** : l'âge part de la date du commit de campagne, qui est égale ou postérieure
+     au `asOf` du catalogue. Le pin reste donc valide jusqu'au `reviewDueOn` de ce
+     catalogue, au moins. La marge réelle est le temps entre la campagne suivante et ce
+     `reviewDueOn`, qui doit suffire à publier, avec le feu vert de Gabriel, puis à
+     déclarer.
+   - **Où la borne est définie** : `freshness.maxAgeDays` et `freshness.reviewDueOn` dans
+     `content/public/catalog/certifications.json` de `gchambaud_microsoft/certigo-content`.
+     Si cette valeur change, relire ce budget.
 
 2. **Le bump que ce budget réclame n'est pas toujours jouable depuis ce dépôt.** Il n'est
    légitime qu'*après* une publication côté `certigo-content` :
@@ -41,14 +54,16 @@ from project_state import (  # noqa: E402
     load_active_content_reference,
 )
 
-DEFAULT_MAX_AGE_DAYS = 14
+DEFAULT_MAX_AGE_DAYS = 30
 # Seuil d'avertissement : en deçà du mur, la sortie reste verte (code 0) mais
 # annonce l'échéance. Motif : ce budget échoue sur un fait qui n'est pas causé
 # par la PR qui le subit, donc son expiration se présente comme une panne
 # généralisée — toutes les PR en vol rougissent le même jour sur un contrôle
 # étranger à leur contenu, et la recherche d'une cause commune inexistante coûte
 # plus cher que le bump lui-même. L'avertissement transforme ce mur en pente.
-DEFAULT_WARN_AGE_DAYS = 10
+# Sept jours de préavis (30 - 7 = 23) : la veille de fraîcheur, hebdomadaire,
+# voit donc au moins une fois l'avertissement avant le mur.
+DEFAULT_WARN_AGE_DAYS = 23
 
 
 def reference_age(root: Path, now: datetime) -> tuple[str, timedelta]:

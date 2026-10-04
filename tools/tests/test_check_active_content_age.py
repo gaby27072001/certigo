@@ -46,7 +46,12 @@ class CheckActiveContentAgeTest(unittest.TestCase):
         # authentic revision SHA with synthetic timestamps — it has every marker of a
         # production reading. Left on the console it is indistinguishable from one, and it
         # has already been mistaken for the real pin age once. No fixture output escapes.
-        code, _ = self.run_capturing(root, now, "--max-age-days", days)
+        # An explicit budget below the default warning threshold needs its own threshold,
+        # otherwise the argument check rejects the pair before the age is even measured.
+        warn = str(max(1, int(days) - 4))
+        code, _ = self.run_capturing(
+            root, now, "--max-age-days", days, "--warn-age-days", warn
+        )
         return code
 
     def run_capturing(
@@ -89,17 +94,17 @@ class CheckActiveContentAgeTest(unittest.TestCase):
 
     def test_stays_silent_below_the_warning_threshold(self) -> None:
         root = self.workspace("2026-09-01T00:00:00Z")
-        code, out = self.run_capturing(root, "2026-09-10T00:00:00Z")
+        code, out = self.run_capturing(root, "2026-09-23T00:00:00Z")
         self.assertEqual(code, 0)
         self.assertNotIn("::warning::", out)
 
     def test_warns_without_failing_inside_the_warning_band(self) -> None:
         """The band exists so the budget degrades as a slope, not as a wall."""
         root = self.workspace("2026-09-01T00:00:00Z")
-        code, out = self.run_capturing(root, "2026-09-13T00:00:00Z")
+        code, out = self.run_capturing(root, "2026-09-26T00:00:00Z")
         self.assertEqual(code, 0)
         self.assertIn("::warning::", out)
-        self.assertIn("expires in 2 day(s)", out)
+        self.assertIn("expires in 5 day(s)", out)
 
     def test_rejects_a_warning_threshold_at_or_above_the_budget(self) -> None:
         root = self.workspace("2026-09-01T00:00:00Z")
@@ -117,8 +122,23 @@ class CheckActiveContentAgeTest(unittest.TestCase):
 
     def test_still_fails_past_the_budget_even_though_it_warned_first(self) -> None:
         root = self.workspace("2026-09-01T00:00:00Z")
-        code, _ = self.run_capturing(root, "2026-09-16T00:00:00Z")
+        code, _ = self.run_capturing(root, "2026-10-02T00:00:00Z")
         self.assertEqual(code, 1)
+
+    def test_default_budget_covers_the_upstream_catalog_freshness_window(self) -> None:
+        """A pin must survive until the next re-verification campaign of certigo-content.
+
+        Campaigns are at most `freshness.maxAgeDays` (30) apart upstream, so the default
+        budget may not be shorter: exactly 30 days still passes, one second more fails.
+        """
+        self.assertEqual(check_active_content_age.DEFAULT_MAX_AGE_DAYS, 30)
+        self.assertLess(
+            check_active_content_age.DEFAULT_WARN_AGE_DAYS,
+            check_active_content_age.DEFAULT_MAX_AGE_DAYS,
+        )
+        root = self.workspace("2026-09-01T00:00:00Z")
+        self.assertEqual(self.run_capturing(root, "2026-10-01T00:00:00Z")[0], 0)
+        self.assertEqual(self.run_capturing(root, "2026-10-01T00:00:01Z")[0], 1)
 
 
 if __name__ == "__main__":

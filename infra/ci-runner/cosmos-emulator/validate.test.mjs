@@ -55,7 +55,6 @@ test('Bicep isolates the one-shot runner from privileged and application network
       "targetScope = 'resourceGroup'",
       "defaultOutboundAccess: false",
       "name: 'DenyAllInbound'",
-      "destinationAddressPrefix: 'AzurePlatformIMDS'",
       "name: 'DenyVirtualNetworkOutbound'",
       "name: 'AllowHttpsInternetOutbound'",
       "destinationPortRange: '443'",
@@ -65,6 +64,7 @@ test('Bicep isolates the one-shot runner from privileged and application network
       "allowExtensionOperations: true",
       "securityType: 'TrustedLaunch'",
       "deleteOption: 'Delete'",
+      "diskControllerType: 'NVMe'",
       "managedIdentityEnabled bool = false",
       "runnerLabel string = 'certigo-cosmos-emulator'",
     ],
@@ -79,6 +79,37 @@ test('Bicep isolates the one-shot runner from privileged and application network
   assert.doesNotMatch(
     bicep,
     /networkInterfaces[\s\S]*ipConfigurations[\s\S]*publicIPAddress:/,
+  );
+  assert.doesNotMatch(bicep, /param vmSize string = 'Standard_D4s_v5'/,
+    'Standard_D4s_v5 is NotAvailableForSubscription in westeurope');
+});
+
+test('IMDS is denied at the host before registration and at the NSG before the job', () => {
+  // Azure provisioning needs IMDS: an AzurePlatformIMDS deny present at creation made
+  // 5 runner creations out of 5 fail (docs/CI_RUNNER_RESILIENCE.md). The template must
+  // not carry it; the runbook adds it after registration and before the dispatch.
+  assert.doesNotMatch(bicep, /destinationAddressPrefix: 'AzurePlatformIMDS'/);
+  requireMarkers(
+    bootstrap,
+    ['certigo-block-imds', '169.254.169.254/32', 'DOCKER-USER'],
+    'bootstrap.sh',
+  );
+  requireMarkers(
+    runbook,
+    [
+      'az network nsg rule create',
+      '--destination-address-prefixes AzurePlatformIMDS',
+      '--access Deny',
+      'avant le `workflow_dispatch`',
+    ],
+    'COSMOS_EMULATOR_RUNNER.md',
+  );
+  const registrationStep = runbook.match(/\n8\. exécuter le script de registration[\s\S]*?\n9\. /)?.[0];
+  assert.ok(registrationStep, 'activation step 8 must describe the registration');
+  assert.ok(
+    registrationStep.indexOf('refus NSG `AzurePlatformIMDS`')
+      > registrationStep.indexOf('online, non busy'),
+    'step 8 adds the NSG IMDS deny after the runner is registered, before step 9 dispatches',
   );
 });
 
@@ -118,15 +149,81 @@ test('bootstrap pins provenance and registers exactly one ephemeral runner', () 
       'certigo-block-imds',
       '169.254.169.254/32',
       'docker pull "${COSMOS_IMAGE}"',
+      'normalize_apt_sources "${APT_SOURCE_FILES[@]}"',
+      'assert_https_apt_sources "${APT_SOURCE_FILES[@]}"',
+      'DPkg::Lock::Timeout=60',
+      'systemctl disable --now apt-daily.timer apt-daily-upgrade.timer',
     ],
     'bootstrap.sh',
   );
   assert.doesNotMatch(bootstrap, /azure-cli|az login|managed.identity/i);
+  assert.doesNotMatch(bootstrap, /^\s*apt-get (update|install)/m,
+    'apt must go through the bounded, lock-waiting apt_get helper');
   const persistedEnvironment = bootstrap.match(
     /cat > \/etc\/certigo-cosmos-runner\.env <<EOF([\s\S]*?)\nEOF/,
   )?.[1];
   assert.ok(persistedEnvironment);
   assert.doesNotMatch(persistedEnvironment, /RUNNER_TOKEN/);
+});
+
+function bootstrapFunction(name) {
+  const match = bootstrap.match(new RegExp(`^${name}\\(\\) \\{\\n[\\s\\S]*?\\n\\}\\n`, 'm'));
+  assert.ok(match, `bootstrap.sh must define ${name}()`);
+  return match[0];
+}
+
+test('apt sources are rewritten to HTTPS mirrors and clear-text leftovers fail closed', (t) => {
+  if (process.platform === 'win32' && !process.env.CI) {
+    t.skip('bash is exercised on the Linux CI runner');
+    return;
+  }
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-apt-sources-'));
+  const deb822 = path.join(directory, 'ubuntu.sources');
+  const oneLine = path.join(directory, 'sources.list');
+  const thirdParty = path.join(directory, 'third.list');
+  fs.writeFileSync(deb822, [
+    'Types: deb',
+    'URIs: http://azure.archive.ubuntu.com/ubuntu/',
+    'Suites: noble noble-updates noble-backports',
+    '',
+    'Types: deb',
+    'URIs: http://azure.archive.ubuntu.com/ubuntu/',
+    'Suites: noble-security',
+    '',
+  ].join('\n'));
+  fs.writeFileSync(oneLine, [
+    'deb http://westeurope.azure.archive.ubuntu.com/ubuntu noble main',
+    'deb [arch=amd64] http://security.ubuntu.com/ubuntu noble-security main',
+    '',
+  ].join('\n'));
+  const helpers = bootstrapFunction('normalize_apt_sources')
+    + bootstrapFunction('assert_https_apt_sources');
+  const run = (...files) => spawnSync(
+    'bash',
+    ['-c', `${helpers}\nset -euo pipefail\nnormalize_apt_sources "$@"\nassert_https_apt_sources "$@"`,
+      'helpers', ...files],
+    { encoding: 'utf8' },
+  );
+  try {
+    const clean = run(deb822, oneLine, path.join(directory, 'absent.sources'));
+    assert.equal(clean.status, 0, clean.stderr);
+    assert.equal(
+      fs.readFileSync(deb822, 'utf8').match(/^URIs: .*$/gm).join('\n'),
+      'URIs: https://archive.ubuntu.com/ubuntu/\nURIs: https://archive.ubuntu.com/ubuntu/',
+    );
+    assert.equal(
+      fs.readFileSync(oneLine, 'utf8'),
+      'deb https://archive.ubuntu.com/ubuntu/ noble main\n'
+        + 'deb [arch=amd64] https://security.ubuntu.com/ubuntu/ noble-security main\n',
+    );
+
+    fs.writeFileSync(thirdParty, 'deb http://ppa.launchpadcontent.net/x/y/ubuntu noble main\n');
+    const leftover = run(deb822, oneLine, thirdParty);
+    assert.equal(leftover.status, 1);
+    assert.match(leftover.stderr, /third\.list still uses a clear-text HTTP apt source/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('registration uses one protected Run Command and removes it', () => {

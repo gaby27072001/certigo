@@ -6,7 +6,7 @@
 | **Objectif** | Exploiter la CI de Certigo sur ses **runners self-hosted** : **rallumer** les VMs avant une session de travail, les **déallouer** après (économie), **vérifier** l'état des runners et **dépanner** un runner hors ligne. |
 | **Voie officielle** | **Self-hosted** — VMSS flexible Azure. Les runners GitHub-hosted sont indisponibles par politique d'organisation. |
 | **Périmètre** | Repo `gchambaud_microsoft/Certigo` · RG `RG-CERTIGO-CI` · subscription `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**). |
-| **Statut** | **Labels séparés (vérifié le 4 septembre 2026)**. Le point ouvert n'est plus la séparation mais la **reprise automatique** après la déallocation nocturne imposée par la gouvernance MCAPS. |
+| **Statut** | **Labels séparés (vérifié le 4 septembre 2026)**. **Runners à la demande depuis le 2026-09-30** (§13) : les VM s'éteignent seules au repos et se rallument quand un job les attend ; les §4 et §5 ne sont plus que le mode dégradé. |
 
 > **Dérive live consolidée au 4 septembre 2026.** Le pool trusted est
 > `vmss-certigo-runner-zonal` (Flexible, capacité 2, autoscale 2–4) et le pool PR est
@@ -141,7 +141,7 @@ ce n'est ni le plafond live actuel de 4, ni un maximum de production définitif.
 | Pendant une session | zéro scale-in CPU | Ne jamais laisser Azure retirer une instance sur simple faible CPU. |
 | Après la session | 5 min continues à zéro, reset sur toute activité, puis deux gardes | Prévol seulement; changement sous lease, un pool à la fois, avec réarmement sur nouvelle activité. |
 | Panne/maintenance | autre classe préservée | Ne jamais déplacer son label pour contourner la panne. |
-| Chaque matin | toutes les VMs de `rg-certigo-ci` sont désallouées par la gouvernance MCAPS (00:46–00:49 UTC) | La reprise §11 rallume à 01:30 UTC toutes les instances non exclues des deux scale sets ; confirmer ensuite ≥ 2 runners `online` **par classe** côté GitHub (§6). |
+| Chaque matin | toutes les VMs de `rg-certigo-ci` sont désallouées par la gouvernance MCAPS (00:46–00:49 UTC) | La reprise §11 rallume à 01:30 UTC toutes les instances non exclues des deux scale sets ; elles se rééteignent ensuite après leur période calme (§13), et le premier job de la journée réveille son pool. |
 
 Le détail de reconstruction, de santé et de révocation est dans
 [`docs/CI_RUNNER_RESILIENCE.md`](../CI_RUNNER_RESILIENCE.md).
@@ -155,6 +155,9 @@ bash infra/ci-runner/capacity-plan.sh
 ---
 
 ## 4. Rallumer la CI (avant une session de travail)
+
+> ⏻ **Depuis le 2026-09-30, rien à faire** : le premier job en file réveille son pool (§13).
+> Cette section ne sert plus qu'en mode dégradé (réveil désactivé, webhook en échec).
 
 > 📌 **Depuis la reprise automatique (§11), ce rallumage manuel n'est plus la voie normale.**
 > Toutes les instances non exclues des deux scale sets sont démarrées chaque jour à
@@ -185,6 +188,9 @@ Attendre `status: online` **avant** d'approuver un run de PR (sinon les jobs res
 ---
 
 ## 5. Éteindre la CI (après usage — pour le coût)
+
+> ⏻ **Depuis le 2026-09-30, c'est automatique** (§13) : chaque VM s'éteint seule après sa
+> période calme sans job (PR 15 min, trusted 20 min) et Azure la désalloue dans les 5 minutes.
 
 Le prévol ci-dessous vérifie, sur les deux dépôts, les labels, jobs actifs/en file, autoscale,
 frontières d'identité/sous-réseau et réconciliation Azure/GitHub. Il n'effectue aucune
@@ -431,7 +437,13 @@ l'échec de l'un n'empêche pas de rallumer l'autre) :
 > ⏱️ **Durée mesurée d'un démarrage depuis `deallocated`** : ~1 min pour une instance trusted,
 > **~7 min 30 s pour une instance PR** (2026-09-11 : `a14700a3` 7 min 32 s, `bbf83c5c` 8 min 01 s ;
 > 2026-09-23 drill : `6e3abce4` 7 min 32 s). Un run complet dure donc ~8 min ; un runner PR
-> n'est pas en ligne avant ~01:38 UTC.
+> n'est pas en ligne avant ~01:38 UTC. Depuis le réglage cloud-init du 2026-09-30 (§13), un
+> runner PR est en ligne ≈ 45 s après le début du démarrage (mesuré sur `6e3abce4`).
+
+> 🔗 **Depuis le 2026-09-30 (§13), cette reprise garde aussi les runners enregistrés.** Un pool
+> sans job reste désalloué, et GitHub supprime un runner persistant resté plus de 14 jours sans
+> connexion (c'est la panne du 1er septembre). Ne pas désactiver ni espacer cette reprise sans
+> un autre réveil de chaque instance au moins une fois par semaine (ADR-022, risque 8).
 
 ### Vérifier que la reprise a bien tourné
 
@@ -598,6 +610,158 @@ az deployment sub create --location westeurope \
 # Vérifier.
 az lock list -g rg-certigo-ci --subscription "$SUB" -o table
 ```
+
+---
+
+## 13. Runners à la demande : extinction locale, désallocation, réveil (depuis le 2026-09-30)
+
+Décision et risques : [`docs/adr/ADR-022-runners-ci-a-la-demande.md`](../adr/ADR-022-runners-ci-a-la-demande.md).
+En une phrase : **une VM de runner s'éteint seule quand elle n'a plus rien à faire, Azure la
+désalloue, et GitHub la fait redémarrer dès qu'un job l'attend.** Plus besoin de rallumer ni
+d'éteindre la CI à la main (§4, §5).
+
+| Pièce | Où | Ce qu'elle fait | Droits |
+|---|---|---|---|
+| Agent `certigo-idle-shutdown` | chaque VM de runner (timer systemd, 15 s) | après la période calme (PR 900 s, trusted 1 200 s) sans job, deux gardes, arrêt des services runner puis `poweroff` | root local, aucune identité, aucun appel réseau |
+| `logic-certigo-ci-runner-idle-deallocation` | `rg-certigo-ci`, toutes les 5 min de 02:00 à 23:55 UTC | désalloue les instances dont le power state est **exactement** `PowerState/stopped` | `virtualMachines/read` + `deallocate/action` |
+| `logic-certigo-ci-runner-wake` | `rg-certigo-ci`, webhook GitHub `workflow_job` | job `queued`/`waiting` → démarre les instances `deallocated`/`stopped` du pool désigné par les labels, en 4 passes sur 4 min | `virtualMachines/read` + `start/action` |
+| Webhooks `workflow_job` | `Certigo` et `certigo-content` | poussent chaque événement de job vers le déclencheur signé | aucun secret GitHub dans Azure |
+
+Labels → pool (versionné dans `infra/ci-runner/on-demand.config.json`, testé) : `certigo-pr` →
+`vmss-certigo-pr-pilot-z1` ; `certigo-trusted` et `certigo-ci` → `vmss-certigo-runner-zonal`.
+Un label PR ne réveille jamais le pool trusted.
+
+**Ce que voit un développeur.** Premier job d'une rafale après une période calme : le job reste
+`Queued` le temps du démarrage (35 à 59 s mesurés le 2026-09-30 ; ≈ 6 min pour une instance PR
+sans le réglage cloud-init posé par l'installateur, `cloud_init_boot_refresh=new-instance-only`).
+Les jobs suivants partent aussitôt. Un runner `offline` côté GitHub n'est **plus** une anomalie
+en soi : c'est l'état normal d'un pool au repos.
+
+### Déployer (depuis `main`, what-if d'abord)
+
+```bash
+export SUB=b8952c8c-8f72-469d-99cd-ac906da4e2fc
+az deployment sub what-if --subscription "$SUB" --location westeurope \
+  --parameters infra/params/ci-runner-on-demand.bicepparam
+az deployment sub create --subscription "$SUB" --location westeurope \
+  --name "certigo-ci-runner-on-demand-$(date -u +%Y%m%d%H%M%S)" \
+  --parameters infra/params/ci-runner-on-demand.bicepparam
+```
+
+Le what-if d'un premier déploiement crée 2 rôles, 2 assignations, 2 Logic Apps et 2 alertes ;
+il ne modifie ni la reprise, ni l'action group, ni aucune VM. Le déclencheur `Recurrence` de la
+désallocation s'exécute une fois à la création, avant propagation du rôle : un premier run en
+échec est attendu (comme pour la reprise, §11).
+
+### Poser les webhooks GitHub
+
+```powershell
+.\infra\ci-runner\register-wake-webhooks.ps1 -SubscriptionId $env:SUB
+gh api repos/gchambaud_microsoft/Certigo/hooks --jq '.[] | {id, events, active}'
+gh api repos/gchambaud_microsoft/Certigo/hooks/<id>/deliveries --jq '.[0:3][] | {event, status_code, delivered_at}'
+```
+
+Le script lit l'URL signée du déclencheur dans ARM, la transmet à GitHub par l'entrée standard
+de `gh api` et ne l'affiche jamais. Il refuse un endpoint joignable en IPv6 (le déclencheur
+n'admet que les plages IPv4 `hooks`). Le `ping` de création doit être livré en `202`.
+
+### Installer l'agent sur les VM (canari d'abord)
+
+```powershell
+# Une instance PR d'abord, puis toutes les instances gérées de l'inventaire.
+.\infra\ci-runner\install-idle-shutdown.ps1 -SubscriptionId $env:SUB -VmName vmss-certigo-pr-pilot-z1_6e3abce4
+.\infra\ci-runner\install-idle-shutdown.ps1 -SubscriptionId $env:SUB -All
+.\infra\ci-runner\install-idle-shutdown.ps1 -SubscriptionId $env:SUB -All -Action status
+```
+
+La VM doit être `running`. L'installation passe par une Run Command *action* (aucune ressource
+enfant, donc rien d'accumulé sous le verrou du §12), prend la période calme de son pool dans
+`on-demand.config.json`, vérifie l'empreinte SHA-256 de l'agent installé et que le timer est
+actif. Sur une instance PR, elle ordonne aussi `certigo-block-imds.service` avant
+`cloud-init-local.service` et limite le rafraîchissement des métadonnées de cloud-init à une
+nouvelle instance (`/etc/cloud/cloud.cfg.d/91-certigo-imds-blocked.cfg`) : sans ce réglage,
+cloud-init attend 300 s à chaque boot un IMDS bloqué, et le runner n'est en ligne que ≈ 6 min
+après le réveil au lieu de 45 s. `-Action status` affiche alors `imds_drop_in=present` et
+`cloud_init_boot_refresh=new-instance-only` ; une désinstallation garde ces deux réglages. **Toute
+instance ajoutée ou reconstruite doit recevoir l'agent** après son enregistrement ; sans lui,
+elle reste allumée comme avant (coût, pas panne).
+
+### Suspendre l'extinction sur une VM (maintenance)
+
+```bash
+sudo touch /etc/certigo-idle-shutdown.hold     # suspend
+sudo rm /etc/certigo-idle-shutdown.hold        # reprend
+journalctl -u certigo-idle-shutdown.service --since '-1h'   # décisions de l'agent
+```
+
+L'agent ne journalise rien tant qu'il voit une activité ou que la période calme court. Pour
+savoir pourquoi une VM reste allumée, lire `activity=` dans la sortie de `-Action status` :
+`job` (un `Runner.Worker` du vrai listener), `package-maintenance` (apt, apt-get, dpkg ou
+`unattended-upgrade` exécuté par root, hors évaluation périodique des correctifs Azure) ou
+`none` (la VM s'éteindra à la fin de la période
+calme, `last_activity` + `QUIET_PERIOD_SECONDS`). Un `package-maintenance` qui dure sans mise à
+jour en cours désigne un processus root de ce nom : `ps -eo pid,user,comm,args` le montre.
+
+### Vérifier que tout fonctionne
+
+```bash
+WAKE="/subscriptions/$SUB/resourceGroups/rg-certigo-ci/providers/Microsoft.Logic/workflows/logic-certigo-ci-runner-wake"
+DEALLOC="/subscriptions/$SUB/resourceGroups/rg-certigo-ci/providers/Microsoft.Logic/workflows/logic-certigo-ci-runner-idle-deallocation"
+for WF in "$WAKE" "$DEALLOC"; do
+  az rest --method get --subscription "$SUB" \
+    --uri "https://management.azure.com${WF}/runs?api-version=2016-06-01&\$top=20" \
+    --query "value[].{run:name,status:properties.status,start:properties.startTime}" -o table
+done
+az vm list -g rg-certigo-ci -d --subscription "$SUB" --query "[].{vm:name,power:powerState}" -o table
+```
+
+Un run de réveil sans pool concerné (`in_progress`, `completed`, `ping`) se termine en
+`Succeeded` en quelques secondes. Un run de réveil concerné dure ≈ 4 min 30 s (quatre passes).
+
+### Comment on est prévenu d'un échec
+
+| Alerte | Condition | Sens |
+|---|---|---|
+| `alert-certigo-ci-runner-wake-failed` (sév. 1) | `RunsFailed > 0` sur 1 h | aucune instance du pool n'a démarré : un job peut attendre |
+| `alert-certigo-ci-runner-idle-deallocation-failed` (sév. 2) | `RunsFailed > 3` sur 1 h | des VM arrêtées restent allouées (coût), pas une panne de CI |
+
+Les deux sont routées vers `ag-certigo-ci-recovery`, comme la reprise : aucun nouveau
+destinataire, aucune alerte de budget ou de consommation.
+
+**Angles morts connus.** Une livraison refusée avant le déclencheur (plage IP inconnue,
+panne Logic Apps) ne produit aucun run, donc aucune alerte : elle n'apparaît que dans l'onglet
+« Recent Deliveries » du webhook. Remède immédiat : « Redeliver », ou relancer le job. Contrôle
+mensuel des plages : `gh api meta --jq .hooks` doit être inclus dans
+`githubHookSourceRanges.addressRanges` (IPv4) ; sinon, mettre à jour le fichier et redéployer.
+
+### Rotation de l'URL signée
+
+Régénérer la clé d'accès du Logic App invalide toutes les URL émises ; relancer ensuite
+`register-wake-webhooks.ps1`, qui met à jour les deux webhooks en place :
+
+```bash
+az rest --method post --subscription "$SUB" \
+  --uri "https://management.azure.com${WAKE}/regenerateAccessKey?api-version=2019-05-01" \
+  --body '{"keyType":"Primary"}'
+```
+
+### Rollback (sans lever le verrou)
+
+```powershell
+# 1. Rallumer toutes les instances (reprise, §11), puis retirer l'agent (il exige une VM allumée).
+$recovery = "/subscriptions/$env:SUB/resourceGroups/rg-certigo-ci/providers/Microsoft.Logic/workflows/logic-certigo-ci-runner-recovery"
+az rest --method post --subscription $env:SUB --uri "https://management.azure.com$recovery/triggers/Daily_after_the_governance_teardown_window/run?api-version=2016-06-01"
+.\infra\ci-runner\install-idle-shutdown.ps1 -SubscriptionId $env:SUB -All -Action uninstall
+# 2. Retirer les webhooks et désactiver les deux Logic Apps (réversible).
+$workflows = "/subscriptions/$env:SUB/resourceGroups/rg-certigo-ci/providers/Microsoft.Logic/workflows"
+.\infra\ci-runner\register-wake-webhooks.ps1 -SubscriptionId $env:SUB -Remove
+az resource update --ids "$workflows/logic-certigo-ci-runner-wake" --set properties.state=Disabled --subscription $env:SUB
+az resource update --ids "$workflows/logic-certigo-ci-runner-idle-deallocation" --set properties.state=Disabled --subscription $env:SUB
+```
+
+Attendre la fin de la reprise (≈ 8 min, §11) avant l'étape `uninstall`. La suppression complète
+des Logic Apps, alertes, assignations et rôles exige de lever le verrou du §12, comme pour la
+reprise.
 
 ---
 

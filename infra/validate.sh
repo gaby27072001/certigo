@@ -87,6 +87,7 @@ done < <(find "${root}/infra/params" -type f -name '*.bicepparam' -print0 | sort
 
 BICEP_CLI="${bicep_bin}" node --test "${root}/infra/tests/azure-tag-contract.test.mjs"
 BICEP_CLI="${bicep_bin}" node --test "${root}/infra/tests/critical-failures.test.mjs"
+BICEP_CLI="${bicep_bin}" node --test "${root}/infra/tests/readiness-failures.test.mjs"
 node --test "${root}/infra/tests/alert-receivers.test.mjs"
 BICEP_CLI="${bicep_bin}" node --test \
   "${root}/infra/tests/governance-evidence.test.mjs"
@@ -94,7 +95,9 @@ BICEP_CLI="${bicep_bin}" node --test \
   "${root}/infra/tests/governance-planner.test.mjs"
 BICEP_CLI="${bicep_bin}" node --test \
   "${root}/infra/tests/ci-runner-auto-recovery.test.mjs" \
-  "${root}/infra/tests/ci-runner-auto-recovery-simulation.test.mjs"
+  "${root}/infra/tests/ci-runner-auto-recovery-simulation.test.mjs" \
+  "${root}/infra/tests/ci-runner-on-demand.test.mjs" \
+  "${root}/infra/tests/ci-runner-on-demand-simulation.test.mjs"
 node --test "${root}/infra/tests/governance-tooling.test.mjs"
 
 for environment in dev staging prod; do

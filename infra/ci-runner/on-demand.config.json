@@ -1,0 +1,41 @@
+{
+  "pools": [
+    {
+      "scaleSet": "vmss-certigo-runner-zonal",
+      "trustClass": "certigo-trusted",
+      "wakeLabels": [
+        "certigo-trusted",
+        "certigo-ci"
+      ],
+      "quietPeriodSeconds": 1200
+    },
+    {
+      "scaleSet": "vmss-certigo-pr-pilot-z1",
+      "trustClass": "certigo-pr",
+      "wakeLabels": [
+        "certigo-pr"
+      ],
+      "quietPeriodSeconds": 900
+    }
+  ],
+  "wakeActions": [
+    "queued",
+    "waiting"
+  ],
+  "wakePassDelaysSeconds": [
+    60,
+    90,
+    90,
+    30
+  ],
+  "githubHookSourceRanges": {
+    "measuredOn": "2026-09-30",
+    "source": "GitHub meta API, field hooks. IPv4 only: the Logic Apps request endpoint is reached over IPv4.",
+    "addressRanges": [
+      "192.30.252.0/22",
+      "185.199.108.0/22",
+      "140.82.112.0/20",
+      "143.55.64.0/20"
+    ]
+  }
+}
