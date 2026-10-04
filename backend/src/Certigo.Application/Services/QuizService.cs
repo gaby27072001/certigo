@@ -611,12 +611,8 @@ public sealed class QuizService(
         return new RateWindow(RateWindowDuration, recent.Xp, recent.Attempts);
     }
 
-    private static bool IsCorrect(AnswerKeyItem item, AnswerDto answer)
-    {
-        var expected = item.Correct.OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
-        var actual = answer.Selected.OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
-        return expected.SequenceEqual(actual, StringComparer.OrdinalIgnoreCase);
-    }
+    private static bool IsCorrect(AnswerKeyItem item, AnswerDto answer) =>
+        AnswerGrading.IsCorrect(item.Type, item.Correct, answer.Selected);
 }
 
 /// Maps the persisted <see cref="LearnerModelRecord"/> to and from the working

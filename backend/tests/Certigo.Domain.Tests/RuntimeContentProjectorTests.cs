@@ -26,6 +26,38 @@ public sealed class RuntimeContentProjectorTests
         projection.AnswerKeys[0].AnswerKey.Items[0].Explanation.Should().Be("PaaS is managed.");
     }
 
+    // The four item types the runtime v4 contract can publish (#245): each keeps
+    // its answers in the server-only key and ships an answer-free public check.
+    [Theory]
+    [InlineData(ItemType.Mcq, new[] { "paas" })]
+    [InlineData(ItemType.Multi, new[] { "iaas", "paas" })]
+    [InlineData(ItemType.Scenario, new[] { "paas" })]
+    [InlineData(ItemType.SpotTheIssue, new[] { "iaas" })]
+    public void Every_publishable_type_separates_answers_from_the_public_check(
+        ItemType itemType,
+        string[] correct)
+    {
+        var graph = BuildGraph(questionBank: false, itemType, correct);
+
+        var projection = new RuntimeContentProjector().Project(graph);
+
+        var check = projection.Lessons.Should().ContainSingle().Subject.Lesson.Blocks[1].Check!;
+        check.Type.Should().Be(itemType);
+        var publicJson = System.Text.Json.JsonSerializer.Serialize(
+            projection.Lessons[0].Lesson,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        foreach (var forbidden in new[] { "correct", "explanation", "rationale", "answerKey", "solution" })
+        {
+            publicJson.Should().NotContain($"\"{forbidden}\"", $"the public {itemType} check must not leak {forbidden}");
+        }
+
+        publicJson.Should().NotContain("PaaS is managed.");
+        var key = projection.AnswerKeys.Should().ContainSingle().Subject.AnswerKey.Items.Should().ContainSingle().Subject;
+        key.Type.Should().Be(itemType);
+        key.Correct.Should().Equal(correct);
+        key.Explanation.Should().Be("PaaS is managed.");
+    }
+
     [Fact]
     public void Question_bank_projection_synthesizes_one_practice_lesson_per_domain_deterministically()
     {
@@ -154,7 +186,10 @@ public sealed class RuntimeContentProjectorTests
         projection.AnswerKeys.Should().BeEmpty();
     }
 
-    private static CanonicalContentGraph BuildGraph(bool questionBank)
+    private static CanonicalContentGraph BuildGraph(
+        bool questionBank,
+        ItemType itemType = ItemType.Mcq,
+        IReadOnlyList<string>? correct = null)
     {
         var provider = questionBank ? "aws" : "microsoft";
         var certificationSlug = questionBank ? "clf-c02" : "az-900";
@@ -199,11 +234,11 @@ public sealed class RuntimeContentProjectorTests
             "domain-1",
             domainId,
             conceptId,
-            ItemType.Mcq,
+            itemType,
             2,
             "Which service model?",
             [new CheckOption("iaas", "IaaS"), new CheckOption("paas", "PaaS")]);
-        var solution = new CanonicalSolution(questionId, ["paas"], "PaaS is managed.");
+        var solution = new CanonicalSolution(questionId, correct ?? ["paas"], "PaaS is managed.");
         var units = new Dictionary<string, CanonicalUnitResource>(StringComparer.Ordinal);
         var lessons = new Dictionary<string, CanonicalLessonResource>(StringComparer.Ordinal);
         if (!questionBank)

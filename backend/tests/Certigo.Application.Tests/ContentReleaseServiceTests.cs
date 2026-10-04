@@ -59,6 +59,35 @@ public sealed class ContentReleaseServiceTests
     }
 
     [Fact]
+    public async Task A_single_altered_byte_in_a_package_file_is_rejected_before_any_store_mutation()
+    {
+        var source = new TamperedFileReleaseSource();
+        var store = new RecordingReleaseStore();
+        var telemetry = new RecordingTelemetry();
+        var service = new ContentReleaseService(
+            new ContentContractVerifier(
+                source,
+                new AcceptingSchemaValidator(),
+                ContentReleaseLimits.Default),
+            new RuntimeContentProjector(),
+            store,
+            telemetry,
+            new FixedClock());
+        source.ServedHash.Should().NotBe(source.DeclaredHash, "the served bytes differ by one byte");
+
+        var action = () => service.ImportAsync(source.ReleaseId, "admin");
+
+        await action.Should().ThrowAsync<ContentReleaseValidationException>()
+            .WithMessage(
+                $"*file '{TamperedFileReleaseSource.FilePath}' hash is '{source.ServedHash}'; "
+                + $"expected '{source.DeclaredHash}'*");
+        source.FileReads.Should().Be(1);
+        source.PrivateManifestReads.Should().Be(0);
+        store.StageCalls.Should().Be(0);
+        telemetry.Rejections.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Existing_receipt_returns_idempotently_without_reading_blob()
     {
         var receipt = new ContentReleaseReceipt(
@@ -311,6 +340,109 @@ public sealed class ContentReleaseServiceTests
             private static string Sha256(string value)
                 => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))
                     .ToLowerInvariant();
+    }
+
+    /// A schema-valid release whose single public file is served with one byte altered
+    /// (same size, different SHA-256). The private manifest must never be read.
+    private sealed class TamperedFileReleaseSource : IContentReleaseSource
+    {
+        public const string FilePath = "questions/question-1.json";
+        private readonly byte[] _releaseBytes;
+        private readonly byte[] _manifestBytes;
+        private readonly byte[] _servedBytes;
+
+        public TamperedFileReleaseSource()
+        {
+            var declaredBytes = Encoding.UTF8.GetBytes("""{"id":"question-1"}""");
+            _servedBytes = (byte[])declaredBytes.Clone();
+            _servedBytes[^3] ^= 0x01;
+            DeclaredHash = Sha256(declaredBytes);
+            ServedHash = Sha256(_servedBytes);
+            var canonicalManifest =
+                $$"""{"algorithm":"sha256","artifact":"public","channel":"public","fileCount":1,"files":[{"hash":"{{DeclaredHash}}","id":"question-1","path":"{{FilePath}}","resourceType":"question","size":{{declaredBytes.Length}}}],"schema":"certigo.content.package-manifest/v3","serialization":"json-sorted-keys-compact-utf8-lf"}""";
+            var manifestDigest = Sha256(Encoding.UTF8.GetBytes(canonicalManifest));
+            var publicManifestId = $"sha256:{manifestDigest}";
+            var privateManifestId = $"sha256:{new string('b', 64)}";
+            var canonicalRelease =
+                $$"""{"algorithm":"sha256","canonicalization":"json-sorted-keys-compact-utf8","privateManifestId":"{{privateManifestId}}","publicManifestId":"{{publicManifestId}}","schema":"certigo.content.release/v1"}""";
+            ReleaseId = $"sha256:{Sha256(Encoding.UTF8.GetBytes(canonicalRelease))}";
+            _releaseBytes = Encoding.UTF8.GetBytes($$"""
+                {
+                  "schema": "certigo.content.release/v1",
+                  "algorithm": "sha256",
+                  "canonicalization": "json-sorted-keys-compact-utf8",
+                  "publicManifestId": "{{publicManifestId}}",
+                  "privateManifestId": "{{privateManifestId}}",
+                  "releaseId": "{{ReleaseId}}"
+                }
+                """);
+            _manifestBytes = Encoding.UTF8.GetBytes($$"""
+                {
+                  "schema": "certigo.content.package-manifest/v3",
+                  "channel": "public",
+                  "artifact": "public",
+                  "algorithm": "sha256",
+                  "serialization": "json-sorted-keys-compact-utf8-lf",
+                  "fileCount": 1,
+                  "files": [{
+                    "id": "question-1",
+                    "path": "{{FilePath}}",
+                    "resourceType": "question",
+                    "hash": "{{DeclaredHash}}",
+                    "size": {{declaredBytes.Length}}
+                  }],
+                  "manifestId": "{{publicManifestId}}",
+                  "rootHash": "{{manifestDigest}}"
+                }
+                """);
+        }
+
+        public string ReleaseId { get; }
+        public string DeclaredHash { get; }
+        public string ServedHash { get; }
+        public int FileReads { get; private set; }
+        public int PrivateManifestReads { get; private set; }
+
+        public Task<ContentBlobObject> ReadReleaseAsync(
+            string releaseId,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(Blob($"releases/{releaseId}/release.json", _releaseBytes));
+
+        public Task<ContentBlobObject> ReadManifestAsync(
+            ContentArtifact artifact,
+            string manifestId,
+            CancellationToken cancellationToken = default)
+        {
+            if (artifact != ContentArtifact.Public)
+            {
+                PrivateManifestReads++;
+                throw new InvalidOperationException("The private manifest must not be read after a public rejection.");
+            }
+
+            return Task.FromResult(Blob("manifest.json", _manifestBytes));
+        }
+
+        public Task<ContentBlobObject> ReadFileAsync(
+            ContentArtifact artifact,
+            string manifestId,
+            string path,
+            CancellationToken cancellationToken = default)
+        {
+            FileReads++;
+            return Task.FromResult(Blob(path, _servedBytes));
+        }
+
+        public Task<IReadOnlyList<string>> ListFilesAsync(
+            ContentArtifact artifact,
+            string manifestId,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<string>>([FilePath]);
+
+        private static ContentBlobObject Blob(string path, byte[] bytes)
+            => new(path, "version-1", "\"etag\"", true, bytes);
+
+        private static string Sha256(byte[] bytes)
+            => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
     }
 
     private sealed class ThrowingReleaseSource : IContentReleaseSource

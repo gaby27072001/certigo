@@ -54,6 +54,20 @@ subscription) ou la **possession physique** d'un facteur d'authentification.
 | `b2c-extensions-app` | `77216304` | Artefact système Entra |
 | User flow `susi_certigo` | `7fdf12ed` | **Flux d'authentification de PRODUCTION** (lié à `Certigo Mobile`) |
 
+> **Exception temporaire datée — drill `wp-p2-04` (ouverte le 2026-09-23, close le
+> 2026-09-25 à 12:19Z).** Pour le seul drill de rollback N-1 des releases de contenu en
+> staging, une attribution du rôle `Content.Release.Admin`
+> (`8bf21569-a9aa-41db-b8a9-debd6d89619d`) sur le principal de service de « Certigo API »
+> (`31458fff-2110-4d64-8055-1b155a1bdaab`) a été donnée à l'identité dédiée « Certigo
+> Content Release Drill (temporaire 2026-09-23) » (appId
+> `046951da-a7c8-479b-b81f-42974308424b`), le 2026-09-25 de 12:15:42Z à 12:18:06Z. Le 23/09,
+> cette identité avait été créée sans rôle, pour mesurer l'audience des jetons (#512). Chaque
+> secret court a été supprimé dans le même processus que l'obtention du jeton : le
+> 2026-09-25, de 12:15:43Z à 12:16:04Z, avant le drill. L'enregistrement « Certigo API » lui-même
+> n'a pas été modifié. **Close** : attribution retirée, app supprimée, 0 identité de test et 0
+> attribution `Content.Release.Admin` restantes, profil `az` isolé déconnecté et supprimé. Preuve :
+> [`docs/migration/evidence/2026-09-25-content-release-drill.json`](../migration/evidence/2026-09-25-content-release-drill.json).
+
 ## Table des runbooks
 
 | Finding | Criticité | Titre | Fichier | Prérequis d'accès | Statut |

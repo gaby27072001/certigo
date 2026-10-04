@@ -1,14 +1,20 @@
 {
   "id": "wp-p2-04",
-  "status": "in_review",
-  "session_id": "ec84447b-5c18-4c12-be65-9cdf8f0f8b27",
-  "branch": "gchambaud-microsoft-import-content-releases",
-  "pr": "https://github.com/gchambaud_microsoft/Certigo/pull/363",
-  "checkpoint": {
-    "step": "pr-opened",
-    "note": "PR #363 ouverte : code content-release porté depuis la PR draft #304 (superseded, alignée sur certigo-content ADR-0005 mais désynchronisée de main) via merge 3-way fichier par fichier vers une branche neuve. #257, #259 et #304 fermées au profit de #363. Backend (831 tests), IaC (bicep + 36 tests) et mobile (84 Dart + 435 Flutter + 11 golden) validés verts. Reste en in_review (pas done) : la DoD exige un rollback N-1 prouvé en staging, procédure opérateur documentée dans docs/runbooks/CONTENT_RELEASES.md, hors périmètre de cette PR.",
-    "at": "2026-09-03T19:12:00Z"
+  "status": "done",
+  "session_id": "5eafffa1-e2c0-4a57-aeb7-08340a78da3d",
+  "branch": "gchambaud-microsoft-wp-p2-04-cloture",
+  "pr": {
+    "import_and_promotion": "https://github.com/gchambaud_microsoft/Certigo/pull/363",
+    "catalog_transition": "https://github.com/gchambaud_microsoft/Certigo/pull/511",
+    "ciam_audience_v2": "https://github.com/gchambaud_microsoft/Certigo/pull/512",
+    "drill_tool": "https://github.com/gchambaud_microsoft/Certigo/pull/532"
   },
-  "updated_at": "2026-09-03T19:12:00Z",
+  "checkpoint": {
+    "step": "done-staging-rollback-drill",
+    "note": "DoD complète, prouvée le 2026-09-25. (1) Import répété sans doublon : rejeux idempotents à 200 en staging et en dev. (2) Hash invalide rejeté avant mutation : test A_single_altered_byte_in_a_package_file_is_rejected_before_any_store_mutation (StageCalls 0, contrôle de mutation rouge). (3) Rollback N-1 testé en staging : drill tools/content_release_drill.py de 12:16:04Z à 12:18:06Z, 17 contrôles (imports R1 et R2 201 puis 200, 428, 412, première activation If-Match *, promotion de R2, rollback périmé 412, rollback réel avec R1 servie sans clé de corrigé, second rollback 409, nouvelle promotion de R2, 304) ; staging laissé sur R2 sha256:95c69c30…, R1 en previous ; App Insights : content.release.import ×4, promoted ×3, rolled_back ×1, 0 exception. Identité opérateur Content.Release.Admin réelle (jeton CIAM v2, aud GUID accepté grâce à #512), attribution temporaire retirée, app supprimée, profil isolé supprimé. (4) Tests HTTP anti-fuite verts, et 0 clé de corrigé dans le manifeste servi. (5) Le backend expose le manifestId public actif (ETag = manifestId, X-Content-Manifest-Id). Preuve : docs/migration/evidence/2026-09-25-content-release-drill.json. Borne : staging reste en CONTENT_REPOSITORY_MODE=legacy ; aucune activation du contenu runtime en prod sans plan de bascule validé.",
+    "at": "2026-09-25T12:22:47Z"
+  },
+  "evidence": "docs/migration/evidence/2026-09-25-content-release-drill.json",
+  "updated_at": "2026-09-25T12:22:47Z",
   "history_ref": "log.jsonl"
 }
