@@ -493,27 +493,34 @@ def idle_shutdown_checks(merged):
 
 
 def inventory_volume(merged):
-    """What every validation reads and hashes, and what --boot copies (estimate (b))."""
+    """What every validation reads and hashes, and what --boot copies (estimate (b)).
+
+    Azure managed disks count one I/O per started 256 KiB (Microsoft Learn, "Azure
+    managed disk types"): with a cold cache, reading a file costs at least that many.
+    """
     def measure(top):
-        files = size = 0
+        files = size = units = 0
         for directory, _, names in os.walk(top):
             for name in names:
                 info = os.lstat(os.path.join(directory, name))
                 if stat.S_ISREG(info.st_mode):
                     files += 1
                     size += info.st_size
-        return files, size
-    files = size = 0
+                    units += -(-info.st_size // 262144)
+        return files, size, units
+    files = size = units = 0
     for relative in INVENTORY_ROOTS.values():
         if (merged / relative).is_dir():
-            root_files, root_size = measure(merged / relative)
+            root_files, root_size, root_units = measure(merged / relative)
             files += root_files
             size += root_size
+            units += root_units
     manifest = read_json(ROOT / "toolchain-manifest.json")
     flutter = next(tool for tool in manifest["tools"] if tool["id"] == "flutter")["installPath"]
-    flutter_files, flutter_size = measure(merged / flutter.lstrip("/") / "flutter")
-    return {"hashedFiles": files, "hashedBytes": size,
-            "flutterCopyFiles": flutter_files, "flutterCopyBytes": flutter_size}
+    flutter_files, flutter_size, flutter_units = measure(merged / flutter.lstrip("/") / "flutter")
+    return {"hashedFiles": files, "hashedBytes": size, "hashedIoUnits256KiB": units,
+            "flutterCopyFiles": flutter_files, "flutterCopyBytes": flutter_size,
+            "flutterCopyIoUnits256KiB": flutter_units}
 
 
 def post_install_checks(merged, legacy_inventory):

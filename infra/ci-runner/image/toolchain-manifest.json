@@ -169,14 +169,6 @@
     }
   ],
   "contentTools": {
-    "nodeLockfile": "../../../package-lock.json",
-    "nodeLockfileSha256": "4e7e68d10b9f5a7a2485622b26411a99c9a1498ad66f351221522034b7c1bc5e",
-    "entryPoints": [
-      "../../../tools/validate_content.mjs",
-      "../../../tools/seed_content.py",
-      "../../../tools/project_state.py",
-      "../../../tools/validate_migration_registry.py"
-    ],
     "prewarmedProjectDependencies": []
   },
   "artifacts": {

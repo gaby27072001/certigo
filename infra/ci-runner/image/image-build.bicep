@@ -31,7 +31,7 @@ var flutterInputsReady = length(string(contract.reproducibility.flutterEngineArt
 var pythonInputsReady = length(string(contract.reproducibility.pythonWheelLockSha256)) == 64
 var reproducibilityReady = contract.policy.reproducibleInputsReady && contract.reproducibility.status == 'locked' && aptInputsReady && flutterInputsReady && pythonInputsReady
 var effectiveDeploymentEnabled = deploymentEnabled && reproducibilityReady && networkInstallerImplemented
-var contractSha256 = '490d3361b7e92a6c3fbdf7257856ba0bd1688347c707052b827a9c4c6b814a7a'
+var contractSha256 = '843e0ef705b6293e66be85f44e51796741a956fe704a55e2ccf9a22d1baf1e6b'
 var galleryImageDefinitionId = resourceId(
   'Microsoft.Compute/galleries/images',
   contract.destination.galleryName,

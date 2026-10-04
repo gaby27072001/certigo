@@ -41,13 +41,14 @@
       "path": "infra/ci-runner/image/base-image-evidence/base-image-reconstruction.json",
       "sha256": "a79b48083f5d31ac04b6a0bc850583e085b830df5de51c1e0cd2350f5b118c48"
     },
-    "aptPackageLockSha256": "3682ce190d65ee2680862f29562bdf3120c83452c022400620a4a857bb1ea69b",
-    "flutterEngineArtifactLockSha256": "7bd761bd69be44f7f5c043d7da1b77f7accdbe99c4314c274c387392dcb730a1",
+    "aptPackageLockSha256": "b180afba7958922bd1c5a2a633d5b7f3e757578cc1bb16deaf6428fbdb6a1d65",
+    "flutterEngineArtifactLockSha256": "c9b9df7073598ebc3f8976a6bc229cd3d2eff297138201be86211acb0b7de2e7",
     "pythonWheelLockSha256": "05c532bb537a44754cb1219284bca0426c47c24b8d05899fe34061e9fbc3e300",
     "blockedReasons": [
       "The offline consumer (install_offline.py) and its execution tests exist, but the image stays blocked until independent review, green CI and explicit approval.",
       "The template transport embeds the inputs (loadFileAsBase64); no Azure build has exercised it and Azure Image Builder documents no inline size limit.",
       "Defect 6: the sealed Flutter SDK is unusable by the runner user (update_engine_version.sh writes bin/cache on every call); the per-job working copy fix is a separate follow-up.",
+      "On-demand runners (ADR-022): before the canary guard is lifted, its pool must be declared in on-demand.config.json (with recovery and capacity) and its cold start and per-job validation cost measured under the accepted threshold.",
       "Signer activation (#341 point 4) is excluded and still requires a workflow security policy decision."
     ]
   },
@@ -56,13 +57,13 @@
       "id": "apt-lock",
       "path": "infra/ci-runner/image/apt-packages.lock.json",
       "destination": "apt-packages.lock.json",
-      "sha256": "3682ce190d65ee2680862f29562bdf3120c83452c022400620a4a857bb1ea69b"
+      "sha256": "b180afba7958922bd1c5a2a633d5b7f3e757578cc1bb16deaf6428fbdb6a1d65"
     },
     {
       "id": "flutter-lock",
       "path": "infra/ci-runner/image/flutter-engine-artifacts.lock.json",
       "destination": "flutter-engine-artifacts.lock.json",
-      "sha256": "7bd761bd69be44f7f5c043d7da1b77f7accdbe99c4314c274c387392dcb730a1"
+      "sha256": "c9b9df7073598ebc3f8976a6bc229cd3d2eff297138201be86211acb0b7de2e7"
     },
     {
       "id": "bootstrap",
@@ -74,7 +75,7 @@
       "id": "toolchain-manifest",
       "path": "infra/ci-runner/image/toolchain-manifest.json",
       "destination": "toolchain-manifest.json",
-      "sha256": "bdae8e2d435734875efa5f2decd2a1932d46ba7385271cce765bcbfb42404525"
+      "sha256": "97f6423c39beaa6a5084f2947acaa3ead945d1ebad012c3e0f22f422173eaf96"
     },
     {
       "id": "toolchain-sbom",
@@ -98,7 +99,7 @@
       "id": "validator",
       "path": "infra/ci-runner/image/validate-toolchain.sh",
       "destination": "validate-toolchain.sh",
-      "sha256": "1dafd48ee06a262874d3249d9e413e8540f8e574cb1d2c3fa08618c1d0523375"
+      "sha256": "5c42a911d886bb5c48c572f53c7664fc94452b358ab175716becb4eabfe8b462"
     },
     {
       "id": "inventory",

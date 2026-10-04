@@ -177,15 +177,19 @@ test('manifest versions remain aligned with current workflow project state', asy
   assert.match(lint, /releases\/download\/v1\.7\.12\/actionlint_1\.7\.12_linux_amd64/);
 });
 
-test('content tooling lock is pinned without prewarming project dependencies', async () => {
-  const contentLock = await readFile(
-    new URL(manifest.contentTools.nodeLockfile, imageRoot),
-  );
-  assert.equal(
-    createHash('sha256').update(contentLock).digest('hex'),
-    manifest.contentTools.nodeLockfileSha256,
-  );
-  assert.deepEqual(manifest.contentTools.prewarmedProjectDependencies, []);
+test('image manifest attests only what the image installs, never the content tooling lock', async () => {
+  // The image prewarms no project dependency, so it pins no repository lock: an npm fix
+  // must not ripple through the manifest, both locks, the contract and the template.
+  assert.deepEqual(manifest.contentTools, { prewarmedProjectDependencies: [] });
+  assert.doesNotMatch(JSON.stringify(manifest), /\.\.\//, 'manifest points outside the image');
+  const contentLock = await readFile(new URL('package-lock.json', repositoryRoot));
+  const contentLockSha256 = createHash('sha256').update(contentLock).digest('hex');
+  for (const file of ['toolchain-manifest.json', 'apt-packages.lock.json',
+    'flutter-engine-artifacts.lock.json', 'image-build-contract.json', 'image-build.bicep']) {
+    const text = await readFile(new URL(file, imageRoot), 'utf8');
+    assert.doesNotMatch(text, /package-lock|nodeLockfile/, file);
+    assert.ok(!text.includes(contentLockSha256), `${file} pins the content tooling lock`);
+  }
 });
 
 test('PR1 has no Azure image or VMSS deployment wiring', async () => {

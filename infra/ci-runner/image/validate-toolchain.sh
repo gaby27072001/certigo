@@ -103,14 +103,6 @@ expected_sbom_sha="$(jq -er '.artifacts.sbomSha256' "${manifest}")"
   fail "SBOM hash mismatch"
 
 if [[ "${mode}" == "--contract" ]]; then
-  content_lock="$(
-    realpath "${image_root}/$(jq -er '.contentTools.nodeLockfile' "${manifest}")"
-  )"
-  expected_content_lock_sha="$(
-    jq -er '.contentTools.nodeLockfileSha256' "${manifest}"
-  )"
-  [[ "$(sha256sum "${content_lock}" | awk '{print $1}')" == "${expected_content_lock_sha}" ]] ||
-    fail "content tooling lock hash mismatch"
   echo "Toolchain repository contract valid."
   exit 0
 fi

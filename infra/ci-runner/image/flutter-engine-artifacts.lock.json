@@ -15,7 +15,7 @@
       "value": "c853cda0312a162854c481fe6a1bc286d84fbb74bfab7037c39750061dc9b466"
     }
   },
-  "manifestSha256": "bdae8e2d435734875efa5f2decd2a1932d46ba7385271cce765bcbfb42404525",
+  "manifestSha256": "97f6423c39beaa6a5084f2947acaa3ead945d1ebad012c3e0f22f422173eaf96",
   "sdkSourceSha256": {
     "packages/flutter_tools/lib/src/cache.dart": "ff6a424aa26083ac95204a3704aca2d72540fdc227d02fb2510d79fb93d63e0d",
     "packages/flutter_tools/lib/src/flutter_cache.dart": "a0eb7d8ba0457cd6a00e2c6f922f8baaf73ba6caf96a875767f080ab92a4ee64",
