@@ -207,12 +207,14 @@ fifth of the whole fleet's compute, for machines that never served a job. A stop
 instance is not a free instance. They cannot be deleted while the lock stands, so
 removing them is a deliberate act that must lift the lock first.
 
-### On-demand runners (ADR-022), measured and projected on 2026-09-30
+### On-demand runners (ADR-022), projected on 2026-09-30, measured on 2026-10-04
 
-> Volatile facts, dated and bounded. Measured **2026-09-30**. Invalidated by any change of pool
-> size, quiet period, runner VM size, or of the nightly recovery schedule; re-measure rather than
-> amend. Decision and residual risks: `docs/adr/ADR-022-runners-ci-a-la-demande.md`; operations:
-> `docs/runbooks/CI_RUNNERS.md` §13.
+> Volatile facts, dated and bounded. Before and projection measured **2026-09-30**; after
+> activation measured **2026-10-04**. Invalidated by any change of pool size, quiet period, runner
+> VM size, or of the nightly recovery schedule; re-measure rather than amend. The after-activation
+> figures also scale with CI job volume (see "Read the after figures as a floor" below): re-measure
+> on a normal week before using them as a budget. Decision and residual risks:
+> `docs/adr/ADR-022-runners-ci-a-la-demande.md`; operations: `docs/runbooks/CI_RUNNERS.md` §13.
 
 **Before.** The 30-day Cost Management audit of 2026-09-30 puts `rg-certigo-ci` at ≈ 555 USD
 (65% of the Certigo bill): trusted pool ≈ 265 (VM 172, Defender 32, NAT 40, disks 12, IP 7) and
@@ -259,16 +261,49 @@ and it matches the NIC by a MAC address that deallocation keeps. Measured on 202
 deallocated `6e3abce4`: job queued 16:20:43, VM starting +14 s, running +37 s, **runner online
 +45 s** (instead of ≈ 6 min).
 
-**After activation** (to be measured over the first full working days, from the Activity Log
-power operations and the GitHub API; not yet recorded):
+**After activation**, measured on 2026-10-04 over 2026-10-01 00:00 → 2026-10-04 17:00 UTC (cost:
+the three complete days 2026-10-01 → 2026-10-03; jobs and Logic Apps runs: from 2026-09-30
+21:00 UTC), with the final agent on all six instances since 2026-09-30 20:35 UTC. Sources: Cost
+Management query API (`ActualCost`, `Daily`, filtered on `rg-certigo-ci`, grouped by
+`MeterCategory`), Activity Log `start`/`deallocate` operations on the six instances, GitHub jobs
+API over both repositories, Logic Apps runs API.
 
 | Measure | Before | After |
 | --- | ---: | ---: |
-| Powered VM-hours/day, PR | 93 | *pending* |
-| Powered VM-hours/day, trusted | 46 | *pending* |
-| Queue wait p50 / p90, `certigo-pr` | 19 s / 125 s | *pending* |
-| Queue wait p50 / p90, `certigo-trusted` | 2 s / 6 s | *pending* |
-| Wake runs failed / deallocation runs failed | n/a | *pending* |
+| Powered VM-hours/day, PR | 93 | 3.9 |
+| Powered VM-hours/day, trusted | 46 | 4.0 |
+| Queue wait p50 / p90, `certigo-pr` | 19 s / 125 s | 40 s / 83 s (max 120 s) |
+| Queue wait p50 / p90, `certigo-trusted` | 2 s / 6 s | 4 s / 47 s (max 53 s) |
+| Wake runs failed / deallocation runs failed | n/a | 0 of 420 / 0 of 1,010 |
+| Nightly recovery runs failed | n/a | 0 of 4 (≈ 3 min each, ≈ 8 min before the boot fix) |
+| `rg-certigo-ci` actual cost, USD/day | 27.8 | 5.4 |
+
+**Cost, USD/day** — before is the mean of 2026-09-24 → 2026-09-29, after the mean of 2026-10-01 →
+2026-10-03: virtual machines 19.26 → 0.93, Defender for Cloud 3.29 → 0.24, NAT gateways 2.66 →
+2.25, storage 1.86 → 1.29, virtual network 0.60 → 0.60, Logic Apps 0 → 0.06; total **27.8 → 5.4
+(−80%)**. The virtual-machine and Defender lines alone fall by 21.4 USD/day, **≈ 640 USD/30 d**;
+storage had already dropped to ≈ 1.4 on 2026-09-26, before activation, and is not credited to it.
+At this rate `rg-certigo-ci` costs **≈ 162 USD/30 d**, below the ≈ 220 projected above and its
+375 USD budget.
+
+**Read the after figures as a floor.** CI activity in the window was low — 97 `certigo-pr` and
+45 `certigo-trusted`/`certigo-ci` jobs, ≈ 25 PR jobs/day against ≈ 310/day in the baseline
+week — so most powered hours are the nightly recovery and the daily scheduled jobs. At the
+baseline week's volume, the replay above (7.0 + 5.2 VM-hours/day) would add ≈ 0.6 USD/day of
+compute and Defender.
+
+**Queue wait.** The median rose because every burst now starts cold. Across the 7 PR bursts, the
+jobs queued in a burst's first minute waited a median 40 s (max 59 s): the measured wake and boot
+of a deallocated instance. The 120 s maximum is not a wake delay. It comes from the 2026-10-04
+17:00 UTC burst, 68 jobs on the four PR runners, where 52 later jobs waited a median 42 s for a
+free runner while the pool was already up. Saturation of the same four runners already produced
+the before-activation p90 of 125 s and its 627 s maximum.
+
+**Defects found by the canary and fixed before rollout:** #573, the permanent
+`unattended-upgrade-shutdown` helper counted as package maintenance, so no instance ever powered
+off; #574, the cloud-init boot wait above; #575, Azure's hourly patch assessment
+(`apt-get update`, 15 minutes after every boot) counted as package maintenance, which kept every
+woken instance up 15 minutes longer.
 
 ## Guardrails
 
