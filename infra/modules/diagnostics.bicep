@@ -50,7 +50,7 @@ param queueServiceDiagnosticSettingName string = 'security-to-law'
 @description('Existing Table service diagnostic setting name.')
 param tableServiceDiagnosticSettingName string = 'security-to-law'
 
-@description('Observability cost profile, chosen in infra/main.bicep from env (prod is always production). production keeps every signal at its production cadence. nonProduction (staging) evaluates every log-search alert every 15 minutes over 15 minutes and keeps only deletions in the storage data-plane logs; availability tests are unchanged. See docs/runbooks/OBSERVABILITY.md, "Profil de cout hors production".')
+@description('Observability cost profile, chosen in infra/main.bicep from env (prod is always production). production keeps every signal at its production cadence. nonProduction (staging) evaluates every log-search alert every 15 minutes over 15 minutes, keeps only deletions in the storage data-plane logs and only the readiness availability test, at the production cadence and locations. See docs/runbooks/OBSERVABILITY.md, "Profil de cout hors production".')
 @allowed([
   'production'
   'nonProduction'
@@ -212,6 +212,10 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
 // only the liveness test and its alert are new. The probes send no headers, body,
 // query string or user data. The new liveness test disables retries so its
 // execution cost stays strictly bounded.
+// Outside production only the readiness test is kept (decided 2026-10-04): the promotion
+// monitor needs availability results, not a particular test, and the readiness probe keeps
+// its 300-second cadence from both locations. Cadence and locations never depend on the
+// profile: a slower or single-location probe can leave the monitor's first window empty.
 var availabilityTests = [
   {
     name: 'ready'
@@ -221,6 +225,7 @@ var availabilityTests = [
     description: 'Certigo backend availability and dependency-readiness probe.'
     alertDescription: 'Readiness failed from both probe locations; inspect the Function App and Cosmos/Storage/Key Vault dependencies.'
     retryEnabled: true
+    keptOutsideProduction: true
   }
   {
     name: 'live'
@@ -230,10 +235,13 @@ var availabilityTests = [
     description: 'Certigo backend process liveness probe.'
     alertDescription: 'Liveness failed from both probe locations; inspect the Function App process.'
     retryEnabled: false
+    keptOutsideProduction: false
   }
 ]
 
-resource availabilityWebTests 'Microsoft.Insights/webtests@2022-06-15' = [for test in availabilityTests: {
+var deployedAvailabilityTests = filter(availabilityTests, test => !nonProduction || test.keptOutsideProduction)
+
+resource availabilityWebTests 'Microsoft.Insights/webtests@2022-06-15' = [for test in deployedAvailabilityTests: {
   name: test.resourceName
   location: location
   kind: 'standard'
@@ -267,7 +275,7 @@ resource availabilityWebTests 'Microsoft.Insights/webtests@2022-06-15' = [for te
   }
 }]
 
-resource availabilityAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for (test, i) in availabilityTests: {
+resource availabilityAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for (test, i) in deployedAvailabilityTests: {
   name: test.alertName
   location: 'global'
   tags: union(tags, {

@@ -32,9 +32,10 @@ Le module `infra/modules/diagnostics.bicep` ajoute ou ajuste :
   exceptions restent exemptes afin que les alertes demeurent fiables au faible
   volume observe ;
 - en staging seulement (profil `nonProduction`), les cinq alertes de journaux
-  sont evaluees toutes les 15 minutes sur 15 minutes et les journaux data-plane
-  du stockage ne gardent que `StorageDelete` ; les tests de disponibilite ne
-  changent pas. Voir « Profil de cout hors production ».
+  sont evaluees toutes les 15 minutes sur 15 minutes, les journaux data-plane
+  du stockage ne gardent que `StorageDelete` et seul le test de disponibilite
+  readiness est conserve, a la meme cadence et depuis les memes localisations.
+  Voir « Profil de cout hors production ».
 
 Le workflow runner quotidien publie dans son Step Summary des metriques de
 lifecycle, attente du run courant, taille agregee des caches locaux, latence
@@ -485,7 +486,7 @@ recues a la main le 2026-08-15 (tag `managedBy: manual-hardening`).
 | Environnement | Change | Ne change pas |
 | --- | --- | --- |
 | prod | rien | tout ; le template compile resout exactement les valeurs precedentes (`infra/tests/observability-cost-profile.test.mjs`) |
-| staging | 5 alertes de journaux : `PT15M`/`PT15M` ; Blob/Queue/Table : `StorageDelete` seul | requetes, seuils, severites, action group, Function App/Cosmos/Key Vault en `allLogs`, **les deux tests de disponibilite (300 s, 2 localisations)** |
+| staging | 5 alertes de journaux : `PT15M`/`PT15M` ; Blob/Queue/Table : `StorageDelete` seul ; test `-live` et son alerte retires | requetes, seuils, severites, action group, Function App/Cosmos/Key Vault en `allLogs`, **test readiness : 300 s, 2 localisations, retries** |
 | dev | 3 alertes HTTP : `PT15M`/`PT15M` ; Blob/Queue/Table : `StorageDelete` seul | requetes, seuil 25, severite 2, **aucun action group** (comme avant : elles ne notifient personne), reglages de diagnostic Function App/Cosmos/Key Vault |
 
 **Pourquoi seulement les suppressions dans les journaux de stockage.**
@@ -510,26 +511,46 @@ inchanges. Readiness garde le KQL et le seuil de #568 (au moins deux echecs dans
 fenetre). `telemetry-absent` reste coherente : les sondes a 300 s de deux
 localisations donnent au moins quatre requetes par fenetre de 15 minutes.
 
-**Pourquoi les tests de disponibilite de staging restent tels quels.** Le moniteur
-de promotion de #577 exige des `AppAvailabilityResults` : aucun resultat apres
-10 minutes de surveillance, ou un resultat le plus recent plus vieux que
+**Pourquoi staging garde seulement le test readiness, sans changer sa cadence.** Le
+moniteur de promotion de #577 exige des `AppAvailabilityResults` : aucun resultat
+apres 10 minutes de surveillance, ou un resultat le plus recent plus vieux que
 15 minutes, bloque definitivement la promotion. A 600 ou 900 s, une phase
-defavorable plus le delai d'ingestion produit ce blocage meme avec une
-application saine (analyse du proprietaire de #577). Supprimer les tests casserait
-la baseline. Cout conserve : 20 USD/30 j (10 368 executions sur 10 jours). Option
-validee sur le principe par l'orchestrateur, **apres** ce profil et dans une PR
-separee limitee a staging : supprimer seulement le test `-live` et son alerte
-(compatibilite #577 confirmee par son proprietaire), puis capturer une nouvelle
-baseline du moniteur.
+defavorable plus le delai d'ingestion produit ce blocage meme avec une application
+saine (analyse du proprietaire de #577) : la cadence et les localisations ne
+dependent donc jamais du profil. Le moniteur ne depend ni du nom ni de l'URL du
+test `-live`, ni d'un nombre minimal de tests (confirme par son proprietaire le
+2026-10-04) ; un seul resultat frais suffit. Le test readiness reste a 300 s depuis
+deux localisations, avec retries ; seul le test `-live` et son alerte metrique sont
+retires en staging. Decision de Gabriel (supprimer les tests de staging) appliquee
+dans la limite de ce garde-fou, feu vert de principe de l'orchestrateur le
+2026-10-04, apres le profil. En production, les deux tests restent.
 
 **Economie attendue** (meters mesures) : journaux de stockage
 4,5 Go/30 j x 2,99 USD/Go = **13,4 USD/30 j** ; alertes, 8 regles x environ
-0,97 USD = **7,8 USD/30 j** ; total **environ 21 USD/30 j**.
+0,97 USD = **7,8 USD/30 j** ; test `-live` de staging, la moitie des 10 368
+executions mesurees sur 10 jours plus son alerte metrique = **environ 10 USD/30 j** ;
+total **environ 31 USD/30 j**.
 
 **Application.** Dev : automatique, `cd-backend` deploie `infra/main.bicep` a chaque
 fusion sur `main`. Staging : uniquement par la promotion normale `cd-backend`,
 apres la promotion de production du 2026-10-05 et sur creneau de l'orchestrateur,
 jamais par `deployment create` manuel. Prod : rien a appliquer.
+
+Un deploiement incremental ne supprime rien : apres la promotion de staging, le
+test `-live` et son alerte existent encore, hors template (`Ignore` au what-if).
+Avec le feu vert de l'orchestrateur, les supprimer explicitement, l'alerte d'abord
+puisqu'elle reference le test, puis capturer une nouvelle baseline du moniteur de
+#577 avant la promotion suivante :
+
+```powershell
+az resource delete -g rg-certigo-staging --resource-type Microsoft.Insights/metricAlerts `
+  -n alert-certigo-availability-live
+az resource delete -g rg-certigo-staging --resource-type Microsoft.Insights/webtests `
+  -n availability-func-certigo-staging-hwbsyiwa7tqnw-live
+az resource list -g rg-certigo-staging --resource-type Microsoft.Insights/webtests --query "[].name" -o tsv
+```
+
+La derniere commande ne doit plus lister que `availability-func-certigo-staging-hwbsyiwa7tqnw`.
 
 **Verifier apres application** (lecture seule) :
 
@@ -554,9 +575,10 @@ lendemain, `StorageBlobLogs` doit tomber pres de zero dans la table `Usage` du
 workspace. En staging, capturer une nouvelle baseline du moniteur de #577 avant la
 promotion suivante.
 
-**Retour arriere** : PR de revert, puis meme chemin d'application. Pour staging
-seul, `costProfile: 'production'` dans `infra/main.bicep` suffit. Ne pas modifier
-ces regles dans le portail : le prochain deploiement les reecrirait.
+**Retour arriere** : PR de revert, puis meme chemin d'application ; la promotion
+suivante recree le test `-live` et son alerte. Pour staging seul,
+`costProfile: 'production'` dans `infra/main.bicep` suffit. Ne pas modifier ces
+regles dans le portail : le prochain deploiement les reecrirait.
 
 ## Validation sans mutation
 

@@ -106,19 +106,35 @@ test('production keeps every storage data-plane category; non-production keeps d
   }
 });
 
-test('availability tests do not depend on the profile (promotion monitor contract, #577)', () => {
+test('outside production only the readiness availability test remains, at the production cadence', () => {
   const template = diagnostics();
-  const source = readFileSync(path.join(root, 'infra', 'modules', 'diagnostics.bicep'), 'utf8');
-  const availability = source.slice(source.indexOf('var availabilityTests'), source.indexOf('// Activity Log alerts'));
-  assert.doesNotMatch(availability, /nonProduction|costProfile/);
+  assert.deepEqual(template.variables.availabilityTests.map((probe) => [probe.name, probe.keptOutsideProduction]), [
+    ['ready', true], ['live', false],
+  ]);
+  assert.equal(
+    template.variables.deployedAvailabilityTests,
+    "[filter(variables('availabilityTests'), lambda('test', or(not(variables('nonProduction')), lambdaVariables('test').keptOutsideProduction)))]",
+  );
+  // The filter above, applied to each profile: production keeps both tests.
+  for (const [nonProduction, expected] of [[false, ['ready', 'live']], [true, ['ready']]]) {
+    assert.deepEqual(template.variables.availabilityTests
+      .filter((probe) => !nonProduction || probe.keptOutsideProduction)
+      .map((probe) => probe.name), expected);
+  }
   const [webTests] = ofType(template, 'Microsoft.Insights/webtests');
-  assert.equal(webTests.condition, undefined);
-  assert.equal(webTests.copy.count, "[length(variables('availabilityTests'))]");
+  const [alerts] = ofType(template, 'Microsoft.Insights/metricAlerts');
+  for (const resource of [webTests, alerts]) {
+    assert.equal(resource.condition, undefined);
+    assert.equal(resource.copy.count, "[length(variables('deployedAvailabilityTests'))]");
+  }
+  // Cadence and locations never depend on the profile (promotion monitor contract, #577).
   assert.equal(webTests.properties.Frequency, 300);
-  assert.equal(webTests.properties.Locations.length, 2);
-  assert.equal(template.variables.availabilityTests.length, 2);
+  assert.deepEqual(webTests.properties.Locations, [{ Id: 'emea-nl-ams-azr' }, { Id: 'us-va-ash-azr' }]);
+  assert.equal(alerts.properties.criteria.failedLocationCount, 2);
+  const source = readFileSync(path.join(root, 'infra', 'modules', 'diagnostics.bicep'), 'utf8');
+  const probes = source.slice(source.indexOf('resource availabilityWebTests'), source.indexOf('// Activity Log alerts'));
+  assert.doesNotMatch(probes, /nonProduction|costProfile/);
 });
-
 test('dev adopts its three manual HTTP alerts at a 15-minute cadence, unchanged otherwise', () => {
   const main = compile('infra/main.bicep');
   assert.equal(main.resources.devObservability.condition, "[equals(parameters('env'), 'dev')]");

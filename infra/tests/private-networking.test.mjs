@@ -419,29 +419,29 @@ test('bounded liveness and readiness tests require both probe locations to fail'
   );
   assert.equal(webTests.length, 1);
   assert.equal(alerts.length, 1);
-  assert.equal(webTests[0].copy.count, "[length(variables('availabilityTests'))]");
-  assert.equal(alerts[0].copy.count, "[length(variables('availabilityTests'))]");
+  assert.equal(webTests[0].copy.count, "[length(variables('deployedAvailabilityTests'))]");
+  assert.equal(alerts[0].copy.count, "[length(variables('deployedAvailabilityTests'))]");
   assert.equal(
     webTests[0].name,
-    "[variables('availabilityTests')[copyIndex()].resourceName]",
+    "[variables('deployedAvailabilityTests')[copyIndex()].resourceName]",
   );
   assert.equal(
     alerts[0].name,
-    "[variables('availabilityTests')[copyIndex()].alertName]",
+    "[variables('deployedAvailabilityTests')[copyIndex()].alertName]",
   );
   for (const webTest of webTests) {
     assert.equal(webTest.kind, 'standard');
     assert.equal(webTest.properties.Frequency, 300);
     assert.equal(
       webTest.properties.Request.RequestUrl,
-      "[format('https://{0}{1}', parameters('functionAppHostName'), variables('availabilityTests')[copyIndex()].path)]",
+      "[format('https://{0}{1}', parameters('functionAppHostName'), variables('deployedAvailabilityTests')[copyIndex()].path)]",
     );
     assert.equal(webTest.properties.Request.HttpVerb, 'GET');
     assert.equal(webTest.properties.Request.Headers, undefined);
     assert.equal(webTest.properties.Request.RequestBody, undefined);
     assert.equal(
       webTest.properties.RetryEnabled,
-      "[variables('availabilityTests')[copyIndex()].retryEnabled]",
+      "[variables('deployedAvailabilityTests')[copyIndex()].retryEnabled]",
     );
     assert.deepEqual(webTest.properties.Locations, [
       { Id: 'emea-nl-ams-azr' },
