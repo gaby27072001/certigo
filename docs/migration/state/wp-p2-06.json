@@ -1,10 +1,17 @@
 {
   "id": "wp-p2-06",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
-  "pr": null,
-  "checkpoint": {"step": null, "note": null, "at": null},
-  "updated_at": null,
+  "status": "blocked",
+  "session_id": "5eafffa1-e2c0-4a57-aeb7-08340a78da3d",
+  "branch": "gchambaud-microsoft-wp-p2-06-v5-expand",
+  "pr": {
+    "order_sensitive_grading_and_v5_spec": "https://github.com/gchambaud_microsoft/Certigo/pull/530",
+    "v5_expand_backend_and_app": "https://github.com/gchambaud_microsoft/Certigo/pull/565"
+  },
+  "checkpoint": {
+    "step": "blocked-declared-dependency-wp-p2-05",
+    "note": "Avancé hors séquence, bloqué depuis le 2026-10-04 par sa dépendance déclarée wp-p2-05 : le validateur du registre interdit in_progress tant qu'elle n'est pas done. Livré sur main le 2026-10-04 : #530 (a8ef899d) — anti-fuite par type, notation serveur sensible à l'ordre pour ordering, cloze et applied, avec parité Dart ↔ .NET (24 vecteurs), balayage du corpus, spécification v5 et ADR-023 ; #565 (de5ea7fe) — étape 3 de v5 : schémas v5 de certigo-content embarqués à l'octet, règles X1 à X9, matches projeté, applied à sélection partielle accessible. Reste pour la DoD : un golden Flutter par type ; les étapes 4 et 5 de v5 dans certigo-content (resynchroniser les schémas, puis publier du contenu ordering, cloze et matchPairs et migrer le corpus sans perte) ; distribuer l'app, puis lever la garde provisoire sur les distracteurs d'applied (docs/EXERCICES.md). Déblocage : wp-p2-05 done.",
+    "at": "2026-10-04T18:48:04Z"
+  },
+  "updated_at": "2026-10-04T18:48:04Z",
   "history_ref": "log.jsonl"
 }

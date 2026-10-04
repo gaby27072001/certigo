@@ -1,10 +1,17 @@
 {
   "id": "wp-p2-05",
-  "status": "todo",
-  "session_id": null,
-  "branch": null,
-  "pr": null,
-  "checkpoint": {"step": null, "note": null, "at": null},
-  "updated_at": null,
+  "status": "in_progress",
+  "session_id": "5eafffa1-e2c0-4a57-aeb7-08340a78da3d",
+  "branch": "gchambaud-microsoft-wp-p2-05-offline-manifest",
+  "pr": {
+    "offline_manifest_sync": "https://github.com/gchambaud_microsoft/Certigo/pull/315",
+    "telemetry_and_offline_proofs": "https://github.com/gchambaud_microsoft/Certigo/pull/520"
+  },
+  "checkpoint": {
+    "step": "draft-pr-520-device-integration-gate",
+    "note": "En cours depuis le 2026-10-04 : la dépendance wp-p2-04 est done depuis #563 (a48e2029). L'essentiel du mécanisme vient de #315 (fusionnée le 2026-09-05). La PR #520, en brouillon, comble les manques relevés à l'audit de la DoD : télémétrie sans contenu sensible, perte réseau en plein téléchargement avec le vrai store disque, balayage du cache sans aucun corrigé, et jumeau CI du test d'intégration. Reste pour la DoD : rebaser #520 sur main, puis passer les tests d'intégration sur appareil exigés par docs/RELEASE_MOBILE.md §8 (Android, puis iOS). Ce poste n'a ni SDK Android ni macOS ; la voie Codemagic (#555) attend une action de Gabriel. Borne : aucune activation du contenu runtime en prod sans plan de bascule validé.",
+    "at": "2026-10-04T18:48:04Z"
+  },
+  "updated_at": "2026-10-04T18:48:04Z",
   "history_ref": "log.jsonl"
 }

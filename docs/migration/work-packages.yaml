@@ -411,7 +411,7 @@ work_packages:
       - "Tester perte réseau, hash invalide, manifeste incomplet, cache partiel, rollback, redémarrage et absence d'answerKey."
     dod: "Téléchargement différentiel et activation atomique ; dernier cache valide utilisable hors ligne ; tests unitaires et intégration verts ; aucun corrigé dans le paquet ou le cache mobile."
     rollback: "Feature flag vers l'ancien repository de contenu/cache ; données du nouveau cache isolées par version."
-    status: todo
+    status: in_progress
     notes: "Source : gchambaud_microsoft/Certigo#243. La précondition est une formulation locale, absente de l'issue."
 
   - id: wp-p2-06
@@ -429,7 +429,7 @@ work_packages:
       - "Ajouter contrats cross-repo, tests unitaires, goldens Flutter et migrer le corpus sans perte."
     dod: "Pour chaque type : schéma public, schéma privé, validation, modèle Dart, modèle C#, correction serveur, renderer, test unitaire, golden test et test anti-fuite."
     rollback: "Conserver la lecture v2/QCM derrière compatibilité de schéma et ne promouvoir v3 qu'après validation staging."
-    status: todo
+    status: blocked
     notes: "Source : gchambaud_microsoft/Certigo#245. La précondition est une formulation locale, absente de l'issue."
 
   - id: wp-p2-07
