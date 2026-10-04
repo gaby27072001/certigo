@@ -330,8 +330,9 @@ resource deploymentFailureAlert 'Microsoft.Insights/activityLogAlerts@2020-10-01
 }
 
 // Log-search alert definitions. Each `query` returns one row per matching
-// request; the alert fires when the COUNT over the 15-min window exceeds the
-// threshold. ResultCode is a STRING in the Log Analytics schema, so we match on
+// request; the alert fires when the COUNT over the rule's window exceeds the
+// threshold. Readiness requires repeated failures, not one recovered retry.
+// ResultCode is a STRING in the Log Analytics schema, so we match on
 // string values / a strict 5xx regex — no bare toint() that could throw on an
 // empty or non-numeric ResultCode.
 var logAlerts = [
@@ -345,10 +346,10 @@ var logAlerts = [
   }
   {
     name: 'readiness-failure'
-    query: 'AppRequests | where Url endswith "/api/health/ready" and ResultCode != "200"'
-    threshold: 0
+    query: replace(loadTextContent('../queries/readiness-failures.kql'), '__APP_INSIGHTS_RESOURCE_ID__', appInsights.id)
+    threshold: 1
     severity: 1
-    desc: 'Readiness endpoint is failing; inspect dependency checks for Cosmos, Storage and Key Vault.'
+    desc: 'At least two readiness requests failed within 10 minutes. Repeated or partial failure, not necessarily a continuous outage; inspect Cosmos, Storage and Key Vault. See docs/runbooks/OBSERVABILITY.md.'
   }
   {
     name: 'http403-spike'
@@ -393,8 +394,8 @@ resource httpAlerts 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = [ for 
     enabled: true
     // Scope on the workspace (App Insights is workspace-based -> AppRequests).
     scopes: [ workspaceId ]
-    evaluationFrequency: 'PT5M'
-    windowSize: 'PT15M'
+    evaluationFrequency: a.name == 'readiness-failure' ? 'PT1M' : 'PT5M'
+    windowSize: a.name == 'readiness-failure' ? 'PT10M' : 'PT15M'
     autoMitigate: true
     criteria: {
       allOf: [

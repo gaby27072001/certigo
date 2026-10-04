@@ -19,7 +19,8 @@ Le module `infra/modules/diagnostics.bicep` ajoute ou ajuste :
 - une alerte par test, uniquement si les deux localisations echouent ;
 - une alerte au premier 5xx hors endpoints de sante, ou a la premiere exception
   Error/Critical ou explicitement `Unhandled`, sur 15 minutes ;
-- une alerte readiness et une alerte d'absence totale de requetes sur
+- une alerte readiness pour au moins deux requetes en echec sur 10 minutes,
+  evaluee chaque minute, et une alerte d'absence totale de requetes sur
   15 minutes, intervalle normalement alimente par les tests synthetiques ;
 - un workbook agrege Functions, Cosmos DB et Storage ;
 - la metrique `functions.cold_start`, emise une seule fois par processus
@@ -192,6 +193,75 @@ inventes. La remise est donc attestee apres validation OTP, contrairement
 au test anterieur. Cela ne prouve toujours pas le deploiement du nouveau KQL.
 
 ## Contrat de detection a faible trafic
+
+### Readiness : echecs repetes, pas incident transitoire unique
+
+`infra/queries/readiness-failures.kql` cible explicitement le composant
+Application Insights de l'environnement (`_ResourceId`, insensible a la casse)
+et le chemin exact `/api/health/ready`, y compris avec une query string.
+La regle existante `alert-certigo-readiness-failure` conserve son nom, sa
+severite 1, son identite, ses droits, son action group et `autoMitigate=true`.
+Seuls son KQL, son seuil (`Count > 1`), sa fenetre (`PT10M`) et sa cadence
+(`PT1M`) changent. Les autres regles, dont 5xx + exceptions, restent inchangees.
+La cadence plus rapide augmente les evaluations de cette seule regle.
+
+Deux requetes non-200 observees dans la fenetre suffisent, meme si des 200
+s'intercalent ou si les echecs viennent de deux instances/regions differentes :
+un succes sur une instance ne doit pas masquer une panne partielle ailleurs.
+Ce critere signifie **echecs repetes**, pas « service continuellement indisponible ».
+Les retries sont de vraies requetes : deux retries en echec peuvent declencher.
+Ils peuvent partager `OperationId` avec le 200 final ; ne pas dedupliquer par
+cette correlation. Les doublons de `Id` (identite de requete/span) sont elimines,
+meme si leurs timestamps different. Sans `Id`, le repli utilise
+`(TimeGenerated, OperationId, AppRoleInstance)` ; les evenements incomplets
+identiques sont fusionnes conservativement, meme sans nom d'instance.
+`ItemCount` n'est pas additionne : une ligne echantillonnee de poids 10 ne
+prouve pas dix echecs distincts. Requests doit rester exclu du sampling ;
+perte de telemetrie ou sampling peuvent retarder ou empecher la detection.
+Un 503 isole suivi d'un 200 ne declenche jamais, meme si le 200 n'est pas encore
+ingere. L'absence de donnees reste couverte par les signaux existants, pas par
+un faux succes produit par ce KQL.
+
+Avec un premier 503 observe a t0, puis au moins un autre dans les 5 minutes
+(cadence des sondes), le critere devient vrai au plus tard a t0 + 5 min et est
+evalue moins d'une minute plus tard : **moins de 6 minutes depuis le premier
+503**, hors ingestion et ordonnancement Azure. Les retries peuvent le rendre
+vrai plus tot. Avec le profil observe (sondes toutes les 5 minutes et retry
+environ 25 secondes apres le premier echec), une panne 503 continue est
+detectable en moins d'environ **6 min 25 s depuis son debut** : attente de
+sonde <= 5 min, deuxieme echec au retry ~25 s, evaluation < 1 min.
+Cette borne suppose les deux requetes de retry collectees ; deux regions
+peuvent raccourcir l'attente mais leur dephasage n'est pas suppose favorable.
+Sans retry visible, attendre la premiere sonde peut ajouter jusqu'a 5 minutes
+a la borne depuis le premier 503. Ni la latence d'ingestion, ni la remise des notifications,
+ni l'heure de resolution stateful ne sont garanties par ce calcul. Une alerte
+reste active apres le retour des 200 tant que deux echecs restent dans sa
+fenetre, puis selon les evaluations saines exigees par Azure ; sa duree n'est
+donc pas la duree de la panne.
+
+Les fixtures `infra/tests/readiness-failures-fixtures.mjs` generent une requete
+KQL avec `datatable`, la requete de production et des evaluations historiques
+decalees. La suite locale verifie aussi toutes les phases de cadence a la
+seconde. Executer le payload dans Log Analytics en lecture seule pour prouver
+la semantique KQL reelle ; une simulation JavaScript seule ne la prouve pas.
+
+**Rejeu du 27 septembre 2026, sans deploiement :** le service Log Analytics a
+execute le KQL candidat sur staging (26/09, 17:00-18:10 UTC) et production
+(27/09, 12:40-13:50 UTC). Chaque fenetre contient 29 requetes readiness,
+28 succes, un seul echec distinct, aucun `Id` manquant et `ItemCount` maximal 1.
+Toute sous-fenetre de 10 minutes contenue dans ces intervalles a donc au plus
+un echec : aucune phase d'evaluation autour des incidents ne peut declencher.
+Les 30 cas `datatable`, dont les deux echecs continus a 300/325 secondes et
+l'evaluation defavorable a 384 secondes, passent aussi dans le moteur KQL
+reel (zero cas en echec). Le modele local couvre 36 120 combinaisons d'attente
+initiale, phase d'evaluation et visibilite regionale ; son maximum est 384 s.
+Ces preuves ne portent ni sur une regle deployee ni sur la remise d'un email.
+Rejouer apres modification du KQL, du seuil, des cadences ou de la collecte.
+Les payloads et resultats restent dans les artefacts prives ; rapport agrege
+`readiness-replay-report.json`, SHA-256
+`1c8827f8be8fecc90fda9d2f7d60f64ab2e8b580576ce40606cc45deeae81e07`.
+
+### Requetes critiques et exceptions
 
 La requete versionnee `infra/queries/critical-failures.kql` remplace seulement
 la requete de la regle existante : aucun changement de nom de ressource,
