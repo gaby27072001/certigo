@@ -17,6 +17,7 @@
       ".github/workflows/codeql.yml": "19bf9195a861220ff3ee5f603bcdfc03efbb1b4e1130d7aaa81afee08c6ba8b4",
       ".github/workflows/content-infra-apply.yml": "b849b21c8d1a6c8d67c710796aff0526c05f33cf70e219e086f11c60e41e8a43",
       ".github/workflows/content-infra-what-if.yml": "8ed3849f36884f3bb11fb09e81775a070d4132616e97b0cbe31424a94245872d",
+      ".github/workflows/dart-sast.yml": "3f6b3e79c69cfc3422ff6d40ac57c271fb7915c9a7a2dc09867afa82cff0971c",
       ".github/workflows/dependency-vuln-scan.yml": "51a44129d87dca1f2efe14f73a80a5bafd0b5e12abbd8eaf96a6b314f117d80a",
       ".github/workflows/deploy-privacy-policy.yml": "6e8816580159b746593e9d1e3b6449e2cba6ad862b9b613273c6771d1cc8e7cf",
       ".github/workflows/fork-pr-policy.yml": "140ec5d7607b6f1e78554aa999fb12a49b977b3e7fc7b73209205f996fe098fd",
@@ -50,6 +51,7 @@
       ".github/workflows/codeql.yml": "19bf9195a861220ff3ee5f603bcdfc03efbb1b4e1130d7aaa81afee08c6ba8b4",
       ".github/workflows/content-infra-apply.yml": "b849b21c8d1a6c8d67c710796aff0526c05f33cf70e219e086f11c60e41e8a43",
       ".github/workflows/content-infra-what-if.yml": "8ed3849f36884f3bb11fb09e81775a070d4132616e97b0cbe31424a94245872d",
+      ".github/workflows/dart-sast.yml": "3f6b3e79c69cfc3422ff6d40ac57c271fb7915c9a7a2dc09867afa82cff0971c",
       ".github/workflows/dependency-vuln-scan.yml": "51a44129d87dca1f2efe14f73a80a5bafd0b5e12abbd8eaf96a6b314f117d80a",
       ".github/workflows/deploy-privacy-policy.yml": "6e8816580159b746593e9d1e3b6449e2cba6ad862b9b613273c6771d1cc8e7cf",
       ".github/workflows/fork-pr-policy.yml": "140ec5d7607b6f1e78554aa999fb12a49b977b3e7fc7b73209205f996fe098fd",
@@ -82,6 +84,7 @@
       ".github/workflows/codeql.yml": "19bf9195a861220ff3ee5f603bcdfc03efbb1b4e1130d7aaa81afee08c6ba8b4",
       ".github/workflows/content-infra-apply.yml": "b849b21c8d1a6c8d67c710796aff0526c05f33cf70e219e086f11c60e41e8a43",
       ".github/workflows/content-infra-what-if.yml": "8ed3849f36884f3bb11fb09e81775a070d4132616e97b0cbe31424a94245872d",
+      ".github/workflows/dart-sast.yml": "3f6b3e79c69cfc3422ff6d40ac57c271fb7915c9a7a2dc09867afa82cff0971c",
       ".github/workflows/dependency-vuln-scan.yml": "51a44129d87dca1f2efe14f73a80a5bafd0b5e12abbd8eaf96a6b314f117d80a",
       ".github/workflows/deploy-privacy-policy.yml": "6e8816580159b746593e9d1e3b6449e2cba6ad862b9b613273c6771d1cc8e7cf",
       ".github/workflows/fork-pr-policy.yml": "140ec5d7607b6f1e78554aa999fb12a49b977b3e7fc7b73209205f996fe098fd",
@@ -101,10 +104,5 @@
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
   },
-  "preApproved": {
-    ".github/workflows/dart-sast.yml": {
-      "digest": "3f6b3e79c69cfc3422ff6d40ac57c271fb7915c9a7a2dc09867afa82cff0971c",
-      "expires": "2026-10-25"
-    }
-  }
+  "preApproved": {}
 }
