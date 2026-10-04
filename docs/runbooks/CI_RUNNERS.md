@@ -69,19 +69,20 @@ sollicitée. La CI et ses contrôles compensatoires reposent exclusivement sur l
 
 | Élément | Valeur |
 |---|---|
-| **VMSS live** | trusted `vmss-certigo-runner-zonal` (capacité 2, zones 1 et 2) + pilote PR `vmss-certigo-pr-pilot-z1` (zone 1, capacité 4 : ses 4 instances utiles) |
-| **Capacité Azure live** | `f55d176e` (zone 2) et `be505fa1` (zone 1) trusted; `5275ea21`, `94bad106`, `1a6deaa2`, `6e3abce4` (zone 1) PR; les 7 instances PR retirées (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2`, `a14700a3`, `bbf83c5c`, `d8d42366`) ont été supprimées le 2026-09-25 et restent interdites; `4153d1dd` externe; `22f7fb52` et `4596a9d5` absentes/interdites |
+| **VMSS live** | trusted `vmss-certigo-runner-zonal` (capacité 2, zones 1 et 2) + pool PR `vmss-certigo-pr-v2-z1` (zone 1, capacité 4, `vnet-certigo-pr-v2` en `10.44.0.0/16`). L'ancien pool PR `vmss-certigo-pr-pilot-z1` est retiré depuis le DATE_BASCULE_553 (#553) : hors de la reprise, du réveil et de la désallocation, ses 4 instances restent désallouées jusqu'à l'accord de suppression |
+| **Capacité Azure live** | `f55d176e` (zone 2) et `be505fa1` (zone 1) trusted; `feedbee1`, `feedbee2`, `feedbee3`, `feedbee4` (zone 1) PR; les 4 instances de l'ancien pool PR (`5275ea21`, `94bad106`, `1a6deaa2`, `6e3abce4`) désallouées et interdites; les 7 instances PR retirées (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2`, `a14700a3`, `bbf83c5c`, `d8d42366`) ont été supprimées le 2026-09-25 et restent interdites; `4153d1dd` externe; `22f7fb52` et `4596a9d5` absentes/interdites |
 | **Resource group** | `RG-CERTIGO-CI` |
 | **Subscription** | `b8952c8c-8f72-469d-99cd-ac906da4e2fc` (**Non-Prod**) |
-| **Runners GitHub live** | ID 27 `…_f55d176e-Certigo` et ID 29 `…_be505fa1-Certigo` **trusted**; ID 31 `certigo-prMVOC2P`, ID 32 `certigo-prTRHQEY`, ID 33 `certigo-pr7BZU76`, ID 34 `certigo-prUL1UCK` **pr** — labels disjoints |
-| **Classification contrôleur** | f55 + be5 + les 4 instances PR liées explicitement dans `capacity-controller.config.json` · les 7 noms des instances PR supprimées dans `forbiddenVirtualMachines` · `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit |
-| **Identités** | f55/be5 : UAMI du VMSS zonal; pilote PR : aucune identité |
+| **Runners GitHub live** | ID 27 `…_f55d176e-Certigo` et ID 29 `…_be505fa1-Certigo` **trusted**; ID 9901 `certigo-prPLCHD1`, ID 9902 `certigo-prPLCHD2`, ID 9903 `certigo-prPLCHD3`, ID 9904 `certigo-prPLCHD4` **pr** — labels disjoints. Les runners 31 à 34 de l'ancien pool PR restent enregistrés, **hors ligne**, jusqu'à la suppression de leurs VM ; GitHub retire d'office un runner hors ligne depuis plus de 14 jours |
+| **Classification contrôleur** | f55 + be5 + les 4 instances PR liées explicitement dans `capacity-controller.config.json` · les 4 instances de l'ancien pool PR et les 7 noms des instances PR supprimées dans `forbiddenVirtualMachines` · `22f7fb52` absent · `4153d1dd` externe · `4596a9d5` interdit |
+| **Identités** | f55/be5 : UAMI du VMSS zonal; pool PR : aucune identité |
 | **Repo desservi** | `gchambaud_microsoft/Certigo` (les mêmes VMs hébergent aussi un agent pour `gchambaud_microsoft/certigo-content`) |
 
-> Inventaire mesuré le 2026-09-23 vers 16:10 UTC (`az vm list -g rg-certigo-ci -d` et
+> Inventaire mesuré le DATE_BASCULE_553, au remplacement du pool PR (#553)
+> (`az vm list -g rg-certigo-ci -d` et
 > `gh api repos/gchambaud_microsoft/Certigo/actions/runners`; `osProfile.computerName` =
 > nom du runner GitHub). Invalidé par tout ajout, remplacement ou suppression d'instance
-> dans l'un des deux scale sets.
+> dans l'un des deux scale sets en service, ou par la suppression de l'ancien pool PR.
 
 > ✅ Les labels `certigo-pr` et `certigo-trusted` **sont** mutuellement exclusifs depuis le
 > 4 septembre 2026. Un éventuel runner **macOS** dédié à iOS (cf. §9) est **distinct** et
@@ -392,7 +393,7 @@ validations PR ne peut donc être restauré sur le pool trusted.
 
 Un Logic App `logic-certigo-ci-runner-recovery` dans `rg-certigo-ci` rallume **chaque jour à
 01:30 UTC** toutes les instances des scale sets `vmss-certigo-runner-zonal` et
-`vmss-certigo-pr-pilot-z1`, sauf celles exclues par l'inventaire, puis vérifie le résultat. Il
+`vmss-certigo-pr-v2-z1`, sauf celles exclues par l'inventaire, puis vérifie le résultat. Il
 est décrit en Bicep : ne pas le modifier dans le portail.
 
 - Composition : [`infra/ci-runner/auto-recovery.bicep`](../../infra/ci-runner/auto-recovery.bicep)
@@ -628,7 +629,7 @@ d'éteindre la CI à la main (§4, §5).
 | Webhooks `workflow_job` | `Certigo` et `certigo-content` | poussent chaque événement de job vers le déclencheur signé | aucun secret GitHub dans Azure |
 
 Labels → pool (versionné dans `infra/ci-runner/on-demand.config.json`, testé) : `certigo-pr` →
-`vmss-certigo-pr-pilot-z1` ; `certigo-trusted` et `certigo-ci` → `vmss-certigo-runner-zonal`.
+`vmss-certigo-pr-v2-z1` ; `certigo-trusted` et `certigo-ci` → `vmss-certigo-runner-zonal`.
 Un label PR ne réveille jamais le pool trusted.
 
 **Ce que voit un développeur.** Premier job d'une rafale après une période calme : le job reste
@@ -669,7 +670,7 @@ n'admet que les plages IPv4 `hooks`). Le `ping` de création doit être livré e
 
 ```powershell
 # Une instance PR d'abord, puis toutes les instances gérées de l'inventaire.
-.\infra\ci-runner\install-idle-shutdown.ps1 -SubscriptionId $env:SUB -VmName vmss-certigo-pr-pilot-z1_6e3abce4
+.\infra\ci-runner\install-idle-shutdown.ps1 -SubscriptionId $env:SUB -VmName vmss-certigo-pr-v2-z1_feedbee1
 .\infra\ci-runner\install-idle-shutdown.ps1 -SubscriptionId $env:SUB -All
 .\infra\ci-runner\install-idle-shutdown.ps1 -SubscriptionId $env:SUB -All -Action status
 ```
@@ -684,7 +685,15 @@ cloud-init attend 300 s à chaque boot un IMDS bloqué, et le runner n'est en li
 après le réveil au lieu de 45 s. `-Action status` affiche alors `imds_drop_in=present` et
 `cloud_init_boot_refresh=new-instance-only` ; une désinstallation garde ces deux réglages. **Toute
 instance ajoutée ou reconstruite doit recevoir l'agent** après son enregistrement ; sans lui,
-elle reste allumée comme avant (coût, pas panne).
+elle reste allumée comme avant (coût, pas panne). `-VmName` ne prend qu'une VM : un appel par VM.
+
+**Nouveau scale set, ou pool retiré.** Le réveil et la désallocation ne listent que les scale
+sets de `on-demand.config.json`, tels que déployés. Une instance d'un nouveau scale set ne
+reçoit donc l'agent qu'**après** le redéploiement de `on-demand.bicep` qui déclare ce scale set :
+avant, sa première extinction la laisserait `stopped`, jamais réveillée ni désallouée.
+Inversement, dès qu'un scale set quitte `on-demand.config.json` (cas de l'ancien pool PR,
+#553), une de ses instances qui s'arrête seule reste `stopped`, donc facturée : la désallouer
+à la main (`az vm deallocate`), une fois son runner `busy=false`.
 
 ### Suspendre l'extinction sur une VM (maintenance)
 

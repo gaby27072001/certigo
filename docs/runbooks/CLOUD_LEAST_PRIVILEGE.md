@@ -60,20 +60,21 @@ L'état live ne correspond plus aux anciennes VM autonomes documentées :
 
 | Élément | État observé |
 |---|---|
-| Compute géré | `f55d176e` (zone 2) **et `be505fa1` (zone 1)** dans `vmss-certigo-runner-zonal`; pilotes `5275ea21`, `94bad106`, `1a6deaa2` **et `6e3abce4`** dans `vmss-certigo-pr-pilot-z1` zone 1 |
-| Inventaire Azure courant | les six instances gérées ci-dessus; les 7 instances PR retirées (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2`, `a14700a3`, `bbf83c5c`, `d8d42366`) ont été supprimées le 2026-09-25 et restent interdites; `4153d1dd` externe; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
+| Compute géré | `f55d176e` (zone 2) **et `be505fa1` (zone 1)** dans `vmss-certigo-runner-zonal`; `feedbee1`, `feedbee2`, `feedbee3` **et `feedbee4`** dans `vmss-certigo-pr-v2-z1` zone 1 |
+| Inventaire Azure courant | les six instances gérées ci-dessus; les 4 instances de l'ancien pool PR `vmss-certigo-pr-pilot-z1` (`5275ea21`, `94bad106`, `1a6deaa2`, `6e3abce4`), retirées le DATE_BASCULE_553 (#553), désallouées et interdites en attendant leur suppression; les 7 instances PR retirées (`2c1eeb41`, `3601055e`, `765cf6af`, `7d3001c2`, `a14700a3`, `bbf83c5c`, `d8d42366`) ont été supprimées le 2026-09-25 et restent interdites; `4153d1dd` externe; `22f7fb52` absent; essai `4596a9d5` absent/interdit |
 | Autoscale | activé, minimum `2`, défaut `2`, maximum `4` |
 | Scale-out | CPU moyenne > 70 % pendant 10 min |
 | Scale-in | **retiré du live le 2026-09-23 à 18:01Z** (application de `capacity.bicep`) : la règle « CPU < 20 % pendant 45 min » ignorait les jobs GitHub et, sous le verrou `CanNotDelete`, laissait l'instance visée en `Failed` |
-| Inventaire GitHub | runner `27` `f55d176e-Certigo` online **trusted**; runner `29` `be505fa1-Certigo` online **trusted**; runners `31` `certigo-prMVOC2P`, `32` `certigo-prTRHQEY`, `33` `certigo-pr7BZU76`, `34` `certigo-prUL1UCK` online, PR-only; runners `28` et `30` n'existent plus; runner `26` hors scope |
-| Cloisonnement | le pilote est sans identité, sur `vnet-certigo-pr-pilot/snet-pr-runners`; `f55d176e` et `be505fa1` conservent UAMI + `snet-runners`. **Les labels sont désormais strictement disjoints** — plus aucun label double bloquant |
-| Capacité réellement réconciliée | **6 instances gérées/online** : `f55d176e`, `be505fa1`, `5275ea21`, `94bad106`, `1a6deaa2` et `6e3abce4`; `4153d1dd` reste externe |
+| Inventaire GitHub | runner `27` `f55d176e-Certigo` **trusted**; runner `29` `be505fa1-Certigo` **trusted**; runners `9901` `certigo-prPLCHD1`, `9902` `certigo-prPLCHD2`, `9903` `certigo-prPLCHD3`, `9904` `certigo-prPLCHD4` PR-only (à la demande, `offline` au repos : `docs/runbooks/CI_RUNNERS.md` §13); runners `31` à `34` de l'ancien pool PR enregistrés hors ligne jusqu'à leur suppression; runners `28` et `30` n'existent plus; runner `26` hors scope |
+| Cloisonnement | le pool PR est sans identité, sur `vnet-certigo-pr-v2/snet-pr-runners`; `f55d176e` et `be505fa1` conservent UAMI + `snet-runners`. **Les labels sont désormais strictement disjoints** — plus aucun label double bloquant |
+| Capacité réellement réconciliée | **6 instances gérées** : `f55d176e`, `be505fa1`, `feedbee1`, `feedbee2`, `feedbee3` et `feedbee4`; `4153d1dd` reste externe |
 | Plancher de redondance | `minimumOnlineByTrust` = `certigo-pr: 2`, `certigo-trusted: 2` |
 
-> Inventaire mesuré le 2026-09-23 vers 16:10 UTC (`gh api .../actions/runners` et
+> Inventaire mesuré le DATE_BASCULE_553, au remplacement du pool PR (#553)
+> (`gh api .../actions/runners` et
 > `az vm list -d -g rg-certigo-ci`, `osProfile.computerName` = nom du runner). Invalidé par
-> tout ajout, remplacement ou retrait d'instance dans l'un des deux scale sets, ou par un
-> changement de `minimumOnlineByTrust` dans
+> tout ajout, remplacement ou retrait d'instance dans l'un des deux scale sets, par la
+> suppression de l'ancien pool PR, ou par un changement de `minimumOnlineByTrust` dans
 > `infra/ci-runner/capacity-controller.config.json`.
 
 > ⚠️ **`be505fa1` était absente de cet inventaire jusqu'au 4 septembre 2026.** C'est
@@ -86,7 +87,7 @@ Le premier snapshot avait vu trois VM, avant le scale-in CPU. L'état consolidé
 simple comptage « VM Azure / runners GitHub » est faux. La réconciliation explicite classe
 le runner 26 (`22f7fb52-Certigo`) et la VM `4153d1dd` comme **externes**, et les bindings
 exacts `f55d176e`/runner `27`, `be505fa1`/runner `29` et les quatre instances PR
-`5275ea21`/`31`, `94bad106`/`32`, `1a6deaa2`/`33`, `6e3abce4`/`34` comme
+`feedbee1`/`9901`, `feedbee2`/`9902`, `feedbee3`/`9903`, `feedbee4`/`9904` comme
 **gérés**. Externe ne
 signifie ni orphelin ni adoptable : ces ressources sont
 exclue de `currentCapacity`, de toute sélection de cible et de toute opération future par

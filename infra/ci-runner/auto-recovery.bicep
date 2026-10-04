@@ -52,7 +52,7 @@ param scaleSets array = [
     trustClass: 'certigo-trusted'
   }
   {
-    name: 'vmss-certigo-pr-pilot-z1'
+    name: 'vmss-certigo-pr-v2-z1'
     trustClass: 'certigo-pr'
   }
 ]

@@ -160,6 +160,7 @@ test('canary is a new capacity-one PR-only boundary with no identity or IMDS', (
   for (const forbidden of [
     'vmss-certigo-runner-zonal',
     'vmss-certigo-pr-pilot-z1',
+    'vmss-certigo-pr-v2-z1',
     '4153d1dd',
     'certigo-trusted',
   ]) {

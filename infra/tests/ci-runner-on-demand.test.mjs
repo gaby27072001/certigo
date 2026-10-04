@@ -234,7 +234,7 @@ test('the pools, labels and exclusions come from the versioned inventory', () =>
   );
   assert.deepEqual(wake.parameters.wakeLabelsByPool.defaultValue, {
     'vmss-certigo-runner-zonal': ['certigo-trusted', 'certigo-ci'],
-    'vmss-certigo-pr-pilot-z1': ['certigo-pr'],
+    'vmss-certigo-pr-v2-z1': ['certigo-pr'],
   });
 
   // Every managed runner can be woken and deallocated: none is excluded.

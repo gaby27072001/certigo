@@ -377,33 +377,33 @@ function liveTerminalInput() {
         },
         {
           ...runner(
-            'certigo-prMVOC2P',
+            'certigo-prPLCHD1',
             ['certigo-pr', 'certigo-pr-pilot'],
-            { id: 31, status: 'offline' },
+            { id: 9901, status: 'offline' },
           ),
           repository: 'gchambaud_microsoft/Certigo',
         },
         {
           ...runner(
-            'certigo-prTRHQEY',
+            'certigo-prPLCHD2',
             ['certigo-pr', 'certigo-pr-pilot'],
-            { id: 32, status: 'offline' },
+            { id: 9902, status: 'offline' },
           ),
           repository: 'gchambaud_microsoft/Certigo',
         },
         {
           ...runner(
-            'certigo-pr7BZU76',
+            'certigo-prPLCHD3',
             ['certigo-pr', 'certigo-pr-pilot'],
-            { id: 33, status: 'offline' },
+            { id: 9903, status: 'offline' },
           ),
           repository: 'gchambaud_microsoft/Certigo',
         },
         {
           ...runner(
-            'certigo-prUL1UCK',
+            'certigo-prPLCHD4',
             ['certigo-pr', 'certigo-pr-pilot'],
-            { id: 34, status: 'offline' },
+            { id: 9904, status: 'offline' },
           ),
           repository: 'gchambaud_microsoft/Certigo',
         },
@@ -458,44 +458,44 @@ function liveTerminalInput() {
         id:
           '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
           'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
-          'virtualMachines/vmss-certigo-pr-pilot-z1_5275ea21',
-        name: 'vmss-certigo-pr-pilot-z1_5275ea21',
+          'virtualMachines/vmss-certigo-pr-v2-z1_feedbee1',
+        name: 'vmss-certigo-pr-v2-z1_feedbee1',
         powerState: 'VM deallocated',
         virtualMachineScaleSet: {
-          id: '/vmss/vmss-certigo-pr-pilot-z1',
+          id: '/vmss/vmss-certigo-pr-v2-z1',
         },
       },
       {
         id:
           '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
           'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
-          'virtualMachines/vmss-certigo-pr-pilot-z1_94bad106',
-        name: 'vmss-certigo-pr-pilot-z1_94bad106',
+          'virtualMachines/vmss-certigo-pr-v2-z1_feedbee2',
+        name: 'vmss-certigo-pr-v2-z1_feedbee2',
         powerState: 'VM deallocated',
         virtualMachineScaleSet: {
-          id: '/vmss/vmss-certigo-pr-pilot-z1',
+          id: '/vmss/vmss-certigo-pr-v2-z1',
         },
       },
       {
         id:
           '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
           'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
-          'virtualMachines/vmss-certigo-pr-pilot-z1_1a6deaa2',
-        name: 'vmss-certigo-pr-pilot-z1_1a6deaa2',
+          'virtualMachines/vmss-certigo-pr-v2-z1_feedbee3',
+        name: 'vmss-certigo-pr-v2-z1_feedbee3',
         powerState: 'VM deallocated',
         virtualMachineScaleSet: {
-          id: '/vmss/vmss-certigo-pr-pilot-z1',
+          id: '/vmss/vmss-certigo-pr-v2-z1',
         },
       },
       {
         id:
           '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
           'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
-          'virtualMachines/vmss-certigo-pr-pilot-z1_6e3abce4',
-        name: 'vmss-certigo-pr-pilot-z1_6e3abce4',
+          'virtualMachines/vmss-certigo-pr-v2-z1_feedbee4',
+        name: 'vmss-certigo-pr-v2-z1_feedbee4',
         powerState: 'VM deallocated',
         virtualMachineScaleSet: {
-          id: '/vmss/vmss-certigo-pr-pilot-z1',
+          id: '/vmss/vmss-certigo-pr-v2-z1',
         },
       },
       {
@@ -509,7 +509,7 @@ function liveTerminalInput() {
         '/networks/trusted/subnets/runners',
       ),
       scaleSet(
-        'vmss-certigo-pr-pilot-z1',
+        'vmss-certigo-pr-v2-z1',
         '/networks/pr/subnets/runners',
         null,
       ),

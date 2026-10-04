@@ -47,7 +47,8 @@
     ],
     "existingScaleSets": [
       "vmss-certigo-runner-zonal",
-      "vmss-certigo-pr-pilot-z1"
+      "vmss-certigo-pr-pilot-z1",
+      "vmss-certigo-pr-v2-z1"
     ],
     "existingLabels": [
       "certigo-pr",

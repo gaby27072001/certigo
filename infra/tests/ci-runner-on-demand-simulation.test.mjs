@@ -37,15 +37,36 @@ const inventory = JSON.parse(
   readFileSync(path.join(repositoryRoot, 'infra', 'ci-runner', 'capacity-controller.config.json'), 'utf8'),
 );
 const trustedPool = 'vmss-certigo-runner-zonal';
-const prPool = 'vmss-certigo-pr-pilot-z1';
+const prPool = 'vmss-certigo-pr-v2-z1';
+// Replaced by prPool (#553). Its instances are kept, deallocated, until their deletion is
+// approved: the scale set is no on-demand pool any more and each of its instances is forbidden.
+const retiredPrPool = 'vmss-certigo-pr-pilot-z1';
+const forbidden = inventory.inventory.forbiddenVirtualMachines;
+const retiredInPool = forbidden.find((name) => name.startsWith(`${trustedPool}_`));
+const retiredPrNames = forbidden.filter((name) => name.startsWith(`${retiredPrPool}_`));
+assert.ok(retiredInPool, 'the inventory forbids a retired trusted instance');
+assert.ok(retiredPrNames.length > 0, 'the inventory forbids the retired PR pool');
 
 function scaleSetId(name, resourceGroupName = deploymentContext.resourceGroupName) {
   return `/subscriptions/${deploymentContext.subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.Compute/virtualMachineScaleSets/${name}`;
 }
 
-// The live fleet: two trusted instances, four PR instances (their scale set reference carries
-// the upper-case resource group, as measured), plus one retired PR instance that must never be
-// touched because it is listed in forbiddenVirtualMachines.
+function instance(name, pool, power, resourceGroupName) {
+  return {
+    name,
+    scaleSetId: scaleSetId(pool, resourceGroupName),
+    provisioningState: 'Succeeded',
+    power,
+    onStart: 'ok',
+  };
+}
+
+// The live fleet: two trusted instances and four PR instances (the PR scale set reference
+// carries the upper-case resource group, as measured on the previous pool: comparisons must
+// ignore case). Two kinds of retired instances must never be touched: one still listed by its
+// own scale set, kept out only by forbiddenVirtualMachines, and those of the retired PR scale
+// set, which no pool lists any more. An instance of the latter that halted itself therefore
+// stays stopped, and billed, until an operator deallocates it.
 function fleet(power = {}, extra = {}) {
   const upper = 'RG-CERTIGO-CI';
   const managed = [
@@ -54,21 +75,18 @@ function fleet(power = {}, extra = {}) {
     ...inventory.inventory.managedRunnerBindings.slice(2).map(({ virtualMachineName }) => [virtualMachineName, prPool, upper]),
   ];
   const vms = managed.map(([name, pool, resourceGroupName]) => ({
-    name,
-    scaleSetId: scaleSetId(pool, resourceGroupName),
-    provisioningState: 'Succeeded',
-    power: power[name] ?? power[pool] ?? 'deallocated',
-    onStart: 'ok',
+    ...instance(name, pool, power[name] ?? power[pool] ?? 'deallocated', resourceGroupName),
     ...(extra[name] ?? {}),
   }));
-  vms.push({
-    name: 'vmss-certigo-pr-pilot-z1_bbf83c5c',
-    scaleSetId: scaleSetId(prPool, upper),
-    provisioningState: 'Succeeded',
-    power: power.retired ?? 'stopped',
-    onStart: 'ok',
-  });
+  vms.push(instance(retiredInPool, trustedPool, power.retired ?? 'stopped'));
+  for (const name of retiredPrNames) vms.push(instance(name, retiredPrPool, power.retiredPool ?? 'stopped', upper));
   return vms;
+}
+
+function untouchedRetired(arm) {
+  assert.equal(arm.powerOf(retiredInPool), 'stopped', 'a retired instance is never touched');
+  for (const name of retiredPrNames) assert.equal(arm.powerOf(name), 'stopped', `${name} is in the retired pool`);
+  assert.ok(arm.requests.every(({ uri }) => !uri.includes(retiredPrPool)), 'the retired pool is never listed');
 }
 
 const trustedNames = inventory.inventory.managedRunnerBindings
@@ -107,7 +125,7 @@ test('a queued PR job starts every PR instance and nothing else', async () => {
   assert.equal(result.status, 'Succeeded');
   assert.deepEqual(sorted(new Set(arm.startedNames())), sorted(prNames));
   for (const name of trustedNames) assert.equal(arm.powerOf(name), 'deallocated', `${name} is trusted`);
-  assert.equal(arm.powerOf('vmss-certigo-pr-pilot-z1_bbf83c5c'), 'stopped', 'a retired instance is never started');
+  untouchedRetired(arm);
   assert.deepEqual(arm.deallocatedNames(), [], 'waking never deallocates');
 });
 
@@ -121,6 +139,7 @@ test('trusted and content jobs start the trusted pool only', async () => {
     assert.equal(result.status, 'Succeeded');
     assert.deepEqual(sorted(new Set(arm.startedNames())), sorted(trustedNames), labels.join(','));
     for (const name of prNames) assert.equal(arm.powerOf(name), 'deallocated');
+    untouchedRetired(arm);
   }
 });
 
@@ -176,7 +195,7 @@ test('a wake that cannot start anything fails the run loudly', async () => {
   const result = await wake(arm, delivery('queued', ['certigo-pr']));
   assert.equal(result.status, 'Failed');
   assert.equal(result.error.code, 'RunnerWakeFailed');
-  assert.match(result.error.message, /vmss-certigo-pr-pilot-z1/);
+  assert.match(result.error.message, new RegExp(prPool));
 });
 
 test('a throttled or refused start on one instance is tolerated while another wakes', async () => {
@@ -209,6 +228,7 @@ test('deallocation handles only instances whose OS stopped, and never excluded o
       [stoppedTrusted]: 'stopped',
       [runningTrusted]: 'running',
       retired: 'stopped',
+      retiredPool: 'stopped',
     }),
   });
   const result = await deallocate(arm);
@@ -217,8 +237,35 @@ test('deallocation handles only instances whose OS stopped, and never excluded o
   assert.equal(arm.powerOf(runningPr), 'running');
   assert.equal(arm.powerOf(runningTrusted), 'running');
   assert.equal(arm.powerOf(startingPr), 'starting');
-  assert.equal(arm.powerOf('vmss-certigo-pr-pilot-z1_bbf83c5c'), 'stopped', 'a retired instance is never touched');
+  untouchedRetired(arm);
   assert.deepEqual(arm.startedNames(), [], 'deallocation never starts anything');
+});
+
+test('an instance retired inside the PR pool is kept out by its name alone', async () => {
+  // A later replacement inside the PR scale set: until its deletion, the retired instance is
+  // still listed by the pool, and only forbiddenVirtualMachines keeps it out of both paths.
+  const retired = `${prPool}_0ff1ced0`;
+  const excluding = (workflowName) => {
+    const definition = structuredClone(workflows()[workflowName].definition);
+    definition.parameters.excludedVirtualMachineNames.defaultValue.push(retired);
+    return definition;
+  };
+  const withRetired = (power) => [...fleet(power), instance(retired, prPool, 'stopped', 'RG-CERTIGO-CI')];
+
+  const woken = new MockArm({ vms: withRetired({}) });
+  const wakeResult = await runWorkflow(excluding('logic-certigo-ci-runner-wake'), woken, {
+    trigger: delivery('queued', ['certigo-pr']),
+  });
+  assert.equal(wakeResult.status, 'Succeeded');
+  assert.deepEqual(sorted(new Set(woken.startedNames())), sorted(prNames));
+  assert.equal(woken.powerOf(retired), 'stopped');
+
+  const [stoppedPr] = prNames;
+  const halted = new MockArm({ vms: withRetired({ [stoppedPr]: 'stopped' }) });
+  const deallocationResult = await runWorkflow(excluding('logic-certigo-ci-runner-idle-deallocation'), halted);
+  assert.equal(deallocationResult.status, 'Succeeded');
+  assert.deepEqual(halted.deallocatedNames(), [stoppedPr]);
+  assert.equal(halted.powerOf(retired), 'stopped');
 });
 
 test('an instance woken between the listing and the deallocation is left alone', async () => {

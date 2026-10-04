@@ -1286,6 +1286,12 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
     'vmss-certigo-pr-pilot-z1_a14700a3',
     'vmss-certigo-pr-pilot-z1_bbf83c5c',
     'vmss-certigo-pr-pilot-z1_d8d42366',
+    // Previous live PR instances retired by the pool swap (#553): deallocated and still
+    // registered offline during the stability window, pending Gabriel-approved deletion.
+    'vmss-certigo-pr-pilot-z1_5275ea21',
+    'vmss-certigo-pr-pilot-z1_94bad106',
+    'vmss-certigo-pr-pilot-z1_1a6deaa2',
+    'vmss-certigo-pr-pilot-z1_6e3abce4',
   ]);
   // Pin the exact managed set, not just its size. A bare length check is what let the
   // zone-1 trusted instance stay absent from the inventory until GitHub garbage-collected
@@ -1310,24 +1316,24 @@ test('runner capacity planning stays off and encodes the guarded pilot contract'
         virtualMachineName: 'vmss-certigo-runner-zonal_be505fa1',
       },
       {
-        githubRunnerId: 31,
-        runnerName: 'certigo-prMVOC2P',
-        virtualMachineName: 'vmss-certigo-pr-pilot-z1_5275ea21',
+        githubRunnerId: 9901,
+        runnerName: 'certigo-prPLCHD1',
+        virtualMachineName: 'vmss-certigo-pr-v2-z1_feedbee1',
       },
       {
-        githubRunnerId: 32,
-        runnerName: 'certigo-prTRHQEY',
-        virtualMachineName: 'vmss-certigo-pr-pilot-z1_94bad106',
+        githubRunnerId: 9902,
+        runnerName: 'certigo-prPLCHD2',
+        virtualMachineName: 'vmss-certigo-pr-v2-z1_feedbee2',
       },
       {
-        githubRunnerId: 33,
-        runnerName: 'certigo-pr7BZU76',
-        virtualMachineName: 'vmss-certigo-pr-pilot-z1_1a6deaa2',
+        githubRunnerId: 9903,
+        runnerName: 'certigo-prPLCHD3',
+        virtualMachineName: 'vmss-certigo-pr-v2-z1_feedbee3',
       },
       {
-        githubRunnerId: 34,
-        runnerName: 'certigo-prUL1UCK',
-        virtualMachineName: 'vmss-certigo-pr-pilot-z1_6e3abce4',
+        githubRunnerId: 9904,
+        runnerName: 'certigo-prPLCHD4',
+        virtualMachineName: 'vmss-certigo-pr-v2-z1_feedbee4',
       },
     ],
   );

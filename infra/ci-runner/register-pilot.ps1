@@ -9,8 +9,8 @@ param(
   [string] $VmName,
 
   [string] $ResourceGroupName = 'RG-CERTIGO-CI',
-  [string] $ScaleSetName = 'vmss-certigo-pr-pilot-z1',
-  [string] $NetworkSecurityGroupName = 'nsg-certigo-pr-pilot',
+  [string] $ScaleSetName = 'vmss-certigo-pr-v2-z1',
+  [string] $NetworkSecurityGroupName = 'nsg-certigo-pr-v2',
   [string] $Location = 'westeurope',
   [string] $Repository = 'gchambaud_microsoft/Certigo',
 

@@ -25,6 +25,12 @@ pas une affirmation de présence live.
 > nocturne énumère les instances des deux scale sets à chaque run : aucune liste d'instances
 > n'est plus à tenir à jour pour qu'une instance soit rallumée.
 
+> Depuis le DATE_BASCULE_553 (#553), le pool PR est `vmss-certigo-pr-v2-z1`, reconstruit
+> depuis `pilot.bicep` sur un réseau neuf (`vnet-certigo-pr-v2`, `10.44.0.0/16`). L'ancien
+> `vmss-certigo-pr-pilot-z1` est retiré : hors de la reprise et du fonctionnement à la
+> demande, ses quatre instances sont désallouées et interdites, ses runners 31 à 34 restent
+> enregistrés hors ligne jusqu'à leur suppression, soumise à accord.
+
 ## Egress legacy réconcilié
 
 ```
@@ -89,11 +95,11 @@ reste un pool éphémère. Un même runner ne doit jamais porter à la fois `cer
 
 | Propriété | Valeur épinglée |
 | --- | --- |
-| VMSS | `vmss-certigo-pr-pilot-z1`, Flexible, zone 1 ; capacité : paramètre obligatoire `capacity`, sans défaut (voir « Vérifier aussi la capacité ») |
-| Taille / disque | `Standard_D2ads_v6` / Premium SSD LRS 128 Gio demandé ; en service : `Standard_LRS`, rétrogradé par l'automate MCAPS le 2026-09-15 (voir `docs/CI_RUNNER_RESILIENCE.md`) |
+| VMSS | `vmss-certigo-pr-v2-z1`, Flexible, zone 1 ; capacité : paramètre obligatoire `capacity`, sans défaut (voir « Vérifier aussi la capacité ») |
+| Taille / disque | `Standard_D2ads_v6` / Premium SSD LRS 128 Gio demandé ; l'automate MCAPS rétrograde ensuite les disques PR en `Standard_LRS` (mesuré le 2026-09-15 sur l'ancien pool, voir `docs/CI_RUNNER_RESILIENCE.md`) |
 | Image | `Canonical:ubuntu-24_04-lts:server:24.04.202608070` |
 | Sécurité | Trusted Launch, Secure Boot, vTPM, chiffrement hôte |
-| Réseau | `10.43.0.0/16`, sous-réseau privé `10.43.1.0/24`, NAT dédié, aucun peering |
+| Réseau | `vnet-certigo-pr-v2` en `10.44.0.0/16`, sous-réseau privé `10.44.1.0/24`, NAT dédié `nat-certigo-pr-v2`, aucun peering |
 | Identité / métadonnées | aucune identité ; IMDS bloqué par iptables persistant puis NSG |
 | Runner | `2.336.0`, SHA-256 `04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d` |
 | Labels | `certigo-pr,certigo-pr-pilot` exclusivement |
@@ -124,7 +130,7 @@ l'identité prévue par `runner.bicep`, tandis que le pilote PR échoue fermé.
 >
 > ```bash
 > LIVE_CAPACITY="$(az vmss show --subscription <SUBSCRIPTION_ID> \
->   --resource-group RG-CERTIGO-CI --name vmss-certigo-pr-pilot-z1 \
+>   --resource-group RG-CERTIGO-CI --name vmss-certigo-pr-v2-z1 \
 >   --query sku.capacity --output tsv)"
 > az deployment group what-if \
 >   --subscription <SUBSCRIPTION_ID> \
@@ -132,7 +138,7 @@ l'identité prévue par `runner.bicep`, tandis que le pilote PR échoue fermé.
 >   --template-file infra/ci-runner/pilot.bicep \
 >   --parameters imageVersion="$IMAGE_VERSION" \
 >                adminSshPublicKey="$(cat <BREAK_GLASS_PUBLIC_KEY>)" \
->                runnerScaleSetName=vmss-certigo-pr-pilot-z1 \
+>                runnerScaleSetName=vmss-certigo-pr-v2-z1 \
 >                capacity="$LIVE_CAPACITY" \
 >                blockImdsAtNsg=true \
 >   | grep -A2 -E 'bootstrapSha256|sku.capacity'
@@ -171,7 +177,8 @@ terminent ; il ne contient aucun jeton et le bootstrap installe immédiatement l
 
 ```bash
 IMAGE_VERSION=24.04.202608070
-# Nom NEUF : le VMSS vmss-certigo-pr-pilot-z1 existe déjà et ne doit pas être redéployé ici.
+# Nom NEUF : vmss-certigo-pr-v2-z1 (en service) et vmss-certigo-pr-pilot-z1 (retiré) existent
+# déjà et ne doivent pas être redéployés ici.
 PILOT_VMSS=<NOUVEAU_NOM_VMSS>
 PILOT_CAPACITY=<NOMBRE_D_INSTANCES_VOULU>
 
@@ -203,7 +210,8 @@ iptables actif, IMDS inaccessible, outils/egress publics sains et absence de `.r
 Ne demander aucun token avant ce marqueur.
 
 Appliquer ensuite le deny NSG final, après un second `what-if` qui ne doit modifier que
-`nsg-certigo-pr-pilot`, puis réexécuter le preflight :
+le NSG du déploiement (`nsg-certigo-pr-v2` avec les noms par défaut), puis réexécuter le
+preflight :
 
 ```bash
 az deployment group what-if \
@@ -321,7 +329,9 @@ NAT et IP persistent : socle estimé **58,18 USD/mois**, puis `0,138 USD` par he
 Ne jamais lancer le rollback pendant qu'un job est `busy`. Après accord du propriétaire
 du lifecycle, supprimer d'abord uniquement l'enregistrement GitHub du pilote, puis la VM
 Flexible exacte, son VMSS et son réseau dédié. Ne jamais cibler `f55d176e` ni
-`4153d1dd`.
+`4153d1dd`. Depuis #553, les noms ci-dessous désignent l'ancien pool PR retiré : sa
+suppression attend l'accord de Gabriel, et le verrou `CanNotDelete` de `rg-certigo-ci` doit
+être levé puis remis autour de l'opération.
 
 ```bash
 RUNNER_ID="$(gh api repos/gchambaud_microsoft/Certigo/actions/runners \

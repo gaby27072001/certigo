@@ -10,7 +10,7 @@
       "quietPeriodSeconds": 1200
     },
     {
-      "scaleSet": "vmss-certigo-pr-pilot-z1",
+      "scaleSet": "vmss-certigo-pr-v2-z1",
       "trustClass": "certigo-pr",
       "wakeLabels": [
         "certigo-pr"

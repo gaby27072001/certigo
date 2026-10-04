@@ -31,7 +31,7 @@ const f55VmId =
   '/subscriptions/b8952c8c-8f72-469d-99cd-ac906da4e2fc/' +
   'resourceGroups/RG-CERTIGO-CI/providers/Microsoft.Compute/' +
   `virtualMachines/${f55VmName}`;
-// The four live PR instances measured on 2026-09-23 (osProfile.computerName ==
+// The four post-swap PR placeholder instances (osProfile.computerName ==
 // GitHub runner name). The redundancy floor is two per trust class: a fixture stuck
 // on a retired fleet would make a satisfied floor look like a shortfall.
 function vmIdOf(name) {
@@ -42,10 +42,10 @@ function vmIdOf(name) {
   );
 }
 const livePilots = [
-  { id: 31, runnerName: 'certigo-prMVOC2P', vmName: 'vmss-certigo-pr-pilot-z1_5275ea21' },
-  { id: 32, runnerName: 'certigo-prTRHQEY', vmName: 'vmss-certigo-pr-pilot-z1_94bad106' },
-  { id: 33, runnerName: 'certigo-pr7BZU76', vmName: 'vmss-certigo-pr-pilot-z1_1a6deaa2' },
-  { id: 34, runnerName: 'certigo-prUL1UCK', vmName: 'vmss-certigo-pr-pilot-z1_6e3abce4' },
+  { id: 9901, runnerName: 'certigo-prPLCHD1', vmName: 'vmss-certigo-pr-v2-z1_feedbee1' },
+  { id: 9902, runnerName: 'certigo-prPLCHD2', vmName: 'vmss-certigo-pr-v2-z1_feedbee2' },
+  { id: 9903, runnerName: 'certigo-prPLCHD3', vmName: 'vmss-certigo-pr-v2-z1_feedbee3' },
+  { id: 9904, runnerName: 'certigo-prPLCHD4', vmName: 'vmss-certigo-pr-v2-z1_feedbee4' },
 ].map((pilot) => ({ ...pilot, vmId: vmIdOf(pilot.vmName) }));
 const [firstPilot] = livePilots;
 const pilotVmName = firstPilot.vmName;
@@ -157,11 +157,11 @@ function reconciledCapacityInventory() {
         index === 0
           ? legacyId
           : '/subscriptions/example/resourceGroups/RG-CERTIGO-CI/providers/' +
-            'Microsoft.Compute/virtualMachineScaleSets/vmss-certigo-pr-pilot-z1',
+            'Microsoft.Compute/virtualMachineScaleSets/vmss-certigo-pr-v2-z1',
       name:
         index === 0
           ? 'vmss-certigo-runner-zonal'
-          : 'vmss-certigo-pr-pilot-z1',
+          : 'vmss-certigo-pr-v2-z1',
       orchestrationMode: 'Flexible',
       sku: { name: 'Standard_D2ads_v6' },
     }),
@@ -675,7 +675,7 @@ test('real inventory binds f55 and the PR pilot while keeping runner 26 and VM 4
         id: pilotVmId,
         name: pilotVmName,
         powerState: 'VM running',
-        virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-pilot-z1' },
+        virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-v2-z1' },
         zones: ['1'],
       },
     ],
@@ -984,13 +984,13 @@ function zonalInventory({ zone1Powered = true, zone1Online = true } = {}) {
           id: pilot.vmId,
           name: pilot.vmName,
           powerState: 'VM running',
-          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-pilot-z1' },
+          virtualMachineScaleSet: { id: '/vmss/vmss-certigo-pr-v2-z1' },
           zones: ['1'],
         })),
       ],
       vmScaleSets: [
         scaleSet('vmss-certigo-runner-zonal', 0),
-        scaleSet('vmss-certigo-pr-pilot-z1', 1),
+        scaleSet('vmss-certigo-pr-v2-z1', 1),
       ],
     },
   };

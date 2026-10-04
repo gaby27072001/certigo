@@ -3,7 +3,7 @@ targetScope = 'resourceGroup'
 @description('Dedicated Flexible VM Scale Set for the isolated PR-only pilot.')
 @minLength(1)
 @maxLength(64)
-param runnerScaleSetName string = 'vmss-certigo-pr-pilot-z1'
+param runnerScaleSetName string = 'vmss-certigo-pr-v2-z1'
 
 @description('Exact Ubuntu Marketplace image version. Mutable values such as "latest" are rejected.')
 @minLength(1)
@@ -50,25 +50,25 @@ param osDiskSizeGiB int = 128
 param capacity int
 
 @description('Dedicated, unpeered virtual network for the PR-only runner.')
-param vnetName string = 'vnet-certigo-pr-pilot'
+param vnetName string = 'vnet-certigo-pr-v2'
 
 @description('Dedicated private runner subnet.')
 param subnetName string = 'snet-pr-runners'
 
 @description('Dedicated NAT gateway used only for public egress.')
-param natGatewayName string = 'nat-certigo-pr-pilot'
+param natGatewayName string = 'nat-certigo-pr-v2'
 
 @description('Public IP used by the NAT gateway. The VM and its NIC have no public IP.')
-param natPublicIpName string = 'pip-certigo-pr-pilot-nat'
+param natPublicIpName string = 'pip-certigo-pr-v2-nat'
 
 @description('NSG that blocks VNet/private and IMDS access while permitting required public egress.')
-param nsgName string = 'nsg-certigo-pr-pilot'
+param nsgName string = 'nsg-certigo-pr-v2'
 
 @description('Address space of the dedicated, unpeered VNet.')
-param vnetAddressPrefix string = '10.43.0.0/16'
+param vnetAddressPrefix string = '10.44.0.0/16'
 
 @description('Address range of the dedicated runner subnet.')
-param subnetAddressPrefix string = '10.43.1.0/24'
+param subnetAddressPrefix string = '10.44.1.0/24'
 
 @description('Resource tags.')
 param tags object = {

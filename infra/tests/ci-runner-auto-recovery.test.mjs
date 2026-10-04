@@ -245,7 +245,7 @@ test('the recovery scope is declared once and follows the inventory', async () =
     Object.fromEntries(scaleSets.map(({ name, trustClass }) => [name, trustClass])),
     {
       'vmss-certigo-runner-zonal': 'certigo-trusted',
-      'vmss-certigo-pr-pilot-z1': 'certigo-pr',
+      'vmss-certigo-pr-v2-z1': 'certigo-pr',
     },
   );
   // Each pool's floor comes from minimumOnlineByTrust; a zero floor would make the floor

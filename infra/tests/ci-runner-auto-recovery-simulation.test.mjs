@@ -59,30 +59,15 @@ function liveTopology(overrides = {}) {
   const vms = [
     vm('vmss-certigo-runner-zonal_f55d176e', 'vmss-certigo-runner-zonal'),
     vm('vmss-certigo-runner-zonal_be505fa1', 'vmss-certigo-runner-zonal'),
+    vm('vmss-certigo-runner-zonal_22f7fb52', 'vmss-certigo-runner-zonal'),
+    vm('vmss-certigo-pr-v2-z1_feedbee1', 'vmss-certigo-pr-v2-z1', { resourceGroupName: upper }),
+    vm('vmss-certigo-pr-v2-z1_feedbee2', 'vmss-certigo-pr-v2-z1', { resourceGroupName: upper }),
+    vm('vmss-certigo-pr-v2-z1_feedbee3', 'vmss-certigo-pr-v2-z1', { resourceGroupName: upper }),
+    vm('vmss-certigo-pr-v2-z1_feedbee4', 'vmss-certigo-pr-v2-z1', { resourceGroupName: upper }),
     vm('vmss-certigo-pr-pilot-z1_5275ea21', 'vmss-certigo-pr-pilot-z1', { resourceGroupName: upper }),
     vm('vmss-certigo-pr-pilot-z1_94bad106', 'vmss-certigo-pr-pilot-z1', { resourceGroupName: upper }),
     vm('vmss-certigo-pr-pilot-z1_1a6deaa2', 'vmss-certigo-pr-pilot-z1', { resourceGroupName: upper }),
     vm('vmss-certigo-pr-pilot-z1_6e3abce4', 'vmss-certigo-pr-pilot-z1', { resourceGroupName: upper }),
-    vm('vmss-certigo-pr-pilot-z1_2c1eeb41', 'vmss-certigo-pr-pilot-z1', { resourceGroupName: upper }),
-    vm('vmss-certigo-pr-pilot-z1_3601055e', 'vmss-certigo-pr-pilot-z1', { resourceGroupName: upper }),
-    vm('vmss-certigo-pr-pilot-z1_765cf6af', 'vmss-certigo-pr-pilot-z1', { resourceGroupName: upper }),
-    vm('vmss-certigo-pr-pilot-z1_7d3001c2', 'vmss-certigo-pr-pilot-z1', { resourceGroupName: upper }),
-    vm('vmss-certigo-pr-pilot-z1_a14700a3', 'vmss-certigo-pr-pilot-z1', {
-      provisioningState: 'Failed',
-      power: 'none',
-      onStart: 'fail',
-    }),
-    vm('vmss-certigo-pr-pilot-z1_bbf83c5c', 'vmss-certigo-pr-pilot-z1', {
-      resourceGroupName: upper,
-      provisioningState: 'Failed',
-      power: 'none',
-      onStart: 'fail',
-    }),
-    vm('vmss-certigo-pr-pilot-z1_d8d42366', 'vmss-certigo-pr-pilot-z1', {
-      provisioningState: 'Failed',
-      power: 'deallocated',
-      onStart: 'fail',
-    }),
   ];
   return vms.map((item) => ({ ...item, ...(overrides[item.name] ?? {}) }));
 }
@@ -123,10 +108,10 @@ test('starts exactly the managed live runners measured after MCAPS teardown and 
 });
 
 test('discovers, starts, and verifies a replacement PR instance absent from every static list', async () => {
-  const replacement = 'vmss-certigo-pr-pilot-z1_0123abcd';
+  const replacement = 'vmss-certigo-pr-v2-z1_0123abcd';
   const result = await runRecovery([
     ...liveTopology(),
-    vm(replacement, 'vmss-certigo-pr-pilot-z1'),
+    vm(replacement, 'vmss-certigo-pr-v2-z1'),
   ]);
 
   assert.equal(result.status, 'Succeeded');
@@ -134,10 +119,10 @@ test('discovers, starts, and verifies a replacement PR instance absent from ever
 });
 
 test('fails loudly when a non-excluded runner cannot be started and remains deallocated', async () => {
-  const broken = 'vmss-certigo-pr-pilot-z1_0123abcd';
+  const broken = 'vmss-certigo-pr-v2-z1_0123abcd';
   const result = await runRecovery([
     ...liveTopology(),
-    vm(broken, 'vmss-certigo-pr-pilot-z1', { onStart: 'fail' }),
+    vm(broken, 'vmss-certigo-pr-v2-z1', { onStart: 'fail' }),
   ]);
   const expectedOtherStarts = config.inventory.managedRunnerBindings.map((binding) => binding.virtualMachineName);
 
@@ -145,9 +130,9 @@ test('fails loudly when a non-excluded runner cannot be started and remains deal
   assert.equal(result.error.code, 'RunnerPowerStateNotRunning');
   assert.match(result.error.message, new RegExp(broken));
   // Retired instances are excluded from the verification as well as from the start.
-  assert.doesNotMatch(result.error.message, /a14700a3|bbf83c5c|d8d42366|2c1eeb41/);
+  assert.doesNotMatch(result.error.message, /22f7fb52|vmss-certigo-pr-pilot-z1_/);
   assert.equal(result.actions.get('Start_each_instance_of_vmss_certigo_runner_zonal').status, 'Succeeded');
-  assert.equal(result.actions.get('Start_each_instance_of_vmss_certigo_pr_pilot_z1').status, 'Failed');
+  assert.equal(result.actions.get('Start_each_instance_of_vmss_certigo_pr_v2_z1').status, 'Failed');
   for (const name of expectedOtherStarts) {
     assert.ok(result.requests.filter((request) => request.method === 'POST').some((request) => request.name === name), `${name} was not started`);
   }
@@ -156,7 +141,7 @@ test('fails loudly when a non-excluded runner cannot be started and remains deal
 test('fails the redundancy floor when PR managed instances are excluded but still starts trusted runners', async () => {
   const prManaged = config.inventory.managedRunnerBindings
     .map((binding) => binding.virtualMachineName)
-    .filter((name) => name.startsWith('vmss-certigo-pr-pilot-z1_'));
+    .filter((name) => name.startsWith('vmss-certigo-pr-v2-z1_'));
   const result = await runRecovery(liveTopology(), {
     moduleParameters: {
       excludedVirtualMachineNames: [
@@ -177,7 +162,7 @@ test('fails the redundancy floor when PR managed instances are excluded but stil
 
 test('fails with RunnerEnumerationIncomplete when ARM returns a nextLink', async () => {
   const result = await runRecovery(liveTopology(), {
-    nextLinkScaleSets: ['vmss-certigo-pr-pilot-z1'],
+    nextLinkScaleSets: ['vmss-certigo-pr-v2-z1'],
   });
 
   assert.equal(result.status, 'Failed');
@@ -186,7 +171,7 @@ test('fails with RunnerEnumerationIncomplete when ARM returns a nextLink', async
 
 test('still starts trusted runners when the PR pool list returns 403 and marks the run failed', async () => {
   const result = await runRecovery(liveTopology(), {
-    failListScaleSets: ['vmss-certigo-pr-pilot-z1'],
+    failListScaleSets: ['vmss-certigo-pr-v2-z1'],
   });
 
   assert.equal(result.status, 'Failed');
@@ -197,10 +182,10 @@ test('still starts trusted runners when the PR pool list returns 403 and marks t
 });
 
 test('matches upper-case exclusions case-insensitively', async () => {
-  const excluded = 'vmss-certigo-pr-pilot-z1_0123abcd';
+  const excluded = 'vmss-certigo-pr-v2-z1_0123abcd';
   const result = await runRecovery([
     ...liveTopology(),
-    vm(excluded, 'vmss-certigo-pr-pilot-z1'),
+    vm(excluded, 'vmss-certigo-pr-v2-z1'),
   ], {
     moduleParameters: {
       excludedVirtualMachineNames: [
@@ -264,32 +249,50 @@ test('the redundancy floor is not vacuous: a floor above the live PR capacity fa
     moduleParameters: {
       scaleSets: [
         { name: 'vmss-certigo-runner-zonal', minimumRunning: 2 },
-        { name: 'vmss-certigo-pr-pilot-z1', minimumRunning: 5 },
+        { name: 'vmss-certigo-pr-v2-z1', minimumRunning: 5 },
       ],
     },
   });
 
   assert.equal(result.status, 'Failed');
   assert.equal(result.error.code, 'RunnerPoolBelowRedundancyFloor');
-  assert.match(result.error.message, /vmss-certigo-pr-pilot-z1 : 4 running pour un minimum de 5/);
+  assert.match(result.error.message, /vmss-certigo-pr-v2-z1 : 4 running pour un minimum de 5/);
   assert.match(result.error.message, /vmss-certigo-runner-zonal : 2 running pour un minimum de 2/);
 });
 
-test('mutation control: without the exclusion filter the retired instances would be started', async () => {
+test('mutation control: without the exclusion filter a forbidden recovered instance would be started', async () => {
   const definition = recoveryDefinition();
-  definition.actions.Select_the_instances_to_start_in_vmss_certigo_pr_pilot_z1.inputs.where = '@true';
+  definition.actions.Select_the_instances_to_start_in_vmss_certigo_runner_zonal.inputs.where = '@true';
   const result = await runWorkflow(definition, new MockArm({ vms: liveTopology() }));
   const started = result.requests.filter((request) => request.method === 'POST').map((request) => request.name);
 
-  // The broken retired instances then fail to start, which is exactly the 2026-09-12 to
-  // 2026-09-23 failure mode; the real definition never reaches them (first test).
-  const present = new Set(liveTopology().map(({ name }) => name));
-  const retired = config.inventory.forbiddenVirtualMachines.filter((name) => present.has(name));
-  assert.equal(retired.length, 7, 'the live topology holds the seven retired PR instances');
-  for (const name of retired) {
-    assert.ok(started.includes(name), `${name} would be started without the filter`);
-  }
-  assert.equal(result.actions.get('Start_each_instance_of_vmss_certigo_pr_pilot_z1').status, 'Failed');
+  assert.ok(
+    started.includes('vmss-certigo-runner-zonal_22f7fb52'),
+    'the mutation must prove the recovered-scale-set exclusion filter blocks forbidden instances',
+  );
+});
+
+test('old PR pilot pool is never listed or started by recovery', async () => {
+  const result = await runRecovery(liveTopology());
+  const requests = result.requests.map((request) => ({
+    method: request.method,
+    name: request.name ?? '',
+    uri: request.uri,
+  }));
+
+  assert.equal(result.status, 'Succeeded');
+  assert.ok(
+    requests
+      .filter((request) => request.method === 'GET')
+      .every((request) => !request.uri.includes('vmss-certigo-pr-pilot-z1')),
+    'the retired PR scale set must not be enumerated',
+  );
+  assert.ok(
+    requests
+      .filter((request) => request.method === 'POST')
+      .every((request) => !request.name.startsWith('vmss-certigo-pr-pilot-z1_')),
+    'retired PR instances must not be started',
+  );
 });
 
 test('positive control: a tiny workflow terminates through an If else branch', async () => {

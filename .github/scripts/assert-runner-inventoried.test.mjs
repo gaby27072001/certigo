@@ -28,10 +28,10 @@ test('both live trusted runners are present in the versioned inventory', () => {
 
 test('every live PR runner is present in the versioned inventory', () => {
   for (const name of [
-    'certigo-prMVOC2P',
-    'certigo-prTRHQEY',
-    'certigo-pr7BZU76',
-    'certigo-prUL1UCK',
+    'certigo-prPLCHD1',
+    'certigo-prPLCHD2',
+    'certigo-prPLCHD3',
+    'certigo-prPLCHD4',
   ]) {
     assert.deepEqual(assertRunnerInventoried(name, repositoryConfig), []);
   }

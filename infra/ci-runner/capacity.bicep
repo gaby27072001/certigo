@@ -9,8 +9,8 @@ param location string = 'westeurope'
 @description('VMSS legacy qui porte la capacité trusted observée.')
 param legacyVmScaleSetName string = 'vmss-certigo-runner-zonal'
 
-@description('VMSS PR isolé observé.')
-param pilotVmScaleSetName string = 'vmss-certigo-pr-pilot-z1'
+@description('VMSS PR isolé observé (pool live v2).')
+param pilotVmScaleSetName string = 'vmss-certigo-pr-v2-z1'
 
 @description('Taille commune observée sur les VMSS. Utilisée par la détection de drift.')
 param vmSize string = 'Standard_D2ads_v6'
