@@ -206,6 +206,78 @@ void main() {
     expect(lesson.blocks.single.check, isNotNull);
   });
 
+  test('projects v5 matchPairs matches into the runtime quiz item', () async {
+    const String certificationId = 'aws:clf-c02';
+    const String domainId = 'aws.clf-c02.domain.cloud-concepts';
+    const String conceptId = 'aws.clf-c02.concept.cloud-value';
+    final List<ContentFixture> fixtures = <ContentFixture>[
+      _catalog(certificationId, 'domain-1', 'Cloud Concepts'),
+      _runtime(
+        id: 'aws.clf-c02.track.main',
+        type: 'track',
+        path: 'runtime/tracks/aws/clf-c02/track.json',
+        json: <String, dynamic>{
+          'legacyId': 'aws-clf',
+          'certificationId': certificationId,
+          'blueprintVersion': '2026-08-17',
+          'mode': 'questionBank',
+          'summary': 'Bank',
+          'domainIds': <String>[domainId],
+          'unitIds': <String>[],
+        },
+      ),
+      _runtime(
+        id: domainId,
+        type: 'domain',
+        path: 'runtime/domains/aws/clf-c02/domain.json',
+        json: <String, dynamic>{
+          'legacyId': 'aws-domain',
+          'certificationId': certificationId,
+          'blueprintVersion': '2026-08-17',
+          'objectiveId': 'domain-1',
+        },
+      ),
+      _runtime(
+        id: conceptId,
+        type: 'concept',
+        path: 'runtime/concepts/aws/clf-c02/concept.json',
+        json: <String, dynamic>{
+          'legacyId': 'aws-concept',
+          'certificationId': certificationId,
+          'blueprintVersion': '2026-08-17',
+          'domainId': domainId,
+          'title': 'Value',
+        },
+      ),
+      questionFixture(
+        'aws.clf-c02.domain-1.cloud.001',
+        certificationId: certificationId,
+        domainId: domainId,
+        conceptId: conceptId,
+        itemType: 'matchPairs',
+        options: const <Map<String, String>>[
+          <String, String>{'id': 'left-1', 'label': 'EC2'},
+          <String, String>{'id': 'left-2', 'label': 'Lambda'},
+        ],
+        matches: const <Map<String, String>>[
+          <String, String>{'id': 'right-1', 'label': 'IaaS'},
+          <String, String>{'id': 'right-2', 'label': 'Serverless'},
+        ],
+      ),
+    ];
+
+    final Lesson lesson = await _syncAndRead(
+      fixtures,
+      trackId: 'aws-clf',
+      lessonId: 'aws-clf.lesson.domain-1.practice',
+    );
+
+    final QuizItem item = lesson.blocks.single.check!;
+    expect(item.type, ItemType.matchPairs);
+    expect(item.matches.map((QuizOption option) => option.id), <String>['right-1', 'right-2']);
+    expect(item.matches.map((QuizOption option) => option.label), <String>['IaaS', 'Serverless']);
+  });
+
   test('treats a local storage failure as an offline cache miss', () async {
     final RuntimeContentLessonRepository repository = RuntimeContentLessonRepository(
       inner: _OfflineLessons(),

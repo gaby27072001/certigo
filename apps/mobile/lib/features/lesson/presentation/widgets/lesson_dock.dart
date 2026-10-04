@@ -1,3 +1,4 @@
+import 'package:data/data.dart';
 import 'package:flutter/material.dart';
 import 'package:prism_ui/prism_ui.dart';
 
@@ -27,8 +28,10 @@ class LessonDock extends StatelessWidget {
     if (step == null) return const SizedBox.shrink();
 
     final bool submitting = state.status == LessonStatus.submitting;
-    final bool isCheck = step.kind == LessonStepKind.check && step.item != null;
-    final bool validating = isCheck && !state.currentAnswered;
+    final QuizItem? item = step.item;
+    final bool isCheck = step.kind == LessonStepKind.check && item != null;
+    final bool isAnswerable = item != null && isAnswerableCheck(item);
+    final bool validating = isCheck && isAnswerable && !state.currentAnswered;
 
     final String label;
     final VoidCallback? onPressed;

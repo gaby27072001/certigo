@@ -24,6 +24,7 @@ public sealed partial class ContentContractVerifier(
         "correctOptionIds",
         "explanation",
         "privateManifestId",
+        "pairs",
         "rationale",
         "solution",
     };
@@ -398,12 +399,33 @@ public sealed partial class ContentContractVerifier(
 
         return questionSchema switch
         {
+            "v5" => ParseV5QuestionPair(questionValue, solutionValue),
             "v4" => (ParseQuestion(questionValue), ParseSolution(solutionValue)),
             "v3" => AdaptV3QuestionPair(questionValue, solutionValue),
             "v2" => AdaptV2QuestionPair(questionValue, solutionValue, certifications),
             _ => throw Invalid(
                 $"Runtime release contains unsupported question schema '{questionSchema}'."),
         };
+    }
+
+    private static (CanonicalQuestion Question, CanonicalSolution Solution) ParseV5QuestionPair(
+        JsonElement questionValue,
+        JsonElement solutionValue)
+    {
+        var violations = ExerciseItemsV5Rules.Violations(questionValue, solutionValue);
+        if (violations.Count > 0)
+        {
+            var questionId = RequiredString(questionValue, "id", "question");
+            var details = string.Join(
+                "; ",
+                violations.Select(violation => $"[v5:{violation.Rule}] {violation.Message}"));
+            throw Invalid($"Question '{questionId}' violates v5 exercise rules: {details}.");
+        }
+
+        var question = ParseQuestion(questionValue);
+        var solution = ParseSolution(solutionValue);
+        EnsurePairIds(question.Id, solution.Id);
+        return (question, solution);
     }
 
     private static (CanonicalQuestion Question, CanonicalSolution Solution) AdaptV3QuestionPair(
@@ -613,7 +635,7 @@ public sealed partial class ContentContractVerifier(
         if (!graph.Questions.Keys.ToHashSet(StringComparer.Ordinal)
             .SetEquals(graph.Solutions.Keys))
         {
-            throw Invalid("Runtime v4 questions and private solutions must form an exact bijection.");
+            throw Invalid("Runtime questions and private solutions must form an exact bijection.");
         }
 
         var aliases = new HashSet<string>(StringComparer.Ordinal);
@@ -659,15 +681,25 @@ public sealed partial class ContentContractVerifier(
             EnsureUnique(
                 question.Options.Select(option => option.Id),
                 $"option id in question '{question.Id}'");
-            var optionIds = question.Options.Select(option => option.Id).ToHashSet(StringComparer.Ordinal);
-            if (solution.CorrectOptionIds.Any(id => !optionIds.Contains(id)))
+            if (question.Matches is not null)
             {
-                throw Invalid($"Solution '{solution.Id}' references an unknown option.");
+                EnsureUnique(
+                    question.Matches.Select(option => option.Id),
+                    $"match id in question '{question.Id}'");
             }
 
-            if (question.ItemType != ItemType.Multi && solution.CorrectOptionIds.Count != 1)
+            if (question.ItemType is ItemType.Mcq or ItemType.Multi or ItemType.Scenario or ItemType.SpotTheIssue)
             {
-                throw Invalid($"Question '{question.Id}' requires exactly one correct option.");
+                var optionIds = question.Options.Select(option => option.Id).ToHashSet(StringComparer.Ordinal);
+                if (solution.CorrectOptionIds.Any(id => !optionIds.Contains(id)))
+                {
+                    throw Invalid($"Solution '{solution.Id}' references an unknown option.");
+                }
+
+                if (question.ItemType != ItemType.Multi && solution.CorrectOptionIds.Count != 1)
+                {
+                    throw Invalid($"Question '{question.Id}' requires exactly one correct option.");
+                }
             }
         }
 
@@ -1162,9 +1194,9 @@ public sealed partial class ContentContractVerifier(
     private static CanonicalQuestion ParseQuestion(JsonElement value)
     {
         var schemaVersion = value.GetProperty("schemaVersion").GetString();
-        if (!string.Equals(schemaVersion, "v4", StringComparison.Ordinal))
+        if (schemaVersion is not ("v4" or "v5"))
         {
-            throw Invalid($"Runtime release contains non-v4 public question '{value.GetProperty("id")}'.");
+            throw Invalid($"Runtime release contains non-v4/v5 public question '{value.GetProperty("id")}'.");
         }
 
         var resource = Deserialize<QuestionContract>(value, "question");
@@ -1179,15 +1211,16 @@ public sealed partial class ContentContractVerifier(
             resource.ItemType,
             resource.Difficulty,
             resource.Prompt,
-            resource.Options);
+            resource.Options,
+            resource.Matches);
     }
 
     private static CanonicalSolution ParseSolution(JsonElement value)
     {
         var schemaVersion = value.GetProperty("schemaVersion").GetString();
-        if (!string.Equals(schemaVersion, "v4", StringComparison.Ordinal))
+        if (schemaVersion is not ("v4" or "v5"))
         {
-            throw Invalid($"Runtime release contains non-v4 private solution '{value.GetProperty("id")}'.");
+            throw Invalid($"Runtime release contains non-v4/v5 private solution '{value.GetProperty("id")}'.");
         }
 
         var resource = Deserialize<SolutionContract>(value, "solution");
@@ -1691,14 +1724,16 @@ public sealed partial class ContentContractVerifier(
         ItemType ItemType,
         int Difficulty,
         string Prompt,
-        IReadOnlyList<CheckOption> Options);
+        IReadOnlyList<CheckOption> Options,
+        IReadOnlyList<CheckOption>? Matches = null);
 
     private sealed record SolutionContract(
         string Id,
         string SchemaVersion,
         string Kind,
         IReadOnlyList<string> CorrectOptionIds,
-        string Rationale);
+        string Rationale,
+        ItemType? ItemType = null);
 
     private sealed record V2QuestionContract(
         string Id,

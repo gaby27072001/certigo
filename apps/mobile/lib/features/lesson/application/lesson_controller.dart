@@ -127,7 +127,10 @@ class LessonController extends StateNotifier<LessonSessionState> {
         .toList();
     if (lesson.blocks.isEmpty ||
         checks.isEmpty ||
-        checks.any((QuizItem? check) => check == null || !isAnswerableCheck(check))) {
+        checks.any(
+          (QuizItem? check) =>
+              check == null || (check.type != ItemType.unknown && !isAnswerableCheck(check)),
+        )) {
       // Cause distincte du cas précédent : le contenu est arrivé, mais il lui
       // manque de quoi être joué. Réessayer ne changera rien.
       state = state.copyWith(
@@ -216,6 +219,23 @@ class LessonController extends StateNotifier<LessonSessionState> {
     _persistResume();
   }
 
+  /// Moves a placed option inside an ordered answer without changing the set of
+  /// selected ids. Used by accessibility custom actions as an alternative to
+  /// drag-and-drop.
+  void movePlacedOption({required int fromIndex, required int toIndex}) {
+    final QuizItem? item = state.currentItem;
+    if (item == null || state.currentAnswered) return;
+    if (item.type != ItemType.ordering && item.type != ItemType.applied) return;
+    if (fromIndex < 0 || fromIndex >= state.selection.length) return;
+    if (toIndex < 0 || toIndex >= state.selection.length || toIndex == fromIndex) return;
+
+    final List<String> next = List<String>.from(state.selection);
+    final String moved = next.removeAt(fromIndex);
+    next.insert(toIndex, moved);
+    state = state.copyWith(selection: next);
+    _persistResume();
+  }
+
   /// Toggle a `matchPairs` connection between a left [leftId] and right
   /// [rightId]. The selection is a set of canonical `"left:right"` tokens; each
   /// left and each right may appear at most once, so re-pairing either side
@@ -283,6 +303,7 @@ class LessonController extends StateNotifier<LessonSessionState> {
     for (final LessonStep step in state.steps) {
       final QuizItem? item = step.item;
       if (!step.isCheck || item == null) continue;
+      if (!isAnswerableCheck(item)) continue;
       answers.add(
         QuizAnswer(
           itemId: item.id,

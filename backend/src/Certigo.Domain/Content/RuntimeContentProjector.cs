@@ -298,7 +298,8 @@ public sealed class RuntimeContentProjector
                 runtimeConceptId,
                 question.ItemType,
                 question.Prompt,
-                question.Options),
+                question.Options,
+                question.Matches),
             new AnswerKeyItem(
                 runtimeQuestionId,
                 runtimeConceptId,

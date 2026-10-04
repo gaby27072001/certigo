@@ -46,7 +46,7 @@ public sealed class RuntimeContentProjectorTests
         var publicJson = System.Text.Json.JsonSerializer.Serialize(
             projection.Lessons[0].Lesson,
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
-        foreach (var forbidden in new[] { "correct", "explanation", "rationale", "answerKey", "solution" })
+        foreach (var forbidden in new[] { "correct", "explanation", "rationale", "answerKey", "solution", "pairs" })
         {
             publicJson.Should().NotContain($"\"{forbidden}\"", $"the public {itemType} check must not leak {forbidden}");
         }
@@ -56,6 +56,42 @@ public sealed class RuntimeContentProjectorTests
         key.Type.Should().Be(itemType);
         key.Correct.Should().Equal(correct);
         key.Explanation.Should().Be("PaaS is managed.");
+    }
+
+
+    [Fact]
+    public void Match_pairs_projection_transports_public_matches_without_null_matches()
+    {
+        var matches = new[]
+        {
+            new CheckOption("r-all", "All resources"),
+            new CheckOption("r-resources", "Create and manage resources"),
+        };
+        var graph = BuildGraph(
+            questionBank: false,
+            ItemType.MatchPairs,
+            ["l-owner:r-all", "l-contributor:r-resources"],
+            [new CheckOption("l-owner", "Owner"), new CheckOption("l-contributor", "Contributor")],
+            matches);
+
+        var projection = new RuntimeContentProjector().Project(graph);
+
+        var check = projection.Lessons.Should().ContainSingle().Subject.Lesson.Blocks[1].Check!;
+        check.Matches.Should().Equal(matches);
+        projection.AnswerKeys.Should().ContainSingle().Subject.AnswerKey.Items.Should().ContainSingle()
+            .Subject.Correct.Should().Equal("l-owner:r-all", "l-contributor:r-resources");
+
+        var publicJson = System.Text.Json.JsonSerializer.Serialize(
+            projection.Lessons[0].Lesson,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        publicJson.Should().Contain("\"matches\"");
+
+        var graphWithoutMatches = BuildGraph(questionBank: false);
+        var withoutMatches = new RuntimeContentProjector().Project(graphWithoutMatches);
+        var legacyJson = System.Text.Json.JsonSerializer.Serialize(
+            withoutMatches.Lessons[0].Lesson,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        legacyJson.Should().NotContain("\"matches\"");
     }
 
     [Fact]
@@ -189,7 +225,9 @@ public sealed class RuntimeContentProjectorTests
     private static CanonicalContentGraph BuildGraph(
         bool questionBank,
         ItemType itemType = ItemType.Mcq,
-        IReadOnlyList<string>? correct = null)
+        IReadOnlyList<string>? correct = null,
+        IReadOnlyList<CheckOption>? options = null,
+        IReadOnlyList<CheckOption>? matches = null)
     {
         var provider = questionBank ? "aws" : "microsoft";
         var certificationSlug = questionBank ? "clf-c02" : "az-900";
@@ -237,7 +275,8 @@ public sealed class RuntimeContentProjectorTests
             itemType,
             2,
             "Which service model?",
-            [new CheckOption("iaas", "IaaS"), new CheckOption("paas", "PaaS")]);
+            options ?? [new CheckOption("iaas", "IaaS"), new CheckOption("paas", "PaaS")],
+            matches);
         var solution = new CanonicalSolution(questionId, correct ?? ["paas"], "PaaS is managed.");
         var units = new Dictionary<string, CanonicalUnitResource>(StringComparer.Ordinal);
         var lessons = new Dictionary<string, CanonicalLessonResource>(StringComparer.Ordinal);

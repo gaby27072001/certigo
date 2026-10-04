@@ -117,9 +117,11 @@ La correction, elle, se répartit en **trois familles** côté client
 
 ### Aiguillage type → widget
 
-`apps/mobile/lib/features/lesson/presentation/widgets/step_renderer.dart:72`
-couvre les neuf valeurs de l'énumération : **aucun type d'exercice ne tombe dans
-un repli**. L'avertissement connu sur les *blocs* de contenu (13 types
+`apps/mobile/lib/features/lesson/presentation/widgets/step_renderer.dart`
+couvre les neuf valeurs de l'énumération. Depuis l'étape 3 du contrat v5
+(`wp-p2-06`), la neuvième, `unknown`, n'est plus rendue comme un QCM : elle
+affiche un repli explicite (« Exercice non pris en charge »), non répondable,
+qui ne bloque pas la leçon. L'avertissement connu sur les *blocs* de contenu (13 types
 canoniques v2, 6 peints, intersection 2 — épinglé par
 `packages/prism_ui/test/rendering/content_render_coverage_test.dart`) **ne se
 transpose pas ici** : il porte sur `CanonicalBlockType`, un catalogue parallèle
@@ -134,8 +136,9 @@ leçon (`hook`, `concept`, `example`, `code`, `check`, `recap`) sont tous rendus
 | `spotTheIssue` | `CheckStepWidget` (cadre « Repère l'erreur ») | ensembliste | ✅ |
 | `cloze` | `ClozeStepWidget` | ordonnée | ✅ |
 | `ordering` | `OrderingStepWidget` | ordonnée | ✅ |
-| `applied` | `OrderingStepWidget` | ordonnée | ✅ |
-| `matchPairs` | `MatchPairsStepWidget` | paires | ❌ **non** — voir §3 |
+| `applied` | `OrderingStepWidget` (sélection partielle, au moins 2 étapes) | ordonnée | ✅ sans distracteur, voir « Garde provisoire » |
+| `matchPairs` | `MatchPairsStepWidget` | paires | ❌ en legacy, voir §3 ; exprimable en contrat v5 |
+| *inconnu* | repli explicite, non répondable | — | — |
 
 ### Formes YAML et exemples minimaux valides
 
@@ -277,7 +280,9 @@ concerné (balayage du 2026-09-25) :
 
 1. L'app permet de valider un `applied` dès qu'au moins 2 étapes sont placées,
    avec un réordonnancement accessible (VoiceOver, cibles de 44 pt, Dynamic
-   Type). C'est l'étape 3 du [contrat v5](./contracts/exercise-items/v5/README.md).
+   Type). C'est l'étape 3 du [contrat v5](./contracts/exercise-items/v5/README.md),
+   écrite dans la branche `gchambaud-microsoft-wp-p2-06-v5-expand` (2026-09-25) : la
+   condition est remplie une fois cette branche fusionnée et déployée.
 2. Cette version est la seule en circulation chez les apprenants : la dernière
    build TestFlight distribuée, vérifiée dans App Store Connect.
 3. Les vecteurs de parité couvrent les sous-ensembles (`parity.answerGrading` :
@@ -298,7 +303,13 @@ concerné (balayage du 2026-09-25) :
     correct: [p-locate, p-remove, p-delete]
 ```
 
-## 3 · `matchPairs` — implémenté des deux côtés, inatteignable
+## 3 · `matchPairs` — implémenté des deux côtés, inatteignable en legacy
+
+Depuis l'étape 3 du [contrat v5](./contracts/exercise-items/v5/README.md), une
+release runtime v5 exprime `matches`, que le serveur projette dans `LessonCheck`
+et que le client runtime lit. Ce qui suit décrit le chemin **legacy**
+(`content/`, `tools/seed_content.py`), toujours servi en prod, où les quatre
+obstacles demeurent.
 
 `MatchPairsStepWidget` existe (9 011 octets), fonctionne, et affiche deux
 colonnes. La colonne **gauche** vient de `options` ; la colonne **droite** vient

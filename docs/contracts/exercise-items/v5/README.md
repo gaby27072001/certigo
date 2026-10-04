@@ -139,6 +139,12 @@ n'importerait pas. L'ordre est donc strict :
    d'au moins 2 étapes placées, avec un réordonnancement accessible (VoiceOver, cibles de
    44 pt, Dynamic Type) ; le serveur note l'ensemble **et** l'ordre. Puis déploiement en dev,
    en staging et en prod.
+   *Avancement au 2026-09-25 : l'étape 2 est fusionnée dans `certigo-content` (`99c6baa`,
+   PR certigo-content#95). L'étape 3 est écrite dans la branche
+   `gchambaud-microsoft-wp-p2-06-v5-expand` : les schémas embarqués sont copiés à l'octet
+   (sha256 `6fc3b400…` et `666ab993…`), X1 à X9 sont portées depuis
+   `tools/lib/exercise_v5.mjs`, et l'app gère la sélection partielle et le repli. Il reste à
+   la fusionner, puis à la déployer.*
 4. **`certigo-content`** : resynchronisation de sa copie des schémas embarqués. La garde
    accepte alors v5.
 5. **Contenu** : seulement ensuite, des questions `ordering`, `cloze`, `applied` ou
