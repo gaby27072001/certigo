@@ -3,8 +3,9 @@
 > **Fait daté.** Outillage versionné le 2026-09-25 (PR 0 de la séquence ci-dessous). Le
 > contrôle CI `Dart SAST / Security gate` n'existe qu'à partir de la fusion de la PR B.
 > **Invalidé si** `.github/workflows/dart-sast.yml` cesse de lire règles, périmètre, baseline et
-> verrou depuis le SHA de **base**, ou si `dart-sast.mjs` cesse d'échouer sur une couverture
-> incomplète.
+> verrou depuis le SHA de **base**, si `validate-workflow-security.mjs` cesse de lui imposer une
+> forme relue de `.github/scripts/dart-sast-workflow-forms/`, ou si `dart-sast.mjs` cesse
+> d'échouer sur une couverture incomplète.
 
 ## En une phrase
 
@@ -53,6 +54,14 @@ OWASP MASVS et son niveau de confiance.
   (activés : `gh api repos/gchambaud_microsoft/Certigo --jq .security_and_analysis`, lu le
   2026-09-24). La règle `dart-hardcoded-credential` ignore les dossiers de test.
 - **Dépendances.** C'est le rôle d'OSV (`dependency-vuln-scan.yml`).
+- **Runners `certigo-pr` persistants.** Le job `candidate` exécute le code de la PR (son
+  `dart-sast.mjs`, ses règles) sur le même pool que `scan`, et ces runners ne sont pas éphémères :
+  l'espace de travail survit d'un job à l'autre. Du code de PR peut donc y laisser un fichier
+  qu'un job ultérieur chargera. Exemple relevé par la relecture indépendante de #560, mécanisme
+  vérifié avec Python 3.12 : `python -m venv` place le répertoire courant en tête de `sys.path`,
+  donc un `venv.py` déposé dans l'espace de travail s'exécute dans le `scan` suivant, avant le
+  verdict. L'exposition est commune à tous les jobs `certigo-pr` qui exécutent du code de PR ;
+  elle est suivie dans #553 (pool PR reconstruit à chaque job), pas réglée par ce workflow.
 - **Dossiers de test.** Les règles qui ne visent que le code livré excluent les seules racines de
   test des paquets (`/apps/mobile/test/`, `/apps/mobile/integration_test/`,
   `/apps/mobile/test_driver/`, `/packages/*/test/`). Une exclusion plus large (`**/test/**`,
@@ -66,8 +75,11 @@ Dart compile tout fichier qu'une directive désigne, quelle que soit son extensi
 qui contient un octet NUL ou de l'UTF-8 invalide dans un commentaire (mesuré le 2026-10-04 avec
 Dart 3.12 : `import 'hidden.png';` s'exécute, un `// <NUL>` ne gêne pas la compilation). D'où :
 
-- les binaires sont reconnus **par extension seulement** : un fichier texte qui contient un NUL
-  reste analysé (ou fait échouer le scan si Semgrep ne sait pas le lire) ;
+- les binaires sont reconnus **par extension seulement** ; tout autre fichier du périmètre doit
+  être de l'UTF-8 valide sans octet NUL, sinon le scan **échoue** (code 2). Semgrep 1.178.0
+  analyse bien le code situé après un NUL ou un octet invalide (mesuré pendant la relecture de
+  #560), mais ce comportement d'une version n'est pas un contrat ; le contrôle ne dépend plus de
+  lui ;
 - chaque directive `import`, `export` et `part` de chaque fichier `.dart` analysé est relue par
   un petit analyseur lexical (commentaires imbriqués, chaînes brutes, triples et adjacentes,
   échappements `\x`/`\u`, imports conditionnels, `augment`) : elle doit charger `dart:…`, ou un
@@ -90,17 +102,40 @@ fichiers `.semgrepignore` et `.gitignore`, limite de taille, métriques et véri
 version, variables d'environnement `SEMGREP_*` et configuration utilisateur (`HOME` isolé).
 Il échoue ensuite si Semgrep n'a pas rendu **chaque** fichier comme analysé, s'il signale la
 moindre erreur (analyse syntaxique, délai dépassé), s'il analyse un fichier non demandé, si sa
-version diffère du verrou, ou si du code Dart échappe au périmètre (section précédente).
+version diffère du verrou, ou si du code Dart échappe au périmètre (section précédente). Chaque
+option de la ligne de commande ne peut être donnée qu'une fois : un second `--root` est refusé au
+lieu de remplacer silencieusement le premier.
 
-Le validateur des workflows impose ces propriétés au workflow **et à sa proposition de
-pré-approbation** (`.github/scripts/dart-sast-workflow-policy.mjs`, appelé par
-`validate-workflow-security.mjs`) : le job `scan` exécute la copie de base de `dart-sast.mjs`
-sans `--rules`/`--scope`/`--baseline`/`--lock`/`--fixtures`, installe Semgrep depuis le verrou
-de base avec `--require-hashes --only-binary=:all: --no-deps`, ne lit l'arbre de la PR que par
-`--root`, et le job agrégé `Dart SAST / Security gate` ne reçoit aucune permission, ne lit
-aucune source PR et tourne sur `certigo-trusted`, comme tous les gates agrégés
-(`docs/runbooks/CI_RUNNERS.md` §10). Un affaiblissement de ces points est donc refusé dès la
-PR de pré-approbation.
+Le validateur des workflows impose ce montage **à l'identique**. `dart-sast.yml` et, dès la PR A,
+sa proposition de pré-approbation doivent être exactement l'une des formes relues de
+`.github/scripts/dart-sast-workflow-forms/` (`dart-sast-workflow-policy.mjs`, appelé par
+`validate-workflow-security.mjs`). L'égalité est sémantique (commentaires et ordre des clés
+ignorés) mais porte sur tout le reste, révisions d'actions comprises, avec le parseur durci du
+manifeste : ancres, alias, étiquettes, clés en double et retours chariot sont refusés.
+
+Une première version vérifiait des motifs (« le job `scan` contient telle commande »). La
+relecture indépendante de #560 l'a contournée de huit façons sans rien casser de visible :
+`|| true`, second `--root`, variables d'environnement échangées, `shell:` ou `defaults`,
+`working-directory`, étape ajoutée avant le scan, gate sans `exit 1`. Chacune est désormais un
+test de refus (`dart-sast-workflow-policy.test.mjs`). Les invariants que le contrat protège y sont
+aussi vérifiés sur chaque forme relue, pour qu'une forme future ne puisse pas en perdre un sans
+le dire : le job `scan` exécute la copie de base de `dart-sast.mjs`, ne lit l'arbre de la PR que
+par `--root`, installe Semgrep depuis le verrou de base avec `--require-hashes
+--only-binary=:all: --no-deps`, et aucune de ses étapes ne lit la PR avant le verdict ; le job
+agrégé `Dart SAST / Security gate` ne reçoit aucune permission, ne lit aucune source PR et tourne
+sur `certigo-trusted`, comme tous les gates agrégés (`docs/runbooks/CI_RUNNERS.md` §10).
+
+### Modifier le workflow
+
+Le contrat épingle tout, y compris les révisions d'actions : une montée de version proposée par
+Dependabot suit donc le même chemin qu'un changement voulu. Comme pour le contrat des workflows
+Cosmos (`CI_WORKFLOW_CHANGES.md`, « Ce que ce mécanisme ne débloque pas ») :
+
+1. **PR de code** : ajouter la nouvelle forme `v<n+1>.yml` dans `dart-sast-workflow-forms/`, à
+   côté de l'ancienne, qui reste acceptée (sinon `main` refuserait son propre workflow). Les
+   tests de mutation visent la forme la plus récente ; les adapter si une ancre a changé.
+2. **PR A** : pré-approbation ; la proposition doit égaler la nouvelle forme.
+3. **PR B** : appliquer le workflow et retirer l'ancienne forme dans la même PR.
 
 ## Chaîne d'approvisionnement
 
@@ -164,8 +199,11 @@ la version livrée trouve **10 découvertes** sur **523 fichiers**.
    `justification` et `revisitWhen` (au moins 20 caractères chacun, la vraie condition
    d'invalidation).
 
-L'empreinte dépend de la règle, du chemin et des lignes de code trouvées (espaces normalisés),
-pas des numéros de ligne : déplacer ou reformater le code ne crée pas de découverte. Une entrée
+L'empreinte dépend de la règle, du chemin et de **toutes** les lignes de code trouvées (espaces
+normalisés), pas des numéros de ligne : déplacer ou reformater le code ne crée pas de découverte.
+Le résumé n'affiche que les 20 premières lignes, suivies de « … », mais l'empreinte les couvre
+toutes : modifier une ligne au-delà (un `return false;` devenu `return true;` au fond d'un rappel
+accepté) crée une découverte nouvelle. Une entrée
 qui ne correspond plus à rien est signalée `STALE` sans faire échouer le contrôle (sinon un
 correctif serait bloqué par la base) ; la retirer dans la PR qui corrige, ou dans un nettoyage.
 
@@ -203,4 +241,7 @@ Les workflows ne se modifient que par pré-approbation (`CI_WORKFLOW_CHANGES.md`
    seule, aucun secret ; scans sur `certigo-pr`, job agrégé sur `certigo-trusted`).
 3. **PR B** — activation du workflow. Le contexte `Dart SAST / Security gate` n'est **pas**
    requis à ce stade ; le rendre requis passe ensuite par la protection de branche, puis
-   `branch-protection-main.json` et la liste des contextes stables du validateur.
+   `branch-protection-main.json` et la liste des contextes stables du validateur. À ce moment,
+   noter que `required-context-policy.mjs` vérifie qu'un contexte requis est produit, pas qu'il
+   l'est par un seul job : un job homonyme dans un autre workflow publierait le même nom. Cette
+   limite vaut pour tous les contextes requis.
