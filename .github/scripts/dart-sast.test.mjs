@@ -9,10 +9,13 @@ import { fileURLToPath } from 'node:url';
 import {
   BASELINE_SCHEMA,
   DEFAULT_CONTROLS,
+  DirectiveScanError,
   GateError,
   buildFindings,
   compareWithBaseline,
   computeTargets,
+  dartDirectiveUris,
+  directiveProblems,
   evaluateFixtures,
   fingerprintFor,
   listFixtureFiles,
@@ -25,6 +28,7 @@ import {
   renderReport,
   renderSummary,
   safeRelativePath,
+  scopeIntegrityProblems,
   selectScopeTargets,
   semgrepArguments,
   semgrepEnvironment,
@@ -151,11 +155,12 @@ test('the rule catalog requires unique, prefixed ids with a declared risk', () =
   assert.throws(() => parseRuleCatalog([{ name: 'x.yaml', text: 'rules: []\n' }]), /no rule found/);
 });
 
-test('the scope selects mobile files and every Dart file, minus fixtures and binaries', () => {
+test('the scope selects mobile files and every Dart file, minus fixtures and binary extensions', () => {
   const tracked = [
     'apps/mobile/lib/a.dart',
     'apps/mobile/android/app/src/main/AndroidManifest.xml',
     'apps/mobile/assets/logo.png',
+    'apps/mobile/assets/LOGO.PNG',
     'apps/mobile/assets/raw.bin',
     'packages/core/lib/b.dart',
     'tools/generator.dart',
@@ -163,9 +168,10 @@ test('the scope selects mobile files and every Dart file, minus fixtures and bin
     'backend/src/Api.cs',
     '.github/sast/tests/dart/fixture.dart',
   ];
-  const selected = selectScopeTargets(tracked, validateScope(scope()), (file) => file.endsWith('.bin'));
+  const selected = selectScopeTargets(tracked, validateScope(scope()));
   assert.deepEqual(selected, [
     'apps/mobile/android/app/src/main/AndroidManifest.xml',
+    'apps/mobile/assets/raw.bin',
     'apps/mobile/lib/a.dart',
     'packages/core/lib/b.dart',
     'tools/generator.dart',
@@ -469,15 +475,138 @@ function repository(context, files) {
   return root;
 }
 
-test('targets come from tracked files only and binaries are skipped by content', (context) => {
+test('targets come from tracked files only and binaries are recognised by extension, never by content', (context) => {
+  // Dart compiles a file that holds a NUL byte in a comment (measured with Dart 3.12): sniffing
+  // content would let one NUL hide a source file from the scan.
   const root = repository(context, {
     'apps/mobile/lib/a.dart': 'void a() {}\n',
+    'apps/mobile/lib/nul.dart': Buffer.from('void n() {}\n// \u0000 hides nothing\n', 'utf8'),
     'apps/mobile/assets/blob.dat': Buffer.from([0x41, 0x00, 0x42]),
+    'apps/mobile/assets/logo.png': Buffer.from([0x89, 0x50, 0x4e, 0x47]),
     'apps/mobile/README.md': '# mobile\n',
     'backend/src/x.cs': 'class X {}\n',
   });
   fs.writeFileSync(path.join(root, 'apps/mobile/lib/untracked.dart'), 'void b() {}\n');
-  assert.deepEqual(computeTargets(root, validateScope(scope())), ['apps/mobile/README.md', 'apps/mobile/lib/a.dart']);
+  const { targets, tracked } = computeTargets(root, validateScope(scope()));
+  assert.deepEqual(targets, [
+    'apps/mobile/README.md',
+    'apps/mobile/assets/blob.dat',
+    'apps/mobile/lib/a.dart',
+    'apps/mobile/lib/nul.dart',
+  ]);
+  assert.ok(tracked.includes('backend/src/x.cs'));
+  assert.ok(!tracked.includes('apps/mobile/lib/untracked.dart'));
+});
+
+test('directives are read whatever their spelling, as Dart reads them', () => {
+  const uris = (text) => dartDirectiveUris(text).map(({ keyword, uri }) => `${keyword} ${uri}`);
+  const source = [
+    '\uFEFF#!/usr/bin/env dart',
+    '@TestOn(\'vm\') library sample;',
+    "import 'package:flutter/material.dart';",
+    "import 'dart:math' as math show Random hide max;",
+    "import /* a /* nested */ comment */ 'hidden1.png';",
+    'import',
+    "  'hidden2.png'; // line comment 'not.png'",
+    "import r'hidden3.png';",
+    "import 'other.dart' /* between */ '.png';",
+    "import '''hidden4.png''';",
+    "import 'x.\\x70ng';",
+    "import 'y.\\u{70}ng';",
+    "import 'z.\\u0070ng';",
+    "import 'a.dart' if (dart.library.io == 'true') 'b.png' if (dart.library.html) 'c.dart';",
+    "import 'lazy.dart' deferred as lazy;",
+    "import augment 'augmented.png';",
+    "export 'exported.png' show A;",
+    "part 'part.png';",
+    "part of 'library.dart';",
+    "final import = 'import \\'not_a_directive.png\\'';",
+    "final note = '${call({'export': 'not.png'})} \"part\" ' \"import 'neither.png'\";",
+    'class C { void import(String part) {} }',
+    "var later = r'''",
+    "import 'inside_raw_string.png';",
+    "''';",
+  ].join('\n');
+  assert.deepEqual(uris(source), [
+    'import package:flutter/material.dart',
+    'import dart:math',
+    'import hidden1.png',
+    'import hidden2.png',
+    'import hidden3.png',
+    'import other.dart.png',
+    'import hidden4.png',
+    'import x.png',
+    'import y.png',
+    'import z.png',
+    'import a.dart',
+    'import b.png',
+    'import c.dart',
+    'import lazy.dart',
+    'import augmented.png',
+    'export exported.png',
+    'part part.png',
+  ]);
+  for (const broken of [
+    "import 'open.dart;\n",
+    '/* never closed\nimport \'x.dart\';',
+    "final s = '${call(",
+    "import 'a.dart' show A",
+    "import 'x\\x7';",
+  ]) {
+    assert.throws(() => dartDirectiveUris(broken), DirectiveScanError, broken);
+  }
+});
+
+test('only .dart files of the analysed tree may be loaded by a directive', () => {
+  const sast = validateScope(scope());
+  const problems = (file, text) => directiveProblems(file, text, sast);
+  assert.deepEqual(problems('apps/mobile/lib/a.dart', [
+    "import 'dart:io';",
+    "import 'package:data/data.dart';",
+    "import 'src/b.dart';",
+    "import '../../../packages/core/lib/core.dart';",
+    "export 'src/c.dart' show C;",
+    "part 'a.g.dart';",
+  ].join('\n')), []);
+  const cases = new Map([
+    ["import 'hidden.png';", /loads Dart code from a file the scan does not analyse as Dart/u],
+    ["import 'b.DART';", /does not analyse as Dart/u],
+    ["import 'package:evil/evil.png';", /does not analyse as Dart/u],
+    ["part 'p.dart.txt';", /does not analyse as Dart/u],
+    ["import 'file:///etc/x.dart';", /unsupported URI scheme/u],
+    ["import 'https://evil.example/x.dart';", /unsupported URI scheme/u],
+    ["import '../../../../outside.dart';", /resolves outside the analysed tree/u],
+    ["import '../../../.github/sast/tests/dart/tls.dart';", /resolves outside the analysed tree/u],
+    ["import '%2e%2e/%2e%2e/%2e%2e/%2e%2e/outside.dart';", /resolves outside the analysed tree/u],
+    ["import '/abs/x.dart';", /resolves outside the analysed tree/u],
+    ["import 'a\\\\b.dart';", /resolves outside the analysed tree/u],
+    ["import '%E0%A4%A.dart';", /not a valid relative URI/u],
+    ["import 'dart:io$x';", /uses string interpolation/u],
+    ["import 'unterminated.dart", /cannot read the directives/u],
+  ]);
+  for (const [text, pattern] of cases) {
+    const found = problems('apps/mobile/lib/a.dart', text);
+    assert.equal(found.length, 1, `${text}: ${found.join(' | ')}`);
+    assert.match(found[0], pattern, text);
+    assert.match(found[0], /^(?:apps\/mobile\/lib\/a\.dart:1: |scan evasion check cannot read the directives of apps\/mobile\/lib\/a\.dart)/u, text);
+  }
+});
+
+test('no excluded directory may hold a pub package that a path dependency could load', () => {
+  const sast = validateScope(scope());
+  assert.deepEqual(scopeIntegrityProblems([
+    'apps/mobile/pubspec.yaml',
+    'packages/core/pubspec.yaml',
+    '.github/sast/tests/dart/tls.dart',
+  ], sast), []);
+  assert.deepEqual(scopeIntegrityProblems([
+    '.github/sast/tests/evil/pubspec.yaml',
+    '.github/sast/tests/evil/pubspec_overrides.yaml',
+    '.github/sast/tests/evil/lib/evil.dart',
+  ], sast), [
+    '.github/sast/tests/evil/pubspec.yaml would let a path dependency load code the scan excludes',
+    '.github/sast/tests/evil/pubspec_overrides.yaml would let a path dependency load code the scan excludes',
+  ]);
 });
 
 test('a tracked symbolic link inside the scope fails closed', { skip: process.platform === 'win32' }, (context) => {
@@ -580,6 +709,30 @@ test('check exits 1 on a new finding and 0 once it is baselined', { skip: proces
   const accepted = runCheck(workspace, semgrep);
   assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
   assert.match(accepted.stdout, /BASELINED dart-sample-logged apps\/mobile\/lib\/a\.dart:2/);
+});
+
+test('check exits 2 when a Dart directive loads code the scan cannot see', { skip: process.platform === 'win32' }, (context) => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'dart-sast-e2e-'));
+  context.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  const tree = path.join(workspace, 'tree');
+  fs.mkdirSync(path.join(tree, 'apps/mobile/lib'), { recursive: true });
+  fs.mkdirSync(path.join(tree, 'apps/mobile/assets'), { recursive: true });
+  fs.writeFileSync(
+    path.join(tree, 'apps/mobile/lib/a.dart'),
+    "import /* looks like an asset */ '../assets/logo.png';\nvoid a() => hidden();\n",
+  );
+  fs.writeFileSync(path.join(tree, 'apps/mobile/assets/logo.png'), "void hidden() => print('token');\n");
+  git(tree, ['init', '-q']);
+  git(tree, ['add', '-A']);
+  writeControls(workspace);
+
+  const evaded = runCheck(workspace, fakeSemgrep(context, FAKE_SEMGREP), ['--github']);
+  assert.equal(evaded.status, 2, evaded.stdout + evaded.stderr);
+  assert.match(
+    evaded.stdout,
+    /INCOMPLETE apps\/mobile\/lib\/a\.dart:1: import "\.\.\/assets\/logo\.png" loads Dart code from a file the scan does not analyse as Dart/u,
+  );
+  assert.match(evaded.stdout, /::error title=Dart SAST::Dart SAST scan invalid or incomplete/u);
 });
 
 test('check exits 2 when Semgrep fails, omits a target or reports an error', { skip: process.platform === 'win32' }, (context) => {

@@ -16,9 +16,10 @@ apparaît**. Les découvertes déjà revues vivent dans une baseline datée et j
 ## Ce qui est analysé
 
 Le périmètre (`.github/sast/scope.json`) est calculé à partir des fichiers **suivis par Git** :
-tout `apps/mobile/` et `packages/`, plus tout fichier `.dart` du dépôt, moins les binaires et les
-fixtures volontairement vulnérables de `.github/sast/tests/`. Mesuré le 2026-09-25 sur `main`
-`653e9112` : **523 fichiers**, tous analysés.
+tout `apps/mobile/` et `packages/`, plus tout fichier `.dart` du dépôt, moins les fichiers à
+**extension** binaire (`binaryExtensions`) et les fixtures volontairement vulnérables de
+`.github/sast/tests/`. Mesuré le 2026-10-04 sur `main` `23202dff` : **527 fichiers**, tous
+analysés.
 
 | Famille (`certigo-risk`) | Règles | Exemples de ce qui est détecté |
 |---|---|---|
@@ -50,11 +51,31 @@ OWASP MASVS et son niveau de confiance.
   `mobile-platform.yaml`.
 - **Secrets du dépôt entier.** C'est le rôle de GitHub *secret scanning* avec *push protection*
   (activés : `gh api repos/gchambaud_microsoft/Certigo --jq .security_and_analysis`, lu le
-  2026-09-24). La règle `dart-hardcoded-credential` ignore les fichiers de test.
+  2026-09-24). La règle `dart-hardcoded-credential` ignore les dossiers de test.
 - **Dépendances.** C'est le rôle d'OSV (`dependency-vuln-scan.yml`).
-- **Fixtures exclues.** Du code livré qui vivrait sous `.github/sast/tests/` (par exemple via une
-  dépendance `path:`) échapperait au scan ; une telle dépendance se voit en revue et dans
-  `pubspec.lock`.
+- **Dossiers de test.** Les règles qui ne visent que le code livré excluent les seules racines de
+  test des paquets (`/apps/mobile/test/`, `/apps/mobile/integration_test/`,
+  `/apps/mobile/test_driver/`, `/packages/*/test/`). Une exclusion plus large (`**/test/**`,
+  `*_test.dart`) laissait passer du code livré rangé dans `lib/**/test/` ou nommé `*_test.dart` :
+  mesuré le 2026-10-04, corrigé, et verrouillé par les fixtures `apps/` et `packages/` de
+  `.github/sast/tests/`.
+
+## Code qu'une PR voudrait soustraire au scan
+
+Dart compile tout fichier qu'une directive désigne, quelle que soit son extension, et un fichier
+qui contient un octet NUL ou de l'UTF-8 invalide dans un commentaire (mesuré le 2026-10-04 avec
+Dart 3.12 : `import 'hidden.png';` s'exécute, un `// <NUL>` ne gêne pas la compilation). D'où :
+
+- les binaires sont reconnus **par extension seulement** : un fichier texte qui contient un NUL
+  reste analysé (ou fait échouer le scan si Semgrep ne sait pas le lire) ;
+- chaque directive `import`, `export` et `part` de chaque fichier `.dart` analysé est relue par
+  un petit analyseur lexical (commentaires imbriqués, chaînes brutes, triples et adjacentes,
+  échappements `\x`/`\u`, imports conditionnels, `augment`) : elle doit charger `dart:…`, ou un
+  fichier `.dart` par `package:` ou par un chemin relatif qui reste dans l'arbre analysé. Sinon
+  le scan **échoue** (code 2). Mesuré le 2026-10-04 : 449 fichiers Dart, 2 347 directives, même
+  résultat qu'un comptage ligne à ligne, aucun problème sur `main` ;
+- aucun `pubspec.yaml` ne peut vivre sous un dossier exclu (`.github/sast/tests/`) : une
+  dépendance `path:` n'y trouverait donc aucun paquet à charger.
 
 ## Modèle de confiance
 
@@ -68,8 +89,8 @@ qu'une PR pourrait utiliser pour se cacher : commentaires `nosemgrep` (`--disabl
 fichiers `.semgrepignore` et `.gitignore`, limite de taille, métriques et vérification de
 version, variables d'environnement `SEMGREP_*` et configuration utilisateur (`HOME` isolé).
 Il échoue ensuite si Semgrep n'a pas rendu **chaque** fichier comme analysé, s'il signale la
-moindre erreur (analyse syntaxique, délai dépassé), s'il analyse un fichier non demandé, ou si sa
-version diffère du verrou.
+moindre erreur (analyse syntaxique, délai dépassé), s'il analyse un fichier non demandé, si sa
+version diffère du verrou, ou si du code Dart échappe au périmètre (section précédente).
 
 Le validateur des workflows impose ces propriétés au workflow **et à sa proposition de
 pré-approbation** (`.github/scripts/dart-sast-workflow-policy.mjs`, appelé par

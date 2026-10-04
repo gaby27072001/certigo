@@ -36,7 +36,6 @@ const SEVERITIES = new Set(['ERROR', 'WARNING', 'INFO']);
 const FINGERPRINT_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const MAX_SNIPPET_LINES = 20;
-const BINARY_PROBE_BYTES = 8000;
 const SEMGREP_ENV_ALLOWLIST = ['PATH', 'LANG', 'LC_ALL', 'TMPDIR', 'TEMP', 'TMP', 'SYSTEMROOT'];
 
 export class GateError extends Error {
@@ -199,7 +198,10 @@ export function validateScope(value, label = 'scope') {
   return value;
 }
 
-export function selectScopeTargets(trackedFiles, scope, isBinary) {
+// Binary files are recognised by extension only. Content sniffing (a NUL byte) would let a pull
+// request hide a source file from the scan: Dart compiles a file that holds a NUL in a comment.
+// A file kept here that Semgrep cannot read fails the coverage check instead of being skipped.
+export function selectScopeTargets(trackedFiles, scope) {
   const roots = scope.roots.map((root) => `${root}/`);
   const binary = new Set(scope.binaryExtensions);
   const everywhere = new Set(scope.everywhereExtensions);
@@ -213,7 +215,7 @@ export function selectScopeTargets(trackedFiles, scope, isBinary) {
     if (!inRoot && !everywhere.has(extension)) {
       continue;
     }
-    if (binary.has(extension) || isBinary(file)) {
+    if (binary.has(extension)) {
       continue;
     }
     selected.push(file);
@@ -254,33 +256,332 @@ export function listTrackedFiles(root) {
   return files;
 }
 
-function containsNul(file) {
-  const handle = fs.openSync(file, 'r');
-  try {
-    const buffer = Buffer.alloc(BINARY_PROBE_BYTES);
-    const read = fs.readSync(handle, buffer, 0, BINARY_PROBE_BYTES, 0);
-    return buffer.subarray(0, read).includes(0);
-  } finally {
-    fs.closeSync(handle);
-  }
-}
-
 export function computeTargets(root, scope) {
   const tracked = listTrackedFiles(root);
   const special = new Map(tracked.filter((entry) => entry.special).map((entry) => [entry.path, entry.special]));
-  const targets = selectScopeTargets(tracked.map((entry) => entry.path), scope, (file) => {
+  const targets = selectScopeTargets(tracked.map((entry) => entry.path), scope);
+  for (const file of targets) {
     if (special.has(file)) {
       throw new GateError(`scope: ${file} is a ${special.get(file)}, which the scan refuses`);
     }
-    return containsNul(regularFileInside(root, file, 'scope'));
-  });
+    regularFileInside(root, file, 'scope');
+  }
   if (targets.length === 0) {
     throw new GateError('scope: no target selected; refusing an empty scan');
   }
   if (!targets.some((file) => file.endsWith('.dart'))) {
     throw new GateError('scope: no Dart file selected; refusing a scan that cannot cover Dart');
   }
-  return targets;
+  return { targets, tracked: tracked.map((entry) => entry.path) };
+}
+
+// ------------------------------------------------------------------ scan evasion
+//
+// Dart compiles any file a directive points at (`import 'hidden.png';` works), and a path
+// dependency can load a package from anywhere. Code reached that way would never be analysed as
+// Dart, so every directive of every analysed Dart file must load a `.dart` file of the analysed
+// tree, and no excluded directory may hold a pub package.
+
+export class DirectiveScanError extends Error {}
+
+const IDENT_START = /[A-Za-z_$]/u;
+const IDENT_PART = /[A-Za-z0-9_$]/u;
+const SIMPLE_ESCAPES = new Map([['n', '\n'], ['r', '\r'], ['f', '\f'], ['b', '\b'], ['t', '\t'], ['v', '\v']]);
+
+function skipBlockComment(text, start) {
+  let index = start + 2;
+  let depth = 1;
+  while (index < text.length && depth > 0) {
+    if (text.startsWith('/*', index)) {
+      depth += 1;
+      index += 2;
+    } else if (text.startsWith('*/', index)) {
+      depth -= 1;
+      index += 2;
+    } else {
+      index += 1;
+    }
+  }
+  if (depth > 0) {
+    throw new DirectiveScanError('unterminated block comment');
+  }
+  return index;
+}
+
+function hexValue(digits, label) {
+  if (!/^[0-9A-Fa-f]+$/u.test(digits)) {
+    throw new DirectiveScanError(`invalid ${label} escape`);
+  }
+  const codePoint = Number.parseInt(digits, 16);
+  if (codePoint > 0x10ffff) {
+    throw new DirectiveScanError(`invalid ${label} escape`);
+  }
+  return String.fromCodePoint(codePoint);
+}
+
+function decodeEscape(text, index) {
+  const next = text[index + 1];
+  if (next === undefined) {
+    throw new DirectiveScanError('unterminated string literal');
+  }
+  if (SIMPLE_ESCAPES.has(next)) {
+    return [SIMPLE_ESCAPES.get(next), index + 2];
+  }
+  if (next === 'x') {
+    return [hexValue(text.slice(index + 2, index + 4).padEnd(2, '!'), '\\x'), index + 4];
+  }
+  if (next === 'u' && text[index + 2] === '{') {
+    const close = text.indexOf('}', index + 3);
+    if (close < 0 || close - (index + 3) > 6 || close === index + 3) {
+      throw new DirectiveScanError('invalid \\u{} escape');
+    }
+    return [hexValue(text.slice(index + 3, close), '\\u{}'), close + 1];
+  }
+  if (next === 'u') {
+    return [hexValue(text.slice(index + 2, index + 6).padEnd(4, '!'), '\\u'), index + 6];
+  }
+  return [next, index + 2];
+}
+
+function isStringStart(text, index) {
+  const character = text[index];
+  if (character === "'" || character === '"') {
+    return true;
+  }
+  return character === 'r'
+    && (text[index + 1] === "'" || text[index + 1] === '"')
+    && !IDENT_PART.test(text[index - 1] ?? '');
+}
+
+function lexString(text, start, tokens) {
+  let index = start;
+  const raw = text[index] === 'r';
+  if (raw) {
+    index += 1;
+  }
+  const quote = text[index];
+  const delimiter = text.startsWith(quote.repeat(3), index) ? quote.repeat(3) : quote;
+  index += delimiter.length;
+  let value = '';
+  let interpolated = false;
+  for (;;) {
+    if (index >= text.length) {
+      throw new DirectiveScanError('unterminated string literal');
+    }
+    if (text.startsWith(delimiter, index)) {
+      index += delimiter.length;
+      break;
+    }
+    const character = text[index];
+    if (delimiter.length === 1 && (character === '\n' || character === '\r')) {
+      throw new DirectiveScanError('unterminated string literal');
+    }
+    if (!raw && character === '\\') {
+      const [decoded, next] = decodeEscape(text, index);
+      value += decoded;
+      index = next;
+    } else if (!raw && character === '$') {
+      interpolated = true;
+      if (text[index + 1] === '{') {
+        index = lexCode(text, index + 2, [], true);
+      } else {
+        index += 1;
+        while (index < text.length && IDENT_PART.test(text[index]) && text[index] !== '$') {
+          index += 1;
+        }
+      }
+    } else {
+      value += character;
+      index += 1;
+    }
+  }
+  tokens.push({ type: 'string', value, interpolated, start, end: index });
+  return index;
+}
+
+// Tokenizes Dart code until the end of the text or, when nested, until the `}` that closes a
+// string interpolation. Only identifiers, string literals and punctuation are kept.
+function lexCode(text, start, tokens, nested) {
+  let index = start;
+  let depth = 0;
+  while (index < text.length) {
+    const character = text[index];
+    if (character === '/' && text[index + 1] === '/') {
+      const end = text.indexOf('\n', index);
+      index = end < 0 ? text.length : end;
+    } else if (character === '/' && text[index + 1] === '*') {
+      index = skipBlockComment(text, index);
+    } else if (/\s/u.test(character)) {
+      index += 1;
+    } else if (isStringStart(text, index)) {
+      index = lexString(text, index, tokens);
+    } else if (IDENT_START.test(character)) {
+      let end = index + 1;
+      while (end < text.length && IDENT_PART.test(text[end])) {
+        end += 1;
+      }
+      tokens.push({ type: 'ident', value: text.slice(index, end), start: index, end });
+      index = end;
+    } else {
+      if (character === '{') {
+        depth += 1;
+      } else if (character === '}') {
+        if (nested && depth === 0) {
+          return index + 1;
+        }
+        depth -= 1;
+      }
+      tokens.push({ type: 'punct', value: character, start: index, end: index + 1 });
+      index += 1;
+    }
+  }
+  if (nested) {
+    throw new DirectiveScanError('unterminated string interpolation');
+  }
+  return index;
+}
+
+function collectUri(tokens, start, keyword, uris) {
+  let cursor = start;
+  let value = '';
+  let interpolated = false;
+  while (tokens[cursor]?.type === 'string') {
+    value += tokens[cursor].value;
+    interpolated ||= tokens[cursor].interpolated;
+    cursor += 1;
+  }
+  uris.push({ keyword: keyword.value, uri: value, interpolated, offset: keyword.start });
+  return cursor;
+}
+
+// URIs loaded by the top-level import, export and part directives (configurable imports
+// included), with adjacent string literals concatenated as Dart does.
+export function dartDirectiveUris(text) {
+  let start = text.charCodeAt(0) === 0xfeff ? 1 : 0;
+  if (text.startsWith('#!', start)) {
+    const end = text.indexOf('\n', start);
+    start = end < 0 ? text.length : end + 1;
+  }
+  const tokens = [];
+  lexCode(text, start, tokens, false);
+  const uris = [];
+  let depth = 0;
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token.type === 'punct') {
+      if (token.value === '{') {
+        depth += 1;
+      } else if (token.value === '}') {
+        depth -= 1;
+      }
+      continue;
+    }
+    if (depth !== 0 || token.type !== 'ident' || !['import', 'export', 'part'].includes(token.value)) {
+      continue;
+    }
+    let cursor = index + 1;
+    if (tokens[cursor]?.type === 'ident' && tokens[cursor].value === 'augment') {
+      cursor += 1;
+    }
+    if (tokens[cursor]?.type !== 'string') {
+      continue;
+    }
+    cursor = collectUri(tokens, cursor, token, uris);
+    let parentheses = 0;
+    while (cursor < tokens.length) {
+      const current = tokens[cursor];
+      if (current.type === 'punct' && current.value === ';' && parentheses === 0) {
+        break;
+      }
+      if (current.type === 'punct' && (current.value === '{' || current.value === '}')) {
+        throw new DirectiveScanError(`unterminated ${token.value} directive`);
+      }
+      if (current.type === 'punct' && current.value === '(') {
+        parentheses += 1;
+      } else if (current.type === 'punct' && current.value === ')') {
+        parentheses -= 1;
+        if (parentheses === 0 && tokens[cursor + 1]?.type === 'string') {
+          cursor = collectUri(tokens, cursor + 1, token, uris);
+          continue;
+        }
+      }
+      cursor += 1;
+    }
+    if (cursor >= tokens.length) {
+      throw new DirectiveScanError(`unterminated ${token.value} directive`);
+    }
+    index = cursor;
+  }
+  return uris;
+}
+
+function lineAt(text, offset) {
+  let line = 1;
+  for (let index = 0; index < offset; index += 1) {
+    if (text[index] === '\n') {
+      line += 1;
+    }
+  }
+  return line;
+}
+
+export function directiveProblems(file, text, scope) {
+  let uris;
+  try {
+    uris = dartDirectiveUris(text);
+  } catch (error) {
+    if (error instanceof DirectiveScanError) {
+      return [`scan evasion check cannot read the directives of ${file}: ${error.message}`];
+    }
+    throw error;
+  }
+  const problems = [];
+  for (const { keyword, uri, interpolated, offset } of uris) {
+    const where = `${file}:${lineAt(text, offset)}: ${keyword} ${JSON.stringify(uri)}`;
+    if (interpolated) {
+      problems.push(`${where} uses string interpolation`);
+      continue;
+    }
+    if (/^dart:[A-Za-z_][A-Za-z0-9_.]*$/u.test(uri)) {
+      continue;
+    }
+    if (!uri.endsWith('.dart')) {
+      problems.push(`${where} loads Dart code from a file the scan does not analyse as Dart`);
+      continue;
+    }
+    const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/u.exec(uri)?.[1];
+    if (scheme !== undefined) {
+      if (scheme !== 'package') {
+        problems.push(`${where} uses an unsupported URI scheme`);
+      }
+      continue;
+    }
+    let decoded;
+    try {
+      decoded = decodeURIComponent(uri);
+    } catch {
+      problems.push(`${where} is not a valid relative URI`);
+      continue;
+    }
+    const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(file), decoded));
+    if (
+      decoded.includes('\\')
+      || path.posix.isAbsolute(decoded)
+      || resolved === '..'
+      || resolved.startsWith('../')
+      || scope.excludePrefixes.some((prefix) => `${resolved}/`.startsWith(prefix))
+    ) {
+      problems.push(`${where} resolves outside the analysed tree`);
+    }
+  }
+  return problems;
+}
+
+export function scopeIntegrityProblems(trackedFiles, scope) {
+  return trackedFiles
+    .filter((file) => scope.excludePrefixes.some((prefix) => file.startsWith(prefix)))
+    .filter((file) => /(?:^|\/)pubspec(?:_overrides)?\.ya?ml$/u.test(file))
+    .map((file) => `${file} would let a path dependency load code the scan excludes`);
 }
 
 // ------------------------------------------------------------------ Semgrep
@@ -709,7 +1010,17 @@ function scanTree(args) {
   const catalog = loadRuleCatalog(rulesDir);
   const scope = validateScope(readJson(controlPath(args, 'scope'), 'scope'));
   const expectedVersion = readPinnedVersion(controlPath(args, 'lock'));
-  const targets = computeTargets(root, scope);
+  const { targets, tracked } = computeTargets(root, scope);
+  const evasion = [
+    ...scopeIntegrityProblems(tracked, scope),
+    ...targets
+      .filter((file) => path.posix.extname(file).toLowerCase() === '.dart')
+      .flatMap((file) => directiveProblems(
+        file,
+        fs.readFileSync(regularFileInside(root, file, 'directive scan'), 'utf8'),
+        scope,
+      )),
+  ];
   const { output } = runSemgrep({
     semgrep: requireArgument(args, 'semgrep'),
     rulesDir,
@@ -724,7 +1035,14 @@ function scanTree(args) {
     (file) => fs.readFileSync(regularFileInside(root, file, 'finding'), 'utf8'),
     catalog,
   );
-  return { label, catalog, targets, findings, problems, version: expectedVersion };
+  return {
+    label,
+    catalog,
+    targets,
+    findings,
+    problems: [...evasion, ...problems],
+    version: expectedVersion,
+  };
 }
 
 function commandCheck(args) {
@@ -745,7 +1063,7 @@ function commandCheck(args) {
     fs.appendFileSync(args.get('summary'), renderSummary({ ...scan, comparison }), 'utf8');
   }
   if (scan.problems.length > 0) {
-    throw new GateError(`Dart SAST (${scan.label}): the scan is incomplete; see INCOMPLETE lines above.`);
+    throw new GateError(`Dart SAST (${scan.label}): the scan is incomplete or some Dart code escapes it; see INCOMPLETE lines above.`);
   }
   if (comparison.fresh.length > 0) {
     throw new GateError(

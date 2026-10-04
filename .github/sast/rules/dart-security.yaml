@@ -51,11 +51,14 @@ rules:
       owasp-mobile: ["M5: Insecure Communication"]
       confidence: MEDIUM
     paths:
+      # Anchored on the package test roots only. A pattern such as `**/test/**` or
+      # `*_test.dart` would also hide production code placed in `lib/**/test/` or named
+      # `*_test.dart`.
       exclude: &non-production-code
-        - "**/test/**"
-        - "**/integration_test/**"
-        - "**/test_driver/**"
-        - "*_test.dart"
+        - "/apps/mobile/test/"
+        - "/apps/mobile/integration_test/"
+        - "/apps/mobile/test_driver/"
+        - "/packages/*/test/"
     pattern: HttpOverrides.global = $OVERRIDES
 
   - id: dart-cleartext-http-url
