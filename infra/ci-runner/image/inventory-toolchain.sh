@@ -21,8 +21,20 @@ azure_cli_root="${CERTIGO_AZURE_CLI_ROOT:-/opt/az}"
 apt_root="${CERTIGO_APT_ROOT:-/etc/apt}"
 cloud_config_root="${CERTIGO_CLOUD_CONFIG_ROOT:-/etc/cloud/cloud.cfg.d}"
 roots=("${toolchain_root}" "${runner_home}" "${azure_cli_root}" "${apt_root}" "${cloud_config_root}")
+# A PR image orders its IMDS block before cloud-init with a drop-in (idle-shutdown.sh,
+# ADR-022): the whole directory is attested, so an added drop-in cannot undo the block.
+imds_drop_in_root="${CERTIGO_IMDS_DROP_IN_ROOT:-/etc/systemd/system/certigo-block-imds.service.d}"
+if [[ -d "${imds_drop_in_root}" ]]; then
+  roots+=("${imds_drop_in_root}")
+fi
+# The idle-shutdown agent's state (/run/certigo-idle-shutdown) and its operator hold file
+# (/etc/certigo-idle-shutdown.hold) change at runtime by design and stay outside.
 entries=(
+  /etc/certigo-idle-shutdown.env
   /etc/gitconfig
+  /etc/systemd/system/certigo-idle-shutdown.service
+  /etc/systemd/system/certigo-idle-shutdown.timer
+  /etc/systemd/system/timers.target.wants/certigo-idle-shutdown.timer
   /etc/systemd/system/apt-daily-upgrade.service
   /etc/systemd/system/apt-daily-upgrade.timer
   /etc/systemd/system/apt-daily.service
@@ -45,6 +57,7 @@ entries=(
   /usr/local/bin/npm
   /usr/local/bin/npx
   /usr/local/bin/python3
+  /usr/local/sbin/certigo-idle-shutdown
   /usr/local/sbin/certigo-inventory-toolchain
   /usr/local/sbin/certigo-job-complete
   /usr/local/sbin/certigo-job-start

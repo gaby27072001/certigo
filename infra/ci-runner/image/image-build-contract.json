@@ -28,6 +28,12 @@
     "credentialsAllowedInImage": false,
     "managedIdentityAllowedOnCanary": false
   },
+  "idleShutdown": {
+    "agentInput": "idle-shutdown-agent",
+    "trustClass": "certigo-pr",
+    "quietPeriodSeconds": 900,
+    "source": "infra/ci-runner/on-demand.config.json"
+  },
   "reproducibility": {
     "status": "blocked",
     "aptSnapshot": "https://snapshot.ubuntu.com/ubuntu/20260807T000000Z/",
@@ -98,7 +104,7 @@
       "id": "inventory",
       "path": "infra/ci-runner/image/inventory-toolchain.sh",
       "destination": "inventory-toolchain.sh",
-      "sha256": "700b9c213eafd38a2d6364556f7560387382d9735cce08108ed8d35086642e25"
+      "sha256": "9406dd1f229736257ba0691b15145da00e4cf5ecd413ba7aeaa356b7d949f8ec"
     },
     {
       "id": "seal-state",
@@ -146,7 +152,7 @@
       "id": "offline-installer",
       "path": "infra/ci-runner/image/install_offline.py",
       "destination": "install_offline.py",
-      "sha256": "bc9f259032b4f0aeb623d8401e824217d75b555564e91dbb38c37aaef2a374b9"
+      "sha256": "1464c2569a77e0478294aee5c904540decbf709c128ba4451e2f85ae64469ead"
     },
     {
       "id": "artifact-set",
@@ -165,6 +171,12 @@
       "path": "infra/ci-runner/image/lock_inputs.py",
       "destination": "lock_inputs.py",
       "sha256": "f18e3ab1e57b8e798b863970c42b56edc3e7af6fe263f0797149b54d2c259044"
+    },
+    {
+      "id": "idle-shutdown-agent",
+      "path": "infra/ci-runner/idle-shutdown.sh",
+      "destination": "idle-shutdown.sh",
+      "sha256": "55c94bacfa1d42dd8a33f9fbffb904d4e833eabbcb733f0d5db1df5e78eb2f7b"
     }
   ]
 }

@@ -196,7 +196,7 @@ test('gzip derivatives decompress to the exact lock bytes and carry no name or d
   }
 });
 
-test('compiled sizes stay at least 10 % below every documented limit', () => {
+test('compiled sizes stay at least 10 % below every documented limit', (t) => {
   const templateBytes = Buffer.byteLength(compiledText);
   // Upper bound of the expanded resource: customizers fully resolved, plus every other
   // variable and parameter default in case the remaining expressions expand to them.
@@ -211,6 +211,7 @@ test('compiled sizes stay at least 10 % below every documented limit', () => {
     Buffer.byteLength(JSON.stringify(template.parameters));
   const compressedTemplateBytes = gzipSync(Buffer.from(compiledText), { level: 9 }).length;
   const measured = { templateBytes, resourceBytes, compressedTemplateBytes };
+  t.diagnostic(`measured ${JSON.stringify(measured)}`);
   for (const [name, value] of Object.entries(measured)) {
     assert.ok(value <= Math.floor(limits[name] * margin),
       `${name} ${value} exceeds ${margin * 100} % of the documented ${limits[name]}`);

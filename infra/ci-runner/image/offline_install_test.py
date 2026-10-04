@@ -465,6 +465,70 @@ class InventoryTests(unittest.TestCase):
                         "DOTNET_CLI_TELEMETRY_OPTOUT=1"):
             self.assertIn(setting, validator)
 
+    def test_idle_shutdown_agent_is_the_versioned_input_with_the_pool_quiet_period(self):
+        import offline_harness
+        contract = read_json(ROOT / "image-build-contract.json")
+        idle = contract["idleShutdown"]
+        agents = [item for item in contract["inputs"] if item["id"] == idle["agentInput"]]
+        self.assertEqual(len(agents), 1)
+        self.assertEqual(agents[0]["path"], "infra/ci-runner/idle-shutdown.sh")
+        self.assertEqual(agents[0]["sha256"], file_hash(REPOSITORY / agents[0]["path"]))
+        # The image serves one pool class: its quiet period is the one the operators set.
+        self.assertEqual(idle["source"], "infra/ci-runner/on-demand.config.json")
+        pools = [pool for pool in read_json(REPOSITORY / idle["source"])["pools"]
+                 if pool["trustClass"] == idle["trustClass"]]
+        self.assertTrue(pools)
+        self.assertEqual({pool["quietPeriodSeconds"] for pool in pools}, {idle["quietPeriodSeconds"]})
+        self.assertEqual(idle["trustClass"], "certigo-pr")
+        template = (ROOT / "image-build.bicep").read_text()
+        self.assertIn("loadFileAsBase64('../idle-shutdown.sh')", template)
+        for check in ("is-enabled --quiet certigo-idle-shutdown.timer",
+                      "is-active --quiet certigo-idle-shutdown.timer"):
+            self.assertIn(check, template)
+        inventory = (ROOT / "inventory-toolchain.sh").read_text()
+        for path in offline_harness.IDLE_ATTESTED:
+            if path.startswith("/etc/systemd/system/certigo-block-imds.service.d"):
+                continue  # a whole attested root, present on the PR image only
+            if path == "/etc/cloud/cloud.cfg.d/91-certigo-imds-blocked.cfg":
+                continue  # inside the attested cloud-init root
+            self.assertIn(f"  {path}\n", inventory)
+        self.assertIn("${CERTIGO_IMDS_DROP_IN_ROOT:-/etc/systemd/system/certigo-block-imds.service.d}",
+                      inventory)
+        for runtime in ("/run/certigo-idle-shutdown", "/etc/certigo-idle-shutdown.hold\n"):
+            self.assertNotIn(f"  {runtime}", inventory)
+        self.assertEqual(offline_harness.INVENTORY_ROOTS["CERTIGO_IMDS_DROP_IN_ROOT"],
+                         "etc/systemd/system/certigo-block-imds.service.d")
+
+    @unittest.skipUnless(shutil.which("bash"), "requires bash")
+    def test_inventory_attests_the_imds_drop_in_directory_only_when_present(self):
+        script = ROOT / "inventory-toolchain.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            roots = {name: base / name for name in ("toolchains", "runner", "az", "apt", "cloud")}
+            for path in roots.values():
+                path.mkdir()
+            drop_in = base / "certigo-block-imds.service.d"
+            environment = dict(os.environ, LC_ALL="C",
+                               CERTIGO_TOOLCHAIN_ROOT=str(roots["toolchains"]),
+                               CERTIGO_RUNNER_HOME=str(roots["runner"]),
+                               CERTIGO_AZURE_CLI_ROOT=str(roots["az"]),
+                               CERTIGO_APT_ROOT=str(roots["apt"]),
+                               CERTIGO_CLOUD_CONFIG_ROOT=str(roots["cloud"]),
+                               CERTIGO_IMDS_DROP_IN_ROOT=str(drop_in))
+            output = base / "inventory.tsv"
+            subprocess.run(["bash", script, "--roots-only", str(output)], env=environment, check=True)
+            self.assertNotIn(str(drop_in), output.read_text())
+            drop_in.mkdir()
+            (drop_in / "10-certigo-before-cloud-init.conf").write_text("[Unit]\n")
+            subprocess.run(["bash", script, "--roots-only", str(output)], env=environment, check=True)
+            records = output.read_text()
+            self.assertIn(f"\t{drop_in}\t-\n", records)
+            self.assertIn(f"\t{drop_in}/10-certigo-before-cloud-init.conf\t", records)
+            # A drop-in added later to undo the IMDS ordering changes the attested inventory.
+            (drop_in / "20-undo.conf").write_text("[Unit]\nBefore=\n")
+            subprocess.run(["bash", script, "--roots-only", str(output)], env=environment, check=True)
+            self.assertNotEqual(records, output.read_text())
+
     @unittest.skipUnless(shutil.which("jq") and shutil.which("bash"), "requires jq and bash")
     def test_validator_reads_every_probe_field_even_when_one_is_empty(self):
         validator = (ROOT / "validate-toolchain.sh").read_text()
@@ -512,6 +576,15 @@ class ExecutionEvidenceTests(unittest.TestCase):
         self.assertEqual(positive["attestation"]["networkAttempts"], [])
         self.assertTrue(positive["inventoryEquivalence"]["identical"])
         self.assertTrue(positive["runnerRuntime"].startswith("blocked by defect 6"))
+        self.assertEqual(positive["runtime"]["python3-venv"],
+                         "/opt/certigo/toolchains/python-3.12.3 6.0.2")
+        self.assertEqual(positive["idleShutdown"]["attested"], list(offline_harness.IDLE_ATTESTED))
+        self.assertEqual(positive["drift"]["idle-shutdown-config"]["reason"],
+                         "complete toolchain inventory mismatch")
+        self.assertEqual(positive["drift"]["valid-again-with-hold-file"]["reason"], "valid")
+        for key in ("bootValidationSeconds", "jobValidationSeconds", "hashedBytes",
+                    "flutterCopyBytes"):
+            self.assertGreater(positive["coldStart"][key], 0, key)
 
 
 @unittest.skipUnless(os.environ.get("CERTIGO_OFFLINE_ROOTFS"), "requires the qemu harness base")

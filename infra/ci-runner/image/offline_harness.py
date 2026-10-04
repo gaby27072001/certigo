@@ -17,6 +17,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -62,7 +63,10 @@ case "${verb}" in
     exec /usr/bin/systemctl.certigo-real --root=/ "${verb}" "${args[@]}" ;;
   daemon-reload|start|stop|restart|reload|try-restart|reset-failed)
     exit 0 ;;
+  list-units)
+    exit 0 ;;  # nothing runs in the chroot
   is-active)
+    echo inactive
     exit 3 ;;
   *)
     echo "harness systemctl: unsupported verb ${verb}" >&2
@@ -297,13 +301,16 @@ if ipv6:
     families.append(socket.AF_INET6)
 sentinel = NetworkSentinel().start(families=families)
 self_test(sentinel, ipv6)
+started = time.monotonic()
 result = subprocess.run(sys.argv[1:], capture_output=True, text=True, errors="replace",
                         env={{"PATH": {CHILD_PATH!r}, "LANG": "C.UTF-8",
                              "DEBIAN_FRONTEND": "noninteractive"}})
+seconds = round(time.monotonic() - started, 1)
 time.sleep(1)
 flows = {{name: count for name, count in sentinel.counters().items() if count}}
 events = sentinel.stop()
-print(json.dumps({{"returncode": result.returncode, "output": (result.stdout + result.stderr)[-3000:],
+print(json.dumps({{"returncode": result.returncode, "seconds": seconds,
+                  "output": (result.stdout + result.stderr)[-3000:],
                   "events": events[:20], "eventCount": len(events), "flows": flows,
                   "attempts": len(events) + sum(flows.values())}}))
 """
@@ -342,7 +349,8 @@ def expect_validation(merged, message):
     else:
         require(result["returncode"] != 0 and message in output,
                 f"Boot validation did not refuse for the expected reason ({message}): {output[-2000:]}")
-    return {"returncode": result["returncode"], "reason": message or "valid", "attempts": 0}
+    return {"returncode": result["returncode"], "reason": message or "valid", "attempts": 0,
+            "seconds": result["seconds"]}
 
 
 RUNNER_ENV = ["HOME=/tmp/certigo-runner-home", "CI=true", "FLUTTER_ALREADY_LOCKED=true",
@@ -357,6 +365,9 @@ RUNNER_PROBES = {
     "npm": (["/usr/local/bin/npm", "--version"], "10.8.2"),
     "checkov": (["/usr/local/bin/checkov", "--version"], "3.2.495"),
     "python3": (["/usr/local/bin/python3", "--version"], "Python 3.12.3"),
+    # Defect 10: the entry point must run inside the locked venv, not the system Python.
+    "python3-venv": (["/usr/local/bin/python3", "-c", "import sys, yaml; print(sys.prefix, yaml.__version__)"],
+                     "/opt/certigo/toolchains/python-3.12.3 6.0.2"),
     "bicep": (["/usr/local/bin/bicep", "--version"], "Bicep CLI version 0.44.1"),
     "actionlint": (["/usr/local/bin/actionlint", "-version"], "1.7.12"),
     "dart-format-3.6.0": (["/usr/local/bin/dart-format-3.6.0", "--version"], "Dart SDK version: 3.6.0"),
@@ -375,7 +386,18 @@ KNOWN_DEFECT_6 = {
 LEGACY_ROOTS = ("opt/certigo/toolchains", "opt/actions-runner", "opt/az")
 INVENTORY_ROOTS = {"CERTIGO_TOOLCHAIN_ROOT": "opt/certigo/toolchains",
                    "CERTIGO_RUNNER_HOME": "opt/actions-runner", "CERTIGO_AZURE_CLI_ROOT": "opt/az",
-                   "CERTIGO_APT_ROOT": "etc/apt", "CERTIGO_CLOUD_CONFIG_ROOT": "etc/cloud/cloud.cfg.d"}
+                   "CERTIGO_APT_ROOT": "etc/apt", "CERTIGO_CLOUD_CONFIG_ROOT": "etc/cloud/cloud.cfg.d",
+                   "CERTIGO_IMDS_DROP_IN_ROOT": "etc/systemd/system/certigo-block-imds.service.d"}
+# Written by the on-demand agent's own `install` (ADR-022); each must be attested.
+IDLE_ATTESTED = ("/usr/local/sbin/certigo-idle-shutdown", "/etc/certigo-idle-shutdown.env",
+                 "/etc/systemd/system/certigo-idle-shutdown.service",
+                 "/etc/systemd/system/certigo-idle-shutdown.timer",
+                 "/etc/systemd/system/timers.target.wants/certigo-idle-shutdown.timer",
+                 "/etc/systemd/system/certigo-block-imds.service.d",
+                 "/etc/systemd/system/certigo-block-imds.service.d/10-certigo-before-cloud-init.conf",
+                 "/etc/cloud/cloud.cfg.d/91-certigo-imds-blocked.cfg")
+IDLE_STATUS = ("hold=absent", "imds_drop_in=present", "cloud_init_boot_refresh=new-instance-only",
+               "config.NO_SHUTDOWN_WINDOW_UTC=0115-0150")
 
 
 def gnu_coreutils_path(directory):
@@ -445,11 +467,60 @@ def inventory_equivalence(merged, legacy_inventory, work):
     return comparison
 
 
+def idle_shutdown_checks(merged):
+    """The on-demand agent is the contract input, enabled, PR-hardened and attested."""
+    contract = read_json(ROOT / CONTRACT)
+    idle = contract["idleShutdown"]
+    agent = next(item for item in contract["inputs"] if item["id"] == idle["agentInput"])
+    link = merged / "etc/systemd/system/timers.target.wants/certigo-idle-shutdown.timer"
+    require(link.is_symlink() and os.readlink(link) == "/etc/systemd/system/certigo-idle-shutdown.timer",
+            "certigo-idle-shutdown.timer is not enabled in the image")
+    result = chroot_run(merged, "/usr/local/sbin/certigo-idle-shutdown", "status")
+    require(result.returncode == 0, f"idle-shutdown status failed: {result.stderr[-800:]}")
+    lines = result.stdout.splitlines()
+    expected = [f"script_sha256={agent['sha256']}",
+                f"config.QUIET_PERIOD_SECONDS={idle['quietPeriodSeconds']}", *IDLE_STATUS]
+    missing = [line for line in expected if line not in lines]
+    require(not missing, f"idle-shutdown status differs: {missing} in {lines}")
+    inventory = merged / "opt/certigo/runner-image/toolchain-inventory.tsv"
+    attested = {line.split("\t")[3] for line in inventory.read_text(encoding="utf-8").splitlines()}
+    unattested = [path for path in IDLE_ATTESTED if path not in attested]
+    require(not unattested, f"Idle-shutdown files outside the attested inventory: {unattested}")
+    runtime = [path for path in attested
+               if path.startswith(("/run/", "/etc/certigo-idle-shutdown.hold"))]
+    require(not runtime, f"Runtime agent state is attested: {runtime}")
+    return {"status": expected, "attested": list(IDLE_ATTESTED)}
+
+
+def inventory_volume(merged):
+    """What every validation reads and hashes, and what --boot copies (estimate (b))."""
+    def measure(top):
+        files = size = 0
+        for directory, _, names in os.walk(top):
+            for name in names:
+                info = os.lstat(os.path.join(directory, name))
+                if stat.S_ISREG(info.st_mode):
+                    files += 1
+                    size += info.st_size
+        return files, size
+    files = size = 0
+    for relative in INVENTORY_ROOTS.values():
+        if (merged / relative).is_dir():
+            root_files, root_size = measure(merged / relative)
+            files += root_files
+            size += root_size
+    manifest = read_json(ROOT / "toolchain-manifest.json")
+    flutter = next(tool for tool in manifest["tools"] if tool["id"] == "flutter")["installPath"]
+    flutter_files, flutter_size = measure(merged / flutter.lstrip("/") / "flutter")
+    return {"hashedFiles": files, "hashedBytes": size,
+            "flutterCopyFiles": flutter_files, "flutterCopyBytes": flutter_size}
+
+
 def post_install_checks(merged, legacy_inventory):
     """Guest patching simulation, sentinel controls, runner probes, then drift at boot."""
     (merged / OBSERVER.lstrip("/")).write_text(OBSERVER_SOURCE, encoding="utf-8")
     report = {"patching": {}, "sentinelControls": {}, "drift": {}, "runtime": {},
-              "knownDefects": {}}
+              "knownDefects": {}, "idleShutdown": idle_shutdown_checks(merged)}
     commands = {
         "lpe.refresh": ["apt-get", "-q", "update"],
         "lpe.assessment": ["apt-get", "-s", "dist-upgrade"],
@@ -474,10 +545,13 @@ def post_install_checks(merged, legacy_inventory):
         require(control["attempts"] > 0, f"Sentinel control not observed: {name}")
     report["drift"]["valid"] = expect_validation(merged, None)
     def as_runner(command):
+        started = time.monotonic()
         result = chroot_run(merged, "runuser", "-u", "runner", "--", "env", *RUNNER_ENV, *command,
                             timeout=1800)
+        seconds = round(time.monotonic() - started, 1)
         output = (result.stdout + result.stderr).strip()
-        return result.returncode, output, {"returncode": result.returncode, "output": output[-1500:]}
+        return result.returncode, output, {"returncode": result.returncode, "seconds": seconds,
+                                           "output": output[-1500:]}
 
     for name, (command, expected) in RUNNER_PROBES.items():
         returncode, output, entry = as_runner(command)
@@ -509,11 +583,24 @@ def post_install_checks(merged, legacy_inventory):
     report["drift"]["seeded-snap"] = expect_validation(
         merged, "a snap package is installed or seeded")
     (seed / "certigo-drift_1.snap").unlink()
+    idle = read_json(ROOT / CONTRACT)["idleShutdown"]["quietPeriodSeconds"]
+    config = merged / "etc/certigo-idle-shutdown.env"
+    original = config.read_bytes()
+    altered = original.replace(f"QUIET_PERIOD_SECONDS={idle}\n".encode(), b"QUIET_PERIOD_SECONDS=86400\n")
+    require(altered != original, "Unexpected idle-shutdown configuration shape")
+    config.write_bytes(altered)
+    report["drift"]["idle-shutdown-config"] = expect_validation(
+        merged, "complete toolchain inventory mismatch")
+    config.write_bytes(original)
     unmask = chroot_run(merged, "systemctl", "unmask", "apt-daily.timer")
     require(unmask.returncode == 0, f"unmask failed: {unmask.stderr}")
     report["drift"]["unmasked-timer"] = expect_validation(merged, "apt-daily.timer is not masked")
     chroot_run(merged, "systemctl", "mask", "apt-daily.timer")
-    report["drift"]["valid-again"] = expect_validation(merged, None)
+    # The operator hold file and the agent state under /run are runtime, never attested.
+    hold = merged / "etc/certigo-idle-shutdown.hold"
+    hold.write_text("harness hold\n", encoding="utf-8")
+    report["drift"]["valid-again-with-hold-file"] = expect_validation(merged, None)
+    hold.unlink()
     probe = merged / "tmp/certigo-drift-probe"
     (probe / "DEBIAN").mkdir(parents=True)
     (probe / "DEBIAN/control").write_text(DRIFT_PACKAGE, encoding="utf-8")
@@ -527,6 +614,12 @@ def post_install_checks(merged, legacy_inventory):
     if legacy_inventory:
         with tempfile.TemporaryDirectory(prefix="certigo-inventory-", dir=merged.parent.parent) as tmp:
             report["inventoryEquivalence"] = inventory_equivalence(merged, legacy_inventory, Path(tmp))
+    report["coldStart"] = {
+        "environment": "qemu-user amd64 on WSL2 ARM64, warm page cache: an estimate, not Azure",
+        "bootValidationSeconds": report["drift"]["valid"]["seconds"],
+        "jobValidationSeconds": report["runtime"]["validate-job"]["seconds"],
+        **inventory_volume(merged),
+    }
     return report
 
 
@@ -675,6 +768,8 @@ def summarize(outcome):
                                    post["knownDefects"].items()}
         summary["runnerRuntime"] = post["runnerRuntime"]
         summary["inventoryEquivalence"] = post.get("inventoryEquivalence")
+        summary["idleShutdown"] = post["idleShutdown"]
+        summary["coldStart"] = post["coldStart"]
     if outcome.get("postInstallError"):
         summary["postInstallError"] = outcome["postInstallError"][-800:]
     return summary

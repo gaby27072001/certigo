@@ -190,6 +190,7 @@ test('compiled ARM remains inert even after all JSON readiness and signer flags 
   const directory = join(workspace, 'image');
   cpSync(root, directory, { recursive: true });
   copyFileSync(join(root, '..', 'bootstrap.sh'), join(workspace, 'bootstrap.sh'));
+  copyFileSync(join(root, '..', 'idle-shutdown.sh'), join(workspace, 'idle-shutdown.sh'));
   const templates = ['image-build', 'canary', 'canary-main'];
   writeFileSync(join(directory, 'image-build-contract.json'), JSON.stringify(contract));
   const policy = JSON.parse(readFileSync(join(directory, 'attestation-policy.json'), 'utf8'));

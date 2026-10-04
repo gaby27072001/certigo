@@ -31,7 +31,7 @@ var flutterInputsReady = length(string(contract.reproducibility.flutterEngineArt
 var pythonInputsReady = length(string(contract.reproducibility.pythonWheelLockSha256)) == 64
 var reproducibilityReady = contract.policy.reproducibleInputsReady && contract.reproducibility.status == 'locked' && aptInputsReady && flutterInputsReady && pythonInputsReady
 var effectiveDeploymentEnabled = deploymentEnabled && reproducibilityReady && networkInstallerImplemented
-var contractSha256 = '936cd1b3fbeb3066cf581c1372bfd12cb4232cbfd9167d1640edf14ff8e86291'
+var contractSha256 = '490d3361b7e92a6c3fbdf7257856ba0bd1688347c707052b827a9c4c6b814a7a'
 var galleryImageDefinitionId = resourceId(
   'Microsoft.Compute/galleries/images',
   contract.destination.galleryName,
@@ -77,6 +77,7 @@ var stageEmbeddedInputs = {
     'printf \'%s\' \'${loadFileAsBase64('image_artifacts.py')}\' > /tmp/certigo-image-staging/image_artifacts.py.b64 || exit 1'
     'printf \'%s\' \'${loadFileAsBase64('lock_flutter.py')}\' > /tmp/certigo-image-staging/lock_flutter.py.b64 || exit 1'
     'printf \'%s\' \'${loadFileAsBase64('lock_inputs.py')}\' > /tmp/certigo-image-staging/lock_inputs.py.b64 || exit 1'
+    'printf \'%s\' \'${loadFileAsBase64('../idle-shutdown.sh')}\' > /tmp/certigo-image-staging/idle-shutdown.sh.b64 || exit 1'
   ]
 }
 var verifyEmbeddedInputs = {
@@ -210,6 +211,9 @@ resource imageTemplate 'Microsoft.VirtualMachineImages/imageTemplates@2025-10-01
             'sudo test ! -s /var/cache/certigo-runner/actions-runner-token || exit 1'
             'sudo systemctl is-enabled --quiet certigo-block-imds.service || exit 1'
             'sudo systemctl is-active --quiet certigo-block-imds.service || exit 1'
+            // On-demand runner (ADR-022): the attested agent ships enabled and running.
+            'sudo systemctl is-enabled --quiet certigo-idle-shutdown.timer || exit 1'
+            'sudo systemctl is-active --quiet certigo-idle-shutdown.timer || exit 1'
             'sudo /usr/sbin/iptables -C OUTPUT -d 169.254.169.254/32 -j REJECT || exit 1'
             'if curl --silent --show-error --connect-timeout 2 --max-time 3 http://169.254.169.254/metadata/instance?api-version=2021-02-01 -H Metadata:true --output /dev/null; then echo "IMDS is reachable in the completed image." >&2; exit 1; fi'
           ]

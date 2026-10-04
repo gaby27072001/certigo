@@ -76,6 +76,17 @@ CLOUD_INIT_APT = ("# Certigo immutable runner image (#341): never regenerate APT
                   "package_upgrade: false\n"
                   "package_reboot_if_required: false\n")
 SOURCES_LIST = "# Certigo immutable runner image (#341): no remote APT source.\n"
+# Written by idle-shutdown.sh install (ADR-022); attested by inventory-toolchain.sh.
+IDLE_AGENT = Path("/usr/local/sbin/certigo-idle-shutdown")
+IDLE_CONFIG = Path("/etc/certigo-idle-shutdown.env")
+IDLE_TIMER = "certigo-idle-shutdown.timer"
+IDLE_FILES = (
+    IDLE_AGENT, IDLE_CONFIG,
+    Path("/etc/systemd/system/certigo-idle-shutdown.service"),
+    Path("/etc/systemd/system/certigo-idle-shutdown.timer"),
+    Path("/etc/systemd/system/certigo-block-imds.service.d/10-certigo-before-cloud-init.conf"),
+    Path("/etc/cloud/cloud.cfg.d/91-certigo-imds-blocked.cfg"),
+)
 PATCHING_FILES = {
     Path("/etc/apt/apt.conf.d/20auto-upgrades"): AUTO_UPGRADES,
     Path("/etc/apt/apt.conf.d/99certigo-immutable-image"): APT_PERIODIC,
@@ -890,13 +901,23 @@ class Installer:
             "/usr/local/bin/bicep": f"bicep-{v('bicep')}/bicep",
             "/usr/local/bin/actionlint": f"actionlint-{v('actionlint')}/actionlint",
             "/usr/local/bin/checkov": f"python-{python_version}/bin/checkov",
-            "/usr/local/bin/python3": f"python-{python_version}/bin/python",
         }
         for link, relative in links.items():
             path = Path(link)
             if path.is_symlink() or path.exists():
                 path.unlink()
             path.symlink_to(TOOLCHAIN_ROOT / relative)
+        # Defect 10: CPython looks for pyvenv.cfg beside the path it was invoked by. A
+        # symlink to the venv interpreter therefore runs without the venv (system
+        # site-packages, PyYAML 6.0.1 instead of the locked 6.0.2); exec keeps the venv path.
+        python3 = Path("/usr/local/bin/python3")
+        if python3.is_symlink() or python3.exists():
+            python3.unlink()
+        python3.write_text("#!/bin/sh\n"
+                           f"exec {TOOLCHAIN_ROOT}/python-{python_version}/bin/python \"$@\"\n",
+                           encoding="utf-8")
+        os.chown(python3, 0, 0)
+        os.chmod(python3, 0o755)
         IMAGE_ROOT.mkdir(mode=0o755, parents=True, exist_ok=True)
         files = (
             ("toolchain-manifest.json", IMAGE_ROOT / "toolchain-manifest.json", 0o644),
@@ -925,7 +946,41 @@ class Installer:
                 path.unlink()
             path.symlink_to("/usr/local/sbin/certigo-job-temp")
 
-    # ------------------------------------------------------- guest patching (#341)
+    # ------------------------------------------------- on-demand idle shutdown (ADR-022)
+    def install_idle_shutdown(self):
+        """Install the versioned on-demand shutdown agent exactly as its Run Command does.
+
+        The agent's own `install` writes the script, its configuration, its units and,
+        on a PR runner (certigo-block-imds.service present), the IMDS boot ordering and
+        the cloud-init refresh limit. It never powers off a machine without a configured
+        actions.runner.* unit, so starting its timer on the build machine is harmless.
+        """
+        idle = self.contract["idleShutdown"]
+        quiet = idle["quietPeriodSeconds"]
+        require(idle["trustClass"] == "certigo-pr", "The runner image serves PR runners only")
+        require(type(quiet) is int and 300 <= quiet <= 86400, "Invalid idle-shutdown quiet period")
+        sources = [item for item in self.contract["inputs"] if item["id"] == idle["agentInput"]]
+        require(len(sources) == 1, "The idle-shutdown agent is not a single contract input")
+        require(Path("/etc/systemd/system/certigo-block-imds.service").is_file(),
+                "The PR image must block IMDS before the idle-shutdown agent is installed")
+        agent = self.input(sources[0]["destination"])
+        result = self.run("idle-shutdown.install", ["bash", agent, "install", str(quiet)])
+        require("certigo-idle-shutdown installed" in result.stdout,
+                "The idle-shutdown agent did not report its installation")
+        require(file_hash(IDLE_AGENT) == sources[0]["sha256"],
+                "Installed idle-shutdown agent differs from the verified input")
+        config = IDLE_CONFIG.read_text(encoding="utf-8").splitlines()
+        require(f"QUIET_PERIOD_SECONDS={quiet}" in config,
+                "Idle-shutdown configuration differs from the contract quiet period")
+        for path in IDLE_FILES:
+            require(path.is_file() and not path.is_symlink(), f"Idle-shutdown agent file missing: {path}")
+        # Without it cloud-init waits 300 s for the blocked IMDS at every wake (ADR-022, #574).
+        require("when: ['boot-new-instance']" in IDLE_FILES[-1].read_text(encoding="utf-8"),
+                "cloud-init would refresh its metadata at every boot of the PR image")
+        state = self.run("idle-shutdown.timer", ["systemctl", "is-enabled", IDLE_TIMER],
+                         check=False).stdout.strip()
+        require(state == "enabled", f"{IDLE_TIMER} is not enabled ({state})")
+
     def neutralize_guest_patching(self):
         for path, content in PATCHING_FILES.items():
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -1000,6 +1055,7 @@ class Installer:
         self.install_flutter()
         self.install_python()
         self.install_links_and_files()
+        self.install_idle_shutdown()
         self.neutralize_guest_patching()
         self.seal_and_attest()
         self.validate()
