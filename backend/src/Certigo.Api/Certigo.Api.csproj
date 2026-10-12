@@ -26,4 +26,30 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Certigo.Api.Tests" />
   </ItemGroup>
+  <UsingTask TaskName="CertigoBuildIdentityTask"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <Task>
+      <Code Type="Class" Language="cs" Source="$(MSBuildThisFileDirectory)..\..\BuildTasks\CertigoBuildIdentityTask.cs" />
+    </Task>
+  </UsingTask>
+  <Target Name="GenerateCertigoBuildIdentity"
+          BeforeTargets="GetAssemblyAttributes"
+          DependsOnTargets="InitializeSourceControlInformation">
+    <CertigoBuildIdentityTask SourceRevisionId="$(SourceRevisionId)"
+                             BuildTimeUtc="$(CertigoBuildTimeUtc)"
+                             ContinuousIntegrationBuild="$(ContinuousIntegrationBuild)"
+                             GitHubActions="$(GITHUB_ACTIONS)"
+                             GitHubWorkflow="$(GITHUB_WORKFLOW)"
+                             GitHubEventName="$(GITHUB_EVENT_NAME)"
+                             GitHubRef="$(GITHUB_REF)"
+                             GitHubSha="$(GITHUB_SHA)">
+      <Output TaskParameter="CommitSha" PropertyName="_CertigoCommitSha" />
+      <Output TaskParameter="ValidatedBuildTimeUtc" PropertyName="_CertigoBuildTimeUtc" />
+    </CertigoBuildIdentityTask>
+    <ItemGroup>
+      <AssemblyMetadata Include="Certigo.CommitSha" Value="$(_CertigoCommitSha)" />
+      <AssemblyMetadata Include="Certigo.BuildTimeUtc" Value="$(_CertigoBuildTimeUtc)" />
+    </ItemGroup>
+  </Target>
 </Project>

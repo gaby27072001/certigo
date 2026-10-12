@@ -3,11 +3,15 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Certigo.Api.Http;
+using Certigo.Api.Observability;
 
 namespace Certigo.Api.Functions;
 
 /// Anonymous liveness and readiness probes for platform and uptime monitoring.
-public sealed class HealthFunctions(IHealthProbe probe, ILogger<HealthFunctions> logger)
+public sealed class HealthFunctions(
+    IHealthProbe probe,
+    ILogger<HealthFunctions> logger,
+    BuildIdentity buildIdentity)
 {
     [Function("Health")]
     public async Task<HttpResponseData> Health(
@@ -26,7 +30,12 @@ public sealed class HealthFunctions(IHealthProbe probe, ILogger<HealthFunctions>
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "health/live")] HttpRequestData request,
         FunctionContext context)
         => await request.JsonAsync(
-            new { status = "healthy" },
+            new
+            {
+                status = "healthy",
+                commitSha = buildIdentity.ShortCommitSha,
+                buildTimeUtc = buildIdentity.BuildTimeUtc
+            },
             cancellationToken: context.CancellationToken);
 
     private async Task<HttpResponseData> Ready(HttpRequestData request, FunctionContext context)

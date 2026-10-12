@@ -4,6 +4,7 @@ using Azure.Communication.Email;
 using Azure.Core;
 using Azure.Identity;
 using Azure.Storage.Blobs;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.ApplicationInsights;
@@ -60,6 +61,8 @@ var host = new HostBuilder()
                 configuration["ENTERPRISE_LEARNING_METRICS_V1"]);
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
+        services.AddSingleton(BuildIdentity.FromAssembly());
+        services.AddSingleton<ITelemetryInitializer, BuildIdentityTelemetryInitializer>();
         services.AddHostedService<ColdStartTelemetryService>();
 
         services.AddSingleton<TokenCredential, DefaultAzureCredential>();

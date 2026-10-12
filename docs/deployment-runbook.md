@@ -112,6 +112,75 @@ secrets isolés de cet environnement, exige le commit, le hash et le run source
 enregistrés dans `previous`, puis exécute les deux smoke tests. En cas d'échec, le
 pointeur `current` n'est pas modifié et le workflow échoue fermé.
 
+#### Identité du build et preuve après promotion
+
+`Certigo.Api.dll` embarque deux attributs `AssemblyMetadata` : `Certigo.CommitSha`
+(SHA complet du checkout compilé) et `Certigo.BuildTimeUtc` (instant UTC du build).
+Le SDK .NET résout `SourceRevisionId` depuis Git avant la génération des attributs.
+Le chemin réel `cd-backend` fait le checkout du push `main`, puis
+`dotnet publish ... --configuration Release --no-restore
+-p:ContinuousIntegrationBuild=true -p:Deterministic=true -p:DebugType=None`.
+Le projet exige alors un SHA disponible et, pour le push `main` de `cd-backend`,
+sa concordance avec `GITHUB_SHA`, également utilisé par `release-manifest.json`.
+Cette comparaison ne s'applique **pas** au job `ci-backend` sur
+`pull_request_target` : celui-ci compile la tête de PR, pas le SHA de base contenu
+dans `GITHUB_SHA`. Aucun workflow n'est modifié pour injecter ces métadonnées.
+La validation et la capture utilisent une tâche C# du `RoslynCodeTaskFactory`
+fourni avec le SDK MSBuild (`backend/BuildTasks/CertigoBuildIdentityTask.cs`).
+Les déclarations de dépendances restent inconditionnelles et le contrôle NuGet
+existant reste inchangé ; cette tâche n'ajoute aucune dépendance.
+
+MSBuild capture l'heure une fois lors de la génération des attributs, pas au
+démarrage du processus ni à chaque requête. Le publish inclut la DLL dans le ZIP ;
+une promotion ou un rollback réutilise cette DLL sans la reconstruire. Aucun app
+setting, variable de conteneur, nom de blob ou `main` consulté au déploiement ne
+peut remplacer l'identité embarquée. Le SHA désigne la révision source, **pas**
+le SHA-256 du ZIP. Un checkout local modifié n'est pas certifié propre par ce SHA.
+
+Pour une compilation depuis une archive sans `.git`, fournir le SHA de provenance
+vérifié via `-p:SourceRevisionId=<40 caractères hexadécimaux>`. Une compilation
+locale sans provenance reste possible : `commitSha` vaut explicitement `null`.
+Une compilation avec `ContinuousIntegrationBuild=true` refuse ce manque. Pour
+rejouer intentionnellement un build avec un instant déjà enregistré, fournir
+`-p:CertigoBuildTimeUtc=2026-09-27T17:00:00.0000000Z` (exemple de format uniquement ;
+utiliser l'instant réel du build source). La date doit être valide et UTC.
+Sans cette propriété, chaque nouvelle compilation capture une nouvelle date :
+`Deterministic=true` stabilise le compilateur pour les mêmes entrées, mais ne
+promet pas un ZIP identique entre deux builds ayant des dates différentes.
+`publish --no-build` conserve les attributs de la compilation précédente
+(réutiliser la même configuration et `DebugType=None` pour une compilation release
+sans PDB).
+
+**Gate opérateur après promotion ou rollback, avant validation de livraison :**
+
+1. Relever le `commitSha` complet du manifeste du **run source promu**, déjà
+   vérifié avec le digest du ZIP. Ne pas prendre le SHA de `main` actuel ni celui
+   du run de promotion.
+2. Appeler `GET /api/health/live` : exiger HTTP 200, `status: "healthy"`,
+   `commitSha` égal aux **12 premiers caractères** du SHA source, et
+   `buildTimeUtc` UTC identique à celui relevé pour ce même artefact en dev puis
+   staging. Le corps ne contient que ces trois champs ; l'absence de métadonnées
+   est représentée par `null`, jamais par une date runtime ou un faux SHA.
+   Si une version ancienne ne fournit pas ces champs, noter « identité non
+   prouvée » : HTTP 200 seul ne valide pas l'artefact.
+3. Vérifier séparément `/api/health/ready` (ou `/api/health`) : leur payload,
+   leurs dépendances et leurs statuts 200/503 ne changent pas. Un SHA correct ne
+   dispense pas des contrôles de disponibilité et d'authentification.
+4. Corroborer sur de nouveaux événements du **worker .NET isolé** :
+   `Context.Component.Version` est le SHA complet, exposé comme
+   `ApplicationVersion` dans les tables workspace Application Insights
+   (`AppTraces`, `AppExceptions`, `AppDependencies` selon les événements émis).
+   Les builds sans SHA indiquent `unknown`. Les requêtes/logs émis directement
+   par le **host Functions**, notamment `AppRequests`, ne passent pas par cet
+   initializer ; ne pas promettre leur enrichissement ni modifier `cloud_RoleName`.
+
+Ce gate est une vérification opérateur supplémentaire : les smoke tests
+automatiques existants vérifient la santé, pas encore la correspondance du SHA.
+L'identité applicative relie le code en exécution à la provenance du build ; elle
+ne remplace ni la vérification cryptographique du ZIP ni une lecture de ses octets.
+Un déploiement ancien sans métadonnées nécessite un nouveau build pour bénéficier
+de ce contrôle, pas une modification des variables de l'environnement.
+
 ### Alertes opérables
 
 Staging et production utilisent l'Action Group email existant. Les règles sont
