@@ -11,14 +11,21 @@
 		000000000000000000000005 = {isa = PBXBuildFile; productRef = 000000000000000000000042; };
 		000000000000000000000006 = {isa = PBXBuildFile; fileRef = 000000000000000000000015; };
 		000000000000000000000007 = {isa = PBXBuildFile; productRef = 000000000000000000000044; };
+		000000000000000000000008 = {isa = PBXBuildFile; fileRef = 000000000000000000000016; };
+		000000000000000000000009 = {isa = PBXBuildFile; fileRef = 000000000000000000000017; };
+		00000000000000000000000A = {isa = PBXBuildFile; productRef = 000000000000000000000045; };
+		00000000000000000000000B = {isa = PBXBuildFile; productRef = 000000000000000000000046; };
 		000000000000000000000011 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertigoNativeApp.swift; sourceTree = "<group>"; };
 		000000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeModel.swift; sourceTree = "<group>"; };
 		000000000000000000000013 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialVault.swift; sourceTree = "<group>"; };
 		000000000000000000000014 = {isa = PBXFileReference; explicitFileType = wrapper.application; path = CertigoNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000015 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MSALAuthenticationProvider.swift; sourceTree = "<group>"; };
+		000000000000000000000016 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoAuthTests/NoAuthConfigurationTests.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000017 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../CertigoKit/Tests/CertigoKitTests/RuntimeDiskProtectionTests.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000018 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = CertigoNoAuthTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000020 = {
 			isa = PBXGroup;
-			children = (000000000000000000000021, 000000000000000000000022);
+			children = (000000000000000000000021, 000000000000000000000022, 000000000000000000000016, 000000000000000000000017);
 			sourceTree = "<group>";
 		};
 		000000000000000000000021 = {
@@ -29,7 +36,7 @@
 		};
 		000000000000000000000022 = {
 			isa = PBXGroup;
-			children = (000000000000000000000014);
+			children = (000000000000000000000014, 000000000000000000000018);
 			name = Products;
 			sourceTree = "<group>";
 		};
@@ -55,6 +62,9 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../CertigoKit;
 		};
+		000000000000000000000033 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000008, 000000000000000000000009); runOnlyForDeploymentPostprocessing = 0; };
+		000000000000000000000034 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (00000000000000000000000A, 00000000000000000000000B); runOnlyForDeploymentPostprocessing = 0; };
+		000000000000000000000035 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		000000000000000000000041 = {isa = XCSwiftPackageProductDependency; package = 000000000000000000000040; productName = CertigoDomain; };
 		000000000000000000000042 = {isa = XCSwiftPackageProductDependency; package = 000000000000000000000040; productName = CertigoData; };
 		000000000000000000000043 = {
@@ -63,6 +73,8 @@
 			requirement = {kind = exactVersion; version = 2.16.0; };
 		};
 		000000000000000000000044 = {isa = XCSwiftPackageProductDependency; package = 000000000000000000000043; productName = MSAL; };
+		000000000000000000000045 = {isa = XCSwiftPackageProductDependency; package = 000000000000000000000040; productName = CertigoData; };
+		000000000000000000000046 = {isa = XCSwiftPackageProductDependency; package = 000000000000000000000043; productName = MSAL; };
 		000000000000000000000050 = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 000000000000000000000071;
@@ -88,7 +100,48 @@
 			productRefGroup = 000000000000000000000022;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (000000000000000000000050);
+			targets = (000000000000000000000050, 000000000000000000000051);
+		};
+		000000000000000000000051 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000072;
+			buildPhases = (000000000000000000000033, 000000000000000000000034, 000000000000000000000035);
+			buildRules = ();
+			dependencies = ();
+			name = CertigoNoAuthTests;
+			packageProductDependencies = (000000000000000000000045, 000000000000000000000046);
+			productName = CertigoNoAuthTests;
+			productReference = 000000000000000000000018;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		000000000000000000000072 = {isa = XCConfigurationList; buildConfigurations = (000000000000000000000084, 000000000000000000000085); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		000000000000000000000084 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.noauth-tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphonesimulator";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				ENABLE_TESTABILITY = YES;
+			};
+			name = Debug;
+		};
+		000000000000000000000085 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.noauth-tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphonesimulator";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				ENABLE_TESTABILITY = YES;
+			};
+			name = Release;
 		};
 		000000000000000000000070 = {
 			isa = XCConfigurationList;

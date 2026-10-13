@@ -602,6 +602,54 @@ composition activated and no Graph registration/signing changed.
 Conditional DEV callback consent remains unconsumed until the remaining
 Apple/bundle/collision checks and owner review actually pass.
 
+### Source-only unhosted no-auth test preparation
+
+`CertigoNoAuthTests` is a distinct unhosted XCTest target and shared scheme in
+the existing Xcode project, reusing the exact MSAL/CertigoData products.
+Its source test bundle identifier is `com.certigo.native.noauth-tests`;
+it has no `TEST_HOST`, `BUNDLE_LOADER`, callback declaration or added
+entitlement, and signing remains disabled. The DEV application target/scheme,
+bundle and entitlements are not changed. Actual generated XCTest runner
+identity and test execution still need new explicitly scoped Mac permission.
+An unhosted test bundle identity does **not** establish signed runner identity,
+Keychain isolation or permission.
+
+The harness tests pure metadata rejection of unregistered redirects/collisions
+and its own test bundle identifier. The existing iOS-only descriptor-protection
+test is moved, without changing assertions, to one shared source file compiled
+by both this target and SwiftPM tests. It uses a fresh temporary directory and
+synthetic single-byte payload; verifies actual first-unlock protection,
+payload and absence of witnesses; removes only that generated directory.
+No tests construct MSAL, enumerate/read/clear its cache, acquire/remove accounts,
+visit an authority or simulate successful authentication. Linking/importing MSAL
+only is not SDK initialization. Initialization/private-cache probes are
+deliberately deferred: choosing a unique client UUID does not isolate the
+runner's default Keychain group, and construction may touch that cache before
+isolation is proved. A distinct signed host/entitlement policy needs a later
+owner decision, not an implicit test capability addition.
+
+`python tools/validate_apple_noauth.py` checks bounded repository configuration:
+test identity/unhosted/no-entitlement policy, source DEV callback declarations,
+source Flutter/native scheme separation, and all three exact source lock pins
+including upstream locations. `python -m unittest discover -s tools -p
+'test_validate_apple_noauth.py'` covers synthetic accepted/rejected public
+metadata. No installed apps or caches are searched.
+Explicit `--built-dev-plist`, `--built-test-plist` and `--resolved-lock` file
+arguments can check later **supplied** artifacts; no artifact auto-discovery
+or source-equals-built proof is implied. These semantic pin checks do not
+claim byte equality of Xcode's lock with the source lock.
+
+Future commands, only after exact-SHA access/execution permission, are
+`xcodebuild -project apps/apple/CertigoNative/CertigoNative.xcodeproj
+-scheme CertigoNoAuthTests -destination 'generic/platform=iOS Simulator'
+CODE_SIGNING_ALLOWED=NO build-for-testing`, followed separately by an
+explicitly approved **isolated** simulator destination with `test`. A generic
+build does not run tests. If Xcode requires signing, a host or entitlements,
+stop and report the gate; do not add those or skip failures into success.
+Built-plist inspection, simulator creation/boot/install/execution and cleanup
+are separate permission scopes. The temporary access from the prior lot was
+removed; this source preparation does not reuse it.
+
 ## Non-destructive Flutter queue inspection
 
 `FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/
