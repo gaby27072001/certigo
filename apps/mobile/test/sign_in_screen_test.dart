@@ -223,8 +223,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50)); // échec → carte persistante + réarmement
 
     expect(gateway.signInCalls, <AuthProvider>[AuthProvider.microsoft]);
-    // Message d'annulation affiché dans la carte d'erreur persistante.
-    expect(find.text('Connexion annulée.'), findsOneWidget);
+    // Message d'annulation affiché dans la carte d'erreur persistante : la cause
+    // possible et l'action, pas le seul constat « Connexion annulée. ».
+    expect(
+      find.text(
+        'La connexion Microsoft n\'a pas abouti : la fenêtre a été fermée ou n\'a pas pu '
+        's\'ouvrir. Réessaie, ou connecte-toi avec ton e-mail.',
+      ),
+      findsOneWidget,
+    );
     // Bouton réarmé : plus de spinner en cours.
     final AuthProviderButton button = tester.widget<AuthProviderButton>(
       find.ancestor(of: microsoft, matching: find.byType(AuthProviderButton)),

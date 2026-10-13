@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:core/core.dart';
 import 'package:data/data.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,11 +20,13 @@ import '../app/offline/prefs_sync_store.dart';
 import '../app/providers.dart';
 import '../app/session_resume_store.dart';
 import '../features/auth/application/auth_controller.dart';
+import '../features/auth/application/auth_telemetry.dart';
 import '../features/notifications/notification_lifecycle_scope.dart';
 import '../features/notifications/notification_service.dart';
 import 'config_error_app.dart';
 import 'crash_reporting.dart';
 import 'crash_smoke_test_app.dart';
+import 'sentry_auth_telemetry.dart';
 
 /// Centralized app bootstrap.
 ///
@@ -110,6 +113,9 @@ Future<void> bootstrap({
     sessionResumeStoreProvider.overrideWithValue(
       SharedPreferencesSessionResumeStore(prefs),
     ),
+    // Release : les échecs de connexion sociale partent vers Sentry, balises
+    // techniques seulement (no-op si Sentry est désactivé). Debug : journal local.
+    if (!kDebugMode) authTelemetryProvider.overrideWithValue(SentryAuthTelemetry()),
   ];
   if (kRuntimeContentMobileEnabled) {
     final FileRuntimeContentStore? store = await resolveFileRuntimeContentStore();

@@ -6,9 +6,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import '../features/auth/application/auth_telemetry.dart';
 import 'crash_reporting.dart';
 
 typedef SentryCapture = Future<SentryId> Function(CrashReport report);
+
+Future<void> captureSentryEvent({
+  required Future<SentryId> Function() capture,
+  required void Function(String message) diagnosticSink,
+}) async {
+  try {
+    final SentryId id = await capture();
+    if (id == const SentryId.empty()) {
+      diagnosticSink('[crash] Sentry rejected the event.');
+    }
+  } on Object catch (error) {
+    diagnosticSink('[crash] Sentry capture failed (${CrashPrivacy.errorType(error)}).');
+  }
+}
 
 /// Routes provider-agnostic crash reports to the initialized Sentry hub.
 class SentryCrashReporter implements CrashReporter {
@@ -33,18 +48,7 @@ class SentryCrashReporter implements CrashReporter {
       return;
     }
 
-    unawaited(_captureAndReport(report));
-  }
-
-  Future<void> _captureAndReport(CrashReport report) async {
-    try {
-      final SentryId id = await _capture(report);
-      if (id == const SentryId.empty()) {
-        _diagnosticSink('[crash] Sentry rejected the event.');
-      }
-    } on Object catch (error) {
-      _diagnosticSink('[crash] Sentry capture failed (${CrashPrivacy.errorType(error)}).');
-    }
+    unawaited(captureSentryEvent(capture: () => _capture(report), diagnosticSink: _diagnosticSink));
   }
 
   static Future<SentryId> _captureWithSentry(CrashReport report) {
@@ -146,7 +150,6 @@ class SentryPrivacyScrubber {
         _clock = clock ?? DateTime.now;
 
   static const Set<String> _allowedTags = <String>{'crash.source', 'crash.fatal'};
-
   final String release;
   final String dist;
   final String environment;
@@ -200,6 +203,11 @@ class SentryPrivacyScrubber {
       final String? value = tags[key];
       if (value != null) {
         safe[key] = CrashPrivacy.text(value, maxCharacters: 80);
+      }
+    }
+    for (final MapEntry<String, String> tag in tags.entries) {
+      if (isSafeAuthFailureTag(tag.key, tag.value)) {
+        safe[tag.key] = tag.value;
       }
     }
     return safe.isEmpty ? null : safe;

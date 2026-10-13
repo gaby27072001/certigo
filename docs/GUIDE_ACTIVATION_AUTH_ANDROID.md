@@ -74,8 +74,10 @@ gh auth login            # authentifie la CLI GitHub sur le repo gchambaud_micro
 | `ENTRA_API_SCOPE` | `api://<backend-client-id>/user_impersonation` | App registration **BACKEND** (**A**) |
 
 Optionnelles (laisser vide = défaut app) :
-`ENTRA_REDIRECT_URI=certigo://auth/`, `ENTRA_DOMAIN_HINT_MICROSOFT=microsoft.com`,
-`ENTRA_DOMAIN_HINT_GOOGLE=google.com`, `ENTRA_DOMAIN_HINT_APPLE=apple.com`.
+`ENTRA_REDIRECT_URI=certigo://auth/`, `ENTRA_DOMAIN_HINT_MICROSOFT=live.com`,
+`ENTRA_DOMAIN_HINT_GOOGLE=google`, `ENTRA_DOMAIN_HINT_APPLE=apple` (valeurs
+mesurées le 2026-09-27 : voir `AppEnv.appleDomainHint`, ne jamais remettre
+`apple.com`, qui mène à l'accès interne des employés d'Apple).
 
 > 💡 Gardez un bloc‑notes ouvert : à chaque étape A/B, vous y collerez la valeur
 > obtenue. En section **C**, vous les reporterez d'un coup.
@@ -183,11 +185,16 @@ ENTRA_API_SCOPE = api://<backend-client-id>/user_impersonation
 Exemple **réel Certigo** (tenant `certigoapp`) :
 ```
 ENTRA_CLIENT_ID = 4d1f1075-7bc5-4764-947b-701435a85f8c
-ENTRA_AUTHORITY = https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0
+ENTRA_AUTHORITY = https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0
 ENTRA_API_SCOPE = api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation
 ```
 
-> ⚠️ Utilisez le sous-domaine = GUID du tenant (issuer canonique retourné par le document de découverte OIDC), PAS le domaine vanity certigoapp.ciamlogin.com — flutter_appauth valide strictement l'issuer et un mismatch fait échouer silencieusement l'échange de jetons (spinner infini).
+> ⚠️ Pour l'**app**, utilisez l'hôte nommé `certigoapp.ciamlogin.com`, le seul domaine
+> de retour enregistré dans le Services ID Apple : avec l'hôte GUID, Apple refuse
+> l'URL de retour et la connexion Apple échoue. L'issuer des jetons reste la forme
+> GUID quel que soit l'hôte (mesuré le 2026-10-04), et AppAuth le compare au document
+> de découverte, pas à l'URL d'autorité. Le **backend** garde la forme GUID (A.7).
+> Mesures et retour arrière : `docs/RELEASE_MOBILE.md` §2.3, « Autorité CIAM de l'app ».
 
 ✅ **Fin de A**, vous avez : `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`, `ENTRA_API_SCOPE`.
 
@@ -321,11 +328,29 @@ Copy-Item mobile-secrets.env.example mobile-secrets.env
 gh variable set MOBILE_CERTIGO_ENV      --body "prod"
 gh variable set MOBILE_API_BASE_URL     --body "https://func-certigo-...azurewebsites.net/api"
 gh variable set MOBILE_ENTRA_CLIENT_ID  --body "00000000-0000-0000-0000-000000000000"
-gh variable set MOBILE_ENTRA_AUTHORITY  --body "https://certigo.ciamlogin.com/<tenant-id>/v2.0"
+gh variable set MOBILE_ENTRA_AUTHORITY  --body "https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0"
 gh variable set MOBILE_ENTRA_API_SCOPE  --body "api://<backend-client-id>/user_impersonation"
 ```
 > ⚠️ Dans cette voie, **ne définissez pas** `AZURE_KEYVAULT_NAME` (sinon la CI ira
 > chercher les secrets Key Vault au lieu de ces variables).
+>
+> 🔒 `MOBILE_ENTRA_AUTHORITY` n'accepte que deux formes, vérifiées par
+> `.github/scripts/validate-mobile-release-config.mjs` : la forme GUID
+> (`https://<tenant-guid>.ciamlogin.com/<tenant-guid>/v2.0`) ou, exactement,
+> `https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0`,
+> sans slash final, port, espace ni paramètre. Avant toute release, vérifiez la
+> valeur posée avec le validateur, sans rien lancer :
+> ```powershell
+> node .github/scripts/validate-mobile-release-config.mjs `
+>   --api-base-url (gh variable get MOBILE_API_BASE_URL) `
+>   --entra-client-id (gh variable get MOBILE_ENTRA_CLIENT_ID) `
+>   --entra-authority (gh variable get MOBILE_ENTRA_AUTHORITY) `
+>   --entra-api-scope (gh variable get MOBILE_ENTRA_API_SCOPE) `
+>   --certigo-env (gh variable get MOBILE_CERTIGO_ENV)
+> ```
+> Code de sortie 0 : la release acceptera la configuration. Historique de la
+> variable (ancienne valeur et confirmation manuelle encore attendue) :
+> `docs/RELEASE_MOBILE.md`, « Autorité CIAM de l'app ».
 
 ✅ **Fin de C** : les 5 valeurs sont stockées (KV ou variables GitHub).
 

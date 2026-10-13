@@ -186,6 +186,9 @@ class AuthController extends Notifier<AuthState> {
           method,
           AuthFailureCause.providerError,
           durationMs: sw.elapsedMilliseconds,
+          detail: _socialFailureDetail(
+            const AuthFailureSignature(errorType: 'EmptyAccessToken'),
+          ),
         );
         _diagnostics.mark(
           AuthDiagnosticStep.failed,
@@ -208,7 +211,12 @@ class AuthController extends Notifier<AuthState> {
     } on TimeoutException catch (e, st) {
       if (!_isCurrent(revision)) return;
       _logAuthError('signIn(${provider.id}, timeout)', e, st);
-      _telemetry.authFailure(method, AuthFailureCause.timeout, durationMs: sw.elapsedMilliseconds);
+      _telemetry.authFailure(
+        method,
+        AuthFailureCause.timeout,
+        durationMs: sw.elapsedMilliseconds,
+        detail: _socialFailureDetail(AuthFailureSignature.fromError(e)),
+      );
       final int seconds = _socialTimeout.inSeconds;
       _diagnostics.mark(
         AuthDiagnosticStep.failed,
@@ -220,12 +228,22 @@ class AuthController extends Notifier<AuthState> {
       );
     } on AuthGatewayException catch (e) {
       if (!_isCurrent(revision)) return;
-      _telemetry.authFailure(method, e.cause, durationMs: sw.elapsedMilliseconds);
+      _telemetry.authFailure(
+        method,
+        e.cause,
+        durationMs: sw.elapsedMilliseconds,
+        detail: _socialFailureDetail(e.signature),
+      );
       state = Unauthenticated(_displayError(e, provider));
     } catch (e, st) {
       if (!_isCurrent(revision)) return;
       _logAuthError('signIn(${provider.id})', e, st);
-      _telemetry.authFailure(method, AuthFailureCause.unknown, durationMs: sw.elapsedMilliseconds);
+      _telemetry.authFailure(
+        method,
+        AuthFailureCause.unknown,
+        durationMs: sw.elapsedMilliseconds,
+        detail: _socialFailureDetail(AuthFailureSignature.fromError(e)),
+      );
       _diagnostics.mark(AuthDiagnosticStep.failed, detail: '${e.runtimeType} : $e');
       state = Unauthenticated(
         'La connexion ${_providerLabel(provider)} a échoué. '
@@ -233,6 +251,16 @@ class AuthController extends Notifier<AuthState> {
       );
     }
   }
+
+  AuthFailureDetail _socialFailureDetail(
+    AuthFailureSignature? signature, {
+    AuthFlow flow = AuthFlow.signIn,
+  }) =>
+      AuthFailureDetail(
+        flow: flow,
+        lastStep: _diagnostics.lastReachedStep,
+        signature: signature,
+      );
 
   /// Message affiché pour une erreur métier passerelle.
   ///
@@ -242,13 +270,18 @@ class AuthController extends Notifier<AuthState> {
   /// ce qu'il pouvait en faire.
   ///
   /// Le message métier, lui, est conservé quand la passerelle a su qualifier la
-  /// cause (réseau, annulation, identifiants) ; les causes que seul un
-  /// développeur peut corriger (configuration, refus du fournisseur) sont
+  /// cause (réseau, délai, identifiants). Une annulation reçoit un message qui
+  /// ne présume pas que l'apprenant a fermé la fenêtre, et les causes que seul
+  /// un développeur peut corriger (configuration, refus du fournisseur) sont
   /// remplacées par la seule action que l'apprenant peut réellement tenter.
   String _displayError(AuthGatewayException e, AuthProvider provider) {
     _logAuthDetail('signIn(${provider.id})', e.diagnostic ?? e.message);
     return switch (e.cause) {
-      AuthFailureCause.cancelled ||
+      // AppAuth iOS signale aussi en « annulation » une page qui n'a pas pu
+      // s'ouvrir : le message ne présume pas que l'apprenant l'a fermée.
+      AuthFailureCause.cancelled => 'La connexion ${_providerLabel(provider)} n\'a pas abouti : '
+          'la fenêtre a été fermée ou n\'a pas pu s\'ouvrir. '
+          'Réessaie, ou connecte-toi avec ton e-mail.',
       AuthFailureCause.network ||
       AuthFailureCause.timeout ||
       AuthFailureCause.invalidCredentials =>
@@ -461,6 +494,7 @@ class AuthController extends Notifier<AuthState> {
         }
         fresh = await _credentials.login(email: email, password: password).timeout(_emailTimeout);
       } else {
+        _diagnostics.reset();
         fresh = await _gateway.reauthenticate(provider).timeout(_socialTimeout);
       }
 
@@ -477,13 +511,54 @@ class AuthController extends Notifier<AuthState> {
       );
     } on TimeoutException catch (error, stackTrace) {
       _logAuthError('reauthenticateForAccountDeletion(timeout)', error, stackTrace);
+      _reportReauthenticationFailure(
+        provider,
+        AuthFailureCause.timeout,
+        AuthFailureSignature.fromError(error),
+      );
       return const SensitiveReauthenticationResult.failure('La vérification a expiré. Réessayez.');
     } on AuthGatewayException catch (error) {
-      return SensitiveReauthenticationResult.failure(error.message);
+      _reportReauthenticationFailure(provider, error.cause, error.signature);
+      return SensitiveReauthenticationResult.failure(_reauthenticationError(error, provider));
     } catch (error, stackTrace) {
       _logAuthError('reauthenticateForAccountDeletion', error, stackTrace);
+      _reportReauthenticationFailure(
+        provider,
+        AuthFailureCause.unknown,
+        AuthFailureSignature.fromError(error),
+      );
       return const SensitiveReauthenticationResult.failure('La vérification a échoué. Réessayez.');
     }
+  }
+
+  void _reportReauthenticationFailure(
+    AuthProvider provider,
+    AuthFailureCause cause,
+    AuthFailureSignature? signature,
+  ) {
+    if (provider == AuthProvider.email) return;
+    _telemetry.authFailure(
+      AuthMethodX.fromProvider(provider),
+      cause,
+      detail: _socialFailureDetail(signature, flow: AuthFlow.reauthentication),
+    );
+  }
+
+  /// Message d'une vérification sociale échouée avant suppression : la cause,
+  /// le fait que rien n'a été supprimé, et quoi faire. Comme à la connexion, le
+  /// détail technique part au journal et non à l'écran.
+  String _reauthenticationError(AuthGatewayException e, AuthProvider provider) {
+    if (provider == AuthProvider.email) return e.message;
+    _logAuthDetail('reauthenticate(${provider.id})', e.diagnostic ?? e.message);
+    final String label = _providerLabel(provider);
+    return switch (e.cause) {
+      AuthFailureCause.network => e.message,
+      AuthFailureCause.cancelled => 'La vérification $label n\'a pas abouti : la fenêtre a été '
+          'fermée ou n\'a pas pu s\'ouvrir. Votre compte n\'a pas été supprimé. '
+          'Réessayez pour confirmer la suppression.',
+      _ => 'La vérification $label a échoué. Votre compte n\'a pas été supprimé. '
+          'Réessayez dans un instant.',
+    };
   }
 
   Future<void> completeAccountDeletion({required String expectedUserId}) async {

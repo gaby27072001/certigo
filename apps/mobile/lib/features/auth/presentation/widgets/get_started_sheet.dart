@@ -74,10 +74,19 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
   /// Fournisseur social dont la connexion est en cours (spinner du bouton).
   AuthProvider? _pending;
 
+  /// Échec de la dernière tentative lancée depuis CETTE feuille. Un échec
+  /// s'affiche sur la surface qui a lancé la tentative, jusqu'à la suivante :
+  /// la feuille reste montée pendant et après la tentative, donc c'est ici que
+  /// l'apprenant doit le lire, pas derrière la feuille sur l'accueil.
+  String? _error;
+
   bool get _isSignIn => widget.intent == GetStartedIntent.signIn;
 
   void _signInSocial(AuthProvider provider) {
-    setState(() => _pending = provider);
+    setState(() {
+      _pending = provider;
+      _error = null;
+    });
     ref.read(authControllerProvider.notifier).signIn(provider);
   }
 
@@ -100,10 +109,15 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
     final TextTheme text = Theme.of(context).textTheme;
 
     // Réarme les boutons dès que le flux retombe sur un état non authentifié
-    // (annulation, échec) — le message détaillé reste porté par l'écran e-mail.
+    // (annulation, échec), et garde le message seulement s'il conclut une
+    // tentative lancée depuis cette feuille.
     ref.listen<AuthState>(authControllerProvider, (AuthState? prev, AuthState next) {
       if (next is Unauthenticated && _pending != null) {
-        setState(() => _pending = null);
+        final String? message = next.message;
+        setState(() {
+          _pending = null;
+          _error = message == null || message.isEmpty ? null : message;
+        });
       }
     });
 
@@ -192,6 +206,10 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
               style: text.titleMedium?.copyWith(color: p.textSecondary),
             ),
             const SizedBox(height: PrismSpacing.lg),
+            if (_error != null) ...<Widget>[
+              _SheetErrorCard(message: _error!),
+              const SizedBox(height: PrismSpacing.md),
+            ],
             // Fournisseurs sociaux — toujours proposés, quelle que soit
             // l'intention (Microsoft mis en avant, puis Google et Apple) : un
             // compte existant a pu être créé avec n'importe lequel.
@@ -235,6 +253,46 @@ class _GetStartedSheetState extends ConsumerState<GetStartedSheet> {
               'notre politique de confidentialité.',
               textAlign: TextAlign.center,
               style: text.bodySmall?.copyWith(color: p.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Échec de la dernière tentative de la feuille, au style de la carte d'erreur
+/// de l'écran e-mail. Annoncé par VoiceOver/TalkBack dès son apparition.
+class _SheetErrorCard extends StatelessWidget {
+  const _SheetErrorCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final PrismColorScheme p = context.prism;
+    final TextTheme text = Theme.of(context).textTheme;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        key: const Key('get-started-error'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(PrismSpacing.md),
+        decoration: BoxDecoration(
+          color: p.error.withOpacity(0.12),
+          borderRadius: const BorderRadius.all(Radius.circular(14)),
+          border: Border.all(color: p.error.withOpacity(0.55)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Icon(Icons.error_outline, color: p.error, size: 20),
+            const SizedBox(width: PrismSpacing.xs),
+            Expanded(
+              child: Text(
+                message,
+                style: text.bodyMedium?.copyWith(color: p.textPrimary, height: 1.35),
+              ),
             ),
           ],
         ),

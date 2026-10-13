@@ -8,12 +8,69 @@ import 'package:flutter/services.dart';
 import 'auth_diagnostics.dart';
 import 'auth_state.dart';
 
+/// Signature **technique** d'un échec de connexion sociale, sans donnée
+/// personnelle : uniquement des identifiants fixes du SDK AppAuth et du
+/// protocole OAuth. Jamais de description, d'URL, d'e-mail ni de jeton.
+///
+/// Elle rend diagnostiquable, depuis Sentry, un échec survenu sur l'appareil
+/// d'un testeur : les builds de release n'affichent pas la carte de diagnostic
+/// et `debugPrint` n'y laisse aucune trace exploitable.
+@immutable
+class AuthFailureSignature {
+  const AuthFailureSignature({
+    this.pluginCode,
+    this.nativeType,
+    this.nativeCode,
+    this.oauthError,
+    this.underlyingDomain,
+    this.errorType,
+  });
+
+  /// Construit la signature d'une erreur `flutter_appauth`, ou à défaut son
+  /// seul type Dart.
+  factory AuthFailureSignature.fromError(Object error) {
+    final FlutterAppAuthPlatformErrorDetails? details = switch (error) {
+      FlutterAppAuthUserCancelledException(:final platformErrorDetails) => platformErrorDetails,
+      FlutterAppAuthPlatformException(:final platformErrorDetails) => platformErrorDetails,
+      _ => null,
+    };
+    return AuthFailureSignature(
+      pluginCode: error is PlatformException ? error.code : null,
+      nativeType: details?.type,
+      nativeCode: details?.code,
+      oauthError: details?.error,
+      underlyingDomain: details?.domain,
+      errorType: error.runtimeType.toString(),
+    );
+  }
+
+  /// Code d'erreur du plugin (`authorize_failed`, `discovery_failed`…).
+  final String? pluginCode;
+
+  /// Domaine d'erreur AppAuth (`org.openid.appauth.general`…).
+  final String? nativeType;
+
+  /// Code d'erreur AppAuth dans ce domaine (`-3`…).
+  final String? nativeCode;
+
+  /// Code d'erreur OAuth renvoyé par le serveur (`invalid_request`…).
+  final String? oauthError;
+
+  /// Domaine de l'erreur sous-jacente, sur iOS
+  /// (`com.apple.AuthenticationServices.WebAuthenticationSession`…).
+  final String? underlyingDomain;
+
+  /// Type Dart de l'erreur reçue.
+  final String? errorType;
+}
+
 /// Erreur métier remontée au contrôleur pour afficher un message clair.
 class AuthGatewayException implements Exception {
   const AuthGatewayException(
     this.message, {
     this.cause = AuthFailureCause.unknown,
     this.diagnostic,
+    this.signature,
   });
 
   final String message;
@@ -30,6 +87,9 @@ class AuthGatewayException implements Exception {
   /// recopié devant l'apprenant lui donnait tout sauf une action possible.
   /// `null` pour les cas volontairement propres (ex. annulation).
   final String? diagnostic;
+
+  /// Signature sans donnée personnelle, seule partie remontée à Sentry.
+  final AuthFailureSignature? signature;
 
   @override
   String toString() =>
@@ -121,9 +181,14 @@ class AppAuthGateway implements AuthGateway {
             ...?_hintFor(provider),
             if (sensitive) 'max_age': '0',
           },
-          // Laisse l'utilisateur choisir/ajouter un compte à chaque connexion
-          // explicite (utile après une déconnexion).
-          promptValues: sensitive ? const <String>['login'] : const <String>['select_account'],
+          // `login` et jamais `select_account` : mesuré le 2026-09-27, avec
+          // `select_account` CIAM ignore l'indice de fournisseur et réaffiche sa
+          // propre page de choix, que l'utilisateur prenait pour l'écran de
+          // connexion de l'app (« c'est une boucle »). `login` respecte aussi le
+          // fournisseur choisi quand une session CIAM existe encore (Android).
+          // Pour une opération sensible, `max_age=0` exige en plus une
+          // authentification fraîche (`auth_time`).
+          promptValues: const <String>['login'],
           externalUserAgent: _preferredUserAgent,
         ),
       );
@@ -146,6 +211,7 @@ class AppAuthGateway implements AuthGateway {
           diagnostic: 'authorize() est revenu sans authorizationCode '
               '(étape : callback / autorisation). Le navigateur est revenu à '
               'l\'app mais sans code exploitable.',
+          signature: AuthFailureSignature(errorType: 'MissingAuthorizationCode'),
         );
       }
 
@@ -180,14 +246,17 @@ class AppAuthGateway implements AuthGateway {
         result.accessTokenExpirationDateTime,
         provider,
       );
-    } on FlutterAppAuthUserCancelledException {
+    } on FlutterAppAuthUserCancelledException catch (e) {
       _diagnostics.mark(
         AuthDiagnosticStep.failed,
         detail: 'annulé par l\'utilisateur',
       );
-      throw const AuthGatewayException(
+      // AppAuth iOS signale aussi comme « annulation » une page web qui n'a pas
+      // pu s'ouvrir : la signature permet de distinguer les deux dans Sentry.
+      throw AuthGatewayException(
         'Connexion annulée.',
         cause: AuthFailureCause.cancelled,
+        signature: AuthFailureSignature.fromError(e),
       );
     } on AuthGatewayException {
       // Déjà typée + tracée (ex. code d'autorisation absent) : relayer telle quelle.
@@ -205,6 +274,7 @@ class AppAuthGateway implements AuthGateway {
         described.message,
         cause: described.cause,
         diagnostic: diagnostic,
+        signature: AuthFailureSignature.fromError(e),
       );
     } catch (e) {
       // Erreur inattendue (non PlatformException) : on ne l'avale pas, on
@@ -217,6 +287,7 @@ class AppAuthGateway implements AuthGateway {
         'La connexion via ${provider.id} a échoué. Vérifiez la configuration Entra puis réessayez.',
         cause: AuthFailureCause.providerError,
         diagnostic: '${e.runtimeType} : $e',
+        signature: AuthFailureSignature.fromError(e),
       );
     }
   }
@@ -328,17 +399,14 @@ class AppAuthGateway implements AuthGateway {
   @override
   Future<void> signOut(AuthSession session) async {
     // Déconnexion locale : on n'ouvre pas le navigateur pour fermer la session
-    // du fournisseur (expérience moins brutale). `select_account` à la
-    // prochaine connexion permet de changer de compte.
+    // du fournisseur (expérience moins brutale). `prompt=login` redemande les
+    // identifiants à la connexion suivante : changer de compte reste possible.
     return;
   }
 
-  /// Retourne les paramètres additionnels OIDC pour pré-sélectionner
-  /// le fournisseur d'identité dans Entra External ID.
-  ///
-  /// `domain_hint=microsoft.com` achemine vers le fournisseur Microsoft
-  /// Account du locataire CIAM, qui supporte à la fois les comptes
-  /// personnels MSA et les comptes Azure AD professionnels.
+  /// Retourne l'indice de fournisseur (`domain_hint`) qui envoie Entra External
+  /// ID directement chez le fournisseur choisi (voir [AppEnv.appleDomainHint]
+  /// pour les valeurs mesurées).
   Map<String, String>? _hintFor(AuthProvider provider) {
     final String hint = switch (provider) {
       AuthProvider.microsoft => AppEnv.microsoftDomainHint,

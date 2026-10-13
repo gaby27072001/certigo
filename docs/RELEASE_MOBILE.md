@@ -230,7 +230,7 @@ noms sont référencés dans le code.
 |---|---|---|---|
 | URL de base API | `mobile-app-api-base-url` | `vars.MOBILE_API_BASE_URL` | `https://func-certigo-prod-izfhvvxjdxc2k.azurewebsites.net/api` |
 | Entra client ID | `mobile-entra-client-id` | `vars.MOBILE_ENTRA_CLIENT_ID` | GUID App Registration mobile |
-| Entra authority | `mobile-entra-authority` | `vars.MOBILE_ENTRA_AUTHORITY` | `https://<tenant-guid>.ciamlogin.com/<tenant-guid>/v2.0` |
+| Entra authority | `mobile-entra-authority` | `vars.MOBILE_ENTRA_AUTHORITY` | `https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` (voir « Autorité CIAM de l'app » ci-dessous) |
 | Entra API scope | `mobile-entra-api-scope` | `vars.MOBILE_ENTRA_API_SCOPE` | `api://<backend-client-id>/user_impersonation` |
 | Env (flavor) | `mobile-app-env` | `vars.MOBILE_CERTIGO_ENV` | `prod` uniquement |
 
@@ -246,23 +246,113 @@ noms sont référencés dans le code.
 > cinq valeurs sont obligatoires et validées strictement. La configuration doit
 > cibler la production : URL API Certigo HTTPS en `/api`, GUID client non
 > placeholder, authority External ID canonique dont l'hôte GUID correspond au
-> tenant GUID du chemin, scope `api://...` non placeholder et
-> `MOBILE_CERTIGO_ENV=prod`. La source est le Key Vault désigné par
+> tenant GUID du chemin **ou** exactement l'autorité nommée épinglée en dur dans
+> `.github/scripts/validate-mobile-release-config.mjs`, scope `api://...` non
+> placeholder et `MOBILE_CERTIGO_ENV=prod`. La source est le Key Vault désigné par
 > `AZURE_KEYVAULT_NAME`, sinon les variables `MOBILE_*` au scope environnement ou
 > dépôt. La variable legacy `API_BASE_URL` et les anciennes valeurs Microlingo ne
-> sont jamais lues. Les valeurs live sont corrigées hors de cette PR.
+> sont jamais lues. Le changement des valeurs live reste une action manuelle,
+> après fusion et accord explicite ; cette PR ne l'effectue pas.
+
+#### Autorité CIAM de l'app : l'hôte nommé `certigoapp.ciamlogin.com`
+
+L'autorité choisie pour la prochaine configuration mobile (Android et iOS) est
+`https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0`. Le
+backend garde la forme GUID dans `infra/params/*.bicepparam`. Les deux sont
+corrects, pour les raisons mesurées suivantes :
+
+- **Apple n'accepte que l'hôte nommé.** Le Services ID `com.certigo.ciam.service`
+  n'enregistre que `certigoapp.ciamlogin.com` comme domaine de retour. Avec
+  l'autorité GUID, Apple affiche « invalid_request Invalid web redirect url » et
+  la connexion Apple échoue. Mesuré le 2026-09-27 dans un navigateur isolé, avec
+  les paramètres exacts de l'app.
+- **L'issuer des jetons ne dépend pas de l'hôte.** Mesuré le 2026-10-04 à
+  18:22Z. La sonde reprend le flux d'AppAuth (découverte, autorisation, échange
+  du code avec PKCE). Elle utilise un compte local CIAM jetable, créé à 18:22Z
+  et purgé à 18:24Z, dans un navigateur neuf et éphémère. Par l'hôte nommé, la
+  découverte annonce
+  `https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0`.
+  L'ID token et le jeton d'accès portent exactement cet `iss`, et le jeton
+  d'accès a `aud` = `12910b8e-…`. On obtient le même résultat par l'hôte GUID.
+  AppAuth [iOS 1.7.6](https://github.com/openid/AppAuth-iOS/blob/1.7.6/Sources/AppAuthCore/OIDAuthorizationService.m)
+  et [Android 0.11.1](https://github.com/openid/AppAuth-Android/blob/0.11.1/library/java/net/openid/appauth/IdToken.java)
+  comparent l'`iss` de l'ID token à l'issuer **du document de découverte**,
+  jamais à l'URL d'autorité. `EntraTokenValidator` fait de même
+  (`ValidIssuer = config.Issuer`). Cela correspond à la documentation Microsoft
+  ([Tokens and claims overview](https://learn.microsoft.com/entra/identity-platform/security-tokens#token-endpoints-and-issuers)).
+- **Le diagnostic de #167 (2026-07-03) est donc réfuté.** Il attribuait un blocage
+  à un « issuer mismatch » de l'hôte nommé, mais ce désaccord n'existe pas.
+  Les commentaires historiques de `infra/params/{prod,staging}.bicepparam` et
+  `codemagic.yaml` sont conservés sans modification : ce sont des surfaces de
+  déploiement/release, pas la preuve d'un changement de configuration mobile.
+  La réfutation est portée ici ; aucune valeur backend n'est changée.
+
+**Contre-épreuve navigateur du 2026-10-12, 16:08–16:09Z** :
+la sonde `apple-final-parameters-probe-verified.log`, conservée avec les preuves
+de coordination Apple, utilise un navigateur distinct et un contexte éphémère
+neuf par cas. `prompt=login` + `domain_hint=apple`, avec ou sans `max_age=0`,
+arrive sur `appleid.apple.com` sans rejet ; `live.com` arrive sur `login.live.com`.
+L'hôte GUID reproduit le rejet Apple « Invalid web redirect url » et les anciens
+`select_account` + `apple.com` reproduisent le choix CIAM. Le cas Google termine
+sur un timeout du sélecteur de la sonde : ce n'est ni une preuve de succès, ni
+une preuve de défaut du produit. Aucune saisie, aucun code OAuth et aucun appel
+backend n'ont eu lieu. Ces observations valident le routage navigateur, **pas**
+le callback AppAuth ni une connexion Apple complète sur iPhone physique.
+
+Ce constat est à revérifier si Microsoft change l'issuer des locataires externes,
+si le Services ID Apple change de domaines, ou si une montée de `flutter_appauth`
+change la version d'AppAuth.
+
+**Valeur précédente, pour un retour arrière** :
+`https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0`
+(forme GUID, encore acceptée par le validateur). Elle fonctionne pour Microsoft
+et Google, mais pas pour Apple.
 
 **iOS — groupe de variables Codemagic `certigo_mobile_config`**
 
-Codemagic n'a pas accès au Key Vault : créer dans le dashboard Codemagic
-(**Settings → Environment variables**) un **groupe** nommé `certigo_mobile_config`
-contenant `PROD_API_BASE_URL`, `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`,
+Codemagic n'a pas accès au Key Vault. Utiliser l'application et le groupe
+**existants** dans le dashboard (**Environment variables**),
+`certigo_mobile_config`, contenant `PROD_API_BASE_URL`, `ENTRA_CLIENT_ID`, `ENTRA_AUTHORITY`,
 `ENTRA_API_SCOPE`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`,
 `SENTRY_AUTH_TOKEN` et `CERTIFICATE_PRIVATE_KEY`. `codemagic.yaml` référence ce
 groupe et injecte uniquement les valeurs publiques utiles à l'app en
 `--dart-define` ; `CERTIGO_ENV` est fixé inline (`prod` pour `ios-release`,
 `dev` pour `ios-release-dry`, `staging` pour `ios-crash-smoke`). Le token Sentry
 et la clé privée de signature ne sont jamais injectés dans le binaire.
+
+**Procédure manuelle après fusion, au signal explicite seulement :**
+
+1. Ouvrir l'application Certigo existante dans Codemagic, puis **Environment
+   variables** ; sélectionner le groupe **certigo_mobile_config**.
+2. Ouvrir la variable **ENTRA_AUTHORITY** et remplacer uniquement sa valeur par
+   `https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0`,
+   sans slash final, espace, port ni paramètre. Laisser **Secure décoché** :
+   cette URL publique finit dans le binaire ; ne toucher à aucun secret.
+3. Enregistrer, rouvrir la variable et vérifier la valeur exacte et son groupe.
+   La valeur précédente est la forme GUID indiquée ci-dessus. Consigner la
+   confirmation et la date ; cette procédure n'atteste pas qu'elle a été suivie.
+4. Ne démarrer `ios-release-dry` ou `ios-release` que sur une source approuvée,
+   au signal distinct de l'opérateur. Respecter la limite configurée de
+   **90 minutes**, sans présumer une durée d'exécution mesurée.
+
+**Inventaire de `MOBILE_ENTRA_AUTHORITY` (sans modification live)** :
+`release-android.yml` lit `vars.MOBILE_ENTRA_AUTHORITY` comme repli de l'étape
+`appconfig`, après `mobile-entra-authority` du Key Vault quand
+`AZURE_KEYVAULT_NAME` est défini. Les variables GitHub peuvent être au scope
+environnement ou dépôt ; changer seulement le repli ne remplace pas une valeur
+du vault. `tools/secrets/set-keyvault-secrets.ps1` charge
+`mobile-entra-authority` depuis `ENTRA_AUTHORITY` du fichier local ignoré.
+Le validateur de release contrôle la valeur résolue. Les références
+documentaires sont `RELEASE.md`, `GUIDE_ACTIVATION_AUTH_ANDROID.md` et ce
+runbook ; Codemagic utilise séparément `ENTRA_AUTHORITY`, pas `MOBILE_*`.
+
+À la préparation de ce correctif, aucune confirmation explicite de changement
+`ENTRA_AUTHORITY`, de résultat `ios-release-dry` ou de nouveau candidat
+TestFlight n'a été retrouvée : ces trois actions restent **manuelles en
+attente**. `APPLE_CIAM_DOMAIN_RECONFIGURED` reste `false` jusqu'à une preuve de
+parcours réel sur iPhone. `1.1.3+12` dans le pubspec ne constitue ni un tag
+`v1.1.3`, ni une autorisation de release : le feu vert est distinct, après les
+fusions requises, la validation backend et la confirmation de l'opérateur.
 
 ---
 
@@ -440,7 +530,7 @@ approbation et sa restriction à `main`.
    |---|---|---|---|
    | `PROD_API_BASE_URL` | `https://<prod-func-app>.azurewebsites.net/api` (sortie du déploiement backend prod, cf. PR #158 → `functionAppName`) | non | `ios-release` |
    | `ENTRA_CLIENT_ID` | `4d1f1075-7bc5-4764-947b-701435a85f8c` | non | `ios-release` + `ios-release-dry` |
-   | `ENTRA_AUTHORITY` | `https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` | non | idem |
+   | `ENTRA_AUTHORITY` | `https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0` (hôte nommé, seul accepté par Apple : voir §2.3) | non | idem |
    | `ENTRA_API_SCOPE` | `api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation` | non | idem |
    | `SENTRY_DSN` | DSN HTTPS public du projet Flutter Sentry | non | binaire des 3 workflows IPA |
    | `SENTRY_ORG` | slug d'organisation Sentry | non | upload dSYM Codemagic |

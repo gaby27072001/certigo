@@ -97,27 +97,34 @@ class AppEnv {
     defaultValue: '',
   );
 
-  /// Indices de domaine (`domain_hint`) pour pré-orienter Entra vers le bon
-  /// fournisseur fédéré. Configurables car le nom exact du fournisseur Google /
-  /// Apple dépend du paramétrage du locataire externe.
+  /// Indices de domaine (`domain_hint`) qui envoient CIAM directement chez le
+  /// fournisseur choisi dans l'app, sans repasser par la page de choix CIAM.
   ///
-  /// Pour Microsoft : `microsoft.com` achemine vers le fournisseur Microsoft
-  /// Account configuré dans le locataire CIAM, qui accepte à la fois les
-  /// comptes personnels MSA (outlook.com, hotmail.com…) ET les comptes
-  /// professionnels Azure AD (y compris les comptes @microsoft.com des employés
-  /// Microsoft). Laisser vide revient à afficher l'écran CIAM générique sans
-  /// bouton Microsoft visible.
+  /// Valeurs mesurées le 2026-09-27 sur le locataire `af721be8-…`, avec les
+  /// paramètres exacts de l'app, dans un navigateur sans cookies (comme la
+  /// session éphémère iOS) et avec `prompt=login` :
+  /// - `apple` : `appleid.apple.com` (valeur documentée par Microsoft) ;
+  /// - `live.com` : `login.live.com`, le fournisseur « Microsoft account »
+  ///   (OIDC personnalisé sur `consumers`, comptes personnels seulement) ;
+  /// - `google` (valeur documentée) : aucune accélération mesurée ; CIAM
+  ///   affiche sa page de choix et l'utilisateur y retouche Google.
+  ///
+  /// Ne jamais revenir à `apple.com` : c'est un domaine d'annuaire, pas un
+  /// indice de fournisseur. Avec `prompt=login`, il mène à `idmsac.apple.com`
+  /// (« AppleConnect », l'accès interne des employés d'Apple). Un utilisateur
+  /// Apple ne pouvait donc ni se connecter, ni se ré-authentifier pour
+  /// supprimer son compte (#307).
   static const String microsoftDomainHint = String.fromEnvironment(
     'ENTRA_DOMAIN_HINT_MICROSOFT',
-    defaultValue: 'microsoft.com',
+    defaultValue: 'live.com',
   );
   static const String googleDomainHint = String.fromEnvironment(
     'ENTRA_DOMAIN_HINT_GOOGLE',
-    defaultValue: 'google.com',
+    defaultValue: 'google',
   );
   static const String appleDomainHint = String.fromEnvironment(
     'ENTRA_DOMAIN_HINT_APPLE',
-    defaultValue: 'apple.com',
+    defaultValue: 'apple',
   );
 
   /// Vrai quand Entra External ID est réellement configuré : l'app présente

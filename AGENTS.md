@@ -60,6 +60,13 @@ credentials. Do not run it unless the user asks for a real data upload.
 Run the smallest relevant test first. Before completing changes, run the
 matching format/analyze/build gate used by `.github\workflows`.
 
+Browser authentication tests (OIDC, CIAM, social sign-in) run only in an
+isolated, ephemeral browser context: a new context or a separately launched
+browser, closed when the test ends. Never use a shared or persistent browser
+profile, such as the shared Playwright MCP page: it may hold a person's real
+sessions, and a test there can start a real sign-in on their account. Use
+accounts created for the test, and delete them afterwards.
+
 ## Project Structure
 
 - `apps\mobile` - Flutter application; feature-first UI, Riverpod providers,
@@ -157,7 +164,8 @@ Key entry points are `apps\mobile\lib\main.dart`,
 - **Never do:** commit `local.settings.json`, credentials, signing material, or
   generated seed output; expose quiz answer keys to clients; accept identity from
   request payloads; weaken production auth fallbacks; manually edit generated
-  files; modify build output or third-party dependency directories.
+  files; modify build output or third-party dependency directories; run an
+  authentication test in a shared or persistent browser profile (see Testing).
 
 ## Documentation
 

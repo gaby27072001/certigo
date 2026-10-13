@@ -9,6 +9,18 @@ const zeroGuid = '00000000-0000-0000-0000-000000000000';
 const productionApiHostPattern =
   /^func-certigo-prod-[a-z0-9]{13}\.azurewebsites\.net$/;
 
+// Seule autorité à hôte nommé acceptée en plus de la forme GUID. Elle est écrite
+// en dur et n'est jamais lue d'une variable : le Services ID « Sign in with
+// Apple » n'enregistre que certigoapp.ciamlogin.com comme URL de retour, et Apple
+// refuse celle de l'hôte GUID (« Invalid web redirect url », mesuré le
+// 2026-09-27). Les jetons obtenus par cet hôte portent le même issuer, en forme
+// GUID, que le document de découverte, seule valeur que comparent AppAuth et le
+// backend (mesuré le 2026-10-04, voir docs/RELEASE_MOBILE.md §2.3).
+export const pinnedCiamTenantId = 'af721be8-5901-422a-b299-b9c57847b968';
+export const pinnedNamedAuthorityHost = 'certigoapp.ciamlogin.com';
+export const pinnedNamedAuthority =
+  `https://${pinnedNamedAuthorityHost}/${pinnedCiamTenantId}/v2.0`;
+
 function readArguments(argv) {
   const values = new Map();
   for (let index = 0; index < argv.length; index += 2) {
@@ -41,6 +53,32 @@ function parseHttpsUrl(value, label) {
   return url;
 }
 
+// Vrai seulement pour l'autorité nommée épinglée, sous sa forme canonique exacte.
+// L'analyseur WHATWG efface sans bruit `:443`, les espaces autour, les segments
+// `.`/`..`, les antislashs et la casse de l'hôte, et garde un `?` ou `#` vide :
+// une valeur qui n'égale l'épingle qu'après normalisation est refusée, pas
+// réparée. Les contrôles par composant documentent chaque exigence.
+export function isPinnedNamedAuthority(value) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  return url.protocol === 'https:'
+    && url.username === ''
+    && url.password === ''
+    && url.port === ''
+    && url.search === ''
+    && url.hash === ''
+    && url.hostname === pinnedNamedAuthorityHost
+    && url.pathname === `/${pinnedCiamTenantId}/v2.0`
+    && value === pinnedNamedAuthority;
+}
+
 export function validateMobileReleaseConfig(config) {
   const errors = [];
 
@@ -70,23 +108,26 @@ export function validateMobileReleaseConfig(config) {
   }
 
   try {
-    const authority = parseHttpsUrl(config.entraAuthority, 'MOBILE_ENTRA_AUTHORITY');
-    const authorityMatch = authority.pathname.match(
-      /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/v2\.0\/?$/i,
-    );
-    const authorityHostMatch = authority.hostname.match(
-      /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.ciamlogin\.com$/i,
-    );
-    if (
-      !authorityHostMatch
-      || !authorityMatch
-      || authorityMatch[1].toLowerCase() === zeroGuid
-      || authorityHostMatch[1].toLowerCase() !== authorityMatch[1].toLowerCase()
-      || placeholderPattern.test(config.entraAuthority)
-    ) {
-      errors.push(
-        'MOBILE_ENTRA_AUTHORITY must use the matching canonical tenant GUID in its host and path.',
+    if (!isPinnedNamedAuthority(config.entraAuthority)) {
+      const authority = parseHttpsUrl(config.entraAuthority, 'MOBILE_ENTRA_AUTHORITY');
+      const authorityMatch = authority.pathname.match(
+        /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/v2\.0\/?$/i,
       );
+      const authorityHostMatch = authority.hostname.match(
+        /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.ciamlogin\.com$/i,
+      );
+      if (
+        !authorityHostMatch
+        || !authorityMatch
+        || authorityMatch[1].toLowerCase() === zeroGuid
+        || authorityHostMatch[1].toLowerCase() !== authorityMatch[1].toLowerCase()
+        || placeholderPattern.test(config.entraAuthority)
+      ) {
+        errors.push(
+          'MOBILE_ENTRA_AUTHORITY must use the matching canonical tenant GUID in its host and path, '
+          + `or be exactly ${pinnedNamedAuthority}.`,
+        );
+      }
     }
   } catch (error) {
     errors.push(error.message);

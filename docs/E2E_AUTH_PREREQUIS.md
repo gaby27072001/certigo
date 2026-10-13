@@ -58,12 +58,12 @@ initiale = `microlingo://auth`.
 | dart-define | Valeur | entraConfigured |
 |-------------|--------|:---:|
 | `ENTRA_CLIENT_ID` | client_id app reg | ✅ requis |
-| `ENTRA_AUTHORITY` | `https://<domain>.ciamlogin.com/<tenant-id>/v2.0` | ✅ requis |
+| `ENTRA_AUTHORITY` | `https://certigoapp.ciamlogin.com/<tenant-id>/v2.0` | ✅ requis |
 | `ENTRA_REDIRECT_URI` | `certigo://auth/` | défaut |
 | `ENTRA_API_SCOPE` | `api://<client-id>/user_impersonation` | – |
-| `ENTRA_DOMAIN_HINT_MICROSOFT` | `microsoft.com` | défaut |
-| `ENTRA_DOMAIN_HINT_GOOGLE` | `google.com` | défaut |
-| `ENTRA_DOMAIN_HINT_APPLE` | `apple.com` | défaut |
+| `ENTRA_DOMAIN_HINT_MICROSOFT` | `live.com` | défaut |
+| `ENTRA_DOMAIN_HINT_GOOGLE` | `google` | défaut |
+| `ENTRA_DOMAIN_HINT_APPLE` | `apple` | défaut |
 
 `entraConfigured` = client_id + authority non vides. Tant que vide → flux Entra
 désactivé, app reste fonctionnelle.
@@ -119,11 +119,14 @@ Pour **chaque plateforme (iOS physique + Android physique)** et **chaque méthod
    ressaisie (session restaurée).
 4. **Callback deep-link** — vérifier le retour dans l'app après le navigateur
    système (schéma `certigo://auth/`).
-5. **Annulation** — fermer le navigateur / bouton retour → attendu : message
-   « Connexion annulée. », boutons **réarmés**, pas de spinner figé.
+5. **Annulation** — fermer le navigateur / bouton retour → attendu : dans la
+   surface qui a lancé la tentative, « La connexion <fournisseur> n'a pas abouti :
+   la fenêtre a été fermée ou n'a pas pu s'ouvrir. Réessaie, ou connecte-toi avec
+   ton e-mail. », boutons **réarmés**, pas de spinner figé.
 6. **Réseau lent / hors-ligne** — activer un réseau dégradé ou le mode avion →
    attendu : message réseau clair, réarmement ; en social, expiration au bout du
-   filet de sécurité (120 s) → « La connexion a expiré. Réessayez. »
+   filet de sécurité (120 s) → « La fenêtre <fournisseur> n'a pas répondu.
+   Réessaie, ou connecte-toi avec ton e-mail. »
 7. **Identifiants invalides** (e-mail) → « E-mail ou mot de passe incorrect. »
 8. **Token expiré** — attendre/forcer l'expiration puis appeler l'API →
    rafraîchissement silencieux (200) ou, si échec, redirection connexion (401).

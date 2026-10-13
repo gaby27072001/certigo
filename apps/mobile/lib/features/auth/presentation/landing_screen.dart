@@ -79,19 +79,38 @@ class _LandingScreenState extends ConsumerState<LandingScreen> with SingleTicker
 
   bool _started = false;
 
-  /// Dernier message d'échec d'authentification, capturé à la transition vers
-  /// [Unauthenticated] et affiché de façon **persistante** au-dessus du CTA
-  /// « Commencer ». Sans cela, toute panne de connexion déclenchée depuis la
-  /// **bottom sheet** « Commencer » serait totalement silencieuse : la sheet
-  /// est démontée par le garde d'auth (`AuthLoading → /splash`) avant que
-  /// l'état `Unauthenticated(message)` ne soit publié, et son listener local
-  /// disparaît avec elle — le message écrit par le contrôleur n'a AUCUN
-  /// destinataire (bug rapporté sur TestFlight 1.1.0). Le repli sur
-  /// `state.message` (voir `build`) couvre le second temps : le routeur remonte
-  /// une **nouvelle** instance de landing après `Unauthenticated → /landing`,
-  /// dont le `_authError` local est vide et dont le `ref.listen` a manqué
-  /// l'émission ; c'est le même repli documenté par `sign_in_screen.dart`.
+  /// Message d'authentification qui ne conclut PAS une tentative lancée depuis
+  /// la feuille « Commencer » (déconnexion, compte supprimé, session expirée…),
+  /// affiché de façon persistante au-dessus du CTA.
+  ///
+  /// Un échec appartient à la surface qui a lancé la tentative : la feuille
+  /// reste montée pendant `AuthLoading` (#444) et l'affiche elle-même jusqu'à
+  /// la tentative suivante. Le répéter ici le ferait apparaître derrière la
+  /// feuille, puis une seconde fois après sa fermeture.
+  ///
+  /// Le repli sur `state.message` (voir `build`) couvre une instance montée
+  /// APRÈS l'émission (redirection vers `/landing` à la déconnexion ou après une
+  /// suppression de compte) : son `ref.listen` a manqué la transition.
   String? _authError;
+
+  /// Vrai pendant que la feuille « Commencer » est ouverte : toute transition
+  /// d'auth survenue alors conclut une tentative de la feuille. Le signal est
+  /// l'ouverture de la feuille et non la transition `AuthLoading`, que certains
+  /// échecs immédiats ne publient pas (build sans Entra).
+  bool _sheetOpen = false;
+
+  /// Vrai dès qu'une tentative de la feuille a été vue par cette instance : le
+  /// message d'état qui la conclut appartient à la feuille, pas à l'accueil.
+  bool _attemptObserved = false;
+
+  Future<void> _openSheet({GetStartedIntent intent = GetStartedIntent.signUp}) async {
+    setState(() => _sheetOpen = true);
+    try {
+      await showGetStartedSheet(context, intent: intent);
+    } finally {
+      if (mounted) setState(() => _sheetOpen = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -223,19 +242,26 @@ class _LandingScreenState extends ConsumerState<LandingScreen> with SingleTicker
     final TextTheme text = Theme.of(context).textTheme;
     final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
-    // Capture du message d'échec du dernier flux d'authentification. Voir la
-    // documentation de [_authError] pour la raison exacte : la sheet « Commencer »
-    // meurt avec l'écran quand le garde d'auth pousse `/splash`, donc l'unique
-    // destinataire viable du message est **cette landing** — qui est le
-    // premier écran où l'utilisateur retombe après l'échec.
+    // Messages hors tentative uniquement : voir [_authError]. Ce qui survient
+    // pendant que la feuille est ouverte appartient à sa tentative.
     ref.listen<AuthState>(authControllerProvider, (AuthState? prev, AuthState next) {
+      if (_sheetOpen) {
+        if (next is AuthLoading || next is Unauthenticated) {
+          setState(() {
+            _attemptObserved = true;
+            _authError = null;
+          });
+        }
+        return;
+      }
       if (next is! Unauthenticated) return;
       final String? message = next.message;
       if (message == null || message.isEmpty) return;
       setState(() => _authError = message);
     });
     final AuthState authState = ref.watch(authControllerProvider);
-    final String? stateMessage = authState is Unauthenticated ? authState.message : null;
+    final String? stateMessage =
+        !_attemptObserved && authState is Unauthenticated ? authState.message : null;
     final String? shownError =
         _authError ?? (stateMessage != null && stateMessage.isNotEmpty ? stateMessage : null);
 
@@ -352,15 +378,12 @@ class _LandingScreenState extends ConsumerState<LandingScreen> with SingleTicker
                           ],
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 420),
-                            child: _CommencerButton(onPressed: () => showGetStartedSheet(context)),
+                            child: _CommencerButton(onPressed: () => _openSheet()),
                           ),
                           const SizedBox(height: PrismSpacing.xs),
                           TextButton(
                             key: const Key('landing-existing-account'),
-                            onPressed: () => showGetStartedSheet(
-                              context,
-                              intent: GetStartedIntent.signIn,
-                            ),
+                            onPressed: () => _openSheet(intent: GetStartedIntent.signIn),
                             child: Text(
                               'J’ai déjà un compte',
                               style: text.titleSmall?.copyWith(

@@ -16,9 +16,12 @@
 
 La première demande exige un `auth_time` de moins de 10 minutes. Un compte
 e-mail doit ressaisir son mot de passe. Un compte fédéré relance OIDC avec
-`prompt=login` et `max_age=0`. L’ID token de preuve est validé côté serveur et
-doit porter le même sujet que le bearer token. Une reprise d’une demande déjà
-persistée n’impose pas une nouvelle ré-authentification.
+`prompt=login`, `max_age=0` et le même `domain_hint` qu’à la connexion
+(`apple`, `live.com` ou `google`). Pour Apple, l’ancien indice `apple.com`
+menait à l’accès interne des employés d’Apple : la vérification était
+impossible (mesuré le 2026-09-27). L’ID token de preuve est validé côté
+serveur et doit porter le même sujet que le bearer token. Une reprise d’une
+demande déjà persistée n’impose pas une nouvelle ré-authentification.
 
 ## Ordre de suppression et reprise
 

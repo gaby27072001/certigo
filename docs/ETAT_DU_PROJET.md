@@ -38,7 +38,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-10-13** |
-| Commit de référence analysé | `729ab4dffb572c418ed15e66dbf902f9049a0bac` |
+| Commit de référence analysé | `479bc0167167b026c48b3e98ce083ec0d449b9c1` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -46,7 +46,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Package public actif | **1622 fichiers** — `sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb` |
 | Package privé actif (`answerKey`) | **714 fichiers** — `sha256:7781a6d36add31223ea234c60808ded367d283c0d1f4a9a042cb1cdad71f9055` |
 | Workflows GitHub Actions | **31** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `ciam-posture-monitor.yml`, `codeql.yml`, `content-infra-apply.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `post-merge-cosmos-account-deletion.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **311 fichiers** — .NET : 4 projets / 123 fichiers ; Flutter/Dart : 6 racines / 176 fichiers ; Python : 1 racine / 12 fichier |
+| Tests découverts | **315 fichiers** — .NET : 4 projets / 123 fichiers ; Flutter/Dart : 6 racines / 180 fichiers ; Python : 1 racine / 12 fichier |
 | Corpus **historique** local | **91 pistes**, **147 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
@@ -824,6 +824,9 @@ et la capability Apple, puis une validation sur iPhone.
 **Chantiers techniques :**
 - 🏗️ **Provisionner `staging`** par Bicep et valider `/health` ; `dev`, `prod` et CI sont déjà déployés.
 - 🔐 **Valider l'auth de bout en bout** sur un vrai tenant Entra External ID (E2E).
+  - Le contrat mobile Apple, les limites des sondes navigateur et les actions
+    manuelles de configuration/release sont décrits dans `RELEASE_MOBILE.md`,
+    « Autorité CIAM de l'app » ; ne pas assimiler ce contrat à une activation live.
   - Constat du **23 septembre 2026**, borné à `EntraTokenValidator` et à l'app CIAM
     « Certigo API » (`requestedAccessTokenVersion = 2`) : un jeton d'accès v2 porte
     `aud` = identifiant client nu, alors que staging et prod n'acceptaient que

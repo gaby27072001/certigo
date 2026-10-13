@@ -116,6 +116,15 @@ class AuthDiagnosticsNotifier extends Notifier<List<AuthDiagnosticEntry>>
       AuthDiagnosticEntry(at: DateTime.now(), step: step, detail: detail),
     ];
   }
+
+  /// Dernière étape franchie avant l'échec : c'est elle qui situe la panne
+  /// (la page web ne s'est pas ouverte, le code n'est pas revenu…).
+  AuthDiagnosticStep? get lastReachedStep {
+    for (final AuthDiagnosticEntry entry in state.reversed) {
+      if (entry.step != AuthDiagnosticStep.failed) return entry.step;
+    }
+    return null;
+  }
 }
 
 /// Trace de diagnostic d'auth sociale, observée par l'écran de connexion et

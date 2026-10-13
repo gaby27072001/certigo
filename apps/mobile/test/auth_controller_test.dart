@@ -157,6 +157,9 @@ class FakeAuthTelemetry implements AuthTelemetry {
   final List<({String method, AuthFailureCause cause})> failures =
       <({String method, AuthFailureCause cause})>[];
 
+  /// Détail technique de chaque échec, dans le même ordre que [failures].
+  final List<AuthFailureDetail?> failureDetails = <AuthFailureDetail?>[];
+
   @override
   void authStart(AuthMethod method) => starts.add(method.label);
 
@@ -164,8 +167,15 @@ class FakeAuthTelemetry implements AuthTelemetry {
   void authSuccess(AuthMethod method, {int? durationMs}) => successes.add(method.label);
 
   @override
-  void authFailure(AuthMethod method, AuthFailureCause cause, {int? durationMs}) =>
-      failures.add((method: method.label, cause: cause));
+  void authFailure(
+    AuthMethod method,
+    AuthFailureCause cause, {
+    int? durationMs,
+    AuthFailureDetail? detail,
+  }) {
+    failures.add((method: method.label, cause: cause));
+    failureDetails.add(detail);
+  }
 }
 
 void main() {
@@ -826,7 +836,8 @@ void main() {
       expect(telemetry.successes, contains('google'));
     });
 
-    test('annulation sociale → message « Connexion annulée. » + cause cancelled', () async {
+    test('annulation sociale → cause et action, sans présumer un geste + cause cancelled',
+        () async {
       final FakeAuthTelemetry telemetry = FakeAuthTelemetry();
       final FakeAuthGateway gateway = FakeAuthGateway(
         onSignIn: (_) => throw const AuthGatewayException(
@@ -846,7 +857,13 @@ void main() {
 
       final AuthState state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
-      expect((state as Unauthenticated).message, 'Connexion annulée.');
+      // AppAuth iOS signale aussi en « annulation » une page qui n'a pas pu
+      // s'ouvrir : le message donne la cause possible et l'action, sans accuser.
+      expect(
+        (state as Unauthenticated).message,
+        'La connexion Apple n\'a pas abouti : la fenêtre a été fermée ou n\'a pas pu '
+        's\'ouvrir. Réessaie, ou connecte-toi avec ton e-mail.',
+      );
       expect(telemetry.failures.single.cause, AuthFailureCause.cancelled);
     });
 
