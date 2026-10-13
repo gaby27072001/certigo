@@ -259,6 +259,15 @@ It is executable on Linux/macOS, not an iOS process-management feature.
 This proves the tested Linux filesystem/logic behavior, not physical power-loss
 behavior or Apple file-protection semantics.
 
+An independent read-only code review of runtime disk/store, session/outbox
+coordination, resource reader and runtime tests found no significant defect on
+2026-10-13. It ran no tests and did not independently reproduce the Linux results.
+Apple validation must still exercise Darwin's descriptor-relative filesystem
+and directory-fsync behavior; the iOS `F_SETPROTECTIONCLASS`/`PROTECTION_CLASS_C`
+branch and outbox `completeUntilFirstUserAuthentication` attributes; and the
+macOS `xcrun xctest` subprocess/lock/SIGKILL recovery path. No concrete Darwin
+incompatibility was identified by the review, but none of these gates is closed.
+
 The runtime engine is not enabled in the development SwiftUI composition.
 It requires explicit store configuration and the authenticated connection;
 restart tests do not prove a production offline-login lifecycle. No live release,
@@ -278,6 +287,23 @@ approved signing/TestFlight plan and a tested recovery procedure.
 Watch/TV, purchases, CloudKit and local generative AI are not enabled.
 Progress/readiness remain authoritative on Azure. Do not infer deployment,
 signature or account-linking availability from repository configuration.
+
+## Shared backend HTTP vectors
+
+`Fixtures/http-wire/v1/` copies only the six JSON vectors and README from
+`docs/contracts/native-client/v1/` at backend revision
+`56067f1c4c57a518ff27c2527ca6edd95a1aa589`. Every copied file was checked against
+its original Git blob with `hash-object --no-filters`. No backend code or release
+workflow was cherry-picked. These public synthetic vectors were exercised by the
+backend's real HTTP functions/serializer; Swift tests independently decode the
+same bytes and retain null/omitted-field and unsupported-capability distinctions.
+
+The fixture submission's illustrative `demo-client-attempt` is not a UUID:
+decoding it does not authorize replay under the current native creation policy.
+It is a serializer vector, not proof of successful domain submission or a live
+manifest. Matching-question wire data decodes but remains unsupported for the
+current UI capability. Nullable/partial API projections are not the closed
+canonical corpus schema. Authorized POST feedback is not a public answer bank.
 
 ## Next authentication implementation
 
