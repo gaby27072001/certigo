@@ -379,3 +379,41 @@ callback list, preserving both Flutter entries and concurrent edits. This needs
 specific owner/tenant approval and subsequent SDK/device proof; no registration
 was changed. Default-format broker compatibility is not proof that broker
 authentication is available for this external tenant.
+
+## Non-destructive Flutter queue inspection
+
+`FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/
+Keychain bridge. The real Flutter store persists a plain JSON list under
+`certigo.sync.queue.v1` (`prefs_sync_store.dart`, `sync_queue_store.dart`);
+`SyncAction.toJson` emits distinct entry `id` and server `idempotencyKey`, original
+owner, UTC timestamps, raw intent, status and optional content pin. The quiz
+decorator captures `/quiz/{encoded-lesson}/submit` and uses `clientAttemptId`
+as its idempotency key. No per-entry API environment is stored in that format.
+
+Inspection retains the **entire exact source Data** and its official SHA-256
+fingerprint; it never serializes a decoded payload, truncates timestamp precision,
+replaces a non-UUID legacy attempt, invents an owner or converts a terminal
+action to pending. It bounds input to 2 MiB and 1,000 entries. Duplicate JSON
+keys (including escaped spellings), invalid roots and syntax are visible
+document-quarantine diagnostics. Duplicate queue/attempt identities, unknown
+fields/kinds/statuses, impossible/non-UTC dates, unsafe routes, fractional/bool
+retry counts, mismatched pins/idempotency keys and missing owners are held.
+Only the current emitted format is inspected: legacy parser defaults are not
+silently applied.
+
+Source API provenance must be supplied **per entry**, with an evidence identifier
+and validated HTTPS API URL. Neither the current API nor a current account is
+accepted as implicit historical provenance. Missing pins remain held rather than
+silently using a current release. Done/dead records remain original diagnostics,
+not replay candidates. Quarantine here means in-memory classification with raw
+source retained; nothing is written, moved, deleted or quarantined in the user's
+actual preferences.
+
+An empty issue list is not migration eligibility: full payload/server-capability
+admission, actual source-provenance proof, authenticated owner mapping, release
+availability/pins and exact raw-intent replay still require a separately validated
+bridge. Current typed native submissions require UUIDs and normalize newly
+created dates; they are **not used** to re-encode this legacy data. Real iOS
+SharedPreferences prefix/domain, same-bundle access, Keychain access group,
+SDK/account changes and restart/rollback tests require Apple/bundle evidence.
+No existing account or real preference data was accessed by these synthetic tests.
