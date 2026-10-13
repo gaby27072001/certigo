@@ -1,4 +1,9 @@
 import { parseDocument } from 'yaml';
+import {
+  nativeAppleWorkflowFile,
+  validateNativeAppleWorkflow,
+} from './native-apple-workflow-policy.mjs';
+import path from 'node:path';
 
 // Ensembles de labels autorisés, sur le YAML analysé. La règle textuelle de
 // validate-workflow-security.mjs ne lit que les lignes qui commencent par `runs-on:` : une clé
@@ -18,6 +23,9 @@ function isAllowedLabelSet(labels) {
 }
 
 export function validateRunnerLabels(text, label) {
+  if (path.basename(label) === nativeAppleWorkflowFile) {
+    return validateNativeAppleWorkflow(text, label);
+  }
   const document = parseDocument(text, {
     merge: false,
     strict: true,

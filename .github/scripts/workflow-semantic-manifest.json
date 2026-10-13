@@ -101,5 +101,10 @@
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
   },
-  "preApproved": {}
+  "preApproved": {
+    ".github/workflows/native-apple-check.yml": {
+      "digest": "f027da490854dbc92e36549742f036c4b0c9767e85bfa415e62da94ac4e0fdc1",
+      "expires": "2026-10-27"
+    }
+  }
 }

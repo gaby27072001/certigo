@@ -125,6 +125,29 @@ approuvé, jamais un autre ; et l'écart se referme au premier mouvement de `mai
 
 ## Règle pour les tests de `.github/scripts`
 
+### Exception native Apple sans signature
+
+`native-apple-check.yml` est la seule exception aux labels self-hosted :
+`native-apple-workflow-policy.mjs` autorise son contenu exact par empreinte SHA-256
+des octets, sans ajouter de runner à la liste globale. Contrairement aux empreintes
+sémantiques du manifeste, cette exception refuse aussi les modifications de commentaires
+et de fins de ligne. Toute évolution exige une revue du contrat de politique et le cycle
+de pré-approbation A/B ; la pré-approbation seule ne modifie pas la politique.
+
+Le workflow proposé utilise le runner standard `macos-15` et Xcode 26.3, uniquement sur
+dispatch du propriétaire du dépôt personnel `gaby27072001/certigo`. Le champ
+`candidate_sha` doit être un SHA complet de 40 caractères hexadécimaux minuscules :
+aucune branche ni aucun tag n'est accepté. Le checkout est vérifié, sans credentials
+persistants. Les tests SPM et le build simulateur iPhone/iPad sont sans signature,
+sans environnement, secret, permission d'écriture, distribution ni publication.
+Cela ne prouve ni une installation sur appareil physique ni la validité des accès Apple.
+
+La fixture `.github/scripts/fixtures/native-apple-check.yml` rend les tests de politique
+indépendants de la présence et de l'expiration de la proposition. Les runners standard
+hébergés sont gratuits pour les dépôts publics selon
+[la documentation GitHub](https://docs.github.com/en/actions/concepts/billing-and-usage).
+Ne pas remplacer le label par un runner larger, ni utiliser ce workflow dans un dépôt privé.
+
 Ces tests tournent sur l'arbre de `main` à chaque PR. **Un test de base ne doit dépendre ni des
 pré-approbations en attente sur `main`, ni des empreintes de production, ni de la date du jour** :
 une PR qui pré-approuverait exactement la mutation qu'un test attend refusée, ou une évolution
