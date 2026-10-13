@@ -849,6 +849,94 @@ device pairing/trust/developer mode, signing/provisioning and any paid
 enrollment require their own user decisions and are not performed in this
 documentation-only lot.
 
+### Dedicated physical-test host source preparation
+
+`CertigoProtectionProbe` is a new minimal SwiftUI application target, separate
+from DEV and the unhosted simulator harness. It displays an inert test-host
+label, with no package products, authentication composition or network work.
+`CertigoProtectionProbeTests` depends on this host and only the existing local
+`CertigoData` product. It compiles the unchanged shared protection-test source;
+the separate scheme selects exactly the existing Foundation empty-file and
+descriptor-write tests. MSAL remains a dependency of other project targets
+but is not a linked product/source dependency of either probe target. Project
+package resolution may still resolve public dependencies; that is not SDK
+construction or auth-cache access.
+
+Proposed source identities are `com.certigo.protection-probe` and
+`com.certigo.protection-probe.tests`. Live App ID availability is unproved.
+Both Debug/Release configurations default to `CODE_SIGNING_ALLOWED=NO`, with
+no team, profile, entitlement, callback or shared-group declaration.
+The test `TEST_HOST` points only to
+`$(BUILT_PRODUCTS_DIR)/CertigoProtectionProbe.app/CertigoProtectionProbe`;
+`BUNDLE_LOADER=$(TEST_HOST)` and the explicit target dependency bind the
+dedicated host. DEV and the original unhosted target configurations, source
+memberships and schemes are unchanged. No production signing policy changes.
+
+`validate_apple_noauth.py` checks these source bindings/identities, unsigned
+defaults, selected-test pair and no-MSAL host dependency boundaries. Explicit
+`--built-probe-plist`/`--built-probe-test-plist` paths can validate later supplied
+artifact identities and absence of callback registrations; they do not
+discover device apps/accounts or establish effective signed entitlements.
+Source checks and Swift syntax parsing on Linux are not Xcode project loading,
+Apple typechecking, signed hosting, installation or physical execution proof.
+
+Only after separate exact-SHA/device/signing/provisioning authorization, the
+executor can adapt this command template using the user-selected team and
+device, neither guessed nor committed:
+
+```sh
+xcodebuild -project apps/apple/CertigoNative/CertigoNative.xcodeproj \
+  -scheme CertigoProtectionProbe -configuration Debug \
+  -destination "platform=iOS,id=$APPROVED_DEVICE_ID" \
+  -derivedDataPath "$B/DerivedData" \
+  -clonedSourcePackagesDirPath "$B/DerivedData/SourcePackages" \
+  -disablePackageRepositoryCache -onlyUsePackageVersionsFromResolvedFile \
+  CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Automatic \
+  DEVELOPMENT_TEAM="$APPROVED_PERSONAL_TEAM" build-for-testing
+```
+
+Without separately authorized provisioning updates this command may stop on
+missing provisioning; it must not silently add `-allowProvisioningUpdates` or
+`-allowProvisioningDeviceRegistration`. If those flags are explicitly
+authorized, their effects can include App ID/device registration and signing
+certificate/profile creation by Xcode. Verify the built host/test identities,
+signatures and their effective entitlements and profile before installation.
+Stop on unexpected host/shared group, callback, paid capability, signing
+failure or unapproved registration; do not change DEV or add entitlements.
+Then, only within the installation/execution consent:
+
+```sh
+xcodebuild -project apps/apple/CertigoNative/CertigoNative.xcodeproj \
+  -scheme CertigoProtectionProbe -configuration Debug \
+  -destination "platform=iOS,id=$APPROVED_DEVICE_ID" \
+  -derivedDataPath "$B/DerivedData" \
+  -clonedSourcePackagesDirPath "$B/DerivedData/SourcePackages" \
+  -disablePackageRepositoryCache -onlyUsePackageVersionsFromResolvedFile \
+  -only-testing:CertigoProtectionProbeTests/RuntimeDiskProtectionTests/testFoundationProtectionSetterReadsBackExactPolicyOnEmptyFile \
+  -only-testing:CertigoProtectionProbeTests/RuntimeDiskProtectionTests/testProtectedDescriptorWriteRetainsFirstUnlockPolicyAndRemovesEmptyWitness \
+  CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Automatic \
+  DEVELOPMENT_TEAM="$APPROVED_PERSONAL_TEAM" test-without-building
+```
+
+These are future templates, not executed commands or proven Personal Team
+compatibility. `test-without-building` installs/launches the hosted test
+product; this effect requires consent, not just a successful build.
+USB pairing/trust, Developer Mode, passcode entry/reboot and account operations
+remain user-controlled separate manual steps. Test cleanup removes only each
+generated temporary root; separately authorized device cleanup must remove
+only the newly installed named probe/test products, never personal/DEV apps,
+shared Keychain items or global signing credentials/profiles.
+No lock/reboot protection proof, MSAL initialization or personal-cache isolation
+claim follows from adding this source target.
+This source lot passed 116 portable XCTest tests, strict Swift formatting,
+release warnings-as-errors, seven Python validator tests and source checks.
+All pre-existing target/configuration/build-phase objects were compared with
+the prior revision and are unchanged; project object references are resolved
+and unique, and scheme XML/selectors validate. The new host syntax parses on
+Linux, not an Apple typecheck. Shared paired-test bytes and seven original
+HTTP fixture blobs remain unchanged. Direct bounded review of host binding,
+dependencies and default signing restrictions is source evidence only.
+
 ## Non-destructive Flutter queue inspection
 
 `FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/
