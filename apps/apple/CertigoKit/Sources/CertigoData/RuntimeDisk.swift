@@ -1,5 +1,9 @@
 import Foundation
 
+#if os(iOS)
+    import CertigoAppleFileIO
+#endif
+
 /// Flat generated names, directory-relative handles and no-follow opens avoid path re-resolution.
 /// The caller serializes access; root must be dedicated trusted application storage.
 
@@ -167,10 +171,10 @@ final class RuntimeDisk {
         }
         #if os(iOS)
             let protection = try firstUnlockProtectionClass()
-            guard fcntl(handle, F_SETPROTECTIONCLASS, protection) == 0 else {
+            guard certigo_set_file_protection(handle, protection) == 0 else {
                 throw RuntimeStoreError.io(errno)
             }
-            let applied = fcntl(handle, F_GETPROTECTIONCLASS)
+            let applied = certigo_file_protection(handle)
             guard applied >= 0 else { throw RuntimeStoreError.io(errno) }
             guard applied == protection else { throw RuntimeStoreError.unsafeDiskEntry }
         #endif
@@ -203,7 +207,7 @@ final class RuntimeDisk {
             var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
             guard
                 path.withUnsafeMutableBufferPointer({
-                    fcntl(directory, F_GETPATH, $0.baseAddress)
+                    certigo_file_path(directory, $0.baseAddress, $0.count)
                 }) == 0
             else { throw RuntimeStoreError.io(errno) }
             let name = ".tmp-\(UUID().uuidString)"
@@ -231,7 +235,7 @@ final class RuntimeDisk {
                     attributes[.protectionKey] as? FileProtectionType
                         == .completeUntilFirstUserAuthentication
                 else { throw RuntimeStoreError.unsafeDiskEntry }
-                result = fcntl(handle, F_GETPROTECTIONCLASS)
+                result = certigo_file_protection(handle)
                 guard result >= 0 else { throw RuntimeStoreError.io(errno) }
                 guard lstat(url.path, &named) == 0,
                     opened.st_dev == named.st_dev, opened.st_ino == named.st_ino

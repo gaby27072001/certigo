@@ -538,6 +538,25 @@ it is deliberately not counted in Linux/macOS tests and remains unexecuted.
 Actual iOS compile/protection semantics, including lock/reboot/device behavior,
 still require the next approved exact candidate and real Apple tests.
 
+The subsequent approved exact `0bb286f4a01ca8989b9815e5f2fd07f1f972054e`
+again passed 114 Darwin tests, but the unsigned build failed on Swift's
+unavailable variadic `fcntl` overload for the `F_GETPATH` pointer argument
+(`files/apple-public-protection-sdk-mac.log`, access session). The class
+constant error disappeared; iOS execution and completed MSAL compilation
+still did not occur.
+
+The next bounded candidate adds a tiny internal C target,
+`CertigoAppleFileIO`, with typed wrappers for all three public fcntl operations
+used by this protection trace: path, get-class and set-class. The path wrapper
+checks nonnull buffer/capacity against the public `MAXPATHLEN`; other operations
+preserve the syscall return value and errno. No casted variadic function,
+dynamic symbol lookup, private API or guessed constant is used.
+`CertigoData` depends on it only for iOS, and the C implementation is
+Apple-conditional: Linux has no fake-success protection implementation.
+Protection/witness lifecycle, inode validation and fail-closed policy are
+unchanged. This is repository-owned interop code, not a new external dependency.
+Apple compiler/runtime evidence for these wrappers is still required.
+
 ## Non-destructive Flutter queue inspection
 
 `FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/
