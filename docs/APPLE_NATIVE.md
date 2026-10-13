@@ -330,3 +330,52 @@ Official references consulted on 2026-10-13:
 
 This preparation is not evidence that the registration, device callback, SDK
 entitlements or CIAM federation have passed a live test.
+
+### Offline authentication boundary
+
+`CIAMConfiguration` only validates supplied **public metadata**: identifier
+shape, distinct authority/issuer tenant binding, protected API audience/scope,
+HTTPS origin restrictions, exact registered callback, declared scheme and
+known other-app scheme collisions. Standard CIAM authority candidates use the
+documented root host; explicitly supplied custom-domain candidates use the
+documented tenant path. Neither variant has been initialized in MSAL here.
+Universal-link redirects are deliberately outside this baseline, not unsupported
+by MSAL itself. Registration strings are never silently rewritten, including
+the Flutter trailing slash; matching callback schemes for collision detection
+is case-insensitive.
+
+The `@MainActor` provider protocol defines silent/interactive acquisition and
+local SDK account removal; there is **no provider implementation** or composition
+change. The SDK must own refresh/cache/account selection and return a redacted
+token wrapper, never a guessed backend owner ID. `/me` remains authoritative for
+owner binding. Metadata validation is not account permission, SDK compatibility,
+consent, token acceptance or a working login. All tests use synthetic configuration
+only; the SDK, entitlements, callback handler and live authentication remain gates.
+
+Cloud's read-only ARM/Graph/OIDC observation on 2026-10-13 supplies these bounded
+facts (workstream `7b055adb-fb93-4b7a-8d50-439593835e40`, sent to the parent):
+
+- Staging host: `func-certigo-staging-hwbsyiwa7tqnw.azurewebsites.net`;
+  ARM `Running` does not establish HTTP health or the runtime API configuration.
+- Public client: `4d1f1075-7bc5-4764-947b-701435a85f8c`; registered callbacks
+  were only `certigo://auth` and `certigo://auth/`.
+- CIAM tenant: `af721be8-5901-422a-b299-b9c57847b968`; discovery issuer
+  `https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0`.
+  This issuer is **not** blindly passed as the MSAL authority URL.
+- API v2 audience: `12910b8e-6c75-4d51-91d8-4d5fb8a6e915`; delegated scope:
+  `api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation`.
+
+These facts must be rechecked before SDK/staging activation or after registration/
+environment changes. No secret, app setting, account sign-in or consent was read.
+The external CIAM identity directory is distinct from the permitted Azure
+infrastructure tenant; do not substitute the latter for the former.
+
+[Microsoft's redirect documentation](https://learn.microsoft.com/en-us/entra/msal/objc/redirect-uris-ios)
+allows explicitly configured custom `<scheme>://host` callbacks, but the shared
+`certigo` scheme can collide when Flutter and native development apps coexist.
+AppAuth's slash behavior proves nothing about MSAL. The preferred proposal is to
+add **only** `msauth.com.certigo.native.dev://auth` to the existing public client's
+callback list, preserving both Flutter entries and concurrent edits. This needs
+specific owner/tenant approval and subsequent SDK/device proof; no registration
+was changed. Default-format broker compatibility is not proof that broker
+authentication is available for this external tenant.
