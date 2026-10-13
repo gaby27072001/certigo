@@ -1,3 +1,138 @@
+// Classification is per exception, never by a request's 499 or health route.
+let ScopedExceptions = materialize(AppExceptions
+    | where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
+    | extend InvocationId=tostring(Properties.InvocationId));
+let ErrorEvents = materialize(ScopedExceptions
+    | where SeverityLevel >= 3 or HandledAt =~ "Unhandled"
+    | extend HasCorrelation=isnotempty(OperationId) and isnotempty(InvocationId) and isnotempty(AppRoleInstance)
+    | extend PlainCancellation=ExceptionType in (
+        "System.OperationCanceledException", "System.Threading.Tasks.TaskCanceledException")
+        and array_length(Details) == 1 and tostring(Details[0].type) == ExceptionType);
+// A host RPC string alone is insufficient: require its exact worker exception,
+// invocation, instance, function and causal type, in the immediate propagation window.
+let WorkerCancellations = ErrorEvents
+    | where HasCorrelation and PlainCancellation
+    | where tostring(Properties.CategoryName) == "Microsoft.Azure.Functions.Worker.FunctionsApplication"
+    | where tostring(Properties.EventName) == "InvocationError"
+    | where tostring(Properties.OriginalFormat) == "Function '{functionName}', Invocation id '{invocationId}': An exception was thrown by the invocation."
+    | where tostring(Properties.invocationId) == InvocationId
+    | extend WorkerFunction=tostring(Properties.functionName)
+    | where isnotempty(WorkerFunction)
+    | summarize WorkerCount=count(), WorkerTime=min(TimeGenerated),
+        WorkerFunction=take_any(WorkerFunction), WorkerType=take_any(ExceptionType)
+        by OperationId, InvocationId, AppRoleInstance;
+// This marker proves observed shutdown, not client abandonment. Missing or
+// contradictory markers leave cancellation immediately alertable.
+let ShutdownMarkers = AppExceptions
+    | where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
+    | where SeverityLevel == 2 and HandledAt !~ "Unhandled"
+    | where ExceptionType in ("System.OperationCanceledException", "System.Threading.Tasks.TaskCanceledException")
+    | where array_length(Details) == 1 and tostring(Details[0].type) == ExceptionType
+    | where tostring(Properties.CategoryName) == "Certigo.Api.Middleware.ExceptionMiddleware"
+    | where tostring(Properties.OriginalFormat) == "Host shutdown cancellation in function {FunctionName}, invocation {InvocationId}; preserving cancellation."
+    | extend InvocationId = tostring(Properties.InvocationId), FunctionName = tostring(Properties.FunctionName)
+    | where isnotempty(OperationId) and isnotempty(InvocationId) and isnotempty(AppRoleInstance) and isnotempty(FunctionName)
+    // Duplicate/contradictory markers are ambiguous; preserve the errors.
+    | summarize MarkerCount=count(), MarkerTime=min(TimeGenerated),
+        MarkerFunction=take_any(FunctionName), MarkerType=take_any(ExceptionType)
+        by OperationId, InvocationId, AppRoleInstance
+    | where MarkerCount == 1
+    // A 5xx from the same invocation must never be reclassified as shutdown.
+    | join kind=leftanti (
+        AppRequests
+        | where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
+        | where ResultCode matches regex "^5[0-9][0-9]$"
+        | project OperationId, InvocationId=tostring(Properties.InvocationId), AppRoleInstance
+    ) on OperationId, InvocationId, AppRoleInstance;
+let Classified = materialize(ErrorEvents
+    | join kind=leftouter WorkerCancellations on OperationId, InvocationId, AppRoleInstance
+    | extend NativeWorkerRecord = PlainCancellation
+        and tostring(Properties.CategoryName) == "Microsoft.Azure.Functions.Worker.FunctionsApplication"
+        and tostring(Properties.EventName) == "InvocationError"
+        and tostring(Properties.OriginalFormat) == "Function '{functionName}', Invocation id '{invocationId}': An exception was thrown by the invocation."
+        and tostring(Properties.functionName) == WorkerFunction
+        and tostring(Properties.invocationId) == InvocationId
+    | extend RpcMessage=tostring(Details[1].message)
+    | extend RpcCancellation =
+        ExceptionType == "Microsoft.Azure.WebJobs.Script.Workers.Rpc.RpcException"
+        and array_length(Details) == 2
+        and tostring(Details[0].type) == "Microsoft.Azure.WebJobs.Host.FunctionInvocationException"
+        and tostring(Details[0].message) == strcat("Exception while executing function: Functions.", WorkerFunction)
+        and tostring(Details[1].type) == ExceptionType
+        and isnotempty(tostring(Details[0].id))
+        and tostring(Details[1].outerId) == tostring(Details[0].id)
+        and extract(@"^Result: Failure\r?\nType: \r?\nException: (System\.OperationCanceledException|System\.Threading\.Tasks\.TaskCanceledException): [^\r\n]*\r?\n", 1, RpcMessage) == WorkerType
+        and RpcMessage !contains "--->"
+        and WorkerCount == 1 and TimeGenerated between (WorkerTime .. WorkerTime + 5s)
+        and (
+            (tostring(Properties.Category) == strcat("Function.", WorkerFunction)
+                and tostring(Properties.EventName) == "FunctionCompleted"
+                and tostring(Properties.prop__functionName) == strcat("Functions.", WorkerFunction)
+                and tostring(Properties.prop__invocationId) == InvocationId)
+            or (tostring(Properties.Category) == "Host.Results"
+                and tostring(Properties.prop__Name) == WorkerFunction
+                and tostring(Properties.prop__InvocationId) == InvocationId))
+    // Critical or explicitly unhandled events remain immediate, even cancellation.
+    | extend IsCancellation=coalesce(
+        HasCorrelation and SeverityLevel == 3 and HandledAt !~ "Unhandled"
+        and (PlainCancellation or RpcCancellation), false)
+    | join kind=leftouter ShutdownMarkers on OperationId, InvocationId, AppRoleInstance
+    | extend ProvenShutdown=coalesce(
+        IsCancellation and MarkerCount == 1 and WorkerCount == 1
+        and MarkerFunction == WorkerFunction and MarkerType == WorkerType
+        and TimeGenerated between (MarkerTime .. MarkerTime + 5s)
+        and (NativeWorkerRecord or RpcCancellation), false)
+    | extend ReadinessCancellation=coalesce(IsCancellation and (
+        (PlainCancellation
+            and tostring(Properties.CategoryName) == "Certigo.Api.Middleware.ExceptionMiddleware"
+            and tostring(Properties.FunctionName) == "Readiness"
+            and tostring(Properties.OriginalFormat) == "Unhandled exception in function {FunctionName}.")
+        or ((NativeWorkerRecord or RpcCancellation) and WorkerCount == 1 and WorkerFunction == "Readiness")), false));
+// Readiness has its own repeated-failure alert. Transfer only a fully correlated
+// 499 cancellation to that signal, never an unknown failure or an entire operation.
+let CoveredReadiness = AppRequests
+    | where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
+    | where tostring(parse_url(Url).Path) =~ "/api/health/ready"
+    | where Name == "Readiness" and ResultCode == "499" and Success == false
+    | extend InvocationId=tostring(Properties.InvocationId)
+    | where isnotempty(Id) and isnotempty(OperationId) and isnotempty(InvocationId) and isnotempty(AppRoleInstance)
+    | where DurationMs >= 0
+    | summarize RequestCount=count(), RequestStart=min(TimeGenerated),
+        RequestEnd=max(TimeGenerated + DurationMs * 1ms + 5s)
+        by OperationId, InvocationId, AppRoleInstance
+    | where RequestCount == 1
+    | join kind=leftanti (
+        AppRequests
+        | where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
+        | where ResultCode != "499" or Name != "Readiness"
+            or tostring(parse_url(Url).Path) !~ "/api/health/ready"
+        | project OperationId, InvocationId=tostring(Properties.InvocationId), AppRoleInstance
+    ) on OperationId, InvocationId, AppRoleInstance
+    // A real/unknown error in this invocation vetoes the entire transfer.
+    | join kind=leftanti (
+        Classified | where not(ReadinessCancellation)
+        | project OperationId, InvocationId, AppRoleInstance
+    ) on OperationId, InvocationId, AppRoleInstance
+    | join kind=leftanti (
+        ScopedExceptions
+        | where (SeverityLevel < 3 or isnull(SeverityLevel)) and HandledAt !~ "Unhandled"
+        | extend PureWarning =
+            (array_length(Details) == 1 and tostring(Details[0].type) == ExceptionType
+                and ExceptionType in ("System.OperationCanceledException", "System.Threading.Tasks.TaskCanceledException",
+                    "Microsoft.Azure.Cosmos.CosmosOperationCanceledException"))
+            or (array_length(Details) == 2 and ExceptionType == "System.Threading.Tasks.TaskCanceledException"
+                and tostring(Details[0].type) == ExceptionType and tostring(Details[1].type) == ExceptionType
+                and isnotempty(tostring(Details[0].id))
+                and tostring(Details[1].outerId) == tostring(Details[0].id))
+        | where not(coalesce(PureWarning, false))
+        | project OperationId, InvocationId, AppRoleInstance
+    ) on OperationId, InvocationId, AppRoleInstance
+    // Without an invocation id, an error on this operation/instance is ambiguous.
+    | join kind=leftanti (
+        ScopedExceptions | where SeverityLevel >= 2 or HandledAt =~ "Unhandled"
+        | where isempty(InvocationId) or isempty(AppRoleInstance)
+        | project OperationId
+    ) on OperationId;
 union
     (AppRequests
     | where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
@@ -22,9 +157,9 @@ union
         | where isnotempty(OperationId) and isnotempty(DisabledInvocationId)
     ) on OperationId, DisabledInvocationId
     | project TimeGenerated),
-    (AppExceptions
-    | where _ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"
-    // Worker middleware exceptions have empty OperationName and HandledAt.
-    // Error/Critical also covers the worker and host unhandled-exception logs.
-    | where SeverityLevel >= 3 or HandledAt =~ "Unhandled"
+    (Classified
+    | join kind=leftouter CoveredReadiness on OperationId, InvocationId, AppRoleInstance
+    | extend CoveredCancellation=coalesce(ReadinessCancellation and RequestCount == 1
+        and TimeGenerated between (RequestStart .. RequestEnd), false)
+    | where not(ProvenShutdown) and not(CoveredCancellation)
     | project TimeGenerated)

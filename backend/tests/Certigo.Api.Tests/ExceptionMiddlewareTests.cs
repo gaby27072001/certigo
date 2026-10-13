@@ -6,6 +6,8 @@ using Certigo.Application.Abstractions;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace Certigo.Api.Tests;
@@ -186,6 +188,167 @@ public sealed class ExceptionMiddlewareTests
             Entries.Add((logLevel, exception, properties));
         }
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ShutdownBeforeInvocationCancellation_LogsMarkerAndRethrowsWithoutWriting500(bool nonHttp)
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var stopping = new CancellationTokenSource();
+        using var services = new ServiceCollection()
+            .AddSingleton<IHostApplicationLifetime>(new TestLifetime(stopping.Token))
+            .BuildServiceProvider();
+        var invocation = nonHttp
+            ? FunctionTestHarness.CreateNonHttp(services: services, cancellationToken: cancellation.Token)
+            : FunctionTestHarness.CreateHttp(services: services, cancellationToken: cancellation.Token);
+        var logger = new CapturingLogger();
+        var middleware = new ExceptionMiddleware(logger);
+        OperationCanceledException? original = null;
+
+        var action = () => middleware.Invoke(invocation.Context, async _ =>
+        {
+            var work = Task.Delay(Timeout.Infinite, cancellation.Token);
+            stopping.Cancel();
+            cancellation.Cancel();
+            try
+            {
+                await work;
+            }
+            catch (OperationCanceledException ex)
+            {
+                original = ex;
+                throw;
+            }
+        });
+
+        var thrown = await action.Should().ThrowAsync<OperationCanceledException>();
+        thrown.Which.Should().BeSameAs(original);
+        invocation.Response.Should().BeNull();
+        invocation.Bindings.InvocationResult.Should().BeNull();
+        var entry = logger.Entries.Should().ContainSingle().Subject;
+        entry.Level.Should().Be(LogLevel.Warning);
+        entry.Exception.Should().BeSameAs(original);
+        entry.Properties["InvocationId"].Should().Be(invocation.Context.InvocationId);
+        entry.Properties["FunctionName"].Should().Be(invocation.Context.FunctionDefinition.Name);
+        entry.Properties["{OriginalFormat}"].Should().Be(
+            "Host shutdown cancellation in function {FunctionName}, invocation {InvocationId}; preserving cancellation.");
+    }
+
+    [Fact]
+    public async Task ApplicationStoppingToken_IsDirectProofEvenWithoutInvocationCancellation()
+    {
+        using var stopping = new CancellationTokenSource();
+        using var services = new ServiceCollection()
+            .AddSingleton<IHostApplicationLifetime>(new TestLifetime(stopping.Token))
+            .BuildServiceProvider();
+        var invocation = FunctionTestHarness.CreateHttp(services: services);
+        var logger = new CapturingLogger();
+        var middleware = new ExceptionMiddleware(logger);
+        var action = () => middleware.Invoke(invocation.Context, async _ =>
+        {
+            var work = Task.Delay(Timeout.Infinite, stopping.Token);
+            stopping.Cancel();
+            await work;
+        });
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        invocation.Response.Should().BeNull();
+        logger.Entries.Should().ContainSingle().Which.Level.Should().Be(LogLevel.Warning);
+    }
+
+    [Theory]
+    [InlineData("unknown-invocation")]
+    [InlineData("before-shutdown")]
+    [InlineData("already-cancelled")]
+    [InlineData("internal-timeout")]
+    [InlineData("tokenless")]
+    [InlineData("inner-error")]
+    [InlineData("inner-timeout")]
+    [InlineData("derived-cancellation")]
+    [InlineData("real-error")]
+    public async Task UnprovenOrIndependentFailure_StaysErrorAndPreservesOriginalOnCancelledInvocation(string scenario)
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var stopping = new CancellationTokenSource();
+        using var internalTimeout = new CancellationTokenSource();
+        using var services = new ServiceCollection()
+            .AddSingleton<IHostApplicationLifetime>(new TestLifetime(stopping.Token))
+            .BuildServiceProvider();
+        if (scenario == "already-cancelled")
+        {
+            cancellation.Cancel();
+            stopping.Cancel();
+        }
+        var invocation = FunctionTestHarness.CreateHttp(services: services, cancellationToken: cancellation.Token);
+        var logger = new CapturingLogger();
+        var middleware = new ExceptionMiddleware(logger);
+        Exception? original = null;
+        var action = () => middleware.Invoke(invocation.Context, _ =>
+        {
+            if (scenario == "before-shutdown")
+            {
+                cancellation.Cancel();
+            }
+            if (scenario != "unknown-invocation")
+            {
+                stopping.Cancel();
+            }
+            cancellation.Cancel();
+            internalTimeout.Cancel();
+            original = scenario switch
+            {
+                "internal-timeout" => new OperationCanceledException(internalTimeout.Token),
+                "tokenless" => new OperationCanceledException(),
+                "inner-error" => new OperationCanceledException(
+                    "Cancellation with real error", new InvalidOperationException("real error"), cancellation.Token),
+                "inner-timeout" => new TaskCanceledException(
+                    "Internal deadline", new TimeoutException("Internal timeout"), cancellation.Token),
+                "derived-cancellation" => new DerivedCancellation(cancellation.Token),
+                "real-error" => new InvalidOperationException("real error"),
+                _ => new OperationCanceledException(cancellation.Token)
+            };
+            throw original;
+        });
+
+        var thrown = await action.Should().ThrowAsync<Exception>();
+        thrown.Which.Should().BeSameAs(original);
+        invocation.Response.Should().BeNull();
+        invocation.Bindings.InvocationResult.Should().BeNull();
+        var entry = logger.Entries.Should().ContainSingle().Subject;
+        entry.Level.Should().Be(LogLevel.Error);
+        entry.Exception.Should().BeSameAs(original);
+        entry.Properties["{OriginalFormat}"].Should().Be("Unhandled exception in function {FunctionName}.");
+    }
+
+    [Fact]
+    public async Task InternalTimeoutWithActiveInvocation_StillReturns500AndLogsError()
+    {
+        using var timeout = new CancellationTokenSource();
+        var invocation = FunctionTestHarness.CreateHttp();
+        var logger = new CapturingLogger();
+        var middleware = new ExceptionMiddleware(logger);
+
+        await middleware.Invoke(invocation.Context, async _ =>
+        {
+            var work = Task.Delay(Timeout.Infinite, timeout.Token);
+            timeout.Cancel();
+            await work;
+        });
+
+        invocation.Response!.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        logger.Entries.Should().ContainSingle().Which.Level.Should().Be(LogLevel.Error);
+    }
+
+    private sealed class TestLifetime(CancellationToken stopping) : IHostApplicationLifetime
+    {
+        public CancellationToken ApplicationStarted => CancellationToken.None;
+        public CancellationToken ApplicationStopping => stopping;
+        public CancellationToken ApplicationStopped => CancellationToken.None;
+        public void StopApplication() => throw new NotSupportedException();
+    }
+
+    private sealed class DerivedCancellation(CancellationToken token) : OperationCanceledException(token);
 
     [Fact]
     public async Task DuplicateRecordException_MapsTo409_WithExceptionMessage()

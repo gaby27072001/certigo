@@ -13,7 +13,7 @@ const template = JSON.parse(execFileSync(
   { encoding: 'utf8', timeout: 120_000 },
 ));
 
-test('live KQL fixtures use the deployed query and assert 46 independent scenarios', () => {
+test('live KQL fixtures use the deployed query and assert independent shutdown scenarios', () => {
   const fixture = JSON.parse(execFileSync(process.execPath, [
     path.join(root, 'infra/tests/critical-failures-fixtures.mjs'),
   ], { encoding: 'utf8', timeout: 10_000 }));
@@ -22,14 +22,16 @@ test('live KQL fixtures use the deployed query and assert 46 independent scenari
     '/subscriptions/test/resourceGroups/test/providers/Microsoft.Insights/components/test',
   )));
   assert.match(fixture.query, /FailedCases=countif\(not\(Passed\)\)/);
+  assert.match(fixture.query, /ExpectedRows == coalesce\(ActualRows, 0\)/);
   // Each case has one expectation; marker cases also emit correlated exceptions.
-  assert.equal(fixture.query.match(/datetime\(2026-01-01T00:00:\d\dZ\), (true|false)/g)?.length, 46);
+  assert.match(fixture.query, /Independent cases: 119/);
+  assert.equal(fixture.query.match(/datetime\(2026-01-01T[\d:.]+Z\), (true|false)/g)?.length, 119);
 });
 
 test('only the proven disabled GET is excluded and unhandled exceptions stay independent', () => {
   assert.match(query, /AppRequests/);
   assert.match(query, /AppExceptions/);
-  assert.equal(query.match(/_ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"/g)?.length, 3);
+  assert.equal(query.match(/_ResourceId =~ "__APP_INSIGHTS_RESOURCE_ID__"/g)?.length, 7);
   assert.match(query, /ResultCode matches regex "\^5\[0-9\]\[0-9\]\$"/);
   assert.match(query, /SeverityLevel >= 3 or HandledAt =~ "Unhandled"/);
   assert.match(query, /parse_url\(Url\)\.Path/);
@@ -41,10 +43,19 @@ test('only the proven disabled GET is excluded and unhandled exceptions stay ind
   assert.match(executable, /join kind=leftanti/);
   assert.match(executable, /on OperationId, DisabledInvocationId/);
   assert.match(executable, /isnotempty\(OperationId\) and isnotempty\(DisabledInvocationId\)/);
-  const exceptionBranch = executable.slice(executable.lastIndexOf('(AppExceptions'));
-  assert.doesNotMatch(exceptionBranch, /join|FunctionName|OperationId|ExceptionType/);
+  assert.match(executable, /where not\(ProvenShutdown\) and not\(CoveredCancellation\)/);
+  assert.match(executable, /MarkerCount == 1 and WorkerCount == 1/);
+  assert.match(executable, /on OperationId, InvocationId, AppRoleInstance/);
+  assert.match(executable, /TimeGenerated between \(MarkerTime \.\. MarkerTime \+ 5s\)/);
+  assert.match(executable, /RpcMessage !contains "--->"/);
+  assert.match(executable, /tostring\(Details\[1\]\.outerId\) == tostring\(Details\[0\]\.id\)/);
+  assert.match(executable, /Name == "Readiness" and ResultCode == "499" and Success == false/);
+  assert.match(executable, /isnotempty\(Id\) and isnotempty\(OperationId\) and isnotempty\(InvocationId\) and isnotempty\(AppRoleInstance\)/);
+  assert.match(executable, /RequestCount == 1/);
+  assert.match(executable, /Classified \| where not\(ReadinessCancellation\)/);
+  assert.doesNotMatch(executable, /RequestAborted|PreviousOperation|prev\(/);
   assert.equal(executable.match(/project TimeGenerated/g)?.length, 2);
-  assert.doesNotMatch(executable, /summarize|bin\(|ago\(|take |limit /);
+  assert.doesNotMatch(executable, /bin\(|ago\(|take |limit /);
 });
 
 test('one event fires one existing stateful incident with no high-cardinality dimensions', () => {

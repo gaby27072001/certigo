@@ -366,7 +366,7 @@ var logAlerts = [
     query: replace(loadTextContent('../queries/critical-failures.kql'), '__APP_INSIGHTS_RESOURCE_ID__', appInsights.id)
     threshold: 0
     severity: 1
-    desc: 'A non-health API request returned 5xx or an Error/Critical or unhandled exception was recorded. Investigate even if the alert resolves: no traffic is not proof of recovery. See docs/runbooks/OBSERVABILITY.md.'
+    desc: 'A non-health API request returned 5xx or an Error/Critical or unhandled exception was recorded. Strictly correlated host-shutdown envelopes are excluded; pure readiness 499 cancellations use the dedicated repeated-readiness-failure alert. This signal is not limited to HTTP 5xx. Investigate even if the alert resolves: no traffic is not proof of recovery. See docs/runbooks/OBSERVABILITY.md.'
   }
   {
     name: 'telemetry-absent'

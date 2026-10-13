@@ -283,7 +283,7 @@ porte les memes `OperationId` **et** `InvocationId` non vides.
 Le catch existant emet ce marqueur type ; le statut et le corps HTTP ne changent
 pas. Ne pas joindre sur `CorrelationId` fourni par le client.
 Tout autre 5xx, le POST, une autre invocation, ou un marqueur absent/retarde
-conserve l'alerte. La branche exceptions Error/Critical/Unhandled reste intacte.
+conserve l'alerte. Cette exception ne filtre aucune exception Error/Critical/Unhandled.
 Ainsi une vraie panne simultanee ne peut pas etre masquee par un appel normal
 a la fonctionnalite desactivee. Le marqueur Warning ne constitue pas lui-meme
 une panne non geree. Retirer cette exception KQL et son marqueur quand #307
@@ -295,7 +295,9 @@ Les exceptions Error/Critical (`SeverityLevel >= 3`) ou explicitement
 exceptions Cosmos du middleware observees, `OperationName` et `HandledAt`
 sont vides : filtrer seulement l'un de ces champs raterait la panne. Les
 exceptions Warning des sondes de dependances ont leurs alertes readiness ;
-aucune exclusion dans cette branche par type Cosmos, annulation, route ou utilisateur.
+aucune exclusion globale par type Cosmos, annulation, route ou utilisateur.
+Les exceptions sont la propagation d'un **arret hote prouve** et les annulations
+readiness strictement couvertes par leur propre alerte, decrites ci-dessous.
 
 L'union ne projette que `TimeGenerated`, sans URL, payload, identifiant
 utilisateur ou texte d'exception dans les resultats de l'alerte. Un 500 et son
@@ -313,6 +315,106 @@ quand l'utilisateur abandonne. Un humain doit accuser reception, investiguer
 le premier incident et confirmer une operation reussie apres correction avant
 de clore le suivi. Les sondes de sante ne valident pas le scoring d'un quiz.
 
+### Annulations : arret hote prouve, inconnu toujours visible
+
+`ExceptionMiddleware` ne tente plus de fabriquer une reponse 500 quand le token
+d'invocation est deja annule : il conserve le journal Error et relance l'exception
+originale. Une erreur reelle n'est donc plus remplacee par l'echec d'ecriture de
+sa propre reponse. Aucun faux succes ni resultat d'invocation n'est fabrique.
+
+Seules les classes exactes `OperationCanceledException` et `TaskCanceledException`,
+sans exception interne et avec leur token effectivement annule, peuvent emettre
+le Warning structure `Host shutdown cancellation in function {FunctionName},
+invocation {InvocationId}; preserving cancellation.` Il faut soit le token exact
+`IHostApplicationLifetime.ApplicationStopping`, soit le token exact d'invocation
+dont l'annulation a ete observee **apres** le signal d'arret. Un token deja annule
+a l'entree du middleware ne permet pas d'etablir cet ordre. Un autre token,
+un timeout interne, une exception derivee Cosmos, une erreur reelle ou une cause
+inconnue reste Error, meme pendant un arret. Le Warning conserve l'exception ;
+sa propagation est maintenue, pas absorbee.
+
+Le KQL ne retire que les enveloppes Error connues du worker et de l'hote,
+avec un marqueur unique, les memes `OperationId`, `InvocationId`,
+`AppRoleInstance`, fonction et type, dans les cinq secondes suivant le marqueur.
+Une enveloppe RPC doit contenir la chaine exacte `FunctionInvocationException`
+-> `RpcException` -> annulation, sans exception interne serialisee, avec
+corroboration par l'unique erreur du worker. Un 5xx de la meme invocation
+invalide le marqueur. Les marqueurs absents/dupliques, correlations incompletes,
+autres invocations, autres erreurs coexistantes, Critical et Unhandled restent
+visibles. Aucun 5xx auparavant alertable n'est retire : les exclusions health
+et GET disabled ci-dessus sont preservees, sans extension.
+
+**Limite volontaire : l'abandon client n'est pas classifie. Hors transfert
+readiness ci-dessous, les annulations non marquees restent immediates, meme
+isolees. Aucune nouvelle regle de repetition n'est introduite.**
+Les API publiques du Worker 1.24.0
+([FunctionContext](https://github.com/Azure/azure-functions-dotnet-worker/blob/1.24.0/src/DotNetWorker.Core/Context/FunctionContext.cs),
+[HttpRequestData](https://github.com/Azure/azure-functions-dotnet-worker/blob/1.24.0/src/DotNetWorker.Core/Http/HttpRequestData.cs))
+ne donnent ni `RequestAborted`, ni l'origine du token, ni le debut de traitement
+hote. Le `host.json` du depot ne fixe pas `functionTimeout`. Un chronometre
+middleware ne couvre pas le pretraitement : il ne prouve pas une duree inferieure
+au timeout effectif. Ne pas remplacer cette preuve par 499, `OperationId`, un
+message Cosmos ou `ApplicationStopping` simplement concomitant.
+
+La piste d'une alerte timeout independante ne justifie pas d'abaisser ces
+annulations : [FunctionExecutor, revision f15e95c](https://github.com/Azure/azure-webjobs-sdk/blob/f15e95c8e4127ae1af8184289d6994e59731d12b/src/Microsoft.Azure.WebJobs.Host/Executors/FunctionExecutor.cs#L448-L452)
+emet `LogError(message)` sans exception, et
+[la levee de FunctionTimeoutException](https://github.com/Azure/azure-webjobs-sdk/blob/f15e95c8e4127ae1af8184289d6994e59731d12b/src/Microsoft.Azure.WebJobs.Host/Executors/FunctionExecutor.cs#L667-L672)
+depend de `throwOnTimeout`. Cette source ne prouve ni le binaire prod ni
+l'acheminement dans `AppExceptions` (une trace Error seule n'est pas ce signal).
+Les captures du 03/10 indiquent un hote `4.1054.250.26428`, sans attestation de
+ce chemin timeout dans la collecte. L'evaluation d'une integration ASP.NET Core
+avec `RequestAborted` reste un lot distinct ([suivi #581](https://github.com/gchambaud_microsoft/Certigo/issues/581)),
+sans migration ni dependance ajoutee ici. Les tests unitaires prouvent le comportement
+du middleware ; les fixtures prouvent le KQL, pas une emission reelle de l'hote
+apres deploiement. Perte de telemetrie ou changement de format peuvent conserver
+une alerte d'arret : c'est le repli prudent.
+
+### Annulations readiness deja couvertes par l'alerte dediee
+
+La readiness est le seul transfert de signal autorise sans marqueur d'arret.
+Il exige une requete `Readiness`, chemin exact `/api/health/ready` (query string
+acceptee), `499`, `Success=false`, avec `Id`, `InvocationId`, `OperationId`,
+instance et duree presents. Cette ligne satisfait exactement le predicat
+non-200 et la deduplication par `Id` de `readiness-failures.kql`, laisse inchange.
+Elle est comptee comme un echec reel, pas effacee de la telemetrie.
+
+Les exceptions doivent appartenir a la meme invocation/operation/instance,
+dans la duree de la requete plus cinq secondes de propagation. Il faut une
+chaine pure middleware/worker/hote : types natifs attendus, enveloppes RPC
+causalement liees au worker unique. Toute exception reelle, timeout, warning
+de dependance non purement annule, correlation incomplete ou contradictoire
+invalide le transfert. Une requete dupliquee, un 200/503 contradictoire pour
+la meme invocation, un identifiant absent ou une autre fonction le refusent.
+Un retry ayant seulement le meme `OperationId` n'autorise aucune exclusion.
+Les autres fonctions et leurs annulations restent immediates.
+
+Ce n'est pas une preuve d'abandon client ou d'innocuite : c'est le choix explicite
+de laisser l'alerte readiness traiter ce seul cas selon son seuil de deux
+requetes non-200 distinctes en dix minutes. Un echec isole ne declenche pas ;
+un deuxieme echec distinct declenche. Le signal exceptions garde sa fenetre de
+quinze minutes et sa cadence de cinq minutes : il cherche la requete correlee
+dans cette fenetre, tandis que readiness evalue ses propres dix minutes.
+Ingestion manquante/tardive peut conserver une alerte exceptions ; absence de
+logs n'est pas succes. Aucun 5xx auparavant alertable n'est filtre par ce transfert.
+
+Rejeu en lecture seule le **04/10/2026**, intervalle UTC semi-ouvert
+**[04/09/2026 17:00, 04/10/2026 17:00)** : **47 -> 43 lignes**.
+Les **sept erreurs Cosmos**, les **quatre annulations metier du 11/09** et
+les **32 signaux requetes** sont tous conserves, evenement par evenement.
+Seules les quatre erreurs readiness du 03/10 sont transferees : annulation
+pendant `JsonAsync(request)`, seconde annulation pendant `JsonAsync(response)`
+du middleware, puis `Function.Readiness` et `Host.Results`. Les trois warnings
+de dependances sont des chaines pures d'annulation ; aucune autre erreur
+coexistante n'est observee pour cette invocation.
+
+Dans la fenetre **03/10 22:24-22:34 UTC**, le KQL readiness exact compte le
+499 reel comme **un echec**, donc sans declenchement. Un rejeu avec une seconde
+copie synthetique de cette requete, `Id` distinct et timestamp decale d'une
+minute, donne **deux echecs et declenchement**. Ces requetes Logs API n'ingerent
+aucun evenement et n'executent aucune alerte. Les resultats portent sur la
+telemetrie collectee, pas sur des erreurs eventuellement absentes des logs.
+
 ### Verifier le moteur KQL, pas une imitation JavaScript
 
 `infra/tests/critical-failures.test.mjs` protege le contrat ARM compile et le
@@ -329,11 +431,18 @@ az rest --method post `
 Remove-Item "$env:TEMP\certigo-critical-fixtures.json"
 ```
 
-Exiger `Cases=46`, `FailedCases=0`, `Failures=[]`. Resultat mesure le
-24 septembre : **46/46**, avec routes critiques, route future, URL absente,
+Exiger `Cases=119`, `FailedCases=0`, `Failures=[]`. Resultat mesure le
+4 octobre : **119/119**, avec routes critiques, route future, URL absente,
 sante avec query string, 4xx, code invalide, autre composant et exception
 sans operation ni severite, plus marqueur exact, methodes, causes et correlations
-incorrectes, marqueur absent et requete soeur non masquee.
+incorrectes, marqueur absent et requete soeur non masquee. Les cas d'arret
+ajoutent les enveloppes worker/RPC, limites de correlation, marqueurs ambigus,
+erreur reelle sur `/api/health/ready`, 500 puis annulation, timeout interne et
+`FunctionTimeoutException` coexistants, ainsi que la couverture readiness,
+ses identifiants manquants, contradictions, warnings et bornes temporelles.
+Les sources/reponses completes et la
+difference evenement par evenement restent dans les preuves privees ; les
+erreurs partielles Logs API et le plafond de lignes sont refuses.
 
 Rejeu de la requete exacte sur **23/09/2026 16:17:51 UTC ->
 24/09/2026 16:17:51 UTC**, via Azure Logs, sans ecriture :

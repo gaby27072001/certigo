@@ -141,11 +141,17 @@ internal sealed class EmptyServiceProvider : IServiceProvider
 
 internal sealed class FakeFunctionContext : FunctionContext
 {
-    public FakeFunctionContext(IServiceProvider? instanceServices = null, string functionName = "TestFunction")
+    public FakeFunctionContext(
+        IServiceProvider? instanceServices = null,
+        string functionName = "TestFunction",
+        CancellationToken cancellationToken = default)
     {
         InstanceServices = instanceServices ?? EmptyServiceProvider.Instance;
         FunctionDefinition = new FakeFunctionDefinition(functionName);
+        CancellationToken = cancellationToken;
     }
+
+    public override CancellationToken CancellationToken { get; }
 
     public override string InvocationId { get; } = Guid.NewGuid().ToString("n");
 
@@ -288,9 +294,10 @@ internal static class FunctionTestHarness
         string? body = null,
         IDictionary<string, string>? headers = null,
         IServiceProvider? services = null,
-        string functionName = "TestFunction")
+        string functionName = "TestFunction",
+        CancellationToken cancellationToken = default)
     {
-        var context = new FakeFunctionContext(services, functionName);
+        var context = new FakeFunctionContext(services, functionName, cancellationToken);
         var (bindingsFeature, bindings) = BindingsFeature.Create();
         ((FakeInvocationFeatures)context.Features).SetRaw(BindingsFeature.FeatureType, bindingsFeature);
 
@@ -316,9 +323,10 @@ internal static class FunctionTestHarness
     /// <summary>Builds a non-HTTP invocation: the HTTP request feature resolves to <c>null</c>.</summary>
     public static HarnessInvocation CreateNonHttp(
         IServiceProvider? services = null,
-        string functionName = "TimerFunction")
+        string functionName = "TimerFunction",
+        CancellationToken cancellationToken = default)
     {
-        var context = new FakeFunctionContext(services, functionName);
+        var context = new FakeFunctionContext(services, functionName, cancellationToken);
         var (bindingsFeature, bindings) = BindingsFeature.Create();
         ((FakeInvocationFeatures)context.Features).SetRaw(BindingsFeature.FeatureType, bindingsFeature);
         context.Features.Set<IHttpRequestDataFeature>(new FakeHttpRequestDataFeature(null));

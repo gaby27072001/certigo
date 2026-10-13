@@ -4,6 +4,8 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Certigo.Api.Http;
 using Certigo.Application.Abstractions;
 using Certigo.Domain.Organizations;
@@ -20,10 +22,40 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
         var correlationId = await ResolveCorrelationIdAsync(context);
         context.Items["CorrelationId"] = correlationId;
         using var scope = logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = correlationId });
+        var stopping = context.InstanceServices.GetService<IHostApplicationLifetime>()?.ApplicationStopping
+            ?? CancellationToken.None;
+        var invocationToken = context.CancellationToken;
+        // A token already cancelled on entry has no observable ordering relative to shutdown.
+        var cancelledDuringShutdown = 0;
+        using var cancellationRegistration = invocationToken.IsCancellationRequested
+            ? default
+            : invocationToken.Register(() =>
+            {
+                if (stopping.IsCancellationRequested)
+                {
+                    Interlocked.Exchange(ref cancelledDuringShutdown, 1);
+                }
+            });
 
         try
         {
             await next(context);
+        }
+        catch (OperationCanceledException ex) when (
+            (ex.GetType() == typeof(OperationCanceledException) || ex.GetType() == typeof(TaskCanceledException))
+            && ex.InnerException is null
+            && ex.CancellationToken.CanBeCanceled
+            && ex.CancellationToken.IsCancellationRequested
+            && (ex.CancellationToken == stopping
+                || (ex.CancellationToken == invocationToken
+                    && Volatile.Read(ref cancelledDuringShutdown) == 1)))
+        {
+            logger.LogWarning(
+                ex,
+                "Host shutdown cancellation in function {FunctionName}, invocation {InvocationId}; preserving cancellation.",
+                context.FunctionDefinition.Name,
+                context.InvocationId);
+            throw;
         }
         catch (BadRequestException ex)
         {
@@ -281,7 +313,8 @@ public sealed class ExceptionMiddleware(ILogger<ExceptionMiddleware> logger) : I
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled exception in function {FunctionName}.", context.FunctionDefinition.Name);
-            if (!await WriteProblemAsync(context, HttpStatusCode.InternalServerError, "Unexpected server error",
+            if (invocationToken.IsCancellationRequested
+                || !await WriteProblemAsync(context, HttpStatusCode.InternalServerError, "Unexpected server error",
                     "Certigo could not complete the request.", correlationId))
             {
                 throw;
