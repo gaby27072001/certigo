@@ -333,6 +333,48 @@ test('accepts migration state C with only the gated one-shot active and legacy a
   });
 });
 
+test('accepts the personal repository conjunction only with its trusted semantic approval', () => {
+  withFixture(['activeOneShot', 'archivedLegacy'], (root) => {
+    const relativePath = '.github/workflows/post-merge-cosmos-account-deletion.yml';
+    const workflowPath = path.join(root, ...relativePath.split('/'));
+    const document = parseDocument(fs.readFileSync(workflowPath, 'utf8'));
+    const condition = document.getIn(['jobs', 'account-deletion', 'if']);
+    document.setIn(
+      ['jobs', 'account-deletion', 'if'],
+      condition.replace('gchambaud_microsoft/Certigo', 'gaby27072001/certigo'),
+    );
+    const content = document.toString();
+    fs.writeFileSync(workflowPath, content);
+    assert.ok(validate(root).some((error) => error.includes('semantic manifest')));
+
+    const manifest = JSON.parse(fs.readFileSync(trustedManifestOf(root), 'utf8'));
+    manifest.states.C[relativePath] = fingerprintWorkflow(relativePath, content).digest;
+    fs.writeFileSync(trustedManifestOf(root), renderWorkflowManifest(manifest));
+    assert.deepEqual(validate(root), []);
+  });
+});
+
+test('repository migration never permits a fork or a disjunction of canonical owners', () => {
+  for (const repositoryCondition of [
+    "github.repository == 'attacker/certigo'",
+    "(github.repository == 'gchambaud_microsoft/Certigo' || github.repository == 'gaby27072001/certigo')",
+  ]) {
+    withFixture(['activeOneShot', 'archivedLegacy'], (root) => {
+      const file = path.join(root, '.github', 'workflows', 'post-merge-cosmos-account-deletion.yml');
+      mutateWorkflow(file, (document) => {
+        document.setIn(['jobs', 'account-deletion', 'if'], [
+          "github.event_name == 'workflow_dispatch'",
+          repositoryCondition,
+          "github.ref == 'refs/heads/main'",
+          "vars.CERTIGO_COSMOS_EMULATOR_ENABLED == 'true'",
+        ].join(' && '));
+      });
+      assert.ok(validate(root)
+        .some((error) => error.includes('if condition must be the exact gated conjunction')));
+    });
+  }
+});
+
 test('rejects every partial or mixed workflow migration layout', () => {
   const labels = Object.keys(files);
   const validMasks = new Set([0b0001, 0b0110, 0b1100]);

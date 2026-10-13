@@ -159,6 +159,29 @@ imprévisibles (nonce aléatoire). `account-deletion-cosmos-policy.test.mjs` mon
 
 ## Un workflow modifié ne s'exécute pas dans sa propre PR
 
+### Migration vers le dépôt personnel
+
+La migration de `gchambaud_microsoft/Certigo` vers `gaby27072001/certigo`
+ne constitue pas une pré-approbation de workflow ou de confiance Azure.
+Le validateur Cosmos accepte temporairement les deux **conjonctions exactes**
+de propriétaire, chacune conservant `workflow_dispatch`, `main`, le flag
+d'activation et le runner dédié. Une disjonction entre propriétaires, un fork
+ou une condition moins restrictive reste interdit. Le manifeste trusted doit
+encore autoriser le contenu exact avant qu'il puisse être appliqué.
+
+Procéder dans cet ordre : fusion revue du contrat compatible de validation,
+PR A avec proposition du nouveau propriétaire, puis PR B appliquant exactement
+cette proposition. Ne pas modifier l'empreinte active pour rendre verte la
+première PR. La même séquence s'applique à la version SDK du gate Cosmos ;
+elle n'autorise pas à changer un workflow privilégié scellé à l'octet.
+
+L'autorisation du dispatch backend utilise uniquement le dépôt personnel
+canonique. Elle continue d'exiger un opérateur humain autorisé et un reviewer
+indépendant empêchant l'auto-approbation. Ce contrôle n'enregistre aucun runner,
+ne crée aucun Environment et ne modifie aucune fédération OIDC. Établir les
+protections et vérifier leur fonctionnement avant d'ajouter un sujet OIDC exact
+du nouveau dépôt ; ne retirer l'ancien qu'après preuve et approbation.
+
 Les workflows de PR sont chargés depuis `main` (`pull_request_target`) : la PR B tourne avec
 l'**ancien** workflow, et ses nouvelles étapes n'agissent qu'après la fusion. Une étape cassée dans
 un job requis ne peut alors être réparée que par une PR… jugée par l'étape cassée.

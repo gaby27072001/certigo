@@ -106,7 +106,7 @@ async function loadEnvironment(environment) {
   if (
     !token
     || apiUrl !== 'https://api.github.com'
-    || repository !== 'gchambaud_microsoft/Certigo'
+    || repository !== 'gaby27072001/certigo'
   ) {
     fail('Canonical GITHUB_TOKEN, GITHUB_API_URL and GITHUB_REPOSITORY are required.');
   }

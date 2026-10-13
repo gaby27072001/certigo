@@ -376,7 +376,10 @@ function validateWorkflow(file) {
     }
     if (
       !text.includes("github.event_name == 'workflow_dispatch'")
-      || !text.includes("github.repository == 'gchambaud_microsoft/Certigo'")
+      || ![
+        "github.repository == 'gchambaud_microsoft/Certigo'",
+        "github.repository == 'gaby27072001/certigo'",
+      ].some((condition) => text.includes(condition))
       || !text.includes("github.ref == 'refs/heads/main'")
       || !text.includes('ref: refs/heads/main')
       || !text.includes("vars.CERTIGO_COSMOS_EMULATOR_ENABLED == 'true'")

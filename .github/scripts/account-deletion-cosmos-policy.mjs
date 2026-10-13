@@ -33,12 +33,17 @@ const preApprovalRemedy = 'The validator always reads the manifest of the truste
   + 'the workflow change: a main whose manifest disagrees with its own workflows blocks every '
   + 'pull request (#497). See docs/runbooks/CI_WORKFLOW_CHANGES.md.';
 
-const oneShotCondition = [
+// Both exact forms are needed during the reviewed two-PR repository migration.
+// The trusted semantic manifest still decides which workflow may actually land.
+const oneShotConditions = new Set([
+  'gchambaud_microsoft/Certigo',
+  'gaby27072001/certigo',
+].map((repository) => [
   "github.event_name == 'workflow_dispatch'",
-  "github.repository == 'gchambaud_microsoft/Certigo'",
+  `github.repository == '${repository}'`,
   "github.ref == 'refs/heads/main'",
   "vars.CERTIGO_COSMOS_EMULATOR_ENABLED == 'true'",
-].join(' && ');
+].join(' && ')));
 
 const pinnedAction = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-f]{40}$/;
 const expectedRunner = ['self-hosted', 'Linux', 'X64', 'certigo-cosmos-emulator'];
@@ -424,7 +429,7 @@ function validateOneShotStructure(content, errors) {
     errors.push(`${oneShotWorkflow}: permissions must be empty globally and contents-read on the job`);
   }
   const condition = typeof job?.if === 'string' ? job.if.replace(/\s+/g, ' ').trim() : '';
-  if (condition !== oneShotCondition) {
+  if (!oneShotConditions.has(condition)) {
     errors.push(`${oneShotWorkflow}: account-deletion if condition must be the exact gated conjunction`);
   }
 
