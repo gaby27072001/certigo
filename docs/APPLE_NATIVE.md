@@ -580,6 +580,28 @@ redacted typed mapping. The same log exposed a Swift 6.4 C-array string
 deprecation in the protection helper; the correction explicitly requires a
 NUL terminator and valid UTF-8 instead of repairing malformed path bytes.
 
+### Completed bounded Apple compilation milestone
+
+The approved exact **`a32fe16d76f44cf26678070c652f26ed40854685`** succeeded
+on the same actual Mac toolchain: **114 Darwin XCTest tests, zero failures/
+skips, and generic iOS simulator `CertigoNative` BUILD SUCCEEDED with
+`CODE_SIGNING_ALLOWED=NO`**, exit 0. The access workstream preserved
+`files/apple-msal-corrected-mac.log`; its candidate assertion, XCTest summaries
+and build-success line were directly checked on 2026-10-13.
+The actual MSAL adapter and iOS C interop now compile in the complete app.
+An App Intents metadata warning remains nonblocking. The initial `bbd58...`
+proof remains a separate historical candidate, not replaced by this result.
+
+This closes the bounded source/Apple-compilation correction lot only.
+It does **not** establish SDK initialization/private-cache behavior,
+built-plist/lock-byte inspection, callback delivery/collision, sign-in,
+consent, token acceptance or refresh/logout. The iOS-only protection test was
+not executed by macOS package tests or a generic simulator build; device
+lock/reboot semantics remain open. No simulator was booted, no login/runtime
+composition activated and no Graph registration/signing changed.
+Conditional DEV callback consent remains unconsumed until the remaining
+Apple/bundle/collision checks and owner review actually pass.
+
 ## Non-destructive Flutter queue inspection
 
 `FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/
