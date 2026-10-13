@@ -757,6 +757,98 @@ The seven original HTTP fixture blobs are unchanged. Neither the new direct
 Foundation test nor changed iOS setter has yet compiled/executed on Apple;
 the prior Apple result applies only to exact 92829, not this correction.
 
+### Paired result and platform evidence boundary (2026-10-13)
+
+The approved exact `5a80231c05803501e4b89c5e7e4672bd87b667f0` built unsigned
+successfully, with built no-auth identity/no callbacks confirmed. Its six
+tests produced **four passes, two failures, zero skips**, `xcodebuild` exit 65.
+The metadata and representation tests passed. Both
+`testFoundationProtectionSetterReadsBackExactPolicyOnEmptyFile` and
+`testProtectedDescriptorWriteRetainsFirstUnlockPolicyAndRemovesEmptyWitness`
+threw `missingAttribute`, not a different-policy or nonstring rejection.
+The access log `files/apple-foundation-runtime.log` was read directly.
+This proves absence of the Foundation protection attribute in both tested
+paths in that execution environment, not lack of protection everywhere,
+unsupported iOS 27 Simulator as a general rule, or successful descriptor
+class application. No payload bytes are admitted by the failing helper.
+Access confirmed removal/absence of its sole new simulator UUID
+`4F18F2AB-7413-48AD-932E-3C9CE2FAB908`, key withdrawal, authentication
+denial (255), local-copy deletion and cleared automation.
+
+Directly inspected official sources bound the next decision:
+
+- [Xcode: running on simulated or physical devices](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices)
+  states that simulators do not replicate physical-device features and that
+  hardware-specific features must be tested on physical devices. This is
+  general guidance, not a specific guarantee about protection attribute
+  reporting in the tested Simulator release.
+- [UIKit: encrypting your app's files](https://developer.apple.com/documentation/uikit/encrypting-your-app-s-files)
+  describes passcode-enabled, hardware-accelerated Data Protection and
+  first-unlock behavior. Its documented existing-file example uses
+  `NSURL.setResourceValue(_:forKey:)` with a `URLFileProtection` value and
+  `.fileProtectionKey`. That supplies a possible separate public-API
+  comparison, not evidence that changing the current setter would fix this
+  environment.
+- [Data Protection entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.default-data-protection)
+  describes the default protection level and capability. It does not establish
+  that this entitlement is required to explicitly set an individual file's
+  policy, or that adding it would fix the Simulator result.
+- Apple's public [XNU fcntl header](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/fcntl.h)
+  describes protection-class GET as returning an integer and SET as requiring
+  an integer. It does not establish filesystem support in this execution
+  environment. No numeric constant or private implementation is imported from
+  that reference.
+
+The archived Simulator guide is retired for Xcode 9 and later and did not
+provide the sought specific Data Protection limitation. Suggested DTS forum
+references could not be directly verified due to the site's verification
+barrier; no claimed quote or categorical unsupported-Simulator conclusion is
+used as evidence. The observed cause remains **missing attribute in the
+paired execution**, with platform/filesystem/API support not yet determined.
+
+Do not repeat the same simulator test without a new testable hypothesis.
+The smallest proposed device proof is the existing direct/readback and
+descriptor-write pair, unchanged and fail-closed, on a user-approved physical
+device with a passcode and a separately approved signed isolated no-auth
+host/effective bundle identity. Signing, provisioning, host changes and device
+operations are outside this lot and are not performed automatically.
+Success must include exact first-unlock readback, descriptor class GET/SET
+equality before payload bytes, expected payload and no witness leftovers.
+Physical lock/reboot behavior is a separate explicit test step, not implied by
+that success. No MSAL, Keychain, account or network operation is needed.
+If a narrowly approved environment diagnosis is chosen instead, compare only
+fresh empty files through the documented URL-resource API and public
+filesystem-protection support reporting; preserve the paired failures and
+strict policy requirement rather than declaring a bypass or successful
+protection. No additional diagnostic code, entitlement or retry is added here.
+
+For a proposed physical-device lot, first obtain only device availability
+(iPhone/iPad usable for isolated testing), not account details or a scan of
+personal device data. Then choose the effective no-auth host/test identity
+and signing team explicitly. A distinct test bundle alone does not isolate
+the runner; review the eventual host, signed entitlements and provisioning
+before executing. Use only generated files in that host's sandbox, no DEV app
+host, existing SDK/user cache, cloud access or account calls. Start with the
+two existing paired protection tests at the approved exact source; retain
+failures and stop if the expected policy is absent. Only after those pass
+consider separately authorized lock/reboot verification. Delete only the
+named harness and generated artifacts under its agreed cleanup scope, never
+personal apps/data.
+
+Apple's [developer account overview](https://developer.apple.com/help/account/basics/about-your-developer-account)
+confirms free Personal Team device installation/testing with an Apple Account
+in Xcode; profiles expire after seven days and limits apply. It does not
+guarantee that every capability needed by an eventual harness is available
+to that team. Apple's [program enrollment guidance](https://developer.apple.com/help/account/membership/program-enrollment)
+states that paid membership is not required merely to install an app on a
+personal device; the annual Developer Program fee is USD 99, with regional
+currency/pricing differences. An existing authorized team may suffice; do
+not buy membership or promise a free entitlement path before the chosen
+capabilities/provisioning are verified. Account sign-in, developer agreement,
+device pairing/trust/developer mode, signing/provisioning and any paid
+enrollment require their own user decisions and are not performed in this
+documentation-only lot.
+
 ## Non-destructive Flutter queue inspection
 
 `FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/
