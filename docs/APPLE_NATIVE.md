@@ -311,7 +311,7 @@ Microsoft's external-tenant iOS tutorial uses **MSALCIAMAuthority**, not the
 workforce/common authority. MSAL supports an exact-version Swift Package
 dependency and browser-delegated acquisition/refresh. The next auth lot must
 validate the public client ID, CIAM authority, protected API scope and the
-development redirect against the existing registration before adding the SDK.
+development redirect against the existing registration before activating the SDK.
 The example redirect convention is `msauth.<bundle-id>://auth`; it must not be
 silently substituted for the currently registered Flutter callback.
 
@@ -345,8 +345,8 @@ the Flutter trailing slash; matching callback schemes for collision detection
 is case-insensitive.
 
 The `@MainActor` provider protocol defines silent/interactive acquisition and
-local SDK account removal; there is **no provider implementation** or composition
-change. The SDK must own refresh/cache/account selection and return a redacted
+local SDK account removal; the Apple-only candidate adapter described below is
+**not composed into the app**. The SDK must own refresh/cache/account selection and return a redacted
 token wrapper, never a guessed backend owner ID. `/me` remains authoritative for
 owner binding. Metadata validation is not account permission, SDK compatibility,
 consent, token acceptance or a working login. All tests use synthetic configuration
@@ -376,9 +376,91 @@ allows explicitly configured custom `<scheme>://host` callbacks, but the shared
 AppAuth's slash behavior proves nothing about MSAL. The preferred proposal is to
 add **only** `msauth.com.certigo.native.dev://auth` to the existing public client's
 callback list, preserving both Flutter entries and concurrent edits. This needs
-specific owner/tenant approval and subsequent SDK/device proof; no registration
-was changed. Default-format broker compatibility is not proof that broker
+specific owner/tenant approval and subsequent SDK/device proof; the owner's
+reported consent is conditional: **"Oui, après les vérifications Apple"**.
+No registration was changed. Default-format broker compatibility is not proof that broker
 authentication is available for this external tenant.
+
+### Official MSAL Apple SDK preparation (not activation)
+
+The development Xcode target pins official **MSAL 2.16.0**, released 2026-09-22,
+at revision `8dfe5bf41fe10e6d2afed62a72c4232adbef20f4`, licensed MIT.
+The exact [official manifest](https://github.com/AzureAD/microsoft-authentication-library-for-objc/blob/8dfe5bf41fe10e6d2afed62a72c4232adbef20f4/Package.swift)
+declares a binary `MSAL` product, Swift tools 5.9, iOS 17/macOS 14/visionOS 1,
+and archive SHA-256
+`3bef53dae500878c2f07fd7493d54063f4fdcb057dfdb3c239256289a349edb8`.
+This aligns with this development target's iOS 17 floor, not watchOS/tvOS SDK
+support. SwiftPM dependency and binary-checksum resolution passed under WSL;
+the first attempt lacked `unzip`, restored only after that actual failure.
+That resolution did **not** build MSAL, UIKit or the Apple app.
+
+The workspace's candidate lock is a schema-v2 pin projection of that successful
+temporary resolver's three exact revisions, preserving Crypto/ASN.1 pins. It
+does not copy the temporary manifest's origin hash or claim an Xcode-generated
+resolution. Mac must resolve/verify these pins against the actual project,
+without silently choosing newer packages.
+
+`MSALAuthenticationProvider` is Apple-only, `@MainActor`, and uninstantiated.
+It supplies the protected API scope to silent/interactive requests, requests
+account selection in an attached UIKit presentation controller, and asks the
+SDK for an ephemeral authentication session with broker invocation disabled.
+It does not choose the first cached account or fabricate refresh/access tokens.
+SDK callbacks carry the SDK's `NS_SWIFT_SENDABLE` result to actor-isolated
+validation; this annotation and all Swift-imported APIs still require actual
+Apple compilation. It retains only an opaque SDK account/cache identifier and
+the returned authority for subsequent silent calls, not a backend user ID.
+
+Result admission requires nonempty whitespace-free Bearer token, unexpired
+SDK expiry, matching authority host/tenant and the exact protected granted
+scope. Live CIAM scope/tenant representations must be checked; absent or
+unexpected fields fail closed, not normalized into a successful login. The API
+still validates the access token and `/me` establishes the authoritative owner.
+No local JWT parsing, nonce generation, browser OAuth implementation or token
+insertion replaces SDK-owned PKCE/state/nonce validation. SDK errors expose
+only typed categories, never raw descriptions/userInfo/claims/tokens;
+SDK logging is disabled. The private SDK Keychain group is the development
+bundle identifier, as documented in the exact cache header, **not nil or a
+shared Microsoft group**. No Keychain-sharing entitlement was added.
+
+Acquisition overlaps and local account removal during an outstanding SDK
+request fail explicitly. Removal is of the selected SDK cache account only,
+not remote sign-out, browser-session clearing or app outbox/profile deletion.
+Task cancellation suppresses token delivery but does not prove cancellation of
+the SDK browser/request or removal of a record the SDK already cached.
+Account selection/restoration across app restart and composition with `/me`,
+session generations and durable owner-scoped queues remain Apple/auth gates.
+The constructor restricts this adapter to the existing development bundle and
+its unique callback. `DevelopmentInfo.plist` prepares that DEV scheme only;
+the generated/merged built plist and URL delivery remain unverified.
+No app callback handler or UI login action is wired.
+
+`CIAMDevelopmentCandidate` records the dated public observation above but
+requires supplied registration/scheme/collision evidence. The observed Flutter
+redirect list explicitly **fails** native metadata admission. A test's
+hypothetical added redirect is not an actual registration or permission.
+Four focused portable tests cover categories, cancellation/network precedence,
+the unregistered callback and collision rejection; none executes SDK auth.
+
+Exact-version API references:
+[result and Sendable annotation](https://github.com/AzureAD/microsoft-authentication-library-for-objc/blob/8dfe5bf41fe10e6d2afed62a72c4232adbef20f4/MSAL/src/public/MSALResult.h),
+[token parameters/returned authority](https://github.com/AzureAD/microsoft-authentication-library-for-objc/blob/8dfe5bf41fe10e6d2afed62a72c4232adbef20f4/MSAL/src/public/MSALTokenParameters.h),
+[private cache option](https://github.com/AzureAD/microsoft-authentication-library-for-objc/blob/8dfe5bf41fe10e6d2afed62a72c4232adbef20f4/MSAL/src/public/configuration/publicClientApplication/cache/MSALCacheConfig.h),
+[error values](https://github.com/AzureAD/microsoft-authentication-library-for-objc/blob/8dfe5bf41fe10e6d2afed62a72c4232adbef20f4/MSAL/src/public/MSALError.h),
+[logger settings](https://github.com/AzureAD/microsoft-authentication-library-for-objc/blob/8dfe5bf41fe10e6d2afed62a72c4232adbef20f4/MSAL/src/public/configuration/global/MSALLoggerConfig.h).
+
+Physical Mac/Xcode availability was reported on 2026-10-13; versions,
+connectivity and actual build results are not established by that report.
+The **first** unsigned Mac validation remains exact
+`bbd58c899d269484740d8766a4e6ef378b8621ea`, scheme `CertigoNative`.
+This SDK lot is a separate later candidate, never an automatic replacement
+for that initial checkout. After the initial gate, the later exact SHA needs
+toolchain/SDK discovery, locked package resolution, package tests including
+Darwin subprocess/protection checks, and generic-simulator build with
+`CODE_SIGNING_ALLOWED=NO`. Then inspect its built DEV bundle/plist, SDK
+initialization, callback collision and private-cache behavior before owner
+review can satisfy conditional callback permission. Token/login/logout,
+isolated test accounts/browsers and runtime activation remain separate gates;
+no successful Linux test or syntax parse closes them.
 
 ## Non-destructive Flutter queue inspection
 
