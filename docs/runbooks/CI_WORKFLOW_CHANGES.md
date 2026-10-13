@@ -182,6 +182,22 @@ ne crée aucun Environment et ne modifie aucune fédération OIDC. Établir les
 protections et vérifier leur fonctionnement avant d'ajouter un sujet OIDC exact
 du nouveau dépôt ; ne retirer l'ancien qu'après preuve et approbation.
 
+### Prérequis de fusion de la cible backend .NET 10
+
+Le changement des `TargetFramework` ne met pas à jour les workflows actifs.
+Le gate backend doit installer le SDK .NET 10 approuvé et, après la restauration
+de la solution, restaurer directement `src/Certigo.Api/Certigo.Api.csproj` :
+le hook de `Azure.Functions.Sdk` restaure ainsi le projet d'extensions généré.
+L'absence de ce hook peut être masquée par un répertoire `obj` existant ; la
+preuve CI doit donc venir d'un checkout propre.
+
+L'évolution du pin Cosmos exige d'abord un contrat de validation compatible
+avec les deux pins exacts, puis les PR A/B. Le pin du CD privilégié reste soumis
+à son propre scellé : aucune mise à jour de manifeste ni de documentation ne
+constitue une autorisation de le remplacer. Ne pas fusionner la cible .NET 10
+avant que les workflows requis puissent la compiler ; ne pas promouvoir son
+artefact avant la validation et l'approbation de la transition du runtime Flex.
+
 Les workflows de PR sont chargés depuis `main` (`pull_request_target`) : la PR B tourne avec
 l'**ancien** workflow, et ses nouvelles étapes n'agissent qu'après la fusion. Une étape cassée dans
 un job requis ne peut alors être réparée que par une PR… jugée par l'étape cassée.

@@ -1,4 +1,4 @@
-// Azure Functions (Linux Flex Consumption, .NET 8 isolated worker) hosting the
+// Azure Functions (Linux Flex Consumption, .NET 10 isolated worker) hosting the
 // Certigo API. Uses a preprovisioned user-assigned identity for FC1 host storage,
 // Key Vault references and Application Insights, plus a system-assigned identity
 // for Cosmos data-plane access. No storage account keys are used.
@@ -275,7 +275,7 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
       }
       runtime: {
         name: 'dotnet-isolated'
-        version: '8.0'
+        version: '10.0'
       }
     }
     siteConfig: {

@@ -114,6 +114,11 @@ Le backend suit un modèle **CD par environnement** (pas un tag applicatif) :
 - **Build unique** : chaque push `main` publie une seule fois le backend avec le SDK
   .NET `8.0.424` et CycloneDX `6.2.0`, normalise les timestamps du ZIP et produit
   `release-manifest.json` (commit, SHA-256 du ZIP/SBOM, run et provenance).
+- **Migration .NET 10** : la cible source et Bicep ne changent pas ce pin actif.
+  Le SDK `10.0.401` a été utilisé pour la validation locale ; son adoption en CI/CD
+  exige la procédure gouvernée de
+  [`CI_WORKFLOW_CHANGES.md`](runbooks/CI_WORKFLOW_CHANGES.md), sans rotation implicite
+  d'un scellé privilégié. Ne pas promouvoir un artefact .NET 10 sur un runtime .NET 8.
 - **`dev`** : ce même run déploie automatiquement l'artefact retenu. Aucun job de
   déploiement ne relance `dotnet publish`.
 - **`staging` puis `prod`** : deux promotions manuelles référencent le `source_run_id`

@@ -1,7 +1,7 @@
 # Architecture — Certigo
 
 Ce document décrit l'architecture de référence du monorepo : frontend Flutter, backend
-.NET 8 Azure Functions, moteur pédagogique Cortex, contenu *as-code* et flux de données.
+.NET 10 Azure Functions, moteur pédagogique Cortex, contenu *as-code* et flux de données.
 
 > Rappel produit : Certigo enseigne des **concepts techniques réels** et prépare à des
 > certifications cloud multi-fournisseurs. Le catalogue canonique (`content/public/catalog/certifications.json`
@@ -40,7 +40,7 @@ Ce document décrit l'architecture de référence du monorepo : frontend Flutter
 └───────────────────────────────────┬──────────────────────────────────────────────┘
                                      │ HTTPS + JWT (Entra External ID)
                                      ▼
-┌──────────────────────── backend (.NET 8 isolated Functions) ─────────────────────┐
+┌──────────────────────── backend (.NET 10 isolated Functions) ────────────────────┐
 │  Certigo.Api            HTTP triggers · JwtAuthMiddleware · ExceptionMiddleware │
 │      │                                                                            │
 │      ▼                                                                            │
@@ -99,7 +99,7 @@ gitignorés).
 
 ---
 
-## 4. Backend .NET 8
+## 4. Backend .NET 10
 
 ### 4.1 Projets
 
@@ -311,7 +311,7 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement. **`infra/mod
 | `appInsights.bicep` | Application Insights *workspace-based* |
 | `keyvault.bicep` | Key Vault (modèle RBAC) |
 | `privateNetwork.bicep` | VNet `/24`, subnet FC1 `/26`, subnet private endpoint, 5 zones DNS/liens et endpoints privés Storage/KV/Cosmos |
-| `functionApp.bicep` | plan FC1 Linux, `dotnet-isolated` 8.0, intégration VNet privée sans route-all, identité système Cosmos et identité utilisateur préprovisionnée pour stockage/KV/App Insights |
+| `functionApp.bicep` | plan FC1 Linux, `dotnet-isolated` 10.0, intégration VNet privée sans route-all, identité système Cosmos et identité utilisateur préprovisionnée pour stockage/KV/App Insights |
 | `openai.bicep` | déploiement Azure OpenAI du tuteur |
 | `communicationEmail.bicep` | Azure Communication Services (e-mails transactionnels) |
 | `defender.bicep`, `policy.bicep`, `diagnostics.bicep` | posture de sécurité, Azure Policy et journalisation |
