@@ -1,9 +1,6 @@
 import CertigoData
-
 import CertigoDomain
-
 import Foundation
-
 import XCTest
 
 #if canImport(FoundationNetworking)

@@ -13,6 +13,9 @@ assumption, not an approved decision to drop support on users' devices.
   malformed/unsupported content errors, and authoritative result models.
 - `CertigoData`: HTTPS URLSession transport, existing REST routes, session
   generation isolation, and an atomic, owner/environment-scoped submission store.
+- `CertigoCortex`: pure Swift, explicitly timed local learning predictions using
+  the existing `1.0.0` algorithm contract. It is not connected to quiz correction
+  in the development UI.
 
 `apps/apple/CertigoNative` is an unsigned universal SwiftUI development target,
 with an adaptive library, path and MCQ session. Its distinct bundle identifier is
@@ -71,6 +74,33 @@ protection; it is not claimed to be encrypted by SwiftData. This first
 implementation deliberately uses an atomic versioned file for its small outbox.
 
 ## Run and validate
+
+### Cortex evidence and limits
+
+`CortexTests` reads the existing single source
+`packages/cortex/test/golden/cortex_golden_vectors.json` directly from the checkout;
+it does not regenerate or copy expectations. Scheduler float assertions use
+`1e-9`, and fractional due dates retain the shared `1ms` tolerance. Time is passed
+explicitly, using elapsed seconds rather than calendar days or device timezone.
+State validation rejects nonfinite values and mixed-track computations.
+
+Outside these shared vectors, the incumbent Dart and C# implementations already
+differ. Swift preserves **authoritative C#** readiness midpoint rounding
+(ties-to-even), the `max(1, conceptCount)` denominator and the `0.0001` total-weight
+floor. Dart uses away-from-zero rounding and returns zero for an empty authored
+domain. C# answer comparison ignores identifier case; Dart does not. Swift matches
+the server for ASCII identifiers and explicitly rejects non-ASCII comparison
+rather than pretending Unicode locale folding is .NET ordinal comparison.
+Local boundary tests pin these differences; the algorithm version and existing
+Dart/C# sources are unchanged. Passing the shared vectors is **not complete
+three-language parity** for these uncovered cases.
+
+The session planner has only a Dart twin, not a C# recommendation contract.
+Swift follows its lane allocation, deduplication and due/new backfill. Equal sort
+keys preserve input order deterministically; the shared vectors do not specify
+ties. This is a local prediction, not a guarantee of server recommendation order.
+The client never derives correction, rewards or readiness for a pending attempt,
+and no private answer bank is bundled.
 
 Run portable tests from the repository root:
 

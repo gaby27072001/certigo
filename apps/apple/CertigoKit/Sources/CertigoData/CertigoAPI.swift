@@ -1,5 +1,4 @@
 import CertigoDomain
-
 import Foundation
 
 #if canImport(FoundationNetworking)

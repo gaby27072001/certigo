@@ -8,13 +8,15 @@ let package = Package(
     products: [
         .library(name: "CertigoDomain", targets: ["CertigoDomain"]),
         .library(name: "CertigoData", targets: ["CertigoData"]),
+        .library(name: "CertigoCortex", targets: ["CertigoCortex"]),
     ],
     targets: [
         .target(name: "CertigoDomain"),
         .target(name: "CertigoData", dependencies: ["CertigoDomain"]),
+        .target(name: "CertigoCortex"),
         .testTarget(
             name: "CertigoKitTests",
-            dependencies: ["CertigoDomain", "CertigoData"],
+            dependencies: ["CertigoDomain", "CertigoData", "CertigoCortex"],
             resources: [.copy("Fixtures")]
         ),
     ]

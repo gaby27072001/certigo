@@ -1,5 +1,4 @@
 import CertigoDomain
-
 import Foundation
 
 public enum SubmissionOutcome: Equatable, Sendable {

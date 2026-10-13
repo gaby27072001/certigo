@@ -1,5 +1,4 @@
 import CertigoDomain
-
 import Foundation
 
 public enum SubmissionStatus: String, Codable, Sendable {
