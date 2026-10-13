@@ -8,13 +8,21 @@ public enum SubmissionOutcome: Equatable, Sendable {
 public actor LearningClient {
     private let api: CertigoAPI
     private let store: SubmissionStore
+    private let runtimeStore: RuntimeContentStore?
+    private let publicSource: PublicReleaseAPI
+    private var runtimeGeneration = UUID()
     private var current: APICredentials?
     private var generation = UUID()
     private var sending: Set<String> = []
 
-    public init(api: CertigoAPI, store: SubmissionStore) {
+    public init(
+        api: CertigoAPI, store: SubmissionStore, runtimeStore: RuntimeContentStore? = nil,
+        runtimeTransport: any BoundedHTTPTransport = BoundedURLSessionTransport()
+    ) {
         self.api = api
         self.store = store
+        self.runtimeStore = runtimeStore
+        publicSource = PublicReleaseAPI(api: api, transport: runtimeTransport)
     }
 
     public func connect(accessToken: String) async throws -> Profile {
@@ -62,10 +70,75 @@ public actor LearningClient {
         return entries
     }
 
+    public func synchronizePublicContent() async throws -> RuntimeContentSnapshot {
+        let context = try credentials()
+        guard let runtimeStore else { throw APIError.configuration }
+        runtimeGeneration = UUID()
+        let requestGeneration = runtimeGeneration
+        let pins = try await store.manifestPins()
+        try assertRuntimeCurrent(context, requestGeneration)
+        try runtimeStore.retainPins(pins)
+        let fetched = try await publicSource.activeManifest(credentials: context)
+        try assertRuntimeCurrent(context, requestGeneration)
+        guard case .fetched(let manifest, let binding, _) = fetched else {
+            throw PublicReleaseError.provenance
+        }
+        let stage = try runtimeStore.begin(
+            RuntimeContentSnapshot(
+                ownerId: context.ownerId, apiScope: api.scope, manifest: manifest, binding: binding)
+        )
+        for file in manifest.files {
+            try assertRuntimeCurrent(context, requestGeneration)
+            if try runtimeStore.cachedFile(file) != nil { continue }
+            let bytes = try await publicSource.file(
+                file, manifest: manifest, binding: binding, credentials: context)
+            try assertRuntimeCurrent(context, requestGeneration)
+            try runtimeStore.saveFile(bytes, file: file)
+        }
+        try assertRuntimeCurrent(context, requestGeneration)
+        // This guard and durable pointer transaction are synchronous on this same actor.
+        return try runtimeStore.activate(stage)
+    }
+
+    public func cachedPublicContent() throws -> RuntimeContentSnapshot? {
+        let context = try credentials()
+        guard let runtimeStore else { throw APIError.configuration }
+        return try runtimeStore.active(ownerId: context.ownerId, apiScope: api.scope)
+    }
+
+    public func restorePreviousPublicContent() throws -> RuntimeContentSnapshot {
+        let context = try credentials()
+        guard let runtimeStore else { throw APIError.configuration }
+        return try runtimeStore.restorePrevious(ownerId: context.ownerId, apiScope: api.scope)
+    }
+
+    public func cleanupPublicContent() async throws -> Int {
+        let context = try credentials()
+        guard let runtimeStore else { throw APIError.configuration }
+        let pins = try await store.manifestPins()
+        try assertCurrent(context)
+        try Task.checkCancellation()
+        try runtimeStore.retainPins(pins)
+        return try runtimeStore.cleanup()
+    }
+
+    private func assertRuntimeCurrent(_ context: APICredentials, _ requestGeneration: UUID) throws {
+        try Task.checkCancellation()
+        try assertCurrent(context)
+        guard requestGeneration == runtimeGeneration else { throw APIError.staleSession }
+    }
+
     public func submit(lessonId: String, submission: QuizSubmission) async throws
         -> SubmissionOutcome
     {
         let context = try credentials()
+        _ = try submission.validated()
+        if let manifestId = submission.publicManifestId {
+            try runtimeStore?.retainPins([
+                RuntimeManifestPin(
+                    ownerId: context.ownerId, apiScope: api.scope, manifestId: manifestId)
+            ])
+        }
         let saved = try await store.enqueue(
             SavedSubmission(
                 ownerId: context.ownerId, apiScope: api.scope, lessonId: lessonId,

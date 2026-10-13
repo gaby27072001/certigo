@@ -204,18 +204,72 @@ URL, exact cache directives, MIME, identities, ETag, byte count and file SHA.
 Transport tests use a per-session synthetic URL protocol, not a global/shared
 browser or live content source.
 
-Contract/payload validation and bounded fetch are **not a complete runtime release client**.
-Runtime track/lesson resources, safe disk staging,
-atomic activation, previous-release recovery and durable owner/outbox pin
-retention remain required. Do not activate untrusted files merely because a
-payload or manifest digest matches.
+### Durable public runtime engine
+
+`PublicResourceReader` validates the existing closed catalog/v1, coverage/v1
+and five runtime-resource/v1 forms against their repository contracts, in
+addition to the canonical question profile. Identity and exact byte hash/size
+must match the manifest. `questionBank` and `guided` unit requirements are
+distinct; checks reference questions instead of carrying correction keys.
+Unknown schemas/types and unsupported exercise capabilities fail explicitly.
+This is package validation, not a new guided-course editor or renderer, and not
+a replacement for the producer/backend's publication and reference-graph gates.
+The public anti-leak check never applies to authorized quiz POST feedback.
+
+The opt-in `RuntimeContentStore` uses content-addressed flat filenames, no-follow
+directory-relative POSIX handles, regular-file/hard-link checks and a dedicated
+process lock. The root must be trusted application storage, separate from the
+outbox. Trusted OS path aliases are resolved once; generated cache entries are
+never followed through symlinks. Temporary writes are flushed, renamed atomically
+and followed by a directory flush. iOS writes request the
+complete-until-first-authentication protection class; this Apple-only branch
+still requires an Apple SDK/device gate.
+
+One durable state file switches the owner/API-scoped `active` and `previous`
+pointers together. Staged files are verified again before publication, reused
+after interruption, and never exposed as active while incomplete. Corrupt data,
+missing state with existing snapshots, disk failures and capacity failures are
+errors, not empty caches or silent legacy/previous fallbacks. Previous recovery
+is an explicit operation and revalidates the snapshot first.
+
+`LearningClient.synchronizePublicContent()` obtains the owner from its existing
+authenticated `/me` session. It checks both session and sync generation after
+every suspension; the final guard and durable activation are synchronous on
+the same actor. A persisted revision rejects competing/late activations.
+New submissions retain their original manifest pin before enqueue; synchronization
+and cleanup import all persisted outbox pins, including other owners and API
+environments. Attempts, selected answers and manifest IDs are never rewritten to
+the new release, and pending correction still has no local verdict.
+
+Cache accounting includes temporary copies and is capped at 384 MiB.
+Explicit cleanup removes at most 32 unreferenced entries per call, retaining
+all owners' active/previous/staged manifests, shared blobs and durable outbox
+pins. Pins are conservative and never automatically expired, including after an
+ACK: a future retention/account-deletion policy must explicitly coordinate them.
+If protected data leaves insufficient space, the operation fails rather than
+evicting it. This baseline also bounds state to 256 scopes, 1,000 pins and 1 MiB;
+quota and full-release I/O performance remain pilot measurement gates.
+
+Synthetic tests cover all public resource forms, tampering, symlink/hard-link
+attacks, process-lock contention, actual cleanup thresholds, partial download
+restart/reuse, owner changes and overlapping sync generations. The portable
+process-death test sends **SIGKILL to its own isolated XCTest subprocess** both
+before and after the activation rename/flush, then reopens and resumes the cache.
+It is executable on Linux/macOS, not an iOS process-management feature.
+This proves the tested Linux filesystem/logic behavior, not physical power-loss
+behavior or Apple file-protection semantics.
+
+The runtime engine is not enabled in the development SwiftUI composition.
+It requires explicit store configuration and the authenticated connection;
+restart tests do not prove a production offline-login lifecycle. No live release,
+new endpoint, private payload, auth setting or release/signing workflow was used.
 
 ## Remaining gates before a user pilot
 
 No production readiness follows from this foundation alone. Required gates:
 actual Xcode simulator build and iPhone/iPad UI tests; supported CIAM SDK and test
 account login/refresh/logout; cross-language Cortex vectors; shared backend HTTP
-goldens; runtime public content validation/activation; durable in-progress draft
+goldens; runtime engine's Apple filesystem/live-contract and app-composition gates; durable in-progress draft
 and lesson cache/restart recovery; Flutter-to-Swift Keychain/preferences/outbox
 migration; account deletion and consent/notification lifecycle; localization and
 VoiceOver/keyboard/Dynamic Type checks; measured startup/input/storage budgets;

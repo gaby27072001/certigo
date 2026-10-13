@@ -73,12 +73,16 @@ public struct CertigoAPI: Sendable {
     public var scope: String { baseURL.absoluteString }
 
     public init(baseURL: URL, transport: any HTTPTransport = URLSessionTransport()) throws {
+        try Self.validateBaseURL(baseURL)
+        self.baseURL = baseURL
+        self.transport = transport
+    }
+
+    static func validateBaseURL(_ baseURL: URL) throws {
         guard baseURL.scheme == "https", baseURL.host != nil,
             baseURL.user == nil, baseURL.password == nil,
             baseURL.query == nil, baseURL.fragment == nil
         else { throw APIError.configuration }
-        self.baseURL = baseURL
-        self.transport = transport
     }
 
     public func profile(accessToken: String) async throws -> Profile {

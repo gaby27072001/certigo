@@ -44,6 +44,14 @@ public actor SubmissionStore {
         try read().filter { $0.ownerId == ownerId && $0.apiScope == apiScope }
     }
 
+    public func manifestPins() throws -> [RuntimeManifestPin] {
+        try read().compactMap { entry in
+            entry.submission.publicManifestId.map {
+                RuntimeManifestPin(ownerId: entry.ownerId, apiScope: entry.apiScope, manifestId: $0)
+            }
+        }
+    }
+
     public func enqueue(_ entry: SavedSubmission) throws -> SavedSubmission {
         try validate(entry)
         var entries = try read()
