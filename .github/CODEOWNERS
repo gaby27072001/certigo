@@ -5,41 +5,39 @@
 # règle « Require review from Code Owners » sur la branche `main` et documenter
 # la responsabilité de revue par périmètre.
 #
-# NOTE — Le dépôt appartient à un compte utilisateur (`gchambaud_microsoft`),
-# pas à une organisation : il n'existe pas encore d'équipes GitHub (@org/team).
-# Tous les périmètres pointent donc pour l'instant vers le propriétaire unique.
-# Remplacer par des handles d'équipe (`@certigo/backend`, etc.) dès qu'une
-# organisation / des équipes existeront, sans changer la structure ci-dessous.
+# Le dépôt personnel utilise le fonctionnement solo décrit dans
+# docs/GOVERNANCE.md. Ces affectations servent au routage, pas à prouver une
+# approbation indépendante ni à autoriser un déploiement privilégié.
 #
 # Rappel : le dernier motif correspondant l'emporte (ordre = du plus général
 # au plus spécifique).
 
 # Défaut — tout le dépôt
-*                       @gchambaud_microsoft
+*                       @gaby27072001
 
 # Gouvernance CI/CD, workflows, sécurité de la chaîne d'approvisionnement
-/.github/               @gchambaud_microsoft
+/.github/               @gaby27072001
 
 # Backend .NET (Azure Functions)
-/backend/               @gchambaud_microsoft
+/backend/               @gaby27072001
 
 # Application mobile Flutter
-/apps/mobile/           @gchambaud_microsoft
+/apps/mobile/           @gaby27072001
 
 # Paquets partagés
-/packages/              @gchambaud_microsoft
+/packages/              @gaby27072001
 
 # Infrastructure as Code (Bicep / Azure)
-/infra/                 @gchambaud_microsoft
+/infra/                 @gaby27072001
 
 # Outils & scripts
-/tools/                 @gchambaud_microsoft
+/tools/                 @gaby27072001
 
 # Contenu (pages statiques, privacy policy, etc.)
-/content/               @gchambaud_microsoft
+/content/               @gaby27072001
 
 # Documentation
-/docs/                  @gchambaud_microsoft
+/docs/                  @gaby27072001
 
 # Registre de migration — source de vérité de l'orchestration
-/docs/migration/        @gchambaud_microsoft
+/docs/migration/        @gaby27072001

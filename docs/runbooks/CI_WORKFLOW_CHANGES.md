@@ -161,6 +161,12 @@ imprévisibles (nonce aléatoire). `account-deletion-cosmos-policy.test.mjs` mon
 
 ### Migration vers le dépôt personnel
 
+Pour les changements de code et workflows non privilégiés, appliquer le
+[fonctionnement solo](../GOVERNANCE.md#fonctionnement-solo-du-dépôt-personnel) :
+revue technique indépendante, décision explicite du propriétaire sur la
+proposition exacte et gates A/B inchangées. Cette politique source n'est pas
+une autorisation de protection live ni une exception aux scellés de CD.
+
 La migration de `gchambaud_microsoft/Certigo` vers `gaby27072001/certigo`
 ne constitue pas une pré-approbation de workflow ou de confiance Azure.
 Le validateur Cosmos accepte temporairement les deux **conjonctions exactes**

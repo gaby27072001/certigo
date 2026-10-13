@@ -7,9 +7,54 @@
 
 ---
 
-## 1. Protection de la branche `main` — état ACTUEL appliqué
+## Fonctionnement solo du dépôt personnel
 
-La branche `main` est **déjà protégée** (protection « classique », pas de *ruleset*).
+Le propriétaire a approuvé le 2026-10-13 la préparation du fonctionnement solo
+pour le code et les tests : « Oui, prépare ce fonctionnement solo pour le code
+et les tests ». Cette décision autorise la proposition source ci-dessous, pas
+l'application de protections GitHub, une fusion, un accès supplémentaire ou
+une opération Azure.
+
+La cible versionnée dans `.github/branch-protection-main.json` conserve les sept
+gates stables, `strict`, l'application aux administrateurs, la résolution des
+conversations et l'interdiction de force-push/suppression. Elle ne requiert
+aucune approbation humaine ni revue CODEOWNER : le propriétaire travaille seul
+et ne peut pas approuver sa propre PR. `CODEOWNERS` sert uniquement au routage.
+Cette réduction explicite de séparation humaine n'est pas compensée de façon
+équivalente par une revue d'agent.
+
+Pour chaque lot de code ordinaire : revue technique indépendante du diff exact,
+résolution ou acceptation explicite des findings, tests pertinents et checks
+requis sur le HEAD exact, puis décision explicite du propriétaire avant fusion.
+Une revue technique d'agent n'est jamais une approbation humaine GitHub.
+Ne pas utiliser d'override administrateur, de push direct ou de fusion automatique.
+
+Pour un workflow non privilégié, garder la séquence contrat compatible, PR A
+de pré-approbation exacte, puis PR B d'application exacte. La décision du
+propriétaire identifie dépôt, PR, base/HEAD, chemins, digest sémantique, SHA256
+des octets proposés, preuves, expiration et rollback. Une modification de ces
+éléments exige une nouvelle décision. Le manifeste trusted A/B reste le contrôle
+exécutable ; un consentement en conversation ou un commentaire d'agent n'est
+pas un reçu authentifié de l'API GitHub.
+
+Les scellés de CD, les guards fork/environnement, les permissions minimales et
+les contrôles trusted-base restent inchangés. Le dispatch backend exige toujours
+un reviewer humain distinct : le fonctionnement solo du code ne débloque ni ce
+dispatch, ni le déploiement .NET 10, ni une publication privilégiée.
+
+L'installation live de la cible nécessite une autorisation distincte, lecture
+préalable et vérification après application. Si la protection est absente, un
+PATCH des seuls checks ne l'initialise pas. Ne pas envoyer le JSON commenté
+complet avec PUT ; préparer le contrat minimal de création approuvé. Les checks
+en attente d'un runner restent bloquants, pas une raison de les retirer.
+Retour arrière : décision explicite préservant les checks et les contrôles
+anti-bypass ; ne réintroduire une revue humaine obligatoire que si un reviewer
+réellement éligible est disponible.
+
+## 1. Protection de la branche `main` — observation historique de l'ancien dépôt
+
+Cette observation concerne l'ancien dépôt, pas la protection live du dépôt personnel.
+La branche `main` y était protégée (protection « classique », pas de *ruleset*).
 Valeurs constatées en lecture via `gh api repos/gchambaud_microsoft/Certigo/branches/main/protection` :
 
 | Réglage | Valeur appliquée | DoD |
@@ -450,11 +495,14 @@ Si les deux diffèrent, les contrôles affichés décrivent un `main` révolu, q
 couleur. **C'est le régime ordinaire, pas l'exception** : relevé le 2026-09-08 à 14 h UTC, les
 9 PR ouvertes du dépôt portaient **toutes** une base distincte de la tête de `main`.
 
-**Conséquence pratique — armer l'auto-fusion plutôt que courir après le vert.** Sous
+**Ancienne stratégie d'auto-fusion — non applicable au fonctionnement solo.** Sous
 `strict: true`, résoudre un conflit puis attendre le vert à la main est une course perdue dès que
 le dépôt est actif : chaque fusion sur `main` périme la résolution avant la fin du cycle de
 contrôles, et un pool de runners réduit allonge ce cycle. Armer `gh pr merge <n> --auto --squash`
 retire l'exigence d'être présent à l'instant précis où les conditions s'alignent.
+Cette stratégie historique est remplacée, dans le dépôt personnel, par la
+décision explicite du propriétaire après vérification du HEAD et de la base
+courants. Ne pas armer l'auto-fusion pour ce fonctionnement solo.
 
 ### Snapshot d'état projet périmé : la branche, ou `main` ?
 
@@ -675,17 +723,23 @@ Deux pièges :
 Le fichier [`.github/CODEOWNERS`](../.github/CODEOWNERS) déclare les responsables de revue
 par domaine (backend, mobile, infra, `.github`, docs, registre de migration…).
 
-- **État actuel** : le dépôt appartient à un **compte utilisateur**
-  (`gchambaud_microsoft`), pas à une organisation → il n'existe pas encore d'équipes
-  GitHub. Tous les périmètres pointent donc vers `@gchambaud_microsoft`.
+- **Cible source personnelle** : tous les périmètres pointent vers
+  `@gaby27072001` pour le routage, sans exigence de revue CODEOWNER.
 - **Évolution** : remplacer par des handles d'équipe (`@certigo/backend`, …) dès qu'une
   organisation existera, **sans changer la structure** du fichier.
-- **Activation** : `CODEOWNERS` ne devient contraignant que si
-  `require_code_owner_reviews = true` est activé sur la protection de `main` (réserve §4).
+- **Activation future** : une exigence de revue CODEOWNER nécessite une nouvelle
+  décision de gouvernance et un reviewer réellement éligible ; ne pas l'activer
+  dans le fonctionnement solo.
 
 ---
 
-## 4. Réserve admin — (ré)appliquer / durcir la protection
+## 4. Procédure historique de protection de l'ancien dépôt
+
+Les commandes et cibles de cette section sont conservées comme historique,
+pas comme instructions applicables au dépôt personnel. Elles ne sont pas
+autorisées par la préparation source solo. La cible solo et son installation
+séparément approuvée sont décrites dans « Fonctionnement solo du dépôt personnel ».
+En particulier, la cible historique de revue CODEOWNER obligatoire est remplacée.
 
 > ⚠️ **Réserve** : les réglages ci-dessous nécessitent des **droits ADMIN** sur le dépôt.
 > Ne jamais appliquer le document durci complet avec `PUT`. Une mise à jour des checks doit rester
@@ -762,6 +816,9 @@ ou contexte interne d'un workflow réutilisable ne doit être ajouté à la prot
 
 ## 5. Réconciliation avec `deployment-runbook.md` (§T0.3)
 
+Cette réconciliation concerne uniquement l'ancien dépôt. Elle ne prouve aucune
+protection live du dépôt personnel ; pour celui-ci, suivre la politique solo.
+
 Le [runbook de déploiement](./deployment-runbook.md) (§T0.3, tableau d'en-tête) marquait :
 
 > `| Branch protection sur main | ⛔ Humain (admin repo) | §T0.3 |`
@@ -782,7 +839,11 @@ désormais autorité** pour la protection de `main` et **remplacent** la sous-se
 
 ---
 
-## 6. Récapitulatif des réserves (à appliquer par un admin, hors session)
+## 6. Récapitulatif historique des réserves de l'ancien dépôt
+
+Cette liste n'est pas un backlog d'application au dépôt personnel. La préparation
+solo n'autorise aucun de ces changements live ; sa cible de revue humaine et
+CODEOWNER est explicitement différente.
 
 - [ ] Activer `enforce_admins = true`.
 - [ ] Activer `require_code_owner_reviews = true` (après merge de `CODEOWNERS` sur `main`).
