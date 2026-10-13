@@ -51,7 +51,7 @@ public struct ContentFileDigest: Equatable, Sendable {
     public let sha256: String
 }
 public enum CanonicalQuestionReader {
-    public static let maximumPayloadBytes = 1_048_576
+    public static let maximumPayloadBytes = 2 * 1_024 * 1_024
     private static let segment = "[a-z0-9]+(?:-[a-z0-9]+)*"
     private static let provider = "(?:aws|gcp|microsoft)"
 
@@ -181,7 +181,7 @@ public enum CanonicalQuestionReader {
         )
     }
 
-    private static func object(_ data: Data) throws -> [String: Any] {
+    static func object(_ data: Data) throws -> [String: Any] {
         guard data.count <= maximumPayloadBytes else { throw CanonicalContentError.payloadTooLarge }
         do {
             guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -193,7 +193,7 @@ public enum CanonicalQuestionReader {
         }
     }
 
-    private static func keys(
+    static func keys(
         _ object: [String: Any], required: Set<String>, optional: Set<String> = []
     ) throws {
         let actual = Set(object.keys)
@@ -202,14 +202,14 @@ public enum CanonicalQuestionReader {
         }
     }
 
-    private static func string(_ object: [String: Any], _ key: String) throws -> String {
+    static func string(_ object: [String: Any], _ key: String) throws -> String {
         guard let value = object[key] as? String, !value.isEmpty else {
             throw CanonicalContentError.malformed
         }
         return value
     }
 
-    private static func matches(_ value: String, _ pattern: String) throws {
+    static func matches(_ value: String, _ pattern: String) throws {
         guard value.range(of: "\\A(?:\(pattern))\\z", options: .regularExpression) != nil else {
             throw CanonicalContentError.malformed
         }

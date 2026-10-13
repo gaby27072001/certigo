@@ -167,11 +167,48 @@ numbers, future schemas and unsupported capabilities. Canonical serialization is
 limited to the supported question schemas' fixed ASCII keys and small integer
 numbers, not a general ECMAScript/JCS canonicalizer.
 
-This is a **payload reader and digest check**, not a downloaded package release
-verifier. Manifest-derived IDs/root hashes, release descriptors, safe paths,
-runtime track/lesson resources, staging/atomic activation, previous-release
-fallback and submission pin retention across updates remain a distinct gate.
-Do not activate untrusted files merely because a payload digest matches.
+### Public runtime contract stage
+
+`PublicReleaseContracts` validates public package-manifest/v3 metadata, closed
+file entries, optional metadata omission (not null), resource/path consistency,
+unique IDs/paths and byte/file/release limits. `rootHash` and `manifestId` are
+recomputed from compact sorted body JSON, excluding both identity fields and the
+HTTP projection's optional `releaseId`; this is **not** the hash of the serialized
+manifest file or the LF-terminated payload files.
+
+The existing authenticated active-manifest endpoint supplies the release binding
+in its body and `X-Content-Release-Id`/`X-Content-Manifest-Id`/ETag headers.
+`releaseId` is excluded from the manifest digest, so digest agreement alone
+cannot authenticate that binding. The separate binding check requires these
+values to agree; an authorized HTTPS source remains mandatory.
+
+A pure optional release/v1 descriptor validator excludes only `releaseId` from
+its body hash. That contract legitimately includes an opaque `privateManifestId`;
+the validated result exposes only the public/release binding. Public manifests
+reject `privateManifestId`. **There is no new public descriptor endpoint and no
+private package download.** Descriptor parsing is outside the production fetch
+path unless an authorized existing source supplies one.
+
+The synthetic `Fixtures/runtime/` metadata references the unchanged producer
+question byte digests and follows the current Dart manifest-fixture builder and
+C# standalone-manifest/digest contracts. Expected body/release IDs were computed
+independently with Node sorted-key JSON and standard SHA-256. The all-zero private
+ID is opaque synthetic descriptor metadata, not a private payload. These fixtures
+are neither an accessible published release nor proof of the C# HTTP gate.
+
+`PublicReleaseAPI` uses only the existing authenticated active-manifest and public
+file routes. The per-request ephemeral transport rejects declared oversized
+bodies before buffering, checks each incoming chunk against the quota, denies
+redirects and supports cancellation. The source independently checks response
+URL, exact cache directives, MIME, identities, ETag, byte count and file SHA.
+Transport tests use a per-session synthetic URL protocol, not a global/shared
+browser or live content source.
+
+Contract/payload validation and bounded fetch are **not a complete runtime release client**.
+Runtime track/lesson resources, safe disk staging,
+atomic activation, previous-release recovery and durable owner/outbox pin
+retention remain required. Do not activate untrusted files merely because a
+payload or manifest digest matches.
 
 ## Remaining gates before a user pilot
 
