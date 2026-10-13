@@ -11,6 +11,8 @@ import 'package:certigo/features/auth/application/auth_telemetry.dart';
 import 'package:certigo/features/auth/application/credentials_gateway.dart';
 import 'package:certigo/features/auth/application/session_store.dart';
 
+import 'support/technical_shape.dart';
+
 /// Passerelle OIDC factice : aucune dépendance plateforme, comportement
 /// scriptable par test (succès, échec, jeton rafraîchi…).
 class FakeAuthGateway implements AuthGateway {
@@ -351,7 +353,8 @@ void main() {
       );
     });
 
-    test('Entra non configuré → message de configuration, aucun appel passerelle', () async {
+    test('Entra non configuré → dit quoi faire, sans nom de variable, aucun appel passerelle',
+        () async {
       final FakeSessionStore store = FakeSessionStore();
       final FakeAuthGateway gateway = FakeAuthGateway(onSignIn: (_) => session());
       // required=true (UI forcée) mais configured=false.
@@ -363,12 +366,43 @@ void main() {
       container.read(authControllerProvider);
       await settle();
 
-      await container.read(authControllerProvider.notifier).signIn(AuthProvider.microsoft);
+      await container.read(authControllerProvider.notifier).signIn(AuthProvider.apple);
 
       final AuthState state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
-      expect((state as Unauthenticated).message, contains('Configuration Entra requise'));
+      final String message = (state as Unauthenticated).message ?? '';
+      // La feuille propose les fournisseurs même sans Entra : ce message arrive
+      // donc devant un apprenant, qui ne peut pas renseigner `ENTRA_CLIENT_ID`.
+      expect(technicalShapeIn(message), isNull, reason: message);
+      expect(message, contains('Apple'));
+      expect(message, contains('e-mail'));
       expect(gateway.signInCalls, isEmpty);
+    });
+
+    test('Entra non configuré : une tentative répétée est notifiée à chaque fois', () async {
+      // Ancien message : `const Unauthenticated('Configuration Entra requise…')`.
+      // Au 2e tap, l'état publié était IDENTIQUE au précédent : Riverpod ne
+      // notifiait personne, et la feuille gardait son bouton en chargement, les
+      // autres boutons inactifs, sans fin.
+      final ProviderContainer container = makeContainer(
+        gateway: FakeAuthGateway(),
+        store: FakeSessionStore(),
+        configured: false,
+      );
+      container.read(authControllerProvider);
+      await settle();
+      final List<AuthState> notified = <AuthState>[];
+      container.listen<AuthState>(
+        authControllerProvider,
+        (AuthState? previous, AuthState next) => notified.add(next),
+      );
+
+      final AuthController notifier = container.read(authControllerProvider.notifier);
+      await notifier.signIn(AuthProvider.apple);
+      await notifier.signIn(AuthProvider.apple);
+
+      expect(notified, hasLength(2));
+      expect(notified, everyElement(isA<Unauthenticated>()));
     });
   });
 

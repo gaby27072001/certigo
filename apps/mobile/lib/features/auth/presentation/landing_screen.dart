@@ -551,8 +551,9 @@ class _HeroAnchor extends StatelessWidget {
 /// Étoile à 4 branches remplie du dégradé de marque (alternative d'ancre).
 /// Carte d'erreur d'authentification affichée sur la landing quand une
 /// tentative de connexion depuis la sheet « Commencer » a échoué. Cohérente
-/// avec la carte `auth-error` de `sign_in_screen.dart` (même palette, même
-/// mention de copie/capture pour le diagnostic), mais **distincte** :
+/// avec la carte `auth-error` de `sign_in_screen.dart` (même palette, et comme
+/// elle sans consigne de diagnostic : le message dit la cause et l'action, le
+/// détail technique part au journal), mais **distincte** :
 ///
 /// - clé `landing-auth-error` (le test widget de landing la localise sans
 ///   collision avec la carte de l'écran e-mail, qui a la clé `auth-error`) ;
@@ -595,11 +596,6 @@ class _LandingErrorCard extends StatelessWidget {
           SelectableText(
             message,
             style: text.bodySmall?.copyWith(color: p.textPrimary, height: 1.35),
-          ),
-          const SizedBox(height: PrismSpacing.xs),
-          Text(
-            'Copie ou capture ce message pour le diagnostic.',
-            style: text.bodySmall?.copyWith(color: p.textSecondary),
           ),
         ],
       ),

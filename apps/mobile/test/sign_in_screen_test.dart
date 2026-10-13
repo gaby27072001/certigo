@@ -278,6 +278,77 @@ void main() {
     expect(find.byKey(const Key('auth-error')), findsOneWidget);
   });
 
+  testWidgets(
+      'n’hérite pas de l’échec d’une tentative faite ailleurs, '
+      'et n’affiche que celui de sa propre tentative', (tester) async {
+    // Parcours signalé le 2026-09-25 : « Continuer avec Apple » échoue dans la
+    // feuille d'accueil, puis l'apprenant choisit l'e-mail. L'écran de
+    // connexion s'ouvrait alors sur « Échec de la connexion » avant toute
+    // saisie, avec le message de la tentative Apple.
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        authGatewayProvider.overrideWithValue(
+          FakeAuthGateway(
+            onSignIn: (_) => throw const AuthGatewayException(
+              'La connexion a échoué.',
+              cause: AuthFailureCause.providerError,
+              diagnostic: 'PlatformException code=authorize_failed',
+            ),
+          ),
+        ),
+        credentialsGatewayProvider.overrideWithValue(
+          FakeCredentialsGateway(
+            onLogin: (_, __) => throw const AuthGatewayException(
+              'E-mail ou mot de passe incorrect.',
+              cause: AuthFailureCause.invalidCredentials,
+            ),
+          ),
+        ),
+        sessionStoreProvider.overrideWithValue(FakeSessionStore()),
+        authConfiguredProvider.overrideWithValue(true),
+        authRequiredProvider.overrideWithValue(true),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(authControllerProvider);
+    await tester.pump();
+    await container.read(authControllerProvider.notifier).signIn(AuthProvider.apple);
+    final AuthState before = container.read(authControllerProvider);
+    expect(before, isA<Unauthenticated>());
+    final String otherFailure = (before as Unauthenticated).message ?? '';
+    expect(otherFailure, isNotEmpty);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(theme: PrismTheme.light(), home: const SignInScreen(emailOnly: true)),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Content de te revoir'), findsOneWidget);
+    expect(find.byKey(const Key('auth-error')), findsNothing);
+    expect(find.text(otherFailure), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('email-field')), 'a@b.com');
+    await tester.enterText(find.byKey(const Key('password-field')), 'password123');
+    await tester.tap(find.byKey(const Key('email-submit')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final Finder card = find.byKey(const Key('auth-error'));
+    expect(card, findsOneWidget);
+    expect(
+      find.descendant(of: card, matching: find.text('E-mail ou mot de passe incorrect.')),
+      findsOneWidget,
+    );
+    expect(find.text(otherFailure), findsNothing);
+  });
+
   testWidgets('la trace de diagnostic technique est éteinte par défaut', (tester) async {
     final FakeAuthGateway gateway = FakeAuthGateway(
       onSignIn: (_) => throw const AuthGatewayException(

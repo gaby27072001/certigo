@@ -63,6 +63,12 @@ final List<({String name, RegExp pattern})> technicalShapes = <({String name, Re
     name: 'appel de fonction rendu',
     pattern: RegExp(r'\b[a-z]\w*\(\)\s'),
   ),
+  (
+    // `ENTRA_CLIENT_ID`, `API_BASE_URL` : un apprenant ne peut pas renseigner
+    // une variable de build, et son nom ne lui dit pas quoi faire.
+    name: 'nom de variable de configuration',
+    pattern: RegExp(r'\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b'),
+  ),
 ];
 
 /// Le nom de la première forme technique trouvée dans [text], ou `null` si le
@@ -124,5 +130,11 @@ const List<({String label, String sample})> technicalCorpus = <({String label, S
   (
     label: 'type Dart nu',
     sample: 'MissingPluginException : No implementation found for method authorize',
+  ),
+  (
+    // Affiché sur l'accueil puis sur l'écran e-mail, mesuré le 2026-09-27 sur
+    // l'aperçu web branché au backend dev (build sans Entra).
+    label: 'variable de configuration exigée d\u2019un apprenant',
+    sample: 'Configuration Entra requise : renseignez ENTRA_CLIENT_ID et ENTRA_AUTHORITY.',
   ),
 ];

@@ -9,6 +9,7 @@ import 'package:certigo/features/auth/presentation/widgets/auth_provider_button.
 import 'package:prism_ui/prism_ui.dart';
 
 import 'auth_controller_test.dart' show FakeAuthGateway, FakeCredentialsGateway, FakeSessionStore;
+import 'support/error_message.dart';
 
 /// Tests d'interface de [LandingScreen] : le hero d'ouverture façon Luma rend
 /// sans exception, et le CTA « Commencer » ouvre la bottom sheet d'auth
@@ -223,6 +224,44 @@ void main() {
     // qu'aucune transition d'état n'ait été observée par le `ref.listen`.
     expect(find.byKey(const Key('landing-auth-error')), findsOneWidget);
     expect(find.textContaining(errorMessage), findsOneWidget);
+  });
+
+  testWidgets(
+      'la carte d’échec parle à l’apprenant : ni consigne de diagnostic, '
+      'ni forme technique', (WidgetTester tester) async {
+    // Mesuré le 2026-09-27 sur l'aperçu web (backend dev) : la carte de
+    // l'accueil demandait « Copie ou capture ce message pour le diagnostic. »
+    // — une consigne de débogage, pas une action pour l'apprenant. Le message
+    // pris ici est l'un de ceux que l'accueil affiche lui-même (et non un
+    // échec de tentative, qu'affiche la surface qui l'a lancée).
+    const String errorMessage = 'Votre session a expiré. Reconnectez-vous.';
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          authControllerProvider.overrideWith(
+            () => _StaticUnauthController(const Unauthenticated(errorMessage)),
+          ),
+          authGatewayProvider.overrideWithValue(FakeAuthGateway()),
+          credentialsGatewayProvider.overrideWithValue(FakeCredentialsGateway()),
+          sessionStoreProvider.overrideWithValue(FakeSessionStore()),
+          authConfiguredProvider.overrideWithValue(true),
+          authRequiredProvider.overrideWithValue(true),
+        ],
+        child: MaterialApp(theme: PrismTheme.light(), home: const LandingScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final Finder card = find.byKey(const Key('landing-auth-error'));
+    expect(card, findsOneWidget);
+    expect(find.descendant(of: card, matching: find.text(errorMessage)), findsOneWidget);
+    expect(find.textContaining('diagnostic'), findsNothing);
+    expectNoTechnicalText(tester, context: 'accueil après un échec social');
   });
 }
 

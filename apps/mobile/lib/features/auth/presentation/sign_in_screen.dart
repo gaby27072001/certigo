@@ -11,6 +11,11 @@ import 'widgets/auth_provider_button.dart';
 /// Mode du formulaire e-mail : se connecter à un compte existant, ou en créer un.
 enum _AuthMode { signIn, register }
 
+/// Plafond Dynamic Type du titre d'affichage : à ×3, « Content » ne tenait plus
+/// sur 342 pt et se coupait en plein mot (« Conten / t de te ») ; à ×2 il tient.
+/// Le reste de l'écran suit l'échelle du système sans plafond.
+const double _kMaxTitleTextScale = 2.0;
+
 /// Premier écran à l'ouverture de l'app (tant qu'aucun compte n'est mémorisé).
 ///
 /// Propose **toujours** la connexion par e-mail + mot de passe (gérée par notre
@@ -45,9 +50,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   /// Soumission e-mail en cours (spinner du bouton principal).
   bool _emailSubmitting = false;
 
-  /// Dernier message d'échec d'authentification, affiché de façon **persistante**
-  /// (jusqu'à la prochaine tentative) pour être lu et capturé — indispensable au
-  /// diagnostic quand l'erreur OIDC réelle doit être remontée depuis l'appareil.
+  /// Dernier échec d'une tentative lancée **depuis cet écran**, affiché de façon
+  /// persistante (jusqu'à la prochaine tentative) pour être lu posément.
   String? _authError;
 
   @override
@@ -121,16 +125,23 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final TextTheme text = Theme.of(context).textTheme;
     final bool socialEnabled = ref.watch(authConfiguredProvider) && !widget.emailOnly;
 
-    // Réarme les boutons et **conserve** l'erreur à l'écran quand le flux
-    // retombe sur un état non authentifié. Un SnackBar disparaîtrait trop vite
-    // pour être lu/capturé : on affiche une carte persistante (voir _ErrorCard).
+    // Un échec appartient à la tentative qui l'a produit : seul celui d'une
+    // tentative lancée DEPUIS cet écran s'y affiche, et il y reste (carte
+    // persistante, voir _ErrorCard) jusqu'à la tentative suivante. Le message
+    // que porte l'état global peut venir d'ailleurs — un échec Apple dans la
+    // feuille d'accueil — et s'affichait, avant toute saisie, comme l'échec de
+    // cette connexion. L'ancien repli sur ce message compensait le démontage
+    // de l'écran pendant sa propre tentative ; depuis que `/auth` reste monté
+    // pendant `AuthLoading` (`resolveAuthRedirect`), ce `ref.listen` voit
+    // l'issue de chaque tentative de l'écran.
     ref.listen<AuthState>(authControllerProvider, (AuthState? prev, AuthState next) {
       if (next is! Unauthenticated) return;
+      final bool ownAttempt = _pending != null || _emailSubmitting;
       final String? message = next.message;
       setState(() {
         _pending = null;
         _emailSubmitting = false;
-        if (message != null && message.isNotEmpty) {
+        if (ownAttempt && message != null && message.isNotEmpty) {
           _authError = message;
         }
       });
@@ -140,17 +151,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final bool busy = state is AuthLoading || _pending != null || _emailSubmitting;
     final bool retryingSignIn = state is AuthLoading && state.retrying;
     final bool registering = _mode == _AuthMode.register;
-
-    // Message d'erreur affiché : on privilégie le message local (posé par le
-    // `ref.listen` ci-dessus sur CETTE instance d'écran) et on retombe sur celui
-    // porté par l'état `Unauthenticated` courant. Ce repli est ESSENTIEL au flux
-    // social : le routeur démonte cet écran (AuthLoading → /splash) puis en
-    // remonte un NEUF (Unauthenticated → /auth) ; ce nouvel écran n'a pas de
-    // `_authError` local et son `ref.listen` a manqué l'émission — sans ce repli,
-    // aucun message ne s'afficherait malgré l'échec ou le timeout (bug observé).
-    final String? stateMessage = state is Unauthenticated ? state.message : null;
-    final String? shownError =
-        _authError ?? (stateMessage != null && stateMessage.isNotEmpty ? stateMessage : null);
+    final String? shownError = _authError;
 
     // Trace de diagnostic (étapes horodatées du dernier flux social). Portée par
     // un provider — et non par l'état local — pour survivre au démontage/remontage
@@ -190,12 +191,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                             const SizedBox(height: PrismSpacing.md),
                             // Pas de sur-titre « Certigo » : le badge de
                             // marque est juste au-dessus et le dit déjà.
-                            Text(
-                              registering ? 'Crée ton compte' : 'Content de te revoir',
-                              textAlign: TextAlign.center,
-                              style: text.displaySmall?.copyWith(
-                                color: p.textPrimary,
-                                fontWeight: FontWeight.w800,
+                            MediaQuery.withClampedTextScaling(
+                              maxScaleFactor: _kMaxTitleTextScale,
+                              child: Text(
+                                registering ? 'Crée ton compte' : 'Content de te revoir',
+                                textAlign: TextAlign.center,
+                                style: text.displaySmall?.copyWith(
+                                  color: p.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
                             const SizedBox(height: PrismSpacing.xs),
@@ -220,7 +224,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                                       textInputAction: TextInputAction.next,
                                       textCapitalization: TextCapitalization.words,
                                       decoration: const InputDecoration(
-                                        labelText: 'Nom (facultatif)',
+                                        // `label` et non `labelText` : ce dernier
+                                        // s'élide, un widget passe à la ligne à
+                                        // grand texte (« Mot de pa… » à ×3).
+                                        label: Text('Nom (facultatif)'),
                                         prefixIcon: Icon(Icons.person_outline),
                                       ),
                                     ),
@@ -235,7 +242,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                                     autocorrect: false,
                                     autofillHints: const <String>[AutofillHints.email],
                                     decoration: const InputDecoration(
-                                      labelText: 'E-mail',
+                                      label: Text('E-mail'),
                                       prefixIcon: Icon(Icons.alternate_email),
                                     ),
                                     validator: _validateEmail,
@@ -254,7 +261,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                                     ],
                                     onFieldSubmitted: (_) => _submitEmail(),
                                     decoration: InputDecoration(
-                                      labelText: 'Mot de passe',
+                                      label: const Text('Mot de passe'),
                                       prefixIcon: const Icon(Icons.lock_outline),
                                       suffixIcon: IconButton(
                                         onPressed: () => setState(() => _obscure = !_obscure),
@@ -269,8 +276,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                                     validator: _validatePassword,
                                   ),
                                   const SizedBox(height: PrismSpacing.lg),
-                                  SizedBox(
-                                    height: 52,
+                                  // Plancher et non hauteur fixe : à ×3 le
+                                  // libellé demandait 54 px et le bouton de 52
+                                  // le rognait. À 1× rien ne bouge.
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(minHeight: 52),
                                     child: FilledButton(
                                       key: const Key('email-submit'),
                                       onPressed: busy ? null : _submitEmail,
@@ -651,9 +661,14 @@ class _BrandBadge extends StatelessWidget {
             ),
           ),
           alignment: Alignment.center,
-          child: const Text(
-            'C',
-            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
+          // Un logo, pas du texte à lire : il ne suit pas Dynamic Type (il
+          // débordait de son cadre dès ×2) et VoiceOver ne l'annonce pas.
+          child: const ExcludeSemantics(
+            child: Text(
+              'C',
+              textScaler: TextScaler.noScaling,
+              style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
+            ),
           ),
         ),
       ),

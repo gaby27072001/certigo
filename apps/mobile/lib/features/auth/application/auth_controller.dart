@@ -158,8 +158,16 @@ class AuthController extends Notifier<AuthState> {
     final AuthMethod method = AuthMethodX.fromProvider(provider);
     if (!_configured) {
       _telemetry.authFailure(method, AuthFailureCause.configError);
-      state = const Unauthenticated(
-        'Configuration Entra requise : renseignez ENTRA_CLIENT_ID et ENTRA_AUTHORITY.',
+      // La feuille d'accueil propose les fournisseurs même sans Entra (dev, ou
+      // build `ENTRA_OPTIONAL=true`) : ce message arrive devant un apprenant,
+      // qui ne peut pas renseigner une variable de build. Elle part au journal.
+      _logAuthDetail(
+        'signIn(${provider.id})',
+        'Entra non configuré : ENTRA_CLIENT_ID et ENTRA_AUTHORITY absents du build',
+      );
+      state = Unauthenticated(
+        'La connexion ${_providerLabel(provider)} n\'est pas disponible dans cette version. '
+        'Connecte-toi avec ton e-mail.',
       );
       return;
     }
