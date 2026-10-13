@@ -288,6 +288,14 @@ const IDENT_START = /[A-Za-z_$]/u;
 const IDENT_PART = /[A-Za-z0-9_$]/u;
 const SIMPLE_ESCAPES = new Map([['n', '\n'], ['r', '\r'], ['f', '\f'], ['b', '\b'], ['t', '\t'], ['v', '\v']]);
 
+function skipLine(text, start) {
+  let index = start;
+  while (index < text.length && text[index] !== '\n' && text[index] !== '\r') {
+    index += 1;
+  }
+  return index;
+}
+
 function skipBlockComment(text, start) {
   let index = start + 2;
   let depth = 1;
@@ -407,8 +415,7 @@ function lexCode(text, start, tokens, nested) {
   while (index < text.length) {
     const character = text[index];
     if (character === '/' && text[index + 1] === '/') {
-      const end = text.indexOf('\n', index);
-      index = end < 0 ? text.length : end;
+      index = skipLine(text, index + 2);
     } else if (character === '/' && text[index + 1] === '*') {
       index = skipBlockComment(text, index);
     } else if (/\s/u.test(character)) {
@@ -459,8 +466,7 @@ function collectUri(tokens, start, keyword, uris) {
 export function dartDirectiveUris(text) {
   let start = text.charCodeAt(0) === 0xfeff ? 1 : 0;
   if (text.startsWith('#!', start)) {
-    const end = text.indexOf('\n', start);
-    start = end < 0 ? text.length : end + 1;
+    start = skipLine(text, start + 2);
   }
   const tokens = [];
   lexCode(text, start, tokens, false);
@@ -518,7 +524,12 @@ export function dartDirectiveUris(text) {
 function lineAt(text, offset) {
   let line = 1;
   for (let index = 0; index < offset; index += 1) {
-    if (text[index] === '\n') {
+    if (text[index] === '\r') {
+      line += 1;
+      if (text[index + 1] === '\n') {
+        index += 1;
+      }
+    } else if (text[index] === '\n') {
       line += 1;
     }
   }
@@ -587,12 +598,18 @@ export function scopeIntegrityProblems(trackedFiles, scope) {
 const strictUtf8 = new TextDecoder('utf-8', { fatal: true });
 
 // Every target that is not binary by extension must read as text. Dart compiles a file that
-// holds a NUL or invalid UTF-8 in a comment; failing here keeps such a file from depending on
-// how a given Semgrep version happens to parse it.
+// holds a NUL or invalid UTF-8 in a comment, and ends a line comment at an isolated CR that
+// Semgrep can ignore. Fail closed instead of relying on the scanner's interpretation.
 export function textTargetProblems(file, bytes) {
   if (bytes.includes(0)) {
     return [`${file} contains a NUL byte; a text target must not hide content from the scan `
       + '(list its extension in binaryExtensions if the file is really binary)'];
+  }
+  for (let index = bytes.indexOf(0x0d); index !== -1; index = bytes.indexOf(0x0d, index + 1)) {
+    if (bytes[index + 1] !== 0x0a) {
+      return [`${file} contains an isolated carriage return (CR); use LF or CRLF `
+        + 'so Dart code cannot hide from the scan'];
+    }
   }
   try {
     strictUtf8.decode(bytes);

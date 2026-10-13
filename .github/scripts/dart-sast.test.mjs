@@ -541,6 +541,26 @@ test('a text target must be valid UTF-8 without NUL bytes', () => {
   }
 });
 
+test('a text target accepts LF and CRLF but rejects every isolated CR', () => {
+  for (const text of ['void a() {}\n', 'void a() {}\r\n', '// comment\r\nvoid a() {}\n']) {
+    assert.deepEqual(textTargetProblems('a.dart', Buffer.from(text, 'utf8')), [], text);
+  }
+  for (const text of [
+    '// cover\rHttpClient().badCertificateCallback = (cert, host, port) => true;\n',
+    "// cover\rimport 'hidden.png';\n",
+    "#!/usr/bin/env dart\rimport 'hidden.png';\n",
+    'void a() {}\r',
+    '// comment\r\r\nvoid a() {}\n',
+    '// comment\r\nvoid a() {}\r',
+  ]) {
+    assert.match(
+      textTargetProblems('a.dart', Buffer.from(text, 'utf8')).join(),
+      /^a\.dart contains an isolated carriage return \(CR\); use LF or CRLF/u,
+      text,
+    );
+  }
+});
+
 test('directives are read whatever their spelling, as Dart reads them', () => {
   const uris = (text) => dartDirectiveUris(text).map(({ keyword, uri }) => `${keyword} ${uri}`);
   const source = [
@@ -598,6 +618,30 @@ test('directives are read whatever their spelling, as Dart reads them', () => {
   ]) {
     assert.throws(() => dartDirectiveUris(broken), DirectiveScanError, broken);
   }
+});
+
+test('line comments and shebangs end at CR, LF or CRLF, as Dart reads them', () => {
+  const sast = validateScope(scope());
+  for (const prefix of ['// cover', '#!/usr/bin/env dart', '\uFEFF#!/usr/bin/env dart']) {
+    for (const newline of ['\r', '\n', '\r\n']) {
+      const source = `${prefix}${newline}import 'hidden.png';\nvoid main() => hidden();\n`;
+      assert.deepEqual(
+        dartDirectiveUris(source).map(({ uri }) => uri),
+        ['hidden.png'],
+        `${prefix} ${JSON.stringify(newline)}`,
+      );
+      const problems = directiveProblems('apps/mobile/lib/a.dart', source, sast);
+      assert.equal(problems.length, 1, source);
+      assert.match(problems[0], /^apps\/mobile\/lib\/a\.dart:2: import "hidden\.png"/u, source);
+    }
+  }
+  const mixed = "// line one\r\n// line two\r// line three\nimport 'hidden.png';\n";
+  assert.match(
+    directiveProblems('apps/mobile/lib/a.dart', mixed, sast)[0],
+    /^apps\/mobile\/lib\/a\.dart:4: import "hidden\.png"/u,
+  );
+  assert.deepEqual(dartDirectiveUris('// no newline'), []);
+  assert.deepEqual(dartDirectiveUris('#!/usr/bin/env dart'), []);
 });
 
 test('only .dart files of the analysed tree may be loaded by a directive', () => {
@@ -799,6 +843,41 @@ test('check exits 2 when a text target holds a NUL byte or invalid UTF-8', { ski
     assert.equal(result.status, 2, result.stdout + result.stderr);
     assert.match(result.stdout, new RegExp(`INCOMPLETE apps/mobile/lib/${name.replace('.', '\\.')} ${problem.source}`, 'u'));
     assert.match(result.stdout, /::error title=Dart SAST::Dart SAST scan invalid or incomplete/u);
+  }
+});
+
+test('check fails closed on isolated CR even when Semgrep reports no finding or error', { skip: process.platform === 'win32' }, (context) => {
+  const cases = [
+    [
+      "import 'dart:io';\nvoid main() {\n"
+        + '  // cover\r  HttpClient().badCertificateCallback = (cert, host, port) => true;\n}\n',
+      2,
+    ],
+    ["// cover\rimport '../assets/hidden.png';\nvoid main() => hidden();\n", 2],
+    ["#!/usr/bin/env dart\rimport '../assets/hidden.png';\nvoid main() => hidden();\n", 2],
+    ['// comment\r\nvoid main() {}\r\n', 0],
+  ];
+  for (const [source, expectedStatus] of cases) {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'dart-sast-e2e-'));
+    context.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+    const tree = path.join(workspace, 'tree');
+    fs.mkdirSync(path.join(tree, 'apps/mobile/lib'), { recursive: true });
+    fs.mkdirSync(path.join(tree, 'apps/mobile/assets'), { recursive: true });
+    fs.writeFileSync(path.join(tree, 'apps/mobile/lib/a.dart'), source);
+    fs.writeFileSync(path.join(tree, 'apps/mobile/assets/hidden.png'), 'void hidden() {}\n');
+    git(tree, ['init', '-q']);
+    git(tree, ['add', '-A']);
+    writeControls(workspace);
+
+    const checked = runCheck(workspace, fakeSemgrep(context, FAKE_SEMGREP), ['--github']);
+    assert.equal(checked.status, expectedStatus, checked.stdout + checked.stderr);
+    assert.doesNotMatch(checked.stdout, /NEW ERROR/u);
+    if (expectedStatus === 2) {
+      assert.match(checked.stdout, /INCOMPLETE apps\/mobile\/lib\/a\.dart contains an isolated carriage return/u);
+      assert.match(checked.stdout, /::error title=Dart SAST::Dart SAST scan invalid or incomplete/u);
+    } else {
+      assert.match(checked.stdout, /no new finding/u);
+    }
   }
 });
 

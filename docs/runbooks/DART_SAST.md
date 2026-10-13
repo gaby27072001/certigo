@@ -76,10 +76,14 @@ qui contient un octet NUL ou de l'UTF-8 invalide dans un commentaire (mesuré le
 Dart 3.12 : `import 'hidden.png';` s'exécute, un `// <NUL>` ne gêne pas la compilation). D'où :
 
 - les binaires sont reconnus **par extension seulement** ; tout autre fichier du périmètre doit
-  être de l'UTF-8 valide sans octet NUL, sinon le scan **échoue** (code 2). Semgrep 1.178.0
+  être de l'UTF-8 valide sans octet NUL ni retour chariot isolé (`CR`), sinon le scan **échoue**
+  (code 2). Les fins de ligne `LF` et `CRLF` restent acceptées. Semgrep 1.178.0
   analyse bien le code situé après un NUL ou un octet invalide (mesuré pendant la relecture de
   #560), mais ce comportement d'une version n'est pas un contrat ; le contrôle ne dépend plus de
-  lui ;
+  lui. La relecture indépendante du 2026-10-13 a aussi montré que Dart 3.12.2 termine un
+  commentaire `//` sur un `CR` isolé, alors que Semgrep 1.178.0 ignore le code situé après ce
+  `CR`, sans erreur. Corriger le lexeur seul ne suffit donc pas : cette entrée est refusée avant
+  tout verdict vert ;
 - chaque directive `import`, `export` et `part` de chaque fichier `.dart` analysé est relue par
   un petit analyseur lexical (commentaires imbriqués, chaînes brutes, triples et adjacentes,
   échappements `\x`/`\u`, imports conditionnels, `augment`) : elle doit charger `dart:…`, ou un
