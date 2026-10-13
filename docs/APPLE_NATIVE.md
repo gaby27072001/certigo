@@ -498,6 +498,46 @@ an explicitly approved later Mac SHA. No remote arbitrary probe or allowlist
 change was performed by this workstream, and no MSAL/callback readiness is
 claimed from this correction.
 
+### Confirmed path correction; next iOS protection compilation gate
+
+The approved exact `3801da48daf0e26a2ed9910dc02c8d60d111af73` Mac retry
+passed **114 XCTest tests, zero failures/skips**. Its preserved access-session
+`files/apple-corrected-sdk-mac.log` confirms
+`Foundation preserved missing alias suffix: false`: the earlier missing-path
+rewrite is now demonstrated on Darwin, and the corrected requested-root
+regressions pass there. This is actual package evidence, not iOS protection
+execution.
+
+Xcode resolved MSAL 2.16.0, Crypto 5.0.1 and ASN.1 1.7.3, then failed the
+unsigned simulator build with `PROTECTION_CLASS_C` unavailable in Swift scope
+at `RuntimeDisk.swift`. Build exit 65 is not MSAL adapter compilation or a
+built-plist proof. Apple's public
+[fcntl interface](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/fcntl.h)
+exposes descriptor protection get/set operations but does not expose that
+class constant to this Swift build. No private header/shim or numeric class
+guess is adopted.
+
+The bounded candidate uses the existing public Foundation
+[`FileProtectionType.completeUntilFirstUserAuthentication`](https://developer.apple.com/documentation/foundation/fileprotectiontype/completeuntilfirstuserauthentication)
+policy to determine the class from an **empty witness** in dedicated trusted
+storage. The witness is opened relative to the anchored directory with
+exclusive creation, no-follow, mode 0600 and a fresh generated name.
+`F_GETPATH` supplies the directory path only for the empty witness's Foundation
+attribute operation; device/inode identity is checked before and after it.
+The public attribute is set/read back, then its class obtained from the opened
+descriptor. That class is applied and read back on the actual payload
+descriptor **before any payload bytes are written**. Payload writes/rename
+remain descriptor-relative; no user data enters the path-based witness.
+Witness deletion errors propagate on both success and failure; no default,
+numeric fallback or simulator-only bypass exists.
+
+A separately invoked read-only targeted reviewer found no significant helper/
+lifecycle issues, not Apple execution proof. An iOS-only focused test checks
+the written blob's first-unlock attribute, bytes and absence of witness files;
+it is deliberately not counted in Linux/macOS tests and remains unexecuted.
+Actual iOS compile/protection semantics, including lock/reboot/device behavior,
+still require the next approved exact candidate and real Apple tests.
+
 ## Non-destructive Flutter queue inspection
 
 `FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/

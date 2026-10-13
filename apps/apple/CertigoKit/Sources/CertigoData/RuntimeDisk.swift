@@ -166,9 +166,13 @@ final class RuntimeDisk {
             _ = unlinkat(directory, temporary, 0)
         }
         #if os(iOS)
-            guard fcntl(handle, F_SETPROTECTIONCLASS, PROTECTION_CLASS_C) == 0 else {
+            let protection = try firstUnlockProtectionClass()
+            guard fcntl(handle, F_SETPROTECTIONCLASS, protection) == 0 else {
                 throw RuntimeStoreError.io(errno)
             }
+            let applied = fcntl(handle, F_GETPROTECTIONCLASS)
+            guard applied >= 0 else { throw RuntimeStoreError.io(errno) }
+            guard applied == protection else { throw RuntimeStoreError.unsafeDiskEntry }
         #endif
         try bytes.withUnsafeBytes { raw in
             var offset = 0
@@ -191,6 +195,57 @@ final class RuntimeDisk {
         guard fsync(directory) == 0 else { throw RuntimeStoreError.io(errno) }
         try fault(.afterRename, name)
     }
+
+    #if os(iOS)
+        private func firstUnlockProtectionClass() throws -> Int32 {
+            // Foundation exposes the protection policy; Darwin exposes descriptor operations,
+            // but the SDK does not expose a Swift class-C constant. Never guess its numeric value.
+            var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+            guard
+                path.withUnsafeMutableBufferPointer({
+                    fcntl(directory, F_GETPATH, $0.baseAddress)
+                }) == 0
+            else { throw RuntimeStoreError.io(errno) }
+            let name = ".tmp-\(UUID().uuidString)"
+            let url = URL(fileURLWithPath: String(cString: path), isDirectory: true)
+                .appendingPathComponent(name)
+            let handle = openat(
+                directory, name,
+                O_CREAT | O_EXCL | O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK, 0o600)
+            guard handle >= 0 else { throw RuntimeStoreError.io(errno) }
+            defer { close(handle) }
+            let result: Int32
+            do {
+                var opened = stat()
+                var named = stat()
+                guard fstat(handle, &opened) == 0, lstat(url.path, &named) == 0,
+                    opened.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+                    opened.st_nlink == 1, opened.st_size == 0,
+                    opened.st_dev == named.st_dev, opened.st_ino == named.st_ino
+                else { throw RuntimeStoreError.unsafeDiskEntry }
+                try FileManager.default.setAttributes(
+                    [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                    ofItemAtPath: url.path)
+                let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+                guard
+                    attributes[.protectionKey] as? FileProtectionType
+                        == .completeUntilFirstUserAuthentication
+                else { throw RuntimeStoreError.unsafeDiskEntry }
+                result = fcntl(handle, F_GETPROTECTIONCLASS)
+                guard result >= 0 else { throw RuntimeStoreError.io(errno) }
+                guard lstat(url.path, &named) == 0,
+                    opened.st_dev == named.st_dev, opened.st_ino == named.st_ino
+                else { throw RuntimeStoreError.unsafeDiskEntry }
+            } catch {
+                guard unlinkat(directory, name, 0) == 0 else {
+                    throw RuntimeStoreError.io(errno)
+                }
+                throw error
+            }
+            guard unlinkat(directory, name, 0) == 0 else { throw RuntimeStoreError.io(errno) }
+            return result
+        }
+    #endif
 
     private func usedBytes() throws -> Int {
         try entries().reduce(0) { $0 + $1.bytes }
