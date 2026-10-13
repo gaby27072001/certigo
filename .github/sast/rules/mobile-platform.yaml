@@ -1,0 +1,217 @@
+# Certigo — Android/iOS platform configuration SAST rules (Semgrep Community Edition).
+#
+# These files decide transport security, backups and deep-link entry points of the Flutter
+# app. Trusted control: CI loads this file from the pull request BASE SHA only.
+# Same conventions as dart-security.yaml (see docs/runbooks/DART_SAST.md).
+
+rules:
+  # ---------------------------------------------------------------- Android
+
+  - id: mobile-android-cleartext-traffic
+    languages: [regex]
+    severity: ERROR
+    message: >-
+      Cleartext HTTP traffic is allowed for the Android app. Bearer tokens and API responses
+      would travel unencrypted. Remove the flag or restrict it to a debug-only network config.
+    metadata:
+      certigo-risk: tls
+      category: security
+      cwe: ["CWE-319: Cleartext Transmission of Sensitive Information"]
+      masvs: ["MASVS-NETWORK-1"]
+      owasp-mobile: ["M5: Insecure Communication"]
+      confidence: HIGH
+    paths:
+      include:
+        - "**/AndroidManifest.xml"
+        - "**/res/xml/*.xml"
+    pattern-either:
+      - pattern-regex: android:usesCleartextTraffic\s*=\s*"true"
+      - pattern-regex: cleartextTrafficPermitted\s*=\s*"true"
+
+  - id: mobile-android-user-certificates-trusted
+    languages: [regex]
+    severity: WARNING
+    message: >-
+      The network security config trusts user-installed CA certificates, so any certificate a
+      user (or an attacker with device access) installs can intercept the app's TLS traffic.
+    metadata:
+      certigo-risk: tls
+      category: security
+      cwe: ["CWE-295: Improper Certificate Validation"]
+      masvs: ["MASVS-NETWORK-1"]
+      owasp-mobile: ["M5: Insecure Communication"]
+      confidence: MEDIUM
+    paths:
+      include:
+        - "**/res/xml/*.xml"
+    pattern-regex: <certificates\s+src\s*=\s*"user"
+
+  - id: mobile-android-debuggable
+    languages: [regex]
+    severity: ERROR
+    message: >-
+      `android:debuggable="true"` in a manifest lets anyone with USB access attach a debugger
+      and read the app's memory and private files.
+    metadata:
+      certigo-risk: platform
+      category: security
+      cwe: ["CWE-489: Active Debug Code"]
+      masvs: ["MASVS-RESILIENCE-4"]
+      owasp-mobile: ["M7: Insufficient Binary Protections"]
+      confidence: HIGH
+    paths:
+      include:
+        - "**/src/main/AndroidManifest.xml"
+    pattern-regex: android:debuggable\s*=\s*"true"
+
+  - id: mobile-android-backup-enabled
+    languages: [regex]
+    severity: WARNING
+    message: >-
+      The Android `<application>` does not disable backups nor restrict them with backup rules.
+      Android Auto Backup then copies app files and SharedPreferences off the device.
+    metadata:
+      certigo-risk: storage
+      category: security
+      cwe: ["CWE-530: Exposure of Backup File to an Unauthorized Control Sphere"]
+      masvs: ["MASVS-STORAGE-2"]
+      owasp-mobile: ["M9: Insecure Data Storage"]
+      confidence: MEDIUM
+    paths:
+      include:
+        - "**/src/main/AndroidManifest.xml"
+    pattern-regex: (?s)<application\b(?![^>]*android:allowBackup\s*=\s*"false")(?![^>]*android:(?:fullBackupContent|dataExtractionRules)\s*=\s*"@xml/)[^>]*>
+
+  - id: mobile-android-app-link-unverified
+    languages: [regex]
+    severity: WARNING
+    message: >-
+      An intent filter handles http(s) links without `android:autoVerify="true"`. Unverified
+      links can be claimed by any other app, which then receives the URLs (and their tokens).
+    metadata:
+      certigo-risk: deeplink
+      category: security
+      cwe: ["CWE-939: Improper Authorization in Handler for Custom URL Scheme"]
+      masvs: ["MASVS-PLATFORM-1"]
+      owasp-mobile: ["M8: Security Misconfiguration"]
+      confidence: MEDIUM
+    paths:
+      include:
+        - "**/AndroidManifest.xml"
+    pattern-regex: (?s)<intent-filter\b(?![^>]*android:autoVerify\s*=\s*"true")[^>]*>(?:(?!</intent-filter>).)*?android:scheme\s*=\s*"https?"
+
+  - id: mobile-android-custom-scheme
+    languages: [regex]
+    severity: WARNING
+    message: >-
+      An intent filter registers a custom URL scheme. Any app or web page can open it, and
+      Flutter (3.27 and later) routes such links into the app router by default. Treat every
+      value received through it as untrusted input.
+    metadata:
+      certigo-risk: deeplink
+      category: security
+      cwe: ["CWE-939: Improper Authorization in Handler for Custom URL Scheme"]
+      masvs: ["MASVS-PLATFORM-1"]
+      owasp-mobile: ["M8: Security Misconfiguration"]
+      confidence: LOW
+    paths:
+      include:
+        - "**/AndroidManifest.xml"
+    pattern-regex: android:scheme\s*=\s*"(?!https?")[A-Za-z][A-Za-z0-9+.-]*"
+
+  # ---------------------------------------------------------------- iOS
+
+  - id: mobile-ios-ats-disabled
+    languages: [regex]
+    severity: ERROR
+    message: >-
+      App Transport Security is relaxed in Info.plist, allowing cleartext or weak TLS
+      connections. Remove the exception or scope it to a documented debug-only host.
+    metadata:
+      certigo-risk: tls
+      category: security
+      cwe: ["CWE-319: Cleartext Transmission of Sensitive Information"]
+      masvs: ["MASVS-NETWORK-1"]
+      owasp-mobile: ["M5: Insecure Communication"]
+      confidence: HIGH
+    paths:
+      include:
+        - "**/Info.plist"
+    pattern-regex: <key>(?:NSAllowsArbitraryLoads|NSAllowsArbitraryLoadsInWebContent|NSAllowsArbitraryLoadsForMedia|NSExceptionAllowsInsecureHTTPLoads|NSTemporaryExceptionAllowsInsecureHTTPLoads)</key>\s*<true\s*/>
+
+  - id: mobile-ios-custom-url-scheme
+    languages: [regex]
+    severity: WARNING
+    message: >-
+      Info.plist registers custom URL schemes. Any app or web page can open them, and Flutter
+      (3.27 and later) routes them into the app router unless `FlutterDeepLinkingEnabled` is
+      false. Treat every value received through them as untrusted input. The finding covers the
+      whole scheme list, so adding a scheme is a new finding to review.
+    metadata:
+      certigo-risk: deeplink
+      category: security
+      cwe: ["CWE-939: Improper Authorization in Handler for Custom URL Scheme"]
+      masvs: ["MASVS-PLATFORM-1"]
+      owasp-mobile: ["M8: Security Misconfiguration"]
+      confidence: LOW
+      references:
+        - https://docs.flutter.dev/release/breaking-changes/deep-links-flag-change
+    paths:
+      include:
+        - "**/Info.plist"
+    pattern-regex: (?s)<key>CFBundleURLSchemes</key>\s*<array>.*?</array>
+
+  - id: mobile-ios-flutter-deep-linking-enabled
+    languages: [regex]
+    severity: WARNING
+    message: >-
+      `FlutterDeepLinkingEnabled` is explicitly true: every URL that opens the app is pushed to
+      the Flutter router. Keep it only if routes are safe to open from an untrusted link.
+    metadata:
+      certigo-risk: deeplink
+      category: security
+      cwe: ["CWE-939: Improper Authorization in Handler for Custom URL Scheme"]
+      masvs: ["MASVS-PLATFORM-1"]
+      owasp-mobile: ["M8: Security Misconfiguration"]
+      confidence: LOW
+    paths:
+      include:
+        - "**/Info.plist"
+    pattern-regex: <key>FlutterDeepLinkingEnabled</key>\s*<true\s*/>
+
+  # ---------------------------------------------------------------- secrets (mobile surface)
+
+  - id: mobile-private-key-material
+    languages: [regex]
+    severity: ERROR
+    message: >-
+      Private key material is committed in the mobile code base. It ships inside the app or its
+      build inputs and must be treated as compromised: revoke it and load keys at build time
+      from a secret store.
+    metadata:
+      certigo-risk: secrets
+      certigo-redact: true
+      category: security
+      cwe: ["CWE-321: Use of Hard-coded Cryptographic Key"]
+      masvs: ["MASVS-CRYPTO-2"]
+      owasp-mobile: ["M1: Improper Credential Usage"]
+      confidence: HIGH
+    pattern-regex: '-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY(?:[ ]BLOCK)?-----'
+
+  - id: mobile-azure-shared-key
+    languages: [regex]
+    severity: ERROR
+    message: >-
+      An Azure shared key or SAS signature is committed in the mobile code base. Anyone who
+      unpacks the app obtains it. Revoke it and let the backend mint scoped, short-lived access.
+    metadata:
+      certigo-risk: secrets
+      certigo-redact: true
+      category: security
+      cwe: ["CWE-798: Use of Hard-coded Credentials"]
+      masvs: ["MASVS-STORAGE-1"]
+      owasp-mobile: ["M1: Improper Credential Usage"]
+      confidence: MEDIUM
+    pattern-either:
+      - pattern-regex: (?i)(?:AccountKey|SharedAccessKey)=[A-Za-z0-9+/]{20,}={0,2}
+      - pattern-regex: '[?&]sig=[A-Za-z0-9%+/]{20,}={0,2}'

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fixture for .github/sast/rules/mobile-platform.yaml: every risky Android setting. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- ruleid: mobile-android-backup-enabled, mobile-android-debuggable, mobile-android-cleartext-traffic -->
+    <application android:label="Fixture" android:debuggable="true" android:usesCleartextTraffic="true" android:networkSecurityConfig="@xml/network_security_config">
+        <activity android:name=".MainActivity" android:exported="true">
+            <!-- ruleid: mobile-android-app-link-unverified -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="links.certigo.example"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <!-- ruleid: mobile-android-custom-scheme -->
+                <data android:scheme="certigo" android:host="auth"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

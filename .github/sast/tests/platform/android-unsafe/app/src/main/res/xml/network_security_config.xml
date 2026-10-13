@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fixture for .github/sast/rules/mobile-platform.yaml: risky network security config. -->
+<network-security-config>
+    <!-- ruleid: mobile-android-cleartext-traffic -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+            <!-- ruleid: mobile-android-user-certificates-trusted -->
+            <certificates src="user"/>
+        </trust-anchors>
+    </base-config>
+    <debug-overrides>
+        <trust-anchors>
+            <!-- ok: mobile-android-user-certificates-trusted -->
+            <certificates src="system"/>
+        </trust-anchors>
+    </debug-overrides>
+    <!-- ok: mobile-android-cleartext-traffic -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">certigo.example</domain>
+    </domain-config>
+</network-security-config>

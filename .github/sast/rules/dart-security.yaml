@@ -1,0 +1,734 @@
+# Certigo — Dart/Flutter SAST rules (Semgrep Community Edition).
+#
+# Trusted control: CI always loads this file from the pull request BASE SHA
+# (.trusted-control), never from the pull request head. See docs/runbooks/DART_SAST.md.
+#
+# Conventions enforced by .github/scripts/dart-sast.mjs:
+# - every rule id is `dart-<risk>-<name>` or `mobile-<risk>-<name>`, dash-only (no dots);
+# - every rule has metadata.certigo-risk and at least one positive and one negative fixture
+#   under .github/sast/tests/;
+# - rules tagged `certigo-redact: true` never print the matched source in CI logs.
+#
+# Semgrep's metavariable-regex is anchored at the start of the metavariable text (re.match).
+
+rules:
+  # ---------------------------------------------------------------- TLS / network
+
+  - id: dart-tls-bad-certificate-callback
+    languages: [dart]
+    severity: ERROR
+    message: >-
+      Custom `badCertificateCallback` on a dart:io HttpClient. Returning true for an invalid
+      certificate disables TLS validation for every request of this client (MITM). Remove it,
+      or implement certificate pinning that only ever narrows trust and record the review.
+    metadata:
+      certigo-risk: tls
+      category: security
+      cwe: ["CWE-295: Improper Certificate Validation"]
+      masvs: ["MASVS-NETWORK-1"]
+      owasp-mobile: ["M5: Insecure Communication"]
+      confidence: HIGH
+      references:
+        - https://api.dart.dev/stable/dart-io/HttpClient/badCertificateCallback.html
+    pattern-either:
+      - pattern: $CLIENT.badCertificateCallback = $CALLBACK
+      - pattern: |
+          IOHttpClientAdapter(..., validateCertificate: (...) => true, ...)
+      - pattern: |
+          IOHttpClientAdapter(..., validateCertificate: (...) { return true; }, ...)
+
+  - id: dart-tls-global-http-overrides
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      `HttpOverrides.global` replaces the HttpClient factory for the whole process. It is the
+      usual way TLS validation gets disabled app-wide; production code must not install one.
+    metadata:
+      certigo-risk: tls
+      category: security
+      cwe: ["CWE-295: Improper Certificate Validation"]
+      masvs: ["MASVS-NETWORK-1"]
+      owasp-mobile: ["M5: Insecure Communication"]
+      confidence: MEDIUM
+    paths:
+      # Anchored on the package test roots only. A pattern such as `**/test/**` or
+      # `*_test.dart` would also hide production code placed in `lib/**/test/` or named
+      # `*_test.dart`.
+      exclude: &non-production-code
+        - "/apps/mobile/test/"
+        - "/apps/mobile/integration_test/"
+        - "/apps/mobile/test_driver/"
+        - "/packages/*/test/"
+    pattern: HttpOverrides.global = $OVERRIDES
+
+  - id: dart-cleartext-http-url
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      Cleartext `http://` URL in shipped code. Traffic and bearer tokens would be readable and
+      modifiable on the network. Use https:// (loopback and Android emulator hosts are exempt).
+    metadata:
+      certigo-risk: tls
+      category: security
+      cwe: ["CWE-319: Cleartext Transmission of Sensitive Information"]
+      masvs: ["MASVS-NETWORK-1"]
+      owasp-mobile: ["M5: Insecure Communication"]
+      confidence: MEDIUM
+    paths:
+      exclude: *non-production-code
+    patterns:
+      - pattern-either:
+          - pattern: "'...'"
+          - pattern: '"..."'
+      - pattern-regex: >-
+          (?i)(?:r?['"])http://(?!(?:localhost|127\.0\.0\.1|10\.0\.2\.2|\[::1\])(?:[:/'"]|$))[^'"\s]+
+
+  - id: dart-oidc-allow-insecure-connections
+    languages: [dart]
+    severity: ERROR
+    message: >-
+      `allowInsecureConnections: true` lets flutter_appauth talk to the authorization server
+      over cleartext HTTP, exposing authorization codes and tokens.
+    metadata:
+      certigo-risk: tls
+      category: security
+      cwe: ["CWE-319: Cleartext Transmission of Sensitive Information"]
+      masvs: ["MASVS-NETWORK-1", "MASVS-AUTH-1"]
+      owasp-mobile: ["M5: Insecure Communication"]
+      confidence: HIGH
+    # Semgrep's Dart matcher does not bind named arguments under a metavariable callee
+    # (`$F(..., name: v, ...)` never matches), so constructors are listed explicitly.
+    pattern-either:
+      - pattern: |
+          AuthorizationTokenRequest(..., allowInsecureConnections: true, ...)
+      - pattern: |
+          AuthorizationRequest(..., allowInsecureConnections: true, ...)
+      - pattern: |
+          TokenRequest(..., allowInsecureConnections: true, ...)
+      - pattern: |
+          EndSessionRequest(..., allowInsecureConnections: true, ...)
+
+  # ---------------------------------------------------------------- logging / leakage
+
+  - id: dart-sensitive-data-logged
+    languages: [dart]
+    severity: ERROR
+    message: >-
+      `$VALUE` looks like a credential (token, password, secret, session, cookie) and reaches a
+      log, diagnostics, telemetry or crash-report sink. Device logs and crash reports are
+      readable outside the app. Log a non-sensitive attribute instead (for example its length).
+    metadata:
+      certigo-risk: logging
+      category: security
+      cwe: ["CWE-532: Insertion of Sensitive Information into Log File"]
+      masvs: ["MASVS-STORAGE-2", "MASVS-PRIVACY-1"]
+      owasp-mobile: ["M6: Inadequate Privacy Controls", "M9: Insecure Data Storage"]
+      confidence: MEDIUM
+    paths:
+      exclude: *non-production-code
+    patterns:
+      - pattern-either:
+          - pattern-inside: print(...)
+          - pattern-inside: debugPrint(...)
+          - pattern-inside: debugPrintStack(...)
+          - pattern-inside: log(...)
+          - pattern-inside: developer.log(...)
+          - pattern-inside: stdout.$WRITE(...)
+          - pattern-inside: stderr.$WRITE(...)
+          - pattern-inside: Sentry.$CAPTURE(...)
+          - pattern-inside: Breadcrumb(...)
+          - pattern-inside: $SCOPE.setExtra(...)
+          - pattern-inside: $SCOPE.setTag(...)
+          - pattern-inside: $SCOPE.setContexts(...)
+          - patterns:
+              - pattern-inside: $LOGGER.$METHOD(...)
+              - metavariable-regex:
+                  metavariable: $LOGGER
+                  regex: (?i)^(?:[a-z_$][\w$]*[?!]?\.)*_*[a-z]*(?:log|logger|logging|telemetry|diagnostics?|crashlytics|analytics|sink|tracer?)$
+          - patterns:
+              - pattern-inside: $LOGFUNCTION(...)
+              - metavariable-regex:
+                  metavariable: $LOGFUNCTION
+                  regex: ^_*(?:log|debugLog|trace)(?:[A-Z]\w*)?$
+          - patterns:
+              - pattern-inside: $SINK?.call(...)
+              - metavariable-regex:
+                  metavariable: $SINK
+                  regex: (?i)^(?:[a-z_$][\w$]*\.)*_*\w*(?:log|logger|sink|trace)$
+          - patterns:
+              - pattern-inside: $SINK.call(...)
+              - metavariable-regex:
+                  metavariable: $SINK
+                  regex: (?i)^(?:[a-z_$][\w$]*\.)*_*\w*(?:log|logger|sink|trace)$
+      - pattern: $VALUE
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: &sensitive-identifier ^(?:[A-Za-z_$][\w$]*[?!]?\.)*_*(?:(?!(?:has|is|was|should|can|did|needs?|show|hide|obscure|reveal|toggle|allow|expects?|requires?|must|on|max|min|last|num|count|validate|verify|check|forgot|reset)[A-Z])[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*(?:AuthorizationHeader|AuthorizationCode|EncryptionKey|Authorization|CodeVerifier|Credentials|Passphrase|PrivateKey|SigningKey|Credential|SecretKey|AccessKey|Password|AuthCode|Cookies|Session|Passwd|Secret|ApiKey|Bearer|Cookie|Token|Jwt)|(?:authorizationHeader|authorizationCode|encryptionKey|authorization|codeVerifier|credentials|credential|privateKey|passphrase|signingKey|accessKey|secretKey|authCode|password|cookies|session|passwd|secret|apiKey|bearer|cookie|token|jwt)|(?:[a-z0-9]+_)+(?:token|jwt|password|passwd|secret|key|authorization|bearer|credentials?|cookies?|verifier|session)|[A-Z0-9_]*(?:TOKEN|JWT|PASSWORD|PASSWD|SECRET|API_KEY|PRIVATE_KEY|AUTHORIZATION|BEARER|CREDENTIALS?))$
+      - pattern-not-inside: $OBJECT.length
+      - pattern-not-inside: $OBJECT?.length
+      - pattern-not-inside: $OBJECT.isEmpty
+      - pattern-not-inside: $OBJECT.isNotEmpty
+      - pattern-not-inside: $OBJECT?.isEmpty
+      - pattern-not-inside: $OBJECT?.isNotEmpty
+      - pattern-not-inside: $OBJECT == null
+      - pattern-not-inside: $OBJECT != null
+      - pattern-not-inside: $OBJECT.runtimeType
+      - pattern-not-inside: $OBJECT.hashCode
+      - pattern-not-inside: $OBJECT is $TYPE
+
+  - id: dart-dio-log-interceptor-headers
+    languages: [dart]
+    severity: ERROR
+    message: >-
+      Dio `LogInterceptor` logs request headers by default, including `Authorization: Bearer`.
+      Pass `requestHeader: false` (and keep bodies off), or do not register it.
+    metadata:
+      certigo-risk: logging
+      category: security
+      cwe: ["CWE-532: Insertion of Sensitive Information into Log File"]
+      masvs: ["MASVS-STORAGE-2"]
+      owasp-mobile: ["M9: Insecure Data Storage"]
+      confidence: HIGH
+    paths:
+      exclude: *non-production-code
+    pattern-either:
+      - patterns:
+          - pattern: LogInterceptor(...)
+          - pattern-not: |
+              LogInterceptor(..., requestHeader: false, ...)
+      - pattern: |
+          PrettyDioLogger(..., requestHeader: true, ...)
+
+  - id: dart-sentry-send-default-pii
+    languages: [dart]
+    severity: ERROR
+    message: >-
+      `sendDefaultPii = true` makes Sentry attach IP addresses, user identifiers and request data
+      to every event sent to a third party. Keep it false.
+    metadata:
+      certigo-risk: logging
+      category: security
+      cwe: ["CWE-359: Exposure of Private Personal Information to an Unauthorized Actor"]
+      masvs: ["MASVS-PRIVACY-1"]
+      owasp-mobile: ["M6: Inadequate Privacy Controls"]
+      confidence: HIGH
+    pattern-either:
+      - pattern: $OPTIONS.sendDefaultPii = true
+      - pattern: |
+          SentryFlutterOptions(..., sendDefaultPii: true, ...)
+      - pattern: |
+          SentryOptions(..., sendDefaultPii: true, ...)
+
+  - id: dart-sensitive-data-to-clipboard
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      `$VALUE` looks like a credential and is copied to the system clipboard, which other apps
+      and cloud clipboard sync can read.
+    metadata:
+      certigo-risk: logging
+      category: security
+      cwe: ["CWE-200: Exposure of Sensitive Information to an Unauthorized Actor"]
+      masvs: ["MASVS-STORAGE-2"]
+      owasp-mobile: ["M9: Insecure Data Storage"]
+      confidence: MEDIUM
+    paths:
+      exclude: *non-production-code
+    patterns:
+      - pattern-inside: Clipboard.setData(...)
+      - pattern: $VALUE
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: *sensitive-identifier
+      - pattern-not-inside: $OBJECT.length
+
+  # ---------------------------------------------------------------- storage
+
+  - id: dart-sensitive-data-in-shared-preferences
+    languages: [dart]
+    severity: ERROR
+    message: >-
+      A credential-like value or key is written to SharedPreferences, which is stored in clear
+      on the device and included in backups. Store secrets with flutter_secure_storage.
+    metadata:
+      certigo-risk: storage
+      category: security
+      cwe: ["CWE-312: Cleartext Storage of Sensitive Information"]
+      masvs: ["MASVS-STORAGE-1"]
+      owasp-mobile: ["M9: Insecure Data Storage"]
+      confidence: MEDIUM
+    paths:
+      exclude: *non-production-code
+    pattern-either:
+      - patterns:
+          - pattern: $PREFS.$SET($KEY, ...)
+          - metavariable-regex:
+              metavariable: $SET
+              regex: ^(?:setString|setStringList)$
+          - metavariable-regex:
+              metavariable: $KEY
+              regex: (?i)^(?:r?['"].*(?:token|jwt|passw|secret|credential|api[_.-]?key|private[_.-]?key|cookie|bearer).*['"]|(?:[a-z_$][\w$]*\.)*_*[a-z0-9_]*(?:token|jwt|password|secret|credential|apikey|privatekey|cookie|bearer)[a-z0-9_]*)$
+      - patterns:
+          - pattern: $PREFS.$SET($KEY, $VALUE)
+          - metavariable-regex:
+              metavariable: $SET
+              regex: ^(?:setString|setStringList)$
+          - metavariable-regex:
+              metavariable: $VALUE
+              regex: *sensitive-identifier
+
+  - id: dart-sensitive-data-written-to-file
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      `$VALUE` looks like a credential and is written to a plain file. App files are not
+      encrypted by the app and may be backed up; use flutter_secure_storage.
+    metadata:
+      certigo-risk: storage
+      category: security
+      cwe: ["CWE-312: Cleartext Storage of Sensitive Information"]
+      masvs: ["MASVS-STORAGE-1"]
+      owasp-mobile: ["M9: Insecure Data Storage"]
+      confidence: MEDIUM
+    paths:
+      exclude: *non-production-code
+    patterns:
+      - pattern-either:
+          - pattern-inside: $FILE.writeAsString(...)
+          - pattern-inside: $FILE.writeAsStringSync(...)
+          - pattern-inside: $FILE.writeAsBytes(...)
+          - pattern-inside: $FILE.writeAsBytesSync(...)
+      - pattern: $VALUE
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: *sensitive-identifier
+      - pattern-not-inside: $OBJECT.length
+
+  - id: dart-keychain-accessibility-migratable
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      Keychain items saved with `$ACCESSIBILITY` (without `_this_device`) are included in
+      encrypted iCloud/device backups and can migrate to another device. Tokens should use a
+      `*_this_device` accessibility.
+    metadata:
+      certigo-risk: storage
+      category: security
+      cwe: ["CWE-922: Insecure Storage of Sensitive Information"]
+      masvs: ["MASVS-STORAGE-1"]
+      owasp-mobile: ["M9: Insecure Data Storage"]
+      confidence: HIGH
+    pattern-either:
+      - pattern: KeychainAccessibility.first_unlock
+      - pattern: KeychainAccessibility.unlocked
+
+  - id: dart-external-storage-directory
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      `$DIRECTORY` returns shared or user-visible storage. Data written there is readable by
+      other apps or the user; keep app data in application support or documents directories.
+    metadata:
+      certigo-risk: storage
+      category: security
+      cwe: ["CWE-921: Storage of Sensitive Data in a Mechanism without Access Control"]
+      masvs: ["MASVS-STORAGE-1"]
+      owasp-mobile: ["M9: Insecure Data Storage"]
+      confidence: LOW
+    paths:
+      exclude: *non-production-code
+    patterns:
+      - pattern: $DIRECTORY(...)
+      - metavariable-regex:
+          metavariable: $DIRECTORY
+          regex: ^(?:getExternalStorageDirectory|getExternalStorageDirectories|getExternalCacheDirectories|getDownloadsDirectory)$
+
+  # ---------------------------------------------------------------- WebView
+
+  - id: dart-webview-javascript-enabled
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      JavaScript is enabled in a WebView. Combined with remote or user-influenced content it
+      turns any content injection into code execution inside the app context.
+    metadata:
+      certigo-risk: webview
+      category: security
+      cwe: ["CWE-749: Exposed Dangerous Method or Function"]
+      masvs: ["MASVS-PLATFORM-2"]
+      owasp-mobile: ["M4: Insufficient Input/Output Validation"]
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: $CONTROLLER.setJavaScriptMode(JavaScriptMode.unrestricted)
+      - pattern: |
+          WebView(..., javascriptMode: JavascriptMode.unrestricted, ...)
+      - pattern: |
+          InAppWebViewSettings(..., javaScriptEnabled: true, ...)
+      - pattern: |
+          InAppWebViewOptions(..., javaScriptEnabled: true, ...)
+
+  - id: dart-webview-javascript-bridge
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      A JavaScript bridge exposes Dart code to the page loaded in the WebView. Any script able
+      to run in that page can call it; restrict it to trusted origins and validate messages.
+    metadata:
+      certigo-risk: webview
+      category: security
+      cwe: ["CWE-749: Exposed Dangerous Method or Function"]
+      masvs: ["MASVS-PLATFORM-2"]
+      owasp-mobile: ["M4: Insufficient Input/Output Validation"]
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: $CONTROLLER.addJavaScriptChannel(...)
+      - pattern: $CONTROLLER.addJavaScriptHandler(...)
+      - pattern: |
+          WebView(..., javascriptChannels: $CHANNELS, ...)
+
+  - id: dart-webview-file-access
+    languages: [dart]
+    severity: ERROR
+    message: >-
+      WebView file or mixed-content access is widened. file:// pages would be able to read
+      local files or reach any origin, and HTTPS pages could load cleartext content.
+    metadata:
+      certigo-risk: webview
+      category: security
+      cwe: ["CWE-200: Exposure of Sensitive Information to an Unauthorized Actor"]
+      masvs: ["MASVS-PLATFORM-2"]
+      owasp-mobile: ["M8: Security Misconfiguration"]
+      confidence: HIGH
+    pattern-either:
+      - pattern: |
+          InAppWebViewSettings(..., allowFileAccessFromFileURLs: true, ...)
+      - pattern: |
+          InAppWebViewSettings(..., allowUniversalAccessFromFileURLs: true, ...)
+      - pattern: |
+          InAppWebViewSettings(..., allowFileAccess: true, ...)
+      - pattern: |
+          InAppWebViewSettings(..., mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW, ...)
+      - pattern: |
+          InAppWebViewOptions(..., allowFileAccessFromFileURLs: true, ...)
+      - pattern: |
+          InAppWebViewOptions(..., allowUniversalAccessFromFileURLs: true, ...)
+      - pattern: |
+          AndroidInAppWebViewOptions(..., allowFileAccess: true, ...)
+      - pattern: |
+          AndroidInAppWebViewOptions(..., mixedContentMode: AndroidMixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW, ...)
+      - pattern: $CONTROLLER.setAllowFileAccess(true)
+
+  - id: dart-webview-dynamic-content
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      The WebView loads a URL or HTML that is not a compile-time literal. Validate the scheme
+      and host against an allow-list before loading it.
+    metadata:
+      certigo-risk: webview
+      category: security
+      cwe: ["CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"]
+      masvs: ["MASVS-PLATFORM-2"]
+      owasp-mobile: ["M4: Insufficient Input/Output Validation"]
+      confidence: LOW
+    paths:
+      exclude: *non-production-code
+    patterns:
+      - pattern-either:
+          - pattern: $CONTROLLER.loadRequest($TARGET, ...)
+          - pattern: $CONTROLLER.loadHtmlString($TARGET, ...)
+          - pattern: |
+              $CONTROLLER.loadUrl(..., urlRequest: $TARGET, ...)
+      - pattern-not: $CONTROLLER.loadRequest(Uri.parse('...'), ...)
+      - pattern-not: $CONTROLLER.loadRequest(Uri.https('...', ...), ...)
+      - pattern-not: $CONTROLLER.loadHtmlString('...', ...)
+
+  # ---------------------------------------------------------------- deep links / URLs
+
+  - id: dart-deeplink-untrusted-navigation
+    languages: [dart]
+    severity: ERROR
+    message: >-
+      A value taken from a deep link or route parameter decides where the app navigates, what
+      it opens or what a WebView loads. Anyone who can make the user open a link controls it.
+      Map it to a fixed set of internal destinations instead.
+    metadata:
+      certigo-risk: deeplink
+      category: security
+      cwe: ["CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"]
+      masvs: ["MASVS-PLATFORM-1"]
+      owasp-mobile: ["M4: Insufficient Input/Output Validation"]
+      confidence: MEDIUM
+    mode: taint
+    pattern-sources:
+      - pattern: $STATE.uri.queryParameters[...]
+      - pattern: $STATE.uri.queryParametersAll[...]
+      - pattern: $STATE.queryParameters[...]
+      - pattern: $STATE.pathParameters[...]
+      - pattern: $STATE.uri.fragment
+      - pattern: $LINKS.getInitialLink()
+      - pattern: $LINKS.getInitialAppLink()
+      - pattern: $LINKS.getLatestLink()
+      - pattern: getInitialLink()
+      - pattern: getInitialUri()
+      - pattern: PlatformDispatcher.instance.defaultRouteName
+    pattern-sinks:
+      - patterns:
+          - pattern: $NAVIGATOR.$NAVIGATE($DESTINATION, ...)
+          - metavariable-regex:
+              metavariable: $NAVIGATE
+              regex: ^(?:go|push|pushReplacement|replace|pushNamed|goNamed|pushReplacementNamed|pushNamedAndRemoveUntil|popAndPushNamed|restorablePushNamed)$
+          - focus-metavariable: $DESTINATION
+      - pattern: launchUrl(...)
+      - pattern: launchUrlString(...)
+      - pattern: $CONTROLLER.loadRequest(...)
+    pattern-sanitizers:
+      - pattern: Uri.encodeComponent(...)
+      - pattern: Uri.encodeQueryComponent(...)
+      - pattern: int.parse(...)
+      - pattern: int.tryParse(...)
+
+  - id: dart-url-launch-dynamic
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      An external URL that is not a compile-time literal is launched. Validate its scheme and
+      host (https + allow-listed domain) before handing it to the platform.
+    metadata:
+      certigo-risk: deeplink
+      category: security
+      cwe: ["CWE-939: Improper Authorization in Handler for Custom URL Scheme"]
+      masvs: ["MASVS-PLATFORM-1"]
+      owasp-mobile: ["M4: Insufficient Input/Output Validation"]
+      confidence: LOW
+    paths:
+      exclude: *non-production-code
+    patterns:
+      - pattern-either:
+          - pattern: launchUrl($TARGET, ...)
+          - pattern: launchUrlString($TARGET, ...)
+          - pattern: launch($TARGET, ...)
+      - pattern-not: launchUrl(Uri.parse('...'), ...)
+      - pattern-not: launchUrl(Uri.https('...', ...), ...)
+      - pattern-not: launchUrlString('...', ...)
+      - pattern-not: launch('...', ...)
+
+  - id: dart-deeplink-listener
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      The app subscribes to incoming deep links. Every value received here is attacker
+      controlled: parse it into a closed set of destinations and never forward it verbatim.
+    metadata:
+      certigo-risk: deeplink
+      category: security
+      cwe: ["CWE-939: Improper Authorization in Handler for Custom URL Scheme"]
+      masvs: ["MASVS-PLATFORM-1"]
+      owasp-mobile: ["M4: Insufficient Input/Output Validation"]
+      confidence: LOW
+    paths:
+      exclude: *non-production-code
+    pattern-either:
+      - pattern: $LINKS.uriLinkStream
+      - pattern: $LINKS.stringLinkStream
+      - pattern: uriLinkStream
+      - pattern: linkStream
+      - pattern: $LINKS.getInitialLink()
+      - pattern: $LINKS.getInitialAppLink()
+      - pattern: getInitialLink()
+      - pattern: getInitialUri()
+
+  - id: dart-api-path-unencoded-interpolation
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      `$SEGMENT` is interpolated into an API path without `Uri.encodeComponent`. A value holding
+      `/`, `?` or `#` (for example from a deep link) would retarget the authenticated request to
+      another endpoint (client-side path traversal). Encode every path segment; `ApiClient`
+      additionally refuses `.` and `..` segments, which encoding leaves unchanged.
+    metadata:
+      certigo-risk: deeplink
+      category: security
+      cwe: ["CWE-22: Improper Limitation of a Pathname to a Restricted Directory"]
+      masvs: ["MASVS-CODE-4"]
+      owasp-mobile: ["M4: Insufficient Input/Output Validation"]
+      confidence: MEDIUM
+    paths:
+      exclude: *non-production-code
+    # Four shapes: API client calls, bare HTTP verbs on client-like receivers, generic calls
+    # (`dio.get<T>(...)`, which Semgrep's Dart parser only matches through pattern-inside, so the
+    # literal itself is reported) and paths queued for offline replay (`endpoint:`).
+    pattern-either:
+      - patterns:
+          - pattern: $API.$METHOD($PATH, ...)
+          - metavariable-regex:
+              metavariable: $METHOD
+              regex: ^(?:getJson|getJsonWithHeaders|getJsonResponse|getBytesResponse|postJson|postJsonResponse|putJson|patchJson|deleteJson)$
+          - metavariable-pattern:
+              metavariable: $PATH
+              patterns: &unencoded-path-literal
+                - pattern: '"...$SEGMENT..."'
+                - metavariable-pattern: &segment-not-encoded
+                    metavariable: $SEGMENT
+                    patterns:
+                      - pattern-not: Uri.encodeComponent(...)
+                      - pattern-not: Uri.encodeQueryComponent(...)
+                      - pattern-not: $VALUE.toIso8601String()
+                      - pattern-not: $VALUE.toUtc().toIso8601String()
+                - metavariable-regex: &segment-not-constant
+                    metavariable: $SEGMENT
+                    regex: ^(?!k[A-Z])
+      - patterns:
+          - pattern: $CLIENT.$VERB($PATH, ...)
+          - metavariable-regex:
+              metavariable: $VERB
+              regex: ^(?:get|post|put|patch|delete|head|request|download)$
+          - metavariable-regex:
+              metavariable: $CLIENT
+              regex: &http-client-receiver (?i)^(?:[a-z_$][\w$]*\.)*_*[a-z]*(?:api|dio|http|rest|client)[a-z0-9]*$
+          - metavariable-pattern:
+              metavariable: $PATH
+              patterns: *unencoded-path-literal
+      - patterns:
+          - pattern-inside: $CLIENT.$METHOD<$TYPE>(...)
+          - metavariable-regex:
+              metavariable: $METHOD
+              regex: ^(?:getJson|getJsonWithHeaders|getJsonResponse|getBytesResponse|postJson|postJsonResponse|putJson|patchJson|deleteJson|get|post|put|patch|delete|head|request|download)$
+          - metavariable-regex:
+              metavariable: $CLIENT
+              regex: *http-client-receiver
+          - pattern: '"...$SEGMENT..."'
+          - metavariable-pattern: *segment-not-encoded
+          - metavariable-regex: *segment-not-constant
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  $ENGINE.enqueue(..., endpoint: "...$SEGMENT...", ...)
+              - pattern: |
+                  SyncAction(..., endpoint: "...$SEGMENT...", ...)
+          - metavariable-pattern: *segment-not-encoded
+          - metavariable-regex: *segment-not-constant
+
+  # ---------------------------------------------------------------- randomness / crypto
+
+  - id: dart-insecure-random
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      `dart:math` `Random()` is not a cryptographically secure generator. Use `Random.secure()`
+      for anything that must be unpredictable or collision-resistant (identifiers, nonces, keys).
+    metadata:
+      certigo-risk: randomness
+      category: security
+      cwe: ["CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)"]
+      masvs: ["MASVS-CRYPTO-1"]
+      owasp-mobile: ["M10: Insufficient Cryptography"]
+      confidence: MEDIUM
+    paths:
+      exclude: *non-production-code
+    pattern-either:
+      - pattern: Random()
+      - pattern: Random(<... DateTime.now() ...>)
+      - pattern: math.Random()
+      - pattern: math.Random(<... DateTime.now() ...>)
+
+  - id: dart-weak-hash-algorithm
+    languages: [dart]
+    severity: WARNING
+    message: >-
+      MD5 and SHA-1 are broken for collision resistance. Use SHA-256 or stronger for integrity,
+      and a password hashing function for passwords.
+    metadata:
+      certigo-risk: crypto
+      category: security
+      cwe: ["CWE-328: Use of Weak Hash"]
+      masvs: ["MASVS-CRYPTO-1"]
+      owasp-mobile: ["M10: Insufficient Cryptography"]
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: md5.convert(...)
+      - pattern: sha1.convert(...)
+      - pattern: Hmac(md5, ...)
+      - pattern: Hmac(sha1, ...)
+      - pattern: crypto.md5.convert(...)
+      - pattern: crypto.sha1.convert(...)
+
+  - id: dart-weak-cipher-mode
+    languages: [dart]
+    severity: ERROR
+    message: >-
+      ECB mode encrypts identical blocks to identical ciphertext and leaks data patterns. Use an
+      authenticated mode such as AES-GCM.
+    metadata:
+      certigo-risk: crypto
+      category: security
+      cwe: ["CWE-327: Use of a Broken or Risky Cryptographic Algorithm"]
+      masvs: ["MASVS-CRYPTO-1"]
+      owasp-mobile: ["M10: Insufficient Cryptography"]
+      confidence: HIGH
+    pattern-either:
+      - pattern: AESMode.ecb
+      - pattern: ECBBlockCipher(...)
+
+  # ---------------------------------------------------------------- secrets
+
+  - id: dart-hardcoded-credential
+    languages: [dart]
+    severity: ERROR
+    message: >-
+      A credential-like name is assigned a literal that looks like a real secret. Anything
+      compiled into the app can be extracted from the binary. Provision secrets server-side.
+    metadata:
+      certigo-risk: secrets
+      certigo-redact: true
+      category: security
+      cwe: ["CWE-798: Use of Hard-coded Credentials"]
+      masvs: ["MASVS-STORAGE-1", "MASVS-RESILIENCE-3"]
+      owasp-mobile: ["M1: Improper Credential Usage"]
+      confidence: MEDIUM
+    # Test code is not shipped; repository-wide secret detection is GitHub secret scanning with
+    # push protection (docs/runbooks/DART_SAST.md, "Ce que le scanner ne couvre pas").
+    paths:
+      exclude: *non-production-code
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: const $TYPE $NAME = $LITERAL;
+              - pattern: final $TYPE $NAME = $LITERAL;
+              - pattern: $TYPE $NAME = $LITERAL;
+              - pattern: const $NAME = $LITERAL;
+              - pattern: final $NAME = $LITERAL;
+              - pattern: var $NAME = $LITERAL;
+              - pattern: $OBJECT.$NAME = $LITERAL
+              - patterns:
+                  - pattern: $NAME = $LITERAL
+                  - pattern-not-inside: const $TYPE $NAME = $LITERAL;
+                  - pattern-not-inside: final $TYPE $NAME = $LITERAL;
+                  - pattern-not-inside: $TYPE $NAME = $LITERAL;
+                  - pattern-not-inside: const $NAME = $LITERAL;
+                  - pattern-not-inside: final $NAME = $LITERAL;
+                  - pattern-not-inside: var $NAME = $LITERAL;
+          - metavariable-regex:
+              metavariable: $NAME
+              regex: *sensitive-identifier
+          - metavariable-regex:
+              metavariable: $LITERAL
+              regex: &secret-looking-literal ^r?(['"])(?=[^'"\s$]*[0-9])(?=[^'"\s$]*[A-Za-z])[^'"\s$]{12,}\1$
+      # Named arguments and map entries: Semgrep's Dart matcher cannot bind a named-argument
+      # label to a metavariable, so these two forms are matched lexically.
+      - patterns:
+          - pattern-regex: |-
+              (?<![\w$])(?:[a-z][a-zA-Z0-9]*(?:Password|Secret|ApiKey|PrivateKey|Token)|password|passwd|secret|apiKey|privateKey|token)\s*:\s*r?(['"])(?=[^'"\s$]*[0-9])(?=[^'"\s$]*[A-Za-z])[^'"\s$]{12,}\1
+          - pattern-not-regex: |-
+              (?<![\w$])(?:has|is|show|obscure|validate)[A-Z]\w*\s*:
+      - pattern-regex: |-
+          (?i)(['"])(?:[a-z0-9_]*[_-])?(?:password|passwd|secret|client_secret|api_key|apikey|private_key|access_token|refresh_token|id_token|token)\1\s*:\s*r?(['"])(?=[^'"\s$]*[0-9])(?=[^'"\s$]*[A-Za-z])[^'"\s$]{12,}\2
+      - patterns:
+          - pattern: |
+              String.fromEnvironment($KEY, defaultValue: $LITERAL)
+          - metavariable-regex:
+              metavariable: $KEY
+              regex: (?i)^r?['"][a-z0-9_]*(?:token|jwt|password|passwd|secret|api_?key|private_?key|client_?secret|credential)[a-z0-9_]*['"]$
+          - metavariable-regex:
+              metavariable: $LITERAL
+              regex: *secret-looking-literal

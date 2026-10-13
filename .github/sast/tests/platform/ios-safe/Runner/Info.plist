@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Fixture for .github/sast/rules/mobile-platform.yaml: the hardened counterpart. -->
+<plist version="1.0">
+<dict>
+	<!-- ok: mobile-ios-flutter-deep-linking-enabled -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- ok: mobile-ios-ats-disabled -->
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+	</dict>
+	<!-- ok: mobile-ios-custom-url-scheme -->
+	<key>CFBundleDisplayName</key>
+	<string>Certigo</string>
+</dict>
+</plist>

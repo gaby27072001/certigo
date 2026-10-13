@@ -5,6 +5,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAccountDeletionCosmosLayout } from './account-deletion-cosmos-policy.mjs';
 import { validateCandidateScriptTestsJob } from './candidate-script-tests-policy.mjs';
+import {
+  dartSastGateJobId,
+  dartSastWorkflowFile,
+  validateDartSastWorkflow,
+} from './dart-sast-workflow-policy.mjs';
 import { validateBackendDeployWorkspace } from './backend-deploy-workflow-policy.mjs';
 import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
@@ -95,6 +100,7 @@ const trustedOnlyWorkflowFiles = new Set([
 const trustedAggregateJobs = new Map([
   ['ci-project-state.yml', new Set(['validate'])],
   ['codeql.yml', new Set(['security-gate'])],
+  [dartSastWorkflowFile, new Set([dartSastGateJobId])],
   ['security-gate.yml', new Set(['security-gate'])],
 ]);
 const privilegedDispatchTypes = new Map([
@@ -304,6 +310,9 @@ function validateWorkflow(file) {
     /^ {2}pull_request(?:_target)?:\s*$/m.test(text);
 
   errors.push(...validateTrustedControlReferences(text, file));
+  if (fileName === dartSastWorkflowFile) {
+    errors.push(...validateDartSastWorkflow(text, file));
+  }
   if (!lines.some((line) => /^permissions:\s*(?:\{\})?\s*$/.test(line))) {
     errors.push(`${file}: missing explicit top-level permissions`);
   }
