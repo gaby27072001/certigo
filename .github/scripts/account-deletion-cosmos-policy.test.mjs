@@ -375,6 +375,70 @@ test('repository migration never permits a fork or a disjunction of canonical ow
   }
 });
 
+test('exact LTS one-shot SDK requires trusted approval and preserves both owner contracts', () => {
+  for (const repository of ['gchambaud_microsoft/Certigo', 'gaby27072001/certigo']) {
+    withFixture(['activeOneShot', 'archivedLegacy'], (root) => {
+      const relativePath = '.github/workflows/post-merge-cosmos-account-deletion.yml';
+      const file = path.join(root, ...relativePath.split('/'));
+      mutateWorkflow(file, (document) => {
+        document.setIn(['jobs', 'account-deletion', 'steps', 2, 'with', 'dotnet-version'], '10.0.401');
+        const condition = document.getIn(['jobs', 'account-deletion', 'if']);
+        document.setIn(
+          ['jobs', 'account-deletion', 'if'],
+          condition.replace('gchambaud_microsoft/Certigo', repository),
+        );
+      });
+      assert.ok(validate(root).some((error) => error.includes('semantic manifest')));
+      const manifest = JSON.parse(fs.readFileSync(trustedManifestOf(root), 'utf8'));
+      manifest.states.C[relativePath] = fingerprintWorkflow(
+        relativePath, fs.readFileSync(file, 'utf8'),
+      ).digest;
+      fs.writeFileSync(trustedManifestOf(root), renderWorkflowManifest(manifest));
+      assert.deepEqual(validate(root), []);
+    });
+  }
+});
+
+test('LTS compatibility never permits arbitrary SDKs or unrelated step changes even if approved', () => {
+  const controls = [
+    (document) => document.setIn(
+      ['jobs', 'account-deletion', 'steps', 2, 'with', 'dotnet-version'], '10.0.x',
+    ),
+    (document) => document.setIn(
+      ['jobs', 'account-deletion', 'steps', 2, 'with', 'dotnet-version'], '10.0.400',
+    ),
+    (document) => document.setIn(
+      ['jobs', 'account-deletion', 'steps', 2, 'with', 'dotnet-version'], '11.0.100',
+    ),
+    (document) => document.setIn(
+      ['jobs', 'account-deletion', 'steps', 2, 'with', 'include-prerelease'], true,
+    ),
+    (document) => document.setIn(
+      ['jobs', 'account-deletion', 'steps', 0, 'with', 'persist-credentials'], true,
+    ),
+    (document) => document.setIn(
+      ['jobs', 'account-deletion', 'steps', 3, 'run'], 'dotnet restore --force-evaluate',
+    ),
+  ];
+  for (const mutate of controls) {
+    withFixture(['activeOneShot', 'archivedLegacy'], (root) => {
+      const relativePath = '.github/workflows/post-merge-cosmos-account-deletion.yml';
+      const file = path.join(root, ...relativePath.split('/'));
+      mutateWorkflow(file, (document) => {
+        document.setIn(['jobs', 'account-deletion', 'steps', 2, 'with', 'dotnet-version'], '10.0.401');
+        mutate(document);
+      });
+      const manifest = JSON.parse(fs.readFileSync(trustedManifestOf(root), 'utf8'));
+      manifest.states.C[relativePath] = fingerprintWorkflow(
+        relativePath, fs.readFileSync(file, 'utf8'),
+      ).digest;
+      fs.writeFileSync(trustedManifestOf(root), renderWorkflowManifest(manifest));
+      assert.ok(validate(root)
+        .some((error) => error.includes('steps must exactly match')));
+    });
+  }
+});
+
 test('rejects every partial or mixed workflow migration layout', () => {
   const labels = Object.keys(files);
   const validMasks = new Set([0b0001, 0b0110, 0b1100]);

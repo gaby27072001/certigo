@@ -198,6 +198,12 @@ constitue une autorisation de le remplacer. Ne pas fusionner la cible .NET 10
 avant que les workflows requis puissent la compiler ; ne pas promouvoir son
 artefact avant la validation et l'approbation de la transition du runtime Flex.
 
+Le contrat du one-shot Cosmos accepte uniquement les deux formes identiques
+dont le pin SDK est `8.0.424` ou `10.0.401`. La pré-approbation trusted reste
+requise pour changer le workflow actif. Aucune version flottante, option
+prerelease, modification de commande ou nouvelle permission n'est autorisée
+par cette compatibilité. Le workflow legacy archivé reste inchangé.
+
 Les workflows de PR sont chargés depuis `main` (`pull_request_target`) : la PR B tourne avec
 l'**ancien** workflow, et ses nouvelles étapes n'agissent qu'après la fusion. Une étape cassée dans
 un job requis ne peut alors être réparée que par une PR… jugée par l'étape cassée.

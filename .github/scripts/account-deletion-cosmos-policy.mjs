@@ -156,6 +156,10 @@ const expectedSteps = [
   },
 ];
 
+const ltsSteps = structuredClone(expectedSteps);
+ltsSteps[2].with['dotnet-version'] = '10.0.401';
+const approvedStepContracts = new Set([expectedSteps, ltsSteps].map((steps) => JSON.stringify(steps)));
+
 const expectedLegacyWorkflow = {
   name: 'test-account-deletion-cosmos',
   on: {
@@ -460,7 +464,7 @@ function validateOneShotStructure(content, errors) {
   if (runSteps.length !== 1) {
     errors.push(`${oneShotWorkflow}: account-deletion must invoke the exact local emulator script`);
   }
-  if (JSON.stringify(job?.steps) !== JSON.stringify(expectedSteps)) {
+  if (!approvedStepContracts.has(JSON.stringify(job?.steps))) {
     errors.push(`${oneShotWorkflow}: steps must exactly match the reviewed one-shot contract`);
   }
 }
