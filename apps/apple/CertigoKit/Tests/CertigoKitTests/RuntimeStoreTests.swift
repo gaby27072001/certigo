@@ -383,4 +383,54 @@ final class RuntimeStoreTests: XCTestCase {
         FileManager.default.temporaryDirectory.appendingPathComponent(
             "certigo-runtime-\(UUID().uuidString)")
     }
+
+    func testMissingNestedRootIsCreatedAtTheExactRequestedPathThroughAnExistingAlias() throws {
+        let parent = temporaryRoot()
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false)
+        defer { XCTAssertNoThrow(try FileManager.default.removeItem(at: parent)) }
+        let target = parent.appendingPathComponent("target", isDirectory: true)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false)
+        let alias = parent.appendingPathComponent("alias", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: target)
+        let root = alias.appendingPathComponent("missing", isDirectory: true)
+            .appendingPathComponent("cache", isDirectory: true)
+        let foundationBeforeCreation = root.resolvingSymlinksInPath().path
+        let name = "b-\(String(repeating: "a", count: 64)).json"
+        let disk = try RuntimeDisk(root: root, maximumBytes: 1_024)
+        try disk.exclusive { try disk.write(Data([0x42]), name: name) }
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(name)), Data([0x42]))
+        XCTAssertEqual(
+            try Data(
+                contentsOf: target.appendingPathComponent("missing/cache").appendingPathComponent(
+                    name)),
+            Data([0x42]))
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: target.appendingPathComponent(name).path))
+        print(
+            "Foundation preserved missing alias suffix: \(foundationBeforeCreation == root.resolvingSymlinksInPath().path)"
+        )
+    }
+
+    func testRootSymlinkAndDanglingAncestorAreRejectedWithoutCreatingTheirDestination() throws {
+        let parent = temporaryRoot()
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false)
+        defer { XCTAssertNoThrow(try FileManager.default.removeItem(at: parent)) }
+        let target = parent.appendingPathComponent("target", isDirectory: true)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false)
+        let alias = parent.appendingPathComponent("alias", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: target)
+        XCTAssertThrowsError(try RuntimeDisk(root: alias, maximumBytes: 1_024)) {
+            XCTAssertEqual($0 as? RuntimeStoreError, .unsafeDiskEntry)
+        }
+        let absent = parent.appendingPathComponent("absent", isDirectory: true)
+        let dangling = parent.appendingPathComponent("dangling", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: dangling, withDestinationURL: absent)
+        XCTAssertThrowsError(
+            try RuntimeDisk(root: dangling.appendingPathComponent("cache"), maximumBytes: 1_024)
+        ) {
+            XCTAssertEqual($0 as? RuntimeStoreError, .unsafeDiskEntry)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: absent.path))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: target.path), [])
+    }
 }

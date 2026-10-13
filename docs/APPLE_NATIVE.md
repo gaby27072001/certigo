@@ -462,6 +462,42 @@ review can satisfy conditional callback permission. Token/login/logout,
 isolated test accounts/browsers and runtime activation remain separate gates;
 no successful Linux test or syntax parse closes them.
 
+### First actual Mac results and bounded path correction
+
+Access workstream `d3c9449b-220b-437d-8a21-4f7722c4faf4` supplied actual
+2026-10-13 logs, directly inspected in its `files/apple-first-mac.log`:
+macOS 27.0.1, Xcode 27.0 build 27A266a, Apple Swift 6.4 and simulator SDK 27.0.
+The exact initial `bbd58c899d269484740d8766a4e6ef378b8621ea` passed 17
+XCTest tests and the generic iOS simulator build with
+`CODE_SIGNING_ALLOWED=NO`. No simulator boot, SDK authentication or signing
+is implied. An App Intents metadata-extraction warning was nonblocking.
+
+The separate `ba7cfbce6efbee7bc8a3effba83f42507abeac09` attempt is **not
+green**: `files/apple-sdk-mac.log` reports 112 tests with 35 failures,
+17 unexpected, and exit 1. Runtime tests could not access/remove their
+requested temporary roots (Cocoa 260/4). The fail-closed wrapper stopped before
+Xcode package resolution, MSAL compilation and built-plist inspection.
+The earlier portable results did not detect this Apple path behavior.
+
+The bounded correction replaces whole-missing-URL Foundation symlink resolution
+in `RuntimeDisk` with POSIX `realpath` of the nearest **existing** ancestor,
+then appends the exact missing suffix for descriptor-relative no-follow
+creation. Only `ENOENT` permits ancestor ascent; other errors remain explicit.
+Absolute paths reject NUL/dot/parent components; final-root symlinks still
+fail admission, and missing suffixes encountering a dangling link fail closed.
+No test precreates its runtime root to hide the failure and no cleanup error
+is ignored.
+
+Two focused regressions check actual blob access at the requested nested root
+through an existing alias, absence at the ancestor's wrong location, and
+rejection of final/dangling links without destination creation. A synthetic
+boolean diagnostic compares Foundation's pre/post-creation resolution without
+logging filesystem paths. This narrows the suspected Darwin missing-suffix
+rewrite; actual confirmation of the mechanism and correction still requires
+an explicitly approved later Mac SHA. No remote arbitrary probe or allowlist
+change was performed by this workstream, and no MSAL/callback readiness is
+claimed from this correction.
+
 ## Non-destructive Flutter queue inspection
 
 `FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/

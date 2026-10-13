@@ -35,6 +35,9 @@ final class RuntimeDisk {
         guard root.isFileURL, maximumBytes > 0, maximumBytes <= 384 * 1_024 * 1_024 else {
             throw RuntimeStoreError.capacity
         }
+        guard root.path.hasPrefix("/"), !root.path.utf8.contains(0),
+            root.path.split(separator: "/").allSatisfy({ $0 != "." && $0 != ".." })
+        else { throw RuntimeStoreError.unsafeDiskEntry }
         var original = stat()
         if lstat(root.path, &original) == 0 {
             guard original.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else {
@@ -43,8 +46,8 @@ final class RuntimeDisk {
         } else if errno != ENOENT {
             throw RuntimeStoreError.io(errno)
         }
-        // Resolve trusted OS aliases such as iOS /var once, then walk with no-follow handles.
-        let path = root.resolvingSymlinksInPath().path
+        // Canonicalize only an existing ancestor; Foundation may rewrite a missing Darwin suffix.
+        let path = try Self.creationPath(root)
         var handle = open("/", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard handle >= 0 else { throw RuntimeStoreError.io(errno) }
         do {
@@ -79,6 +82,26 @@ final class RuntimeDisk {
         }
         self.maximumBytes = maximumBytes
         self.fault = fault
+    }
+
+    private static func creationPath(_ root: URL) throws -> String {
+        var ancestor = root
+        var missing: [String] = []
+        while true {
+            if let resolved = realpath(ancestor.path, nil) {
+                defer { free(resolved) }
+                let prefix = String(cString: resolved)
+                return ([prefix] + missing.reversed()).joined(separator: "/")
+            }
+            let failure = errno
+            guard failure == ENOENT else { throw RuntimeStoreError.io(failure) }
+            let component = ancestor.lastPathComponent
+            guard !component.isEmpty, component != "/", component != ".", component != ".." else {
+                throw RuntimeStoreError.unsafeDiskEntry
+            }
+            missing.append(component)
+            ancestor.deleteLastPathComponent()
+        }
     }
 
     deinit {
