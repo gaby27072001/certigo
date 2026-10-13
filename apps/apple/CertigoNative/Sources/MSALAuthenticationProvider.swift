@@ -51,10 +51,7 @@ final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
         }
         let account: MSALAccount
         do {
-            guard let found = try application.account(forIdentifier: identifier) else {
-                throw CIAMAuthenticationFailure.accountMissing
-            }
-            account = found
+            account = try application.account(forIdentifier: identifier)
         } catch let error as CIAMAuthenticationFailure {
             throw error
         } catch {
@@ -113,12 +110,8 @@ final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
             throw CIAMAuthenticationFailure.accountMissing
         }
         do {
-            guard let account = try application.account(forIdentifier: identifier) else {
-                throw CIAMAuthenticationFailure.accountMissing
-            }
-            guard try application.remove(account) else {
-                throw CIAMAuthenticationFailure.providerFailure
-            }
+            let account = try application.account(forIdentifier: identifier)
+            try application.remove(account)
             accountIdentifier = nil
             returnedAuthority = nil
         } catch let error as CIAMAuthenticationFailure {

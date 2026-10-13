@@ -210,8 +210,12 @@ final class RuntimeDisk {
                     certigo_file_path(directory, $0.baseAddress, $0.count)
                 }) == 0
             else { throw RuntimeStoreError.io(errno) }
+            guard let terminator = path.firstIndex(of: 0),
+                let directoryPath = String(
+                    bytes: path[..<terminator].map { UInt8(bitPattern: $0) }, encoding: .utf8)
+            else { throw RuntimeStoreError.unsafeDiskEntry }
             let name = ".tmp-\(UUID().uuidString)"
-            let url = URL(fileURLWithPath: String(cString: path), isDirectory: true)
+            let url = URL(fileURLWithPath: directoryPath, isDirectory: true)
                 .appendingPathComponent(name)
             let handle = openat(
                 directory, name,

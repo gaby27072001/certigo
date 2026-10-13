@@ -557,6 +557,29 @@ Protection/witness lifecycle, inode validation and fail-closed policy are
 unchanged. This is repository-owned interop code, not a new external dependency.
 Apple compiler/runtime evidence for these wrappers is still required.
 
+The approved `ba5d1ea8c04e78f0224e32288fc5c7dd97034e82` actual Mac attempt
+passed 114 Darwin tests and compiled the C interop/iOS RuntimeDisk branch.
+It then failed on actual MSAL 2.16.0 Swift-imported method shapes:
+`account(forIdentifier:)` is a throwing **nonoptional** account return, and
+`remove(_:)` is throwing **Void**, not a Bool success indicator. These errors
+appeared for both simulator architectures in
+`files/apple-c-interop-sdk-mac.log` of the access workstream.
+The adapter correction consumes those imported shapes directly and preserves
+typed error propagation; it does not invent an optional result, return false,
+ignore removal errors or change account/session ownership.
+Successful compilation of earlier objects is not protection execution,
+successful complete MSAL app build or a login proof. The corrected adapter
+still requires its own approved exact-SHA build.
+
+The exact public `MSALPublicClientApplication.h` declares nullable
+`accountForIdentifier:error:` and BOOL `removeAccount:error:`; Swift's NSError
+importer transforms these into throwing nonoptional-account and Void methods.
+The actual SDK compiler diagnostics, rather than a header-only guess, establish
+these imported shapes. Thrown account/removal errors still pass through the
+redacted typed mapping. The same log exposed a Swift 6.4 C-array string
+deprecation in the protection helper; the correction explicitly requires a
+NUL terminator and valid UTF-8 instead of repairing malformed path bytes.
+
 ## Non-destructive Flutter queue inspection
 
 `FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/
