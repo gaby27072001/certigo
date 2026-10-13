@@ -17,4 +17,22 @@ final class FileProtectionPolicyTests: XCTestCase {
         }
         XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(nil))
     }
+
+    func testRejectionReportsOnlyTheAttributeCategory() throws {
+        try FileProtectionPolicy.requireFirstUnlock(
+            "NSFileProtectionCompleteUntilFirstUserAuthentication" as NSString)
+        for (value, expected): (Any?, FileProtectionPolicy.Rejection) in [
+            (nil, .missingAttribute),
+            (NSNumber(value: 3), .nonstringAttribute),
+            ("NSFileProtectionNone", .differentKnownPolicy),
+            ("NSFileProtectionComplete", .differentKnownPolicy),
+            ("NSFileProtectionCompleteUnlessOpen", .differentKnownPolicy),
+            ("NSFileProtectionCompleteUntilFirstUserAuthentication\n", .unrecognizedPolicy),
+        ] {
+            XCTAssertEqual(FileProtectionPolicy.rejection(value), expected)
+            XCTAssertThrowsError(try FileProtectionPolicy.requireFirstUnlock(value)) {
+                XCTAssertEqual($0 as? FileProtectionPolicy.Rejection, expected)
+            }
+        }
+    }
 }

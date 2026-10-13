@@ -234,12 +234,14 @@ final class RuntimeDisk {
                     opened.st_dev == named.st_dev, opened.st_ino == named.st_ino
                 else { throw RuntimeStoreError.protectionWitnessIdentityMismatch }
                 try FileManager.default.setAttributes(
-                    [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                    [
+                        .protectionKey:
+                            FileProtectionType.completeUntilFirstUserAuthentication.rawValue
+                            as NSString
+                    ],
                     ofItemAtPath: url.path)
                 let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-                guard FileProtectionPolicy.isFirstUnlock(attributes[.protectionKey]) else {
-                    throw RuntimeStoreError.protectionAttributeMismatch
-                }
+                try FileProtectionPolicy.requireFirstUnlock(attributes[.protectionKey])
                 result = certigo_file_protection(handle)
                 guard result >= 0 else { throw RuntimeStoreError.io(errno) }
                 guard lstat(url.path, &named) == 0,

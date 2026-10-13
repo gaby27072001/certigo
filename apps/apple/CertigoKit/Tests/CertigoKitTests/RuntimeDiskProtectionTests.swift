@@ -5,6 +5,25 @@ import XCTest
 
 #if os(iOS)
     final class RuntimeDiskProtectionTests: XCTestCase {
+        func testFoundationProtectionSetterReadsBackExactPolicyOnEmptyFile() throws {
+            let manager = FileManager.default
+            let root = manager.temporaryDirectory.appendingPathComponent(
+                "certigo-foundation-protection-test-\(UUID().uuidString)")
+            try manager.createDirectory(at: root, withIntermediateDirectories: false)
+            defer { XCTAssertNoThrow(try manager.removeItem(at: root)) }
+            let url = root.appendingPathComponent("empty-witness")
+            XCTAssertTrue(manager.createFile(atPath: url.path, contents: Data()))
+            try manager.setAttributes(
+                [
+                    .protectionKey:
+                        FileProtectionType.completeUntilFirstUserAuthentication.rawValue as NSString
+                ],
+                ofItemAtPath: url.path)
+            let attributes = try manager.attributesOfItem(atPath: url.path)
+            try FileProtectionPolicy.requireFirstUnlock(attributes[.protectionKey])
+            XCTAssertEqual(try Data(contentsOf: url), Data())
+        }
+
         func testProtectionAttributeRepresentationsFailClosed() {
             let policy = FileProtectionType.completeUntilFirstUserAuthentication
             XCTAssertTrue(FileProtectionPolicy.isFirstUnlock(policy))
@@ -21,6 +40,14 @@ import XCTest
             XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(NSNumber(value: 3)))
             XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(policy.rawValue + "\n"))
             XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(policy.rawValue.lowercased()))
+            XCTAssertEqual(FileProtectionPolicy.rejection(nil), .missingAttribute)
+            XCTAssertEqual(
+                FileProtectionPolicy.rejection(NSNumber(value: 3)), .nonstringAttribute)
+            XCTAssertEqual(
+                FileProtectionPolicy.rejection(FileProtectionType.none),
+                .differentKnownPolicy)
+            XCTAssertEqual(
+                FileProtectionPolicy.rejection(policy.rawValue + "\n"), .unrecognizedPolicy)
         }
 
         func testProtectedDescriptorWriteRetainsFirstUnlockPolicyAndRemovesEmptyWitness() throws {

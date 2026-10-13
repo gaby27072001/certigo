@@ -705,6 +705,58 @@ ordering and witness cleanup; it is not Apple compilation or execution evidence.
 The new iOS representation regression is in the already shared
 `RuntimeDiskProtectionTests` source, so it requires no new target/project wiring.
 
+The later approved exact correction
+`92829d9dff848fb5d2bfcc7825652c4ebc9adcd6` also built unsigned successfully
+and ran five tests on a new isolated simulator. The three metadata tests and
+`testProtectionAttributeRepresentationsFailClosed` passed on Apple; the
+descriptor-write test **still failed**, now with `protectionAttributeMismatch`
+re-thrown at line 252 (`xcodebuild` exit 65). The preserved access log
+`files/apple-protection-runtime.log` was read directly. This localizes the
+rejection to Foundation attribute readback after the setter and before the
+descriptor class operations/payload write. It does not distinguish a missing
+attribute, unexpected representation or different policy: those values were
+not recorded. The representation regression passes, but the source correction
+does not establish working iOS protection. No guard is weakened or skipped.
+Access reported deletion/absence of its newly owned simulator
+`C57A0F1E-9098-4D97-84BC-08D09927D580` and removal of the temporary remote key
+and marker; the final authentication-denial receipt was still pending when this
+result was received. Further Mac execution requires a new authorized scope.
+
+### Public setter contract correction and bounded diagnostics
+
+Official Foundation documentation inspected on 2026-10-13 states that
+[`FileAttributeKey.protectionKey`](https://developer.apple.com/documentation/foundation/fileattributekey/protectionkey)
+has a corresponding **NSString** value.
+[`FileManager.setAttributes(_:ofItemAtPath:)`](https://developer.apple.com/documentation/foundation/filemanager/setattributes(_:ofitematpath:))
+“ignores any rejection of an attempted modification.” Therefore a nonthrowing
+setter cannot substitute for exact policy readback.
+The helper's setter now explicitly supplies the public first-unlock
+`rawValue as NSString`, rather than boxing the Swift struct into `Any`.
+This aligns the input with the documented Objective-C value contract; it does
+not yet prove that this input was the cause of the Apple runtime failure.
+
+Strict readback now throws one of four internal typed categories:
+`missingAttribute`, `nonstringAttribute`, `differentKnownPolicy`,
+`unrecognizedPolicy`. It records no raw string, type description or path,
+does not normalize returned values and accepts no alternative policy.
+The existing shared iOS test source adds exactly one independent
+Foundation setter/readback test on a fresh empty temporary file, using the
+same documented NSString input but no RuntimeDisk/descriptor helper.
+It retains strict expected-policy and empty-content checks and deletes only
+its generated directory. Paired with the descriptor-write test, this isolates
+whether the direct public API readback also fails in the approved runtime;
+neither outcome is inferred in advance.
+The harness now has **six tests**: three metadata, representation/category
+regression, direct Foundation empty-file readback and descriptor-write
+protection. No MSAL construction, cache or network work is added.
+Descriptor class GET/SET/exact readback before bytes, witness inode checks and
+explicit cleanup remain intact.
+This setter/diagnostic source lot passed 116 Linux XCTest tests, strict format,
+release warnings-as-errors and the five Python validator tests/source check.
+The seven original HTTP fixture blobs are unchanged. Neither the new direct
+Foundation test nor changed iOS setter has yet compiled/executed on Apple;
+the prior Apple result applies only to exact 92829, not this correction.
+
 ## Non-destructive Flutter queue inspection
 
 `FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/
