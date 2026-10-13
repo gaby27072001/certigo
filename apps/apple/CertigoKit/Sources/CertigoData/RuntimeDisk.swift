@@ -20,6 +20,8 @@ public enum RuntimeStoreError: Error, Equatable, Sendable {
     case busy
     case missingFile
     case staleActivation
+    case protectionAttributeMismatch
+    case protectionWitnessIdentityMismatch
 }
 enum RuntimeWritePoint: Sendable { case beforeRename, afterRename }
 final class RuntimeDisk {
@@ -230,20 +232,19 @@ final class RuntimeDisk {
                     opened.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
                     opened.st_nlink == 1, opened.st_size == 0,
                     opened.st_dev == named.st_dev, opened.st_ino == named.st_ino
-                else { throw RuntimeStoreError.unsafeDiskEntry }
+                else { throw RuntimeStoreError.protectionWitnessIdentityMismatch }
                 try FileManager.default.setAttributes(
                     [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                     ofItemAtPath: url.path)
                 let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-                guard
-                    attributes[.protectionKey] as? FileProtectionType
-                        == .completeUntilFirstUserAuthentication
-                else { throw RuntimeStoreError.unsafeDiskEntry }
+                guard FileProtectionPolicy.isFirstUnlock(attributes[.protectionKey]) else {
+                    throw RuntimeStoreError.protectionAttributeMismatch
+                }
                 result = certigo_file_protection(handle)
                 guard result >= 0 else { throw RuntimeStoreError.io(errno) }
                 guard lstat(url.path, &named) == 0,
                     opened.st_dev == named.st_dev, opened.st_ino == named.st_ino
-                else { throw RuntimeStoreError.unsafeDiskEntry }
+                else { throw RuntimeStoreError.protectionWitnessIdentityMismatch }
             } catch {
                 guard unlinkat(directory, name, 0) == 0 else {
                     throw RuntimeStoreError.io(errno)

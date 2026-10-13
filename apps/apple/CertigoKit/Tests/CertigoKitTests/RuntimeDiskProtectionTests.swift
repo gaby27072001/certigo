@@ -5,6 +5,24 @@ import XCTest
 
 #if os(iOS)
     final class RuntimeDiskProtectionTests: XCTestCase {
+        func testProtectionAttributeRepresentationsFailClosed() {
+            let policy = FileProtectionType.completeUntilFirstUserAuthentication
+            XCTAssertTrue(FileProtectionPolicy.isFirstUnlock(policy))
+            XCTAssertTrue(FileProtectionPolicy.isFirstUnlock(policy.rawValue))
+            XCTAssertTrue(FileProtectionPolicy.isFirstUnlock(policy.rawValue as NSString))
+            for other in [
+                FileProtectionType.none, .complete, .completeUnlessOpen,
+            ] {
+                XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(other))
+                XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(other.rawValue))
+                XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(other.rawValue as NSString))
+            }
+            XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(nil))
+            XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(NSNumber(value: 3)))
+            XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(policy.rawValue + "\n"))
+            XCTAssertFalse(FileProtectionPolicy.isFirstUnlock(policy.rawValue.lowercased()))
+        }
+
         func testProtectedDescriptorWriteRetainsFirstUnlockPolicyAndRemovesEmptyWitness() throws {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent(
                 "certigo-protection-test-\(UUID().uuidString)")
@@ -16,9 +34,7 @@ import XCTest
             let url = root.appendingPathComponent(name)
             XCTAssertEqual(try Data(contentsOf: url), bytes)
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-            XCTAssertEqual(
-                attributes[.protectionKey] as? FileProtectionType,
-                .completeUntilFirstUserAuthentication)
+            XCTAssertTrue(FileProtectionPolicy.isFirstUnlock(attributes[.protectionKey]))
             XCTAssertEqual(
                 Set(try FileManager.default.contentsOfDirectory(atPath: root.path)),
                 Set([".lock", name]))

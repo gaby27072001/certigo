@@ -534,7 +534,8 @@ numeric fallback or simulator-only bypass exists.
 A separately invoked read-only targeted reviewer found no significant helper/
 lifecycle issues, not Apple execution proof. An iOS-only focused test checks
 the written blob's first-unlock attribute, bytes and absence of witness files;
-it is deliberately not counted in Linux/macOS tests and remains unexecuted.
+it is deliberately not counted in Linux/macOS tests and was unexecuted
+at this source milestone (see the later isolated harness result below).
 Actual iOS compile/protection semantics, including lock/reboot/device behavior,
 still require the next approved exact candidate and real Apple tests.
 
@@ -649,6 +650,60 @@ stop and report the gate; do not add those or skip failures into success.
 Built-plist inspection, simulator creation/boot/install/execution and cleanup
 are separate permission scopes. The temporary access from the prior lot was
 removed; this source preparation does not reuse it.
+
+### Later retained artifact and isolated harness evidence (2026-10-13)
+
+The preserved access log `files/apple-noauth-evidence-corrected.log` attributes
+the retained artifact to exact `a32fe16d76f44cf26678070c652f26ed40854685`.
+The built DEV bundle identifier is `com.certigo.native.dev`, with exactly the
+singleton callback scheme `msauth.com.certigo.native.dev`. All three pinned
+dependencies passed identity, URL, version and revision checks. The source
+lock at a32 and retained lock are byte-identical, both SHA-256
+`bdd47caeafeeaece3a223b7e70a9a77cd1598fb5240322f4847469e2d3ff13e4`.
+MSAL framework presence is confirmed; artifact metadata is absent and a
+Mac ZIP checksum is **not proved**. A framework hash is not a ZIP checksum.
+These reads do not prove installed callback ownership/delivery or live
+registration, nor SDK construction/cache behavior.
+
+The approved `1272233cb85b6bebefe95597fb7f7f8aae5041f4` harness actually
+built unsigned (`TEST BUILD SUCCEEDED`), produced the distinct no-auth bundle
+with no callbacks, and ran on a newly created isolated simulator. Its three
+metadata tests passed; the protection test **failed** with `unsafeDiskEntry`
+re-thrown at the witness helper's catch site. The preserved
+`files/apple-noauth-runtime.log` does not distinguish the inode and attribute
+guards, so the precise failing guard is not claimed from that line alone.
+The final result was four tests, one failure, `xcodebuild` exit 65.
+Access confirmed deletion/absence of the sole newly owned simulator UUID
+`F990D430-691D-4306-90A0-197DFA8D627F`, removal of the authorized key,
+authentication denial (255), deletion of local keys and cleared automation.
+That access scope is consumed, not reusable for a correction SHA.
+
+The bounded next correction addresses an actual representation assumption:
+`FileManager`'s `[FileAttributeKey: Any]` dictionary can supply the Objective-C
+extensible string enum as String/NSString, not a Swift `FileProtectionType`
+struct. The shared policy check accepts the typed first-unlock policy or
+**exactly its public raw string value**; it rejects absent/nonstring values,
+other/weaker policies and trailing bytes. iOS compares against the public
+`FileProtectionType` raw value, never a numeric class guess.
+The protection test uses that same strict semantic readback rather than an
+unconditional struct cast. A portable regression checks NSString/String
+bridging and rejected alternatives; the iOS typed-policy regression remains
+platform-specific.
+
+Distinct typed errors now identify attribute-policy versus witness-identity
+rejection without paths, values, credentials or ignored failures. The original
+setter, inode checks, descriptor class get/set/readback and explicit cleanup
+are unchanged. Simulator correctness of this correction and the original
+failure's exact guard still require an approved later retry; no test is skipped
+or transformed into success.
+Portable validation of this correction passed 115 Linux XCTest tests, strict
+Swift formatting and release build with warnings as errors, plus the existing
+five Python validator tests and source metadata check. The seven HTTP fixture
+blobs remain identical to their original source. Direct bounded review checked
+exact enum/string matching, unchanged no-follow/inode/descriptor-before-write
+ordering and witness cleanup; it is not Apple compilation or execution evidence.
+The new iOS representation regression is in the already shared
+`RuntimeDiskProtectionTests` source, so it requires no new target/project wiring.
 
 ## Non-destructive Flutter queue inspection
 
