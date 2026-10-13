@@ -183,4 +183,23 @@ final class FlutterQueueDryRunTests: XCTestCase {
         XCTAssertTrue(
             try XCTUnwrap(inspect(retained).entries.first).issues.contains(.unsupportedEntry))
     }
+
+    func testMatchingPinsWithTrailingTerminatorsAreStillInvalid() throws {
+        let pin = "sha256:" + String(repeating: "a", count: 64)
+        for suffix in ["\\n", "\\r\\n", "\\r"] {
+            let changed = entry.replacingOccurrences(of: "\(pin)\"", with: "\(pin)\(suffix)\"")
+            let value = try XCTUnwrap(inspect(changed).entries.first)
+            XCTAssertTrue(value.issues.contains(.missingManifest))
+            XCTAssertFalse(value.issues.contains(.manifestMismatch))
+        }
+    }
+
+    func testUTCTimestampsWithTrailingTerminatorsAreInvalidRatherThanPartiallyMatched() throws {
+        for suffix in ["\\n", "\\r\\n", "\\r"] {
+            let changed = entry.replacingOccurrences(
+                of: "2026-10-01T12:00:00.123456Z\"", with: "2026-10-01T12:00:00.123456Z\(suffix)\"")
+            XCTAssertTrue(
+                try XCTUnwrap(inspect(changed).entries.first).issues.contains(.malformedEntry))
+        }
+    }
 }

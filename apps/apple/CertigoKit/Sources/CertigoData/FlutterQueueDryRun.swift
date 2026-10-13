@@ -143,7 +143,10 @@ public enum FlutterQueueReader {
     }
 
     private static func validManifest(_ value: String?) -> Bool {
-        value?.range(of: "^sha256:[0-9a-f]{64}$", options: .regularExpression) != nil
+        guard let value, value.utf8.count == 71, value.hasPrefix("sha256:") else { return false }
+        return value.dropFirst(7).utf8.allSatisfy {
+            (48...57).contains($0) || (97...102).contains($0)
+        }
     }
 
     private static func validOptionalString(_ value: Any?) -> Bool {
@@ -165,7 +168,7 @@ public enum FlutterQueueReader {
     private static func validDate(_ value: Any?) -> Bool {
         guard let text = value as? String,
             text.range(
-                of: #"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?Z$"#,
+                of: #"\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?Z\z"#,
                 options: .regularExpression) != nil
         else { return false }
         let formatter = ISO8601DateFormatter()

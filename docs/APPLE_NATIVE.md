@@ -417,3 +417,93 @@ created dates; they are **not used** to re-encode this legacy data. Real iOS
 SharedPreferences prefix/domain, same-bundle access, Keychain access group,
 SDK/account changes and restart/rollback tests require Apple/bundle evidence.
 No existing account or real preference data was accessed by these synthetic tests.
+
+The independent targeted dry-run review identified one real classification bug:
+ICU `$` can match before a final line terminator, admitting equally malformed
+pins. Pins now require exact UTF-8 length/prefix/hex bytes and timestamps use
+absolute string anchors. Tests cover matching pins and UTC dates with LF/CRLF/CR
+terminators. The reviewer read only the dry-run source/tests and underlying Dart
+queue formats and ran an ICU probe, not the Swift suite or Apple SDK.
+
+### Source-only storage/bundle evidence
+
+Observation on 2026-10-13, bounded to the repository sources and these exact
+locked package archives; re-evaluate after bundle, plugin, build-config or storage
+changes. The published archive SHA-256 values were downloaded and matched to
+`apps/mobile/pubspec.lock`; no plugin was installed, executed or copied into
+application code:
+
+| Package | Locked version | Archive SHA-256 | Lock reference |
+|---|---|---|---|
+| `shared_preferences` | 2.5.5 | `c3025c5534b01739267eb7d76959bbc25a6d10f6988e1c2a3036940133dd10bf` | `pubspec.lock:707-714` |
+| `shared_preferences_foundation` | 2.5.6 | `4e7eaffc2b17ba398759f1151415869a34771ba11ebbccd1b0145472a619a64f` | `pubspec.lock:723-730` |
+| `flutter_secure_storage` | 9.2.4 | `9cad52d75ebc511adfae3d447d5d13da15a55a92c9410e50f67335b6d21d16ea` | `pubspec.lock:272-279` |
+
+Published version/source references:
+[preferences 2.5.5](https://pub.dev/api/packages/shared_preferences/versions/2.5.5),
+[foundation 2.5.6](https://pub.dev/api/packages/shared_preferences_foundation/versions/2.5.6),
+[secure storage 9.2.4](https://pub.dev/api/packages/flutter_secure_storage/versions/9.2.4).
+Each response supplies the verified archive URL/hash; the member paths/line
+references below refer to those exact archives, not an unpinned current branch.
+
+**Preferences.** Bootstrap uses legacy `SharedPreferences.getInstance`
+(`apps/mobile/lib/bootstrap/bootstrap.dart:78,109`) and the repo contains no
+`setPrefix` override. The locked Dart implementation's
+`lib/src/shared_preferences_legacy.dart:22,172-186,259-264` applies/strips
+`flutter.`. Therefore the source-derived physical queue key is
+`flutter.certigo.sync.queue.v1`, and quarantine keys are prefixed similarly.
+The foundation member
+`darwin/shared_preferences_foundation/Sources/shared_preferences_foundation/SharedPreferencesPlugin.swift:40-45,58-64,87-107,149-169`
+uses standard defaults for legacy writes and, for enumeration, the main bundle's
+persistent domain with default (nil-suite) options. This is **not** the new
+`SharedPreferencesAsync` or app-group suite path.
+
+**Bundle boundary.** Flutter's checked-in Debug/Profile/Release identifiers are
+`com.certigo.mobileapp`
+(`apps/mobile/ios/Runner.xcodeproj/project.pbxproj:375,554,576`); its Info.plist
+derives `CFBundleIdentifier` from that build setting and declares the `certigo`
+callback (`apps/mobile/ios/Runner/Info.plist:12,29-32`). The unsigned native
+development project instead uses `com.certigo.native.dev`
+(`apps/apple/CertigoNative/CertigoNative.xcodeproj/project.pbxproj:131,151`).
+Neither tree has a checked-in entitlements file or a `CODE_SIGN_ENTITLEMENTS`
+setting in the inspected projects. This does not prove deployed entitlements,
+Team ID, access groups, an App Store identity or a build-time override.
+The development bundle does not gain access to the Flutter default domain merely
+by naming it. Same-bundle replacement and sandbox/update continuity remain
+unproven until actual Apple update-build/device tests; do not change identities to
+manufacture access.
+
+**Keychain.** `apps/mobile/lib/features/auth/application/session_store.dart:23-62`
+sets only `first_unlock_this_device`, stores `certigo.session.v1`, and reads
+`certigo.session.signed_out.v1` **first**, treating exact `true` as a tombstone.
+Clear writes that tombstone before attempting deletion; a retained old session
+must not be resurrected if deletion failed. The locked plugin's
+`lib/options/apple_options.dart:27-37,60-67` and `ios_options.dart:5-15`
+default the confusingly named `accountName` option to **service**
+`flutter_secure_storage_service`, `groupId` to nil and synchronizable to false.
+Actual `ios/Classes/SwiftFlutterSecureStoragePlugin.swift:84-92,173-191`
+passes those options to the storage manager;
+`ios/Classes/FlutterSecureStorage.swift:11-54` maps the storage key to
+`kSecAttrAccount`, option accountName to `kSecAttrService`, and an explicitly
+provided groupId to `kSecAttrAccessGroup`. Accessibility is
+`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`. No explicit group means
+default **signed** access, not an empty group or proven cross-bundle access.
+The plugin read path considers synchronizable variants (`:118-141`); do not
+assume a future bridge should read only one variant based on the write default.
+
+Native `CredentialVault.swift:17-20,36-41` uses a completely different development
+service/account (`com.certigo.native.dev.session` / `developer-connection`) and
+`WhenUnlockedThisDeviceOnly`. It is not a legacy session bridge or MSAL cache.
+The old `AuthSession` JSON includes tokens and display claims; source decoding
+can derive a user identifier from unvalidated token claims
+(`auth_state.dart:146-202`). A bridge must not promote those claims to authoritative
+owner mapping: validate through the API and honor the tombstone before any token
+handling. No actual session item or credential was read.
+
+**API provenance.** `packages/core/lib/src/app_env.dart:14-38` chooses flavor and
+API URL through compile-time defines with a development default. The queue
+`sync_action.dart:135-166` does not record an API URL; current build config,
+installed bundle or a decoded token cannot establish every retained entry's
+historical environment. Do not invent per-entry evidence from those defaults.
+Runtime cache/draft migration, signed entitlement inspection and synthetic
+Flutter-install-to-native-update persistence tests remain separate future gates.
