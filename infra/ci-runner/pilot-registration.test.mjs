@@ -117,3 +117,13 @@ test('operator requires explicit repository and applies same guard before token 
   assert.match(operator, /\$registerScript = \$repositoryGuard \+ \$registerScript/);
   assert.match(operator, /\$pilot\[0\]\.status -eq 'offline'/);
 });
+
+test('held verification requires explicit nonbusy state and never deletes a drifted registration', () => {
+  const operator = fs.readFileSync(new URL('./register-pilot.ps1', import.meta.url), 'utf8');
+  const verification = operator.slice(operator.indexOf('$deadline = (Get-Date).AddMinutes(3)'));
+  assert.match(verification, /PSObject\.Properties\['busy'\]/);
+  assert.match(verification, /\$busyProperty\.Value -isnot \[bool\]/);
+  assert.match(verification, /busy=false; do not activate or deallocate/);
+  assert.doesNotMatch(verification, /'--method', 'DELETE'/);
+  assert.match(verification, /Removal requires separate authorization/);
+});

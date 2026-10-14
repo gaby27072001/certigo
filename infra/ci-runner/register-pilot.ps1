@@ -307,13 +307,7 @@ do {
     $pilot = @($ownRunners | Where-Object { (@($_.labels.name) -join ',') -eq $drillLabel })
     $unexpected = @($ownRunners | Where-Object { (@($_.labels.name) -join ',') -ne $drillLabel })
     if ($unexpected.Count -gt 0) {
-      # A drill runner with any other label could pick up a real job: remove it before failing.
-      foreach ($runner in $unexpected) {
-        $null = Invoke-NativeText -FilePath 'gh' -ArgumentList @(
-          'api', '--method', 'DELETE', "repos/$Repository/actions/runners/$($runner.id)"
-        )
-      }
-      throw "The drill runner registered with labels other than exactly '$drillLabel'; it was removed."
+      throw "The held drill runner has labels other than exactly '$drillLabel'; do not activate it. Removal requires separate authorization."
     }
   }
   else {
@@ -326,8 +320,18 @@ do {
       }
     }
   }
-  if ($pilot.Count -eq 1 -and $pilot[0].status -eq 'offline') {
-    break
+  if ($pilot.Count -eq 1) {
+    $busyProperty = $pilot[0].PSObject.Properties['busy']
+    if (
+      $null -eq $busyProperty -or
+      $busyProperty.Value -isnot [bool] -or
+      $busyProperty.Value
+    ) {
+      throw 'The held runner must explicitly report busy=false; do not activate or deallocate it.'
+    }
+    if ($pilot[0].status -eq 'offline') {
+      break
+    }
   }
   if ((Get-Date) -ge $deadline) {
     throw 'The newly registered PR-only runner was not verified held offline.'

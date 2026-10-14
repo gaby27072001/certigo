@@ -211,6 +211,17 @@ des jobs : le maintien offline repose sur l'absence de listener/service et la
 vérification GitHub. Une activation ultérieure nécessite sa propre approbation,
 un nouveau contrôle isolation/destination/labels et une procédure de drain.
 Ce lot ne fournit aucune activation live ni preuve de confiance du guest.
+Le readback doit rapporter explicitement `busy=false` et `offline`; un champ
+absent, mal formé ou `busy=true` bloque toute activation/désallocation.
+Une dérive des labels de drill n'autorise plus la suppression automatique :
+l'inscription reste à inspecter, et son retrait nécessite une autorisation.
+
+Ne pas utiliser `idle-shutdown.sh` comme procédure de drain sans interruption
+pour cette restauration bornée : son contrat historique arrête les services
+et peut éteindre la machine malgré un worker encore présent après le délai.
+Une activation future exige une méthode d'admission/drain distincte vérifiée ;
+ni le readback `busy=false` seul ni `--disableupdate` ne ferme la course
+d'attribution des jobs. Le maintien offline est le seul état préparé ici.
 
 Ce preflight ne reçoit aucun token. Son succès vérifie dans cet ordre : cloud-init terminé, service
 iptables actif, IMDS inaccessible, outils/egress publics sains et absence de `.runner`.
