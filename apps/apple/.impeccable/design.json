@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-14T17:18:16+01:00",
+  "title": "Design System: Certigo Apple",
+  "extensions": {
+    "typographyMeta": {
+      "display": {
+        "displayName": "Apple system display",
+        "purpose": "SwiftUI largeTitle, with Dynamic Type."
+      },
+      "body": {
+        "displayName": "Apple system body",
+        "purpose": "SwiftUI semantic text styles, never fixed-point CSS."
+      }
+    },
+    "motion": [],
+    "shadows": [],
+    "breakpoints": []
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "Prism, native to Apple.",
+    "rules": [
+      "System controls own material and depth; exercises remain opaque.",
+      "Synthetic demo state must never appear to be production progress."
+    ]
+  }
+}
