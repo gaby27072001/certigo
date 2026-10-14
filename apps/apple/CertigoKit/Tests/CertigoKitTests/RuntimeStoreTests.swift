@@ -12,7 +12,10 @@ struct RuntimeFixture {
     let snapshot: RuntimeContentSnapshot
     let files: [Data]
 
-    init(version: Int = 0, owner: String = "owner-A", apiScope: String = "https://certigo.test/api")
+    init(
+        version: Int = 0, owner: String = "owner-A",
+        apiScope: String = "https://certigo.test/api", secondItemType: String? = nil
+    )
         throws
     {
         let root = try XCTUnwrap(Bundle.module.url(forResource: "Fixtures", withExtension: nil))
@@ -26,9 +29,17 @@ struct RuntimeFixture {
                 withJSONObject: question, options: [.sortedKeys, .withoutEscapingSlashes])
             first.append(0x0A)
         }
-        let second = try Data(
+        var second = try Data(
             contentsOf: root.appendingPathComponent(
                 "apple-compat/v1/supported/question-v4-mcq.json"))
+        if let secondItemType {
+            var question = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: second) as? [String: Any])
+            question["itemType"] = secondItemType
+            second = try JSONSerialization.data(
+                withJSONObject: question, options: [.sortedKeys, .withoutEscapingSlashes])
+            second.append(0x0A)
+        }
         files = [first, second]
         let bytes = try Data(contentsOf: root.appendingPathComponent("runtime/manifest-v3.json"))
         var object = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes) as? [String: Any])

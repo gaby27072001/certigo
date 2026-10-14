@@ -7,6 +7,19 @@ import XCTest
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
+private final class ActivationWriteFailure: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stateWrites = 0
+
+    func check(_ point: RuntimeWritePoint, _ name: String) throws {
+        guard point == .beforeRename, name == "state.json" else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        stateWrites += 1
+        // An existing archive writes staging first, then the activation pointer.
+        if stateWrites == 2 { throw URLError(.cannotWriteToFile) }
+    }
+}
 private actor RuntimeTransport: BoundedHTTPTransport {
     private var fixture: RuntimeFixture
     private var failingIndex: Int?
@@ -67,6 +80,273 @@ private actor RuntimeTransport: BoundedHTTPTransport {
 }
 @MainActor
 final class RuntimeClientTests: XCTestCase {
+    func testVerifiedMCQPendingRestartAndPinnedReplayOnlyUseServerFeedback() async throws {
+        let root = temporaryRoot()
+        defer { XCTAssertNoThrow(try FileManager.default.removeItem(at: root)) }
+        let initial = try RuntimeFixture()
+        let source = RuntimeTransport(initial)
+        let server = RoutingTransport()
+        let api = try CertigoAPI(
+            baseURL: XCTUnwrap(URL(string: initial.snapshot.apiScope)), transport: server)
+        let cacheRoot = root.appendingPathComponent("cache")
+        let queueFile = root.appendingPathComponent("outbox.json")
+        let cache = try RuntimeContentStore(root: cacheRoot)
+        let client = LearningClient(
+            api: api, store: SubmissionStore(file: queueFile),
+            runtimeStore: cache, runtimeTransport: source)
+        _ = try await client.connect(accessToken: "synthetic-only")
+        let active = try await client.synchronizePublicContent()
+        let file = active.manifest.files[1]
+        let bytes = try XCTUnwrap(cache.cachedFile(file))
+        let question = try CanonicalQuestionReader.decode(bytes)
+        try question.requireBasicCapability()
+        guard case .identified(let options) = question.options else {
+            return XCTFail("Expected public identified MCQ options")
+        }
+        let selected = try XCTUnwrap(options.first?.id)
+        let request = QuizSubmission(
+            clientAttemptId: "602c351a-19c0-44c9-99da-1a0d8c9b43c3",
+            trackId: question.metadata.certification,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            answers: [
+                QuizAnswer(
+                    itemId: question.id, itemType: question.itemType,
+                    selected: [selected], latencyMs: 321)
+            ],
+            publicManifestId: active.manifest.manifestId)
+        await server.setOffline(true)
+        let pending = try await client.submit(
+            lessonId: "synthetic-bank-session", submission: request)
+        XCTAssertEqual(pending, .pendingCorrection)
+        let pendingEntries = try await client.savedSubmissions()
+        let saved = try XCTUnwrap(pendingEntries.first)
+        XCTAssertEqual(saved.status, .pendingCorrection)
+        XCTAssertNil(saved.result)
+        XCTAssertEqual(saved.submission, request)
+        await client.disconnect()
+
+        let reopenedCache = try RuntimeContentStore(root: cacheRoot)
+        let restarted = LearningClient(
+            api: api, store: SubmissionStore(file: queueFile),
+            runtimeStore: reopenedCache, runtimeTransport: source)
+        _ = try await restarted.connect(accessToken: "synthetic-only")
+        let restored = try await restarted.savedSubmissions()
+        XCTAssertEqual(restored, [saved])
+        let restoredContent = try await restarted.cachedPublicContent()
+        XCTAssertEqual(restoredContent?.binding, active.binding)
+        XCTAssertEqual(try reopenedCache.cachedFile(file), bytes)
+        await server.setOwner("owner-B")
+        _ = try await restarted.connect(accessToken: "synthetic-B")
+        let otherQueue = try await restarted.savedSubmissions()
+        XCTAssertTrue(otherQueue.isEmpty)
+        let otherContent = try await restarted.cachedPublicContent()
+        XCTAssertNil(otherContent)
+        do {
+            _ = try await restarted.retry(attemptId: request.clientAttemptId)
+            XCTFail("Another owner replayed the pending attempt")
+        } catch { XCTAssertEqual(error as? StoreError, .invalidRecord) }
+        await server.setOwner("owner-A")
+        _ = try await restarted.connect(accessToken: "synthetic-A")
+        let next = try RuntimeFixture(version: 1)
+        await source.setFixture(next)
+        _ = try await restarted.synchronizePublicContent()
+        XCTAssertTrue(
+            try reopenedCache.retainedPins().contains(
+                RuntimeManifestPin(
+                    ownerId: saved.ownerId, apiScope: saved.apiScope,
+                    manifestId: active.manifest.manifestId)))
+
+        var response = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: fixture("result")) as? [String: Any])
+        var results = try XCTUnwrap(response["results"] as? [[String: Any]])
+        results[0]["itemId"] = question.id
+        results[0]["correct"] = false
+        results[0]["correctAnswer"] = [try XCTUnwrap(options.dropFirst().first?.id)]
+        results[0]["explanation"] = "Synthetic authoritative feedback after replay only."
+        response["results"] = results
+        response["scorePct"] = 0
+        let responseBytes = try JSONSerialization.data(withJSONObject: response)
+        await server.setResult(responseBytes)
+        await server.setOffline(false)
+        let corrected = try await restarted.retry(attemptId: request.clientAttemptId)
+        guard case .corrected(let result) = corrected else {
+            return XCTFail("Mock server did not correct the pending attempt")
+        }
+        XCTAssertEqual(result.scorePct, 0)
+        XCTAssertFalse(try XCTUnwrap(result.results.first).correct)
+        XCTAssertEqual(
+            result.results.first?.explanation,
+            "Synthetic authoritative feedback after replay only.")
+        let payloads = await server.posts()
+        XCTAssertEqual(payloads.count, 2)
+        XCTAssertEqual(payloads[0], payloads[1])
+        let wire = try CertigoAPI.decoder().decode(QuizSubmission.self, from: payloads[1])
+        XCTAssertEqual(wire, request)
+        let finalQueue = try await SubmissionStore(file: queueFile).entries(
+            ownerId: saved.ownerId, apiScope: saved.apiScope)
+        XCTAssertEqual(finalQueue.first?.result, result)
+        let repeatResult = try await restarted.retry(attemptId: request.clientAttemptId)
+        XCTAssertEqual(repeatResult, corrected)
+        let afterRepeat = await server.posts()
+        XCTAssertEqual(afterRepeat.count, 2)
+    }
+
+    func testLogoutDuringReleaseFetchCannotPublishOrActivateCandidate() async throws {
+        let root = temporaryRoot()
+        defer { XCTAssertNoThrow(try FileManager.default.removeItem(at: root)) }
+        let fixture = try RuntimeFixture()
+        let source = RuntimeTransport(fixture)
+        let api = try CertigoAPI(
+            baseURL: XCTUnwrap(URL(string: fixture.snapshot.apiScope)),
+            transport: RoutingTransport())
+        let cache = try RuntimeContentStore(root: root.appendingPathComponent("cache"))
+        let client = LearningClient(
+            api: api, store: SubmissionStore(file: root.appendingPathComponent("outbox.json")),
+            runtimeStore: cache, runtimeTransport: source)
+        _ = try await client.connect(accessToken: "synthetic-only")
+        _ = try await client.synchronizePublicContent()
+        await source.setFixture(try RuntimeFixture(version: 1))
+        await source.pauseNextFile()
+        let request = Task { try await client.synchronizePublicContent() }
+        try await waitForSuspension(source)
+        await client.disconnect()
+        await source.resume()
+        do {
+            _ = try await request.value
+            XCTFail("Logged-out candidate published")
+        } catch { XCTAssertEqual(error as? APIError, .staleSession) }
+        do {
+            _ = try await client.cachedPublicContent()
+            XCTFail("Logged-out content exposed")
+        } catch { XCTAssertEqual(error as? APIError, .unauthorized) }
+        XCTAssertEqual(
+            try cache.active(ownerId: "owner-A", apiScope: api.scope)?.binding,
+            fixture.snapshot.binding)
+    }
+
+    func testInterruptedReplacementKeepsActiveAndPreviousAcrossRestart() async throws {
+        let root = temporaryRoot()
+        defer { XCTAssertNoThrow(try FileManager.default.removeItem(at: root)) }
+        let first = try RuntimeFixture()
+        let source = RuntimeTransport(first)
+        let api = try CertigoAPI(
+            baseURL: XCTUnwrap(URL(string: first.snapshot.apiScope)), transport: RoutingTransport())
+        let cacheRoot = root.appendingPathComponent("cache")
+        let queueFile = root.appendingPathComponent("outbox.json")
+        let client = LearningClient(
+            api: api, store: SubmissionStore(file: queueFile),
+            runtimeStore: try RuntimeContentStore(root: cacheRoot), runtimeTransport: source)
+        _ = try await client.connect(accessToken: "synthetic-only")
+        _ = try await client.synchronizePublicContent()
+        let second = try RuntimeFixture(version: 1)
+        await source.setFixture(second)
+        _ = try await client.synchronizePublicContent()
+        let candidate = try RuntimeFixture(version: 2)
+        await source.setFixture(candidate)
+        await source.fail(0)
+        do {
+            _ = try await client.synchronizePublicContent()
+            XCTFail("Interrupted candidate activated")
+        } catch {
+            XCTAssertEqual(error as? APIError, .transport(URLError.notConnectedToInternet.rawValue))
+        }
+        let reopened = try RuntimeContentStore(root: cacheRoot)
+        XCTAssertEqual(
+            try reopened.active(ownerId: "owner-A", apiScope: api.scope)?.binding,
+            second.snapshot.binding)
+        XCTAssertEqual(
+            try reopened.previous(ownerId: "owner-A", apiScope: api.scope)?.binding,
+            first.snapshot.binding)
+        let restarted = LearningClient(
+            api: api, store: SubmissionStore(file: queueFile),
+            runtimeStore: reopened, runtimeTransport: source)
+        _ = try await restarted.connect(accessToken: "synthetic-only")
+        await source.fail(nil)
+        let activated = try await restarted.synchronizePublicContent()
+        XCTAssertEqual(activated.binding, candidate.snapshot.binding)
+        XCTAssertEqual(
+            try reopened.previous(ownerId: "owner-A", apiScope: api.scope)?.binding,
+            second.snapshot.binding)
+    }
+
+    func testUnsupportedCandidateFailsStagingWithoutReplacingReleaseOrChangingQueue() async throws {
+        let root = temporaryRoot()
+        defer { XCTAssertNoThrow(try FileManager.default.removeItem(at: root)) }
+        let supported = try RuntimeFixture()
+        let source = RuntimeTransport(supported)
+        let api = try CertigoAPI(
+            baseURL: XCTUnwrap(URL(string: supported.snapshot.apiScope)),
+            transport: RoutingTransport())
+        let cache = try RuntimeContentStore(root: root.appendingPathComponent("cache"))
+        let client = LearningClient(
+            api: api, store: SubmissionStore(file: root.appendingPathComponent("outbox.json")),
+            runtimeStore: cache, runtimeTransport: source)
+        _ = try await client.connect(accessToken: "synthetic-only")
+        _ = try await client.synchronizePublicContent()
+        let unsupported = try RuntimeFixture(version: 1, secondItemType: "spotTheIssue")
+        await source.setFixture(unsupported)
+        do {
+            _ = try await client.synchronizePublicContent()
+            XCTFail("Unsupported exercise activated as MCQ")
+        } catch {
+            XCTAssertEqual(
+                error as? CanonicalContentError, .unsupportedCapability("itemType:spotTheIssue"))
+        }
+        let active = try await client.cachedPublicContent()
+        XCTAssertEqual(active?.binding, supported.snapshot.binding)
+        XCTAssertNil(try cache.cachedFile(unsupported.snapshot.manifest.files[1]))
+        let saved = try await client.savedSubmissions()
+        XCTAssertTrue(saved.isEmpty)
+    }
+
+    func testActivationPointerWriteFailureKeepsActiveAndPreviousForRestartedClient() async throws {
+        let root = temporaryRoot()
+        defer { XCTAssertNoThrow(try FileManager.default.removeItem(at: root)) }
+        let first = try RuntimeFixture()
+        let second = try RuntimeFixture(version: 1)
+        let candidate = try RuntimeFixture(version: 2)
+        let cacheRoot = root.appendingPathComponent("cache")
+        let initial = try RuntimeContentStore(root: cacheRoot)
+        try first.activate(initial)
+        try second.activate(initial)
+        let failure = ActivationWriteFailure()
+        let interrupted = try RuntimeContentStore(root: cacheRoot, fault: failure.check)
+        let source = RuntimeTransport(candidate)
+        let api = try CertigoAPI(
+            baseURL: XCTUnwrap(URL(string: first.snapshot.apiScope)), transport: RoutingTransport())
+        let queueFile = root.appendingPathComponent("outbox.json")
+        let client = LearningClient(
+            api: api, store: SubmissionStore(file: queueFile),
+            runtimeStore: interrupted, runtimeTransport: source)
+        _ = try await client.connect(accessToken: "synthetic-only")
+        do {
+            _ = try await client.synchronizePublicContent()
+            XCTFail("Uncommitted activation returned success")
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .cannotWriteToFile)
+        }
+        let reopened = try RuntimeContentStore(root: cacheRoot)
+        XCTAssertEqual(
+            try reopened.active(ownerId: "owner-A", apiScope: api.scope)?.binding,
+            second.snapshot.binding)
+        XCTAssertEqual(
+            try reopened.previous(ownerId: "owner-A", apiScope: api.scope)?.binding,
+            first.snapshot.binding)
+        XCTAssertEqual(
+            try reopened.cachedFile(candidate.snapshot.manifest.files[0]), candidate.files[0])
+        let restarted = LearningClient(
+            api: api, store: SubmissionStore(file: queueFile),
+            runtimeStore: reopened, runtimeTransport: source)
+        _ = try await restarted.connect(accessToken: "synthetic-only")
+        let visible = try await restarted.cachedPublicContent()
+        XCTAssertEqual(visible?.binding, second.snapshot.binding)
+        let activated = try await restarted.synchronizePublicContent()
+        XCTAssertEqual(activated.binding, candidate.snapshot.binding)
+        XCTAssertEqual(
+            try reopened.previous(ownerId: "owner-A", apiScope: api.scope)?.binding,
+            second.snapshot.binding)
+    }
+
     func testInterruptedDownloadResumesWithVerifiedCASWithoutActivatingPartialRelease() async throws
     {
         let root = temporaryRoot()

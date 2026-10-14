@@ -13,6 +13,7 @@ actor RoutingTransport: HTTPTransport {
     var postPayloads: [Data] = []
     var profileWaiter: CheckedContinuation<Void, Never>?
     var pauseProfile = false
+    private var resultBody: Data?
 
     func setOwner(_ value: String) { owner = value }
     func setOffline(_ value: Bool) { offline = value }
@@ -23,6 +24,7 @@ actor RoutingTransport: HTTPTransport {
     }
     func isWaiting() -> Bool { profileWaiter != nil }
     func posts() -> [Data] { postPayloads }
+    func setResult(_ body: Data) { resultBody = body }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let body: Data
@@ -30,7 +32,7 @@ actor RoutingTransport: HTTPTransport {
             postCount += 1
             postPayloads.append(request.httpBody!)
             if offline { throw URLError(.notConnectedToInternet) }
-            body = try fixture("result")
+            body = try resultBody ?? fixture("result")
         } else {
             let capturedOwner = owner
             if pauseProfile {

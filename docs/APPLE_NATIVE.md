@@ -275,28 +275,36 @@ new endpoint, private payload, auth setting or release/signing workflow was used
 
 ## Remaining gates before a user pilot
 
-### Next source-only vertical slice
+### Synthetic package vertical slice
 
-Prepare the runtime composition seam before activating authentication or a
-live release. `NativeModel.connect()` currently creates `LearningClient` with
-the API and submission store only; the development runtime remains disabled.
-The next bounded source lot should compose the existing public-content runtime
-with an explicitly injected synthetic connection/store and fixtures, without
-instantiating MSAL, reading its cache, calling Graph or changing signing.
-Keep the live developer composition disabled until its separate activation
-gate is satisfied; do not introduce a token or production endpoint default.
+The source-only integration tests compose the existing `LearningClient`,
+`RuntimeContentStore` and `SubmissionStore` through their existing injected
+transports. They use public compatibility question fixtures, a hash-bound
+synthetic manifest, temporary storage and in-memory HTTP responses. There is
+no new public interface, cache, scorer, dependency or live endpoint. No MSAL
+instance/cache, Graph call, signing or installed-app action is involved.
+`NativeModel.connect()` still creates `LearningClient` with only its API and
+submission store; the live development runtime remains disabled.
 
-Exit criteria: a synthetic owner loads a supported public lesson from a
-verified pinned release, completes an MCQ, persists an ungraded pending attempt,
-restarts without changing its owner/attempt/release identity, and receives only
-mock-server-authorized feedback after replay. Test owner changes and logout
-during a fetch, interrupted activation preserving the previous release, and
-unsupported capabilities failing explicitly. Reuse the existing runtime and
-submission coordination rather than creating another cache or scoring engine.
-Start with package-level synthetic tests; any SwiftUI or Apple build/runtime
-validation remains a separate approved execution. This is a proposed source
-lot, not an enabled runtime, a new public interface decision, or a completed
-authentication/migration gate.
+The tested journey reads an identified public MCQ from verified cache bytes,
+uses a synthetic question-bank session (not an authored guided lesson), saves
+an ungraded pending attempt, and reopens both durable stores. Owner, request
+bytes, attempt ID, release binding and manifest pin survive restart and active
+release rotation. Another owner cannot see/replay that attempt. Only the
+mock server's POST response supplies the eventual verdict and explanation;
+repeating a corrected retry makes no additional POST. This is synthetic
+contract integration, not a claim that these fixtures form a live lesson.
+
+Related tests reject an old owner's fetch, reject publication after logout,
+preserve active/previous pointers across download interruption and an injected
+failure immediately before the activation-state rename, then resume through a
+new client/store. An integrity-valid unsupported exercise fails explicitly
+before activation without replacing the supported release or changing the queue.
+Existing filesystem process-death tests remain complementary to the injected
+write failure. These are portable package tests, not SwiftUI journey, physical
+power-loss, authentication or migration proofs. A future app composition lot
+must still define its explicit activation and authenticated owner lifecycle;
+Apple build/runtime execution requires its separate approval.
 
 No production readiness follows from this foundation alone. Required gates:
 actual Xcode simulator build and iPhone/iPad UI tests; supported CIAM SDK and test
@@ -1024,14 +1032,20 @@ remain required. Linux/macOS use the same algorithm; no iOS bypass is added.
 The new regression checks both missing and existing roots without touching
 personal directories or weakening their permissions.
 
-**User-reported physical result, 2026-10-14:** after preparing and explicitly
+**Physical result with reviewed test log, 2026-10-14:** after preparing and explicitly
 approving a fresh exact-source lot for
-`482b22408d5ca33409d9d993beff563b898fd644`, the user first reported success
-and then selected the precise confirmation: **both tests passed on the iPhone**.
-This is an explicit user report of the two selected probe tests, not an
-independently inspected test log, result bundle, signing/build-guard receipt or
-post-test Git status for this source. It supports the bounded physical milestone;
-the exact earlier refused component is still unknown. It does not prove
+`482b22408d5ca33409d9d993beff563b898fd644`, the user confirmed both tests
+passed and supplied the complete test log. The coordinating session reviewed
+all 148 lines: installation/launch matches the approved host on iPhone 17 /
+iOS 27.0.1; the direct Foundation test passed in 0.003 s and the descriptor-write
+test passed in 0.004 s. The selected suite reports two tests, zero failures and
+zero unexpected failures (0.007 s). Repeated copies have identical timestamps
+and represent one run. Source attribution comes from the prepared/consented
+lot and matching host, not an embedded build-guard SHA/hash receipt.
+The result bundle and post-test Git status have not been inspected; receipt
+of a text export does not establish private result-bundle preservation.
+No raw log, personal identifiers or private paths are published.
+The exact earlier refused component is still unknown. This result does not prove
 lock/reboot behavior, a full Apple suite, authentication, migration or app-wide
 runtime readiness. Keep the result bundle private for later inspection.
 No previous lot was retargeted. User cleanup remains limited to the exact
