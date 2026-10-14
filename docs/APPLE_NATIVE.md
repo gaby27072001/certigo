@@ -275,6 +275,29 @@ new endpoint, private payload, auth setting or release/signing workflow was used
 
 ## Remaining gates before a user pilot
 
+### Next source-only vertical slice
+
+Prepare the runtime composition seam before activating authentication or a
+live release. `NativeModel.connect()` currently creates `LearningClient` with
+the API and submission store only; the development runtime remains disabled.
+The next bounded source lot should compose the existing public-content runtime
+with an explicitly injected synthetic connection/store and fixtures, without
+instantiating MSAL, reading its cache, calling Graph or changing signing.
+Keep the live developer composition disabled until its separate activation
+gate is satisfied; do not introduce a token or production endpoint default.
+
+Exit criteria: a synthetic owner loads a supported public lesson from a
+verified pinned release, completes an MCQ, persists an ungraded pending attempt,
+restarts without changing its owner/attempt/release identity, and receives only
+mock-server-authorized feedback after replay. Test owner changes and logout
+during a fetch, interrupted activation preserving the previous release, and
+unsupported capabilities failing explicitly. Reuse the existing runtime and
+submission coordination rather than creating another cache or scoring engine.
+Start with package-level synthetic tests; any SwiftUI or Apple build/runtime
+validation remains a separate approved execution. This is a proposed source
+lot, not an enabled runtime, a new public interface decision, or a completed
+authentication/migration gate.
+
 No production readiness follows from this foundation alone. Required gates:
 actual Xcode simulator build and iPhone/iPad UI tests; supported CIAM SDK and test
 account login/refresh/logout; cross-language Cortex vectors; shared backend HTTP
@@ -1001,13 +1024,19 @@ remain required. Linux/macOS use the same algorithm; no iOS bypass is added.
 The new regression checks both missing and existing roots without touching
 personal directories or weakening their permissions.
 
-This removes a concretely reproduced inappropriate parent-read requirement,
-but **the corrected source has not been compiled or run on Apple hardware**.
-An iOS-specific denial at the anchor or a later protection operation may still
-occur. The previous approved lot is not retargeted; a new reviewed source/lot
-and consent are necessary before execution. Keep the private result bundle
-and installed-lot ownership receipt; user cleanup remains limited to the
-exact installed probe after export.
+**User-reported physical result, 2026-10-14:** after preparing and explicitly
+approving a fresh exact-source lot for
+`482b22408d5ca33409d9d993beff563b898fd644`, the user first reported success
+and then selected the precise confirmation: **both tests passed on the iPhone**.
+This is an explicit user report of the two selected probe tests, not an
+independently inspected test log, result bundle, signing/build-guard receipt or
+post-test Git status for this source. It supports the bounded physical milestone;
+the exact earlier refused component is still unknown. It does not prove
+lock/reboot behavior, a full Apple suite, authentication, migration or app-wide
+runtime readiness. Keep the result bundle private for later inspection.
+No previous lot was retargeted. User cleanup remains limited to the exact
+installed probe after private export; no machine-confirmed absence is claimed.
+This lot's consent does not authorize any subsequent source or operation.
 
 **Repeated source-rewrite diagnosis, 2026-10-14:** user Git status and complete
 three-file diffs for the source `27b8831e` and later diagnostic source
