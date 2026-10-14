@@ -11,6 +11,7 @@ from validate_apple_noauth import (
     validate_probe_plist, probe_bundles,
     validate_probe_signing,
     validate_probe_entitlements,
+    normalized_project, parse_project,
 )
 
 LOT_SUFFIX = "ab" * 16
@@ -116,7 +117,7 @@ class AppleNoAuthMetadataTests(unittest.TestCase):
     def probe(self):
         native = Path(__file__).resolve().parents[1] / "apps" / "apple" / "CertigoNative"
         return (
-            (native / "CertigoNative.xcodeproj" / "project.pbxproj").read_text(),
+            normalized_project((native / "CertigoNative.xcodeproj" / "project.pbxproj").read_text()),
             (native / "CertigoNative.xcodeproj" / "xcshareddata" / "xcschemes"
              / "CertigoProtectionProbe.xcscheme").read_text(),
             (native / "ProtectionProbe" / "CertigoProtectionProbeApp.swift").read_text(),
@@ -129,8 +130,7 @@ class AppleNoAuthMetadataTests(unittest.TestCase):
             project.replace('"$(PROBE_TEST_BUNDLE_IDENTIFIER)"', '"com.certigo.native.dev"'),
             project.replace("CertigoProtectionProbe.app/CertigoProtectionProbe",
                             "CertigoNative.app/CertigoNative"),
-            project.replace("productName = CertigoData; };\n\t\t000000000000000000000152",
-                            "productName = MSAL; };\n\t\t000000000000000000000152"),
+            project.replace("productName = CertigoData;", "productName = MSAL;"),
             project.replace('PRODUCT_BUNDLE_IDENTIFIER = "$(PROBE_HOST_BUNDLE_IDENTIFIER)";',
                             'DEVELOPMENT_TEAM = example; PRODUCT_BUNDLE_IDENTIFIER = "$(PROBE_HOST_BUNDLE_IDENTIFIER)";'),
             project.replace(" verify-build", " verify"),
@@ -146,6 +146,43 @@ class AppleNoAuthMetadataTests(unittest.TestCase):
             validate_probe(project, scheme.replace(
                 "testFoundationProtectionSetterReadsBackExactPolicyOnEmptyFile",
                 "testProtectionAttributeRepresentationsFailClosed"), source)
+
+    def test_project_parser_preserves_strings_and_rejects_duplicate_or_malformed_data(self):
+        document = '/* comment */ { key = "https://example.invalid/a"; list = (one, "two",); }'
+        self.assertEqual(parse_project(document), {
+            "key": "https://example.invalid/a", "list": ["one", "two"],
+        })
+        self.assertEqual(parse_project(normalized_project(document)), parse_project(document))
+        for invalid in (
+            "{ key = one; key = two; }", "{ key = one }", "{ key = (one two); }",
+            "{ key = one; } trailing", "{ key = one; /* unterminated",
+            "{ key = one; @bad = two; }", "{ key = " * 14 + "value" + "; }" * 14,
+            " " * 128_001,
+        ):
+            with self.subTest(invalid=invalid[:60]), self.assertRaises(ValueError):
+                parse_project(invalid)
+
+    def test_canonical_project_keeps_binding_and_unsigned_defaults_fail_closed(self):
+        native = Path(__file__).resolve().parents[1] / "apps" / "apple" / "CertigoNative"
+        raw = (native / "CertigoNative.xcodeproj" / "project.pbxproj").read_text()
+        _, scheme, host = self.probe()
+        validate_probe(raw, scheme, host)
+        mutations = (
+            ('productName = CertigoData;', 'productName = MSAL;'),
+            ('PRODUCT_BUNDLE_IDENTIFIER = "$(PROBE_TEST_BUNDLE_IDENTIFIER)";',
+             'PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.dev;'),
+            ('CODE_SIGNING_ALLOWED = "$(PROBE_CODE_SIGNING_ALLOWED)";', 'CODE_SIGNING_ALLOWED = YES;'),
+            ('baseConfigurationReference = 000000000000000000000114',
+             'baseConfigurationReference = 000000000000000000011'),
+            ('CertigoProtectionProbe.app/CertigoProtectionProbe', 'CertigoNative.app/CertigoNative'),
+            ('verify-build', 'verify'),
+            ('remoteGlobalIDString = 000000000000000000000150;',
+             'remoteGlobalIDString = 000000000000000000000050;'),
+        )
+        for before, after in mutations:
+            self.assertIn(before, raw)
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                validate_probe(raw.replace(before, after), scheme, host)
 
     def test_probe_artifacts_require_exact_separate_identities_without_callbacks(self):
         validate_probe_plist({"CFBundleIdentifier": PROBE_BUNDLE}, test=False, lot_suffix=LOT_SUFFIX)

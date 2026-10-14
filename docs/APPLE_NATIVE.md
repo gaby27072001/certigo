@@ -960,6 +960,47 @@ real signed artifacts or execution. No Apple/device command was run.
 
 ### Direct Xcode private-lot preparation
 
+**Repeated source-rewrite diagnosis, 2026-10-14:** user Git status and complete
+three-file diffs for the source `27b8831e` and later diagnostic source
+`670490cb` workspaces show the same rewritten project, DEV scheme and DEV
+plist. The second supplied diff is identical to the first reviewed diff.
+The project dictionaries/objects are structurally equal except
+`objectVersion` 56 becoming 60. DEV plist dictionaries are equal. DEV scheme
+retains its target/configurations/build flags but replaces both launcher
+identifiers with `Xcode.DebuggerFoundation.Launcher.LLDB`, adds empty
+`Testables`, explicit `debugServiceExtension="internal"` and
+`allowLocationSimulation="YES"`, and empty `savedToolIdentifier`.
+These are observed serialization/launcher-default changes, not a new bundle,
+callback, team, profile, capability or probe binding. The diffs alone do not
+establish the exact user action that caused the writes.
+
+The first private backup and scoped three-file restoration preserved the lot.
+The user reported clean Git status after reopening that workspace, followed
+by the physical result below. In the later `670490cb` workspace the source
+guard again rejected changed files before diagnostic tests ran; no physical
+initialization diagnostic result follows from that attempted run.
+
+The subsequent source correction commits the reviewed Xcode serialization
+of those three public files, including object version and the explicitly
+reviewed DEV scheme attributes. A bounded OpenStep-subset parser now reads
+comments, quoted scalar values, multiline dictionaries/lists and trailing
+list commas before applying the existing object/configuration/binding checks.
+It rejects unsupported syntax, duplicate keys, truncated/trailing input and
+excessive size/depth. It does not remove comment-like text inside strings,
+accept duplicate object definitions, or silently ignore unparsed content.
+Mutation tests still reject wrong package products, host/loader/target
+bindings, bundle identities, signing defaults and build guards.
+
+**Exact clean HEAD, source SHA, manifest/approval hash and effective lot
+identity checks remain unchanged.** There is no dirty-file allowlist,
+semantic-hash retarget, ignore expansion or restoration loop. Canonicalizing
+the observed source is intended to avoid that specific serialization rewrite;
+it has not been opened or tested in Xcode here, so stability on the next
+Mac run remains unproved. This is a new source candidate, requiring a new
+workspace/lot and separate execution consent. Existing user workspaces,
+private backup and exported result remain untouched. No new Mac/SSH/device
+operation or iOS protection fix is implied.
+
 **Physical result reported on 2026-10-14:** the coordinating session reviewed
 four user screenshots of source
 `27b8831e471ca841fb5a522b4b94dee1bde79711`, the approved private lot, its

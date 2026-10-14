@@ -158,7 +158,85 @@ def project_object(project, identifier):
     return match.group(1)
 
 
+def parse_project(project):
+    """Bounded OpenStep subset used by this project, never a permissive text scrub."""
+    require(len(project) <= 128_000, "Project exceeds parser bound")
+    pattern = re.compile(
+        r'\s+|/\*.*?\*/|//[^\n]*|"(?:\\.|[^"\\])*"|[{}()=;,]|[A-Za-z0-9_./$<>-]+',
+        re.S,
+    )
+    tokens = []
+    position = 0
+    while position < len(project):
+        match = pattern.match(project, position)
+        require(match is not None, "Unsupported project syntax")
+        token = match.group()
+        position = match.end()
+        if not token.isspace() and not token.startswith(("/*", "//")):
+            tokens.append(token)
+    require(len(tokens) <= 16_000, "Project token bound exceeded")
+    index = 0
+
+    def take(expected):
+        nonlocal index
+        require(index < len(tokens) and tokens[index] == expected, "Malformed project structure")
+        index += 1
+
+    def value(depth=0):
+        nonlocal index
+        require(depth <= 12 and index < len(tokens), "Project nesting/truncation rejected")
+        token = tokens[index]
+        index += 1
+        if token == "{":
+            result = {}
+            while index < len(tokens) and tokens[index] != "}":
+                key = value(depth + 1)
+                require(isinstance(key, str) and key not in result, "Duplicate/invalid project key")
+                take("=")
+                result[key] = value(depth + 1)
+                take(";")
+            take("}")
+            return result
+        if token == "(":
+            result = []
+            while index < len(tokens) and tokens[index] != ")":
+                result.append(value(depth + 1))
+                if index < len(tokens) and tokens[index] == ",":
+                    take(",")
+                else:
+                    require(index < len(tokens) and tokens[index] == ")", "Missing list separator")
+            take(")")
+            return result
+        require(token not in "{}()=;,", "Unexpected project punctuation")
+        if token.startswith('"'):
+            return json.loads(token)
+        return token
+
+    result = value()
+    require(index == len(tokens) and isinstance(result, dict), "Trailing/invalid project data")
+    return result
+
+
+def normalized_project(project):
+    document = parse_project(project)
+
+    def render(value, depth):
+        if isinstance(value, dict):
+            return "{\n" + "".join(
+                "\t" * (depth + 1) + key + " = " + render(child, depth + 1) + ";\n"
+                for key, child in value.items()
+            ) + "\t" * depth + "}"
+        if isinstance(value, list):
+            return "(" + ", ".join(render(child, depth) for child in value) + ")"
+        if re.fullmatch(r"[A-Za-z0-9_./<>-]+", value) is None:
+            return json.dumps(value)
+        return value
+
+    return render(document, 0) + "\n"
+
+
 def validate_probe(project, scheme, host_source):
+    project = normalized_project(project)
     identifiers = re.findall(r"^\t\t([0-9A-F]{24}) = ", project, re.M)
     require(len(identifiers) == len(set(identifiers)), "Duplicate project object identifier")
     require(set(re.findall(r"\b[0-9A-F]{24}\b", project)) <= set(identifiers),
@@ -238,7 +316,7 @@ def validate_probe(project, scheme, host_source):
 
 def validate_source(root):
     native = root / "apps" / "apple" / "CertigoNative"
-    project = (native / "CertigoNative.xcodeproj" / "project.pbxproj").read_text()
+    project = normalized_project((native / "CertigoNative.xcodeproj" / "project.pbxproj").read_text())
     require(
         project.count(f"PRODUCT_BUNDLE_IDENTIFIER = {DEV_BUNDLE};") == 2,
         "DEV application source identity changed",
