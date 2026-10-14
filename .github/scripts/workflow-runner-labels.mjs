@@ -1,4 +1,5 @@
 import { parseDocument } from 'yaml';
+import { isHostedLinuxCiRunner, validateHostedLinuxJob } from './linux-ci-runner-policy.mjs';
 
 // Ensembles de labels autorisés, sur le YAML analysé. La règle textuelle de
 // validate-workflow-security.mjs ne lit que les lignes qui commencent par `runs-on:` : une clé
@@ -47,7 +48,8 @@ export function validateRunnerLabels(text, label) {
     ) {
       continue;
     }
-    if (!isAllowedLabelSet(job['runs-on'])) {
+    errors.push(...validateHostedLinuxJob(workflow, job, jobId, label));
+    if (!isAllowedLabelSet(job['runs-on']) && !isHostedLinuxCiRunner(label, jobId, job['runs-on'])) {
       errors.push(
         `${label}: job ${jobId} must run on a fixed Azure self-hosted label set, `
         + `not ${JSON.stringify(job['runs-on'])}`,

@@ -22,6 +22,8 @@ import {
 import { validateRequiredContexts } from './required-context-policy.mjs';
 import { validateRunnerLabels } from './workflow-runner-labels.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
+import { parseDocument } from 'yaml';
+import { hostedLinuxRunner, isHostedLinuxCiRunner, isPrLinuxCiRunner } from './linux-ci-runner-policy.mjs';
 
 const controlRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -66,6 +68,7 @@ const allowedRunnerLines = new Set([
   trustedLinuxRunner,
   cosmosLinuxRunner,
   'runs-on: [self-hosted, macOS, certigo-trusted]',
+  `runs-on: ${hostedLinuxRunner}`,
 ]);
 const forbiddenRunnerConfiguration = [
   'CI_GITHUB_HOSTED_FALLBACK',
@@ -299,6 +302,19 @@ function jobBlocks(text) {
   }));
 }
 
+function hasPrCiRunner(text, file) {
+  const document = parseDocument(text, { uniqueKeys: true });
+  if (document.errors.length > 0) {
+    return false;
+  }
+  try {
+    const jobs = document.toJS({ maxAliasCount: 0 })?.jobs ?? {};
+    return Object.entries(jobs).some(([id, job]) => isPrLinuxCiRunner(file, id, job?.['runs-on']));
+  } catch {
+    return false;
+  }
+}
+
 function validateWorkflow(file) {
   const text = fs.readFileSync(file, 'utf8');
   const lines = text.split(/\r?\n/);
@@ -308,6 +324,15 @@ function validateWorkflow(file) {
   const hasCosmosJob = text.includes('certigo-cosmos-emulator');
   const hasPrTrigger =
     /^ {2}pull_request(?:_target)?:\s*$/m.test(text);
+  const parsedDocument = parseDocument(text, { uniqueKeys: true });
+  let parsedJobs = {};
+  if (parsedDocument.errors.length === 0) {
+    try {
+      parsedJobs = parsedDocument.toJS({ maxAliasCount: 0 })?.jobs ?? {};
+    } catch {
+      // validateRunnerLabels reports unsafe YAML below.
+    }
+  }
 
   errors.push(...validateTrustedControlReferences(text, file));
   if (fileName === dartSastWorkflowFile) {
@@ -434,10 +459,11 @@ function validateWorkflow(file) {
     if (
       trustedAggregateJobs.get(fileName)?.has(job.id)
       && !job.text.includes(trustedLinuxRunner)
+      && !isHostedLinuxCiRunner(fileName, job.id, parsedJobs[job.id]?.['runs-on'])
     ) {
       errors.push(`${file}: aggregate job ${job.id} must use certigo-trusted`);
     }
-    if (job.text.includes(prLinuxRunner)) {
+    if (isPrLinuxCiRunner(fileName, job.id, parsedJobs[job.id]?.['runs-on'])) {
       if (
         job.text.includes('secrets.')
         || /^\s+environment:\s*/m.test(job.text)
@@ -1188,7 +1214,7 @@ function validateRepositoryInvariants() {
     'node "$TRUSTED_CONTROL_DIR/.github/scripts/validate-workflow-security.mjs"',
     '--workspace "$UNTRUSTED_SOURCE_DIR"',
   ]) {
-    if (!lint.includes(marker)) {
+    if (marker === prLinuxRunner ? !hasPrCiRunner(lint, 'lint-workflows.yml') : !lint.includes(marker)) {
       errors.push(`lint-workflows.yml: missing trusted Azure PR invariant ${marker}`);
     }
   }
@@ -1215,7 +1241,7 @@ function validateRepositoryInvariants() {
     '"$TRUSTED_CONTROL_DIR/tools/project_state.py"',
     '--root "$UNTRUSTED_SOURCE_DIR"',
   ]) {
-    if (!preflight.includes(marker)) {
+    if (marker === prLinuxRunner ? !hasPrCiRunner(preflight, 'ci-preflight.yml') : !preflight.includes(marker)) {
       errors.push(`ci-preflight.yml: missing trusted Python launcher invariant ${marker}`);
     }
   }
@@ -1417,7 +1443,7 @@ function validateRepositoryInvariants() {
     if (!workflow.includes('workflow_call:')) {
       errors.push(`${fileName}: scanner must be callable by the stable security gate`);
     }
-    if (!workflow.includes(prLinuxRunner)) {
+    if (!hasPrCiRunner(workflow, fileName)) {
       errors.push(`${fileName}: scanner must use the isolated PR runner`);
     }
     for (const marker of [
@@ -1704,7 +1730,7 @@ function validateRepositoryInvariants() {
     prLinuxRunner,
     'HEAD_REPOSITORY" != "$BASE_REPOSITORY',
   ]) {
-    if (!forkPolicy.includes(marker)) {
+    if (marker === prLinuxRunner ? !hasPrCiRunner(forkPolicy, 'fork-pr-policy.yml') : !forkPolicy.includes(marker)) {
       errors.push(`fork-pr-policy.yml: missing fail-closed invariant ${marker}`);
     }
   }
@@ -1721,7 +1747,7 @@ function validateRepositoryInvariants() {
     'const current = pull.head.sha === eventHeadSha;',
     "core.setOutput('current', current ? 'true' : 'false');",
   ]) {
-    if (!prHeadFreshness.includes(marker)) {
+    if (marker === prLinuxRunner ? !hasPrCiRunner(prHeadFreshness, 'pr-head-freshness.yml') : !prHeadFreshness.includes(marker)) {
       errors.push(`pr-head-freshness.yml: missing fail-closed freshness invariant ${marker}`);
     }
   }
