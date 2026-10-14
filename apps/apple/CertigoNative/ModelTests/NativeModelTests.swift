@@ -77,24 +77,52 @@
     }
     private actor ModelTransport: HTTPTransport {
         private let catalog: Data
+        private let lesson: Data
+        private let result: Data
+        let manifestId = "sha256:" + String(repeating: "a", count: 64)
         private var owner = "server-owner-A"
         private var pause = false
         private var waiter: CheckedContinuation<Void, Never>?
         private var requests = 0
-        init(catalog: Data) { self.catalog = catalog }
+        private var offline = false
+        private var corrected = false
+        private var lessonStatus = 200
+        private var pauseLesson = false
+        private var posts: [Data] = []
+        init(resources: URL) throws {
+            catalog = try Data(contentsOf: resources.appendingPathComponent("catalog.json"))
+            lesson = try Data(contentsOf: resources.appendingPathComponent("lesson.json"))
+            let object = try JSONSerialization.jsonObject(
+                with: Data(contentsOf: resources.appendingPathComponent("result.json")))
+            guard var response = object as? [String: Any],
+                var items = response["results"] as? [[String: Any]], !items.isEmpty
+            else { throw ModelTestFailure.assertion("Invalid synthetic feedback fixture") }
+            items[0]["correct"] = false
+            items[0]["correctAnswer"] = ["second"]
+            response["results"] = items
+            response["scorePct"] = 0
+            result = try JSONSerialization.data(withJSONObject: response)
+        }
         func setOwner(_ value: String) { owner = value }
         func pauseProfile() { pause = true }
+        func suspendLesson() { pauseLesson = true }
+        func setOffline(_ value: Bool) { offline = value }
+        func failLesson(_ status: Int) { lessonStatus = status }
+        func payloads() -> [Data] { posts }
         func isWaiting() -> Bool { waiter != nil }
         func count() -> Int { requests }
         func resume() {
             waiter?.resume()
             waiter = nil
             pause = false
+            pauseLesson = false
         }
         func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
             requests += 1
             guard let url = request.url else { throw APIError.configuration }
             let bytes: Data
+            var status = 200
+            var headers = ["Content-Type": "application/json"]
             if url.path.hasSuffix("/me") {
                 let capturedOwner = owner
                 if pause { await withCheckedContinuation { waiter = $0 } }
@@ -104,13 +132,34 @@
                     """.utf8)
             } else if url.path.hasSuffix("/catalog/tracks") {
                 bytes = catalog
+            } else if url.path.hasSuffix("/me/paths/fixture:foundations") {
+                let state = corrected ? "completed" : "available"
+                bytes = Data(
+                    """
+                    {"trackId":"fixture:foundations","trackName":"Synthetic","readinessScore":12,
+                    "units":[{"id":"fixture-unit","title":"Synthetic practice","lessons":[
+                    {"id":"fixture-lesson","title":"Synthetic exercise","status":"\(state)","estMinutes":1}]}]}
+                    """.utf8)
+            } else if url.path.hasSuffix("/tracks/fixture:foundations/lessons/fixture-lesson") {
+                if pauseLesson { await withCheckedContinuation { waiter = $0 } }
+                bytes = lesson
+                status = lessonStatus
+                headers["X-Content-Manifest-Id"] = manifestId
+                headers["ETag"] = "\"\(manifestId)\""
+            } else if url.path.hasSuffix("/quiz/fixture-lesson/submit"),
+                request.httpMethod == "POST"
+            {
+                guard let payload = request.httpBody else { throw APIError.invalidResponse }
+                posts.append(payload)
+                if offline { throw URLError(.notConnectedToInternet) }
+                corrected = true
+                bytes = result
             } else {
                 throw APIError.invalidResponse
             }
             guard
                 let response = HTTPURLResponse(
-                    url: url, statusCode: 200, httpVersion: nil,
-                    headerFields: ["Content-Type": "application/json"])
+                    url: url, statusCode: status, httpVersion: nil, headerFields: headers)
             else { throw APIError.invalidResponse }
             return (bytes, response)
         }
@@ -133,8 +182,7 @@
                 throw ModelTestFailure.assertion("Cannot create isolated preferences")
             }
             self.defaults = defaults
-            server = ModelTransport(
-                catalog: try Data(contentsOf: resources.appendingPathComponent("catalog.json")))
+            server = try ModelTransport(resources: resources)
             configuration = try CIAMConfiguration(
                 clientID: "11111111-1111-4111-8111-111111111111",
                 tenantID: "22222222-2222-4222-8222-222222222222",
@@ -180,7 +228,11 @@
             try await logoutDuringProfile(resources)
             try await refusedCacheRemoval(resources)
             try await expiryDuringProfile(resources)
-            print("NativeModel: 8 synthetic coordination scenarios passed (Linux source harness).")
+            try await manualLessonJourney(resources)
+            try await lessonFailureAndLateOwner(resources)
+            print(
+                "NativeModel: 10 synthetic coordination/journey scenarios passed (Linux source harness)."
+            )
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
@@ -340,6 +392,108 @@
                 "Token expiring during /me was published")
             let count = await fixture.server.count()
             try expect(count == 1, "Expired /me result triggered a catalog request")
+        }
+        @MainActor static func manualLessonJourney(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model(authenticated: false)
+            model.baseURL = "https://example.invalid/api"
+            model.token = "synthetic-manual-token"
+            await model.connect()
+            guard let track = model.tracks.first else {
+                throw ModelTestFailure.assertion("No discovered catalog track")
+            }
+            await model.loadPath(track)
+            guard let node = model.path?.units.first?.lessons.first else {
+                throw ModelTestFailure.assertion("No discovered path lesson")
+            }
+            await model.loadLesson(node)
+            guard let lesson = model.lesson, let question = lesson.questions.first,
+                let option = question.options.first
+            else { throw ModelTestFailure.assertion("No supported lesson question") }
+            try expect(
+                lesson.publicManifestId == fixture.server.manifestId,
+                "Header-only pin not normalized into lesson")
+            try expect(!model.canSubmit, "Unanswered lesson accepted")
+            model.questionAppeared(question.id)
+            model.select(option, question: question)
+            try expect(model.canSubmit, "Identified option did not enable submission")
+            await fixture.server.setOffline(true)
+            await model.submit()
+            try expect(model.outcome == .pendingCorrection, "Offline model guessed a verdict")
+            try expect(!model.canSubmit && !model.busy, "Pending submission remained editable/busy")
+            guard let saved = model.queue.first else {
+                throw ModelTestFailure.assertion("Pending submission missing from model queue")
+            }
+            try expect(
+                saved.ownerId == "server-owner-A" && saved.result == nil,
+                "Pending attempt owner/result incorrect")
+            try expect(
+                saved.submission.answers.first?.selected == [option.id]
+                    && saved.submission.publicManifestId == fixture.server.manifestId,
+                "Option identity or header pin lost before persistence")
+            let reopened = fixture.model(authenticated: false)
+            await reopened.restore()
+            try expect(reopened.queue == [saved], "Manual model restart changed pending request")
+            await fixture.server.setOffline(false)
+            await reopened.retry(saved)
+            guard let result = reopened.queue.first?.result else {
+                throw ModelTestFailure.assertion("Retry feedback not reflected in queue")
+            }
+            try expect(
+                result.scorePct == 0 && !result.results[0].correct, "Server verdict replaced")
+            try expect(
+                !result.results[0].explanation.isEmpty, "Authorized feedback not displayed")
+            let payloads = await fixture.server.payloads()
+            try expect(
+                payloads.count == 2 && payloads[0] == payloads[1],
+                "Model retry changed attempt payload or emitted extra request")
+            await reopened.loadPath(track)
+            await reopened.refreshProgress()
+            try expect(
+                reopened.path?.units.first?.lessons.first?.status == .completed,
+                "Reviewed concepts were not refreshed after wrong answer")
+            try expect(reopened.queue.first?.result?.scorePct == 0, "Progress changed quiz score")
+            await reopened.retry(saved)
+            let afterRepeat = await fixture.server.payloads()
+            try expect(afterRepeat.count == 2, "Corrected retry repeated POST")
+        }
+        @MainActor static func lessonFailureAndLateOwner(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model(authenticated: false)
+            model.baseURL = "https://example.invalid/api"
+            model.token = "synthetic-manual-token"
+            await model.connect()
+            guard let track = model.tracks.first else {
+                throw ModelTestFailure.assertion("Missing synthetic track")
+            }
+            await model.loadPath(track)
+            guard let node = model.path?.units.first?.lessons.first else {
+                throw ModelTestFailure.assertion("Missing synthetic lesson node")
+            }
+            await fixture.server.failLesson(503)
+            await model.loadLesson(node)
+            try expect(
+                model.lesson == nil && model.errorMessage != nil && !model.busy,
+                "Lesson loading failure became success or stayed busy")
+            await fixture.server.failLesson(200)
+            await model.loadLesson(node)
+            try expect(model.lesson != nil && model.errorMessage == nil, "Retry did not recover")
+            await fixture.server.suspendLesson()
+            let late = Task { await model.loadLesson(node) }
+            try await wait { await fixture.server.isWaiting() }
+            try expect(model.busy, "Suspended lesson did not expose loading state")
+            await model.disconnect()
+            await fixture.server.setOwner("server-owner-B")
+            model.token = "synthetic-owner-B-token"
+            await model.connect()
+            await fixture.server.resume()
+            await late.value
+            try expect(
+                model.profile?.id == "server-owner-B" && model.lesson == nil
+                    && model.queue.isEmpty && !model.busy,
+                "Late previous-owner lesson leaked into new model session")
         }
     }
 #endif

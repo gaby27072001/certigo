@@ -345,6 +345,24 @@ switch, fresh versus near-expiry refresh, silent interaction-required failure,
 logout during login/refresh/profile fetch, refused local cache removal/retry,
 and expiry during `/me` without a subsequent catalog request.
 
+The same actual-source harness also exercises the manual DEV model journey
+through injected HTTP responses: catalog discovery, path-provided lesson ID,
+API lesson loading, identified option selection, offline pending submission,
+model/store reopen, exact retry payload and authorized server feedback, then
+progress refresh. The lesson fixture has no manifest property in its JSON body;
+the mock supplies `X-Content-Manifest-Id` and the model preserves that normalized
+pin in the durable request. A wrong server verdict with score zero coexists with
+a path node marked `completed`, representing concepts reviewed rather than a
+passing score. Corrected retry does not send another POST.
+
+Loading failure exposes an error and clears busy state; retry recovers. A
+suspended old-owner lesson fetch is discarded after logout and reconnect to a
+different authoritative `/me` owner. This adds model-contract coverage beyond
+the package-only runtime/outbox tests without replacing their durability and
+owner-isolation coverage. These responses are deliberately synthetic, not a
+claim of a real backend, versioned import, UI interaction or authenticated
+end-to-end run. No production behavior or UI change is needed for these tests.
+
 This portable source check does **not** compile Security/UIKit/MSAL, build the
 Apple app, or execute an Xcode test target. Apple compilation and a separately
 approved dedicated-account lifecycle remain required before activating this
