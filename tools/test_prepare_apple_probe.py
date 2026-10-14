@@ -223,6 +223,122 @@ class PrivateProbeLotTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.verify(checksum)
 
+    @unittest.skipUnless(os.name == "posix", "POSIX private identity reuse")
+    def test_reused_selections_create_fresh_unsigned_lot_without_copying_approval(self):
+        old, checksum = self.prepare()
+        directory = self.root / lot.LOCAL
+        lot.write_new(directory / "Execution.xcconfig", lot.execution(self.team))
+        lot.write_new(directory / "approved.sha256", (checksum + "\n").encode())
+        before = {path.name: path.read_bytes() for path in directory.iterdir()}
+        new_root = self.root / "new-checkout"
+        (new_root / lot.LOCAL).parent.mkdir(parents=True)
+        output = io.StringIO()
+        with patch("sys.argv", [
+            "prepare_apple_probe.py", "prepare", "--source-sha", "c" * 40,
+            "--identities-from", str(directory / "manifest.json"),
+        ]), patch.object(lot, "__file__", str(new_root / "tools" / "prepare_apple_probe.py")), \
+                patch.object(lot, "check_source") as check, \
+                patch.object(lot.getpass, "getpass") as prompts, \
+                patch.object(lot.secrets, "token_hex", return_value="cd" * 16), \
+                contextlib.redirect_stdout(output):
+            lot.main()
+            prompts.assert_not_called()
+            check.assert_called_once_with(new_root, "c" * 40)
+        new_directory = new_root / lot.LOCAL
+        new = json.loads((new_directory / "manifest.json").read_bytes())
+        self.assertEqual((new["team"], new["device"]), (old["team"], old["device"]))
+        self.assertEqual(new["source"], "c" * 40)
+        self.assertNotEqual(new["suffix"], old["suffix"])
+        self.assertNotEqual((new_directory / "manifest.sha256").read_text().strip(), checksum)
+        self.assertFalse((new_directory / "Execution.xcconfig").exists())
+        self.assertFalse((new_directory / "approved.sha256").exists())
+        self.assertEqual(before, {path.name: path.read_bytes() for path in directory.iterdir()})
+        self.assertNotIn(self.team, output.getvalue())
+        self.assertNotIn(self.device, output.getvalue())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX private identity reuse")
+    def test_reuse_rejects_absent_unsafe_and_invalid_inputs_without_prompt_fallback(self):
+        _, _ = self.prepare()
+        directory = self.root / lot.LOCAL
+        manifest = directory / "manifest.json"
+        original = manifest.read_bytes()
+        checksum = directory / "manifest.sha256"
+        with self.assertRaises(ValueError):
+            lot.identities_from(Path("relative/LocalLot/manifest.json"))
+        checksum.unlink()
+        with self.assertRaises(ValueError):
+            lot.identities_from(manifest)
+        lot.write_new(checksum, b"0" * 64 + b"\n")
+        with self.assertRaises(ValueError):
+            lot.identities_from(manifest)
+        for mutate in (
+            lambda m: m.update(team="invalid"),
+            lambda m: m.update(device="$(INJECT)"),
+            lambda m: m.update(source="main"),
+            lambda m: m.update(selectors=[]),
+            lambda m: m.update(configuration_sha256="0" * 64),
+            lambda m: m.update(extra="unexpected"),
+        ):
+            changed = json.loads(original)
+            mutate(changed)
+            raw = lot.canonical(changed)
+            manifest.write_bytes(raw)
+            checksum.write_bytes((lot.digest(raw) + "\n").encode())
+            with self.assertRaises(ValueError):
+                lot.identities_from(manifest)
+        for raw in (b"{bad", original.replace(b'{"configuration', b'{"device":"duplicate","configuration'),
+                    b" " * 32_768):
+            manifest.write_bytes(raw)
+            checksum.write_bytes((lot.digest(raw) + "\n").encode())
+            with self.assertRaises(ValueError):
+                lot.identities_from(manifest)
+        manifest.write_bytes(original)
+        checksum.write_bytes((lot.digest(original) + "\n").encode())
+        for path in (manifest, checksum, directory):
+            mode = path.stat().st_mode & 0o777
+            path.chmod(0o755 if path == directory else 0o644)
+            with self.assertRaises(ValueError):
+                lot.identities_from(manifest)
+            path.chmod(mode)
+        target = directory / "actual-manifest"
+        manifest.rename(target)
+        manifest.symlink_to(target)
+        with self.assertRaises(ValueError):
+            lot.identities_from(manifest)
+        manifest.unlink()
+        target.rename(manifest)
+        checksum_target = directory / "actual-checksum"
+        checksum.rename(checksum_target)
+        checksum.symlink_to(checksum_target)
+        with self.assertRaises(ValueError):
+            lot.identities_from(manifest)
+        checksum.unlink()
+        checksum_target.rename(checksum)
+        manifest.rename(target)
+        os.mkfifo(manifest, 0o600)
+        with self.assertRaises(ValueError):
+            lot.identities_from(manifest)
+        manifest.unlink()
+        target.rename(manifest)
+        alias = self.root / "alias-checkout"
+        alias.symlink_to(directory.parent, target_is_directory=True)
+        with self.assertRaises(ValueError):
+            lot.identities_from(alias / "LocalLot" / "manifest.json")
+        target = directory / "hardlink"
+        os.link(manifest, target)
+        with self.assertRaises(ValueError):
+            lot.identities_from(manifest)
+        target.unlink()
+        with patch("sys.argv", [
+            "prepare_apple_probe.py", "prepare", "--source-sha", self.source,
+            "--identities-from", str(directory / "missing" / "manifest.json"),
+        ]), patch.object(lot.getpass, "getpass") as prompts, \
+                patch.object(lot.secrets, "token_hex") as random:
+            with self.assertRaises(ValueError):
+                lot.main()
+            prompts.assert_not_called()
+            random.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

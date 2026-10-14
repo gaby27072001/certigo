@@ -7,6 +7,7 @@ import json
 import os
 import re
 import secrets
+import stat
 import subprocess
 from pathlib import Path
 
@@ -69,6 +70,91 @@ def private_read(path):
     return path.read_bytes()
 
 
+def validate_manifest(raw):
+    def unique_pairs(pairs):
+        result = {}
+        for key, value in pairs:
+            require(key not in result, "Duplicate private manifest key")
+            result[key] = value
+        return result
+
+    try:
+        manifest = json.loads(raw, object_pairs_hook=unique_pairs)
+    except (UnicodeError, json.JSONDecodeError, RecursionError):
+        raise ValueError("Malformed private lot manifest") from None
+    require(isinstance(manifest, dict) and set(manifest) == {
+        "schema", "source", "suffix", "host", "tests", "team", "device", "selectors",
+        "configuration_sha256", "execution_sha256",
+    } and manifest["schema"] == "certigo.private-probe-lot/v1", "Unexpected lot manifest")
+    require(isinstance(manifest["source"], str)
+            and re.fullmatch(r"[0-9a-f]{40}", manifest["source"]) is not None,
+            "Invalid private manifest source")
+    host, tests = probe_bundles(manifest["suffix"])
+    require((manifest["host"], manifest["tests"]) == (host, tests)
+            and manifest["selectors"] == sorted(PROBE_SELECTORS), "Lot identity/test binding changed")
+    require(isinstance(manifest["device"], str)
+            and re.fullmatch(r"[A-Za-z0-9-]{8,80}", manifest["device"]) is not None,
+            "Invalid selected device binding")
+    require(manifest["configuration_sha256"] == digest(configuration(manifest["suffix"]))
+            and manifest["execution_sha256"] == digest(execution(manifest["team"])),
+            "Private manifest configuration binding changed")
+    return manifest
+
+
+def identities_from(path):
+    """Read only a specifically selected previous lot; no account/device discovery."""
+    require(os.name == "posix", "Private identity reuse requires macOS/POSIX permission checks")
+    require(path.is_absolute() and path.name == "manifest.json"
+            and path.parent.name == "LocalLot" and ".." not in path.parts,
+            "Select the exact absolute private LocalLot/manifest.json path")
+    try:
+        for directory in (path.parent, *path.parent.parents):
+            info = directory.lstat()
+            if stat.S_ISLNK(info.st_mode):
+                require(directory == Path("/tmp") and directory.resolve() == Path("/private/tmp"),
+                        "Symlinked private manifest ancestor rejected")
+                info = directory.stat()
+            require(stat.S_ISDIR(info.st_mode), "Invalid private manifest ancestor")
+            if directory == path.parent:
+                require(info.st_uid == os.getuid() and info.st_mode & 0o077 == 0,
+                        "Previous lot directory must be owner-only")
+            else:
+                require(info.st_mode & 0o022 == 0 or (
+                    directory in (Path("/tmp"), Path("/private/tmp"))
+                    and info.st_mode & stat.S_ISVTX != 0
+                ), "Writable private manifest ancestor rejected")
+        selected = path.parent.lstat()
+        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            info = os.fstat(directory)
+            require((info.st_dev, info.st_ino) == (selected.st_dev, selected.st_ino)
+                    and info.st_uid == os.getuid() and info.st_mode & 0o077 == 0,
+                    "Previous lot directory must be owner-only")
+
+            def read(name):
+                handle = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                                 dir_fd=directory)
+                with os.fdopen(handle, "rb") as stream:
+                    info = os.fstat(stream.fileno())
+                    require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1
+                            and info.st_uid == os.getuid() and info.st_mode & 0o077 == 0,
+                            "Previous lot files must be private regular single-link files")
+                    require(0 < info.st_size < 32_768, "Previous lot file exceeds read bound")
+                    data = stream.read(32_768)
+                    require(len(data) < 32_768, "Previous lot file exceeds read bound")
+                    return data
+
+            raw = read("manifest.json")
+            recorded = read("manifest.sha256")
+        finally:
+            os.close(directory)
+        require(recorded == (digest(raw) + "\n").encode(), "Previous manifest checksum mismatch")
+        manifest = validate_manifest(raw)
+    except OSError:
+        raise ValueError("Cannot safely read the selected previous private manifest") from None
+    return manifest["team"], manifest["device"]
+
+
 def prepare(root, source, team, device):
     check_source(root, source)
     execution(team)
@@ -103,23 +189,11 @@ def verify(root, expected_digest=None, active=False):
     recorded = private_read(directory / "manifest.sha256").decode().strip()
     require(digest(raw) == recorded and (expected_digest is None or recorded == expected_digest),
             "Lot digest differs from the separately reviewed manifest")
-    manifest = json.loads(raw)
-    require(set(manifest) == {
-        "schema", "source", "suffix", "host", "tests", "team", "device", "selectors",
-        "configuration_sha256", "execution_sha256",
-    } and manifest["schema"] == "certigo.private-probe-lot/v1", "Unexpected lot manifest")
+    manifest = validate_manifest(raw)
     check_source(root, manifest["source"])
-    host, tests = probe_bundles(manifest["suffix"])
-    require((manifest["host"], manifest["tests"]) == (host, tests)
-            and manifest["selectors"] == sorted(PROBE_SELECTORS), "Lot identity/test binding changed")
-    require(isinstance(manifest["device"], str)
-            and re.fullmatch(r"[A-Za-z0-9-]{8,80}", manifest["device"]) is not None,
-            "Invalid selected device binding")
     config = configuration(manifest["suffix"])
-    require(private_read(directory / "ProbeLot.xcconfig") == config
-            and digest(config) == manifest["configuration_sha256"], "Lot configuration changed")
+    require(private_read(directory / "ProbeLot.xcconfig") == config, "Lot configuration changed")
     activation = execution(manifest["team"])
-    require(digest(activation) == manifest["execution_sha256"], "Signing configuration changed")
     path = directory / "Execution.xcconfig"
     if active or path.exists() or path.is_symlink():
         require(private_read(path) == activation, "Execution configuration missing or changed")
@@ -146,6 +220,8 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     create = sub.add_parser("prepare")
     create.add_argument("--source-sha", required=True)
+    create.add_argument("--identities-from", type=Path,
+                        help="Reuse only team/device from an explicitly selected private manifest")
     sub.add_parser("verify")
     activate = sub.add_parser("enable")
     activate.add_argument("--approved-manifest-sha256", required=True)
@@ -154,10 +230,13 @@ def main():
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     if args.command == "prepare":
+        if args.identities_from is not None:
+            team, device = identities_from(args.identities_from)
+        else:
+            team = getpass.getpass("Selected Xcode development team ID (private): ").strip()
+            device = getpass.getpass("Selected iPhone device ID (private; no discovery): ").strip()
         manifest, checksum = prepare(
-            root, args.source_sha,
-            getpass.getpass("Selected Xcode development team ID (private): ").strip(),
-            getpass.getpass("Selected iPhone device ID (private; no discovery): ").strip(),
+            root, args.source_sha, team, device,
         )
         print("Prepared unsigned lot. Do not test until this exact manifest is approved.")
     else:

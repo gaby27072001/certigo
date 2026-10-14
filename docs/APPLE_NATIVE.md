@@ -1077,6 +1077,37 @@ now:**
    python3 -B tools/prepare_apple_probe.py prepare --source-sha <REVIEWED_SOURCE_SHA>
    ```
 
+   To intentionally reuse the **same selected team and iPhone** without typing
+   their identifiers again, supply the exact absolute path of an existing
+   private lot's manifest:
+
+   ```sh
+   python3 -B tools/prepare_apple_probe.py prepare --source-sha <REVIEWED_SOURCE_SHA> --identities-from <ABSOLUTE_PREVIOUS_PRIVATE_LOT_PATH>/manifest.json
+   ```
+
+   This opt-in option reads only `team` and `device` into the new preparation.
+   It does not discover an account/device, read the old checkout HEAD, or copy
+   its source, suffix, approval, execution configuration or consent. Default
+   preparation retains the two masked interactive prompts. A new random
+   128-bit suffix, source binding, manifest/hash and unsigned configuration
+   are still generated; execution needs a new exact-lot approval.
+
+   Reuse is supported on macOS/POSIX only, where ownership/private modes can
+   be checked. It requires the exact `LocalLot/manifest.json` filename and
+   owner-only lot directory, regular single-link owner-only files, a bounded
+   read, exact companion `manifest.sha256`, strict complete schema/identity/
+   selector/configuration bindings, and no symlinked files or private
+   ancestors. The standard macOS `/tmp` alias to `/private/tmp` is accepted;
+   public sticky temporary directories need not be owner-only. Other
+   writable ancestors or aliases are rejected. The companion hash detects
+   inconsistency, not malicious control of both local files, and is not an
+   execution authorization. No identifiers are put into command arguments,
+   environment variables, successful output, logs or Git by this option.
+   Missing/expired temporary paths, malformed inputs or unsafe permissions
+   stop with an error, never silently fall back to prompts or another file.
+   Keep the old lot private and intact; select a different lot or use the
+   masked prompts if the intended team/iPhone changes.
+
 2. Keep the resulting manifest/hash for approval of **this exact source, lot,
    team, device and two tests**. Local files are in the ignored, private
    `apps/apple/CertigoNative/ProtectionProbe/LocalLot` directory; do not commit
