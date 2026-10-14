@@ -94,7 +94,23 @@ test('moving to hosted Linux cannot introduce persistent dependency caches', () 
   }
 });
 
-test('the full validator accepts old, pre-approved and applied Linux runner trees', (t) => {
+function setFixtureRunners(root, hosted) {
+  for (const [file, ids] of Object.entries(linuxCiJobs)) {
+    const location = path.join(root, '.github', 'workflows', file);
+    let currentJob;
+    const text = fs.readFileSync(location, 'utf8').split('\n').map((line) => {
+      const match = /^ {2}([\w-]+):\s*$/u.exec(line);
+      if (match) currentJob = match[1];
+      if (!ids.includes(currentJob) || !/^ {4}runs-on:/u.test(line)) return line;
+      const pool = file === 'ci-project-state.yml' && currentJob === 'validate'
+        ? 'certigo-trusted' : 'certigo-pr';
+      return `    runs-on: ${hosted ? hostedLinuxRunner : `[self-hosted, Linux, X64, ${pool}]`}`;
+    }).join('\n');
+    fs.writeFileSync(location, text);
+  }
+}
+
+function validateFixtureTransition(t, copiedHosted) {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-linux-ci-'));
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
   const base = path.join(temporary, 'base');
@@ -133,23 +149,19 @@ test('the full validator accepts old, pre-approved and applied Linux runner tree
     ], { encoding: 'utf8' });
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   };
+  setFixtureRunners(base, copiedHosted);
+  generate(base, '--write');
+  validate(base);
+  // The transition always starts from its own old state, not production's current runners.
+  setFixtureRunners(base, false);
   generate(base, '--write');
   validate(base);
   const originals = new Map();
-  for (const [file, ids] of Object.entries(linuxCiJobs)) {
+  for (const file of Object.keys(linuxCiJobs)) {
     const location = path.join(base, '.github', 'workflows', file);
-    const source = fs.readFileSync(location, 'utf8');
-    originals.set(location, source);
-    // Preserve all other bytes, including shell blocks and quoted policy markers.
-    let currentJob;
-    const future = source.split('\n').map((line) => {
-      const match = /^ {2}([\w-]+):\s*$/u.exec(line);
-      if (match) currentJob = match[1];
-      return ids.includes(currentJob) && /^ {4}runs-on:/u.test(line)
-        ? `    runs-on: ${hostedLinuxRunner}` : line;
-    }).join('\n');
-    fs.writeFileSync(location, future);
+    originals.set(location, fs.readFileSync(location, 'utf8'));
   }
+  setFixtureRunners(base, true);
   generate(base, '--pre-approve');
   const candidate = path.join(temporary, 'candidate');
   fs.cpSync(base, candidate, { recursive: true, filter: (source) => path.basename(source) !== 'node_modules' });
@@ -157,4 +169,10 @@ test('the full validator accepts old, pre-approved and applied Linux runner tree
   validate(base);
   generate(candidate, '--write');
   validate(candidate);
+}
+
+test('the full validator accepts old, pre-approved and applied Linux runner trees', (t) => {
+  for (const copiedHosted of [false, true]) {
+    validateFixtureTransition(t, copiedHosted);
+  }
 });
