@@ -101,5 +101,54 @@
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
   },
-  "preApproved": {}
+  "preApproved": {
+    ".github/workflows/ci-backend.yml": {
+      "digest": "998e89a94bbd7e637d918d35d251eb4a697c658ad5e380dadcc6e610ad35494a",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/ci-content.yml": {
+      "digest": "2aa6e5f89c849f1c3efec50a8c241a82c9e087492cca9b1915b140d28f46276d",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/ci-cortex-parity.yml": {
+      "digest": "68e9a26c33805ac7adff82bbd8cb31e83d16fd4a4011050e079131f49979f7c2",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/ci-migration-registry.yml": {
+      "digest": "29a8ff40bcae274a2ccd42045393374dd797a03ee1a464849c318754db1e3f42",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/ci-mobile.yml": {
+      "digest": "266f9c4f75b3ccf45e46797c22c7c99d4677e8ab5a7578f9641eda7a2f463fc9",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/ci-preflight.yml": {
+      "digest": "6c590fae265903fe48070e1089d6002e838c54a8a6e844a9d3efaf36c340545d",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/ci-project-state.yml": {
+      "digest": "8e742473f8743225a966dd258d0f56ee61c035f2b44aeab498e009a67002e6c0",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/dependency-vuln-scan.yml": {
+      "digest": "0b51d3d93277aff81b0c6e66b70847d8e318f5e7a418046d88f40e78e5d7aa90",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/fork-pr-policy.yml": {
+      "digest": "cc0278754754edfa6f1e7798f1898dc1dbd243bf62e4a2dfbdcc574856c389d7",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/lint-workflows.yml": {
+      "digest": "103e9bf44fee0d2f3978c88cc9660f98d26303634cc3a59f6076f4b827fdc5ad",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/pr-head-freshness.yml": {
+      "digest": "0b1832a5587c6337536e2a3ccea1dadd80f7043b86b1c0430e8683fe74d5b388",
+      "expires": "2026-10-28"
+    },
+    ".github/workflows/security-scan.yml": {
+      "digest": "5f21c0c766c0217456a7974ab0829174751e2463d6d97683fa9e883b7ae574d2",
+      "expires": "2026-10-28"
+    }
+  }
 }

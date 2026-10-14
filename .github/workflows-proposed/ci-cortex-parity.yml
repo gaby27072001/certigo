@@ -1,0 +1,142 @@
+name: ci-cortex-parity
+
+# CORTEX parity gate : le meme jeu de golden vectors partages
+# (packages/cortex/test/golden/cortex_golden_vectors.json) est rejoue par les DEUX
+# implementations de l'algorithme CORTEX — Dart (packages/cortex) et .NET
+# (backend/src/Certigo.Domain). Si l'une des deux diverge des vecteurs, son test
+# echoue et CE gate echoue : la PR est bloquee tant que Dart et .NET ne sont pas
+# d'accord bit-a-bit sur les sorties (version d'algo, scheduler/dueAt, weakness,
+# readiness). Source unique de verite = le JSON ; aucun vecteur duplique par langage.
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - "packages/cortex/**"
+      - "backend/src/Certigo.Domain/**"
+      - "backend/tests/Certigo.Domain.Tests/**"
+      - ".github/workflows/ci-cortex-parity.yml"
+  pull_request_target:
+
+concurrency:
+  group: ci-cortex-parity-${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && (github.event.action == 'opened' || github.event.action == 'synchronize') && github.run_attempt == 1 && github.event.pull_request.number > 0 && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}-{2}', github.event_name, github.run_id, github.run_attempt) }}
+  cancel-in-progress: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.run_attempt == 1 && github.event.pull_request.number > 0 && github.event.after != '' }}
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+    uses: ./.github/workflows/pr-head-freshness.yml
+    with:
+      pull-request-number: ${{ github.event.pull_request.number }}
+      event-head-sha: ${{ github.event.pull_request.head.sha }}
+    permissions:
+      pull-requests: read
+
+  # CI-08 : detecte si des chemins pertinents ont change pour cette PR. Une PR qui ne
+  # touche pas le perimetre CORTEX skippe le gate AU NIVEAU JOB (le check requis passe
+  # alors en success 'skipped'), au lieu d'un skip par filtre de chemin workflow-level
+  # qui laisserait le check requis Pending et bloquerait la PR indefiniment.
+  changes:
+    name: Detect changed paths
+    needs: freshness
+    if: ${{ always() && github.event_name == 'pull_request_target' && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'packages/cortex/**'
+              - 'backend/src/Certigo.Domain/**'
+              - 'backend/tests/Certigo.Domain.Tests/**'
+              - '.github/workflows/ci-cortex-parity.yml'
+
+  parity:
+    name: Dart <-> .NET golden vectors parity
+    needs: [freshness, changes]
+    # Only an internal head SHA from the trusted base workflow reaches this runner.
+    if: >-
+      always()
+      && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current != 'false')
+      && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    # Le runner-2 a /usr/share/dotnet NON inscriptible : on force actions/setup-dotnet a
+    # installer dans un dossier temporaire inscriptible pour que le job passe sur les 2 runners.
+    env:
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
+    steps:
+      - name: Enforce initial PR freshness validation
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        shell: bash
+        env:
+          FRESHNESS_RESULT: ${{ needs.freshness.result }}
+        run: |
+          if [ "$FRESHNESS_RESULT" != "success" ]; then
+            echo "::error::Initial PR head freshness validation did not succeed."
+            exit 1
+          fi
+      - name: Recheck current PR head after assignment
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Ensure CI prerequisites (unzip, jq, zip, xz)
+        run: |
+          set -e
+          missing=""
+          for t in unzip zip jq xz; do
+            command -v "$t" >/dev/null 2>&1 || missing="$missing $t"
+          done
+          if [ -n "$missing" ]; then
+            echo "Installing missing tools:$missing"
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y unzip zip jq xz-utils
+          else
+            echo "All prerequisites already present."
+          fi
+      - uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
+        with:
+          # Epingle pour une CI reproductible (Dart livre avec Flutter 3.44.4).
+          # A bumper deliberement avec FLUTTER_VERSION de ci-mobile.
+          sdk: "3.12.2"
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: "8.0.x"
+      # --- Cote Dart : rejoue les golden vectors partages via package:cortex ---
+      - name: Dart cortex get dependencies
+        working-directory: packages/cortex
+        run: dart pub get --enforce-lockfile
+      - name: Dart parity golden test
+        working-directory: packages/cortex
+        run: dart test test/cortex_golden_test.dart
+      # --- Cote .NET : rejoue LES MEMES golden vectors via Certigo.Domain ---
+      - name: .NET parity golden test
+        working-directory: backend
+        run: dotnet test tests/Certigo.Domain.Tests/Certigo.Domain.Tests.csproj --filter "FullyQualifiedName~CortexParityTests" --verbosity normal
