@@ -230,12 +230,204 @@
             try await expiryDuringProfile(resources)
             try await manualLessonJourney(resources)
             try await lessonFailureAndLateOwner(resources)
+            try resumeNavigation(resources)
             print(
-                "NativeModel: 10 synthetic coordination/journey scenarios passed (Linux source harness)."
+                "NativeModel: 10 coordination/journey scenarios and resume-state checks passed."
             )
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+        static func expectResumeError(
+            _ expected: NativeResumeError, _ operation: () throws -> Void
+        ) throws {
+            do {
+                try operation()
+            } catch let error as NativeResumeError {
+                try expect(error == expected, "Unexpected resume-state rejection: \(error)")
+                return
+            }
+            throw ModelTestFailure.assertion("Invalid resume-state operation succeeded")
+        }
+        static func resumeNavigation(_ resources: URL) throws {
+            let owner = "synthetic-owner"
+            let scope = "https://example.invalid/api"
+            let pin = "sha256:" + String(repeating: "a", count: 64)
+            let otherPin = "sha256:" + String(repeating: "b", count: 64)
+            let session = NativeResumeState.Session(
+                trackId: "fixture:foundations", lessonId: "fixture-lesson",
+                publicManifestId: pin, phase: .draft, attemptId: nil)
+            for tab in [NativeResumeState.Tab.objective, .explorer, .followUp] {
+                let root = try NativeResumeState(tab: tab, ownerId: owner, apiScope: scope)
+                try expect(try NativeResumeState.decode(root.encoded()) == root, "Root tab changed")
+                let draft = try NativeResumeState(
+                    tab: tab, ownerId: owner, apiScope: scope, session: session)
+                let reopened = try NativeResumeState.decode(draft.encoded())
+                let resumed = try reopened.reconciled(
+                    ownerId: owner, apiScope: scope, currentManifestId: pin, submissions: [])
+                try expect(resumed == draft, "Draft navigation changed on relaunch")
+            }
+            let draft = try NativeResumeState(
+                tab: .explorer, ownerId: owner, apiScope: scope, session: session)
+            try expectResumeError(.ownerChanged) {
+                _ = try draft.reconciled(
+                    ownerId: "another-owner", apiScope: scope,
+                    currentManifestId: pin, submissions: [])
+            }
+            try expectResumeError(.scopeChanged) {
+                _ = try draft.reconciled(
+                    ownerId: owner, apiScope: "https://other.invalid/api",
+                    currentManifestId: pin, submissions: [])
+            }
+            try expectResumeError(.releaseChanged) {
+                _ = try draft.reconciled(
+                    ownerId: owner, apiScope: scope,
+                    currentManifestId: otherPin, submissions: [])
+            }
+            let request = QuizSubmission(
+                clientAttemptId: "5d67e221-7649-4f23-bc51-a984f756d84a",
+                trackId: session.trackId, startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                answers: [
+                    QuizAnswer(
+                        itemId: "fixture-question", itemType: "mcq",
+                        selected: ["first"], latencyMs: 10)
+                ], publicManifestId: pin)
+            let submitting = try draft.beginningSubmission(request)
+            try expectResumeError(.duplicateSubmission) {
+                _ = try submitting.beginningSubmission(request)
+            }
+            try expectResumeError(.submissionUnresolved) {
+                _ = try submitting.reconciled(
+                    ownerId: owner, apiScope: scope, currentManifestId: pin, submissions: [])
+            }
+            var saved = SavedSubmission(
+                ownerId: owner, apiScope: scope, lessonId: session.lessonId, submission: request)
+            let relaunched = try NativeResumeState.decode(submitting.encoded())
+            let pending = try relaunched.reconciled(
+                ownerId: owner, apiScope: scope, currentManifestId: otherPin, submissions: [saved])
+            try expect(
+                pending.session?.phase == .pending
+                    && pending.session?.attemptId == request.clientAttemptId
+                    && pending.session?.publicManifestId == pin,
+                "Pending recovery changed original identity or pin")
+            try expectResumeError(.duplicateSubmission) {
+                _ = try pending.beginningSubmission(request)
+            }
+            let wrongOwner = SavedSubmission(
+                ownerId: "another-owner", apiScope: scope,
+                lessonId: session.lessonId, submission: request)
+            try expectResumeError(.attemptMismatch) {
+                _ = try pending.reconciled(
+                    ownerId: owner, apiScope: scope, currentManifestId: pin,
+                    submissions: [wrongOwner])
+            }
+            let wrongPin = QuizSubmission(
+                clientAttemptId: request.clientAttemptId, trackId: request.trackId,
+                startedAt: request.startedAt, answers: request.answers, publicManifestId: otherPin)
+            let mismatched = SavedSubmission(
+                ownerId: owner, apiScope: scope, lessonId: session.lessonId, submission: wrongPin)
+            try expectResumeError(.attemptMismatch) {
+                _ = try draft.beginningSubmission(wrongPin)
+            }
+            try expectResumeError(.attemptMismatch) {
+                _ = try pending.reconciled(
+                    ownerId: owner, apiScope: scope, currentManifestId: otherPin,
+                    submissions: [mismatched])
+            }
+            for invalid in [
+                SavedSubmission(
+                    ownerId: owner, apiScope: "https://other.invalid/api",
+                    lessonId: session.lessonId, submission: request),
+                SavedSubmission(
+                    ownerId: owner, apiScope: scope,
+                    lessonId: "different-lesson", submission: request),
+            ] {
+                try expectResumeError(.attemptMismatch) {
+                    _ = try pending.reconciled(
+                        ownerId: owner, apiScope: scope, currentManifestId: pin,
+                        submissions: [invalid])
+                }
+            }
+            try expectResumeError(.submissionUnresolved) {
+                _ = try pending.reconciled(
+                    ownerId: owner, apiScope: scope, currentManifestId: pin,
+                    submissions: [saved, saved])
+            }
+            saved.status = .corrected
+            try expectResumeError(.attemptMismatch) {
+                _ = try pending.reconciled(
+                    ownerId: owner, apiScope: scope, currentManifestId: pin, submissions: [saved])
+            }
+            saved.result = try CertigoAPI.decoder().decode(
+                QuizResult.self,
+                from: Data(contentsOf: resources.appendingPathComponent("result.json")))
+            let confirmed = try pending.reconciled(
+                ownerId: owner, apiScope: scope, currentManifestId: otherPin, submissions: [saved])
+            try expect(
+                confirmed.session?.phase == .confirmed,
+                "Outbox correction did not determine confirmed navigation")
+            var stillPending = saved
+            stillPending.status = .pendingCorrection
+            stillPending.result = nil
+            let notConfirmed = try confirmed.reconciled(
+                ownerId: owner, apiScope: scope, currentManifestId: pin,
+                submissions: [stillPending])
+            try expect(
+                notConfirmed.session?.phase == .pending,
+                "Persisted confirmed marker overruled pending outbox")
+            try expectResumeError(.submissionUnresolved) {
+                _ = try NativeResumeState.decode(confirmed.encoded()).reconciled(
+                    ownerId: owner, apiScope: scope, currentManifestId: pin, submissions: [])
+            }
+            saved.status = .failed
+            saved.result = nil
+            let failed = try confirmed.reconciled(
+                ownerId: owner, apiScope: scope, currentManifestId: pin, submissions: [saved])
+            try expect(failed.session?.phase == .failed, "Failed outbox entry became corrected")
+            let rootObject = try JSONSerialization.jsonObject(with: draft.encoded())
+            guard var object = rootObject as? [String: Any],
+                var fields = object["session"] as? [String: Any]
+            else { throw ModelTestFailure.assertion("Invalid synthetic route fixture") }
+            object["unexpected"] = true
+            try expectResumeError(.malformed) {
+                _ = try NativeResumeState.decode(JSONSerialization.data(withJSONObject: object))
+            }
+            object.removeValue(forKey: "unexpected")
+            object["schema"] = 99
+            try expectResumeError(.malformed) {
+                _ = try NativeResumeState.decode(JSONSerialization.data(withJSONObject: object))
+            }
+            object["schema"] = 1
+            fields["unknown"] = true
+            object["session"] = fields
+            try expectResumeError(.malformed) {
+                _ = try NativeResumeState.decode(JSONSerialization.data(withJSONObject: object))
+            }
+            fields.removeValue(forKey: "unknown")
+            fields["phase"] = "correctLocally"
+            object["session"] = fields
+            try expectResumeError(.malformed) {
+                _ = try NativeResumeState.decode(JSONSerialization.data(withJSONObject: object))
+            }
+            fields["phase"] = "submitting"
+            fields["attemptId"] = "not-an-attempt-uuid"
+            object["session"] = fields
+            try expectResumeError(.malformed) {
+                _ = try NativeResumeState.decode(JSONSerialization.data(withJSONObject: object))
+            }
+            try expectResumeError(.malformed) {
+                _ = try NativeResumeState.decode(Data(repeating: 32, count: 8_193))
+            }
+            try expectResumeError(.malformed) {
+                _ = try NativeResumeState.decode(Data("truncated {".utf8))
+            }
+            let traversal = NativeResumeState.Session(
+                trackId: session.trackId, lessonId: "..", publicManifestId: pin,
+                phase: .draft, attemptId: nil)
+            try expectResumeError(.malformed) {
+                _ = try NativeResumeState(
+                    tab: .objective, ownerId: owner, apiScope: scope, session: traversal)
+            }
         }
         @MainActor static func wait(_ condition: @MainActor () async -> Bool) async throws {
             for _ in 0..<10_000 {
