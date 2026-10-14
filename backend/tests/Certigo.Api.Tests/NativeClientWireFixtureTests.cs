@@ -95,6 +95,8 @@ public sealed class NativeClientWireFixtureTests
         response.Headers.GetValues("X-Content-Manifest-Id").Should().Equal(ManifestId);
         response.Headers.GetValues("ETag").Should().Equal($"\"{ManifestId}\"");
         var publicJson = JsonNode.Parse(ReadFixture("lesson.json"))!;
+        publicJson.AsObject().ContainsKey("publicManifestId").Should().BeFalse(
+            "the existing lesson pin is transported in response headers, not its body");
         publicJson["blocks"]![1]!["check"]!.AsObject().ContainsKey("matches").Should().BeFalse();
         publicJson["blocks"]![2]!["check"]!.AsObject().ContainsKey("matches").Should().BeTrue();
         RequireAnswerFree(publicJson);

@@ -43,3 +43,45 @@ invent a verdict for an answer absent from `results`.
 Authentication, live issuer/audience/redirect URIs and staging availability need
 their own evidence and approval. Do not infer them from these samples or run a
 login against a shared browser/profile.
+
+## Existing discovery, submission and resume
+
+Select the catalog track's `id`, then discover lesson IDs from
+`GET /api/me/paths/{trackId}` and fetch the exact returned lesson route.
+`learningAvailable` is an availability summary, not proof that a particular
+release is deployed or that a raw public question-bank file is submittable.
+
+For imported versioned `questionBank` tracks, the production
+`RuntimeContentProjector` creates one practice lesson per domain objective.
+Its runtime track ID uses `legacyId` when present, otherwise the canonical ID;
+the generated lesson is `{runtimeTrackId}.lesson.{objectiveId}.practice`.
+Question/check and concept IDs likewise preserve their legacy ID when present,
+otherwise their canonical ID; option IDs remain unchanged. These are server
+projection rules, not permission for the client to fabricate lesson IDs.
+Discover the projected path from the API. Public v3 choice text must first pass
+the producer/backend schema adapter; it is not an alternative `AnswerDto`
+encoding. Submit exact check IDs and selected option IDs from the served lesson.
+
+The lesson response carries the version pin in `X-Content-Manifest-Id`/`ETag`,
+not a `publicManifestId` body property. Copy that header into the submission's
+`publicManifestId`; legacy lessons have no such pin. Historical pins resolve
+the matching imported private answer key even if the active release changes.
+This source contract does not establish any live import, flag or activation.
+
+After submission, re-read the path for server-owned concept progress.
+`completed` means all gradable concepts have a recorded review, not a perfect
+score; an incorrect answer can complete a lesson while leaving low mastery.
+The path contains no latest-attempt ID, selections or feedback, and there is
+no latest-quiz-attempt GET route in this contract. An unfinished session is
+restored from the client's owner-scoped local state. A submitted-but-unconfirmed
+session retries the original payload/clientAttemptId/pin to recover the stored
+result without crediting rewards again; do not submit a new attempt merely to
+refresh progress. Cross-device restoration of unsubmitted local answers is
+not provided by these routes.
+
+`NativeLearningJourneyContractTests` exercises the real catalog/content/path/
+quiz services with synthetic in-memory storage, including wrong-answer
+completion, owner-isolated progress, idempotent retries and historical pinning.
+`RuntimeContentProjectorTests` separately checks question-bank IDs/options and
+public/private mapping. Neither is a live Cosmos/import/authentication test or
+proof of persistent-store durability across process restarts.
