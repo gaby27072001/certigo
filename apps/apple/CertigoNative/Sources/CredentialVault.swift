@@ -1,16 +1,11 @@
 import Foundation
-
 import Security
 
-struct DeveloperConnection: Codable {
-    let baseURL: String
-    let accessToken: String
-}
 enum CredentialVaultError: Error {
     case status(OSStatus)
     case invalidItem
 }
-struct CredentialVault {
+struct CredentialVault: DeveloperConnectionVault {
     private var query: [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,

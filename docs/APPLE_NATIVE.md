@@ -306,6 +306,53 @@ power-loss, authentication or migration proofs. A future app composition lot
 must still define its explicit activation and authenticated owner lifecycle;
 Apple build/runtime execution requires its separate approval.
 
+### Inactive authentication coordination with mocks
+
+`NativeModel` now accepts an internal client factory, developer-vault interface,
+isolated preferences and clock. An optional explicit tuple reuses the existing
+`CIAMAuthenticationProvider` and validated `CIAMConfiguration`; the default
+`NativeModel()` still has **no authentication provider** and retains the manual
+developer connector. The SwiftUI composition, callback handling, MSAL adapter,
+package interfaces, runtime enablement and signing settings are unchanged.
+There is no SDK initialization or configuration/endpoint discovery in this lot.
+
+The injected candidate handles interactive versus silent acquisition explicitly,
+rejects empty/expired tokens, and refreshes silently within 30 seconds of expiry
+before a model operation. It repeats `/me` and uses the returned backend owner,
+never an SDK account ID. Same-owner refresh retains session selections; a changed
+owner clears the old lesson/selection/outcome state before publication. Generation
+checks suppress late login, profile and refresh completions after logout, and
+expiry is rechecked at the asynchronous publication boundaries. Silent failure
+does not open an interactive browser or guess a successful renewal. HTTP 401 is
+reported; no automatic request replay or broad authentication fallback is added.
+The developer token vault is not read/written/cleared by the injected auth path.
+
+Logout immediately invalidates visible/client state and prevents automatic
+restore, then requests local account removal. Refusal (including an acquisition
+still in progress) remains an explicit error with an explicit cleanup retry;
+late acquisition cannot turn it into UI success. This is not remote or browser
+logout and does not establish that a real SDK cache has been cleared.
+
+`tools/test_apple_model.sh <existing-Swift-package-scratch-path>` runs on Linux
+with Swift on PATH. It builds the existing package and compiles the **actual**
+`NativeModel.swift` in Swift 6 complete concurrency mode against those package
+objects and a test harness. Only the platform vault implementation is replaced:
+the Linux stand-in throws on every operation and tests inject an in-memory vault.
+All HTTP responses, provider operations and preferences are isolated synthetic
+fixtures; no real Keychain, SDK cache, token, registration or network is used.
+The harness covers manual save/restore and failed clear, authoritative owner
+switch, fresh versus near-expiry refresh, silent interaction-required failure,
+logout during login/refresh/profile fetch, refused local cache removal/retry,
+and expiry during `/me` without a subsequent catalog request.
+
+This portable source check does **not** compile Security/UIKit/MSAL, build the
+Apple app, or execute an Xcode test target. Apple compilation and a separately
+approved dedicated-account lifecycle remain required before activating this
+candidate. Startup cache account selection, callback routing, real cache
+isolation/removal and ephemeral browser behavior are still unverified. A real
+`GET /me` can provision a server profile (`GetOrProvisionAsync`), so even the
+first live connection is not a read-only authentication probe.
+
 No production readiness follows from this foundation alone. Required gates:
 actual Xcode simulator build and iPhone/iPad UI tests; supported CIAM SDK and test
 account login/refresh/logout; cross-language Cortex vectors; shared backend HTTP
