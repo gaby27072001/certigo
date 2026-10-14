@@ -5,6 +5,7 @@ import json
 import plistlib
 import re
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -60,6 +61,67 @@ def validate_probe_plist(info, *, test):
     expected = PROBE_TEST_BUNDLE if test else PROBE_BUNDLE
     require(info.get("CFBundleIdentifier") == expected, "Wrong built probe identity")
     require(not info.get("CFBundleURLTypes"), "Probe must not declare callback registrations")
+
+
+def validate_probe_entitlements(entitlements, *, bundle, team, prefix):
+    require(bundle in (PROBE_BUNDLE, PROBE_TEST_BUNDLE), "Unexpected probe signing target")
+    require(all(isinstance(value, str) and value for value in (team, prefix)),
+            "Explicit selected team and App ID prefix are required")
+    require(re.fullmatch(r"[A-Z0-9]{10}", team) is not None
+            and re.fullmatch(r"[A-Z0-9]{10}", prefix) is not None,
+            "Invalid selected team or App ID prefix format")
+    require(isinstance(entitlements, dict), "Signed entitlements must be a dictionary")
+    allowed = {"application-identifier", "com.apple.developer.team-identifier",
+               "get-task-allow", "keychain-access-groups"}
+    require(set(entitlements) <= allowed, "Unexpected signed probe permission")
+    application = prefix + "." + bundle
+    require(entitlements.get("application-identifier") == application,
+            "Wrong signed probe application identity")
+    require(entitlements.get("com.apple.developer.team-identifier") == team,
+            "Wrong signed probe team")
+    require(entitlements.get("get-task-allow") is True,
+            "Probe requires a development signature")
+    groups = entitlements.get("keychain-access-groups")
+    require(groups is None or groups == [application],
+            "Probe must not gain an explicit shared Keychain group")
+    return application, groups, allowed
+
+
+def validate_probe_signing(entitlements, profile, *, bundle, team, prefix, device, now):
+    """Check supplied decoded artifact metadata, not signature/CMS authenticity."""
+    application, groups, allowed = validate_probe_entitlements(
+        entitlements, bundle=bundle, team=team, prefix=prefix,
+    )
+    require(isinstance(device, str) and device, "Explicit selected device required")
+    require(isinstance(profile, dict), "Decoded profile must be a dictionary")
+    require(profile.get("TeamIdentifier") == [team], "Wrong profile team")
+    require(profile.get("ApplicationIdentifierPrefix") == [prefix], "Wrong profile App ID prefix")
+    require(profile.get("ProvisionsAllDevices") is not True, "Unexpected all-device profile")
+    devices = profile.get("ProvisionedDevices")
+    require(isinstance(devices, list) and device in devices, "Selected device not provisioned")
+    require(all(isinstance(value, str) and value for value in devices),
+            "Invalid profile device metadata")
+    created, expires = profile.get("CreationDate"), profile.get("ExpirationDate")
+    require(isinstance(created, datetime) and isinstance(expires, datetime),
+            "Missing profile validity interval")
+    def utc(value):
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    require(utc(created) <= utc(now) < utc(expires), "Profile is not currently valid")
+    certificates = profile.get("DeveloperCertificates")
+    require(isinstance(certificates, list) and certificates
+            and all(isinstance(value, bytes) and value for value in certificates),
+            "Missing profile development certificates")
+    granted = profile.get("Entitlements")
+    require(isinstance(granted, dict) and set(granted) <= allowed,
+            "Unexpected profile permission requires manual review")
+    require(granted.get("com.apple.developer.team-identifier") == team
+            and granted.get("get-task-allow") is True, "Wrong development profile grant")
+    require(granted.get("application-identifier") in (application, prefix + ".*"),
+            "Profile does not grant the selected application identity")
+    grants = granted.get("keychain-access-groups")
+    require(grants is None or grants in ([application], [prefix + ".*"]),
+            "Unexpected profile Keychain grant")
+    require(groups is None or grants is not None, "Signed Keychain group absent from profile grant")
 
 
 def validate_pins(document):
@@ -206,6 +268,13 @@ def main():
     parser.add_argument("--resolved-lock", type=Path)
     parser.add_argument("--built-probe-plist", type=Path)
     parser.add_argument("--built-probe-test-plist", type=Path)
+    parser.add_argument("--probe-entitlements", type=Path)
+    parser.add_argument("--probe-profile", type=Path)
+    parser.add_argument("--probe-test-entitlements", type=Path)
+    parser.add_argument("--probe-test-profile", type=Path)
+    parser.add_argument("--expected-team")
+    parser.add_argument("--expected-app-id-prefix")
+    parser.add_argument("--expected-device")
     args = parser.parse_args()
     validate_source(Path(__file__).resolve().parents[1])
     if args.built_dev_plist:
@@ -218,6 +287,33 @@ def main():
         validate_probe_plist(plistlib.loads(args.built_probe_plist.read_bytes()), test=False)
     if args.built_probe_test_plist:
         validate_probe_plist(plistlib.loads(args.built_probe_test_plist.read_bytes()), test=True)
+    signing_inputs = (
+        args.probe_entitlements, args.probe_profile, args.probe_test_entitlements,
+        args.expected_team, args.expected_app_id_prefix, args.expected_device,
+        args.built_probe_plist, args.built_probe_test_plist,
+    )
+    if any(signing_inputs[:6]) or args.probe_test_profile:
+        require(all(signing_inputs), "Supply both built plists, both signing artifacts and selections")
+        validate_probe_signing(
+            plistlib.loads(args.probe_entitlements.read_bytes()),
+            plistlib.loads(args.probe_profile.read_bytes()), bundle=PROBE_BUNDLE,
+            team=args.expected_team, prefix=args.expected_app_id_prefix,
+            device=args.expected_device, now=datetime.now(timezone.utc),
+        )
+        test_entitlements = plistlib.loads(args.probe_test_entitlements.read_bytes())
+        validate_probe_entitlements(
+            test_entitlements, bundle=PROBE_TEST_BUNDLE, team=args.expected_team,
+            prefix=args.expected_app_id_prefix,
+        )
+        # Hosted test bundles may not embed their own profile; never invent one.
+        if args.probe_test_profile:
+            validate_probe_signing(
+                test_entitlements, plistlib.loads(args.probe_test_profile.read_bytes()),
+                bundle=PROBE_TEST_BUNDLE, team=args.expected_team,
+                prefix=args.expected_app_id_prefix, device=args.expected_device,
+                now=datetime.now(timezone.utc),
+            )
+        print("Supplied signing metadata matched; codesign/CMS authenticity is a separate gate.")
     print("Public source metadata checked; supplied built artifacts only if explicitly requested.")
     print("No SDK initialization/cache, installed-app collision or runtime authentication proof.")
 

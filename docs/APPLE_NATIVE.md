@@ -937,6 +937,57 @@ Linux, not an Apple typecheck. Shared paired-test bytes and seven original
 HTTP fixture blobs remain unchanged. Direct bounded review of host binding,
 dependencies and default signing restrictions is source evidence only.
 
+The later bounded artifact checker accepts only explicitly supplied decoded
+entitlement/profile plists and selected team, App ID prefix and device.
+Following Apple's [TN2415 entitlement troubleshooting](https://developer.apple.com/library/archive/technotes/tn2415/_index.html),
+signed application identifiers are exact while a profile may grant its
+selected prefix wildcard. Team and App ID prefix are separate explicit
+inputs, not assumed identical. The checker requires the expected probe
+application ID, team, development debugging permission, optional sole default
+Keychain group matching that application ID, provisioned selected device,
+current profile validity interval and development-certificate metadata.
+Unexpected signed/profile permissions, shared groups, wrong identities,
+invalid/expired profiles and all-device profiles stop for manual review.
+No policy entitlement is added to make the test pass.
+
+Future invocation, only on artifact files from the approved build:
+
+```sh
+python3 -B tools/validate_apple_noauth.py \
+  --built-probe-plist "$HOST/Info.plist" \
+  --built-probe-test-plist "$TEST_BUNDLE/Info.plist" \
+  --probe-entitlements "$B/host-entitlements.plist" \
+  --probe-profile "$B/host-profile.plist" \
+  --probe-test-entitlements "$B/test-entitlements.plist" \
+  --expected-team "$APPROVED_PERSONAL_TEAM" \
+  --expected-app-id-prefix "$APPROVED_APP_ID_PREFIX" \
+  --expected-device "$APPROVED_DEVICE_ID"
+```
+
+Each file is an explicit input, not a directory search. The entitlement
+inputs are prior `codesign` readbacks of the specific built products; the
+decoded profile is the specific built host's embedded profile, not a global
+profile/account lookup. The optional `--probe-test-profile` checks a separate
+profile only if the actual hosted test product embeds one; none is invented.
+If the hosted test's actual entitlement layout lacks the expected identity
+keys or otherwise differs, the checker stops for manual artifact review;
+it does not assume that this conservative allowlist is a proven Xcode 27
+hosted-test signing schema.
+
+**Metadata checks are not cryptographic signature/CMS verification**, proof
+of certificate ownership, runner identity, installed absence or successful
+physical hosting. Verify signatures/provisioning authenticity independently
+on the fixed artifacts before installation. Synthetic unit fixtures
+deliberately use noncertificate bytes to keep that boundary explicit.
+No team/device/account/profile data is committed or printed by successful
+validation. Existing exact-SHA execution approval is not automatically
+retargeted to a later validator commit. The application/test sources remain
+unchanged from the approved source candidate.
+The artifact-checker lot passed eleven hermetic Python tests and the bounded
+source validator; the application/package/project/scheme diff against exact
+25e736 is empty. These tests validate metadata rejection rules only, not
+real signed artifacts or execution. No Apple/device command was run.
+
 ## Non-destructive Flutter queue inspection
 
 `FlutterQueueReader` is a **dry-run inspector**, not an importer or a preferences/

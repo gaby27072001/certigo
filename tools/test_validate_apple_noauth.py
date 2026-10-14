@@ -1,4 +1,7 @@
 import unittest
+import plistlib
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from validate_apple_noauth import (
@@ -6,10 +9,107 @@ from validate_apple_noauth import (
     validate_dev_plist, validate_pins, validate_test_plist,
     validate_probe,
     validate_probe_plist, PROBE_BUNDLE, PROBE_TEST_BUNDLE,
+    validate_probe_signing,
+    validate_probe_entitlements,
 )
 
 
 class AppleNoAuthMetadataTests(unittest.TestCase):
+    def signing(self):
+        now = datetime(2026, 10, 13, tzinfo=timezone.utc)
+        team, prefix = "A" * 10, "B" * 10
+        app = prefix + "." + PROBE_BUNDLE
+        signed = {
+            "application-identifier": app, "com.apple.developer.team-identifier": team,
+            "get-task-allow": True, "keychain-access-groups": [app],
+        }
+        profile = {
+            "TeamIdentifier": [team], "ApplicationIdentifierPrefix": [prefix],
+            "ProvisionedDevices": ["synthetic-selected-device"],
+            "CreationDate": now - timedelta(days=1), "ExpirationDate": now + timedelta(days=1),
+            "DeveloperCertificates": [b"synthetic-not-a-certificate"],
+            "Entitlements": {
+                "application-identifier": prefix + ".*",
+                "com.apple.developer.team-identifier": team,
+                "get-task-allow": True, "keychain-access-groups": [prefix + ".*"],
+            },
+        }
+        selections = dict(bundle=PROBE_BUNDLE, team=team, prefix=prefix,
+                          device="synthetic-selected-device", now=now)
+        return signed, profile, selections
+
+    def test_signing_metadata_accepts_only_exact_signed_identity_and_bounded_profile_grant(self):
+        signed, profile, selections = self.signing()
+        validate_probe_signing(signed, profile, **selections)
+        # Decoded provisioning plists represent dates without a timezone.
+        decoded = plistlib.loads(plistlib.dumps({
+            **profile, "CreationDate": profile["CreationDate"].replace(tzinfo=None),
+            "ExpirationDate": profile["ExpirationDate"].replace(tzinfo=None),
+        }))
+        validate_probe_signing(signed, decoded, **selections)
+        # A metadata-only check intentionally does not validate synthetic certificate bytes.
+        profile["Entitlements"]["application-identifier"] = signed["application-identifier"]
+        profile["Entitlements"]["keychain-access-groups"] = signed["keychain-access-groups"]
+        validate_probe_signing(signed, profile, **selections)
+
+    def test_hosted_test_signature_identity_is_separate_without_assuming_an_embedded_profile(self):
+        signed, _, selections = self.signing()
+        application = selections["prefix"] + "." + PROBE_TEST_BUNDLE
+        signed["application-identifier"] = application
+        signed["keychain-access-groups"] = [application]
+        validate_probe_entitlements(
+            signed, bundle=PROBE_TEST_BUNDLE, team=selections["team"],
+            prefix=selections["prefix"],
+        )
+        del signed["application-identifier"]
+        with self.assertRaises(ValueError):
+            validate_probe_entitlements(
+                signed, bundle=PROBE_TEST_BUNDLE, team=selections["team"],
+                prefix=selections["prefix"],
+            )
+
+    def test_signing_metadata_rejects_wrong_team_identity_or_extra_permissions(self):
+        signed, profile, selections = self.signing()
+        for key, value in (
+            ("application-identifier", "B" * 10 + ".com.certigo.native.dev"),
+            ("com.apple.developer.team-identifier", "C" * 10),
+            ("get-task-allow", False),
+            ("get-task-allow", 1),
+            ("keychain-access-groups", ["com.microsoft.adalcache"]),
+            ("com.apple.security.application-groups", ["group.synthetic"]),
+            ("aps-environment", "development"),
+            ("com.apple.developer.default-data-protection", "NSFileProtectionNone"),
+        ):
+            changed = deepcopy(signed)
+            changed[key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                validate_probe_signing(changed, profile, **selections)
+
+    def test_profile_rejects_unselected_devices_invalid_dates_and_unexpected_grants(self):
+        signed, profile, selections = self.signing()
+        for key, value in (
+            ("TeamIdentifier", ["C" * 10]),
+            ("ApplicationIdentifierPrefix", ["C" * 10]),
+            ("ProvisionedDevices", ["synthetic-different-device"]),
+            ("ExpirationDate", selections["now"]),
+            ("CreationDate", selections["now"] + timedelta(days=1)),
+            ("DeveloperCertificates", []),
+            ("ProvisionsAllDevices", True),
+        ):
+            changed = deepcopy(profile)
+            changed[key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_probe_signing(signed, changed, **selections)
+        for key, value in (
+            ("application-identifier", "*"),
+            ("keychain-access-groups", ["C" * 10 + ".*"]),
+            ("com.apple.security.application-groups", ["group.synthetic"]),
+        ):
+            changed = deepcopy(profile)
+            changed["Entitlements"][key] = value
+            with self.subTest(grant=key), self.assertRaises(ValueError):
+                validate_probe_signing(signed, changed, **selections)
+
     def probe(self):
         native = Path(__file__).resolve().parents[1] / "apps" / "apple" / "CertigoNative"
         return (
