@@ -26,10 +26,10 @@ production sign-in. A demo is opt-in, synthetic, and never sends requests.
 | Objective | Selected objective | Start or resume | Demo state only |
 | Catalog | Loading / empty / error | Retry or reset preview | Scenario controls, not a server outage |
 | Exercise | Unselected / selected | Choose and submit | No local live verdict |
-| Submission | Offline / pending | Keep working or retry | Pending is not correct or incorrect |
+| Submission | Offline / pending | Resume or advance the explicit simulation | Pending is not correct or incorrect |
 | Explanation | Mock response | Read and return | Explicit simulation, no rewards or readiness |
 | Follow-up | Pending / reviewed | Reopen work | No server-confirmed progress claim |
-| Resume | Stored demo state | Continue or reset | Separate demo-only persistence key |
+| Resume | Stored demo flow and tab route | Continue or reset | Separate demo-only persistence keys |
 
 ## Validation contract
 
@@ -57,14 +57,24 @@ does not instantiate NativeModel or touch the developer vault. The explicit
 Capture the empty objective, then Explorer > Cloud découverte > Choisir cet
 objectif > Objectif. Capture the violet objective plane and resume action,
 open the exercise, select an option, and record the fictive answer. Capture
-pending before using `Recevoir l'explication simulée`. That explicit action
+pending before using `Simuler l'explication fictive`. That explicit action
 shows a static explanation for the invented scenario, independent of the
 selected option; it never grades the answer.
 
 Return to Suivi to reopen it; close and reopen the demo to verify local resume.
-Options > Scénarios exposes catalog loading/empty/error and simulated offline.
-Offline blocks the mock explanation but keeps pending. Reset requires a
-confirmation and affects only `certigo.native-design-demo.v1`.
+The selected tab and the active objective/catalog route are restored with the
+synthetic answer phase; invalid route/state combinations are rejected. This is
+demo-only navigation and does not restore or persist any live answer. Options >
+Scénarios exposes catalog loading/empty/error and simulated offline. Offline
+keeps the answer pending and offers one explicit action to leave that scenario.
+The snapshot stores flow and navigation together under the demo-only
+`certigo.native-design-demo.v1` key; older flow-only snapshots still restore to
+the objective tab. Reset requires a confirmation and clears only this demo key.
+
+Selection is marked with both visual emphasis and the native selected
+accessibility trait. Pending is explicitly not confirmed; the reviewed demo
+state is labeled as an invented explanation with no verdict. No synthetic
+state is connected to the development API connector.
 
 ## Review provenance
 

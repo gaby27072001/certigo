@@ -84,6 +84,73 @@ struct NativeDemoFlowTests {
                 answer.phase == .reviewed && answer.selection == index,
                 "option \(index) never triggers a local grade")
         }
+        var navigationFlow = NativeDemoFlow()
+        navigationFlow.choose(.fundamentals)
+        navigationFlow.select(1)
+        navigationFlow.submit()
+        let exerciseNavigation = try NativeDemoNavigationState.make(
+            selectedTab: .objective,
+            objectivePath: [.exercise],
+            catalogPath: [],
+            flow: navigationFlow)
+        let restoredNavigation = try NativeDemoNavigationState.restore(
+            JSONEncoder().encode(exerciseNavigation), for: navigationFlow)
+        try check(
+            restoredNavigation == exerciseNavigation && navigationFlow.phase == .pending,
+            "resume restores the objective tab, exercise route, and pending demo state")
+        let catalogNavigation = try NativeDemoNavigationState.make(
+            selectedTab: .catalog,
+            objectivePath: [],
+            catalogPath: [.goalDetail(.operations)],
+            flow: navigationFlow)
+        try check(
+            try NativeDemoNavigationState.restore(
+                JSONEncoder().encode(catalogNavigation), for: navigationFlow) == catalogNavigation,
+            "catalog detail route survives demo re-entry")
+        var emptyFlow = NativeDemoFlow()
+        let invalidNavigation = NativeDemoNavigationState(
+            selectedTab: .objective,
+            objectivePath: [.exercise],
+            catalogPath: [])
+        var rejectedRoute = false
+        do {
+            _ = try NativeDemoNavigationState.restore(
+                JSONEncoder().encode(invalidNavigation), for: emptyFlow)
+        } catch {
+            rejectedRoute = true
+        }
+        try check(rejectedRoute, "exercise route without a selected objective is rejected")
+        emptyFlow.choose(.operations)
+        var rejectedWrongStack = false
+        let wrongStack = NativeDemoNavigationState(
+            selectedTab: .catalog,
+            objectivePath: [.goalDetail(.operations)],
+            catalogPath: [])
+        do {
+            _ = try NativeDemoNavigationState.restore(
+                JSONEncoder().encode(wrongStack), for: emptyFlow)
+        } catch {
+            rejectedWrongStack = true
+        }
+        try check(rejectedWrongStack, "route stored under the wrong tab is rejected")
+        let snapshot = try NativeDemoSnapshot.make(
+            flow: navigationFlow, navigation: exerciseNavigation)
+        try check(
+            try NativeDemoSnapshot.restore(JSONEncoder().encode(snapshot)) == snapshot,
+            "demo flow and route restore together from one snapshot")
+        let legacySnapshot = try NativeDemoSnapshot.restore(JSONEncoder().encode(navigationFlow))
+        try check(
+            legacySnapshot.flow == navigationFlow
+                && legacySnapshot.navigation.selectedTab == .objective
+                && legacySnapshot.navigation.objectivePath.isEmpty,
+            "existing flow-only demo storage remains resumable")
+        var rejectedOversizedSnapshot = false
+        do {
+            _ = try NativeDemoSnapshot.restore(Data(repeating: 0, count: 8_193))
+        } catch {
+            rejectedOversizedSnapshot = true
+        }
+        try check(rejectedOversizedSnapshot, "oversized demo snapshots are rejected")
         print("\(count) demo-only Foundation checks passed; no Apple UI was compiled or rendered.")
     }
 }
