@@ -8,10 +8,13 @@ from validate_apple_noauth import (
     DEV_BUNDLE, DEV_SCHEME, EXPECTED_PINS, PIN_LOCATIONS, TEST_BUNDLE,
     validate_dev_plist, validate_pins, validate_test_plist,
     validate_probe,
-    validate_probe_plist, PROBE_BUNDLE, PROBE_TEST_BUNDLE,
+    validate_probe_plist, probe_bundles,
     validate_probe_signing,
     validate_probe_entitlements,
 )
+
+LOT_SUFFIX = "ab" * 16
+PROBE_BUNDLE, PROBE_TEST_BUNDLE = probe_bundles(LOT_SUFFIX)
 
 
 class AppleNoAuthMetadataTests(unittest.TestCase):
@@ -35,7 +38,7 @@ class AppleNoAuthMetadataTests(unittest.TestCase):
             },
         }
         selections = dict(bundle=PROBE_BUNDLE, team=team, prefix=prefix,
-                          device="synthetic-selected-device", now=now)
+                          device="synthetic-selected-device", now=now, lot_suffix=LOT_SUFFIX)
         return signed, profile, selections
 
     def test_signing_metadata_accepts_only_exact_signed_identity_and_bounded_profile_grant(self):
@@ -59,13 +62,13 @@ class AppleNoAuthMetadataTests(unittest.TestCase):
         signed["keychain-access-groups"] = [application]
         validate_probe_entitlements(
             signed, bundle=PROBE_TEST_BUNDLE, team=selections["team"],
-            prefix=selections["prefix"],
+            prefix=selections["prefix"], lot_suffix=LOT_SUFFIX,
         )
         del signed["application-identifier"]
         with self.assertRaises(ValueError):
             validate_probe_entitlements(
                 signed, bundle=PROBE_TEST_BUNDLE, team=selections["team"],
-                prefix=selections["prefix"],
+                prefix=selections["prefix"], lot_suffix=LOT_SUFFIX,
             )
 
     def test_signing_metadata_rejects_wrong_team_identity_or_extra_permissions(self):
@@ -123,13 +126,15 @@ class AppleNoAuthMetadataTests(unittest.TestCase):
         project, scheme, source = self.probe()
         validate_probe(project, scheme, source)
         for changed in (
-            project.replace('"com.certigo.protection-probe.tests"', '"com.certigo.native.dev"'),
+            project.replace('"$(PROBE_TEST_BUNDLE_IDENTIFIER)"', '"com.certigo.native.dev"'),
             project.replace("CertigoProtectionProbe.app/CertigoProtectionProbe",
                             "CertigoNative.app/CertigoNative"),
             project.replace("productName = CertigoData; };\n\t\t000000000000000000000152",
                             "productName = MSAL; };\n\t\t000000000000000000000152"),
-            project.replace('PRODUCT_BUNDLE_IDENTIFIER = "com.certigo.protection-probe";',
-                            'DEVELOPMENT_TEAM = example; PRODUCT_BUNDLE_IDENTIFIER = "com.certigo.protection-probe";'),
+            project.replace('PRODUCT_BUNDLE_IDENTIFIER = "$(PROBE_HOST_BUNDLE_IDENTIFIER)";',
+                            'DEVELOPMENT_TEAM = example; PRODUCT_BUNDLE_IDENTIFIER = "$(PROBE_HOST_BUNDLE_IDENTIFIER)";'),
+            project.replace(" verify-build", " verify"),
+            project.replace('$(PROBE_CODE_SIGNING_ALLOWED)', 'YES'),
         ):
             with self.assertRaises(ValueError):
                 validate_probe(changed, scheme, source)
@@ -143,15 +148,15 @@ class AppleNoAuthMetadataTests(unittest.TestCase):
                 "testProtectionAttributeRepresentationsFailClosed"), source)
 
     def test_probe_artifacts_require_exact_separate_identities_without_callbacks(self):
-        validate_probe_plist({"CFBundleIdentifier": PROBE_BUNDLE}, test=False)
-        validate_probe_plist({"CFBundleIdentifier": PROBE_TEST_BUNDLE}, test=True)
+        validate_probe_plist({"CFBundleIdentifier": PROBE_BUNDLE}, test=False, lot_suffix=LOT_SUFFIX)
+        validate_probe_plist({"CFBundleIdentifier": PROBE_TEST_BUNDLE}, test=True, lot_suffix=LOT_SUFFIX)
         with self.assertRaises(ValueError):
-            validate_probe_plist({"CFBundleIdentifier": DEV_BUNDLE}, test=False)
+            validate_probe_plist({"CFBundleIdentifier": DEV_BUNDLE}, test=False, lot_suffix=LOT_SUFFIX)
         with self.assertRaises(ValueError):
             validate_probe_plist({
                 "CFBundleIdentifier": PROBE_TEST_BUNDLE,
                 "CFBundleURLTypes": [{"CFBundleURLSchemes": ["certigo"]}],
-            }, test=True)
+            }, test=True, lot_suffix=LOT_SUFFIX)
 
     def pins(self):
         return {"pins": [

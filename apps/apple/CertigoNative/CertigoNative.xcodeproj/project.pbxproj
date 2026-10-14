@@ -21,6 +21,7 @@
 		000000000000000000000111 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectionProbe/CertigoProtectionProbeApp.swift; sourceTree = SOURCE_ROOT; };
 		000000000000000000000112 = {isa = PBXFileReference; explicitFileType = wrapper.application; path = CertigoProtectionProbe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000113 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = CertigoProtectionProbeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000114 = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ProtectionProbe/ProbeLot.xcconfig; sourceTree = SOURCE_ROOT; };
 		000000000000000000000011 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertigoNativeApp.swift; sourceTree = "<group>"; };
 		000000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeModel.swift; sourceTree = "<group>"; };
 		000000000000000000000013 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialVault.swift; sourceTree = "<group>"; };
@@ -31,7 +32,7 @@
 		000000000000000000000018 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = CertigoNoAuthTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000020 = {
 			isa = PBXGroup;
-			children = (000000000000000000000021, 000000000000000000000022, 000000000000000000000016, 000000000000000000000017, 000000000000000000000111);
+			children = (000000000000000000000021, 000000000000000000000022, 000000000000000000000016, 000000000000000000000017, 000000000000000000000111, 000000000000000000000114);
 			sourceTree = "<group>";
 		};
 		000000000000000000000021 = {
@@ -87,13 +88,37 @@
 		000000000000000000000133 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000102); runOnlyForDeploymentPostprocessing = 0; };
 		000000000000000000000134 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000103); runOnlyForDeploymentPostprocessing = 0; };
 		000000000000000000000135 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		000000000000000000000136 = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ();
+			name = "Verify approved private probe lot";
+			outputPaths = ();
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\npython3 -B \"$PROJECT_DIR/../../../tools/prepare_apple_probe.py\" verify-build\n";
+		};
+		000000000000000000000137 = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ();
+			name = "Verify approved private probe lot";
+			outputPaths = ();
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\npython3 -B \"$PROJECT_DIR/../../../tools/prepare_apple_probe.py\" verify-build\n";
+		};
 		000000000000000000000141 = {isa = XCSwiftPackageProductDependency; package = 000000000000000000000040; productName = CertigoData; };
 		000000000000000000000152 = {isa = PBXContainerItemProxy; containerPortal = 000000000000000000000060; proxyType = 1; remoteGlobalIDString = 000000000000000000000150; remoteInfo = CertigoProtectionProbe; };
 		000000000000000000000153 = {isa = PBXTargetDependency; target = 000000000000000000000150; targetProxy = 000000000000000000000152; };
 		000000000000000000000150 = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 000000000000000000000170;
-			buildPhases = (000000000000000000000130, 000000000000000000000131, 000000000000000000000132);
+			buildPhases = (000000000000000000000136, 000000000000000000000130, 000000000000000000000131, 000000000000000000000132);
 			buildRules = ();
 			dependencies = ();
 			name = CertigoProtectionProbe;
@@ -105,7 +130,7 @@
 		000000000000000000000151 = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 000000000000000000000171;
-			buildPhases = (000000000000000000000133, 000000000000000000000134, 000000000000000000000135);
+			buildPhases = (000000000000000000000137, 000000000000000000000133, 000000000000000000000134, 000000000000000000000135);
 			buildRules = ();
 			dependencies = (000000000000000000000153);
 			name = CertigoProtectionProbeTests;
@@ -186,15 +211,17 @@
 		000000000000000000000171 = {isa = XCConfigurationList; buildConfigurations = (000000000000000000000182, 000000000000000000000183); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		000000000000000000000180 = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 000000000000000000000114;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_ALLOWED = "$(PROBE_CODE_SIGNING_ALLOWED)";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Certigo Protection Probe";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				MARKETING_VERSION = 0.1.0;
 				CURRENT_PROJECT_VERSION = 1;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.certigo.protection-probe";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PROBE_HOST_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -205,15 +232,17 @@
 		};
 		000000000000000000000181 = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 000000000000000000000114;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_ALLOWED = "$(PROBE_CODE_SIGNING_ALLOWED)";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Certigo Protection Probe";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				MARKETING_VERSION = 0.1.0;
 				CURRENT_PROJECT_VERSION = 1;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.certigo.protection-probe";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PROBE_HOST_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -224,10 +253,12 @@
 		};
 		000000000000000000000182 = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 000000000000000000000114;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_ALLOWED = "$(PROBE_CODE_SIGNING_ALLOWED)";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.certigo.protection-probe.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PROBE_TEST_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -240,10 +271,12 @@
 		};
 		000000000000000000000183 = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 000000000000000000000114;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_ALLOWED = "$(PROBE_CODE_SIGNING_ALLOWED)";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.certigo.protection-probe.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PROBE_TEST_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				TARGETED_DEVICE_FAMILY = "1,2";

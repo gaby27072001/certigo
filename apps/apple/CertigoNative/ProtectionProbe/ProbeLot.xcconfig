@@ -1,0 +1,6 @@
+// No usable identity or signing without an explicitly prepared private lot.
+PROBE_LOT_SUFFIX =
+PROBE_HOST_BUNDLE_IDENTIFIER =
+PROBE_TEST_BUNDLE_IDENTIFIER =
+PROBE_CODE_SIGNING_ALLOWED = NO
+#include? "LocalLot/ProbeLot.xcconfig"

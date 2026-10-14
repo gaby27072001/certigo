@@ -849,7 +849,11 @@ device pairing/trust/developer mode, signing/provisioning and any paid
 enrollment require their own user decisions and are not performed in this
 documentation-only lot.
 
-### Dedicated physical-test host source preparation
+### Dedicated physical-test host source preparation (historical source 25e736)
+
+The fixed identities and remote command templates from this initial source
+candidate are superseded by **Direct Xcode private-lot preparation** below.
+Approval of source `25e736` does not authorize the new source or a new lot.
 
 `CertigoProtectionProbe` is a new minimal SwiftUI application target, separate
 from DEV and the unhosted simulator harness. It displays an inert test-host
@@ -880,47 +884,10 @@ discover device apps/accounts or establish effective signed entitlements.
 Source checks and Swift syntax parsing on Linux are not Xcode project loading,
 Apple typechecking, signed hosting, installation or physical execution proof.
 
-Only after separate exact-SHA/device/signing/provisioning authorization, the
-executor can adapt this command template using the user-selected team and
-device, neither guessed nor committed:
-
-```sh
-xcodebuild -project apps/apple/CertigoNative/CertigoNative.xcodeproj \
-  -scheme CertigoProtectionProbe -configuration Debug \
-  -destination "platform=iOS,id=$APPROVED_DEVICE_ID" \
-  -derivedDataPath "$B/DerivedData" \
-  -clonedSourcePackagesDirPath "$B/DerivedData/SourcePackages" \
-  -disablePackageRepositoryCache -onlyUsePackageVersionsFromResolvedFile \
-  CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Automatic \
-  DEVELOPMENT_TEAM="$APPROVED_PERSONAL_TEAM" build-for-testing
-```
-
-Without separately authorized provisioning updates this command may stop on
-missing provisioning; it must not silently add `-allowProvisioningUpdates` or
-`-allowProvisioningDeviceRegistration`. If those flags are explicitly
-authorized, their effects can include App ID/device registration and signing
-certificate/profile creation by Xcode. Verify the built host/test identities,
-signatures and their effective entitlements and profile before installation.
-Stop on unexpected host/shared group, callback, paid capability, signing
-failure or unapproved registration; do not change DEV or add entitlements.
-Then, only within the installation/execution consent:
-
-```sh
-xcodebuild -project apps/apple/CertigoNative/CertigoNative.xcodeproj \
-  -scheme CertigoProtectionProbe -configuration Debug \
-  -destination "platform=iOS,id=$APPROVED_DEVICE_ID" \
-  -derivedDataPath "$B/DerivedData" \
-  -clonedSourcePackagesDirPath "$B/DerivedData/SourcePackages" \
-  -disablePackageRepositoryCache -onlyUsePackageVersionsFromResolvedFile \
-  -only-testing:CertigoProtectionProbeTests/RuntimeDiskProtectionTests/testFoundationProtectionSetterReadsBackExactPolicyOnEmptyFile \
-  -only-testing:CertigoProtectionProbeTests/RuntimeDiskProtectionTests/testProtectedDescriptorWriteRetainsFirstUnlockPolicyAndRemovesEmptyWitness \
-  CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Automatic \
-  DEVELOPMENT_TEAM="$APPROVED_PERSONAL_TEAM" test-without-building
-```
-
-These are future templates, not executed commands or proven Personal Team
-compatibility. `test-without-building` installs/launches the hosted test
-product; this effect requires consent, not just a successful build.
+The old project/scheme remote execution templates are retired, not performed.
+Automatic provisioning can include App ID/device registration and signing
+certificate/profile creation by Xcode; these effects require the new exact-lot
+consent. No Personal Team/free/paid status is inferred from the selected team.
 USB pairing/trust, Developer Mode, passcode entry/reboot and account operations
 remain user-controlled separate manual steps. Test cleanup removes only each
 generated temporary root; separately authorized device cleanup must remove
@@ -959,7 +926,8 @@ python3 -B tools/validate_apple_noauth.py \
   --probe-entitlements "$B/host-entitlements.plist" \
   --probe-profile "$B/host-profile.plist" \
   --probe-test-entitlements "$B/test-entitlements.plist" \
-  --expected-team "$APPROVED_PERSONAL_TEAM" \
+  --probe-lot-suffix "$APPROVED_LOT_SUFFIX" \
+  --expected-team "$APPROVED_TEAM" \
   --expected-app-id-prefix "$APPROVED_APP_ID_PREFIX" \
   --expected-device "$APPROVED_DEVICE_ID"
 ```
@@ -976,8 +944,10 @@ hosted-test signing schema.
 
 **Metadata checks are not cryptographic signature/CMS verification**, proof
 of certificate ownership, runner identity, installed absence or successful
-physical hosting. Verify signatures/provisioning authenticity independently
-on the fixed artifacts before installation. Synthetic unit fixtures
+physical hosting. Use standard Xcode signing and iOS runtime enforcement;
+decoding a profile is not offline CMS authentication. The additional offline
+CMS-authentication gate is not part of the selected direct-Xcode route.
+Synthetic unit fixtures
 deliberately use noncertificate bytes to keep that boundary explicit.
 No team/device/account/profile data is committed or printed by successful
 validation. Existing exact-SHA execution approval is not automatically
@@ -987,6 +957,115 @@ The artifact-checker lot passed eleven hermetic Python tests and the bounded
 source validator; the application/package/project/scheme diff against exact
 25e736 is empty. These tests validate metadata rejection rules only, not
 real signed artifacts or execution. No Apple/device command was run.
+
+### Direct Xcode private-lot preparation
+
+This supersedes the fixed-ID/remote route, not the strict file-protection
+checks. No SSH, devicectl presence assertion, app inventory or remote controller
+is required. The previous physical lot stopped before build/sign/provision/
+install/test/uninstall. The Simulator `missingAttribute` failures remain
+unresolved; source preparation is not physical-device protection evidence.
+
+Only the two probe targets inherit `ProtectionProbe/ProbeLot.xcconfig`.
+Without a local lot it supplies **empty bundle identities and signing NO**.
+There is no usable fallback ID. The tool generates `secrets.token_hex(16)`
+once, then derives exactly:
+
+```text
+com.certigo.protection-probe.lot-<32 lowercase hex characters>
+com.certigo.protection-probe.lot-<same suffix>.tests
+```
+
+The suffix is not a proof of absence or mathematical uniqueness: collision
+risk is negligible, not zero. A prior same-ID installation is not authorized
+for replacement. Stop on ID/provisioning conflicts, replacement warnings,
+unrelated data, unexpected permissions, paid capabilities or a separate
+runner. Do not regenerate/retry another lot automatically.
+
+**Short procedure for the user, later on the Mac, not instructions to execute
+now:**
+
+1. In a checkout of the separately reviewed exact source SHA, run the following
+   from the repository root. Python 3 and Git must already be available; no
+   installation/download is implicit. Enter only the already selected team's
+   identifier and intended iPhone identifier privately; never a password.
+   The script does not discover accounts/devices, contact Apple or build.
+
+   ```sh
+   python3 -B tools/prepare_apple_probe.py prepare --source-sha <REVIEWED_SOURCE_SHA>
+   ```
+
+2. Keep the resulting manifest/hash for approval of **this exact source, lot,
+   team, device and two tests**. Local files are in the ignored, private
+   `apps/apple/CertigoNative/ProtectionProbe/LocalLot` directory; do not commit
+   or publish them. On macOS the directory/files are owner-only. The manifest
+   binds source SHA, suffix, both IDs, private selections, exact selectors and
+   configuration hashes. A second prepare refuses even an incomplete existing
+   lot. Files are never overwritten; SHA checks detect changes, not malicious
+   control of the user's checkout. Save the reviewed manifest hash separately.
+   Preparation alone leaves signing NO and is not execution consent.
+
+3. Only after new exact-lot permission for signing/provisioning, installation,
+   both tests and scoped cleanup, enable the configuration using that separately
+   approved hash, then verify it. This writes only local configuration; it
+   neither signs nor installs. Enabling also records the approved hash, and
+   refuses a second enable rather than replacing anything.
+
+   ```sh
+   python3 -B tools/prepare_apple_probe.py enable --approved-manifest-sha256 <APPROVED_HASH> --accept-standard-ios-and-collision-risk
+   python3 -B tools/prepare_apple_probe.py verify
+   ```
+
+4. Open `apps/apple/CertigoNative/CertigoNative.xcodeproj` in Xcode. Select
+   **CertigoProtectionProbe**, Debug and the already chosen iPhone; privately
+   compare destination/team/IDs with the manifest. Reconfirm current USB
+   connection and destination, without broad inventory. Trust was previously
+   handled manually, not proved current here; effective Developer Mode is
+   unproved. Any OS trust/Developer Mode/reboot action remains a separate user
+   step. Stop rather than implicitly downloading SDK/device-support/runtime
+   components. Do not change DEV, sign in again, add capabilities or change the
+   project/team in the editor. Standard Xcode/iOS enforcement replaces the
+   additional offline CMS gate, not platform warnings. After consent, **Product
+   > Test (Command-U)** builds/signs/provisions as needed and installs/runs the
+   host with its embedded tests. In Edit Scheme > Test, the only enabled tests
+   must still be:
+
+   ```text
+   RuntimeDiskProtectionTests/testFoundationProtectionSetterReadsBackExactPolicyOnEmptyFile()
+   RuntimeDiskProtectionTests/testProtectedDescriptorWriteRetainsFirstUnlockPolicyAndRemovesEmptyWitness()
+   ```
+
+5. Export this run's `.xcresult` from Xcode's Report navigator to private
+   storage. Record the source, approved manifest hash, installed host ID,
+   selected destination, installation observation and exported result together
+   as the ownership receipt. Require **both tests actually executed**, zero
+   skips and no platform/signature/profile/auth warnings before claiming a
+   physical result. A launched host alone proves neither test success nor
+   protection. If a test fails, preserve its result and stop; do not change the
+   expected policy. Only after the receipt establishes this lot's installation,
+   the user may remove **that exact host bundle ID** in Xcode's device view.
+   Its embedded test bundle goes with it; no guessed runner/unrelated app or
+   global certificate/profile/device registration is removed. If installation
+   ownership is unclear, do not uninstall. The tests clean only their own
+   generated synthetic roots.
+
+The build guard runs on both probe targets and checks the exact clean source,
+manifest/configuration hashes, reviewed approval hash and effective suffix,
+bundle ID and team. It needs repository read access, so script sandboxing is
+disabled **only for these two probe targets**. This guard is defense against
+stale/modified local input, not a pre-provisioning scheduling guarantee:
+Xcode may resolve signing before build phases. For that reason identity
+validation and exact-lot consent happen **before enabling/opening for Test**;
+without them no Test action is allowed. No claim of validated Xcode 27 project
+loading or signed host compatibility follows from portable tests.
+
+`validate_apple_noauth.py` now requires an explicit `--probe-lot-suffix` for
+supplied probe artifacts/signing metadata and derives both expected identities
+from it; old fixed IDs and another lot cannot pass. The source/scheme still
+bind the unchanged shared tests, TEST_HOST/BUNDLE_LOADER, products and no-MSAL
+dependencies. DEV/unhosted configurations, package pins, file-descriptor
+invariants and protection failure behavior remain unchanged. No real lot,
+account/device data, signature or installation is created by source validation.
 
 ## Non-destructive Flutter queue inspection
 

@@ -12,7 +12,6 @@ from pathlib import Path
 DEV_BUNDLE = "com.certigo.native.dev"
 TEST_BUNDLE = "com.certigo.native.noauth-tests"
 PROBE_BUNDLE = "com.certigo.protection-probe"
-PROBE_TEST_BUNDLE = PROBE_BUNDLE + ".tests"
 PROBE_SELECTORS = {
     "RuntimeDiskProtectionTests/testFoundationProtectionSetterReadsBackExactPolicyOnEmptyFile()",
     "RuntimeDiskProtectionTests/testProtectedDescriptorWriteRetainsFirstUnlockPolicyAndRemovesEmptyWitness()",
@@ -38,6 +37,13 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def probe_bundles(lot_suffix):
+    require(isinstance(lot_suffix, str) and re.fullmatch(r"[0-9a-f]{32}", lot_suffix) is not None,
+            "Probe lot requires exactly 32 lowercase hex characters")
+    host = PROBE_BUNDLE + ".lot-" + lot_suffix
+    return host, host + ".tests"
+
+
 def callback_schemes(info):
     return {
         scheme.lower()
@@ -57,14 +63,16 @@ def validate_test_plist(info):
     require(not callback_schemes(info), "No-auth tests must not declare callbacks")
 
 
-def validate_probe_plist(info, *, test):
-    expected = PROBE_TEST_BUNDLE if test else PROBE_BUNDLE
+def validate_probe_plist(info, *, test, lot_suffix):
+    host, tests = probe_bundles(lot_suffix)
+    expected = tests if test else host
     require(info.get("CFBundleIdentifier") == expected, "Wrong built probe identity")
     require(not info.get("CFBundleURLTypes"), "Probe must not declare callback registrations")
 
 
-def validate_probe_entitlements(entitlements, *, bundle, team, prefix):
-    require(bundle in (PROBE_BUNDLE, PROBE_TEST_BUNDLE), "Unexpected probe signing target")
+def validate_probe_entitlements(entitlements, *, bundle, team, prefix, lot_suffix):
+    expected = probe_bundles(lot_suffix)
+    require(bundle in expected, "Unexpected probe signing target")
     require(all(isinstance(value, str) and value for value in (team, prefix)),
             "Explicit selected team and App ID prefix are required")
     require(re.fullmatch(r"[A-Z0-9]{10}", team) is not None
@@ -87,10 +95,10 @@ def validate_probe_entitlements(entitlements, *, bundle, team, prefix):
     return application, groups, allowed
 
 
-def validate_probe_signing(entitlements, profile, *, bundle, team, prefix, device, now):
+def validate_probe_signing(entitlements, profile, *, bundle, team, prefix, device, now, lot_suffix):
     """Check supplied decoded artifact metadata, not signature/CMS authenticity."""
     application, groups, allowed = validate_probe_entitlements(
-        entitlements, bundle=bundle, team=team, prefix=prefix,
+        entitlements, bundle=bundle, team=team, prefix=prefix, lot_suffix=lot_suffix,
     )
     require(isinstance(device, str) and device, "Explicit selected device required")
     require(isinstance(profile, dict), "Decoded profile must be a dictionary")
@@ -155,11 +163,15 @@ def validate_probe(project, scheme, host_source):
     require(len(identifiers) == len(set(identifiers)), "Duplicate project object identifier")
     require(set(re.findall(r"\b[0-9A-F]{24}\b", project)) <= set(identifiers),
             "Project contains an unresolved object reference")
-    for suffix, bundle in (("180", PROBE_BUNDLE), ("181", PROBE_BUNDLE),
-                           ("182", PROBE_TEST_BUNDLE), ("183", PROBE_TEST_BUNDLE)):
+    for suffix, bundle in (("180", "$(PROBE_HOST_BUNDLE_IDENTIFIER)"),
+                           ("181", "$(PROBE_HOST_BUNDLE_IDENTIFIER)"),
+                           ("182", "$(PROBE_TEST_BUNDLE_IDENTIFIER)"),
+                           ("183", "$(PROBE_TEST_BUNDLE_IDENTIFIER)")):
         settings = project_object(project, "0" * 21 + suffix)
         require(f'PRODUCT_BUNDLE_IDENTIFIER = "{bundle}";' in settings, "Wrong probe identity")
-        require("CODE_SIGNING_ALLOWED = NO;" in settings, "Probe signing must remain off")
+        require('CODE_SIGNING_ALLOWED = "$(PROBE_CODE_SIGNING_ALLOWED)";' in settings
+                and "baseConfigurationReference = 000000000000000000000114;" in settings,
+                "Probe requires unsigned-default lot configuration")
         require(not any(key in settings for key in (
             "DEVELOPMENT_TEAM", "PROVISIONING_PROFILE", "CODE_SIGN_ENTITLEMENTS",
             "\n\t\t\t\tINFOPLIST_FILE =", "CFBundleURL", "SystemCapabilities",
@@ -185,6 +197,7 @@ def validate_probe(project, scheme, host_source):
         "102": "fileRef = 000000000000000000000017;",
         "101": "fileRef = 000000000000000000000111;",
         "111": "path = ProtectionProbe/CertigoProtectionProbeApp.swift;",
+        "114": "path = ProtectionProbe/ProbeLot.xcconfig;",
     }
     for suffix, declaration in expected.items():
         require(declaration in project_object(project, "0" * 21 + suffix),
@@ -193,15 +206,20 @@ def validate_probe(project, scheme, host_source):
             project_object(project, "000000000000000000000151"),
             "Probe tests must depend only on their dedicated host")
     require(
-        "buildPhases = (000000000000000000000130, 000000000000000000000131, 000000000000000000000132);"
+        "buildPhases = (000000000000000000000136, 000000000000000000000130, 000000000000000000000131, 000000000000000000000132);"
         in project_object(project, "000000000000000000000150"),
         "Wrong probe host build phases",
     )
     require(
-        "buildPhases = (000000000000000000000133, 000000000000000000000134, 000000000000000000000135);"
+        "buildPhases = (000000000000000000000137, 000000000000000000000133, 000000000000000000000134, 000000000000000000000135);"
         in project_object(project, "000000000000000000000151"),
         "Wrong probe test build phases",
     )
+    for suffix in ("136", "137"):
+        phase = project_object(project, "0" * 21 + suffix)
+        require("isa = PBXShellScriptBuildPhase;" in phase and "alwaysOutOfDate = 1;" in phase
+                and r'python3 -B \"$PROJECT_DIR/../../../tools/prepare_apple_probe.py\" verify-build\n' in phase,
+                "Probe requires its approved-lot build guard")
     require("import SwiftUI" in host_source, "Missing minimal native host")
     require(not any(word in host_source for word in (
         "MSAL", "CertigoData", "CredentialVault", "NativeModel", "URLSession", "Keychain",
@@ -259,6 +277,13 @@ def validate_source(root):
          / "CertigoProtectionProbe.xcscheme").read_text(),
         (native / "ProtectionProbe" / "CertigoProtectionProbeApp.swift").read_text(),
     )
+    config = (native / "ProtectionProbe" / "ProbeLot.xcconfig").read_text()
+    require(config == (
+        "// No usable identity or signing without an explicitly prepared private lot.\n"
+        "PROBE_LOT_SUFFIX =\nPROBE_HOST_BUNDLE_IDENTIFIER =\n"
+        "PROBE_TEST_BUNDLE_IDENTIFIER =\nPROBE_CODE_SIGNING_ALLOWED = NO\n"
+        '#include? "LocalLot/ProbeLot.xcconfig"\n'
+    ), "Default probe configuration must have no usable identity and signing off")
 
 
 def main():
@@ -275,6 +300,7 @@ def main():
     parser.add_argument("--expected-team")
     parser.add_argument("--expected-app-id-prefix")
     parser.add_argument("--expected-device")
+    parser.add_argument("--probe-lot-suffix")
     args = parser.parse_args()
     validate_source(Path(__file__).resolve().parents[1])
     if args.built_dev_plist:
@@ -284,9 +310,13 @@ def main():
     if args.resolved_lock:
         validate_pins(json.loads(args.resolved_lock.read_text()))
     if args.built_probe_plist:
-        validate_probe_plist(plistlib.loads(args.built_probe_plist.read_bytes()), test=False)
+        probe_bundles(args.probe_lot_suffix)
+        validate_probe_plist(plistlib.loads(args.built_probe_plist.read_bytes()),
+                            test=False, lot_suffix=args.probe_lot_suffix)
     if args.built_probe_test_plist:
-        validate_probe_plist(plistlib.loads(args.built_probe_test_plist.read_bytes()), test=True)
+        probe_bundles(args.probe_lot_suffix)
+        validate_probe_plist(plistlib.loads(args.built_probe_test_plist.read_bytes()),
+                            test=True, lot_suffix=args.probe_lot_suffix)
     signing_inputs = (
         args.probe_entitlements, args.probe_profile, args.probe_test_entitlements,
         args.expected_team, args.expected_app_id_prefix, args.expected_device,
@@ -294,26 +324,27 @@ def main():
     )
     if any(signing_inputs[:6]) or args.probe_test_profile:
         require(all(signing_inputs), "Supply both built plists, both signing artifacts and selections")
+        host_bundle, test_bundle = probe_bundles(args.probe_lot_suffix)
         validate_probe_signing(
             plistlib.loads(args.probe_entitlements.read_bytes()),
-            plistlib.loads(args.probe_profile.read_bytes()), bundle=PROBE_BUNDLE,
+            plistlib.loads(args.probe_profile.read_bytes()), bundle=host_bundle,
             team=args.expected_team, prefix=args.expected_app_id_prefix,
-            device=args.expected_device, now=datetime.now(timezone.utc),
+            device=args.expected_device, now=datetime.now(timezone.utc), lot_suffix=args.probe_lot_suffix,
         )
         test_entitlements = plistlib.loads(args.probe_test_entitlements.read_bytes())
         validate_probe_entitlements(
-            test_entitlements, bundle=PROBE_TEST_BUNDLE, team=args.expected_team,
-            prefix=args.expected_app_id_prefix,
+            test_entitlements, bundle=test_bundle, team=args.expected_team,
+            prefix=args.expected_app_id_prefix, lot_suffix=args.probe_lot_suffix,
         )
         # Hosted test bundles may not embed their own profile; never invent one.
         if args.probe_test_profile:
             validate_probe_signing(
                 test_entitlements, plistlib.loads(args.probe_test_profile.read_bytes()),
-                bundle=PROBE_TEST_BUNDLE, team=args.expected_team,
+                bundle=test_bundle, team=args.expected_team,
                 prefix=args.expected_app_id_prefix, device=args.expected_device,
-                now=datetime.now(timezone.utc),
+                now=datetime.now(timezone.utc), lot_suffix=args.probe_lot_suffix,
             )
-        print("Supplied signing metadata matched; codesign/CMS authenticity is a separate gate.")
+        print("Supplied signing metadata matched; standard Xcode/iOS enforcement remains required.")
     print("Public source metadata checked; supplied built artifacts only if explicitly requested.")
     print("No SDK initialization/cache, installed-app collision or runtime authentication proof.")
 
