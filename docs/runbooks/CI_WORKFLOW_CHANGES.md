@@ -136,6 +136,70 @@ imprévisibles (nonce aléatoire). `account-deletion-cosmos-policy.test.mjs` mon
 
 ## Ce que ce mécanisme ne débloque pas
 
+### Transition bornée vers GitHub-hosted Linux
+
+La politique `linux-ci-runner-policy.mjs` accepte **uniquement le scalaire
+`runs-on: ubuntu-24.04`**, pour les couples fichier/job suivants. Elle conserve les quatre
+ensembles de labels self-hosted existants ; ce n'est ni un fallback, ni une liste de labels
+configurable. `ubuntu-latest`, les tableaux hosted, les expressions, macOS hosted et les autres
+versions Ubuntu restent refusés.
+
+| Workflow | Jobs autorisés |
+|---|---|
+| `ci-backend.yml` | `changes`, `build-test` |
+| `ci-content.yml` | `validate` |
+| `ci-cortex-parity.yml` | `changes`, `parity` |
+| `ci-migration-registry.yml` | `validate` |
+| `ci-mobile.yml` | `changes`, `packages`, `app`, `prism-goldens` |
+| `ci-preflight.yml` | `preflight` |
+| `ci-project-state.yml` | `validate-source`, `validate` |
+| `lint-workflows.yml` | `candidate-script-tests`, `validate` |
+| `fork-pr-policy.yml` | `trust-gate` |
+| `pr-head-freshness.yml` | `freshness` |
+| `dependency-vuln-scan.yml` | `osv-scan`, `locked-restore` |
+| `security-scan.yml` | `iac-scan` |
+
+La migration impose **trois PR ordonnées**, soumises à revue humaine : politique seule
+(aucun workflow ni pré-approbation), puis PR A de contenu futur exact, puis PR B d'application.
+La politique doit être sur la base avant la pré-approbation, puisque le validateur est celui de
+la base. Aucune de ces étapes n'autorise une fusion automatique, un changement des protections,
+la suppression des anciens runners, ou une modification des scellés backend.
+
+Chaque modification de code répond à un obstacle précis : le helper partagé borne les couples
+fichier/job ; `workflow-runner-labels.mjs` vérifie le YAML décodé (y compris les clés citées), les
+permissions héritées et l'absence de secrets/environnement/identité cloud ; les invariants du
+validateur acceptent cette alternative fixe sans perdre les contrôles de fraîcheur, fork,
+same-repository, noms requis et séparation trusted/untrusted ; le contrat candidat de
+`lint-workflows.yml` accepte le runner hosted mais garde ses permissions exactement read-only et
+son étape d'enforcement ; la politique de cache applique aussi les interdictions existantes aux
+jobs hosted. L'agrégat `ci-project-state/validate` reste interdit de checkout ou lecture de source
+PR. Les fixtures Dart SAST restent self-hosted.
+
+**Exclusions :** CodeQL (`security-events: write`), releases/signature/Key Vault, déploiements et
+identités cloud, réseau privé, Cosmos manuel/physique, health/drill et workflows privilégiés.
+`ci-infra.yml` et `security-gate.yml` restent exclus **en entier** : leurs filtres citent
+respectivement `deploy-flex-onedeploy.sh` / `write-secure-bicep-parameters.mjs` et
+`write-secure-bicep-parameters.mjs`. Le scanner de scalaires `privilegedWorkflow` les scelle
+même si ces références ne sont que des chemins de filtre. Ne pas enlever ces chemins ni étendre
+le scellé pour permettre la migration.
+
+Après application, les workflows dispatchables backend (`build-test`), mobile (`packages`,
+matrice core/cortex/data, `app`, `prism-goldens`), parité (`parity`), contenu (`validate`) et
+registre (`validate`) peuvent travailler sans pool self-hosted : leurs conditions `always()`
+autorisent les événements non-PR même si `freshness`/`changes` sont sautés. Sur une PR interne,
+preflight, lint et project-state peuvent aussi aboutir via le reusable `pr-head-freshness`
+migré. Les scanners réutilisables ne suffisent pas à débloquer leur appelant
+`security-gate`, toujours exclu. **En l'absence de runners self-hosted, les contrôles exclus
+peuvent rester en attente : cette migration ne rend pas toute la CI verte et ne contourne
+aucun contrôle requis.**
+
+`ubuntu-24.04` fixe la famille d'OS, **pas une image immuable**. Conserver les installations SDK
+explicites et leurs versions existantes (Flutter, .NET, Node, Python), sans anticiper les
+chantiers Apple ou .NET suivants. Les caractéristiques et conditions de gratuité des runners
+standards de dépôts publics sont celles de la
+[documentation GitHub](https://docs.github.com/en/actions/reference/runners/github-hosted-runners),
+pas une garantie permanente de coût nul.
+
 - **Les workflows privilégiés restent figés à l'octet.** Hors `cd-backend.yml`, un workflow qui
   porte `environment:`, `secrets.`, une permission `write`, `id-token: write` ou `azure/login@`
   (liste complète : `privilegedWorkflow` dans `backend-deploy-workflow-policy.mjs`) est refusé au
