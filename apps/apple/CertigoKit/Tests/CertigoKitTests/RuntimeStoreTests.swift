@@ -411,6 +411,38 @@ final class RuntimeStoreTests: XCTestCase {
         )
     }
 
+    func testAppOwnedRootBelowSearchOnlyAncestorDoesNotRequireOpeningOutsideDirectory() throws {
+        let manager = FileManager.default
+        let parent = temporaryRoot()
+        let outside = parent.appendingPathComponent("search-only", isDirectory: true)
+        let owned = outside.appendingPathComponent("owned", isDirectory: true)
+        try manager.createDirectory(at: owned, withIntermediateDirectories: true)
+        defer {
+            XCTAssertEqual(chmod(outside.path, 0o700), 0)
+            XCTAssertNoThrow(try manager.removeItem(at: parent))
+        }
+        XCTAssertEqual(chmod(outside.path, 0o111), 0)
+        if geteuid() != 0 {
+            let denied = open(outside.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+            let failure = errno
+            if denied >= 0 { close(denied) }
+            XCTAssertEqual(denied, -1)
+            XCTAssertTrue(failure == EACCES || failure == EPERM)
+        }
+        let root = owned.appendingPathComponent("missing/cache", isDirectory: true)
+        let disk = try RuntimeDisk(root: root, maximumBytes: 1_024)
+        try disk.exclusive {}
+        let lock = root.appendingPathComponent(".lock")
+        var attributes = stat()
+        XCTAssertEqual(lstat(lock.path, &attributes), 0)
+        XCTAssertEqual(attributes.st_mode & mode_t(S_IFMT), mode_t(S_IFREG))
+        XCTAssertEqual(attributes.st_nlink, 1)
+        XCTAssertEqual(attributes.st_uid, geteuid())
+        XCTAssertEqual(try manager.contentsOfDirectory(atPath: root.path), [".lock"])
+        let reopened = try RuntimeDisk(root: root, maximumBytes: 1_024)
+        try reopened.exclusive {}
+    }
+
     func testRootSymlinkAndDanglingAncestorAreRejectedWithoutCreatingTheirDestination() throws {
         let parent = temporaryRoot()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false)

@@ -960,6 +960,55 @@ real signed artifacts or execution. No Apple/device command was run.
 
 ### Direct Xcode private-lot preparation
 
+**Physical diagnostic result, 2026-10-14:** the user-supplied test log for
+prepared source `1c31486405f289f210b031dddd9d7d77a00b3397` reports successful
+installation and launch of the approved probe on iPhone 17 / iOS 27.0.1.
+The direct Foundation empty-file test explicitly passed; the descriptor-write
+test failed with **`directoryOpen(1)` (`EPERM`)** during initialization.
+The selected suite executed two tests with one failure. Repeated sections
+have identical timestamps and are duplicate log copies, not additional runs.
+The log has been reviewed locally; raw device identifiers, private paths and
+environment data are not published. It does not supply the build-guard
+SHA/hash receipt or post-test Git status, and is not result-bundle provenance.
+The exact refused directory component remains unknown. The failure is
+before the lock, witness, descriptor class application and payload bytes.
+
+The code previously reopened every canonical path component from `/` with
+`O_RDONLY|O_DIRECTORY`, demanding read access to directories outside the
+application-owned root. That requirement is unnecessary for searching a path
+to an accessible container. A real-filesystem regression creates a search-only
+parent (`0111`) above an owned directory: the original Swift implementation
+fails with `directoryOpen(EACCES)` when run as an unprivileged Linux user,
+while the corrected implementation passes. This reproduces the parent-read
+requirement, **not the specific iOS sandbox policy or refused component**.
+
+The source correction opens the nearest existing POSIX-canonicalized ancestor
+directly with directory/no-follow/close-on-exec flags, verifies its directory
+type and descriptor device/inode against `lstat` before and after opening,
+checks canonical ancestor directory types/device/inodes before and after
+opening without reading their contents, and checks the original identity
+if the requested root already existed. Symlink/non-directory substitutions
+and observed ancestor identity changes are rejected, not silently followed.
+Only the missing suffix is created/traversed relative to that anchored
+descriptor with the same `mkdirat` mode and no-follow `openat`. Resolving
+existing ancestor aliases is the same trusted-path boundary as before;
+the caller must still supply dedicated trusted application storage, not an
+attacker-writable parent path. It does not accept a root symlink or dangling
+ancestor, fall back after permission denial, relax lock type/link checks, or
+change owner-scoped content, payload no-follow/exclusivity, protection-before-
+bytes or cleanup. Existing aliases/missing-suffix and malicious-lock tests
+remain required. Linux/macOS use the same algorithm; no iOS bypass is added.
+The new regression checks both missing and existing roots without touching
+personal directories or weakening their permissions.
+
+This removes a concretely reproduced inappropriate parent-read requirement,
+but **the corrected source has not been compiled or run on Apple hardware**.
+An iOS-specific denial at the anchor or a later protection operation may still
+occur. The previous approved lot is not retargeted; a new reviewed source/lot
+and consent are necessary before execution. Keep the private result bundle
+and installed-lot ownership receipt; user cleanup remains limited to the
+exact installed probe after export.
+
 **Repeated source-rewrite diagnosis, 2026-10-14:** user Git status and complete
 three-file diffs for the source `27b8831e` and later diagnostic source
 `670490cb` workspaces show the same rewritten project, DEV scheme and DEV

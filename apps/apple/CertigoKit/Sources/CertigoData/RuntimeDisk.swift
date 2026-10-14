@@ -53,20 +53,61 @@ final class RuntimeDisk {
             root.path.split(separator: "/").allSatisfy({ $0 != "." && $0 != ".." })
         else { throw RuntimeStoreError.unsafeDiskEntry }
         var original = stat()
-        if lstat(root.path, &original) == 0 {
+        let rootExisted = lstat(root.path, &original) == 0
+        if rootExisted {
             guard original.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else {
                 throw RuntimeStoreError.unsafeDiskEntry
             }
         } else if errno != ENOENT {
             throw RuntimeStoreError.io(errno)
         }
-        // Canonicalize only an existing ancestor; Foundation may rewrite a missing Darwin suffix.
-        let path = try Self.creationPath(root)
-        var handle = open("/", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-        guard handle >= 0 else { throw RuntimeStoreError.io(errno) }
+        // Ancestors outside an app container may permit search without granting directory reads.
+        let anchor = try Self.creationAnchor(root)
+        var ancestors: [(path: String, attributes: stat)] = []
+        var prefix = ""
+        for component in anchor.path.split(separator: "/") {
+            prefix += "/\(component)"
+            var attributes = stat()
+            guard lstat(prefix, &attributes) == 0 else { throw RuntimeStoreError.io(errno) }
+            guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else {
+                throw RuntimeStoreError.unsafeDiskEntry
+            }
+            ancestors.append((prefix, attributes))
+        }
+        var named = stat()
+        guard lstat(anchor.path, &named) == 0 else { throw RuntimeStoreError.io(errno) }
+        guard named.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else {
+            throw RuntimeStoreError.unsafeDiskEntry
+        }
+        var handle = open(anchor.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard handle >= 0 else {
+            let failure = errno
+            throw InitializationFailure.directoryOpen(failure)
+        }
         do {
-            for component in path.split(separator: "/") {
-                let name = String(component)
+            var opened = stat()
+            guard fstat(handle, &opened) == 0 else { throw RuntimeStoreError.io(errno) }
+            guard opened.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+                opened.st_dev == named.st_dev, opened.st_ino == named.st_ino
+            else { throw RuntimeStoreError.unsafeDiskEntry }
+            if rootExisted {
+                guard anchor.missing.isEmpty,
+                    opened.st_dev == original.st_dev, opened.st_ino == original.st_ino
+                else { throw RuntimeStoreError.unsafeDiskEntry }
+            }
+            var checked = stat()
+            guard lstat(anchor.path, &checked) == 0 else { throw RuntimeStoreError.io(errno) }
+            guard checked.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+                opened.st_dev == checked.st_dev, opened.st_ino == checked.st_ino
+            else { throw RuntimeStoreError.unsafeDiskEntry }
+            for ancestor in ancestors {
+                guard lstat(ancestor.path, &checked) == 0 else { throw RuntimeStoreError.io(errno) }
+                guard checked.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+                    checked.st_dev == ancestor.attributes.st_dev,
+                    checked.st_ino == ancestor.attributes.st_ino
+                else { throw RuntimeStoreError.unsafeDiskEntry }
+            }
+            for name in anchor.missing {
                 var next = openat(handle, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
                 if next < 0, errno == ENOENT {
                     guard mkdirat(handle, name, 0o700) == 0 || errno == EEXIST else {
@@ -111,14 +152,14 @@ final class RuntimeDisk {
         self.fault = fault
     }
 
-    private static func creationPath(_ root: URL) throws -> String {
+    private static func creationAnchor(_ root: URL) throws -> (path: String, missing: [String]) {
         var ancestor = root
         var missing: [String] = []
         while true {
             if let resolved = realpath(ancestor.path, nil) {
                 defer { free(resolved) }
                 let prefix = String(cString: resolved)
-                return ([prefix] + missing.reversed()).joined(separator: "/")
+                return (prefix, Array(missing.reversed()))
             }
             let failure = errno
             guard failure == ENOENT else { throw RuntimeStoreError.io(failure) }
