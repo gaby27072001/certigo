@@ -960,6 +960,47 @@ real signed artifacts or execution. No Apple/device command was run.
 
 ### Direct Xcode private-lot preparation
 
+**Physical result reported on 2026-10-14:** the coordinating session reviewed
+four user screenshots of source
+`27b8831e471ca841fb5a522b4b94dee1bde79711`, the approved private lot, its
+successful build guard and successful signed host/test build. The reported
+device was iPhone 17 / iOS 27.0.1. The test summary shows **two executed tests,
+one pass and one failure**. The descriptor-write test failed with
+`unsafeDiskEntry`, attributed to `RuntimeDisk.swift:87`. Given the unchanged
+two-test scheme, the summary implies the direct Foundation test passed; its
+individual result and an exported `.xcresult` have not yet been reviewed here.
+This is screenshot evidence reported by the coordinator, not an independently
+reviewed full log, result-bundle provenance or cryptographic artifact proof.
+It supersedes the earlier no-physical-execution status **for this exact
+source/lot only**, not the outstanding protection gate.
+
+Line 87 in that source rethrows an initialization error. Within its catch,
+`unsafeDiskEntry` can originate from directory-component `openat`, lock-file
+`openat`, or the combined lock `fstat`/regular-file/single-link guard.
+Initialization has therefore not completed at the reported failure: it is
+before the descriptor write, protection witness, class readback and payload
+bytes. The catch line does not identify the failed syscall or prove a
+hard-link, symlink, inode or protection-policy problem. Sandbox/path traversal
+restrictions are a hypothesis, not an established cause. No guard relaxation
+or speculative functional fix follows from this result.
+
+The diagnostic source following that result distinguishes internal
+`RuntimeDisk.InitializationFailure.directoryOpen(errno)`, `lockOpen(errno)`,
+`lockStat(errno)`, `lockNotRegular` and `lockUnexpectedLinkCount`. Failed
+syscall `errno` is copied before cleanup/another syscall; successful `fstat`
+structural rejection never reports stale `errno`. Errors contain no path,
+raw stat value, account/device identifier or file contents. The same
+no-follow/directory/regular/single-link requirements still fail closed,
+with the same descriptor cleanup, canonicalization and protection-before-bytes
+sequence. The public `RuntimeStoreError` declaration remains unchanged.
+Real-filesystem portable regressions cover a dangling directory ancestor,
+lock symlink, directory, FIFO and hard link without following, removing or
+changing their target entries. A deterministic post-open `fstat` failure is
+not fabricated with a race or injected syscall layer.
+This adds attribution, **not a fix or reproduction of the physical failure**;
+it requires its own reviewed SHA and execution lot. The two physical tests
+and their scheme selectors remain unchanged.
+
 This supersedes the fixed-ID/remote route, not the strict file-protection
 checks. No SSH, devicectl presence assertion, app inventory or remote controller
 is required. The previous physical lot stopped before build/sign/provision/

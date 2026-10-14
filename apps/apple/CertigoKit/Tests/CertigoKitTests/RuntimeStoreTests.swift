@@ -428,10 +428,82 @@ final class RuntimeStoreTests: XCTestCase {
         XCTAssertThrowsError(
             try RuntimeDisk(root: dangling.appendingPathComponent("cache"), maximumBytes: 1_024)
         ) {
-            XCTAssertEqual($0 as? RuntimeStoreError, .unsafeDiskEntry)
+            guard case .directoryOpen(let failure) = $0 as? RuntimeDisk.InitializationFailure else {
+                return XCTFail("Expected a redacted directory-open rejection")
+            }
+            XCTAssertTrue(failure == ELOOP || failure == ENOTDIR)
         }
         XCTAssertFalse(FileManager.default.fileExists(atPath: absent.path))
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: target.path), [])
+    }
+
+    func testLockSymlinkReportsOpenFailureWithoutFollowingOrChangingItsTarget() throws {
+        let root = temporaryRoot()
+        let manager = FileManager.default
+        try manager.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { XCTAssertNoThrow(try manager.removeItem(at: root)) }
+        let target = root.appendingPathComponent("untouched")
+        let bytes = Data([0x42])
+        try bytes.write(to: target)
+        let lock = root.appendingPathComponent(".lock")
+        try manager.createSymbolicLink(at: lock, withDestinationURL: target)
+
+        XCTAssertThrowsError(try RuntimeDisk(root: root, maximumBytes: 1_024)) {
+            XCTAssertEqual($0 as? RuntimeDisk.InitializationFailure, .lockOpen(ELOOP))
+        }
+        XCTAssertEqual(try Data(contentsOf: target), bytes)
+        XCTAssertEqual(try manager.destinationOfSymbolicLink(atPath: lock.path), target.path)
+    }
+
+    func testLockDirectoryReportsOpenFailureWithoutRemovingIt() throws {
+        let root = temporaryRoot()
+        let manager = FileManager.default
+        try manager.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { XCTAssertNoThrow(try manager.removeItem(at: root)) }
+        let lock = root.appendingPathComponent(".lock")
+        try manager.createDirectory(at: lock, withIntermediateDirectories: false)
+
+        XCTAssertThrowsError(try RuntimeDisk(root: root, maximumBytes: 1_024)) {
+            XCTAssertEqual($0 as? RuntimeDisk.InitializationFailure, .lockOpen(EISDIR))
+        }
+        XCTAssertEqual(try manager.contentsOfDirectory(atPath: lock.path), [])
+    }
+
+    func testLockFIFOReportsNonRegularEntryWithoutBlockingOrRemovingIt() throws {
+        let root = temporaryRoot()
+        let manager = FileManager.default
+        try manager.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { XCTAssertNoThrow(try manager.removeItem(at: root)) }
+        let lock = root.appendingPathComponent(".lock")
+        XCTAssertEqual(mkfifo(lock.path, 0o600), 0)
+
+        XCTAssertThrowsError(try RuntimeDisk(root: root, maximumBytes: 1_024)) {
+            XCTAssertEqual($0 as? RuntimeDisk.InitializationFailure, .lockNotRegular)
+        }
+        var entry = stat()
+        XCTAssertEqual(lstat(lock.path, &entry), 0)
+        XCTAssertEqual(entry.st_mode & mode_t(S_IFMT), mode_t(S_IFIFO))
+    }
+
+    func testHardLinkedLockReportsLinkCountRejectionWithoutChangingEitherEntry() throws {
+        let root = temporaryRoot()
+        let manager = FileManager.default
+        try manager.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { XCTAssertNoThrow(try manager.removeItem(at: root)) }
+        let target = root.appendingPathComponent("untouched")
+        let bytes = Data([0x42])
+        try bytes.write(to: target)
+        let lock = root.appendingPathComponent(".lock")
+        XCTAssertEqual(link(target.path, lock.path), 0)
+
+        XCTAssertThrowsError(try RuntimeDisk(root: root, maximumBytes: 1_024)) {
+            XCTAssertEqual($0 as? RuntimeDisk.InitializationFailure, .lockUnexpectedLinkCount)
+        }
+        XCTAssertEqual(try Data(contentsOf: target), bytes)
+        XCTAssertEqual(try Data(contentsOf: lock), bytes)
+        var entry = stat()
+        XCTAssertEqual(lstat(lock.path, &entry), 0)
+        XCTAssertEqual(entry.st_nlink, 2)
     }
 
 }

@@ -25,6 +25,14 @@ public enum RuntimeStoreError: Error, Equatable, Sendable {
 }
 enum RuntimeWritePoint: Sendable { case beforeRename, afterRename }
 final class RuntimeDisk {
+    enum InitializationFailure: Error, Equatable, Sendable {
+        case directoryOpen(Int32)
+        case lockOpen(Int32)
+        case lockStat(Int32)
+        case lockNotRegular
+        case lockUnexpectedLinkCount
+    }
+
     struct Entry {
         let name: String
         let bytes: Int
@@ -66,19 +74,32 @@ final class RuntimeDisk {
                     }
                     next = openat(handle, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
                 }
-                guard next >= 0 else { throw RuntimeStoreError.unsafeDiskEntry }
+                guard next >= 0 else {
+                    let failure = errno
+                    throw InitializationFailure.directoryOpen(failure)
+                }
                 close(handle)
                 handle = next
             }
             let lock = openat(
                 handle, ".lock", O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK, 0o600)
-            guard lock >= 0 else { throw RuntimeStoreError.unsafeDiskEntry }
+            guard lock >= 0 else {
+                let failure = errno
+                throw InitializationFailure.lockOpen(failure)
+            }
             var attributes = stat()
-            guard fstat(lock, &attributes) == 0, attributes.st_nlink == 1,
-                attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG)
-            else {
+            guard fstat(lock, &attributes) == 0 else {
+                let failure = errno
                 close(lock)
-                throw RuntimeStoreError.unsafeDiskEntry
+                throw InitializationFailure.lockStat(failure)
+            }
+            guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else {
+                close(lock)
+                throw InitializationFailure.lockNotRegular
+            }
+            guard attributes.st_nlink == 1 else {
+                close(lock)
+                throw InitializationFailure.lockUnexpectedLinkCount
             }
             directory = handle
             lockFile = lock
