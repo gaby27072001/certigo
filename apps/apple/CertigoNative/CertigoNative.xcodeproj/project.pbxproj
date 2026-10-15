@@ -18,6 +18,7 @@
 		000000000000000000000009 /* ../CertigoKit/Tests/CertigoKitTests/RuntimeDiskProtectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000017 /* ../CertigoKit/Tests/CertigoKitTests/RuntimeDiskProtectionTests.swift */; };
 		00000000000000000000000A /* CertigoData in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000045 /* CertigoData */; };
 		00000000000000000000000B /* MSAL in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000046 /* MSAL */; };
+		00000000000000000000000C /* MSAL in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000044 /* MSAL */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		000000000000000000000101 /* ProtectionProbe/CertigoProtectionProbeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000111 /* ProtectionProbe/CertigoProtectionProbeApp.swift */; };
 		000000000000000000000102 /* ../CertigoKit/Tests/CertigoKitTests/RuntimeDiskProtectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000017 /* ../CertigoKit/Tests/CertigoKitTests/RuntimeDiskProtectionTests.swift */; };
 		000000000000000000000103 /* CertigoData in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000141 /* CertigoData */; };
@@ -32,6 +33,20 @@
 			remoteInfo = CertigoProtectionProbe;
 		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		000000000000000000000036 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				00000000000000000000000C /* MSAL in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		000000000000000000000011 /* CertigoNativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertigoNativeApp.swift; sourceTree = "<group>"; };
@@ -130,6 +145,7 @@
 				000000000000000000000030 /* Sources */,
 				000000000000000000000031 /* Frameworks */,
 				000000000000000000000032 /* Resources */,
+				000000000000000000000036 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -390,6 +406,10 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.dev;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -411,6 +431,10 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.dev;
 				PRODUCT_NAME = "$(TARGET_NAME)";

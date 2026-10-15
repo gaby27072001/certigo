@@ -54,3 +54,19 @@ Dynamic Type, Reduce Motion/Transparency, selection, pending/offline/retry,
 back navigation, close/reopen resume, and reset. No target/scheme/probe, signing,
 SDK installation, account, or CI runner policy is changed here. Existing
 NoAuth protection tests are not claimed as a UI gate.
+
+## MSAL runtime packaging
+
+The app links the pinned MSAL binary package and embeds that same product with
+Xcode's standard Embed Frameworks copy phase (Frameworks destination,
+CodeSignOnCopy and RemoveHeadersOnCopy). Debug and Release preserve inherited
+runpaths and search `@executable_path/Frameworks`. This is required even when
+only the synthetic demo is opened: dyld loads linked libraries before SwiftUI.
+Unsigned simulator builds remain unsigned; this does not grant device signing
+or change any authentication configuration.
+
+The source regression check is part of
+`python -m unittest discover -s tools -p test_validate_apple_noauth.py`.
+An Apple build must additionally verify `Frameworks/MSAL.framework/MSAL`,
+its simulator architecture and load commands, then actually launch the app.
+Static project checks alone do not prove packaging or runtime success.
