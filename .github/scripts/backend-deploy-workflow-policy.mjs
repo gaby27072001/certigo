@@ -1151,6 +1151,26 @@ export function validateBackendDeployWorkflow(candidateInput, trustedInput, cont
   return errors;
 }
 
+// Directory ownership remains a caller precondition: these checks are not an
+// atomic confinement primitive against concurrent replacement of ancestors.
+function readInspectedFile(file, inspected) {
+  const descriptor = fs.openSync(
+    file,
+    fs.constants.O_RDONLY
+      | (fs.constants.O_NOFOLLOW ?? 0)
+      | (fs.constants.O_NONBLOCK ?? 0),
+  );
+  try {
+    const opened = fs.fstatSync(descriptor);
+    if (!opened.isFile() || opened.dev !== inspected.dev || opened.ino !== inspected.ino) {
+      throw new Error('inspected regular file changed before opening');
+    }
+    return fs.readFileSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
 function regularFile(root, relativePath, label) {
   const declared = path.resolve(root, ...relativePath.split('/'));
   let rootReal;
@@ -1173,7 +1193,11 @@ function regularFile(root, relativePath, label) {
   ) {
     return { error: `${label}: ${relativePath} must be a contained regular non-symlink file` };
   }
-  return { path: real };
+  try {
+    return { bytes: readInspectedFile(declared, stats) };
+  } catch (error) {
+    return { error: `${label}: cannot read ${relativePath} (${error.message})` };
+  }
 }
 
 function revisionLocalTree(root, relativeRoot, label, errors) {
@@ -1219,7 +1243,14 @@ function revisionLocalTree(root, relativeRoot, label, errors) {
       if (stats.isDirectory()) {
         visit(declared);
       } else if (stats.isFile()) {
-        files.set(path.relative(root, declared).split(path.sep).join('/'), fs.readFileSync(declared));
+        try {
+          files.set(
+            path.relative(root, declared).split(path.sep).join('/'),
+            readInspectedFile(declared, stats),
+          );
+        } catch (error) {
+          errors.push(`${label}: cannot read ${declared} (${error.message})`);
+        }
       } else {
         errors.push(`${label}: ${declared} must be a regular file or directory`);
       }
@@ -1243,7 +1274,7 @@ function validateRevisionLocalPrivilegedInputs(candidateRoot, trustedRoot) {
       errors.push(trusted.error);
       continue;
     }
-    if (!fs.readFileSync(candidate.path).equals(fs.readFileSync(trusted.path))) {
+    if (!candidate.bytes.equals(trusted.bytes)) {
       errors.push(
         `candidate privileged input: ${relativePath} must match the immutable base revision`,
       );
@@ -1352,10 +1383,10 @@ function validateNoncanonicalWorkflows(candidateRoot, trustedRoot) {
       continue;
     }
     const trusted = regularFile(trustedRoot, relativePath, 'revision-local workflow');
-    if (!trusted.error && fs.readFileSync(candidate.path).equals(fs.readFileSync(trusted.path))) {
+    if (!trusted.error && candidate.bytes.equals(trusted.bytes)) {
       continue;
     }
-    const parsed = parseWorkflow(fs.readFileSync(candidate.path, 'utf8'), relativePath);
+    const parsed = parseWorkflow(candidate.bytes.toString('utf8'), relativePath);
     if (parsed.error) {
       errors.push(parsed.error);
     } else if (privilegedWorkflow(parsed.workflow)) {
@@ -1380,7 +1411,7 @@ export function validateBackendDeployWorkspace(candidateRoot, trustedRoot) {
       errors.push(trusted.error);
       continue;
     }
-    if (!fs.readFileSync(candidate.path).equals(fs.readFileSync(trusted.path))) {
+    if (!candidate.bytes.equals(trusted.bytes)) {
       errors.push(
         `candidate trusted control: ${relativePath} must match the immutable base revision`,
       );
@@ -1396,8 +1427,8 @@ export function validateBackendDeployWorkspace(candidateRoot, trustedRoot) {
     errors.push(trustedWorkflow.error);
   }
   if (!candidateWorkflow.error && !trustedWorkflow.error) {
-    const candidateBytes = fs.readFileSync(candidateWorkflow.path);
-    const trustedBytes = fs.readFileSync(trustedWorkflow.path);
+    const candidateBytes = candidateWorkflow.bytes;
+    const trustedBytes = trustedWorkflow.bytes;
     const bytes = candidateBytes;
     const isLegacy = bytes.length === legacyWorkflowSize
       && sha256(bytes) === legacyWorkflowSha256
@@ -1418,7 +1449,7 @@ export function validateBackendDeployWorkspace(candidateRoot, trustedRoot) {
         if (file.error) {
           errors.push(file.error);
         } else {
-          controls.set(relativePath, fs.readFileSync(file.path));
+          controls.set(relativePath, file.bytes);
         }
       }
       const capacityDocument = regularFile(
@@ -1429,7 +1460,7 @@ export function validateBackendDeployWorkspace(candidateRoot, trustedRoot) {
       if (capacityDocument.error) {
         errors.push(capacityDocument.error);
       } else {
-        controls.set(capacityDocumentPath, fs.readFileSync(capacityDocument.path));
+        controls.set(capacityDocumentPath, capacityDocument.bytes);
       }
     }
     errors.push(

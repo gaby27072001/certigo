@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync } from 'node:fs';
+import fs from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -21,11 +22,28 @@ export function verifyNetworkLockDigests(contract, root = imageRoot) {
       throw new Error(`Missing or invalid ${field}.`);
     }
     const path = join(root, filename);
-    const stat = lstatSync(path);
+    const stat = fs.lstatSync(path);
     if (!stat.isFile() || stat.isSymbolicLink()) {
       throw new Error(`Network lock must be a regular file: ${filename}.`);
     }
-    const bytes = readFileSync(path);
+    // NOFOLLOW is additional POSIX protection; ancestor ownership and the
+    // legacy symlink checks remain required on every platform.
+    const descriptor = fs.openSync(
+      path,
+      fs.constants.O_RDONLY
+        | (fs.constants.O_NOFOLLOW ?? 0)
+        | (fs.constants.O_NONBLOCK ?? 0),
+    );
+    let bytes;
+    try {
+      const opened = fs.fstatSync(descriptor);
+      if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino) {
+        throw new Error(`Network lock changed before opening: ${filename}.`);
+      }
+      bytes = fs.readFileSync(descriptor);
+    } finally {
+      fs.closeSync(descriptor);
+    }
     if (createHash('sha256').update(bytes).digest('hex') !== expected) {
       throw new Error(`Network lock digest mismatch: ${filename}.`);
     }

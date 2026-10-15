@@ -668,6 +668,152 @@ test('strict activation seals every additional privileged runtime and IaC input'
   }
 });
 
+test('workspace reads inspected control descriptors and closes them after pathname replacement', (t) => {
+  const root = candidateWorkspace(strictWorkflow);
+  const target = path.join(root, '.github', 'scripts', 'backend-deploy-workflow-policy.mjs');
+  const inspect = fs.fstatSync;
+  const open = fs.openSync;
+  const read = fs.readFileSync;
+  const expected = read(target);
+  const snapshots = [];
+  let descriptor;
+  let replaced = false;
+  t.mock.method(fs, 'openSync', (file, ...args) => {
+    const fd = open(file, ...args);
+    if (file === target && descriptor === undefined) {
+      descriptor = fd;
+      replaced = true;
+      fs.renameSync(target, `${target}.opened`);
+      fs.writeFileSync(target, 'replacement must not be read');
+    }
+    return fd;
+  });
+  t.mock.method(fs, 'readFileSync', (file, ...args) => {
+    const bytes = read(file, ...args);
+    if (file === descriptor) {
+      snapshots.push(bytes);
+    }
+    return bytes;
+  });
+  const errors = validateBackendDeployWorkspace(root, repositoryRoot);
+  assert.equal(replaced, true);
+  assert.equal(
+    createHash('sha256').update(snapshots[0]).digest('hex'),
+    createHash('sha256').update(expected).digest('hex'),
+  );
+  assert.equal(
+    errors.some((error) => error.includes('candidate trusted control:')
+      && error.includes('backend-deploy-workflow-policy.mjs')),
+    false,
+    errors.join('\n'),
+  );
+  assert.throws(() => inspect(descriptor), { code: 'EBADF' });
+});
+
+test('workspace rejects replaced tree objects before reading their bytes', (t) => {
+  const root = candidateWorkspace(strictWorkflow);
+  fs.mkdirSync(path.join(root, 'infra'));
+  const target = path.join(root, 'infra', 'swap.txt');
+  fs.writeFileSync(target, 'inspected');
+  const open = fs.openSync;
+  const read = fs.readFileSync;
+  const inspect = fs.fstatSync;
+  const close = fs.closeSync;
+  let descriptor;
+  let closed = false;
+  let forbiddenReads = 0;
+  t.mock.method(fs, 'openSync', (file, ...args) => {
+    if (file === target && descriptor === undefined) {
+      fs.renameSync(target, `${target}.original`);
+      fs.writeFileSync(target, 'replacement');
+      descriptor = open(file, ...args);
+      return descriptor;
+    }
+    return open(file, ...args);
+  });
+  t.mock.method(fs, 'readFileSync', (file, ...args) => {
+    if (descriptor !== undefined && !closed && file === descriptor) {
+      forbiddenReads += 1;
+    }
+    return read(file, ...args);
+  });
+  t.mock.method(fs, 'closeSync', (fd) => {
+    if (fd === descriptor) {
+      closed = true;
+    }
+    return close(fd);
+  });
+  const errors = validateBackendDeployWorkspace(root, repositoryRoot);
+  assert.match(errors.join('\n'), /swap\.txt.*changed before opening/);
+  assert.equal(forbiddenReads, 0);
+  assert.throws(() => inspect(descriptor), { code: 'EBADF' });
+});
+
+test('workspace rejects a controlled parent swap before reading the outside object', (t) => {
+  const root = candidateWorkspace(strictWorkflow);
+  const directory = path.join(root, 'infra');
+  const outside = fs.mkdtempSync(path.join(testWorkspacesRoot, 'outside-'));
+  fs.mkdirSync(directory);
+  const target = path.join(directory, 'swap.txt');
+  fs.writeFileSync(target, 'inside');
+  fs.writeFileSync(path.join(outside, 'swap.txt'), 'outside');
+  const open = fs.openSync;
+  const close = fs.closeSync;
+  const read = fs.readFileSync;
+  let descriptor;
+  let active = false;
+  let forbiddenReads = 0;
+  t.mock.method(fs, 'openSync', (file, ...args) => {
+    if (file === target && descriptor === undefined) {
+      fs.renameSync(directory, `${directory}.original`);
+      fs.symlinkSync(outside, directory, 'dir');
+      descriptor = open(file, ...args);
+      active = true;
+      return descriptor;
+    }
+    return open(file, ...args);
+  });
+  t.mock.method(fs, 'readFileSync', (file, ...args) => {
+    if (active && file === descriptor) {
+      forbiddenReads += 1;
+    }
+    return read(file, ...args);
+  });
+  t.mock.method(fs, 'closeSync', (fd) => {
+    if (fd === descriptor) active = false;
+    return close(fd);
+  });
+  assert.match(
+    validateBackendDeployWorkspace(root, repositoryRoot).join('\n'),
+    /swap\.txt.*changed before opening/,
+  );
+  assert.equal(forbiddenReads, 0);
+  assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+});
+
+test('workspace reports opened-file validation and IO errors and always closes the descriptor', (t) => {
+  const root = candidateWorkspace(strictWorkflow);
+  const target = path.join(root, '.github', 'scripts', 'backend-deploy-workflow-policy.mjs');
+  const open = fs.openSync;
+  const read = fs.readFileSync;
+  let descriptor;
+  t.mock.method(fs, 'openSync', (file, ...args) => {
+    const fd = open(file, ...args);
+    if (file === target && descriptor === undefined) descriptor = fd;
+    return fd;
+  });
+  let injected = false;
+  t.mock.method(fs, 'readFileSync', (file, ...args) => {
+    if (file === descriptor && !injected) {
+      injected = true;
+      throw Object.assign(new Error('read denied'), { code: 'EACCES' });
+    }
+    return read(file, ...args);
+  });
+  assert.match(validateBackendDeployWorkspace(root, repositoryRoot).join('\n'), /cannot read.*read denied/);
+  assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+});
+
 test('workspace seals each revision-local trust root against deletion and substitution', () => {
   for (const relativePath of backendDeployTrustedFiles) {
     const missing = candidateWorkspace();

@@ -63,6 +63,11 @@ function requireScopes(subscriptionId, scopes) {
     throw new Error('role schedule scopes must be a non-empty array');
   }
   const subscriptionScope = `/subscriptions/${subscriptionId}`.toLowerCase();
+  const resourceGroupScopes = new Set(
+    ['ci', 'dev', 'staging', 'prod'].map(
+      (environment) => `${subscriptionScope}/resourcegroups/rg-certigo-${environment}`,
+    ),
+  );
   const normalizedScopes = scopes.map((scope) => String(scope).toLowerCase());
   if (
     new Set(normalizedScopes).size !== normalizedScopes.length ||
@@ -74,9 +79,7 @@ function requireScopes(subscriptionId, scopes) {
           /^\/providers\/microsoft\.management\/managementgroups\/[^/]+$/.test(
             scope,
           ) ||
-          new RegExp(
-            `^${subscriptionScope}/resourcegroups/rg-certigo-(ci|dev|staging|prod)$`,
-          ).test(scope)
+          resourceGroupScopes.has(scope)
         ),
     )
   ) {

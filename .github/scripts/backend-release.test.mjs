@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import {
   mkdirSync,
   mkdtempSync,
@@ -10,6 +11,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { loadDeploymentState } from './backend-deployment-state.mjs';
+import YAML from 'yaml';
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -47,6 +50,85 @@ const releaseTransferScript = path.join(
   'transfer-backend-release.sh',
 );
 const commitSha = '0123456789abcdef0123456789abcdef01234567';
+
+function stateFixture(t) {
+  const root = mkdtempSync(path.join(tmpdir(), 'certigo-state-reader-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, 'state.json');
+  const state = {
+    schema: 'certigo.backend.deployment-state/v1',
+    environment: 'staging',
+    current: {
+      commitSha,
+      packageSha256: 'a'.repeat(64),
+      blobName: `deployments/${commitSha}.zip`,
+      sourceRunId: 1234,
+      operation: 'promotion',
+      deployedAt: '2026-08-15T10:00:00Z',
+    },
+    previous: null,
+  };
+  writeFileSync(file, JSON.stringify(state));
+  return { root, file, state };
+}
+
+test('state reader preserves absent, empty, valid and legacy symlink behavior', (t) => {
+  const { root, file, state } = stateFixture(t);
+  assert.equal(loadDeploymentState('', 'staging'), null);
+  assert.equal(loadDeploymentState(path.join(root, 'missing'), 'staging'), null);
+  assert.deepEqual(loadDeploymentState(file, 'staging'), state);
+  const link = path.join(root, 'linked.json');
+  fs.symlinkSync(file, link);
+  assert.deepEqual(loadDeploymentState(link, 'staging'), state);
+  writeFileSync(file, '');
+  assert.equal(loadDeploymentState(file, 'staging'), null);
+});
+
+test('state reader uses the opened object despite a pathname replacement and closes it', (t) => {
+  const { file, state } = stateFixture(t);
+  const open = fs.openSync;
+  let descriptor;
+  t.mock.method(fs, 'openSync', (target, ...args) => {
+    descriptor = open(target, ...args);
+    fs.renameSync(file, `${file}.opened`);
+    writeFileSync(file, '{"replacement":true}');
+    return descriptor;
+  });
+  assert.deepEqual(loadDeploymentState(file, 'staging'), state);
+  assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+});
+
+test('state reader propagates nonmissing open and read errors and closes on read failure', (t) => {
+  const { file } = stateFixture(t);
+  const openError = Object.assign(new Error('denied'), { code: 'EACCES' });
+  const openMock = t.mock.method(fs, 'openSync', () => { throw openError; });
+  assert.throws(() => loadDeploymentState(file, 'staging'), openError);
+  openMock.mock.restore();
+  const open = fs.openSync;
+  let descriptor;
+  t.mock.method(fs, 'openSync', (...args) => {
+    descriptor = open(...args);
+    return descriptor;
+  });
+  const readError = Object.assign(new Error('read failed'), { code: 'ENOENT' });
+  t.mock.method(fs, 'readFileSync', () => { throw readError; });
+  assert.throws(() => loadDeploymentState(file, 'staging'), readError);
+  assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+});
+
+test('state reader retains JSON, schema, environment and release validation', (t) => {
+  const { file, state } = stateFixture(t);
+  for (const contents of [
+    '{',
+    JSON.stringify({ ...state, schema: 'unexpected' }),
+    JSON.stringify({ ...state, environment: 'prod' }),
+    JSON.stringify({ ...state, current: { ...state.current, commitSha: 'invalid' } }),
+    JSON.stringify({ ...state, previous: {} }),
+  ]) {
+    writeFileSync(file, contents);
+    assert.throws(() => loadDeploymentState(file, 'staging'));
+  }
+});
 
 function createRelease() {
   const root = mkdtempSync(path.join(tmpdir(), 'certigo-backend-release-'));
@@ -88,6 +170,55 @@ function createRelease() {
   assert.equal(result.status, 0, result.stderr);
   return { release, output };
 }
+
+test('iOS keychain arguments preserve multiple paths, spaces, order and an empty list', () => {
+  const workflow = YAML.parse(readFileSync(
+    path.join(repositoryRoot, '.github', 'workflows', 'release-ios.yml'), 'utf8',
+  ));
+  const signing = Object.values(workflow.jobs)
+    .flatMap((job) => job.steps ?? []).find((step) => step.id === 'signing').run;
+  const start = signing.indexOf('EXISTING_KEYCHAINS=("$KEYCHAIN")');
+  const end = signing.indexOf('\n', signing.indexOf(
+    'security list-keychains -d user -s "${EXISTING_KEYCHAINS[@]}"', start,
+  ));
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const script = [
+    'set -euo pipefail',
+    'security() {',
+    '  if [ "$#" -eq 3 ]; then',
+    '    printf "%s" "$MOCK_KEYCHAINS"',
+    '  else',
+    '    printf "<%s>\\n" "$@"',
+    '  fi',
+    '}',
+    signing.slice(start, end),
+  ].join('\n');
+  for (const existing of [
+    [],
+    ['/Users/test/Library/Keychains/login.keychain-db'],
+    ['/Users/test/Library/Keychains/login.keychain-db', '/Library/Keychains/System.keychain'],
+    ['/Users/test user/login keychain-db', '/Library/Keychains/System.keychain'],
+    ['/Users/test/[literal]*.keychain', '/Users/test/back\\slash.keychain'],
+  ]) {
+    for (const trailingNewline of ['', '\n']) {
+      const result = spawnSync('bash', ['-c', script], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          KEYCHAIN: '/tmp/signing keychain-db',
+          MOCK_KEYCHAINS: existing.map((file) => `    "${file}"`).join('\n') + trailingNewline,
+        },
+      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(
+        result.stdout,
+        ['list-keychains', '-d', 'user', '-s', '/tmp/signing keychain-db', ...existing]
+          .map((argument) => `<${argument}>\n`).join(''),
+      );
+    }
+  }
+});
 
 test('release manifest records and verifies package, SBOM and provenance', () => {
   const { output } = createRelease();

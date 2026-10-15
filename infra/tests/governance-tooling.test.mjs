@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -310,6 +310,41 @@ function scheduleFixture(id, scope, roleSuffix = '01') {
     },
   };
 }
+
+test('schedule scopes match literal subscriptions and exactly four resource groups', () => {
+  const principalId = '30000000-0000-0000-0000-000000000001';
+  for (const id of [subscription, 'sub.name', 'sub(alt)', 'sub+name', 'sub[name]', 'sub|name']) {
+    const base = `/subscriptions/${id}`;
+    const groups = ['ci', 'dev', 'staging', 'prod'].map(
+      (environment) => `${base}/resourceGroups/rg-certigo-${environment}`,
+    );
+    const scopes = [base, ...groups, '/providers/Microsoft.Management/managementGroups/parent'];
+    assert.equal(initialScheduleUrls(id, principalId, undefined, scopes).length, 6);
+    assert.equal(
+      initialScheduleUrls(id.toUpperCase(), principalId, undefined,
+        scopes.map((scope) => scope.toUpperCase())).length,
+      6,
+    );
+    for (const hostile of [
+      `${base}/resourceGroups/rg-certigo-development`,
+      `${base}/resourceGroups/rg-certigo-prod/extra`,
+      `${base}/resourceGroups/rg-certigo-prod\n`,
+      `/subscriptions/${id.replace('.', 'X')}-other/resourceGroups/rg-certigo-dev`,
+      `/subscriptions/${id.replace('.', 'X')}/resourceGroups/rg-certigo-dev`,
+    ].filter((scope) => !groups.includes(scope))) {
+      assert.throws(
+        () => initialScheduleUrls(id, principalId, undefined, [base, hostile]),
+        /approved hierarchy/,
+      );
+    }
+    for (const invalid of [[], groups, [base, base.toUpperCase()], [base, '']]) {
+      assert.throws(
+        () => initialScheduleUrls(id, principalId, undefined, invalid),
+        /non-empty|approved hierarchy/,
+      );
+    }
+  }
+});
 
 test('schedule pagination follows pages and deduplicates identical scope overlap', async () => {
   const principalId = '30000000-0000-0000-0000-000000000001';
@@ -651,6 +686,156 @@ test('evidence paths normalize Windows and Unix separators and reject unsafe for
       ),
     /case-insensitive path collision/,
   );
+});
+
+test('manifest seal overwrites a regular file without changing its existing mode', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-overwrite-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const manifest = path.join(directory, 'manifest.json');
+  const seal = path.join(directory, 'manifest.sha256');
+  fs.writeFileSync(manifest, '{}\n');
+  writeManifestSeal(manifest, seal);
+  assert.equal(fs.statSync(seal).mode & 0o777, 0o600);
+  fs.chmodSync(seal, 0o640);
+  fs.writeFileSync(seal, 'old seal with extra bytes'.repeat(10));
+  writeManifestSeal(manifest, seal);
+  assert.doesNotThrow(() => verifyManifestSeal(manifest, seal));
+  assert.equal(fs.statSync(seal).mode & 0o777, 0o640);
+  assert.match(fs.readFileSync(seal, 'utf8'), /^[0-9a-f]{64}  manifest\.json\n$/);
+});
+
+test('manifest seal rejects symlinks, parent symlinks and nonregular outputs without changing targets', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-hostile-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const manifest = path.join(directory, 'manifest.json');
+  const outside = path.join(directory, 'target');
+  const seal = path.join(directory, 'manifest.sha256');
+  fs.writeFileSync(manifest, '{}\n');
+  fs.writeFileSync(outside, 'untouched');
+  fs.symlinkSync(outside, seal);
+  assert.throws(() => writeManifestSeal(manifest, seal), /symbolic link/);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'untouched');
+  fs.rmSync(seal);
+  fs.mkdirSync(seal);
+  assert.throws(() => writeManifestSeal(manifest, seal), /regular file/);
+  const parent = path.join(directory, 'parent');
+  fs.symlinkSync(directory, parent, 'dir');
+  assert.throws(() => writeManifestSeal(manifest, path.join(parent, 'new.sha256')), /symbolic link/);
+  assert.equal(fs.existsSync(path.join(directory, 'new.sha256')), false);
+});
+
+test('manifest seal detects object substitution before truncation and closes the rejected object', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-swap-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const manifest = path.join(directory, 'manifest.json');
+  const seal = path.join(directory, 'manifest.sha256');
+  fs.writeFileSync(manifest, '{}\n');
+  fs.writeFileSync(seal, 'original');
+  const open = fs.openSync;
+  let descriptor;
+  t.mock.method(fs, 'openSync', (file, ...args) => {
+    if (file === seal && descriptor === undefined) {
+      fs.renameSync(seal, `${seal}.original`);
+      fs.writeFileSync(seal, 'replacement must remain intact');
+      descriptor = open(file, ...args);
+      return descriptor;
+    }
+    return open(file, ...args);
+  });
+  assert.throws(() => writeManifestSeal(manifest, seal), /changed before writing/);
+  assert.equal(fs.readFileSync(seal, 'utf8'), 'replacement must remain intact');
+  assert.equal(fs.readFileSync(`${seal}.original`, 'utf8'), 'original');
+  assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+});
+
+test('manifest seal closes descriptors on validation and write errors', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-io-error-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const manifest = path.join(directory, 'manifest.json');
+  const seal = path.join(directory, 'manifest.sha256');
+  fs.writeFileSync(manifest, '{}\n');
+  fs.writeFileSync(seal, 'original');
+  const open = fs.openSync;
+  let descriptor;
+  t.mock.method(fs, 'openSync', (file, ...args) => {
+    const fd = open(file, ...args);
+    if (file === seal) {
+      descriptor = fd;
+    }
+    return fd;
+  });
+  const denied = Object.assign(new Error('write denied'), { code: 'EACCES' });
+  const truncateMock = t.mock.method(fs, 'ftruncateSync', () => { throw denied; });
+  assert.throws(() => writeManifestSeal(manifest, seal), denied);
+  assert.equal(fs.readFileSync(seal, 'utf8'), 'original');
+  assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+  truncateMock.mock.restore();
+  const inspect = fs.fstatSync;
+  t.mock.method(fs, 'fstatSync', () => { throw denied; });
+  assert.throws(() => writeManifestSeal(manifest, seal), denied);
+  assert.throws(() => inspect(descriptor), { code: 'EBADF' });
+});
+
+test('manifest seal rejects a symlink swap before truncating its outside target', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-link-swap-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const manifest = path.join(directory, 'manifest.json');
+  const seal = path.join(directory, 'manifest.sha256');
+  const outside = path.join(directory, 'outside');
+  fs.writeFileSync(manifest, '{}\n');
+  fs.writeFileSync(seal, 'original');
+  fs.writeFileSync(outside, 'untouched');
+  const open = fs.openSync;
+  let swapped = false;
+  t.mock.method(fs, 'openSync', (file, ...args) => {
+    if (file === seal && !swapped) {
+      swapped = true;
+      fs.renameSync(seal, `${seal}.original`);
+      fs.symlinkSync(outside, seal);
+    }
+    return open(file, ...args);
+  });
+  assert.throws(() => writeManifestSeal(manifest, seal), /ELOOP|changed before writing/);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'untouched');
+  assert.equal(fs.readFileSync(`${seal}.original`, 'utf8'), 'original');
+});
+
+test('manifest seal rejects FIFOs before writing or waiting for a reader', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-fifo-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const manifest = path.join(directory, 'manifest.json');
+  const seal = path.join(directory, 'manifest.sha256');
+  fs.writeFileSync(manifest, '{}\n');
+  execFileSync('mkfifo', [seal]);
+  assert.throws(() => writeManifestSeal(manifest, seal), /regular file/);
+  fs.rmSync(seal);
+  fs.writeFileSync(seal, 'original');
+  const script = `
+    import fs from 'node:fs';
+    import { execFileSync } from 'node:child_process';
+    import { writeManifestSeal } from ${JSON.stringify(new URL('../governance/evidence-files.mjs', import.meta.url).href)};
+    const open = fs.openSync;
+    const seal = ${JSON.stringify(seal)};
+    fs.openSync = (file, ...args) => {
+      if (file === seal) {
+        fs.unlinkSync(seal);
+        execFileSync('mkfifo', [seal]);
+      }
+      return open(file, ...args);
+    };
+    try {
+      writeManifestSeal(${JSON.stringify(manifest)}, seal);
+      process.exitCode = 2;
+    } catch (error) {
+      if (!/ENXIO|changed before writing/.test(error.message)) throw error;
+    }
+  `;
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
+    encoding: 'utf8',
+    timeout: 10000,
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test('manifest seal is path-independent and detects tampering', () => {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
 import { copyFileSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -142,6 +143,128 @@ test('the CLI refuses forged readiness with valid on-disk digests', (t) => {
   assert.equal(result.status, 1);
   assert.equal(result.stdout, '');
   assert.match(result.stderr, /offline network input consumption is not implemented/);
+});
+
+test('network lock reader rejects a replaced object before reading and closes its descriptor', (t) => {
+  const { directory, contract } = fixture(t);
+  const lock = join(directory, 'apt-packages.lock.json');
+  const open = fs.openSync;
+  const read = fs.readFileSync;
+  let descriptor;
+  let reads = 0;
+  t.mock.method(fs, 'openSync', (file, ...args) => {
+    if (file === lock && descriptor === undefined) {
+      fs.renameSync(lock, `${lock}.original`);
+      writeFileSync(lock, '{"replacement":true}');
+      descriptor = open(file, ...args);
+      return descriptor;
+    }
+    return open(file, ...args);
+  });
+  t.mock.method(fs, 'readFileSync', (...args) => {
+    reads += 1;
+    return read(...args);
+  });
+  assert.throws(() => verifyNetworkLockDigests(contract, directory), /changed before opening/);
+  assert.equal(reads, 0);
+  assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+});
+
+test('network lock reader uses and closes the inspected descriptor after a pathname swap', (t) => {
+  const { directory, contract } = fixture(t);
+  const lock = join(directory, 'apt-packages.lock.json');
+  const inspect = fs.fstatSync;
+  let descriptor;
+  t.mock.method(fs, 'fstatSync', (fd, ...args) => {
+    const stat = inspect(fd, ...args);
+    if (descriptor === undefined) {
+      descriptor = fd;
+      fs.renameSync(lock, `${lock}.opened`);
+      writeFileSync(lock, '{"replacement":true}');
+    }
+    return stat;
+  });
+  assert.doesNotThrow(() => verifyNetworkLockDigests(contract, directory));
+  assert.throws(() => inspect(descriptor), { code: 'EBADF' });
+});
+
+test('network lock reader closes on IO errors and rejects nonregular locks without opening', (t) => {
+  const { directory, contract } = fixture(t);
+  const open = fs.openSync;
+  let descriptor;
+  t.mock.method(fs, 'openSync', (...args) => {
+    descriptor = open(...args);
+    return descriptor;
+  });
+  const readError = Object.assign(new Error('read denied'), { code: 'EACCES' });
+  const readMock = t.mock.method(fs, 'readFileSync', () => { throw readError; });
+  assert.throws(() => verifyNetworkLockDigests(contract, directory), readError);
+  assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+  readMock.mock.restore();
+  const lock = join(directory, 'apt-packages.lock.json');
+  rmSync(lock);
+  fs.mkdirSync(lock);
+  descriptor = undefined;
+  assert.throws(() => verifyNetworkLockDigests(contract, directory), /regular file/);
+  assert.equal(descriptor, undefined);
+});
+
+test('network lock reader rejects a symlink substitution without reading its target', (t) => {
+  const { directory, contract } = fixture(t);
+  const lock = join(directory, 'apt-packages.lock.json');
+  const outside = join(directory, 'outside.json');
+  writeFileSync(outside, 'untouched');
+  const open = fs.openSync;
+  let swapped = false;
+  t.mock.method(fs, 'openSync', (file, ...args) => {
+    if (file === lock && !swapped) {
+      swapped = true;
+      fs.renameSync(lock, `${lock}.original`);
+      symlinkSync(outside, lock);
+    }
+    return open(file, ...args);
+  });
+  let reads = 0;
+  t.mock.method(fs, 'readFileSync', () => { reads += 1; throw new Error('unexpected read'); });
+  assert.throws(() => verifyNetworkLockDigests(contract, directory), /ELOOP|changed before opening/);
+  assert.equal(reads, 0);
+  assert.equal(readFileSync(outside, 'utf8'), 'untouched');
+});
+
+test('network lock reader rejects initial and substituted FIFOs without blocking', (t) => {
+  const { directory, contract } = fixture(t);
+  const lock = join(directory, 'apt-packages.lock.json');
+  rmSync(lock);
+  execFileSync('mkfifo', [lock]);
+  assert.throws(() => verifyNetworkLockDigests(contract, directory), /regular file/);
+  rmSync(lock);
+  writeFileSync(lock, '{}');
+  const script = `
+    import fs from 'node:fs';
+    import { execFileSync } from 'node:child_process';
+    import { verifyNetworkLockDigests } from ${JSON.stringify(new URL('./validate-network-inputs.mjs', import.meta.url).href)};
+    const open = fs.openSync;
+    const lock = ${JSON.stringify(lock)};
+    fs.openSync = (file, ...args) => {
+      if (file === lock) {
+        fs.unlinkSync(lock);
+        execFileSync('mkfifo', [lock]);
+      }
+      return open(file, ...args);
+    };
+    try {
+      verifyNetworkLockDigests(${JSON.stringify(contract)}, ${JSON.stringify(directory)});
+      process.exitCode = 2;
+    } catch (error) {
+      if (!/changed before opening/.test(error.message)) throw error;
+    }
+  `;
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
+    encoding: 'utf8',
+    timeout: 10000,
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test('direct prewarm refuses before invoking tools, creating paths or consuming a redirect', (t) => {
