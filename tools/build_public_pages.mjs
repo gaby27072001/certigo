@@ -1,83 +1,10 @@
-import { randomUUID } from 'node:crypto';
-import { constants } from 'node:fs';
-import {
-  lstat,
-  mkdir,
-  open,
-  readFile,
-  realpath,
-  rename,
-  unlink,
-} from 'node:fs/promises';
-import { basename, dirname, resolve } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { validatePublicDomainConfiguration } from '../.github/scripts/public-domain-contract.mjs';
 
 const supportEmail = 'gabriel.chambaud@icloud.com';
-
-async function ensureOutputDirectory(directory) {
-  await mkdir(directory, { recursive: true });
-  const stat = await lstat(directory);
-  if (!stat.isDirectory() || stat.isSymbolicLink()) {
-    throw new Error(`${directory} must be a real non-symlink directory`);
-  }
-  if (await realpath(directory) !== resolve(directory)) {
-    throw new Error(`${directory} must resolve to its exact output path`);
-  }
-}
-
-async function assertSafeOutputFile(filePath) {
-  try {
-    const stat = await lstat(filePath);
-    if (!stat.isFile() || stat.isSymbolicLink()) {
-      throw new Error(`${filePath} must be a regular non-symlink file`);
-    }
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
-    }
-  }
-}
-
-async function writeOutputFile(filePath, contents) {
-  const directory = dirname(filePath);
-  await ensureOutputDirectory(directory);
-  await assertSafeOutputFile(filePath);
-
-  const temporaryPath = resolve(directory, `.${basename(filePath)}.${randomUUID()}.tmp`);
-  let handle;
-  let temporaryCreated = false;
-  try {
-    const flags = constants.O_CREAT
-      | constants.O_EXCL
-      | constants.O_WRONLY
-      | (constants.O_NOFOLLOW ?? 0);
-    handle = await open(temporaryPath, flags, 0o600);
-    temporaryCreated = true;
-    await handle.writeFile(contents, 'utf8');
-    await handle.close();
-    handle = null;
-
-    await ensureOutputDirectory(directory);
-    await assertSafeOutputFile(filePath);
-    await rename(temporaryPath, filePath);
-    temporaryCreated = false;
-  } finally {
-    if (handle) {
-      await handle.close();
-    }
-    if (temporaryCreated) {
-      try {
-        await unlink(temporaryPath);
-      } catch (error) {
-        if (error.code !== 'ENOENT') {
-          throw error;
-        }
-      }
-    }
-  }
-}
 
 function htmlEscape(value) {
   return value
@@ -135,12 +62,9 @@ export async function buildPublicPages({
   const deletionPath = resolve(output, 'account-deletion/index.html');
   const indexPath = resolve(output, 'index.html');
   const configPath = resolve(output, 'staticwebapp.config.json');
-  await ensureOutputDirectory(resolve(output));
-  await ensureOutputDirectory(dirname(privacyPath));
-  await ensureOutputDirectory(dirname(deletionPath));
-  for (const filePath of [configPath, indexPath, privacyPath, deletionPath]) {
-    await assertSafeOutputFile(filePath);
-  }
+  await mkdir(dirname(privacyPath), { recursive: true });
+  await mkdir(dirname(deletionPath), { recursive: true });
+  await mkdir(dirname(indexPath), { recursive: true });
 
   // Azure Static Web Apps sert /.well-known/ tel quel, mais attribue
   // application/octet-stream a un fichier sans extension, et Apple exige
@@ -155,7 +79,7 @@ export async function buildPublicPages({
   // rewrite et non redirect : Apple ne suit aucune redirection. La distinction
   // est invisible dans un navigateur et fatale pour un lien profond, qui echoue
   // alors en silence en ouvrant le navigateur au lieu de l'application.
-  await writeOutputFile(
+  await writeFile(
     configPath,
     `${JSON.stringify(
       {
@@ -170,6 +94,7 @@ export async function buildPublicPages({
       null,
       2,
     )}\n`,
+    'utf8',
   );
 
   // Azure Static Web Apps refuse de publier un dossier sans fichier par defaut
@@ -177,7 +102,7 @@ export async function buildPublicPages({
   // 2026-09-07, un deploiement « reussi » sans cette page a laisse les deux
   // URLs en 404. GitHub Pages, lui, n'exigeait rien de tel. Cette page est
   // aussi le « Site web » declare dans la fiche Google Play.
-  await writeOutputFile(
+  await writeFile(
     indexPath,
     layout(
       'Certigo — informations légales',
@@ -193,17 +118,19 @@ rassemble les documents publics de l’application.</p>
 <p><small>Certigo est une plateforme indépendante, non affiliée aux organismes de
 certification dont elle prépare les examens.</small></p>`,
     ),
+    'utf8',
   );
 
-  await writeOutputFile(
+  await writeFile(
     privacyPath,
     layout(
       'Politique de confidentialité — Certigo',
       `${publicDomain.publicWebOrigin}/privacy-policy/`,
       `<h1>Politique de confidentialité — Certigo</h1><pre>${htmlEscape(privacy)}</pre>`,
     ),
+    'utf8',
   );
-  await writeOutputFile(
+  await writeFile(
     deletionPath,
     layout(
       'Suppression de compte — Certigo',
@@ -221,6 +148,7 @@ certification dont elle prépare les examens.</small></p>`,
 <p>Le reçu pseudonymisé expire après 30 jours. Les sauvegardes résiduelles expirent au plus tard après 30 jours. Les journaux techniques sans identité sont conservés 90 jours.</p>
 <details><summary>Politique technique complète</summary><pre>${htmlEscape(deletion)}</pre></details>`,
     ),
+    'utf8',
   );
 }
 

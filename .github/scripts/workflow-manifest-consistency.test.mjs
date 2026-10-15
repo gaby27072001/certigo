@@ -512,6 +512,7 @@ test('repository file reads stay bound to the verified regular-file descriptor',
     write(outside, 'regular.txt', 'substituted contents');
     assert.equal(readRegularRepositoryFile(root, 'files/regular.txt').content, 'trusted contents');
     assert.deepEqual(readRegularRepositoryFile(root, 'files/missing.txt'), { exists: false });
+    assert.deepEqual(readRegularRepositoryFile(root, 'files/regular.txt/missing.txt'), { exists: false });
     assert.match(readRegularRepositoryFile(root, 'files').error, /regular non-symlink file/u);
 
     const fileLink = resolveIn(root, 'files/final-link.txt');

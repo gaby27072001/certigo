@@ -447,8 +447,9 @@ export function readVerifiedRegularFileSync(filePath, expectedStat) {
   }
 }
 
-// Lit un fichier du dépôt sans jamais suivre de lien symbolique, y compris sur un répertoire
-// parent : l'arbre lu peut être celui d'une PR non fiable.
+// Reject pre-existing file/parent symlinks and bind bytes to the verified inode.
+// O_NOFOLLOW protects only the final component; path checks are not atomic against an
+// actor concurrently replacing writable ancestors. Keep the checkout stable during validation.
 export function readRegularRepositoryFile(root, relativePath) {
   const filePath = path.join(root, ...relativePath.split('/'));
   let stat;
@@ -477,8 +478,7 @@ export function readRegularRepositoryFile(root, relativePath) {
   }
 }
 
-// Calcule, à partir d'un arbre, les états A/B/C exactement comme le générateur les écrit.
-// Ne suit aucun lien symbolique : l'arbre peut être celui d'une PR non fiable.
+// Calcule les états A/B/C d'un arbre stable, en refusant les liens symboliques présents.
 export function computeWorkflowStates(root) {
   const errors = [];
   const workflowsRelative = '.github/workflows';
