@@ -25,6 +25,14 @@ inventaires live et les IDs hors scope ne referencent pas cette image dans PR1.
   hors ligne et ses preuves d'exhaustivite ne sont pas implementes; les chemins
   modifiables du workspace ne servent pas de source aux locks. Le commit doit
   etre present dans la base d'objets Git locale; sinon la verification echoue.
+  La commande explicite `node infra/ci-runner/image/validate-network-inputs.mjs
+  --prepare-contract` recupere seulement le SHA exact manquant depuis `origin`,
+  sans mettre a jour une branche ni `FETCH_HEAD`, puis verifie les blobs.
+  `canary-transition.ps1` execute cette preparation avant la validation; les
+  appels directs du validateur et `validate-canary-evidence.mjs --release`
+  exigent cette preparation prealable dans un clone peu profond. `--plan` et
+  la validation normale ne telechargent rien. Un origin indisponible ou un
+  objet manquant, non-commit ou non conforme provoque un echec sans repli.
   Le SHA est epingle par le contrat versionne et n'est pas authentifie par une
   signature distante dans ce validateur;
 - `validate-toolchain.sh --boot` verifie manifest, SBOM, lock, attestation,

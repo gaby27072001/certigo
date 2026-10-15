@@ -13,10 +13,11 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   assertNetworkInputsReady,
   installationBlocker,
+  prepareNetworkLockCommit,
   verifyNetworkLockDigests,
 } from './validate-network-inputs.mjs';
 import { reconstructBasePackages, verifyBaseImageEvidence } from './verify-base-image-evidence.mjs';
@@ -89,8 +90,97 @@ function fixture(t) {
   return { directory, repositoryRoot, contract };
 }
 
-test('checked-in contract lock digests match blobs at its declared Git commit', () => {
-  assert.doesNotThrow(() => verifyNetworkLockDigests(original));
+test('checked-in lock blobs match the contract digests at the checked-out commit', () => {
+  const commit = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {
+    encoding: 'utf8',
+  }).trim();
+  assert.doesNotThrow(() => verifyNetworkLockDigests({ ...original, contractCommit: commit }));
+});
+
+function shallowFixture(t) {
+  const source = fixture(t);
+  writeFileSync(join(source.repositoryRoot, 'later.txt'), 'shallow tip');
+  execFileSync('git', ['-C', source.repositoryRoot, 'add', '--', 'later.txt']);
+  execFileSync('git', ['-C', source.repositoryRoot, '-c', 'user.name=Certigo test',
+    '-c', 'user.email=certigo@example.invalid', 'commit', '--quiet', '-m', 'Later tip']);
+  const container = mkdtempSync(join(tmpdir(), 'certigo-network-shallow-'));
+  t.after(() => rmSync(container, { recursive: true, force: true }));
+  const checkout = join(container, 'checkout');
+  execFileSync('git', ['clone', '--quiet', '--depth=1', '--no-local',
+    pathToFileURL(source.repositoryRoot).href, checkout]);
+  return {
+    ...source,
+    repositoryRoot: checkout,
+    directory: join(checkout, 'infra', 'ci-runner', 'image'),
+  };
+}
+
+test('shallow validation refuses missing objects until explicit exact-SHA preparation', (t) => {
+  const { directory, repositoryRoot, contract } = shallowFixture(t);
+  assert.equal(execFileSync('git', ['-C', repositoryRoot,
+    'rev-parse', '--is-shallow-repository'], { encoding: 'utf8' }).trim(), 'true');
+  const refs = execFileSync('git', ['-C', repositoryRoot, 'show-ref'], { encoding: 'utf8' });
+  const fetchHead = join(repositoryRoot, '.git', 'FETCH_HEAD');
+  writeFileSync(fetchHead, 'unchanged fetch head\n');
+  assert.throws(() => verifyNetworkLockDigests(contract, directory), /cat-file/);
+  assert.throws(() => assertNetworkInputsReady(contract, directory), /cat-file/);
+  assert.doesNotThrow(() => prepareNetworkLockCommit(contract, directory));
+  assert.doesNotThrow(() => verifyNetworkLockDigests(contract, directory));
+  assert.throws(() => assertNetworkInputsReady(contract, directory), {
+    message: installationBlocker,
+  });
+  assert.equal(execFileSync('git', ['-C', repositoryRoot, 'show-ref'], {
+    encoding: 'utf8',
+  }), refs);
+  assert.equal(readFileSync(fetchHead, 'utf8'), 'unchanged fetch head\n');
+  assert.throws(() => prepareNetworkLockCommit({
+    ...contract,
+    reproducibility: { ...contract.reproducibility, aptPackageLockSha256: '0'.repeat(64) },
+  }, directory), /Network lock digest mismatch/);
+});
+
+test('contract preparation fails closed without origin or with a missing exact object', (t) => {
+  const { directory, repositoryRoot, contract } = shallowFixture(t);
+  assert.throws(
+    () => prepareNetworkLockCommit({ ...contract, contractCommit: 'f'.repeat(40) }, directory),
+    /fetch/,
+  );
+  execFileSync('git', ['-C', repositoryRoot, 'remote', 'remove', 'origin']);
+  assert.throws(() => prepareNetworkLockCommit(contract, directory), /fetch/);
+  assert.throws(() => verifyNetworkLockDigests(contract, directory), /cat-file/);
+});
+
+test('contract preparation rejects a noncommit object and malformed SHA without fetching', (t) => {
+  const { directory, repositoryRoot, contract } = fixture(t);
+  const blob = execFileSync('git', ['-C', repositoryRoot, 'rev-parse',
+    `${contract.contractCommit}:${lockPaths[0]}`], { encoding: 'utf8' }).trim();
+  assert.throws(
+    () => prepareNetworkLockCommit({ ...contract, contractCommit: blob }, directory),
+    /must identify a Git commit/,
+  );
+  assert.throws(
+    () => prepareNetworkLockCommit({ ...contract, contractCommit: 'HEAD' }, directory),
+    /invalid contractCommit/,
+  );
+});
+
+test('explicit preparation CLI supplies shallow inputs without enabling installation', (t) => {
+  const { directory, contract } = shallowFixture(t);
+  const validator = join(directory, 'validate-network-inputs.mjs');
+  copyFileSync(join(root, 'validate-network-inputs.mjs'), validator);
+  writeFileSync(join(directory, 'image-build-contract.json'), JSON.stringify(contract));
+  const unprepared = spawnSync(process.execPath, [validator], { encoding: 'utf8' });
+  assert.equal(unprepared.status, 1);
+  assert.match(unprepared.stderr, /cat-file/);
+  const prepared = spawnSync(process.execPath, [validator, '--prepare-contract'], {
+    encoding: 'utf8',
+  });
+  assert.equal(prepared.status, 0, prepared.stderr);
+  assert.equal(prepared.stdout, '');
+  assert.equal(prepared.stderr, '');
+  const blocked = spawnSync(process.execPath, [validator], { encoding: 'utf8' });
+  assert.equal(blocked.status, 1);
+  assert.equal(blocked.stderr, `${installationBlocker}\n`);
 });
 
 test('real bytes, not hash-shaped strings, are required for both network locks', (t) => {
@@ -139,6 +229,15 @@ test('a changed committed lock cannot pass with the original declared digest', (
   writeFileSync(lock, `${readFileSync(lock, 'utf8')} `);
   contract.contractCommit = commitLocks(repositoryRoot);
   assert.throws(() => verifyNetworkLockDigests(contract, directory), /digest mismatch/);
+});
+
+test('replacement refs cannot redirect the pinned commit to different lock bytes', (t) => {
+  const { directory, repositoryRoot, contract } = fixture(t);
+  writeFileSync(join(directory, 'apt-packages.lock.json'), '{"redirected":true}\n');
+  const replacement = commitLocks(repositoryRoot);
+  execFileSync('git', ['-C', repositoryRoot, 'replace', contract.contractCommit, replacement]);
+  assert.doesNotThrow(() => verifyNetworkLockDigests(contract, directory));
+  assert.doesNotThrow(() => prepareNetworkLockCommit(contract, directory));
 });
 
 test('empty, malformed or non-object JSON is not a network lock even with a matching digest', (t) => {
