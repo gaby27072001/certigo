@@ -19,26 +19,26 @@ PROBE_BUNDLE, PROBE_TEST_BUNDLE = probe_bundles(LOT_SUFFIX)
 
 
 class AppleNoAuthMetadataTests(unittest.TestCase):
-    def test_app_embeds_linked_msal_product_and_searches_frameworks_in_both_configurations(self):
+    def test_app_links_msal_without_copying_package_aggregate_and_searches_frameworks(self):
         native = Path(__file__).resolve().parents[1] / "apps" / "apple" / "CertigoNative"
         objects = parse_project(
             (native / "CertigoNative.xcodeproj" / "project.pbxproj").read_text()
         )["objects"]
         app = objects["000000000000000000000050"]
-        embed = objects["000000000000000000000036"]
-        self.assertIn("000000000000000000000036", app["buildPhases"])
-        self.assertEqual(embed["isa"], "PBXCopyFilesBuildPhase")
-        self.assertEqual(embed["dstSubfolderSpec"], "10")
-        self.assertEqual(embed["dstPath"], "")
-        self.assertEqual(embed["runOnlyForDeploymentPostprocessing"], "0")
-        self.assertEqual(embed["files"], ["00000000000000000000000C"])
         linked = objects["000000000000000000000007"]
-        copied = objects["00000000000000000000000C"]
-        self.assertEqual(copied["productRef"], linked["productRef"])
-        self.assertIn(copied["productRef"], app["packageProductDependencies"])
-        self.assertEqual(
-            copied["settings"]["ATTRIBUTES"], ["CodeSignOnCopy", "RemoveHeadersOnCopy"]
-        )
+        self.assertIn(linked["productRef"], app["packageProductDependencies"])
+        self.assertEqual(objects[linked["productRef"]]["productName"], "MSAL")
+        phases = [objects[identifier] for identifier in app["buildPhases"]]
+        frameworks = [phase for phase in phases if phase["isa"] == "PBXFrameworksBuildPhase"]
+        self.assertEqual(len(frameworks), 1)
+        self.assertIn("000000000000000000000007", frameworks[0]["files"])
+        for phase in phases:
+            if phase["isa"] == "PBXCopyFilesBuildPhase":
+                for identifier in phase["files"]:
+                    self.assertNotEqual(
+                        objects[identifier].get("productRef"), linked["productRef"],
+                        "A SwiftPM productRef resolves to MSAL-product, not MSAL.framework",
+                    )
         for identifier in ("000000000000000000000082", "000000000000000000000083"):
             settings = objects[identifier]["buildSettings"]
             self.assertEqual(settings["LD_RUNPATH_SEARCH_PATHS"],

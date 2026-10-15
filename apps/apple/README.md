@@ -57,11 +57,12 @@ NoAuth protection tests are not claimed as a UI gate.
 
 ## MSAL runtime packaging
 
-The app links the pinned MSAL binary package and embeds that same product with
-Xcode's standard Embed Frameworks copy phase (Frameworks destination,
-CodeSignOnCopy and RemoveHeadersOnCopy). Debug and Release preserve inherited
-runpaths and search `@executable_path/Frameworks`. This is required even when
-only the synthetic demo is opened: dyld loads linked libraries before SwiftUI.
+The app links the pinned MSAL binary package. Xcode's SwiftPM integration copies
+the selected XCFramework library into the app's Frameworks directory; do not add
+a copy phase referencing the package product, which resolves to the non-file
+aggregate `MSAL-product`. Debug and Release preserve inherited runpaths and
+search `@executable_path/Frameworks`. This is required even when only the
+synthetic demo is opened: dyld loads linked libraries before SwiftUI.
 Unsigned simulator builds remain unsigned; this does not grant device signing
 or change any authentication configuration.
 
