@@ -127,8 +127,10 @@ approuvé, jamais un autre ; et l'écart se referme au premier mouvement de `mai
 
 ### Rapports Checkov et couverture effective
 
-Le candidat de durcissement de `security-scan.yml` conserve le journal CLI et ajoute un rapport
-JSON du même scan, contrôlé par `checkov_report_gate.py` depuis les contrôles de la **base**.
+`checkov_report_gate.py` est installé avec ses tests avant toute modification du workflow.
+Cette installation seule ne change pas le scan actif. Lors de son intégration future,
+`security-scan.yml` doit conserver le journal CLI et ajouter un rapport JSON du même scan,
+contrôlé par ce script depuis les contrôles de la **base**.
 Il refuse un code scanner non nul, un contrôle échoué, une erreur de parsing, un rapport
 absent/malformé/incohérent et une couverture effective nulle. Un scan ne peut donc pas être déclaré
 réussi uniquement parce que Checkov renvoie zéro malgré des erreurs de parsing.
