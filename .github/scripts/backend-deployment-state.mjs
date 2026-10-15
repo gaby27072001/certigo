@@ -55,7 +55,11 @@ export function loadDeploymentState(file, environment) {
   }
   let descriptor;
   try {
-    descriptor = fs.openSync(file, 'r');
+    // Size-zero FIFOs historically returned null without waiting for a writer.
+    descriptor = fs.openSync(
+      file,
+      fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0),
+    );
   } catch (error) {
     if (error.code === 'ENOENT') {
       return null;
@@ -64,6 +68,9 @@ export function loadDeploymentState(file, environment) {
   }
   let contents;
   try {
+    if (fs.fstatSync(descriptor).size === 0) {
+      return null;
+    }
     contents = fs.readFileSync(descriptor, 'utf8');
   } finally {
     fs.closeSync(descriptor);

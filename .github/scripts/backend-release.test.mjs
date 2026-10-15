@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import {
   mkdirSync,
@@ -128,6 +128,66 @@ test('state reader retains JSON, schema, environment and release validation', (t
     writeFileSync(file, contents);
     assert.throws(() => loadDeploymentState(file, 'staging'));
   }
+});
+
+test('state reader preserves size-zero FIFO null without blocking, consuming bytes or leaking descriptors', (t) => {
+  const { root } = stateFixture(t);
+  const fifo = path.join(root, 'state.fifo');
+  execFileSync('mkfifo', [fifo]);
+  const script = `
+    import assert from 'node:assert/strict';
+    import fs from 'node:fs';
+    import { loadDeploymentState } from ${JSON.stringify(new URL('./backend-deployment-state.mjs', import.meta.url).href)};
+    const fifo = ${JSON.stringify(fifo)};
+    const open = fs.openSync;
+    let descriptor;
+    fs.openSync = (...args) => {
+      descriptor = open(...args);
+      return descriptor;
+    };
+    assert.equal(loadDeploymentState(fifo, 'staging'), null);
+    assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+    const writer = open(fifo, fs.constants.O_RDWR | fs.constants.O_NONBLOCK);
+    try {
+      fs.writeSync(writer, 'unconsumed');
+      assert.equal(loadDeploymentState(fifo, 'staging'), null);
+      assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+      const buffer = Buffer.alloc(10);
+      assert.equal(fs.readSync(writer, buffer), 10);
+      assert.equal(buffer.toString(), 'unconsumed');
+    } finally {
+      fs.closeSync(writer);
+    }
+    assert.equal(loadDeploymentState(fifo, 'staging'), null);
+    assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+  `;
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
+    encoding: 'utf8',
+    timeout: 10000,
+    killSignal: 'SIGKILL',
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test('state reader closes on fstat failure and does not read size-zero opened objects', (t) => {
+  const { file } = stateFixture(t);
+  const open = fs.openSync;
+  const inspect = fs.fstatSync;
+  let descriptor;
+  t.mock.method(fs, 'openSync', (...args) => {
+    descriptor = open(...args);
+    return descriptor;
+  });
+  const failure = Object.assign(new Error('stat failed'), { code: 'EIO' });
+  const inspectMock = t.mock.method(fs, 'fstatSync', () => { throw failure; });
+  assert.throws(() => loadDeploymentState(file, 'staging'), failure);
+  assert.throws(() => inspect(descriptor), { code: 'EBADF' });
+  inspectMock.mock.restore();
+  t.mock.method(fs, 'fstatSync', () => ({ size: 0 }));
+  t.mock.method(fs, 'readFileSync', () => { throw new Error('unexpected read of size-zero object'); });
+  assert.equal(loadDeploymentState(file, 'staging'), null);
+  assert.throws(() => inspect(descriptor), { code: 'EBADF' });
 });
 
 function createRelease() {
