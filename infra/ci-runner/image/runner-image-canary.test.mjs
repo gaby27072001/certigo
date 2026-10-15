@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   hashAzureEvidence,
   summarizeMeasurements,
@@ -633,6 +635,11 @@ test('release evidence requires cold/warm samples, attestations, and exact rollb
   const releaseAttestationPolicy = structuredClone(attestationPolicy);
   releaseBuildContract.policy.reproducibleInputsReady = true;
   releaseBuildContract.reproducibility.status = 'locked';
+  releaseBuildContract.contractCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: fileURLToPath(repositoryRoot),
+    encoding: 'utf8',
+  }).trim();
+  const rawBuildContract = JSON.stringify(releaseBuildContract);
   releaseAttestationPolicy.activation.status = 'active';
   releaseAttestationPolicy.signerDigest = 'a'.repeat(40);
   evidence.status = 'validated';
@@ -677,11 +684,11 @@ test('release evidence requires cold/warm samples, attestations, and exact rollb
   };
   const descriptor = {
     schemaVersion: 2,
-    contractCommit: buildContract.contractCommit,
+    contractCommit: releaseBuildContract.contractCommit,
     galleryImageVersionId: evidence.imageBuild.galleryImageVersionId,
     runOutputResourceId: evidence.imageBuild.runOutputResourceId,
     buildContractSha256: createHash('sha256')
-      .update(await read('image-build-contract.json'))
+      .update(rawBuildContract)
       .digest('hex'),
     toolchainManifestSha256:
       buildContract.inputs.find((input) => input.id === 'toolchain-manifest').sha256,
@@ -730,7 +737,6 @@ test('release evidence requires cold/warm samples, attestations, and exact rollb
   };
   const rawWhatIf = JSON.stringify(whatIf);
   const rawDescriptor = JSON.stringify(descriptor);
-  const rawBuildContract = await read('image-build-contract.json');
   const rawCanaryTemplate = await read('canary-main.bicep');
   evidence.whatIf.resultSha256 = createHash('sha256').update(rawWhatIf).digest('hex');
   evidence.imageBuild.descriptorSha256 =

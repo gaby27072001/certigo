@@ -1,10 +1,79 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import fs from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { dirname, parse, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { validatePublicDomainConfiguration } from '../.github/scripts/public-domain-contract.mjs';
 
 const supportEmail = 'gabriel.chambaud@icloud.com';
+
+function ensureOutputDirectory(directory) {
+  const absolute = resolve(directory);
+  let current = parse(absolute).root;
+  for (const component of relative(current, absolute).split(sep).filter(Boolean)) {
+    current = resolve(current, component);
+    let stat;
+    try {
+      stat = fs.lstatSync(current);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      fs.mkdirSync(current);
+      stat = fs.lstatSync(current);
+    }
+    if (!stat.isDirectory() || stat.isSymbolicLink()) {
+      throw new Error(`${current}: output ancestors must be real non-symlink directories`);
+    }
+  }
+}
+
+function outputFileStat(filePath) {
+  try {
+    const stat = fs.lstatSync(filePath);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) {
+      throw new Error(`${filePath}: output must be a regular non-symlink single-link file`);
+    }
+    return stat;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    return null;
+  }
+}
+
+// Generation requires a stable, isolated workspace with no hostile concurrent writer.
+// Portable Node cannot atomically confine mutable ancestors; O_NOFOLLOW is final-only.
+// Never use pathname rename/unlink publication, which can substitute a homonymous source.
+function writeOutputFile(filePath, contents) {
+  ensureOutputDirectory(dirname(filePath));
+  const previous = outputFileStat(filePath);
+  const flags = fs.constants.O_WRONLY
+    | (fs.constants.O_NOFOLLOW ?? 0)
+    | (fs.constants.O_NONBLOCK ?? 0)
+    | (previous ? 0 : fs.constants.O_CREAT | fs.constants.O_EXCL);
+  const descriptor = fs.openSync(filePath, flags, 0o600);
+  try {
+    const opened = fs.fstatSync(descriptor);
+    if (
+      !opened.isFile()
+      || opened.nlink !== 1
+      || (previous && (opened.dev !== previous.dev || opened.ino !== previous.ino))
+    ) {
+      throw new Error(`${filePath}: output file changed while opening`);
+    }
+    ensureOutputDirectory(dirname(filePath));
+    const current = outputFileStat(filePath);
+    if (!current || current.dev !== opened.dev || current.ino !== opened.ino) {
+      throw new Error(`${filePath}: output path changed while opening`);
+    }
+    // Check before truncating an existing file, and preserve its permissions on reruns.
+    fs.ftruncateSync(descriptor, 0);
+    fs.writeFileSync(descriptor, contents, 'utf8');
+    if (!previous && process.platform !== 'win32') {
+      fs.fchmodSync(descriptor, 0o666 & ~process.umask());
+    }
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
 
 function htmlEscape(value) {
   return value
@@ -62,9 +131,12 @@ export async function buildPublicPages({
   const deletionPath = resolve(output, 'account-deletion/index.html');
   const indexPath = resolve(output, 'index.html');
   const configPath = resolve(output, 'staticwebapp.config.json');
-  await mkdir(dirname(privacyPath), { recursive: true });
-  await mkdir(dirname(deletionPath), { recursive: true });
-  await mkdir(dirname(indexPath), { recursive: true });
+  ensureOutputDirectory(dirname(privacyPath));
+  ensureOutputDirectory(dirname(deletionPath));
+  ensureOutputDirectory(dirname(indexPath));
+  for (const filePath of [configPath, indexPath, privacyPath, deletionPath]) {
+    outputFileStat(filePath);
+  }
 
   // Azure Static Web Apps sert /.well-known/ tel quel, mais attribue
   // application/octet-stream a un fichier sans extension, et Apple exige
@@ -79,7 +151,7 @@ export async function buildPublicPages({
   // rewrite et non redirect : Apple ne suit aucune redirection. La distinction
   // est invisible dans un navigateur et fatale pour un lien profond, qui echoue
   // alors en silence en ouvrant le navigateur au lieu de l'application.
-  await writeFile(
+  writeOutputFile(
     configPath,
     `${JSON.stringify(
       {
@@ -94,7 +166,6 @@ export async function buildPublicPages({
       null,
       2,
     )}\n`,
-    'utf8',
   );
 
   // Azure Static Web Apps refuse de publier un dossier sans fichier par defaut
@@ -102,7 +173,7 @@ export async function buildPublicPages({
   // 2026-09-07, un deploiement « reussi » sans cette page a laisse les deux
   // URLs en 404. GitHub Pages, lui, n'exigeait rien de tel. Cette page est
   // aussi le « Site web » declare dans la fiche Google Play.
-  await writeFile(
+  writeOutputFile(
     indexPath,
     layout(
       'Certigo — informations légales',
@@ -118,19 +189,17 @@ rassemble les documents publics de l’application.</p>
 <p><small>Certigo est une plateforme indépendante, non affiliée aux organismes de
 certification dont elle prépare les examens.</small></p>`,
     ),
-    'utf8',
   );
 
-  await writeFile(
+  writeOutputFile(
     privacyPath,
     layout(
       'Politique de confidentialité — Certigo',
       `${publicDomain.publicWebOrigin}/privacy-policy/`,
       `<h1>Politique de confidentialité — Certigo</h1><pre>${htmlEscape(privacy)}</pre>`,
     ),
-    'utf8',
   );
-  await writeFile(
+  writeOutputFile(
     deletionPath,
     layout(
       'Suppression de compte — Certigo',
@@ -148,7 +217,6 @@ certification dont elle prépare les examens.</small></p>`,
 <p>Le reçu pseudonymisé expire après 30 jours. Les sauvegardes résiduelles expirent au plus tard après 30 jours. Les journaux techniques sans identité sont conservés 90 jours.</p>
 <details><summary>Politique technique complète</summary><pre>${htmlEscape(deletion)}</pre></details>`,
     ),
-    'utf8',
   );
 }
 

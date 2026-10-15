@@ -31,7 +31,7 @@ jobs:
     name: Validate tracks & lessons
     needs: freshness
     if: ${{ always() && (github.event_name != 'pull_request_target' || (needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository)) }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read

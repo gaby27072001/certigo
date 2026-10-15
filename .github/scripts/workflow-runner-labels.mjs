@@ -1,4 +1,9 @@
 import { parseDocument } from 'yaml';
+import {
+  isReviewedGenerationJob,
+  isReviewedMainCodeqlJob,
+} from './backend-deploy-workflow-policy.mjs';
+import { isHostedLinuxCiRunner, validateHostedLinuxJob } from './linux-ci-runner-policy.mjs';
 
 // Ensembles de labels autorisés, sur le YAML analysé. La règle textuelle de
 // validate-workflow-security.mjs ne lit que les lignes qui commencent par `runs-on:` : une clé
@@ -17,7 +22,7 @@ function isAllowedLabelSet(labels) {
   ));
 }
 
-export function validateRunnerLabels(text, label) {
+export function validateRunnerLabels(text, label, { trustedRoot } = {}) {
   const document = parseDocument(text, {
     merge: false,
     strict: true,
@@ -47,7 +52,14 @@ export function validateRunnerLabels(text, label) {
     ) {
       continue;
     }
-    if (!isAllowedLabelSet(job['runs-on'])) {
+    if (
+      isReviewedGenerationJob(text, label, jobId, trustedRoot)
+      || isReviewedMainCodeqlJob(text, label, jobId, trustedRoot)
+    ) {
+      continue;
+    }
+    errors.push(...validateHostedLinuxJob(workflow, job, jobId, label));
+    if (!isAllowedLabelSet(job['runs-on']) && !isHostedLinuxCiRunner(label, jobId, job['runs-on'])) {
       errors.push(
         `${label}: job ${jobId} must run on a fixed Azure self-hosted label set, `
         + `not ${JSON.stringify(job['runs-on'])}`,
