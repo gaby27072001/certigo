@@ -1,12 +1,14 @@
 # Architecture — Certigo
 
-Ce document décrit l'architecture de référence du monorepo : frontend Flutter, backend
-.NET 10 Azure Functions, moteur pédagogique Cortex, contenu *as-code* et flux de données.
+Ce document décrit l'architecture de référence du monorepo : client Flutter existant,
+cible native Swift/SwiftUI iPhone/iPad, backend .NET 10 Azure Functions, moteur pédagogique
+Cortex, contenu *as-code* et flux de données. La cible Apple réutilise les contrats HTTP ;
+elle ne nécessite ni backend Swift ni deuxième source de progression.
 
 > Rappel produit : Certigo enseigne des **concepts techniques réels** et prépare à des
 > certifications cloud multi-fournisseurs. Le catalogue canonique (`content/public/catalog/certifications.json`
-> dans `certigo-content`) contient **32 certifications** réparties sur **3 fournisseurs** :
-> 14 Google Cloud, 12 AWS, 6 Microsoft. Ce **n'est pas** une app de langues.
+> dans `certigo-content`) fait foi pour les certifications et leur disponibilité.
+> Ce **n'est pas** une app de langues.
 
 ---
 
@@ -27,6 +29,12 @@ Ce document décrit l'architecture de référence du monorepo : frontend Flutter
 ---
 
 ## 2. Vue d'ensemble
+
+Le schéma détaille le client Flutter conservé pendant la migration. La tranche native
+choisir certification → questions → correction → progression/reprise utilise la même API.
+Le contrat [native-client/v1](./contracts/native-client/v1/README.md) précise découverte des
+lessons, pins et rejeu ; ses tests locaux ne prouvent ni activation de release ni santé live.
+Les parcours guidés nécessitent un corpus publié : ne pas les déduire des question banks.
 
 ```
 ┌───────────────────────────── apps/mobile (Flutter) ─────────────────────────────┐
@@ -61,7 +69,7 @@ Le **sens des dépendances** backend : `Api → Application → Domain ← Infra
 
 ---
 
-## 3. Frontend Flutter
+## 3. Frontend Flutter existant
 
 ### 3.1 Découpage
 
@@ -115,8 +123,8 @@ Quatre projets de tests xUnit, un par couche : `Certigo.Domain.Tests` (FSRS, rea
 
 ### 4.2 Endpoints
 
-**24 fichiers `*Functions.cs`** sous `backend/src/Certigo.Api`. Vingt-trois exposent des routes
-HTTP ; `EnterpriseLearningRecoveryFunctions` est un `TimerTrigger` sans route.
+Les fichiers `*Functions.cs` sous `backend/src/Certigo.Api` portent les triggers ;
+`EnterpriseLearningRecoveryFunctions` est notamment un `TimerTrigger` sans route HTTP.
 
 | Fonction | Routes |
 |---|---|
@@ -164,13 +172,16 @@ En local : `local.settings.json` (gabarit `.example` fourni, fichier réel gitig
 
 ## 5. Données — Cosmos DB
 
-Base `certigo`, mode **serverless**. **Dix containers** — la topologie canonique est
+Base `certigo`, mode **serverless**. La topologie canonique est
 `contracts/cosmos-containers.json`, partagée par Bicep et `CosmosContainers.cs` :
 
 | Container | Partition key | Contenu |
 |---|---|---|
 | `users` | `/id` | profil/overlay Person, credentials et LinkedIdentity additifs (ETag, ids déterministes) |
 | `content` | `/trackId` | tracks, leçons publiques, clés de réponse |
+| `content-public` | `/releaseId` | projection publique immuable d'une release |
+| `content-private` | `/releaseId` | clés de correction privées d'une release |
+| `content-control` | `/scope` | receipts d'import et pointeur active/previous sous ETag |
 | `progress` | `/userId` | maîtrise par concept, état FSRS |
 | `attempts` | `/userId` | tentatives de quiz/examen (id déterministe `attempt::{clientAttemptId}` → idempotence atomique) |
 | `events` | `/userId` | événements analytics |
@@ -180,8 +191,10 @@ Base `certigo`, mode **serverless**. **Dix containers** — la topologie canoniq
 | `organizations` | `/organizationId` | organisations, équipes, adhésions et invitations entreprise |
 | `enterpriseMetricReceipts` | `/partitionKey` | reçus d'idempotence des métriques d'apprentissage entreprise |
 
-La partition par `/userId` garde toutes les lectures d'un utilisateur dans une seule
-partition logique (progression, tentatives, événements) — requêtes mono-partition, coût maîtrisé.
+La partition par `/userId` permet des requêtes mono-partition **dans chaque container**.
+Une même valeur de clé dans `progress`, `attempts` et `events` ne crée pas une transaction
+inter-containers. Les journaux et reçus idempotents permettent la reprise des opérations ;
+un `TransactionalBatch` reste limité à un container et une partition logique.
 
 ---
 
@@ -301,12 +314,11 @@ La décision DVA au 18 août 2026 est explicite : `aws:dva-c02` reste l'entrée 
 ## 9. Infrastructure (Bicep)
 
 `infra/main.bicep` est *subscription-scoped* : il crée le resource group puis compose les
-modules. `params/dev.bicepparam` porte les valeurs d'environnement. **`infra/modules` contient
-21 modules** ; les principaux :
+modules. `params/dev.bicepparam` porte les valeurs d'environnement. Les principaux :
 
 | Module | Crée |
 |---|---|
-| `cosmos.bicep` | compte Cosmos serverless + **10 containers** (PK verrouillées) |
+| `cosmos.bicep` | compte Cosmos serverless + containers du contrat canonique (PK verrouillées) |
 | `storage.bicep` | StorageV2 + container `lesson-assets` |
 | `appInsights.bicep` | Application Insights *workspace-based* |
 | `keyvault.bicep` | Key Vault (modèle RBAC) |
@@ -318,6 +330,104 @@ modules. `params/dev.bicepparam` porte les valeurs d'environnement. **`infra/mod
 | `contentStorage.bicep`, `contentIdentity.bicep`, `contentReaderIdentity.bicep`, `contentPrivateEndpoints.bicep` | chaîne de contenu immuable (ADR-020) |
 | `keyvaultGraphClientSecret.bicep`, `keyvaultPreviousJwtSecret.bicep`, `keyVaultSecretsAccess.bicep` | secrets Key Vault et accès |
 | `ciVnetPeering.bicep`, `sharedPrivateDns.bicep`, `privateDnsAppLinks.bicep` | réseau CI, DNS privé partagé et liens |
+
+### 9.1 Prévol local .NET et limites de preuve
+
+Le runtime déclaré dans `infra/modules/functionApp.bicep` est `dotnet-isolated` **10.0**,
+comme les projets backend `net10.0`. Cela ne prouve pas une migration déployée.
+Le commentaire d'en-tête `.NET 8` de `infra/main.bicep` est obsolète, non fonctionnel ;
+sa correction reste séparée pour ne pas modifier les entrées du gate infra scellé.
+Le schéma `host.json` reste **2.0** : ce n'est pas la version de .NET.
+
+`tools/validate_backend_readiness.py` vérifie hors ligne le SDK sélectionné, les projets,
+les versions SDK/Worker attendues, le runtime Bicep littéral et les gabarits Functions.
+Il n'évalue pas MSBuild ni Bicep et ne lit jamais le vrai `local.settings.json`.
+L'option `--publish-dir` contrôle la structure d'un répertoire **déjà publié** :
+DLL non vide, host/runtimeconfig/deps/worker, absence de paramètres locaux. Avec le SDK
+Functions actuel, l'indexation est faite par le worker ; `functions.metadata` statique
+n'est pas requis. Un SDK absent, ancien ou preview échoue ; aucun outil n'est installé.
+
+```powershell
+# Depuis la racine, avec un SDK .NET 10 stable déjà disponible.
+python tools\validate_backend_readiness.py --dotnet "<chemin-dotnet-existant>"
+python -m unittest discover -s tools\tests -p test_validate_backend_readiness.py
+# Après le publish local normal ; ce contrôle ne construit ni ne déploie le package.
+python tools\validate_backend_readiness.py --dotnet "<chemin-dotnet-existant>" --publish-dir "<repertoire-publish>"
+```
+
+Sans `--publish-dir`, le résultat annonce explicitement `publish=NOT CHECKED`.
+Même avec cette option, le résultat n'atteste **ni** provenance/hash/signature,
+exécution Linux, dépendances natives, état Azure, identité, réseau, restauration ou
+autorisation de déployer. Conserver les gates build/test, compilation Bicep et
+vérification ZIP/manifeste/SBOM existants dans `backend-release-manifest.mjs`.
+Ne pas confondre une validation locale et les checks GitHub de la révision livrée.
+
+### 9.2 Compatibilité et trois récupérations distinctes
+
+Les anciens clients et le client Apple partagent les routes existantes : catalogue,
+path, lesson, submit. Découvrir `lessonId` dans le path, sans fabriquer d'identifiant.
+Le pin de lecture versionnée est dans `X-Content-Manifest-Id` et l'ETag ; la soumission
+porte `publicManifestId`. Une réponse de correction autorisée après soumission n'est
+pas une publication de la banque privée. Une reprise hors ligne conserve owner,
+scope, payload, pin et `clientAttemptId` ; une issue réseau incertaine rejoue exactement
+la même tentative, sans produire de nouveau crédit. Il n'existe pas de route
+`latestAttempt` à inventer pour la reprise.
+
+| Opération | Retour contrôlé | Preuve avant exécution |
+|---|---|---|
+| Code Functions Flex | Redéployer l'artefact compatible `previous` via le chemin protégé existant, sans reconstruire ni redéployer Bicep | Provenance, hashes, rétention réelle du bundle, compatibilité avec configuration/données/contenu présents, puis sondes live/ready et parcours avec compte de test autorisé |
+| Contenu | Promotion séparée du pointeur vers une release antérieure importée, avec ETag/CAS et rôle administrateur | Descriptor/manifests et clés historiques conservés, intégrité des packages, ETag courant ; conflit CAS = relire et décider, pas écraser |
+| Données Cosmos | Restaurer vers une **cible isolée**, réconcilier et tester avant toute décision de bascule | Mode/rétention effectivement configurés, point de reprise disponible, dépendances et IAM de cible, preuve de reprise des journaux sans double récompense, RPO/RTO mesurés |
+
+Flex Consumption ne propose pas de slots : pas de « swap » ni bouton d'annulation
+supposé. `RollingUpdate` est une option distincte, pas activée par ce document ;
+la coexistence de versions exige quand même une compatibilité ascendante/descendante.
+Un échec après installation du code peut laisser le pointeur de livraison inchangé
+**sans** avoir automatiquement restauré le code servi : constater l'état réel avant retry.
+Un rollback de code n'annule ni activation éditoriale, ni écritures de progression,
+ni changement de runtime/configuration. Ne pas viser un ancien binaire incompatible
+avec le runtime configuré. Ne pas supprimer les pins, objets immuables ou protections
+de rétention pour rendre un rollback possible.
+
+Les tests `NativeLearningJourneyContractTests`, `NativeClientWireFixtureTests` et
+`RuntimeContentProjectorTests` couvrent le parcours contractuel et les clés historiques.
+Ils ne remplacent pas une restauration Cosmos ni une interruption/reprise réelle.
+La procédure de contenu demeure [CONTENT_RELEASES](./runbooks/CONTENT_RELEASES.md) ;
+le chemin d'artefacts/code reste décrit dans [deployment-runbook](./deployment-runbook.md).
+Aucune restauration destructive ou bascule automatique n'est ajoutée.
+
+### 9.3 Gates de lancement et objectif Advisor
+
+Avant toute promotion : une décision explicite doit autoriser la reprise CI, avec
+capacité PR **et** trusted séparées. Un runner PR seul ne satisfait pas les gates
+security/CodeQL/release/deploy. Un checkpoint local de politique/proposition CI n'est
+ni une activation ni une preuve GitHub actuelle. Préserver workflows, seals et IAM.
+Vérifier ensuite la correspondance exacte dépôt/environment/sujet OIDC et les droits
+minimaux ; ne jamais remplacer un ancien sujet avant preuve additive et plan de retour.
+La conformité de l'abonnement d'hébergement à un produit personnel en production,
+la séparation non-production/production, puis une preuve de restauration restent des
+décisions/gates distinctes. Ce document ne choisit ni nouvel abonnement ni région.
+Toute opération live requiert une autorisation séparée et le préflight approprié.
+
+L'objectif est de se rapprocher de 100 % **mesurés** dans Azure Advisor en corrigeant
+les recommandations applicables, pas en les masquant. Garder la baseline datée et les
+ressources concernées dans un rapport privé, puis remesurer après changement autorisé.
+Le score couvre les workloads évalués de l'abonnement, pas seulement Certigo.
+Un score absent est inconnu ; un score ancien n'est pas une posture actuelle.
+L'ordre privilégie sécurité, fiabilité et échéances de support avant le gain de points.
+Ne pas activer des services payants, retirer une politique imposée ou modifier les
+exclusions/pondérations pour améliorer artificiellement le résultat. Une recommandation
+peut nécessiter une exception motivée, sans suppression automatique de sa visibilité.
+Advisor, conformité Azure Policy et Defender Secure Score sont des mesures distinctes
+(même si la catégorie Security d'Advisor utilise le modèle Secure Score).
+
+Références Microsoft consultées le 14 octobre 2026 :
+[support .NET](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core)
+(.NET 8 : fin le 10 novembre 2026 ; .NET 10 LTS : 14 novembre 2028),
+[Flex](https://learn.microsoft.com/azure/azure-functions/flex-consumption-plan),
+[mises à jour Flex](https://learn.microsoft.com/azure/azure-functions/flex-consumption-site-updates),
+[restauration Cosmos](https://learn.microsoft.com/azure/cosmos-db/continuous-backup-restore-introduction),
+[calcul Advisor](https://learn.microsoft.com/azure/advisor/advisor-score).
 
 ---
 
