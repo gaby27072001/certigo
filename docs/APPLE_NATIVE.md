@@ -345,6 +345,70 @@ switch, fresh versus near-expiry refresh, silent interaction-required failure,
 logout during login/refresh/profile fetch, refused local cache removal/retry,
 and expiry during `/me` without a subsequent catalog request.
 
+The same actual-source harness also exercises the manual DEV model journey
+through injected HTTP responses: catalog discovery, path-provided lesson ID,
+API lesson loading, identified option selection, offline pending submission,
+model/store reopen, exact retry payload and authorized server feedback, then
+progress refresh. The lesson fixture has no manifest property in its JSON body;
+the mock supplies `X-Content-Manifest-Id` and the model preserves that normalized
+pin in the durable request. A wrong server verdict with score zero coexists with
+a path node marked `completed`, representing concepts reviewed rather than a
+passing score. Corrected retry does not send another POST.
+
+Loading failure exposes an error and clears busy state; retry recovers. A
+suspended old-owner lesson fetch is discarded after logout and reconnect to a
+different authoritative `/me` owner. This adds model-contract coverage beyond
+the package-only runtime/outbox tests without replacing their durability and
+owner-isolation coverage. These responses are deliberately synthetic, not a
+claim of a real backend, versioned import, UI interaction or authenticated
+end-to-end run. No production behavior or UI change is needed for these tests.
+
+### Inactive real-session resume contract
+
+`NativeResumeState` is an internal pure Swift value in the already-included
+`NativeModel.swift`; it is **not wired to SwiftUI or a persistence location**.
+It is distinct from the design branch's synthetic `NativeDemoFlow`. Its purpose
+is to make a future real-session navigation bookmark untrusted input that must
+be reconciled, not a second outbox or a local correction engine.
+
+The integration shape is `Tab.objective/explorer/followUp`, `ownerId`, exact
+`apiScope`, optional `Session(trackId, lessonId, publicManifestId, phase,
+attemptId)`, and schema version 1. Session phases are `draft`, `submitting`,
+`pending`, `confirmed`, `failed`. `encoded()` / `decode(_:)` bound the bookmark to
+8 KiB and validate the closed shape, identifiers, HTTPS scope, optional manifest
+hash and phase/UUID relationship. No answers, token, feedback, readiness or
+mastery are stored in this value. A draft bookmark reopens a lesson route only;
+it does **not** restore unsent selections or prove a durable answer draft.
+
+`beginningSubmission(_:)` checks the existing validated `QuizSubmission` track
+and manifest against a draft, then records its existing attempt ID in a
+`submitting` bookmark. Repeating this transition is rejected. This pure helper
+does not enqueue/send anything and does not replace `NativeModel.submit()`
+or the existing actor/outbox idempotency checks. Future integration must write
+the bookmark before dispatch, then reconcile with the real queue on return.
+
+`reconciled(ownerId:apiScope:currentManifestId:submissions:)` requires the
+authenticated `/me` owner and exact API scope. Draft routes require the current
+lesson's normalized manifest pin to match before reopening; IDs must still be
+rediscovered through the catalog/path/lesson contract by the future caller.
+Non-draft routes require exactly one existing outbox attempt with the same
+owner, scope, track, lesson and original manifest pin. Phase is recomputed from
+that record and its validated server result, even if the bookmark says
+`confirmed`. Active content may have rotated: the pending attempt keeps its
+original pin, never the new release's answers. Missing/ambiguous attempts
+produce `submissionUnresolved`, not a guessed confirmation or a new attempt.
+Failed queue records remain failed. Actual retry must use the existing saved
+request through `NativeModel.retry`, not reconstruct a request from this value.
+
+The Linux actual-source harness covers tab/draft serialization and relaunch,
+owner/scope/release mismatches, submitting interruption with and without a
+durable queue entry, original pending identity through release rotation,
+confirmed-marker rejection against a pending/missing outbox, failed records,
+unknown/malformed/oversized metadata and double-submit transition rejection.
+These are value-level reconciliation tests, not navigation execution, scene
+storage, durable draft answers or an Apple relaunch test. UI integration and its
+explicit error/recovery presentation remain a separate design-owned lot.
+
 This portable source check does **not** compile Security/UIKit/MSAL, build the
 Apple app, or execute an Xcode test target. Apple compilation and a separately
 approved dedicated-account lifecycle remain required before activating this

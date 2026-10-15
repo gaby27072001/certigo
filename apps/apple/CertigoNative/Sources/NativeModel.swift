@@ -13,6 +13,160 @@ protocol DeveloperConnectionVault {
     func clear() throws
 }
 
+enum NativeResumeError: Error, Equatable {
+    case malformed, ownerChanged, scopeChanged, releaseChanged
+    case submissionUnresolved, attemptMismatch, duplicateSubmission
+}
+
+// Navigation metadata only; the existing outbox remains the sole persisted submission authority.
+struct NativeResumeState: Codable, Equatable, Sendable {
+    enum Tab: String, Codable, Sendable { case objective, explorer, followUp }
+    enum Phase: String, Codable, Sendable { case draft, submitting, pending, confirmed, failed }
+    struct Session: Codable, Equatable, Sendable {
+        let trackId: String
+        let lessonId: String
+        let publicManifestId: String?
+        var phase: Phase
+        var attemptId: String?
+    }
+
+    let schema: Int
+    var tab: Tab
+    let ownerId: String
+    let apiScope: String
+    var session: Session?
+
+    init(tab: Tab, ownerId: String, apiScope: String, session: Session? = nil) throws {
+        schema = 1
+        self.tab = tab
+        self.ownerId = ownerId
+        self.apiScope = apiScope
+        self.session = session
+        try validate()
+    }
+
+    func encoded() throws -> Data {
+        try validate()
+        let bytes = try JSONEncoder().encode(self)
+        guard bytes.count <= 8_192 else { throw NativeResumeError.malformed }
+        return bytes
+    }
+
+    static func decode(_ bytes: Data) throws -> Self {
+        guard bytes.count <= 8_192 else { throw NativeResumeError.malformed }
+        // A closed shape rejects future/unknown fields rather than silently losing their meaning.
+        let value: Any
+        do { value = try JSONSerialization.jsonObject(with: bytes) } catch {
+            throw NativeResumeError.malformed
+        }
+        guard let object = value as? [String: Any],
+            Set(object.keys).isSubset(of: ["schema", "tab", "ownerId", "apiScope", "session"])
+        else { throw NativeResumeError.malformed }
+        if let session = object["session"], !(session is NSNull) {
+            guard let fields = session as? [String: Any],
+                Set(fields.keys).isSubset(of: [
+                    "trackId", "lessonId", "publicManifestId", "phase", "attemptId",
+                ])
+            else { throw NativeResumeError.malformed }
+        }
+        let decoded: Self
+        do { decoded = try JSONDecoder().decode(Self.self, from: bytes) } catch is DecodingError {
+            throw NativeResumeError.malformed
+        }
+        try decoded.validate()
+        return decoded
+    }
+
+    func beginningSubmission(_ request: QuizSubmission) throws -> Self {
+        try validate()
+        guard var session, session.phase == .draft else {
+            throw NativeResumeError.duplicateSubmission
+        }
+        _ = try request.validated()
+        guard request.trackId == session.trackId,
+            request.publicManifestId == session.publicManifestId
+        else { throw NativeResumeError.attemptMismatch }
+        session.phase = .submitting
+        session.attemptId = request.clientAttemptId
+        var next = self
+        next.session = session
+        return next
+    }
+
+    func reconciled(
+        ownerId: String, apiScope: String, currentManifestId: String?,
+        submissions: [SavedSubmission]
+    ) throws -> Self {
+        try validate()
+        guard self.ownerId == ownerId else { throw NativeResumeError.ownerChanged }
+        guard self.apiScope == apiScope else { throw NativeResumeError.scopeChanged }
+        guard var session else { return self }
+        if session.phase == .draft {
+            guard session.publicManifestId == currentManifestId else {
+                throw NativeResumeError.releaseChanged
+            }
+            return self
+        }
+        let matches = submissions.filter { $0.id == session.attemptId }
+        guard matches.count == 1, let saved = matches.first else {
+            // A submitting marker is never evidence that an attempt was durably enqueued or ACKed.
+            throw NativeResumeError.submissionUnresolved
+        }
+        guard saved.ownerId == ownerId, saved.apiScope == apiScope,
+            saved.lessonId == session.lessonId, saved.submission.trackId == session.trackId,
+            saved.submission.publicManifestId == session.publicManifestId
+        else { throw NativeResumeError.attemptMismatch }
+        _ = try saved.submission.validated()
+        switch saved.status {
+        case .pendingCorrection:
+            guard saved.result == nil else { throw NativeResumeError.attemptMismatch }
+            session.phase = .pending
+        case .corrected:
+            guard let result = saved.result else { throw NativeResumeError.attemptMismatch }
+            _ = try result.validated(for: saved.submission)
+            session.phase = .confirmed
+        case .failed:
+            guard saved.result == nil else { throw NativeResumeError.attemptMismatch }
+            session.phase = .failed
+        }
+        var next = self
+        next.session = session
+        return next
+    }
+
+    private func validate() throws {
+        func identifier(_ value: String) -> Bool {
+            !value.isEmpty && value.utf8.count <= 1_024
+                && value.rangeOfCharacter(from: .controlCharacters) == nil
+        }
+        guard schema == 1, identifier(ownerId), identifier(apiScope),
+            let url = URL(string: apiScope), url.scheme == "https", url.host != nil,
+            url.user == nil, url.password == nil, url.query == nil, url.fragment == nil
+        else { throw NativeResumeError.malformed }
+        guard let session else { return }
+        guard identifier(session.trackId), identifier(session.lessonId),
+            !session.trackId.contains("/"), !session.lessonId.contains("/"),
+            !session.trackId.contains("\\"), !session.lessonId.contains("\\"),
+            session.trackId != ".", session.trackId != "..",
+            session.lessonId != ".", session.lessonId != ".."
+        else { throw NativeResumeError.malformed }
+        if let manifest = session.publicManifestId {
+            guard manifest.hasPrefix("sha256:"), manifest.count == 71,
+                manifest.dropFirst(7).utf8.allSatisfy({
+                    (48...57).contains($0) || (97...102).contains($0)
+                })
+            else { throw NativeResumeError.malformed }
+        }
+        if session.phase == .draft {
+            guard session.attemptId == nil else { throw NativeResumeError.malformed }
+        } else {
+            guard let attemptId = session.attemptId, UUID(uuidString: attemptId) != nil else {
+                throw NativeResumeError.malformed
+            }
+        }
+    }
+}
+
 @Observable @MainActor
 final class NativeModel {
     var baseURL = ""
