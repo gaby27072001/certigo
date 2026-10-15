@@ -12,7 +12,7 @@ import {
 } from './workflow-semantic-fingerprint.mjs';
 
 const repositoryRoot = path.resolve('.');
-const manifestGoldenDigest = '897b848296e74e3c67deda52760cecc3e3529bd1142f87d708f6867fce33b1cb';
+const manifestGoldenDigest = 'dbc204e1c421f5c17f9efc3e6d68150d205985212a518a5641eb936c8687473a';
 // Les workflows Cosmos de suppression de compte sont fournis explicitement par chaque
 // layout testé. Les hériter du dépôt rendrait les fixtures dépendantes de l'état de
 // migration courant : une fois le dépôt en état C, toute fixture porterait un one-shot

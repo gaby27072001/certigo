@@ -34,7 +34,7 @@ jobs:
     name: Select CodeQL languages
     needs: freshness
     if: ${{ always() && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current != 'false') }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -128,13 +128,12 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     needs: [freshness, changes]
-    if: ${{ always() && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current != 'false') && needs.changes.outputs.has_changes == 'true' }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    if: ${{ always() && github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository && needs.freshness.outputs.current != 'false' && needs.changes.outputs.has_changes == 'true' }}
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
       pull-requests: read
-      security-events: write
     env:
       UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
       TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
@@ -201,18 +200,69 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
           output: ${{ env.CODEQL_RESULTS_DIR }}
-          upload: always
+          upload: never
           checkout_path: ${{ env.UNTRUSTED_SOURCE_DIR }}
 
       - name: Enforce CodeQL severity threshold
         if: ${{ always() }}
         run: node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-codeql-sarif.mjs" "$CODEQL_RESULTS_DIR"
 
+  analyze-main:
+    name: Analyze main (${{ matrix.language }})
+    needs: changes
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'schedule') && github.ref == 'refs/heads/main' && needs.changes.result == 'success' && needs.changes.outputs.has_changes == 'true' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    env:
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
+      CODEQL_RESULTS_DIR: ${{ github.workspace }}/.codeql-results/${{ matrix.language }}
+      CODEQL_BLOCKING_SECURITY_SEVERITY: "7.0"
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+      - name: Checkout immutable trusted controls
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          path: .trusted-control
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+          source-root: .untrusted-source
+          config-file: ./.trusted-control/.github/codeql/codeql-config.yml
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        with:
+          category: "/language:${{ matrix.language }}"
+          output: ${{ env.CODEQL_RESULTS_DIR }}
+          upload: always
+          checkout_path: ${{ env.UNTRUSTED_SOURCE_DIR }}
+      - name: Enforce CodeQL severity threshold
+        if: ${{ always() }}
+        run: node "$TRUSTED_CONTROL_DIR/.github/scripts/enforce-codeql-sarif.mjs" "$CODEQL_RESULTS_DIR"
+
   security-gate:
     name: CodeQL / Security gate
-    needs: [freshness, changes, analyze]
+    needs: [freshness, changes, analyze, analyze-main]
     if: ${{ always() && (github.event_name != 'pull_request_target' || (needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository)) }}
-    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    runs-on: ubuntu-24.04
     permissions: {}
     steps:
       - name: Enforce CodeQL result
@@ -223,7 +273,7 @@ jobs:
           FRESHNESS_CURRENT: ${{ needs.freshness.outputs.current }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           HAS_CHANGES: ${{ needs.changes.outputs.has_changes }}
-          ANALYZE_RESULT: ${{ needs.analyze.result }}
+          ANALYZE_RESULT: ${{ github.event_name == 'pull_request_target' && needs.analyze.result || needs.analyze-main.result }}
         run: |
           set -euo pipefail
           case "$EVENT_NAME" in

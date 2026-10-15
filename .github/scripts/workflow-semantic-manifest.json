@@ -3,184 +3,103 @@
   "canonicalization": "certigo-workflow-semantic-v1",
   "states": {
     "A": {
-      ".github/workflows/cd-backend.yml": "9f0a06bd58a0a6ea5c9c6606680e9a97b6b2a124724f97184849dfc85c985e6e",
-      ".github/workflows/ci-backend.yml": "99f7f108564a34dfe4acb9c1f87655a7f93dddcaa127cef2441a23951dd691db",
+      ".github/workflows/cd-backend.yml": "dc142196a66adadf43e1dc1080619dcf94ba25dad0cb13d312f9463a22e19558",
+      ".github/workflows/ci-backend.yml": "998e89a94bbd7e637d918d35d251eb4a697c658ad5e380dadcc6e610ad35494a",
       ".github/workflows/ci-content-drift.yml": "653fb5c0af877b40af3aa96a0a698e0709a0d4b19d5297073194d0d6a148f871",
-      ".github/workflows/ci-content.yml": "2a1d7edafccff02f81cde69e69ceccb06758690a0ab11c2c95fb899d2cefbd54",
-      ".github/workflows/ci-cortex-parity.yml": "1e04fc835714da27a3d8a3686b2d882e2ca2ed0c4f600482c467d82e765460e9",
-      ".github/workflows/ci-infra.yml": "ebf525ea045c8a7e05dafa2404c323dbf7a8a4b40c9697e25bb4874e4acf61d1",
-      ".github/workflows/ci-migration-registry.yml": "136524ac3819fdfe5425317778c1c67892d55f1368caf8add0c68c80f94c9ab4",
-      ".github/workflows/ci-mobile.yml": "41cb16dc274d82ed871330363177d7b65bc7b2ad7b2a9a6c4961fcc8bb294513",
-      ".github/workflows/ci-preflight.yml": "0b307b9820a29ea80e99545bc30444447201c7b4232a3a0528fde4ffa597f523",
-      ".github/workflows/ci-project-state.yml": "5ad5fd8f0f22bf0d7b71890a4cf1d17a503641da9f452f3920ae09bcad544c56",
+      ".github/workflows/ci-content.yml": "2aa6e5f89c849f1c3efec50a8c241a82c9e087492cca9b1915b140d28f46276d",
+      ".github/workflows/ci-cortex-parity.yml": "68e9a26c33805ac7adff82bbd8cb31e83d16fd4a4011050e079131f49979f7c2",
+      ".github/workflows/ci-infra.yml": "263eec23c907b7982ea1339b64cce42b4677d0ae91524b1f0ecd603da0a5d07f",
+      ".github/workflows/ci-migration-registry.yml": "29a8ff40bcae274a2ccd42045393374dd797a03ee1a464849c318754db1e3f42",
+      ".github/workflows/ci-mobile.yml": "266f9c4f75b3ccf45e46797c22c7c99d4677e8ab5a7578f9641eda7a2f463fc9",
+      ".github/workflows/ci-preflight.yml": "6c590fae265903fe48070e1089d6002e838c54a8a6e844a9d3efaf36c340545d",
+      ".github/workflows/ci-project-state.yml": "8e742473f8743225a966dd258d0f56ee61c035f2b44aeab498e009a67002e6c0",
       ".github/workflows/ciam-posture-monitor.yml": "635c6aa8ed8e72cb5e3e0f84e3575bcaa1535ef7e2d4a8a4720cca7f2a70beac",
-      ".github/workflows/codeql.yml": "19bf9195a861220ff3ee5f603bcdfc03efbb1b4e1130d7aaa81afee08c6ba8b4",
+      ".github/workflows/codeql.yml": "56c0704d010a6b4ff4ab09ee75ae66c22f9d6a6b5b3bdf1908ecc7606dcc56b1",
       ".github/workflows/content-infra-apply.yml": "b849b21c8d1a6c8d67c710796aff0526c05f33cf70e219e086f11c60e41e8a43",
       ".github/workflows/content-infra-what-if.yml": "8ed3849f36884f3bb11fb09e81775a070d4132616e97b0cbe31424a94245872d",
-      ".github/workflows/dependency-vuln-scan.yml": "51a44129d87dca1f2efe14f73a80a5bafd0b5e12abbd8eaf96a6b314f117d80a",
-      ".github/workflows/deploy-privacy-policy.yml": "6e8816580159b746593e9d1e3b6449e2cba6ad862b9b613273c6771d1cc8e7cf",
-      ".github/workflows/fork-pr-policy.yml": "140ec5d7607b6f1e78554aa999fb12a49b977b3e7fc7b73209205f996fe098fd",
+      ".github/workflows/dependency-vuln-scan.yml": "0b51d3d93277aff81b0c6e66b70847d8e318f5e7a418046d88f40e78e5d7aa90",
+      ".github/workflows/deploy-privacy-policy.yml": "1c230e2af4be28c66c11820b7bbc99a4b7aa1658a61c61b6597e313299e6d7d1",
+      ".github/workflows/fork-pr-policy.yml": "cc0278754754edfa6f1e7798f1898dc1dbd243bf62e4a2dfbdcc574856c389d7",
       ".github/workflows/governance-bootstrap-phase-a-what-if.yml": "ca632193fe9791f25f9c3e46d1bdce12cccbec96cab9abd1e6f9ef4a36e8c71e",
       ".github/workflows/governance-bootstrap-phase-b-what-if.yml": "13ee3fc22aed63c7dd77a759226ee83c6baf485cd73d25fe5ef7f69522525b9e",
-      ".github/workflows/lint-workflows.yml": "7a4b714bf27b0f5be89a55cb4cb5fa4ddbe27760b81f8f9320162aa3533813f0",
-      ".github/workflows/pr-head-freshness.yml": "f98245f17b71ce3a431f1023bb60da54543eb09902589baf35de450bfd73b5f6",
+      ".github/workflows/lint-workflows.yml": "103e9bf44fee0d2f3978c88cc9660f98d26303634cc3a59f6076f4b827fdc5ad",
+      ".github/workflows/pr-head-freshness.yml": "0b1832a5587c6337536e2a3ccea1dadd80f7043b86b1c0430e8683fe74d5b388",
       ".github/workflows/promote-backend-staging-prod.yml": "dd72c89012ca59f7d8eb3a78f7158652bc5b2537228be11adf2e8ee55afb695b",
-      ".github/workflows/publish-verified-public-pages.yml": "aa4b8c6bd083a9653926211e81e10929a60bee49720ffe26bfbba4dc217bbdae",
-      ".github/workflows/release-android.yml": "4bbdfeb46748f2a28953d1f3a68f8017fcfaf72301b9c0e0a23b50c129ca3d94",
-      ".github/workflows/release-ios.yml": "3b412360bec133bd78b638a751207b72b2e24c6ae9c711487e700438ee533434",
+      ".github/workflows/publish-verified-public-pages.yml": "a12c8d76c83f7ca6099ccef6c5e96861e8c73d2a4515b17301758519eee7e380",
+      ".github/workflows/release-android.yml": "e2e9d1808dec56165d804073c31945aa4c79e236336d80f42ed7319a70ccad3d",
+      ".github/workflows/release-ios.yml": "dbba35c0614b3cc93b463b79ce5dc19ab55e8f772e4c00e7a3bbfafe9fe61c62",
       ".github/workflows/runner-health.yml": "a0788e90961f621193e70a3ca9bbf544e10f19fdb99d0fef212eeedb7f7ade0d",
       ".github/workflows/runner-resilience-drill.yml": "69ec2f18b772180eaac84d57813bad7bb3f9cd8156578ffc6e20e6f377dbb454",
-      ".github/workflows/security-gate.yml": "80927d8e740fde3d8064a534ea19e25c69a01d0ee09e81301045e505f34e6fc0",
-      ".github/workflows/security-scan.yml": "7fe58d8aa920b85581993dd5c83f4956a5a6505812ae9bf60297dd808aa3a26a",
+      ".github/workflows/security-gate.yml": "1bbb28a3b242fded6d38e0ca169de55bbde9939775ea569dd3bd04776accb47b",
+      ".github/workflows/security-scan.yml": "5f21c0c766c0217456a7974ab0829174751e2463d6d97683fa9e883b7ae574d2",
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367",
       ".github/workflows/test-account-deletion-cosmos.yml": "ba53dc333d7998ff05e702b51f2da4db7fafd3e2b2d57f2c51b5f15116a9ac81"
     },
     "B": {
-      ".github/workflows/cd-backend.yml": "9f0a06bd58a0a6ea5c9c6606680e9a97b6b2a124724f97184849dfc85c985e6e",
-      ".github/workflows/ci-backend.yml": "99f7f108564a34dfe4acb9c1f87655a7f93dddcaa127cef2441a23951dd691db",
+      ".github/workflows/cd-backend.yml": "dc142196a66adadf43e1dc1080619dcf94ba25dad0cb13d312f9463a22e19558",
+      ".github/workflows/ci-backend.yml": "998e89a94bbd7e637d918d35d251eb4a697c658ad5e380dadcc6e610ad35494a",
       ".github/workflows/ci-content-drift.yml": "653fb5c0af877b40af3aa96a0a698e0709a0d4b19d5297073194d0d6a148f871",
-      ".github/workflows/ci-content.yml": "2a1d7edafccff02f81cde69e69ceccb06758690a0ab11c2c95fb899d2cefbd54",
-      ".github/workflows/ci-cortex-parity.yml": "1e04fc835714da27a3d8a3686b2d882e2ca2ed0c4f600482c467d82e765460e9",
-      ".github/workflows/ci-infra.yml": "ebf525ea045c8a7e05dafa2404c323dbf7a8a4b40c9697e25bb4874e4acf61d1",
-      ".github/workflows/ci-migration-registry.yml": "136524ac3819fdfe5425317778c1c67892d55f1368caf8add0c68c80f94c9ab4",
-      ".github/workflows/ci-mobile.yml": "41cb16dc274d82ed871330363177d7b65bc7b2ad7b2a9a6c4961fcc8bb294513",
-      ".github/workflows/ci-preflight.yml": "0b307b9820a29ea80e99545bc30444447201c7b4232a3a0528fde4ffa597f523",
-      ".github/workflows/ci-project-state.yml": "5ad5fd8f0f22bf0d7b71890a4cf1d17a503641da9f452f3920ae09bcad544c56",
+      ".github/workflows/ci-content.yml": "2aa6e5f89c849f1c3efec50a8c241a82c9e087492cca9b1915b140d28f46276d",
+      ".github/workflows/ci-cortex-parity.yml": "68e9a26c33805ac7adff82bbd8cb31e83d16fd4a4011050e079131f49979f7c2",
+      ".github/workflows/ci-infra.yml": "263eec23c907b7982ea1339b64cce42b4677d0ae91524b1f0ecd603da0a5d07f",
+      ".github/workflows/ci-migration-registry.yml": "29a8ff40bcae274a2ccd42045393374dd797a03ee1a464849c318754db1e3f42",
+      ".github/workflows/ci-mobile.yml": "266f9c4f75b3ccf45e46797c22c7c99d4677e8ab5a7578f9641eda7a2f463fc9",
+      ".github/workflows/ci-preflight.yml": "6c590fae265903fe48070e1089d6002e838c54a8a6e844a9d3efaf36c340545d",
+      ".github/workflows/ci-project-state.yml": "8e742473f8743225a966dd258d0f56ee61c035f2b44aeab498e009a67002e6c0",
       ".github/workflows/ciam-posture-monitor.yml": "635c6aa8ed8e72cb5e3e0f84e3575bcaa1535ef7e2d4a8a4720cca7f2a70beac",
-      ".github/workflows/codeql.yml": "19bf9195a861220ff3ee5f603bcdfc03efbb1b4e1130d7aaa81afee08c6ba8b4",
+      ".github/workflows/codeql.yml": "56c0704d010a6b4ff4ab09ee75ae66c22f9d6a6b5b3bdf1908ecc7606dcc56b1",
       ".github/workflows/content-infra-apply.yml": "b849b21c8d1a6c8d67c710796aff0526c05f33cf70e219e086f11c60e41e8a43",
       ".github/workflows/content-infra-what-if.yml": "8ed3849f36884f3bb11fb09e81775a070d4132616e97b0cbe31424a94245872d",
-      ".github/workflows/dependency-vuln-scan.yml": "51a44129d87dca1f2efe14f73a80a5bafd0b5e12abbd8eaf96a6b314f117d80a",
-      ".github/workflows/deploy-privacy-policy.yml": "6e8816580159b746593e9d1e3b6449e2cba6ad862b9b613273c6771d1cc8e7cf",
-      ".github/workflows/fork-pr-policy.yml": "140ec5d7607b6f1e78554aa999fb12a49b977b3e7fc7b73209205f996fe098fd",
+      ".github/workflows/dependency-vuln-scan.yml": "0b51d3d93277aff81b0c6e66b70847d8e318f5e7a418046d88f40e78e5d7aa90",
+      ".github/workflows/deploy-privacy-policy.yml": "1c230e2af4be28c66c11820b7bbc99a4b7aa1658a61c61b6597e313299e6d7d1",
+      ".github/workflows/fork-pr-policy.yml": "cc0278754754edfa6f1e7798f1898dc1dbd243bf62e4a2dfbdcc574856c389d7",
       ".github/workflows/governance-bootstrap-phase-a-what-if.yml": "ca632193fe9791f25f9c3e46d1bdce12cccbec96cab9abd1e6f9ef4a36e8c71e",
       ".github/workflows/governance-bootstrap-phase-b-what-if.yml": "13ee3fc22aed63c7dd77a759226ee83c6baf485cd73d25fe5ef7f69522525b9e",
-      ".github/workflows/lint-workflows.yml": "7a4b714bf27b0f5be89a55cb4cb5fa4ddbe27760b81f8f9320162aa3533813f0",
-      ".github/workflows/pr-head-freshness.yml": "f98245f17b71ce3a431f1023bb60da54543eb09902589baf35de450bfd73b5f6",
+      ".github/workflows/lint-workflows.yml": "103e9bf44fee0d2f3978c88cc9660f98d26303634cc3a59f6076f4b827fdc5ad",
+      ".github/workflows/pr-head-freshness.yml": "0b1832a5587c6337536e2a3ccea1dadd80f7043b86b1c0430e8683fe74d5b388",
       ".github/workflows/promote-backend-staging-prod.yml": "dd72c89012ca59f7d8eb3a78f7158652bc5b2537228be11adf2e8ee55afb695b",
-      ".github/workflows/publish-verified-public-pages.yml": "aa4b8c6bd083a9653926211e81e10929a60bee49720ffe26bfbba4dc217bbdae",
-      ".github/workflows/release-android.yml": "4bbdfeb46748f2a28953d1f3a68f8017fcfaf72301b9c0e0a23b50c129ca3d94",
-      ".github/workflows/release-ios.yml": "3b412360bec133bd78b638a751207b72b2e24c6ae9c711487e700438ee533434",
+      ".github/workflows/publish-verified-public-pages.yml": "a12c8d76c83f7ca6099ccef6c5e96861e8c73d2a4515b17301758519eee7e380",
+      ".github/workflows/release-android.yml": "e2e9d1808dec56165d804073c31945aa4c79e236336d80f42ed7319a70ccad3d",
+      ".github/workflows/release-ios.yml": "dbba35c0614b3cc93b463b79ce5dc19ab55e8f772e4c00e7a3bbfafe9fe61c62",
       ".github/workflows/runner-health.yml": "a0788e90961f621193e70a3ca9bbf544e10f19fdb99d0fef212eeedb7f7ade0d",
       ".github/workflows/runner-resilience-drill.yml": "69ec2f18b772180eaac84d57813bad7bb3f9cd8156578ffc6e20e6f377dbb454",
-      ".github/workflows/security-gate.yml": "80927d8e740fde3d8064a534ea19e25c69a01d0ee09e81301045e505f34e6fc0",
-      ".github/workflows/security-scan.yml": "7fe58d8aa920b85581993dd5c83f4956a5a6505812ae9bf60297dd808aa3a26a",
+      ".github/workflows/security-gate.yml": "1bbb28a3b242fded6d38e0ca169de55bbde9939775ea569dd3bd04776accb47b",
+      ".github/workflows/security-scan.yml": "5f21c0c766c0217456a7974ab0829174751e2463d6d97683fa9e883b7ae574d2",
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     },
     "C": {
-      ".github/workflows/cd-backend.yml": "9f0a06bd58a0a6ea5c9c6606680e9a97b6b2a124724f97184849dfc85c985e6e",
-      ".github/workflows/ci-backend.yml": "99f7f108564a34dfe4acb9c1f87655a7f93dddcaa127cef2441a23951dd691db",
+      ".github/workflows/cd-backend.yml": "dc142196a66adadf43e1dc1080619dcf94ba25dad0cb13d312f9463a22e19558",
+      ".github/workflows/ci-backend.yml": "998e89a94bbd7e637d918d35d251eb4a697c658ad5e380dadcc6e610ad35494a",
       ".github/workflows/ci-content-drift.yml": "653fb5c0af877b40af3aa96a0a698e0709a0d4b19d5297073194d0d6a148f871",
-      ".github/workflows/ci-content.yml": "2a1d7edafccff02f81cde69e69ceccb06758690a0ab11c2c95fb899d2cefbd54",
-      ".github/workflows/ci-cortex-parity.yml": "1e04fc835714da27a3d8a3686b2d882e2ca2ed0c4f600482c467d82e765460e9",
-      ".github/workflows/ci-infra.yml": "ebf525ea045c8a7e05dafa2404c323dbf7a8a4b40c9697e25bb4874e4acf61d1",
-      ".github/workflows/ci-migration-registry.yml": "136524ac3819fdfe5425317778c1c67892d55f1368caf8add0c68c80f94c9ab4",
-      ".github/workflows/ci-mobile.yml": "41cb16dc274d82ed871330363177d7b65bc7b2ad7b2a9a6c4961fcc8bb294513",
-      ".github/workflows/ci-preflight.yml": "0b307b9820a29ea80e99545bc30444447201c7b4232a3a0528fde4ffa597f523",
-      ".github/workflows/ci-project-state.yml": "5ad5fd8f0f22bf0d7b71890a4cf1d17a503641da9f452f3920ae09bcad544c56",
+      ".github/workflows/ci-content.yml": "2aa6e5f89c849f1c3efec50a8c241a82c9e087492cca9b1915b140d28f46276d",
+      ".github/workflows/ci-cortex-parity.yml": "68e9a26c33805ac7adff82bbd8cb31e83d16fd4a4011050e079131f49979f7c2",
+      ".github/workflows/ci-infra.yml": "263eec23c907b7982ea1339b64cce42b4677d0ae91524b1f0ecd603da0a5d07f",
+      ".github/workflows/ci-migration-registry.yml": "29a8ff40bcae274a2ccd42045393374dd797a03ee1a464849c318754db1e3f42",
+      ".github/workflows/ci-mobile.yml": "266f9c4f75b3ccf45e46797c22c7c99d4677e8ab5a7578f9641eda7a2f463fc9",
+      ".github/workflows/ci-preflight.yml": "6c590fae265903fe48070e1089d6002e838c54a8a6e844a9d3efaf36c340545d",
+      ".github/workflows/ci-project-state.yml": "8e742473f8743225a966dd258d0f56ee61c035f2b44aeab498e009a67002e6c0",
       ".github/workflows/ciam-posture-monitor.yml": "635c6aa8ed8e72cb5e3e0f84e3575bcaa1535ef7e2d4a8a4720cca7f2a70beac",
-      ".github/workflows/codeql.yml": "19bf9195a861220ff3ee5f603bcdfc03efbb1b4e1130d7aaa81afee08c6ba8b4",
+      ".github/workflows/codeql.yml": "56c0704d010a6b4ff4ab09ee75ae66c22f9d6a6b5b3bdf1908ecc7606dcc56b1",
       ".github/workflows/content-infra-apply.yml": "b849b21c8d1a6c8d67c710796aff0526c05f33cf70e219e086f11c60e41e8a43",
       ".github/workflows/content-infra-what-if.yml": "8ed3849f36884f3bb11fb09e81775a070d4132616e97b0cbe31424a94245872d",
-      ".github/workflows/dependency-vuln-scan.yml": "51a44129d87dca1f2efe14f73a80a5bafd0b5e12abbd8eaf96a6b314f117d80a",
-      ".github/workflows/deploy-privacy-policy.yml": "6e8816580159b746593e9d1e3b6449e2cba6ad862b9b613273c6771d1cc8e7cf",
-      ".github/workflows/fork-pr-policy.yml": "140ec5d7607b6f1e78554aa999fb12a49b977b3e7fc7b73209205f996fe098fd",
+      ".github/workflows/dependency-vuln-scan.yml": "0b51d3d93277aff81b0c6e66b70847d8e318f5e7a418046d88f40e78e5d7aa90",
+      ".github/workflows/deploy-privacy-policy.yml": "1c230e2af4be28c66c11820b7bbc99a4b7aa1658a61c61b6597e313299e6d7d1",
+      ".github/workflows/fork-pr-policy.yml": "cc0278754754edfa6f1e7798f1898dc1dbd243bf62e4a2dfbdcc574856c389d7",
       ".github/workflows/governance-bootstrap-phase-a-what-if.yml": "ca632193fe9791f25f9c3e46d1bdce12cccbec96cab9abd1e6f9ef4a36e8c71e",
       ".github/workflows/governance-bootstrap-phase-b-what-if.yml": "13ee3fc22aed63c7dd77a759226ee83c6baf485cd73d25fe5ef7f69522525b9e",
-      ".github/workflows/lint-workflows.yml": "7a4b714bf27b0f5be89a55cb4cb5fa4ddbe27760b81f8f9320162aa3533813f0",
+      ".github/workflows/lint-workflows.yml": "103e9bf44fee0d2f3978c88cc9660f98d26303634cc3a59f6076f4b827fdc5ad",
       ".github/workflows/post-merge-cosmos-account-deletion.yml": "037567590f74fede30414be48e5b06d4a575d52402351d1520bf8dc4a1b984c4",
-      ".github/workflows/pr-head-freshness.yml": "f98245f17b71ce3a431f1023bb60da54543eb09902589baf35de450bfd73b5f6",
+      ".github/workflows/pr-head-freshness.yml": "0b1832a5587c6337536e2a3ccea1dadd80f7043b86b1c0430e8683fe74d5b388",
       ".github/workflows/promote-backend-staging-prod.yml": "dd72c89012ca59f7d8eb3a78f7158652bc5b2537228be11adf2e8ee55afb695b",
-      ".github/workflows/publish-verified-public-pages.yml": "aa4b8c6bd083a9653926211e81e10929a60bee49720ffe26bfbba4dc217bbdae",
-      ".github/workflows/release-android.yml": "4bbdfeb46748f2a28953d1f3a68f8017fcfaf72301b9c0e0a23b50c129ca3d94",
-      ".github/workflows/release-ios.yml": "3b412360bec133bd78b638a751207b72b2e24c6ae9c711487e700438ee533434",
+      ".github/workflows/publish-verified-public-pages.yml": "a12c8d76c83f7ca6099ccef6c5e96861e8c73d2a4515b17301758519eee7e380",
+      ".github/workflows/release-android.yml": "e2e9d1808dec56165d804073c31945aa4c79e236336d80f42ed7319a70ccad3d",
+      ".github/workflows/release-ios.yml": "dbba35c0614b3cc93b463b79ce5dc19ab55e8f772e4c00e7a3bbfafe9fe61c62",
       ".github/workflows/runner-health.yml": "a0788e90961f621193e70a3ca9bbf544e10f19fdb99d0fef212eeedb7f7ade0d",
       ".github/workflows/runner-resilience-drill.yml": "69ec2f18b772180eaac84d57813bad7bb3f9cd8156578ffc6e20e6f377dbb454",
-      ".github/workflows/security-gate.yml": "80927d8e740fde3d8064a534ea19e25c69a01d0ee09e81301045e505f34e6fc0",
-      ".github/workflows/security-scan.yml": "7fe58d8aa920b85581993dd5c83f4956a5a6505812ae9bf60297dd808aa3a26a",
+      ".github/workflows/security-gate.yml": "1bbb28a3b242fded6d38e0ca169de55bbde9939775ea569dd3bd04776accb47b",
+      ".github/workflows/security-scan.yml": "5f21c0c766c0217456a7974ab0829174751e2463d6d97683fa9e883b7ae574d2",
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
   },
-  "preApproved": {
-    ".github/workflows/cd-backend.yml": {
-      "digest": "dc142196a66adadf43e1dc1080619dcf94ba25dad0cb13d312f9463a22e19558",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/ci-backend.yml": {
-      "digest": "998e89a94bbd7e637d918d35d251eb4a697c658ad5e380dadcc6e610ad35494a",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/ci-content.yml": {
-      "digest": "2aa6e5f89c849f1c3efec50a8c241a82c9e087492cca9b1915b140d28f46276d",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/ci-cortex-parity.yml": {
-      "digest": "68e9a26c33805ac7adff82bbd8cb31e83d16fd4a4011050e079131f49979f7c2",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/ci-infra.yml": {
-      "digest": "263eec23c907b7982ea1339b64cce42b4677d0ae91524b1f0ecd603da0a5d07f",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/ci-migration-registry.yml": {
-      "digest": "29a8ff40bcae274a2ccd42045393374dd797a03ee1a464849c318754db1e3f42",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/ci-mobile.yml": {
-      "digest": "266f9c4f75b3ccf45e46797c22c7c99d4677e8ab5a7578f9641eda7a2f463fc9",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/ci-preflight.yml": {
-      "digest": "6c590fae265903fe48070e1089d6002e838c54a8a6e844a9d3efaf36c340545d",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/ci-project-state.yml": {
-      "digest": "8e742473f8743225a966dd258d0f56ee61c035f2b44aeab498e009a67002e6c0",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/codeql.yml": {
-      "digest": "56c0704d010a6b4ff4ab09ee75ae66c22f9d6a6b5b3bdf1908ecc7606dcc56b1",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/dependency-vuln-scan.yml": {
-      "digest": "0b51d3d93277aff81b0c6e66b70847d8e318f5e7a418046d88f40e78e5d7aa90",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/deploy-privacy-policy.yml": {
-      "digest": "1c230e2af4be28c66c11820b7bbc99a4b7aa1658a61c61b6597e313299e6d7d1",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/fork-pr-policy.yml": {
-      "digest": "cc0278754754edfa6f1e7798f1898dc1dbd243bf62e4a2dfbdcc574856c389d7",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/lint-workflows.yml": {
-      "digest": "103e9bf44fee0d2f3978c88cc9660f98d26303634cc3a59f6076f4b827fdc5ad",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/pr-head-freshness.yml": {
-      "digest": "0b1832a5587c6337536e2a3ccea1dadd80f7043b86b1c0430e8683fe74d5b388",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/publish-verified-public-pages.yml": {
-      "digest": "a12c8d76c83f7ca6099ccef6c5e96861e8c73d2a4515b17301758519eee7e380",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/release-android.yml": {
-      "digest": "e2e9d1808dec56165d804073c31945aa4c79e236336d80f42ed7319a70ccad3d",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/release-ios.yml": {
-      "digest": "dbba35c0614b3cc93b463b79ce5dc19ab55e8f772e4c00e7a3bbfafe9fe61c62",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/security-gate.yml": {
-      "digest": "1bbb28a3b242fded6d38e0ca169de55bbde9939775ea569dd3bd04776accb47b",
-      "expires": "2026-10-29"
-    },
-    ".github/workflows/security-scan.yml": {
-      "digest": "5f21c0c766c0217456a7974ab0829174751e2463d6d97683fa9e883b7ae574d2",
-      "expires": "2026-10-29"
-    }
-  }
+  "preApproved": {}
 }
