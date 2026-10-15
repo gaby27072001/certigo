@@ -1,78 +1,303 @@
-name: ci-content
+name: NONMERGEABLE owner bootstrap proof PR10
 
-# Validates content-as-code (YAML tracks & lessons) against the JSON schemas in
-# content/schema. Keeps the knowledge base structurally correct before publish.
+# Isolated dispatch transport only. Intentionally NOT approved by main policy.
+# No official PR contexts, merge authority, cloud access, or candidate-to-policy handoff.
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths: [ "content/**", "tools/validate_content.mjs", ".github/workflows/ci-content.yml" ]
-  pull_request_target:
-    paths: [ "content/**", "tools/validate_content.mjs", ".github/workflows/ci-content.yml" ]
-
-concurrency:
-  group: ci-content-${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && (github.event.action == 'opened' || github.event.action == 'synchronize') && github.run_attempt == 1 && github.event.pull_request.number > 0 && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}-{2}', github.event_name, github.run_id, github.run_attempt) }}
-  cancel-in-progress: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.run_attempt == 1 && github.event.pull_request.number > 0 && github.event.after != '' }}
 
 permissions:
   contents: read
+  pull-requests: read
+  actions: read
 
 jobs:
-  freshness:
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-    uses: ./.github/workflows/pr-head-freshness.yml
-    with:
-      pull-request-number: ${{ github.event.pull_request.number }}
-      event-head-sha: ${{ github.event.pull_request.head.sha }}
-    permissions:
-      pull-requests: read
-
-  validate:
-    name: Validate tracks & lessons
-    needs: freshness
-    if: ${{ always() && (github.event_name != 'pull_request_target' || (needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository)) }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
-    permissions:
-      contents: read
-      pull-requests: read
+  admission:
+    name: Bootstrap proof / owner admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
-      - name: Enforce initial PR freshness validation
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        shell: bash
-        env:
-          FRESHNESS_RESULT: ${{ needs.freshness.result }}
-        run: |
-          if [ "$FRESHNESS_RESULT" != "success" ]; then
-            echo "::error::Initial PR head freshness validation did not succeed."
-            exit 1
-          fi
-      - name: Recheck current PR head after assignment
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+      - name: Admit exact owner and immutable targets before any checkout
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
-          github-token: ${{ github.token }}
           script: |
-            const { data: pull } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-            });
-            const eventHead = context.payload.pull_request.head.sha;
-            if (!eventHead || pull.head.sha !== eventHead) {
-              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            const assert = require('node:assert/strict');
+            const { createHash } = require('node:crypto');
+            const owner = 'gaby27072001';
+            const ownerId = 260654382;
+            const repository = 'gaby27072001/certigo';
+            const branch = 'gaby27072001-proof-owner-bootstrap';
+            const workflowPath = '.github/workflows/ci-content.yml';
+            const base = '8ddca44c67de35eac6f39c0412802a23588fd841';
+            const candidate = '4cbb61c46b45c676b01a36fda0dad7e453a312c3';
+            const repo = { owner, repo: 'certigo' };
+            assert.equal(context.payload.repository.full_name, repository);
+            assert.equal(context.actor, owner);
+            assert.equal(process.env.GITHUB_ACTOR_ID, String(ownerId));
+            assert.equal(context.payload.sender.login, owner);
+            assert.equal(context.payload.sender.id, ownerId);
+            assert.equal(context.eventName, 'workflow_dispatch');
+            assert.equal(context.ref, `refs/heads/${branch}`);
+            assert.equal(process.env.GITHUB_WORKFLOW_REF,
+              `${repository}/${workflowPath}@refs/heads/${branch}`);
+            assert.match(context.sha, /^[a-f0-9]{40}$/);
+            assert.equal(process.env.GITHUB_WORKFLOW_SHA, context.sha);
+            assert.equal(process.env.GITHUB_RUN_ATTEMPT, '1');
+            const data = async (request) => (await request).data;
+            const [r, u, w, main, proof, pull, pullRef, run, source] = await Promise.all([
+              data(github.rest.repos.get(repo)),
+              data(github.rest.users.getByUsername({ username: owner })),
+              data(github.rest.actions.getWorkflow({ ...repo, workflow_id: 383380838 })),
+              data(github.rest.git.getRef({ ...repo, ref: 'heads/main' })),
+              data(github.rest.git.getRef({ ...repo, ref: `heads/${branch}` })),
+              data(github.rest.pulls.get({ ...repo, pull_number: 10 })),
+              data(github.rest.repos.getCommit({ ...repo, ref: 'refs/pull/10/head' })),
+              data(github.rest.actions.getWorkflowRun({ ...repo, run_id: context.runId })),
+              data(github.rest.repos.getContent({ ...repo, path: workflowPath, ref: context.sha })),
+            ]);
+            assert.equal(r.full_name, repository);
+            for (const identity of [r.owner, u, run.actor, run.triggering_actor]) {
+              assert.equal(identity.login, owner);
+              assert.equal(identity.id, ownerId);
             }
+            assert.equal(w.id, 383380838);
+            assert.equal(w.path, workflowPath);
+            assert.equal(w.state, 'active');
+            assert.equal(main.object.sha, base);
+            assert.equal(proof.object.sha, context.sha);
+            assert.equal(pull.number, 10);
+            assert.equal(pull.state, 'open');
+            assert.equal(pull.head.repo.full_name, repository);
+            assert.equal(pull.head.repo.fork, false);
+            assert.equal(pull.base.repo.full_name, repository);
+            assert.equal(pull.base.ref, 'main');
+            assert.equal(pull.base.sha, base);
+            assert.equal(pull.head.sha, candidate);
+            assert.equal(pullRef.sha, candidate);
+            assert.equal(run.id, context.runId);
+            assert.equal(run.event, 'workflow_dispatch');
+            assert.equal(run.path, workflowPath);
+            assert.equal(run.workflow_id, 383380838);
+            assert.equal(run.repository.full_name, repository);
+            assert.equal(run.head_repository.full_name, repository);
+            assert.equal(run.head_branch, branch);
+            assert.equal(run.head_sha, context.sha);
+            assert.equal(run.run_attempt, 1);
+            assert.equal(source.type, 'file');
+            assert.equal(source.encoding, 'base64');
+            const digest = createHash('sha256')
+              .update(Buffer.from(source.content, 'base64')).digest('hex');
+            core.info(JSON.stringify({
+              runId: run.id, attempt: run.run_attempt, event: run.event,
+              sourceHeadShaFromActionsAPI: run.head_sha,
+              workflowShaFromEnvironment: process.env.GITHUB_WORKFLOW_SHA,
+              computedWorkflowFileSha256: digest, base, candidate,
+              boundary: 'Owner dispatch proof only; not official PR contexts or merge authority',
+            }));
+
+  trusted-controls:
+    name: Bootstrap proof / immutable BASE controls
+    needs: admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
+          path: .proof
+          persist-credentials: false
+      - name: Recheck API before candidate checkout
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const proof = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
+            await proof.collect(github, context);
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: 8ddca44c67de35eac6f39c0412802a23588fd841
+          path: .trusted-control
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: 4cbb61c46b45c676b01a36fda0dad7e453a312c3
+          path: .untrusted-source
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: "20"
-      - name: Install validator dependencies from lock
-        run: npm ci
-      - name: Validate content
-        run: node tools/validate_content.mjs
-      - name: npm audit backend tools
-        run: cd backend && npm audit --audit-level=high 2>/dev/null || true
-      - name: pip check content tools
-        run: pip check 2>/dev/null || true
+          node-version: "20.20.2"
+      - name: Install BASE dependencies only from immutable BASE lockfile
+        working-directory: .trusted-control
+        run: npm ci --ignore-scripts
+      - name: Test proof refusal fixtures
+        run: node --test .proof/.github/proof/owner-bootstrap.test.mjs
+      - name: Install checksum-pinned actionlint using exact BASE step
+        run: |
+          node --input-type=module -e '
+          import { runBaseStep } from "./.proof/.github/proof/owner-bootstrap.mjs";
+          import path from "node:path";
+          runBaseStep(path.resolve(".trusted-control"), "lint-workflows", "validate", "Install actionlint");'
+      - name: Lint candidate YAML using exact BASE step
+        env:
+          UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+        run: |
+          node --input-type=module -e '
+          import { runBaseStep } from "./.proof/.github/proof/owner-bootstrap.mjs";
+          import path from "node:path";
+          runBaseStep(path.resolve(".trusted-control"), "lint-workflows", "validate", "Validate all workflows");'
+      - name: Exact BASE validator and manifest check plus adversarial refusals
+        run: |
+          node --input-type=module -e '
+          import { trustedChecks } from "./.proof/.github/proof/owner-bootstrap.mjs";
+          import path from "node:path";
+          await trustedChecks(path.resolve(".trusted-control"), path.resolve(".untrusted-source"));'
+      - name: Exact BASE script suite including aggregate truth tables
+        working-directory: .trusted-control
+        run: node --test .github/scripts/*.test.mjs
+      - name: Replay exact BASE freshness and fork code on authentic API metadata
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const proof = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
+            await proof.replay(github, context, `${process.env.GITHUB_WORKSPACE}/.trusted-control`);
+      - name: Test exact BASE project-state generator
+        working-directory: .trusted-control
+        env:
+          PYTHONSAFEPATH: "1"
+        run: python -P -m unittest discover -s tools/tests -p "test_*.py" -v
+      - name: Exact BASE generated project-state check of candidate
+        working-directory: .trusted-control
+        env:
+          PYTHONSAFEPATH: "1"
+          PROJECT_WORKSPACE: ${{ github.workspace }}/.untrusted-source
+          CERTIGO_WORKSPACE: ${{ github.workspace }}/.untrusted-source
+        run: python -P tools/project_state.py --root "$PROJECT_WORKSPACE" --check
+      - name: Final API staleness check for trusted controls
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const proof = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
+            await proof.collect(github, context);
+
+  candidate-report:
+    name: Bootstrap proof / candidate suite (report only)
+    needs: admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          path: .proof
+          persist-credentials: false
+      - name: Recheck API before candidate execution
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const proof = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
+            await proof.collect(github, context);
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: 4cbb61c46b45c676b01a36fda0dad7e453a312c3
+          path: .untrusted-source
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+      - name: Install candidate dependencies from its OWN lockfile
+        working-directory: .untrusted-source
+        run: npm ci --ignore-scripts
+      - name: Candidate suite - independent report, never policy authority
+        working-directory: .untrusted-source
+        run: node --test .github/scripts/*.test.mjs
+
+  codeql-proof:
+    name: Bootstrap proof / CodeQL JavaScript (not official)
+    needs: admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      security-events: write
+    env:
+      CODEQL_BLOCKING_SECURITY_SEVERITY: "7.0"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          path: .proof
+          persist-credentials: false
+      - name: Recheck API before CodeQL source checkout
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const proof = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
+            await proof.collect(github, context);
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: 8ddca44c67de35eac6f39c0412802a23588fd841
+          path: .trusted-control
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: 4cbb61c46b45c676b01a36fda0dad7e453a312c3
+          path: .untrusted-source
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+      - name: Install BASE dependencies only
+        working-directory: .trusted-control
+        run: npm ci --ignore-scripts
+      - name: Initialize static JavaScript analysis without candidate execution
+        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-and-quality
+          source-root: .untrusted-source
+          config-file: ./.trusted-control/.github/codeql/codeql-config.yml
+      - name: Recheck immutable API PR head immediately before analysis and upload
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const proof = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
+            await proof.collect(github, context);
+      - name: Analyze and upload under dedicated NONOFFICIAL category
+        id: analyze
+        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        with:
+          ref: refs/pull/10/head
+          sha: 4cbb61c46b45c676b01a36fda0dad7e453a312c3
+          category: /bootstrap-proof/pr-10/javascript-typescript
+          output: ${{ runner.temp }}/bootstrap-codeql-results
+          upload: always
+          upload-database: false
+          wait-for-processing: true
+          checkout_path: ${{ github.workspace }}/.untrusted-source
+          matrix: '{}'
+      - name: Exact BASE threshold on only this job's locally generated SARIF
+        run: node .trusted-control/.github/scripts/enforce-codeql-sarif.mjs "$RUNNER_TEMP/bootstrap-codeql-results"
+      - name: Verify processed upload and final API provenance
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          PROOF_SARIF_ID: ${{ steps.analyze.outputs.sarif-id }}
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const proof = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
+            await proof.verifyUploaded(github, context, process.env.PROOF_SARIF_ID);
