@@ -1,0 +1,186 @@
+# Loaded from main through pull_request_target. Only same-repository pull
+# requests are checked out; fork policy is enforced by fork-pr-policy.yml.
+name: Lint GitHub Actions workflows
+
+on:
+  pull_request_target:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-workflows-${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && (github.event.action == 'opened' || github.event.action == 'synchronize') && github.run_attempt == 1 && github.event.pull_request.number > 0 && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}-{2}', github.event_name, github.run_id, github.run_attempt) }}
+  cancel-in-progress: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.action == 'synchronize' && github.run_attempt == 1 && github.event.pull_request.number > 0 && github.event.after != '' }}
+
+jobs:
+  freshness:
+    uses: ./.github/workflows/pr-head-freshness.yml
+    with:
+      pull-request-number: ${{ github.event.pull_request.number }}
+      event-head-sha: ${{ github.event.pull_request.head.sha }}
+    permissions:
+      pull-requests: read
+
+  # Les tests de .github/scripts du job `validate` sont ceux de la BASE : une PR qui y
+  # apporte un test cassé ne le voit qu'après la fusion, sur toutes les PR (#497). Ce job
+  # exécute ceux de la PR, sur son propre arbre. C'est du code de PR : même régime que les
+  # autres jobs certigo-pr (aucun secret, jeton en lecture), jamais la frontière de confiance.
+  candidate-script-tests:
+    name: Candidate workflow security script tests
+    needs: freshness
+    if: ${{ always() && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Enforce initial PR freshness validation
+        shell: bash
+        env:
+          FRESHNESS_RESULT: ${{ needs.freshness.result }}
+        run: |
+          if [ "$FRESHNESS_RESULT" != "success" ]; then
+            echo "::error::Initial PR head freshness validation did not succeed."
+            exit 1
+          fi
+      - name: Recheck current PR head after assignment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+
+      - name: Install candidate script dependencies
+        working-directory: .untrusted-source
+        run: npm ci --ignore-scripts
+
+      - name: Test the candidate's own workflow security scripts
+        working-directory: .untrusted-source
+        run: node --test .github/scripts/*.test.mjs
+
+  validate:
+    name: Validate workflow YAML
+    needs: [freshness, candidate-script-tests]
+    if: ${{ always() && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
+    steps:
+      - name: Enforce initial PR freshness validation
+        shell: bash
+        env:
+          FRESHNESS_RESULT: ${{ needs.freshness.result }}
+        run: |
+          if [ "$FRESHNESS_RESULT" != "success" ]; then
+            echo "::error::Initial PR head freshness validation did not succeed."
+            exit 1
+          fi
+      - name: Recheck current PR head after assignment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const eventHead = context.payload.pull_request.head.sha;
+            if (!eventHead || pull.head.sha !== eventHead) {
+              core.setFailed(`Superseded PR event ${eventHead || '<missing>'}; current head is ${pull.head.sha}.`);
+            }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: .untrusted-source
+          persist-credentials: false
+
+      - name: Checkout immutable trusted controls
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .trusted-control
+          persist-credentials: false
+
+      - name: Install actionlint
+        run: |
+          set -euo pipefail
+          ACTIONLINT_DIR="$RUNNER_TEMP/actionlint"
+          ACTIONLINT_ARCHIVE="$ACTIONLINT_DIR/actionlint.tar.gz"
+          mkdir -p "$ACTIONLINT_DIR"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$ACTIONLINT_ARCHIVE" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $ACTIONLINT_ARCHIVE" \
+            | sha256sum --check --strict
+          tar xzf "$ACTIONLINT_ARCHIVE" -C "$ACTIONLINT_DIR"
+          chmod +x "$ACTIONLINT_DIR/actionlint"
+          echo "$ACTIONLINT_DIR" >> "$GITHUB_PATH"
+
+      - name: Validate all workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          workflows=(
+            "$UNTRUSTED_SOURCE_DIR"/.github/workflows/*.yml
+            "$UNTRUSTED_SOURCE_DIR"/.github/workflows/*.yaml
+          )
+          if [ "${#workflows[@]}" -eq 0 ]; then
+            echo "::error::No workflow files found under .github/workflows."
+            exit 1
+          fi
+          actionlint "${workflows[@]}"
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+
+      - name: Install trusted validator dependencies
+        working-directory: .trusted-control
+        run: npm ci --ignore-scripts
+
+      - name: Enforce workflow security policy
+        run: |
+          node "$TRUSTED_CONTROL_DIR/.github/scripts/validate-workflow-security.mjs" \
+            --workspace "$UNTRUSTED_SOURCE_DIR"
+
+      - name: Test workflow security scripts
+        working-directory: .trusted-control
+        run: node --test .github/scripts/*.test.mjs
+
+      # Les tests de la PR elle-même (job candidate-script-tests) doivent aussi passer. Le
+      # `always()` de ce job le garde actif quand ils échouent : un contrôle requis sauté
+      # compterait comme vert.
+      - name: Enforce the candidate's own script tests
+        shell: bash
+        env:
+          CANDIDATE_TESTS_RESULT: ${{ needs.candidate-script-tests.result }}
+        run: |
+          if [ "$CANDIDATE_TESTS_RESULT" != "success" ]; then
+            echo "::error::The pull request's own .github/scripts tests did not pass (Candidate workflow security script tests: $CANDIDATE_TESTS_RESULT)."
+            exit 1
+          fi
