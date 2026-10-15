@@ -233,6 +233,46 @@ Concrètement : calculer le manifeste d'un fixture à partir de **ses propres** 
 (`preApproved: {}`), passer `now` explicitement, et réserver le manifeste réel aux mutations
 imprévisibles (nonce aléatoire). `account-deletion-cosmos-policy.test.mjs` montre les deux formes.
 
+## Consolidation des contrôles PR sur runners hosted
+
+La proposition consolidée réutilise la politique de #10 et les consommateurs de #14,
+sans modifier leurs branches. Les vingt couples CI de `linux-ci-runner-policy.mjs`
+acceptent `ubuntu-24.04`, avec permissions décodées read-only, sans secrets,
+environnement ni identité cloud. Les restrictions de cache, fraîcheur et fork,
+les contrôles trusted BASE et les tests candidats distincts restent obligatoires.
+Les agrégats ne peuvent pas checkout ou lire le source PR.
+
+Les sélecteurs et agrégats de `codeql.yml` et `security-gate.yml`, ainsi que
+l'analyse CodeQL PR, rejoignent ce périmètre read-only. La transition de ces deux
+workflows auparavant scellés exige leurs octets source et cible exacts et une
+préapprobation active de BASE, via le helper existant. Ni un manifeste candidat,
+ni les tests candidats, ni une mutation du workflow ne peuvent renouveler cette
+autorité.
+
+CodeQL ne reçoit plus `security-events: write` sur une PR : `analyze` garde la
+configuration et l'enforcer de BASE, produit le SARIF local, applique le seuil
+**7.0**, et utilise `upload: never`. Le job distinct `analyze-main` conserve la
+publication SARIF uniquement sur push/schedule de `refs/heads/main`, avec les deux
+checkouts fixés à `github.sha`. Ce job privilégié hosted n'est accepté que pour
+le workflow exact préapprouvé, jamais comme permission générale de publication.
+Le gate officiel choisit explicitement le résultat de l'analyse applicable.
+Les deux analyses restent buildless, appliquent le même enforcer et ne dépendent
+pas du stockage d'artefacts. Une PR n'alimente donc plus directement le tableau
+GitHub Code scanning : son résultat bloquant est le gate SARIF local ; la
+publication est faite par l'analyse de main après adoption.
+
+La préparation reste ordonnée : code de contrôle installé sur BASE, proposition
+de workflows exacte et expirante sans changer les workflows actifs, puis
+consommation sur cette BASE préapprouvée. Le compare cumulé est une proposition,
+pas un raccourci de landing ni une autorisation d'adoption. Les SDK, noms des
+contextes officiels, déclencheurs, règles de scoring et filtres restent inchangés ;
+seuls les anciens nettoyages de caches persistants Flutter de #14 sont retirés.
+Les releases, signatures, déploiements et identités cloud restent séparés et ne
+sont pas activés par cette migration. Aucune exécution CI/CodeQL, résolution de
+findings, gratuité permanente ni capacité réelle des runners n'est déduite des
+tests locaux. Les erreurs de parsing Checkov officielles restent ouvertes :
+compiler Bicep localement n'est pas une preuve de couverture du scanner.
+
 ## Ce que ce mécanisme ne débloque pas
 
 - **Les workflows privilégiés restent figés à l'octet.** Hors `cd-backend.yml`, un workflow qui

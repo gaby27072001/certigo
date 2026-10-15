@@ -13,6 +13,14 @@ import {
 
 // Exact reviewed preparation deltas, not a general privileged-workflow allowlist.
 const reviewedTransitions = Object.freeze({
+  'codeql.yml': [
+    '30cb9b1ab2d3a8d440530194b593e34bdc2623ac28b04f3fa46c391a58afa124',
+    'dc1fd62b98b5bbe676984059025e99f77aa3bf0bdfc012c69fa2d478bb28dd6e',
+  ],
+  'security-gate.yml': [
+    'f8b0c946071b40068f89e4c04a6bb3c41e260086325651788632788a1c6dbab6',
+    '17e00493c9e5e6a7c6c337ceb1706f0717419f797b5661ecb33d6e447e38a6e6',
+  ],
   'cd-backend.yml': [
     '586addcce22fbbc86d660e601f5e331cd267c334edf4947bc490a5ba3b68a541',
     '05287664503833f3c2e6f7daa4c20ff7cb38584de45dccb89f02aff9401fc516',
@@ -113,6 +121,12 @@ export function isReviewedGenerationJob(candidateInput, file, jobId, trustedRoot
   return ['ci-infra.yml', 'deploy-privacy-policy.yml', 'publish-verified-public-pages.yml']
     .includes(path.basename(file))
     && jobId === expectedJob
+    && isReviewedWorkflowTransition(candidateInput, file, trustedRoot);
+}
+
+export function isReviewedMainCodeqlJob(candidateInput, file, jobId, trustedRoot) {
+  return path.basename(file) === 'codeql.yml'
+    && jobId === 'analyze-main'
     && isReviewedWorkflowTransition(candidateInput, file, trustedRoot);
 }
 
