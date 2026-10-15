@@ -15,9 +15,9 @@ export const target = Object.freeze({
   workflow: '.github/workflows/ci-content.yml',
   workflowId: 383380838,
   base: '8ddca44c67de35eac6f39c0412802a23588fd841',
-  candidate: '44fda1b25b8d01c909b352d863679422723f04c1',
-  pull: 16,
-  category: '/bootstrap-proof/pr-16/javascript-typescript',
+  candidate: '8a5acfbb137bf4799f567545a0460b06d8940f31',
+  pull: 17,
+  category: '/bootstrap-proof/pr-17/javascript-typescript',
 });
 const sha40 = /^[a-f0-9]{40}$/;
 const requireValue = (value, message) => assert.ok(value, `REFUSE: ${message}`);
@@ -75,11 +75,12 @@ export const policyJobs = [
   'Bootstrap proof / owner admission',
   'Bootstrap proof / immutable BASE controls',
   'Bootstrap proof / CodeQL JavaScript (not official)',
+  'Bootstrap proof / exact BASE IaC scan (not official)',
 ];
 export const candidateJob = 'Bootstrap proof / candidate suite (report only)';
 
 export function verifyJobs(jobs, runId) {
-  requireValue(Array.isArray(jobs) && jobs.length === 4, 'missing or unexpected proof jobs');
+  requireValue(Array.isArray(jobs) && jobs.length === 5, 'missing or unexpected proof jobs');
   const ids = new Set();
   for (const name of [...policyJobs, candidateJob]) {
     const matches = jobs.filter((job) => job.name === name);
@@ -377,6 +378,7 @@ export async function replay(github, context, base) {
     fs.rmSync(outputFile, { force: true });
   }
   await collect(github, context);
+  return selected;
 }
 
 export async function verifyUploaded(github, context, sarifId) {

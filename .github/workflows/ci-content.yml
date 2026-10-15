@@ -1,4 +1,4 @@
-name: NONMERGEABLE independent owner bootstrap proof PR16
+name: NONMERGEABLE independent owner bootstrap proof PR17
 
 # Isolated dispatch transport only. Intentionally NOT approved by main policy.
 # No official PR contexts, merge authority, cloud access, or candidate-to-policy handoff.
@@ -28,7 +28,7 @@ jobs:
             const branch = 'gaby27072001-proof-owner-bootstrap';
             const workflowPath = '.github/workflows/ci-content.yml';
             const base = '8ddca44c67de35eac6f39c0412802a23588fd841';
-            const candidate = '44fda1b25b8d01c909b352d863679422723f04c1';
+            const candidate = '8a5acfbb137bf4799f567545a0460b06d8940f31';
             const repo = { owner, repo: 'certigo' };
             assert.equal(context.payload.repository.full_name, repository);
             assert.equal(context.actor, owner);
@@ -49,8 +49,8 @@ jobs:
               data(github.rest.actions.getWorkflow({ ...repo, workflow_id: 383380838 })),
               data(github.rest.git.getRef({ ...repo, ref: 'heads/main' })),
               data(github.rest.git.getRef({ ...repo, ref: `heads/${branch}` })),
-              data(github.rest.pulls.get({ ...repo, pull_number: 16 })),
-              data(github.rest.repos.getCommit({ ...repo, ref: 'refs/pull/16/head' })),
+              data(github.rest.pulls.get({ ...repo, pull_number: 17 })),
+              data(github.rest.repos.getCommit({ ...repo, ref: 'refs/pull/17/head' })),
               data(github.rest.actions.getWorkflowRun({ ...repo, run_id: context.runId })),
               data(github.rest.repos.getContent({ ...repo, path: workflowPath, ref: context.sha })),
             ]);
@@ -64,7 +64,7 @@ jobs:
             assert.equal(w.state, 'active');
             assert.equal(main.object.sha, base);
             assert.equal(proof.object.sha, context.sha);
-            assert.equal(pull.number, 16);
+            assert.equal(pull.number, 17);
             assert.equal(pull.state, 'open');
             assert.equal(pull.head.repo.full_name, repository);
             assert.equal(pull.head.repo.fork, false);
@@ -120,7 +120,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: 44fda1b25b8d01c909b352d863679422723f04c1
+          ref: 8a5acfbb137bf4799f567545a0460b06d8940f31
           path: .untrusted-source
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -147,12 +147,15 @@ jobs:
         run: |
           actionlint -version
           shellcheck --version
-      - name: Exact BASE validator and manifest check plus adversarial refusals
+      - name: Exact BASE manifest check (no seal or contract refresh)
         run: |
           node --input-type=module -e '
-          import { trustedChecks } from "./.proof/.github/proof/owner-bootstrap.mjs";
+          import { pathToFileURL } from "node:url";
           import path from "node:path";
-          await trustedChecks(path.resolve(".trusted-control"), path.resolve(".untrusted-source"));'
+          const { runManifestGenerator } = await import(pathToFileURL(path.resolve(
+            ".trusted-control/.github/scripts/generate-workflow-semantic-manifest.mjs")));
+          process.exitCode = runManifestGenerator({
+            root: path.resolve(".untrusted-source"), mode: "--check" });'
       - name: Exact BASE script suite including aggregate truth tables
         working-directory: .trusted-control
         run: node --test .github/scripts/*.test.mjs
@@ -179,7 +182,11 @@ jobs:
           PROJECT_WORKSPACE: ${{ github.workspace }}/.untrusted-source
           CERTIGO_WORKSPACE: ${{ github.workspace }}/.untrusted-source
         run: python -P tools/project_state.py --root "$PROJECT_WORKSPACE" --check
+      - name: Exact OLD BASE validator (self-seal refusal remains failure)
+        if: ${{ !cancelled() }}
+        run: node .trusted-control/.github/scripts/validate-workflow-security.mjs --workspace .untrusted-source
       - name: Compare exact BASE lint on BASE and candidate (failure remains blocking)
+        if: ${{ !cancelled() }}
         run: |
           node --input-type=module -e '
           import { compareLint } from "./.proof/.github/proof/owner-bootstrap.mjs";
@@ -216,7 +223,7 @@ jobs:
             await proof.collect(github, context);
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: 44fda1b25b8d01c909b352d863679422723f04c1
+          ref: 8a5acfbb137bf4799f567545a0460b06d8940f31
           path: candidate
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -232,7 +239,17 @@ jobs:
           npm --version
       - name: Candidate suite - independent report, never policy authority
         working-directory: candidate
-        run: node --test .github/scripts/*.test.mjs tools/tests/build_public_pages.test.mjs
+        run: >-
+          node --test .github/scripts/*.test.mjs tools/tests/build_public_pages.test.mjs
+          infra/ci-runner/image/network-inputs.test.mjs infra/tests/governance-tooling.test.mjs
+      - name: Candidate validator - report only, never OLD BASE authority
+        if: ${{ !cancelled() }}
+        working-directory: candidate
+        run: node .github/scripts/validate-workflow-security.mjs --workspace .
+      - name: Candidate manifest check - report only, no refresh
+        if: ${{ !cancelled() }}
+        working-directory: candidate
+        run: node .github/scripts/generate-workflow-semantic-manifest.mjs --check
 
   codeql-proof:
     name: Bootstrap proof / CodeQL JavaScript (not official)
@@ -267,7 +284,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: 44fda1b25b8d01c909b352d863679422723f04c1
+          ref: 8a5acfbb137bf4799f567545a0460b06d8940f31
           path: candidate
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -301,9 +318,9 @@ jobs:
         id: analyze
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
-          ref: refs/pull/16/head
-          sha: 44fda1b25b8d01c909b352d863679422723f04c1
-          category: /bootstrap-proof/pr-16/javascript-typescript
+          ref: refs/pull/17/head
+          sha: 8a5acfbb137bf4799f567545a0460b06d8940f31
+          category: /bootstrap-proof/pr-17/javascript-typescript
           output: ${{ runner.temp }}/bootstrap-codeql-results
           upload: always
           upload-database: false
@@ -332,3 +349,108 @@ jobs:
             const proof = await import(pathToFileURL(
               `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
             await proof.verifyUploaded(github, context, process.env.PROOF_SARIF_ID);
+
+  iac-proof:
+    name: Bootstrap proof / exact BASE IaC scan (not official)
+    needs: admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
+      CHECKOV_SCAN_LOG: ${{ github.workspace }}/.scanner-state/checkov-results.log
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          path: .proof
+          persist-credentials: false
+      - name: Recheck API before IaC source checkout
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const proof = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
+            await proof.collect(github, context);
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: 8ddca44c67de35eac6f39c0412802a23588fd841
+          path: .trusted-control
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: 8a5acfbb137bf4799f567545a0460b06d8940f31
+          path: .untrusted-source
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+      - name: Install immutable BASE step-parser dependencies
+        working-directory: .trusted-control
+        run: npm ci --ignore-scripts
+      - name: Require actual BASE selector IaC applicability
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { pathToFileURL } = require('node:url');
+            const proof = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
+            const selected = await proof.replay(github, context,
+              `${process.env.GITHUB_WORKSPACE}/.trusted-control`);
+            assert.ok(selected.includes('iac-security'), 'REFUSE: IaC not selected');
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Record missing scanner prerequisite
+        run: |
+          test "$(node --version)" = "v20.20.2"
+          python --version
+          if command -v checkov; then
+            checkov --version
+          else
+            echo "Checkov missing on fresh hosted job; exact BASE installation follows."
+          fi
+      - name: Install pinned Checkov using exact BASE step
+        id: scanner-install
+        run: |
+          node --input-type=module -e '
+          import { runBaseStep } from "./.proof/.github/proof/owner-bootstrap.mjs";
+          import path from "node:path";
+          runBaseStep(path.resolve(".trusted-control"), "security-scan", "iac-scan", "Install pinned Checkov");'
+      - name: Record actual scanner and immutable config provenance
+        run: |
+          checkov --version
+          python --version
+          sha256sum .trusted-control/.checkov.yaml
+      - name: Compile immutable runner image templates using exact BASE step
+        id: compile
+        run: |
+          node --input-type=module -e '
+          import { runBaseStep } from "./.proof/.github/proof/owner-bootstrap.mjs";
+          import path from "node:path";
+          runBaseStep(path.resolve(".trusted-control"), "security-scan", "iac-scan", "Compile immutable runner image templates");'
+      - name: Scan compiled runner image ARM using exact BASE step
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
+        run: |
+          node --input-type=module -e '
+          import { runBaseStep } from "./.proof/.github/proof/owner-bootstrap.mjs";
+          import path from "node:path";
+          runBaseStep(path.resolve(".trusted-control"), "security-scan", "iac-scan", "Scan compiled runner image ARM");'
+      - name: Run Checkov on infra using exact BASE step
+        if: ${{ !cancelled() && steps.scanner-install.outcome == 'success' }}
+        run: |
+          node --input-type=module -e '
+          import { runBaseStep } from "./.proof/.github/proof/owner-bootstrap.mjs";
+          import path from "node:path";
+          runBaseStep(path.resolve(".trusted-control"), "security-scan", "iac-scan", "Run Checkov on infra/");'
+      - name: Final API staleness check for IaC proof
+        if: ${{ always() }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const proof = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/.proof/.github/proof/owner-bootstrap.mjs`));
+            await proof.collect(github, context);

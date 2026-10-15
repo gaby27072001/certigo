@@ -83,7 +83,7 @@ const jobs = () => [...policyJobs, candidateJob].map((name, index) => ({
 test('accepts exact hosted provenance; candidate failure is report-only', () => {
   verifyJobs(jobs(), 1);
   const candidateFailure = jobs();
-  candidateFailure[3].conclusion = 'failure';
+  candidateFailure[4].conclusion = 'failure';
   verifyJobs(candidateFailure, 1);
 });
 for (const status of ['running', 'skipped', 'cancelled', 'failure']) {
@@ -126,9 +126,11 @@ test('REFUSE invalid/missing upload provenance', () => {
   }, source, 1), /REFUSE/);
 });
 
-test('REFUSE PR10 metadata or analysis in the independent PR16 proof', () => {
+test('REFUSE previous PR10 or PR16 targets in the independent PR17 proof', () => {
   const m = fixture();
   m.pull.number = 10;
+  assert.throws(() => verifyMetadata(m, source), /REFUSE/);
+  m.pull.head.sha = '44fda1b25b8d01c909b352d863679422723f04c1';
   assert.throws(() => verifyMetadata(m, source), /REFUSE/);
   m.pull.number = target.pull;
   m.pull.head.sha = '4cbb61c46b45c676b01a36fda0dad7e453a312c3';
