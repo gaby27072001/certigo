@@ -1,16 +1,69 @@
 import { createHash } from 'node:crypto';
-import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const imageRoot = fileURLToPath(new URL('./', import.meta.url));
 const locks = [
-  ['aptPackageLockSha256', 'apt-packages.lock.json'],
-  ['flutterEngineArtifactLockSha256', 'flutter-engine-artifacts.lock.json'],
+  ['aptPackageLockSha256', 'infra/ci-runner/image/apt-packages.lock.json'],
+  ['flutterEngineArtifactLockSha256', 'infra/ci-runner/image/flutter-engine-artifacts.lock.json'],
 ];
 export const installationBlocker =
   'Image installation blocked: exhaustive offline network input consumption is not implemented (#341).';
+
+// The checkout supplies Git metadata, but mutable lock paths are never opened.
+function readCommittedLocks(contract, root) {
+  const commit = contract.contractCommit;
+  if (typeof commit !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(commit)) {
+    throw new Error('Missing or invalid contractCommit.');
+  }
+  const objectFormat = execFileSync(
+    'git',
+    ['-C', root, 'rev-parse', '--show-object-format'],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  ).trim();
+  const oidLength = objectFormat === 'sha256' ? 64 : 40;
+  if (commit.length !== oidLength) {
+    throw new Error('contractCommit must be a full Git object SHA.');
+  }
+  const repositoryRoot = execFileSync(
+    'git',
+    ['-C', root, 'rev-parse', '--show-toplevel'],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  ).trim();
+  const commitType = execFileSync(
+    'git',
+    ['-C', repositoryRoot, 'cat-file', '-t', commit],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  ).trim();
+  if (commitType !== 'commit') {
+    throw new Error('contractCommit must identify a Git commit.');
+  }
+  return locks.map(([, filename]) => {
+    const treeOutput = execFileSync(
+      'git',
+      ['-C', repositoryRoot, 'ls-tree', '-z', '--full-tree', commit, '--', filename],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    ).toString('utf8');
+    const records = treeOutput.split('\0').filter(Boolean);
+    const name = filename.split('/').at(-1);
+    if (records.length !== 1) {
+      throw new Error(`Network lock is missing from contract commit: ${name}.`);
+    }
+    const separator = records[0].indexOf('\t');
+    const [mode, type, objectId] = records[0].slice(0, separator).split(' ');
+    if (!['100644', '100755'].includes(mode) || type !== 'blob' ||
+        objectId.length !== oidLength || !/^[0-9a-f]+$/.test(objectId)) {
+      throw new Error(`Network lock must be a regular committed file: ${name}.`);
+    }
+    return execFileSync(
+      'git',
+      ['-C', repositoryRoot, 'cat-file', 'blob', objectId],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+  });
+}
 
 // This is an integrity check, not evidence of dependency closure or offline
 // consumption. A later implementation must validate the complete lock schemas
@@ -21,29 +74,11 @@ export function verifyNetworkLockDigests(contract, root = imageRoot) {
     if (typeof expected !== 'string' || !/^[0-9a-f]{64}$/.test(expected)) {
       throw new Error(`Missing or invalid ${field}.`);
     }
-    const path = join(root, filename);
-    const stat = fs.lstatSync(path);
-    if (!stat.isFile() || stat.isSymbolicLink()) {
-      throw new Error(`Network lock must be a regular file: ${filename}.`);
-    }
-    // NOFOLLOW is additional POSIX protection; ancestor ownership and the
-    // legacy symlink checks remain required on every platform.
-    const descriptor = fs.openSync(
-      path,
-      fs.constants.O_RDONLY
-        | (fs.constants.O_NOFOLLOW ?? 0)
-        | (fs.constants.O_NONBLOCK ?? 0),
-    );
-    let bytes;
-    try {
-      const opened = fs.fstatSync(descriptor);
-      if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino) {
-        throw new Error(`Network lock changed before opening: ${filename}.`);
-      }
-      bytes = fs.readFileSync(descriptor);
-    } finally {
-      fs.closeSync(descriptor);
-    }
+  }
+  const committedLocks = readCommittedLocks(contract, root);
+  for (const [index, [field, filename]] of locks.entries()) {
+    const expected = contract.reproducibility[field];
+    const bytes = committedLocks[index];
     if (createHash('sha256').update(bytes).digest('hex') !== expected) {
       throw new Error(`Network lock digest mismatch: ${filename}.`);
     }

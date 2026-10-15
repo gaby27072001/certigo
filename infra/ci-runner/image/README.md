@@ -19,9 +19,14 @@ inventaires live et les IDs hors scope ne referencent pas cette image dans PR1.
   Checkov/PyYAML Python 3.12;
 - `prewarm-toolchain.sh` conserve le futur chemin d'installation des SDK, mais
   refuse actuellement toute execution avant une ecriture ou un telechargement;
-- `validate-network-inputs.mjs` exige les deux vrais fichiers de lock et leurs
-  empreintes, puis refuse encore l'admission tant que le consommateur hors ligne
-  et ses preuves d'exhaustivite ne sont pas implementes;
+- `validate-network-inputs.mjs` lit les deux locks depuis les blobs reguliers
+  du commit Git epingle dans `image-build-contract.json`, verifie leurs
+  empreintes et leur JSON, puis refuse encore l'admission tant que le consommateur
+  hors ligne et ses preuves d'exhaustivite ne sont pas implementes; les chemins
+  modifiables du workspace ne servent pas de source aux locks. Le commit doit
+  etre present dans la base d'objets Git locale; sinon la verification echoue.
+  Le SHA est epingle par le contrat versionne et n'est pas authentifie par une
+  signature distante dans ce validateur;
 - `validate-toolchain.sh --boot` verifie manifest, SBOM, lock, attestation,
   versions et l'inventaire exhaustif (fichiers, repertoires, liens, modes et
   hashes) des toolchains, du runner et d'Azure CLI; tout ajout inattendu echoue;
