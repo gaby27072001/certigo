@@ -101,5 +101,30 @@
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
   },
-  "preApproved": {}
+  "preApproved": {
+    ".github/workflows/cd-backend.yml": {
+      "digest": "dc142196a66adadf43e1dc1080619dcf94ba25dad0cb13d312f9463a22e19558",
+      "expires": "2026-10-29"
+    },
+    ".github/workflows/ci-infra.yml": {
+      "digest": "263eec23c907b7982ea1339b64cce42b4677d0ae91524b1f0ecd603da0a5d07f",
+      "expires": "2026-10-29"
+    },
+    ".github/workflows/deploy-privacy-policy.yml": {
+      "digest": "1c230e2af4be28c66c11820b7bbc99a4b7aa1658a61c61b6597e313299e6d7d1",
+      "expires": "2026-10-29"
+    },
+    ".github/workflows/publish-verified-public-pages.yml": {
+      "digest": "a12c8d76c83f7ca6099ccef6c5e96861e8c73d2a4515b17301758519eee7e380",
+      "expires": "2026-10-29"
+    },
+    ".github/workflows/release-android.yml": {
+      "digest": "e2e9d1808dec56165d804073c31945aa4c79e236336d80f42ed7319a70ccad3d",
+      "expires": "2026-10-29"
+    },
+    ".github/workflows/release-ios.yml": {
+      "digest": "dbba35c0614b3cc93b463b79ce5dc19ab55e8f772e4c00e7a3bbfafe9fe61c62",
+      "expires": "2026-10-29"
+    }
+  }
 }

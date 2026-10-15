@@ -1,0 +1,67 @@
+name: deploy-privacy-policy
+
+# Publie les pages légales publiques (confidentialité + suppression de compte).
+# URL de secours immediate pour Google Play :
+# https://gchambaud_microsoft.github.io/Certigo/privacy-policy/
+# Ces URLs restent canoniques sur GitHub Pages : aucun domaine personnalise
+# non controle ne doit etre configure comme alias ou destination de redirection.
+on:
+  repository_dispatch:
+    types: [deploy-privacy-policy]
+
+permissions: {}
+
+concurrency:
+  group: pages-privacy-policy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build privacy policy page
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - name: Reject unexpected payload fields
+        shell: bash
+        env:
+          CLIENT_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          if ! jq -e 'type == "object" and length == 0' <<< "$CLIENT_PAYLOAD_JSON" >/dev/null; then
+            echo "::error::deploy-privacy-policy does not accept client_payload fields."
+            exit 1
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+        with:
+          enablement: false
+      - name: Build static legal pages
+        run: node tools/build_public_pages.mjs --output _site
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
