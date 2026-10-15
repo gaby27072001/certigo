@@ -853,11 +853,9 @@ class ProjectStateTests(unittest.TestCase):
             workflow,
         )
         self.assertNotIn("environment:", workflow)
-        self.assertIn("runs-on: [self-hosted, Linux, X64, certigo-pr]", workflow)
-        self.assertIn(
-            "runs-on: [self-hosted, Linux, X64, certigo-trusted]",
-            workflow,
-        )
+        self.assertEqual(2, workflow.count("runs-on: ubuntu-24.04"))
+        self.assertNotIn("certigo-pr", workflow)
+        self.assertNotIn("certigo-trusted", workflow)
         self.assertIn(
             "ref: ${{ github.event_name == 'pull_request_target' && "
             "github.event.pull_request.head.sha || github.sha }}",
@@ -1168,10 +1166,7 @@ class ProjectStateTests(unittest.TestCase):
                 self.assertNotIn("continue-on-error: true", workflow)
                 self.assertIn("$GITHUB_STEP_SUMMARY", workflow)
                 self.assertNotIn("environment:", workflow)
-                self.assertIn(
-                    "runs-on: [self-hosted, Linux, X64, certigo-pr]",
-                    workflow,
-                )
+                self.assertIn("runs-on: ubuntu-24.04", workflow)
                 self.assertIn(
                     "ref: ${{ github.event_name == 'pull_request_target' && "
                     "github.event.pull_request.base.sha || github.sha }}",
