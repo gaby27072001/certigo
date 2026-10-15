@@ -695,13 +695,18 @@ test('manifest seal overwrites a regular file without changing its existing mode
   const seal = path.join(directory, 'manifest.sha256');
   fs.writeFileSync(manifest, '{}\n');
   writeManifestSeal(manifest, seal);
-  assert.equal(fs.statSync(seal).mode & 0o777, 0o600);
-  fs.chmodSync(seal, 0o640);
-  fs.writeFileSync(seal, 'old seal with extra bytes'.repeat(10));
-  writeManifestSeal(manifest, seal);
-  assert.doesNotThrow(() => verifyManifestSeal(manifest, seal));
-  assert.equal(fs.statSync(seal).mode & 0o777, 0o640);
-  assert.match(fs.readFileSync(seal, 'utf8'), /^[0-9a-f]{64}  manifest\.json\n$/);
+  const descriptor = fs.openSync(seal, 'r+');
+  try {
+    assert.equal(fs.fstatSync(descriptor).mode & 0o777, 0o600);
+    fs.fchmodSync(descriptor, 0o640);
+    fs.writeSync(descriptor, 'old seal with extra bytes'.repeat(10), 0, 'utf8');
+    writeManifestSeal(manifest, seal);
+    assert.doesNotThrow(() => verifyManifestSeal(manifest, seal));
+    assert.equal(fs.fstatSync(descriptor).mode & 0o777, 0o640);
+    assert.match(fs.readFileSync(descriptor, 'utf8'), /^[0-9a-f]{64}  manifest\.json\n$/);
+  } finally {
+    fs.closeSync(descriptor);
+  }
 });
 
 test('manifest seal rejects symlinks, parent symlinks and nonregular outputs without changing targets', (t) => {
