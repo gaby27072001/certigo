@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   target, verifyMetadata, verifyRun, verifyJobs, policyJobs, candidateJob, verifyAnalysis, collect,
+  verifyCoverageEntries,
 } from './owner-bootstrap.mjs';
 
 const source = 'a'.repeat(40);
@@ -117,4 +118,12 @@ test('REFUSE invalid/missing upload provenance', () => {
   for (const key of ['commit_sha', 'ref', 'category', 'analysis_key', 'sarif_url']) {
     assert.throws(() => verifyAnalysis({ ...analysis, [key]: 'wrong' }, source, 1));
   }
+});
+
+test('REFUSE missing changed-script extraction rather than accept a successful empty scan', () => {
+  const scripts = ['.github/scripts/validate-workflow-security.mjs'];
+  verifyCoverageEntries(['home/runner/work/certigo/certigo/candidate/' + scripts[0]], scripts);
+  assert.throws(() => verifyCoverageEntries([], scripts), /REFUSE/);
+  assert.throws(() => verifyCoverageEntries(['tools/other.mjs'], scripts), /REFUSE/);
+  assert.throws(() => verifyCoverageEntries(['.trusted-control/' + scripts[0]], scripts), /REFUSE/);
 });

@@ -234,6 +234,35 @@ export function runBaseStep(base, workflow, job, name, env = {}) {
   succeed('bash', ['-c', baseStep(base, workflow, job, name)], base, env);
 }
 
+export function compareLint(base, candidate) {
+  const relative = '.github/workflows';
+  const names = (root) => fs.readdirSync(path.join(root, relative))
+    .filter((name) => /\.ya?ml$/.test(name)).sort();
+  assert.deepEqual(names(base), names(candidate), 'workflow file sets differ');
+  for (const name of names(base)) {
+    assert.deepEqual(fs.readFileSync(path.join(base, relative, name)),
+      fs.readFileSync(path.join(candidate, relative, name)), `${name} changed from BASE`);
+  }
+  const script = baseStep(base, 'lint-workflows', 'validate', 'Validate all workflows');
+  const results = [base, candidate].map((root) => execute('bash', ['-c', script], base, {
+    UNTRUSTED_SOURCE_DIR: root,
+  }));
+  const normalize = (text, root) => {
+    const relativeRoot = path.relative(base, root).replace(/\\/g, '/');
+    let normalized = text.replaceAll(`${root}/`, '');
+    if (relativeRoot) normalized = normalized.replaceAll(`${relativeRoot}/`, '');
+    return normalized;
+  };
+  console.log('Exact BASE actionlint invocation on BASE:\n' + results[0].stdout + results[0].stderr);
+  console.log('Exact BASE actionlint invocation on CANDIDATE:\n' + results[1].stdout + results[1].stderr);
+  requireValue(results[0].status === results[1].status
+    && normalize(results[0].stdout + results[0].stderr, base)
+      === normalize(results[1].stdout + results[1].stderr, candidate),
+  'BASE and candidate actionlint diagnostics differ');
+  console.log('BASE and candidate workflow bytes and actionlint diagnostics are identical; baseline failures are NOT a pass.');
+  requireValue(results[1].status === 0, 'exact BASE lint remains failed on BASE and candidate');
+}
+
 export async function replay(github, context, base) {
   const metadata = await collect(github, context);
   const requireBase = createRequire(path.join(base, 'package.json'));
@@ -364,4 +393,36 @@ export async function verifyUploaded(github, context, sarifId) {
     evidence: 'processed CodeQL upload; run/source verified separately through Actions API',
     runId: context.runId, sourceHeadSha: context.sha, sarifId, analysis,
   }));
+}
+
+export async function verifyExtracted(github, context, archive) {
+  const metadata = await collect(github, context);
+  const files = await github.paginate(github.rest.pulls.listFiles, {
+    owner: target.owner, repo: 'certigo', pull_number: target.pull, per_page: 100,
+  });
+  requireValue(files.length === metadata.pull.changed_files && files.length < 300,
+    'incomplete extraction coverage input');
+  const changedScripts = files
+    .filter((file) => file.status !== 'removed' && /\.(?:mjs|cjs|js|ts)$/.test(file.filename))
+    .map((file) => file.filename);
+  requireValue(changedScripts.length > 0 && fs.statSync(archive).isFile(),
+    'missing source archive or changed JavaScript files');
+  const entries = succeed('unzip', ['-Z1', archive], process.env.GITHUB_WORKSPACE)
+    .stdout.split('\n').map((entry) => entry.replace(/\\/g, '/'));
+  verifyCoverageEntries(entries, changedScripts);
+  console.log(JSON.stringify({
+    evidence: 'Changed JavaScript source coverage verified in this CodeQL database source archive',
+    archiveSha256: hash(fs.readFileSync(archive)),
+    changedScripts,
+  }));
+}
+
+export function verifyCoverageEntries(entries, changedScripts) {
+  requireValue(Array.isArray(entries) && entries.length > 0
+    && Array.isArray(changedScripts) && changedScripts.length > 0,
+  'empty extraction coverage');
+  for (const script of changedScripts) {
+    requireValue(entries.some((entry) => entry === script
+      || entry.endsWith(`/candidate/${script}`)), `CodeQL did not extract changed script ${script}`);
+  }
 }
