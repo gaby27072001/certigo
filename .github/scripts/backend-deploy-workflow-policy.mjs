@@ -1380,7 +1380,12 @@ export function validateBackendDeployWorkspace(candidateRoot, trustedRoot) {
       errors.push(trusted.error);
       continue;
     }
-    if (!fs.readFileSync(candidate.path).equals(fs.readFileSync(trusted.path))) {
+    // Policy and tests remain regular files, but are reviewable candidate code.
+    // Only the dispatch authorizer is byte-sealed here; the caller runs BASE code.
+    if (
+      relativePath === '.github/scripts/validate-backend-deploy-dispatch.mjs'
+      && !fs.readFileSync(candidate.path).equals(fs.readFileSync(trusted.path))
+    ) {
       errors.push(
         `candidate trusted control: ${relativePath} must match the immutable base revision`,
       );

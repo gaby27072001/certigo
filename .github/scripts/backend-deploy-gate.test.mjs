@@ -668,7 +668,7 @@ test('strict activation seals every additional privileged runtime and IaC input'
   }
 });
 
-test('workspace seals each revision-local trust root against deletion and substitution', () => {
+test('workspace requires each control but byte-seals only the dispatch authorizer', () => {
   for (const relativePath of backendDeployTrustedFiles) {
     const missing = candidateWorkspace();
     const changed = candidateWorkspace();
@@ -682,14 +682,101 @@ test('workspace seals each revision-local trust root against deletion and substi
         path.join(changed, ...relativePath.split('/')),
         '\n// candidate substitution\n',
       );
-      assert.match(
-        validateBackendDeployWorkspace(changed, repositoryRoot).join('\n'),
-        /must match the immutable base revision/u,
-      );
+      const errors = validateBackendDeployWorkspace(changed, repositoryRoot);
+      if (relativePath.endsWith('validate-backend-deploy-dispatch.mjs')) {
+        assert.match(errors.join('\n'), /must match the immutable base revision/u);
+      } else {
+        assert.deepEqual(errors, [], relativePath);
+      }
     } finally {
       fs.rmSync(missing, { force: true, recursive: true });
       fs.rmSync(changed, { force: true, recursive: true });
     }
+  }
+});
+
+test('BASE policy permits policy/test evolution without executing or trusting candidate code', () => {
+  const trusted = candidateWorkspace();
+  const candidate = candidateWorkspace();
+  try {
+    fs.writeFileSync(
+      path.join(candidate, '.github', 'scripts', 'backend-deploy-workflow-policy.mjs'),
+      'throw new Error("candidate policy must not execute");\n'
+        + 'export function validateBackendDeployWorkspace() { return []; }\n',
+      'utf8',
+    );
+    fs.writeFileSync(
+      path.join(candidate, '.github', 'scripts', 'backend-deploy-gate.test.mjs'),
+      'throw new Error("candidate tests must not execute in trusted validation");\n',
+      'utf8',
+    );
+    assert.deepEqual(validateBackendDeployWorkspace(candidate, trusted), []);
+
+    fs.copyFileSync(
+      workflowPath,
+      path.join(candidate, '.github', 'workflows', 'cd-backend-shadow.yml'),
+    );
+    assert.match(
+      validateBackendDeployWorkspace(candidate, trusted).join('\n'),
+      /changed or new privileged capability is forbidden/u,
+    );
+    fs.rmSync(path.join(candidate, '.github', 'workflows', 'cd-backend-shadow.yml'));
+    fs.appendFileSync(
+      path.join(candidate, '.github', 'scripts', 'validate-backend-deploy-dispatch.mjs'),
+      '\n// candidate dispatch substitution\n',
+    );
+    assert.match(
+      validateBackendDeployWorkspace(candidate, trusted).join('\n'),
+      /validate-backend-deploy-dispatch\.mjs must match the immutable base revision/u,
+    );
+  } finally {
+    fs.rmSync(trusted, { force: true, recursive: true });
+    fs.rmSync(candidate, { force: true, recursive: true });
+  }
+});
+
+test('reviewable policy/test edits do not authorize changed or new privileged workflows', () => {
+  const trusted = candidateWorkspace();
+  const candidate = candidateWorkspace();
+  const relativePath = '.github/workflows/other.yml';
+  const workflow = {
+    name: 'other',
+    on: { workflow_dispatch: {} },
+    permissions: { contents: 'read' },
+    jobs: { check: { 'runs-on': 'ubuntu-latest', steps: [{ run: 'echo read-only' }] } },
+  };
+  try {
+    for (const file of [
+      'backend-deploy-workflow-policy.mjs',
+      'backend-deploy-gate.test.mjs',
+    ]) {
+      fs.appendFileSync(path.join(candidate, '.github', 'scripts', file), '\n// reviewed edit\n');
+    }
+    const mutations = [
+      ['write permission', (value) => { value.permissions.contents = 'write'; }],
+      ['OIDC', (value) => { value.jobs.check.permissions = { 'id-token': 'write' }; }],
+      ['secret', (value) => { value.jobs.check.steps[0].run = 'echo "${{ secrets.TOKEN }}"'; }],
+      ['environment', (value) => { value.jobs.check.environment = 'prod'; }],
+      ['CD', (value) => { value.jobs.check.steps[0].run = 'az functionapp deploy'; }],
+    ];
+    for (const existsInBase of [false, true]) {
+      if (existsInBase) {
+        fs.writeFileSync(path.join(trusted, ...relativePath.split('/')), YAML.stringify(workflow));
+      }
+      for (const [name, mutate] of mutations) {
+        const changed = structuredClone(workflow);
+        mutate(changed);
+        fs.writeFileSync(path.join(candidate, ...relativePath.split('/')), YAML.stringify(changed));
+        assert.match(
+          validateBackendDeployWorkspace(candidate, trusted).join('\n'),
+          /changed or new privileged capability is forbidden/u,
+          `${existsInBase ? 'changed' : 'new'} ${name}`,
+        );
+      }
+    }
+  } finally {
+    fs.rmSync(trusted, { force: true, recursive: true });
+    fs.rmSync(candidate, { force: true, recursive: true });
   }
 });
 
@@ -704,18 +791,18 @@ test('workspace rejects a symlink trust root and privileged shadow workflows', (
   const external = path.join(symlinkRoot, 'external-policy');
   try {
     fs.mkdirSync(external);
-    const policy = path.join(
-      symlinkRoot,
-      '.github',
-      'scripts',
-      'backend-deploy-workflow-policy.mjs',
-    );
-    fs.rmSync(policy);
-    fs.symlinkSync(external, policy, 'junction');
-    assert.match(
-      validateBackendDeployWorkspace(symlinkRoot, repositoryRoot).join('\n'),
-      /regular non-symlink file/u,
-    );
+    for (const relativePath of backendDeployTrustedFiles) {
+      const control = path.join(symlinkRoot, ...relativePath.split('/'));
+      fs.rmSync(control);
+      fs.symlinkSync(external, control, 'junction');
+      assert.match(
+        validateBackendDeployWorkspace(symlinkRoot, repositoryRoot).join('\n'),
+        /regular non-symlink file/u,
+        relativePath,
+      );
+      fs.rmSync(control);
+      copyFile(symlinkRoot, relativePath);
+    }
 
     fs.copyFileSync(
       workflowPath,
