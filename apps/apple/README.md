@@ -40,9 +40,8 @@ and formatting do not prove SwiftUI type correctness or Apple appearance.
 The existing Linux linker can emit an RWX-segment warning independently of
 Swift's warnings-as-errors; do not report this as a warning-free Apple build.
 
-## Apple validation still required
+## Apple validation
 
-No Apple build, XCTest UI run, or rendered capture is supplied by this slice.
 `#Preview` is a source preview entry, not evidence that a preview rendered.
 Use the existing main target with Xcode 26 or newer for the iOS 26 system
 glass API and an unsigned simulator build. The deployment target stays iOS 17;
@@ -54,6 +53,38 @@ Dynamic Type, Reduce Motion/Transparency, selection, pending/offline/retry,
 back navigation, close/reopen resume, and reset. No target/scheme/probe, signing,
 SDK installation, account, or CI runner policy is changed here. Existing
 NoAuth protection tests are not claimed as a UI gate.
+
+### Observed preview evidence
+
+On 2026-10-15, the owner's Mac build receipt confirmed an unsigned arm64
+simulator build of `5eca31de8067772586c3b6c8ff92a84de4f76026`, the bundled MSAL
+binary, its simulator platform, the Frameworks runpath, installation, and a
+launch PID. A subsequent owner photo, relayed by the coordinating session at
+13:28 local time, showed Certigo's entry screen in Device Hub on iPhone 17 /
+iOS 27, without a crash alert at that instant. The source association comes
+from the preceding build and launch receipt, not a SHA visible in the photo.
+Private receipts and the photo are retained in the owner's session, not copied
+into this repository.
+
+This confirms entry-screen rendering for that observed run only. It does not
+validate the demo journey, sustained runtime, authentication, XCTest UI,
+VoiceOver, iPad, or the accessibility and appearance matrix above. A different
+source revision, build configuration, dependencies, device, or runtime requires
+new evidence; do not transfer this result to a newer build.
+
+### Xcode 27 display host
+
+Xcode 27 exposes simulated devices through **Device Hub**. Open it with
+**Xcode > Open Developer Tool > Device Hub**, then select the existing simulator
+in its sidebar to view the screen. Do not infer a broken Xcode installation
+from an absent legacy `Simulator.app` path. See Apple's
+[Device Hub documentation](https://developer.apple.com/documentation/xcode/managing-your-simulated-and-physical-devices-in-device-hub).
+
+Continue preview work in the already chosen Mac project and directory. Update
+that checkout only when clean; preserve local changes and reuse its existing
+package cache and DerivedData rather than creating another preview copy.
+Opening Device Hub does not require another build or an authentication action.
+Keep the developer connector closed during synthetic demo observation.
 
 ## MSAL runtime packaging
 
