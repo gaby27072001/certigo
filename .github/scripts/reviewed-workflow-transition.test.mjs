@@ -205,9 +205,11 @@ function workspace() {
   const manifest = JSON.parse(fs.readFileSync(path.join(directory, manifestPath), 'utf8'));
   manifest.preApproved = {};
   for (const spec of [...specs, cdSpec]) {
-    manifest.states[workflowPath(spec.name)] = fingerprintWorkflow(
-      workflowPath(spec.name), spec.source,
-    ).digest;
+    for (const state of Object.values(manifest.states)) {
+      state[workflowPath(spec.name)] = fingerprintWorkflow(
+        workflowPath(spec.name), spec.source,
+      ).digest;
+    }
   }
   write(directory, manifestPath, renderWorkflowManifest(manifest));
   return directory;
