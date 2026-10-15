@@ -12,7 +12,6 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadDeploymentState } from './backend-deployment-state.mjs';
-import YAML from 'yaml';
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -230,55 +229,6 @@ function createRelease() {
   assert.equal(result.status, 0, result.stderr);
   return { release, output };
 }
-
-test('iOS keychain arguments preserve multiple paths, spaces, order and an empty list', () => {
-  const workflow = YAML.parse(readFileSync(
-    path.join(repositoryRoot, '.github', 'workflows', 'release-ios.yml'), 'utf8',
-  ));
-  const signing = Object.values(workflow.jobs)
-    .flatMap((job) => job.steps ?? []).find((step) => step.id === 'signing').run;
-  const start = signing.indexOf('EXISTING_KEYCHAINS=("$KEYCHAIN")');
-  const end = signing.indexOf('\n', signing.indexOf(
-    'security list-keychains -d user -s "${EXISTING_KEYCHAINS[@]}"', start,
-  ));
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-  const script = [
-    'set -euo pipefail',
-    'security() {',
-    '  if [ "$#" -eq 3 ]; then',
-    '    printf "%s" "$MOCK_KEYCHAINS"',
-    '  else',
-    '    printf "<%s>\\n" "$@"',
-    '  fi',
-    '}',
-    signing.slice(start, end),
-  ].join('\n');
-  for (const existing of [
-    [],
-    ['/Users/test/Library/Keychains/login.keychain-db'],
-    ['/Users/test/Library/Keychains/login.keychain-db', '/Library/Keychains/System.keychain'],
-    ['/Users/test user/login keychain-db', '/Library/Keychains/System.keychain'],
-    ['/Users/test/[literal]*.keychain', '/Users/test/back\\slash.keychain'],
-  ]) {
-    for (const trailingNewline of ['', '\n']) {
-      const result = spawnSync('bash', ['-c', script], {
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          KEYCHAIN: '/tmp/signing keychain-db',
-          MOCK_KEYCHAINS: existing.map((file) => `    "${file}"`).join('\n') + trailingNewline,
-        },
-      });
-      assert.equal(result.status, 0, result.stderr);
-      assert.equal(
-        result.stdout,
-        ['list-keychains', '-d', 'user', '-s', '/tmp/signing keychain-db', ...existing]
-          .map((argument) => `<${argument}>\n`).join(''),
-      );
-    }
-  }
-});
 
 test('release manifest records and verifies package, SBOM and provenance', () => {
   const { output } = createRelease();

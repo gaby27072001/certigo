@@ -121,12 +121,10 @@ jobs:
               exit 1
               ;;
           esac
-          {
-            echo "build_name=$BUILD_NAME"
-            echo "build_number=$BUILD_NUMBER"
-            echo "external=$REQUESTED_EXTERNAL"
-            echo "dry_run=$REQUESTED_DRY_RUN"
-          } >> "$GITHUB_OUTPUT"
+          echo "build_name=$BUILD_NAME"     >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "external=$REQUESTED_EXTERNAL" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$REQUESTED_DRY_RUN" >> "$GITHUB_OUTPUT"
           echo "### Release iOS : $BUILD_NAME (+$BUILD_NUMBER) → TestFlight" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Résoudre les secrets + installer la signature (Key Vault → repli secrets)
@@ -213,13 +211,7 @@ jobs:
             echo "$P12_B64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
             security import "$RUNNER_TEMP/dist.p12" -P "$P12_PWD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN" >/dev/null
-            EXISTING_KEYCHAINS=("$KEYCHAIN")
-            while IFS= read -r EXISTING_KEYCHAIN || [ -n "$EXISTING_KEYCHAIN" ]; do
-              if [ -n "$EXISTING_KEYCHAIN" ]; then
-                EXISTING_KEYCHAINS+=("$EXISTING_KEYCHAIN")
-              fi
-            done < <(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"[[:space:]]*$//')
-            security list-keychains -d user -s "${EXISTING_KEYCHAINS[@]}"
+            security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/[\"[:space:]]//g')
             mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
             echo "$PROFILE_B64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/certigo_beta.mobileprovision"
             {

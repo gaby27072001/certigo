@@ -151,12 +151,10 @@ jobs:
               ;;
           esac
 
-          {
-            echo "build_name=$BUILD_NAME"
-            echo "build_number=$BUILD_NUMBER"
-            echo "track=$TRACK"
-            echo "dry_run=$DRY_RUN"
-          } >> "$GITHUB_OUTPUT"
+          echo "build_name=$BUILD_NAME"   >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "track=$TRACK"             >> "$GITHUB_OUTPUT"
+          echo "dry_run=$DRY_RUN"         >> "$GITHUB_OUTPUT"
           echo "### Release Android : $BUILD_NAME (+$BUILD_NUMBER) → piste \`$TRACK\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Récupérer les dépendances
@@ -348,16 +346,14 @@ jobs:
         run: |
           if [ -f "$AAB_PATH" ]; then
             SIZE=$(du -h "$AAB_PATH" | cut -f1)
-            {
-              echo "### ✅ AAB construit et signé"
-              echo "| Champ | Valeur |"
-              echo "|---|---|"
-              echo "| Version | $BUILD_NAME+$BUILD_NUMBER |"
-              echo "| Taille | $SIZE |"
-              echo "| Chemin runner | $AAB_PATH |"
-              echo "| Publication Play | $PUBLISHED |"
-              echo "| Artefact | AAB signé conservé 90 jours |"
-            } >> "$GITHUB_STEP_SUMMARY"
+            echo "### ✅ AAB construit et signé" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Champ | Valeur |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Version | $BUILD_NAME+$BUILD_NUMBER |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Taille | $SIZE |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Chemin runner | $AAB_PATH |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Publication Play | $PUBLISHED |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Artefact | AAB signé conservé 90 jours |" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "::error::AAB introuvable à $AAB_PATH"
           fi
