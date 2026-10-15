@@ -10,7 +10,10 @@ import {
   dartSastWorkflowFile,
   validateDartSastWorkflow,
 } from './dart-sast-workflow-policy.mjs';
-import { validateBackendDeployWorkspace } from './backend-deploy-workflow-policy.mjs';
+import {
+  isReviewedGenerationJob,
+  validateBackendDeployWorkspace,
+} from './backend-deploy-workflow-policy.mjs';
 import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
 import {
@@ -329,11 +332,17 @@ function validateWorkflow(file) {
   }
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed.startsWith('runs-on:') && !allowedRunnerLines.has(trimmed)) {
+    if (
+      trimmed.startsWith('runs-on:') && !allowedRunnerLines.has(trimmed)
+      && !(trimmed === 'runs-on: ubuntu-24.04' && (
+        isReviewedGenerationJob(text, file, 'build', controlRoot)
+        || isReviewedGenerationJob(text, file, 'bicep-build', controlRoot)
+      ))
+    ) {
       errors.push(`${file}: runner must use a fixed Azure self-hosted label set`);
     }
   }
-  errors.push(...validateRunnerLabels(text, file));
+  errors.push(...validateRunnerLabels(text, file, { trustedRoot: controlRoot }));
   if (
     lines.some(
       (line) => line.trim().startsWith('runs-on:') && line.includes('certigo-ci'),
@@ -428,6 +437,7 @@ function validateWorkflow(file) {
       trustedOnlyWorkflowFiles.has(fileName)
       && job.text.includes('runs-on:')
       && !job.text.includes('certigo-trusted')
+      && !isReviewedGenerationJob(text, file, job.id, controlRoot)
     ) {
       errors.push(`${file}: operational job ${job.id} must use certigo-trusted`);
     }

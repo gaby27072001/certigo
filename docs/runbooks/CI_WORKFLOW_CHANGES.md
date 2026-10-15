@@ -87,6 +87,79 @@ dans un **commit de tête séparé** (voir `docs/GOVERNANCE.md`).
 
 ## Ce que la CI vérifie
 
+### Préparation bornée post-self-seal : lint mobile et génération publique
+
+Le code de préparation de `backend-deploy-workflow-policy.mjs` reconnaît seulement six
+transitions exactes, avec SHA256 **des octets source et cible** : `cd-backend.yml`, `release-android.yml`,
+`release-ios.yml`, `ci-infra.yml`, `deploy-privacy-policy.yml` et
+`publish-verified-public-pages.yml`. Les deux releases gardent leurs triggers, permissions,
+secrets et déploiements ; seules les redirections groupées et la conservation des arguments
+keychain iOS changent. Les trois jobs de génération (`bicep-build` ou `build`) utilisent
+`ubuntu-24.04` ; les deux builds Pages réduisent `pages: write` à `pages: read`, épinglent
+Node et le checkout sans credentials et interdisent l'activation implicite de Pages. Les
+jobs de publication privilégiés restent inchangés. Ce n'est pas une allowlist générale de
+workflows privilégiés ni un fallback de runner.
+
+Le lot lint source est le patch SHA256
+`84e93e57aa09444b25270ecafd045a3228a47a51583ac8578c46c09c43b1f8d5`.
+Les cibles Android/iOS sont reconstruites en **LF** depuis ce patch, sans conversion
+`core.autocrlf`. Les callers publics proviennent du commit
+`a706caa8ad94d162d3a584a5ad39dbc0d8c04a6b`. Ces références désignent une préparation,
+pas une adoption. Les six paires d'empreintes sont littérales dans le code et les tests.
+
+Le landing exige une préapprobation non expirée **déjà dans la trusted BASE**, son manifeste
+valide, sa proposition régulière non symlink aux octets cibles exacts et le workflow source
+exact. Le manifeste candidat ne peut ni accorder ni renouveler cette autorité. Une proposition
+exacte est vérifiable avant cette approbation, mais ne donne aucune permission d'exécuter
+le workflow. Après adoption, l'héritage n'accepte que les octets cibles exacts et leur état
+BASE correspondant. Les autres contrôles (YAML, triggers, secrets, checkouts, caches,
+permissions et runners des autres jobs) continuent tous de s'exécuter.
+
+**Extension CD exacte à revoir explicitement.** La redirection groupée de `cd-backend.yml`
+n'est ni l'objet A/A-hardened original, ni B. La préparation ajoute un seul delta legacy :
+38056 octets, SHA256 `05287664503833f3c2e6f7daa4c20ff7cb38584de45dccb89f02aff9401fc516`,
+depuis les 38066 octets A-hardened existants. L'inverse de la seule redirection groupée doit
+reconstituer exactement A-hardened, dont la taille et l'empreinte existantes ne changent pas.
+Cette version reste soumise à l'approbation préalable BASE et aux mêmes sémantiques de
+déploiement A-hardened ; elle ne prétend pas satisfaire les garanties supplémentaires B.
+Tout autre octet, source ou capacité retombe dans le refus strict B. Pour ce delta, les
+entrées runtime/état/IaC, les contrôles de support et le document de capacité doivent tous
+rester identiques à la BASE (ajouts et suppressions IaC compris). Les contrôles stricts B
+qui n'existent pas dans la BASE legacy doivent rester absents des deux arbres ; leur
+introduction n'est pas autorisée par le delta lint. Les contrôles stricts B
+existants restent inchangés. Ce changement de contrat minimal est un nouveau diff à approuver :
+l'accord sur le head original de PR #18 ne l'adopte pas.
+Les changements de PR #17 ne sont ni importés ni implicitement autorisés.
+
+Ordre d'intégration avec les prérequis réels, sans changer les branches existantes :
+
+1. Installer séparément le code Checkov de PR #19 (préparation code-only
+   `73f3138d444e6ee08fab606d32b760f02dfc52da`) après ses contrôles effectifs et l'autorité
+   requise. Il ne dépend pas du bootstrap self-seal ; son futur workflow reste hors de ce commit.
+2. Résoudre explicitement le bootstrap de PR #18 sur son diff exact. Un accord sur les seuls
+   deux refus binaires ne vaut pas dérogation à un autre échec de lint, scan ou contrôle.
+   Installer ensuite ce code post18 et le code de politique hosted de PR #10 dans la BASE.
+   Les validations locales ne remplacent jamais les checks GitHub exécutés.
+   Le delta réseau isolé `27d69d01..2754545998ec0f1348bdc8e9d06dbb6870004726`
+   (cinq chemins `infra/ci-runner/image`, pas la politique PR #17) doit également être installé
+   comme code avant le landing CD : le combiner au nouveau CD dans la même PR doit être refusé
+   par le contrôle des entrées privilégiées. Aucun nouveau SARIF ne prouve sa résolution CodeQL.
+3. Préapprouver séparément les contenus futurs exacts : transitions ici bornées, migration
+   hosted de PR #12 et futur workflow Checkov. Les empreintes/golden sont alors des données
+   de cette PR de préapprobation distincte, pas un rafraîchissement pour verdir le code policy.
+   Ne jamais fabriquer un état `states` qui contredit les workflows actifs.
+4. Consommer les approbations déjà adoptées dans la BASE avec les landings correspondants
+   (migration hosted PR #14 comprise), sans changer leur périmètre. Le manifeste et les
+   propositions sont consommés par les outils existants. Un assemblage préparatoire dépourvu
+   d'approbation BASE doit rester refusé ; il ne s'auto-approuve pas.
+
+Cet ordre n'annonce ni capacité runner disponible, ni checks officiels verts, ni fusion.
+Une préapprobation doit être recalculée et revue si les octets ou la source changent ; elle
+ne se transpose pas à une combinaison arbitraire de patchs. Aucune modification de settings,
+déploiement Azure, nouveau scan manuel ou changement de seuil CodeQL ne fait partie du lot.
+
+### Contrôles communs
+
 Tout est exécuté par le code de la **base**, sur l'arbre de la PR, dans `Validate workflow YAML`.
 
 | Contrôle | Code | Refuse |

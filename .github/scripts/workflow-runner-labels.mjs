@@ -1,4 +1,5 @@
 import { parseDocument } from 'yaml';
+import { isReviewedGenerationJob } from './backend-deploy-workflow-policy.mjs';
 
 // Ensembles de labels autorisés, sur le YAML analysé. La règle textuelle de
 // validate-workflow-security.mjs ne lit que les lignes qui commencent par `runs-on:` : une clé
@@ -17,7 +18,7 @@ function isAllowedLabelSet(labels) {
   ));
 }
 
-export function validateRunnerLabels(text, label) {
+export function validateRunnerLabels(text, label, { trustedRoot } = {}) {
   const document = parseDocument(text, {
     merge: false,
     strict: true,
@@ -45,6 +46,9 @@ export function validateRunnerLabels(text, label) {
       || Array.isArray(job)
       || !Object.hasOwn(job, 'runs-on')
     ) {
+      continue;
+    }
+    if (isReviewedGenerationJob(text, label, jobId, trustedRoot)) {
       continue;
     }
     if (!isAllowedLabelSet(job['runs-on'])) {
