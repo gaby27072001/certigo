@@ -31,7 +31,7 @@
       ".github/workflows/runner-health.yml": "a0788e90961f621193e70a3ca9bbf544e10f19fdb99d0fef212eeedb7f7ade0d",
       ".github/workflows/runner-resilience-drill.yml": "69ec2f18b772180eaac84d57813bad7bb3f9cd8156578ffc6e20e6f377dbb454",
       ".github/workflows/security-gate.yml": "1bbb28a3b242fded6d38e0ca169de55bbde9939775ea569dd3bd04776accb47b",
-      ".github/workflows/security-scan.yml": "5f21c0c766c0217456a7974ab0829174751e2463d6d97683fa9e883b7ae574d2",
+      ".github/workflows/security-scan.yml": "5a3c6a020b800d600681bbbba28887e7ebcf5d3f101af5fc9c4a0b9017f44b96",
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367",
       ".github/workflows/test-account-deletion-cosmos.yml": "ba53dc333d7998ff05e702b51f2da4db7fafd3e2b2d57f2c51b5f15116a9ac81"
     },
@@ -64,7 +64,7 @@
       ".github/workflows/runner-health.yml": "a0788e90961f621193e70a3ca9bbf544e10f19fdb99d0fef212eeedb7f7ade0d",
       ".github/workflows/runner-resilience-drill.yml": "69ec2f18b772180eaac84d57813bad7bb3f9cd8156578ffc6e20e6f377dbb454",
       ".github/workflows/security-gate.yml": "1bbb28a3b242fded6d38e0ca169de55bbde9939775ea569dd3bd04776accb47b",
-      ".github/workflows/security-scan.yml": "5f21c0c766c0217456a7974ab0829174751e2463d6d97683fa9e883b7ae574d2",
+      ".github/workflows/security-scan.yml": "5a3c6a020b800d600681bbbba28887e7ebcf5d3f101af5fc9c4a0b9017f44b96",
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     },
     "C": {
@@ -97,7 +97,7 @@
       ".github/workflows/runner-health.yml": "a0788e90961f621193e70a3ca9bbf544e10f19fdb99d0fef212eeedb7f7ade0d",
       ".github/workflows/runner-resilience-drill.yml": "69ec2f18b772180eaac84d57813bad7bb3f9cd8156578ffc6e20e6f377dbb454",
       ".github/workflows/security-gate.yml": "1bbb28a3b242fded6d38e0ca169de55bbde9939775ea569dd3bd04776accb47b",
-      ".github/workflows/security-scan.yml": "5f21c0c766c0217456a7974ab0829174751e2463d6d97683fa9e883b7ae574d2",
+      ".github/workflows/security-scan.yml": "5a3c6a020b800d600681bbbba28887e7ebcf5d3f101af5fc9c4a0b9017f44b96",
       ".github/workflows/sync-ios-certs.yml": "a98630bb01062da0f5e6ca2782296997f0d7d0caddc02bf342c1f56df22e6367"
     }
   },

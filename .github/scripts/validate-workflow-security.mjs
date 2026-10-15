@@ -1699,6 +1699,11 @@ function validateRepositoryInvariants() {
     '--directory "$UNTRUSTED_SOURCE_DIR/infra"',
     '--config-file "$TRUSTED_CONTROL_DIR/.checkov.yaml"',
     'failed_checks',
+    '--output cli --output json',
+    '--output-file-path "console,$CHECKOV_SCAN_LOG.json"',
+    'python "$TRUSTED_CONTROL_DIR/.github/scripts/checkov_report_gate.py"',
+    '"$CHECKOV_SCAN_LOG.json" "$scan_status" | tee -a "$GITHUB_STEP_SUMMARY"',
+    'Checkov report is incomplete, has blocking findings, or has zero effective coverage.',
   ]) {
     if (!iacScan.includes(marker)) {
       errors.push(`security-scan.yml: missing fail-closed output invariant ${marker}`);

@@ -133,13 +133,25 @@ l'accord sur le head original de PR #18 ne l'adopte pas.
 La politique de PR #17 n'est ni importée ni implicitement autorisée ; seuls ses cinq
 fichiers réseau finaux sont réutilisés comme prérequis de code distinct.
 
-Ordre d'intégration avec les prérequis réels, sans changer les branches existantes :
+**Adoption de la consolidation : un seul bootstrap atomique à revoir.** Les états
+code, préapprobation et consommation conservés dans l'historique démontrent les frontières
+de confiance ; ils ne sont plus une route de fusions proposée. Ne pas adopter leurs cinq
+erreurs lint historiques ni leurs références de sources intermédiaires périmées. Le lot
+final contient simultanément les corrections lint, les vingt workflows hosted, l'activation
+du garde JSON Checkov et sa référence de sources générée. Il doit passer ses contrôles locaux
+comme arbre entier. Un seul merge du lot final installe cet arbre, pas chaque commit comme PR.
+L'ancienne BASE refuse toujours ce bootstrap : conserver tous ses diagnostics et obtenir
+l'accord humain sur le nouveau diff exact, sans les renommer succès ni étendre l'accord PR #18.
+La décision et l'action GitHub appartiennent au propriétaire ; aucun override administrateur,
+changement de settings, waiver scanner ou exécution Azure n'est implicite.
+
+La simulation historique suivante explique les dépendances, **pas des étapes à adopter** :
 
 1. Faire revoir explicitement le nouveau bootstrap de code : simplification self-seal,
    politique hosted réutilisée de PR #10, code Checkov de PR #19
    (`73f3138d444e6ee08fab606d32b760f02dfc52da`), builder public et les cinq fichiers réseau
    finaux de `2754545998ec0f1348bdc8e9d06dbb6870004726`, sans importer la politique PR #17.
-   Installer ce code avant les workflows. Le compare partiel `7821c4b1` n'est pas un prérequis.
+   Dans cette simulation, le code précède les workflows. Le compare partiel `7821c4b1` n'est pas un prérequis.
    L'accord sur le head original de PR #18 ne couvre pas ce nouveau diff ; l'ancienne BASE
    refuse encore les deux scellés. Les workflows actifs restent ceux de la BASE : leurs
    cinq erreurs actionlint historiques restent présentes à ce stade, non dérogées.
@@ -147,7 +159,7 @@ Ordre d'intégration avec les prérequis réels, sans changer les branches exist
    ou intégralement verte. Aucune preuve locale ne remplace les checks GitHub exécutés.
 2. Préapprouver ensemble les vingt contenus futurs exacts, sans modifier les workflows actifs :
    six transitions initiales, deux scanners et douze consommateurs hosted réutilisés de PR #14.
-   Le futur changement de workflow Checkov reste hors de ce lot. Les empreintes/golden sont des données
+   Cette simulation précédait l'activation du garde Checkov dans le lot atomique final. Les empreintes/golden sont des données
    de cette PR de préapprobation distincte, pas un rafraîchissement pour verdir le code policy.
    Ne jamais fabriquer un état `states` qui contredit les workflows actifs.
 3. Consommer ensemble les vingt approbations déjà adoptées dans la BASE, sans changer leur
@@ -265,17 +277,22 @@ pas du stockage d'artefacts. Une PR n'alimente donc plus directement le tableau
 GitHub Code scanning : son résultat bloquant est le gate SARIF local ; la
 publication est faite par l'analyse de main après adoption.
 
-La préparation reste ordonnée : code de contrôle installé sur BASE, proposition
-de workflows exacte et expirante sans changer les workflows actifs, puis
-consommation sur cette BASE préapprouvée. Le compare cumulé est une proposition,
-pas un raccourci de landing ni une autorisation d'adoption. Les SDK, noms des
+Les simulations ordonnées code/BASE, préapprobation, consommation restent des preuves,
+pas une route d'adoption des états intermédiaires. Le bootstrap de consolidation est
+le lot final atomique décrit plus haut, soumis à une nouvelle décision humaine exacte ;
+ni le manifeste candidat ni ces simulations ne l'autorisent. Les SDK, noms des
 contextes officiels, déclencheurs, règles de scoring et filtres restent inchangés ;
 seuls les anciens nettoyages de caches persistants Flutter de #14 sont retirés.
 Les releases, signatures, déploiements et identités cloud restent séparés et ne
 sont pas activés par cette migration. Aucune exécution CI/CodeQL, résolution de
 findings, gratuité permanente ni capacité réelle des runners n'est déduite des
-tests locaux. Les erreurs de parsing Checkov officielles restent ouvertes :
-compiler Bicep localement n'est pas une preuve de couverture du scanner.
+tests locaux. Le job Checkov exécute désormais les tests du garde Python de BASE, exige
+le rapport JSON de la même invocation et refuse les erreurs de parsing, rapports absents,
+malformés, périmés ou sans couverture effective, même si le scanner renvoie zéro. Le test
+Bash du vrai script de workflow vérifie notamment que 22 erreurs de parsing font échouer
+le job et qu'un rapport complet propre passe. Ce ne sont pas de nouveaux scans.
+Les erreurs de parsing Checkov officielles restent ouvertes : compiler Bicep localement
+n'est pas une preuve de couverture du scanner.
 
 ## Ce que ce mécanisme ne débloque pas
 
