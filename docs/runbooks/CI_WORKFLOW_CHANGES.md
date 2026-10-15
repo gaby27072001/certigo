@@ -296,6 +296,24 @@ n'est pas une preuve de couverture du scanner.
 
 ## Ce que ce mécanisme ne débloque pas
 
+### Correction du répertoire d'extraction CodeQL
+
+Le mode buildless du CodeQL Action épinglé lance `database trace-command --use-build-mode`
+dans son `process.cwd()`, le workspace GitHub, même si `init` a reçu un autre `source-root`.
+Un checkout source uniquement sous `.untrusted-source` peut donc laisser les autobuilders
+JavaScript et C# sans source visible depuis ce répertoire. Le correctif place le source à la
+racine du workspace, fixe `source-root: .` et aligne `UNTRUSTED_SOURCE_DIR`/`checkout_path`
+sur cette même racine, pour PR et main. Le checkout des contrôles reste `.trusted-control`,
+immuable sur BASE pour les PR et sur `github.sha` pour main ; sa seule exclusion de scan
+existante reste inchangée. Aucun langage, filtre de sélection, analyse ou seuil n'est retiré.
+
+Le code de contrôle accepte temporairement les deux layouts cohérents afin de permettre une
+PR A ordinaire sans changer le workflow actif. La transition CodeQL elle-même reste le seul
+couple exact ancien/nouveau déclaré, avec proposition et préapprobation active dans BASE,
+puis consommation séparée B. Les tests de layout utilisent de vrais fichiers JS et C# du
+dépôt et deux checkouts ; ils ne constituent pas une extraction CodeQL réelle. La preuve
+runtime viendra de l'exécution officielle après adoption, sans rerun manuel déduit de ce test.
+
 - **Les workflows privilégiés restent figés à l'octet par défaut.** Hors `cd-backend.yml`
   et des seules transitions source/cible exactes préapprouvées décrites ci-dessus, un workflow qui
   porte `environment:`, `secrets.`, une permission `write`, `id-token: write` ou `azure/login@`

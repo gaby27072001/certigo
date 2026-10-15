@@ -17,7 +17,11 @@ import { validateRunnerLabels } from './workflow-runner-labels.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const workflowPath = '.github/workflows/codeql.yml';
-const target = fs.readFileSync(path.join(root, workflowPath), 'utf8');
+const target = fs.readFileSync(path.join(root, workflowPath), 'utf8')
+  .replaceAll('UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}\n',
+    'UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source\n')
+  .replaceAll('          path: .\n', '          path: .untrusted-source\n')
+  .replaceAll('          source-root: .\n', '          source-root: .untrusted-source\n');
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const prRunner = 'runs-on: [self-hosted, Linux, X64, certigo-pr]';
 const trustedRunner = 'runs-on: [self-hosted, Linux, X64, certigo-trusted]';

@@ -1157,7 +1157,6 @@ function validateRepositoryInvariants() {
     'github.event.pull_request.head.repo.full_name == github.repository',
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
-    'path: .untrusted-source',
     'path: .trusted-control',
     "- '.github/scripts/**/*.js'",
     "- '.github/scripts/**/*.mjs'",
@@ -1171,7 +1170,6 @@ function validateRepositoryInvariants() {
     'output: ${{ env.CODEQL_RESULTS_DIR }}',
     'upload: always',
     'security-events: write',
-    'source-root: .untrusted-source',
     'config-file: ./.trusted-control/.github/codeql/codeql-config.yml',
     'checkout_path: ${{ env.UNTRUSTED_SOURCE_DIR }}',
     'name: Enforce CodeQL severity threshold',
@@ -1179,6 +1177,21 @@ function validateRepositoryInvariants() {
   ]) {
     if (!codeql.includes(marker)) {
       errors.push(`codeql.yml: missing SARIF enforcement invariant ${marker}`);
+    }
+  }
+  const codeqlDocument = parseDocument(codeql).toJS();
+  for (const id of ['analyze', 'analyze-main']) {
+    const job = codeqlDocument.jobs?.[id];
+    if (!job) continue;
+    const sourceCheckout = job.steps?.find((step) => step.uses?.startsWith('actions/checkout@'));
+    const init = job.steps?.find((step) => step.name === 'Initialize CodeQL');
+    const source = sourceCheckout?.with?.path;
+    const expectedDirectory = source === '.' ? '${{ github.workspace }}'
+      : '${{ github.workspace }}/.untrusted-source';
+    if (!['.', '.untrusted-source'].includes(source)
+      || init?.with?.['source-root'] !== source
+      || job.env?.UNTRUSTED_SOURCE_DIR !== expectedDirectory) {
+      errors.push(`codeql.yml: ${id} must keep source checkout, extraction root and SARIF checkout coherent`);
     }
   }
   for (const marker of [

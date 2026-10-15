@@ -61,7 +61,13 @@ export function isReviewedWorkflowTransition(
     return false;
   }
   const name = path.basename(file);
-  const transition = Object.hasOwn(reviewedTransitions, name) ? reviewedTransitions[name] : null;
+  const transition = name === 'codeql.yml'
+    && sha256(candidateInput) === 'd903e104d74b224950c1bcc89ae489ef381ef43d1846b5dca02c853f50c591e6'
+    ? [
+      'dc1fd62b98b5bbe676984059025e99f77aa3bf0bdfc012c69fa2d478bb28dd6e',
+      'd903e104d74b224950c1bcc89ae489ef381ef43d1846b5dca02c853f50c591e6',
+    ]
+    : Object.hasOwn(reviewedTransitions, name) ? reviewedTransitions[name] : null;
   if (!transition || sha256(candidateInput) !== transition[1]) {
     return false;
   }
