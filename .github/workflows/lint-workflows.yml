@@ -30,7 +30,7 @@ jobs:
     name: Candidate workflow security script tests
     needs: freshness
     if: ${{ always() && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -81,7 +81,7 @@ jobs:
     name: Validate workflow YAML
     needs: [freshness, candidate-script-tests]
     if: ${{ always() && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
