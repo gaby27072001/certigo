@@ -15,9 +15,9 @@ export const target = Object.freeze({
   workflow: '.github/workflows/ci-content.yml',
   workflowId: 383380838,
   base: '8ddca44c67de35eac6f39c0412802a23588fd841',
-  candidate: '4cbb61c46b45c676b01a36fda0dad7e453a312c3',
-  pull: 10,
-  category: '/bootstrap-proof/pr-10/javascript-typescript',
+  candidate: '44fda1b25b8d01c909b352d863679422723f04c1',
+  pull: 16,
+  category: '/bootstrap-proof/pr-16/javascript-typescript',
 });
 const sha40 = /^[a-f0-9]{40}$/;
 const requireValue = (value, message) => assert.ok(value, `REFUSE: ${message}`);
@@ -108,17 +108,20 @@ export function verifyAnalysis(analysis, source, runId) {
   requireValue(Number.isSafeInteger(analysis?.id) && analysis.id > 0,
     'missing analysis ID');
   requireValue(analysis.commit_sha === target.candidate
-    && analysis.ref === 'refs/pull/10/head', 'wrong analysis commit/ref');
+    && analysis.ref === `refs/pull/${target.pull}/head`, 'wrong analysis commit/ref');
   requireValue(analysis.category === target.category && analysis.tool?.name === 'CodeQL'
-    && typeof analysis.tool.version === 'string', 'wrong CodeQL tool/category');
+    && analysis.tool.version === '2.27.2', 'wrong CodeQL tool/version/category');
   requireValue(analysis.analysis_key === `${target.workflow}:codeql-proof`,
     'wrong analysis workflow/job');
   requireValue(analysis.environment === '{}' && analysis.error === ''
     && analysis.results_count >= 0, 'incomplete or failed analysis');
-  const url = new URL(analysis.sarif_url);
+  requireValue(typeof analysis.sarif_id === 'string'
+    && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(analysis.sarif_id),
+  'missing or invalid API SARIF ID');
+  const url = new URL(analysis.url);
   requireValue(url.origin === 'https://api.github.com'
-    && url.pathname.startsWith(`/repos/${target.repository}/code-scanning/sarifs/`),
-  'wrong analysis SARIF provenance');
+    && url.pathname === `/repos/${target.repository}/code-scanning/analyses/${analysis.id}`
+    && !url.search && !url.hash, 'wrong analysis API provenance');
   // The analyses API does not supply a workflow SHA or Actions run ID.
   requireValue(sha40.test(source) && Number.isSafeInteger(runId),
     'missing separately verified run provenance');
@@ -134,7 +137,7 @@ export async function collect(github, context, env = process.env) {
     data(github.rest.git.getRef({ ...repo, ref: 'heads/main' })),
     data(github.rest.git.getRef({ ...repo, ref: `heads/${target.branch}` })),
     data(github.rest.pulls.get({ ...repo, pull_number: target.pull })),
-    data(github.rest.repos.getCommit({ ...repo, ref: 'refs/pull/10/head' })),
+    data(github.rest.repos.getCommit({ ...repo, ref: `refs/pull/${target.pull}/head` })),
     data(github.rest.actions.getWorkflowRun({ ...repo, run_id: context.runId })),
   ]);
   const metadata = {
@@ -325,12 +328,13 @@ export async function replay(github, context, base) {
     ? [f.filename, f.previous_filename] : [f.filename]);
   const selected = selectGates(loadMatrix(path.join(base, '.github/ci/impact-matrix.json')), paths);
   requireValue(selected.includes('codeql-javascript'), 'JavaScript CodeQL relevance missing');
-  for (const gate of ['backend', 'mobile', 'cortex-parity', 'dependency-scan', 'iac-security']) {
-    requireValue(!selected.includes(gate), `unexpected applicable gate ${gate}`);
-  }
   console.log(JSON.stringify({
     evidence: 'Exact BASE ci-impact selector; does not exercise dorny PR event wiring',
-    paths, selected, notRun: ['backend', 'mobile', 'cortex-parity', 'OSV', 'Checkov'],
+    paths, selected,
+    notSelected: ['backend', 'mobile', 'cortex-parity', 'dependency-scan', 'iac-security']
+      .filter((gate) => !selected.includes(gate)),
+    scannersNotRun: ['OSV', 'Checkov'],
+    boundary: 'Applicable scanner selection is reported, never treated as scanner success.',
   }));
 
   const security = workflow('security-gate');
@@ -377,22 +381,51 @@ export async function replay(github, context, base) {
 
 export async function verifyUploaded(github, context, sarifId) {
   await collect(github, context);
-  requireValue(typeof sarifId === 'string' && /^[a-zA-Z0-9-]+$/.test(sarifId),
+  requireValue(typeof sarifId === 'string'
+    && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(sarifId),
     'missing SARIF upload ID');
   const repo = { owner: target.owner, repo: 'certigo' };
   const status = (await github.rest.codeScanning.getSarif({ ...repo, sarif_id: sarifId })).data;
-  requireValue(status.processing_status === 'complete' && !status.errors?.length
-    && status.analyses_url, 'SARIF processing incomplete or failed');
+  verifyProcessing(status, sarifId);
   const analyses = (await github.request('GET {url}', { url: status.analyses_url })).data;
   requireValue(Array.isArray(analyses) && analyses.length === 1,
     'missing or duplicate uploaded analysis');
   const analysis = analyses[0];
   verifyAnalysis(analysis, context.sha, context.runId);
-  requireValue(analysis.sarif_url.endsWith(`/sarifs/${sarifId}`), 'SARIF ID mismatch');
+  requireValue(analysis.sarif_id === sarifId, 'SARIF ID mismatch');
+  const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
+    ...repo, run_id: context.runId, attempt_number: 1, per_page: 100,
+  });
+  const matching = jobs.filter((job) => job.name === policyJobs[2]);
+  requireValue(matching.length === 1 && matching[0].run_id === context.runId,
+    'missing CodeQL proof job identity');
+  const uploads = matching[0].steps.filter((step) =>
+    step.name === 'Analyze and upload under dedicated NONOFFICIAL category');
+  requireValue(uploads.length === 1 && uploads[0].conclusion === 'success',
+    'upload step did not succeed');
+  verifyUploadInterval(analysis, uploads[0]);
   console.log(JSON.stringify({
-    evidence: 'processed CodeQL upload; run/source verified separately through Actions API',
-    runId: context.runId, sourceHeadSha: context.sha, sarifId, analysis,
+    evidence: 'processed upload with exact SARIF ID, key/category/ref/commit and job upload interval',
+    boundary: 'Analysis API has no run ID or workflow SHA; Actions API verifies those separately.',
+    runId: context.runId, sourceHeadSha: context.sha, sarifId, analysis, status,
+    codeqlJobId: matching[0].id, uploadStep: uploads[0],
   }));
+}
+
+export function verifyProcessing(status, sarifId) {
+  requireValue(status?.processing_status === 'complete' && !status.errors?.length
+    && status.analyses_url
+      === `https://api.github.com/repos/${target.repository}/code-scanning/analyses?sarif_id=${sarifId}`,
+  'SARIF processing failed, incomplete or wrong API analyses URL');
+}
+
+export function verifyUploadInterval(analysis, upload) {
+  const created = Date.parse(analysis.created_at);
+  const started = Date.parse(upload.started_at);
+  const completed = Date.parse(upload.completed_at);
+  requireValue(Number.isFinite(created) && Number.isFinite(started)
+    && Number.isFinite(completed) && started <= created && created <= completed,
+  'analysis creation outside this exact job upload interval');
 }
 
 export async function verifyExtracted(github, context, archive) {

@@ -35,8 +35,8 @@ const repo = api(repository);
 const workflow = api(`${repository}/actions/workflows/${target.workflowId}`);
 const mainRef = api(`${repository}/git/ref/heads/main`).object.sha;
 const sourceRef = api(`${repository}/git/ref/heads/${target.branch}`).object.sha;
-const pull = api(`${repository}/pulls/10`);
-const pullRef = api(`${repository}/git/ref/pull/10/head`).object.sha;
+const pull = api(`${repository}/pulls/${target.pull}`);
+const pullRef = api(`${repository}/git/ref/pull/${target.pull}/head`).object.sha;
 const liveFile = api(`${repository}/contents/${target.workflow}?ref=${source}`);
 assert.equal(liveFile.type, 'file');
 assert.equal(liveFile.encoding, 'base64');
@@ -65,7 +65,7 @@ if (mode === 'preflight') {
   assert.equal(workflow.state, 'active');
   assert.equal(mainRef, target.base);
   assert.equal(sourceRef, source);
-  assert.equal(pull.number, 10);
+  assert.equal(pull.number, target.pull);
   assert.equal(pull.state, 'open');
   assert.equal(pull.head.repo.full_name, target.repository);
   assert.equal(pull.head.repo.fork, false);
@@ -77,7 +77,7 @@ if (mode === 'preflight') {
   console.log(JSON.stringify({
     source, computedWorkflowFileSha256: hash(remoteBytes),
     workflowGitBlobShaFromContentsAPI: liveFile.sha,
-    base: mainRef, candidate: pull.head.sha, actor: actor.login, actorId: actor.id,
+    pull: target.pull, base: mainRef, candidate: pull.head.sha, actor: actor.login, actorId: actor.id,
     dispatch: `gh workflow run ${target.workflowId} --repo ${target.repository} --ref ${target.branch}`,
     boundary: 'NONMERGEABLE transport; no run or workflow_sha API evidence claimed before dispatch',
   }, null, 2));

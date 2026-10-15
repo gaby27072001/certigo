@@ -1,4 +1,4 @@
-name: NONMERGEABLE owner bootstrap proof PR10
+name: NONMERGEABLE independent owner bootstrap proof PR16
 
 # Isolated dispatch transport only. Intentionally NOT approved by main policy.
 # No official PR contexts, merge authority, cloud access, or candidate-to-policy handoff.
@@ -28,7 +28,7 @@ jobs:
             const branch = 'gaby27072001-proof-owner-bootstrap';
             const workflowPath = '.github/workflows/ci-content.yml';
             const base = '8ddca44c67de35eac6f39c0412802a23588fd841';
-            const candidate = '4cbb61c46b45c676b01a36fda0dad7e453a312c3';
+            const candidate = '44fda1b25b8d01c909b352d863679422723f04c1';
             const repo = { owner, repo: 'certigo' };
             assert.equal(context.payload.repository.full_name, repository);
             assert.equal(context.actor, owner);
@@ -49,8 +49,8 @@ jobs:
               data(github.rest.actions.getWorkflow({ ...repo, workflow_id: 383380838 })),
               data(github.rest.git.getRef({ ...repo, ref: 'heads/main' })),
               data(github.rest.git.getRef({ ...repo, ref: `heads/${branch}` })),
-              data(github.rest.pulls.get({ ...repo, pull_number: 10 })),
-              data(github.rest.repos.getCommit({ ...repo, ref: 'refs/pull/10/head' })),
+              data(github.rest.pulls.get({ ...repo, pull_number: 16 })),
+              data(github.rest.repos.getCommit({ ...repo, ref: 'refs/pull/16/head' })),
               data(github.rest.actions.getWorkflowRun({ ...repo, run_id: context.runId })),
               data(github.rest.repos.getContent({ ...repo, path: workflowPath, ref: context.sha })),
             ]);
@@ -64,7 +64,7 @@ jobs:
             assert.equal(w.state, 'active');
             assert.equal(main.object.sha, base);
             assert.equal(proof.object.sha, context.sha);
-            assert.equal(pull.number, 10);
+            assert.equal(pull.number, 16);
             assert.equal(pull.state, 'open');
             assert.equal(pull.head.repo.full_name, repository);
             assert.equal(pull.head.repo.fork, false);
@@ -120,7 +120,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: 4cbb61c46b45c676b01a36fda0dad7e453a312c3
+          ref: 44fda1b25b8d01c909b352d863679422723f04c1
           path: .untrusted-source
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -129,6 +129,12 @@ jobs:
       - name: Install BASE dependencies only from immutable BASE lockfile
         working-directory: .trusted-control
         run: npm ci --ignore-scripts
+      - name: Record exact Node and dependency-tool versions
+        run: |
+          test "$(node --version)" = "v20.20.2"
+          node --version
+          npm --version
+          python --version
       - name: Test proof refusal fixtures
         run: node --test .proof/.github/proof/owner-bootstrap.test.mjs
       - name: Install checksum-pinned actionlint using exact BASE step
@@ -137,6 +143,10 @@ jobs:
           import { runBaseStep } from "./.proof/.github/proof/owner-bootstrap.mjs";
           import path from "node:path";
           runBaseStep(path.resolve(".trusted-control"), "lint-workflows", "validate", "Install actionlint");'
+      - name: Record exact lint tool versions without changing options
+        run: |
+          actionlint -version
+          shellcheck --version
       - name: Exact BASE validator and manifest check plus adversarial refusals
         run: |
           node --input-type=module -e '
@@ -146,6 +156,9 @@ jobs:
       - name: Exact BASE script suite including aggregate truth tables
         working-directory: .trusted-control
         run: node --test .github/scripts/*.test.mjs
+      - name: Exact BASE public-pages tests
+        working-directory: .trusted-control
+        run: node --test tools/tests/build_public_pages.test.mjs
       - name: Replay exact BASE freshness and fork code on authentic API metadata
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
@@ -203,7 +216,7 @@ jobs:
             await proof.collect(github, context);
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: 4cbb61c46b45c676b01a36fda0dad7e453a312c3
+          ref: 44fda1b25b8d01c909b352d863679422723f04c1
           path: candidate
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -212,9 +225,14 @@ jobs:
       - name: Install candidate dependencies from its OWN lockfile
         working-directory: candidate
         run: npm ci --ignore-scripts
+      - name: Record candidate suite runtime
+        run: |
+          test "$(node --version)" = "v20.20.2"
+          node --version
+          npm --version
       - name: Candidate suite - independent report, never policy authority
         working-directory: candidate
-        run: node --test .github/scripts/*.test.mjs
+        run: node --test .github/scripts/*.test.mjs tools/tests/build_public_pages.test.mjs
 
   codeql-proof:
     name: Bootstrap proof / CodeQL JavaScript (not official)
@@ -249,7 +267,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: 4cbb61c46b45c676b01a36fda0dad7e453a312c3
+          ref: 44fda1b25b8d01c909b352d863679422723f04c1
           path: candidate
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -258,6 +276,11 @@ jobs:
       - name: Install BASE dependencies only
         working-directory: .trusted-control
         run: npm ci --ignore-scripts
+      - name: Record CodeQL threshold runtime and trusted config hash
+        run: |
+          test "$(node --version)" = "v20.20.2"
+          node --version
+          sha256sum .trusted-control/.github/codeql/codeql-config.yml
       - name: Initialize static JavaScript analysis without candidate execution
         uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
@@ -278,9 +301,9 @@ jobs:
         id: analyze
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
-          ref: refs/pull/10/head
-          sha: 4cbb61c46b45c676b01a36fda0dad7e453a312c3
-          category: /bootstrap-proof/pr-10/javascript-typescript
+          ref: refs/pull/16/head
+          sha: 44fda1b25b8d01c909b352d863679422723f04c1
+          category: /bootstrap-proof/pr-16/javascript-typescript
           output: ${{ runner.temp }}/bootstrap-codeql-results
           upload: always
           upload-database: false
@@ -299,6 +322,7 @@ jobs:
       - name: Exact BASE threshold on only this job's locally generated SARIF
         run: node .trusted-control/.github/scripts/enforce-codeql-sarif.mjs "$RUNNER_TEMP/bootstrap-codeql-results"
       - name: Verify processed upload and final API provenance
+        if: ${{ always() }}
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           PROOF_SARIF_ID: ${{ steps.analyze.outputs.sarif-id }}
