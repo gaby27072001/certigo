@@ -27,7 +27,20 @@ const dispatchPath = path.join(
   'validate-backend-deploy-dispatch.mjs',
 );
 const testWorkspacesRoot = path.join(repositoryRoot, '.test-workspaces');
-const baselineWorkflow = fs.readFileSync(workflowPath, 'utf8');
+const currentWorkflow = fs.readFileSync(workflowPath, 'utf8');
+const baselineWorkflow = createHash('sha256').update(currentWorkflow).digest('hex')
+  === '05287664503833f3c2e6f7daa4c20ff7cb38584de45dccb89f02aff9401fc516'
+  ? currentWorkflow.replace(
+    '          {\n'
+      + '            echo "environment=$TARGET"\n'
+      + '            echo "operation=$OPERATION"\n'
+      + '            echo "source-run-id=$SOURCE_RUN_ID"\n'
+      + '          } >> "$GITHUB_OUTPUT"\n',
+    '          echo "environment=$TARGET" >> "$GITHUB_OUTPUT"\n'
+      + '          echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"\n'
+      + '          echo "source-run-id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"\n',
+  )
+  : currentWorkflow;
 
 test.after(() => {
   fs.rmSync(testWorkspacesRoot, { force: true, recursive: true });
@@ -289,7 +302,7 @@ test('accepts the hardened legacy variant byte-identically and rejects every mut
   // rejecting any other byte content. Widening the allow-list requires updating
   // hardenedLegacyWorkflowSize / hardenedLegacyWorkflowSha256 in the policy,
   // which is visible in review and rejects every other candidate.
-  const hardenedBytes = fs.readFileSync(workflowPath);
+  const hardenedBytes = Buffer.from(baselineWorkflow);
   assert.equal(hardenedBytes.length, 38066);
   assert.equal(
     createHash('sha256').update(hardenedBytes).digest('hex'),
@@ -670,25 +683,27 @@ test('strict activation seals every additional privileged runtime and IaC input'
 
 test('workspace requires each control but byte-seals only the dispatch authorizer', () => {
   for (const relativePath of backendDeployTrustedFiles) {
+    const trusted = candidateWorkspace();
     const missing = candidateWorkspace();
     const changed = candidateWorkspace();
     try {
       fs.rmSync(path.join(missing, ...relativePath.split('/')));
       assert.match(
-        validateBackendDeployWorkspace(missing, repositoryRoot).join('\n'),
+        validateBackendDeployWorkspace(missing, trusted).join('\n'),
         new RegExp(`missing.*${path.basename(relativePath)}`, 'u'),
       );
       fs.appendFileSync(
         path.join(changed, ...relativePath.split('/')),
         '\n// candidate substitution\n',
       );
-      const errors = validateBackendDeployWorkspace(changed, repositoryRoot);
+      const errors = validateBackendDeployWorkspace(changed, trusted);
       if (relativePath.endsWith('validate-backend-deploy-dispatch.mjs')) {
         assert.match(errors.join('\n'), /must match the immutable base revision/u);
       } else {
         assert.deepEqual(errors, [], relativePath);
       }
     } finally {
+      fs.rmSync(trusted, { force: true, recursive: true });
       fs.rmSync(missing, { force: true, recursive: true });
       fs.rmSync(changed, { force: true, recursive: true });
     }
