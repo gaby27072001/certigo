@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -20,6 +21,7 @@ import {
   computeWorkflowStates,
   fingerprintWorkflow,
   lifecycleWorkflowNames,
+  readRegularRepositoryFile,
   renderWorkflowManifest,
   validateWorkflowManifest,
 } from './workflow-semantic-fingerprint.mjs';
@@ -495,6 +497,89 @@ test('the guard never reads a symlinked proposal', (context) => {
     assert.ok(judge(main0, approval).some((error) => (
       error.includes('must be a real regular non-symlink file')
     )));
+  });
+});
+
+test('repository file reads stay bound to the verified regular-file descriptor', {
+  timeout: 5000,
+}, (context) => {
+  withTrees((track) => {
+    const root = track(fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-regular-file-')));
+    const outside = track(fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-regular-file-outside-')));
+    const regularPath = resolveIn(root, 'files/regular.txt');
+    write(root, 'files/regular.txt', 'trusted contents');
+    write(outside, 'outside.txt', 'outside contents');
+    write(outside, 'regular.txt', 'substituted contents');
+    assert.equal(readRegularRepositoryFile(root, 'files/regular.txt').content, 'trusted contents');
+    assert.deepEqual(readRegularRepositoryFile(root, 'files/missing.txt'), { exists: false });
+    assert.match(readRegularRepositoryFile(root, 'files').error, /regular non-symlink file/u);
+
+    const fileLink = resolveIn(root, 'files/final-link.txt');
+    try {
+      fs.symlinkSync(resolveIn(outside, 'outside.txt'), fileLink, 'file');
+    } catch (error) {
+      if (error.code !== 'EPERM') throw error;
+    }
+    if (fs.existsSync(fileLink)) {
+      assert.match(readRegularRepositoryFile(root, 'files/final-link.txt').error, /non-symlink/u);
+    }
+
+    const directoryLink = resolveIn(root, 'linked-files');
+    try {
+      fs.symlinkSync(outside, directoryLink, 'junction');
+    } catch (error) {
+      if (error.code !== 'EPERM') throw error;
+    }
+    if (fs.existsSync(directoryLink)) {
+      assert.match(
+        readRegularRepositoryFile(root, 'linked-files/outside.txt').error,
+        /exact repository path/u,
+      );
+    }
+
+    const filesDirectory = resolveIn(root, 'files');
+    const filesBackup = resolveIn(root, 'files.verified');
+    const originalOpen = fs.openSync;
+    fs.openSync = (file, ...args) => {
+      if (path.resolve(file) === path.resolve(regularPath)) {
+        fs.renameSync(filesDirectory, filesBackup);
+        fs.symlinkSync(outside, filesDirectory, 'junction');
+      }
+      return originalOpen.call(fs, file, ...args);
+    };
+    try {
+      assert.match(
+        readRegularRepositoryFile(root, 'files/regular.txt').error,
+        /file (?:changed|path changed) while opening/u,
+      );
+    } finally {
+      fs.openSync = originalOpen;
+      fs.unlinkSync(filesDirectory);
+      fs.renameSync(filesBackup, filesDirectory);
+    }
+
+    const backupPath = `${regularPath}.verified`;
+    fs.openSync = (file, ...args) => {
+      if (path.resolve(file) === path.resolve(regularPath)) {
+        fs.renameSync(regularPath, backupPath);
+        if (process.platform === 'win32') {
+          fs.writeFileSync(regularPath, 'substituted contents');
+        } else {
+          execFileSync('mkfifo', [regularPath]);
+        }
+      }
+      return originalOpen.call(fs, file, ...args);
+    };
+    try {
+      assert.match(
+        readRegularRepositoryFile(root, 'files/regular.txt').error,
+        /file changed while opening/u,
+      );
+    } finally {
+      fs.openSync = originalOpen;
+      fs.rmSync(regularPath, { force: true });
+      fs.renameSync(backupPath, regularPath);
+    }
   });
 });
 

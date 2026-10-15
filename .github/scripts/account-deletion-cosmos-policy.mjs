@@ -8,6 +8,7 @@ import {
   legacyWorkflowName,
   loadWorkflowManifest,
   oneShotWorkflowName,
+  readVerifiedRegularFileSync,
 } from './workflow-semantic-fingerprint.mjs';
 
 const legacyWorkflow = legacyWorkflowName;
@@ -675,7 +676,13 @@ function validateActiveWorkflowSet(root, workflows, state, errors, manifestPath,
       errors.push(`${canonicalPath}: must resolve to its exact repository path`);
       continue;
     }
-    const content = fs.readFileSync(filePath, 'utf8');
+    let content;
+    try {
+      content = readVerifiedRegularFileSync(filePath, fileStat).toString('utf8');
+    } catch (error) {
+      errors.push(`${canonicalPath}: ${error.message}`);
+      continue;
+    }
     const result = fingerprintWorkflow(canonicalPath, content);
     errors.push(...result.errors);
     if (result.errors.length === 0 && !acceptedValues.get(canonicalPath).has(result.digest)) {
