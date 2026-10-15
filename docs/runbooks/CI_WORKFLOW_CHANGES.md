@@ -198,6 +198,32 @@ approuvé, jamais un autre ; et l'écart se referme au premier mouvement de `mai
 
 ## Règle pour les tests de `.github/scripts`
 
+### Rapports Checkov et couverture effective
+
+`checkov_report_gate.py` est installé avec ses tests avant toute modification du workflow.
+Cette installation seule ne change pas le scan actif. Lors de son intégration future,
+`security-scan.yml` doit conserver le journal CLI et ajouter un rapport JSON du même scan,
+contrôlé par ce script depuis les contrôles de la **base**.
+Il refuse un code scanner non nul, un contrôle échoué, une erreur de parsing, un rapport
+absent/malformé/incohérent et une couverture effective nulle. Un scan ne peut donc pas être déclaré
+réussi uniquement parce que Checkov renvoie zéro malgré des erreurs de parsing.
+
+Le résumé distingue le compteur de ressources du scanner et les identités fichier/ressource
+ayant au moins un contrôle exécuté. Aucun des deux ne prouve à lui seul que chaque source a été
+analysée, ni ne compte des ressources déployées uniques. Les exclusions existantes restent
+inchangées ; ce garde-fou ne corrige pas le parseur Bicep et ne remplace pas son analyse par ARM.
+
+Tester le garde-fou sans scanner, réseau ou Azure :
+
+```powershell
+python -m unittest discover -s .github\scripts -p test_checkov_report_gate.py -v
+```
+
+Son intégration suit la pré-approbation puis la consommation ci-dessus ; la présence du code
+candidat et ses tests ne constituent ni une approbation par la base ni une preuve de CI verte.
+
+### Indépendance des tests de la base
+
 Ces tests tournent sur l'arbre de `main` à chaque PR. **Un test de base ne doit dépendre ni des
 pré-approbations en attente sur `main`, ni des empreintes de production, ni de la date du jour** :
 une PR qui pré-approuverait exactement la mutation qu'un test attend refusée, ou une évolution
