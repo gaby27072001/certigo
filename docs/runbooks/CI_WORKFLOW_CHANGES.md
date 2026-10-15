@@ -89,7 +89,7 @@ dans un **commit de tête séparé** (voir `docs/GOVERNANCE.md`).
 
 ### Préparation bornée post-self-seal : lint mobile et génération publique
 
-Le code de préparation de `backend-deploy-workflow-policy.mjs` reconnaît seulement six
+La préparation initiale de `backend-deploy-workflow-policy.mjs` reconnaît six
 transitions exactes, avec SHA256 **des octets source et cible** : `cd-backend.yml`, `release-android.yml`,
 `release-ios.yml`, `ci-infra.yml`, `deploy-privacy-policy.yml` et
 `publish-verified-public-pages.yml`. Les deux releases gardent leurs triggers, permissions,
@@ -105,7 +105,8 @@ Le lot lint source est le patch SHA256
 Les cibles Android/iOS sont reconstruites en **LF** depuis ce patch, sans conversion
 `core.autocrlf`. Les callers publics proviennent du commit
 `a706caa8ad94d162d3a584a5ad39dbc0d8c04a6b`. Ces références désignent une préparation,
-pas une adoption. Les six paires d'empreintes sont littérales dans le code et les tests.
+pas une adoption. Ces six paires d'empreintes sont littérales dans le code et les tests ;
+la consolidation ci-dessous ajoute seulement les deux paires CodeQL/security-gate.
 
 Le landing exige une préapprobation non expirée **déjà dans la trusted BASE**, son manifeste
 valide, sa proposition régulière non symlink aux octets cibles exacts et le workflow source
@@ -129,29 +130,32 @@ qui n'existent pas dans la BASE legacy doivent rester absents des deux arbres ; 
 introduction n'est pas autorisée par le delta lint. Les contrôles stricts B
 existants restent inchangés. Ce changement de contrat minimal est un nouveau diff à approuver :
 l'accord sur le head original de PR #18 ne l'adopte pas.
-Les changements de PR #17 ne sont ni importés ni implicitement autorisés.
+La politique de PR #17 n'est ni importée ni implicitement autorisée ; seuls ses cinq
+fichiers réseau finaux sont réutilisés comme prérequis de code distinct.
 
 Ordre d'intégration avec les prérequis réels, sans changer les branches existantes :
 
-1. Installer séparément le code Checkov de PR #19 (préparation code-only
-   `73f3138d444e6ee08fab606d32b760f02dfc52da`) après ses contrôles effectifs et l'autorité
-   requise. Il ne dépend pas du bootstrap self-seal ; son futur workflow reste hors de ce commit.
-2. Résoudre explicitement le bootstrap de PR #18 sur son diff exact. Un accord sur les seuls
-   deux refus binaires ne vaut pas dérogation à un autre échec de lint, scan ou contrôle.
-   Installer ensuite ce code post18 et le code de politique hosted de PR #10 dans la BASE.
-   Les validations locales ne remplacent jamais les checks GitHub exécutés.
-   Le delta réseau isolé `27d69d01..2754545998ec0f1348bdc8e9d06dbb6870004726`
-   (cinq chemins `infra/ci-runner/image`, pas la politique PR #17) doit également être installé
-   comme code avant le landing CD : le combiner au nouveau CD dans la même PR doit être refusé
-   par le contrôle des entrées privilégiées. Aucun nouveau SARIF ne prouve sa résolution CodeQL.
-3. Préapprouver séparément les contenus futurs exacts : transitions ici bornées, migration
-   hosted de PR #12 et futur workflow Checkov. Les empreintes/golden sont alors des données
+1. Faire revoir explicitement le nouveau bootstrap de code : simplification self-seal,
+   politique hosted réutilisée de PR #10, code Checkov de PR #19
+   (`73f3138d444e6ee08fab606d32b760f02dfc52da`), builder public et les cinq fichiers réseau
+   finaux de `2754545998ec0f1348bdc8e9d06dbb6870004726`, sans importer la politique PR #17.
+   Installer ce code avant les workflows. Le compare partiel `7821c4b1` n'est pas un prérequis.
+   L'accord sur le head original de PR #18 ne couvre pas ce nouveau diff ; l'ancienne BASE
+   refuse encore les deux scellés. Les workflows actifs restent ceux de la BASE : leurs
+   cinq erreurs actionlint historiques restent présentes à ce stade, non dérogées.
+   Cet ordre de préparation ne constitue donc pas une séquence de fusions déjà autorisée
+   ou intégralement verte. Aucune preuve locale ne remplace les checks GitHub exécutés.
+2. Préapprouver ensemble les vingt contenus futurs exacts, sans modifier les workflows actifs :
+   six transitions initiales, deux scanners et douze consommateurs hosted réutilisés de PR #14.
+   Le futur changement de workflow Checkov reste hors de ce lot. Les empreintes/golden sont des données
    de cette PR de préapprobation distincte, pas un rafraîchissement pour verdir le code policy.
    Ne jamais fabriquer un état `states` qui contredit les workflows actifs.
-4. Consommer les approbations déjà adoptées dans la BASE avec les landings correspondants
-   (migration hosted PR #14 comprise), sans changer leur périmètre. Le manifeste et les
+3. Consommer ensemble les vingt approbations déjà adoptées dans la BASE, sans changer leur
+   périmètre. Le manifeste et les
    propositions sont consommés par les outils existants. Un assemblage préparatoire dépourvu
-   d'approbation BASE doit rester refusé ; il ne s'auto-approuve pas.
+   d'approbation BASE doit rester refusé ; il ne s'auto-approuve pas. La combinaison du réseau
+   et du nouveau CD sans installation préalable des cinq fichiers doit également être refusée
+   par le contrôle des entrées privilégiées. Aucun nouveau SARIF ne prouve leur résolution CodeQL.
 
 Cet ordre n'annonce ni capacité runner disponible, ni checks officiels verts, ni fusion.
 Une préapprobation doit être recalculée et revue si les octets ou la source changent ; elle
@@ -275,13 +279,15 @@ compiler Bicep localement n'est pas une preuve de couverture du scanner.
 
 ## Ce que ce mécanisme ne débloque pas
 
-- **Les workflows privilégiés restent figés à l'octet.** Hors `cd-backend.yml`, un workflow qui
+- **Les workflows privilégiés restent figés à l'octet par défaut.** Hors `cd-backend.yml`
+  et des seules transitions source/cible exactes préapprouvées décrites ci-dessus, un workflow qui
   porte `environment:`, `secrets.`, une permission `write`, `id-token: write` ou `azure/login@`
   (liste complète : `privilegedWorkflow` dans `backend-deploy-workflow-policy.mjs`) est refusé au
-  moindre octet modifié, par une règle scellée qu'aucune PR ne peut amender (voir
+  moindre octet modifié, par la politique de la trusted BASE (voir
   `docs/GOVERNANCE.md`, « Workflow privilégié »). C'est le cas de `release-android.yml` : une
   montée de `FLUTTER_VERSION`, qui doit rester alignée entre `ci-mobile.yml`,
-  `release-android.yml` et `codemagic.yaml`, **reste bloquée** par ce scellé-là.
+  `release-android.yml` et `codemagic.yaml`, **reste bloquée** : elle n'est pas le delta lint
+  exact proposé. La politique est amendable par revue explicite, pas par auto-approbation.
 - **Ne jamais renommer un job dont le nom est un contexte requis** (`Flutter app + UI packages`,
   `Build & test`, `Validate workflow YAML`, …) : la protection de `main` attendrait un contexte
   que plus aucun workflow ne produit. C'est désormais refusé automatiquement, dès la PR A

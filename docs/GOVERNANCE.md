@@ -242,10 +242,13 @@ y compris celle qui devait réparer. Le validateur juge désormais aussi le mani
 avec le code de la base : une PR dont le manifeste ne décrit pas ses propres workflows, ou dont le
 golden digest ne correspond pas, est refusée **avant** de pouvoir casser `main`.
 
-### Workflow privilégié : refus inchangé, politique amendable par revue explicite
+### Workflow privilégié : refus par défaut, politique amendable par revue explicite
 
 **Contrat du code proposé.** `validateBackendDeployWorkspace` conserve le refus des workflows
-privilégiés ajoutés ou modifiés hors `cd-backend.yml`. Seule l'égalité binaire de
+privilégiés ajoutés ou modifiés hors `cd-backend.yml`, sauf les seules transitions
+source/cible exactes et préapprouvées décrites dans `docs/runbooks/CI_WORKFLOW_CHANGES.md`,
+« Préparation bornée post-self-seal » et « Consolidation des contrôles PR sur runners hosted ».
+Pour les fichiers de contrôle, seule l'égalité binaire de
 `backend-deploy-workflow-policy.mjs` et `backend-deploy-gate.test.mjs` est retirée : ces deux
 fichiers restent obligatoires, réguliers et non symlinks, dans le candidat comme dans la base.
 `validate-backend-deploy-dispatch.mjs` reste obligatoire **et byte-identique à la base**.
@@ -258,7 +261,7 @@ hors `cd-backend.yml` échoue sur `Validate workflow YAML` avec :
 .github/workflows/<nom>.yml: changed or new privileged capability is forbidden outside cd-backend.yml
 ```
 
-Un commentaire suffit à le déclencher : la comparaison porte sur les **octets** du fichier, pas
+Hors de ces transitions exactes, un commentaire suffit à le déclencher : la comparaison porte sur les **octets** du fichier, pas
 sur les capacités qu'il ajoute. Exemples concernés : `ci-content-drift.yml`,
 `content-infra-apply.yml`, `content-infra-what-if.yml`,
 `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`.
@@ -268,7 +271,9 @@ Leur contenu doit donc rester identique à celui de la base.
 `.github/scripts/backend-deploy-workflow-policy.mjs` signale un workflow dès qu'il porte une
 permission `write` ou `write-all`, un `id-token: write`, un `environment:`, un `secrets:` de job,
 ou l'un de dix-sept marqueurs textuels (`azure/login@`, `secrets.`, `az deployment`,
-`management.azure.com`, …). L'unique exemption est le nom de fichier `cd-backend.yml`, en dur.
+`management.azure.com`, …). `cd-backend.yml` suit son contrat dédié ; les autres transitions
+reconnues sont uniquement les paires exactes déjà préapprouvées par BASE, pas une exemption
+réutilisable pour une nouvelle capacité privilégiée.
 
 **Le dispatch reste scellé.** Toute modification de son contenu, fût-elle d'un commentaire,
 produit :
@@ -285,7 +290,8 @@ verts ne pré-approuvent ni la politique, ni un workflow, ni un déploiement. Le
 doivent toujours refuser le dispatch modifié, les workflows fantômes, les secrets et permissions
 privilégiées ; les fixtures strictes gardent leurs contraintes de triggers, runners, runtime,
 état et IaC. Les octets A/A-hardened/B, les contrôles de support et contrats de capacité,
-les releases/CD et le seuil CodeQL de 7 ne changent pas.
+les garanties des releases/CD et le seuil CodeQL de 7 ne changent pas. Les seuls deltas
+workflow et la séparation CodeQL PR/main sont explicités dans le runbook cité.
 
 **Adoption initiale : décision humaine, pas auto-approbation.** La base antérieure qui scelle
 encore les trois fichiers refuse normalement la PR retirant ces deux égalités. Il faut conserver
