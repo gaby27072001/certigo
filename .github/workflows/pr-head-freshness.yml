@@ -19,7 +19,7 @@ permissions: {}
 jobs:
   freshness:
     name: Verify current PR head
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       pull-requests: read
     outputs:
