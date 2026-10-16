@@ -1,5 +1,10 @@
 import { parseDocument } from 'yaml';
 import {
+  nativeAppleWorkflowFile,
+  validateNativeAppleWorkflow,
+} from './native-apple-workflow-policy.mjs';
+import path from 'node:path';
+import {
   isReviewedGenerationJob,
   isReviewedMainCodeqlJob,
 } from './backend-deploy-workflow-policy.mjs';
@@ -23,6 +28,9 @@ function isAllowedLabelSet(labels) {
 }
 
 export function validateRunnerLabels(text, label, { trustedRoot } = {}) {
+  if (path.basename(label) === nativeAppleWorkflowFile) {
+    return validateNativeAppleWorkflow(text, label);
+  }
   const document = parseDocument(text, {
     merge: false,
     strict: true,

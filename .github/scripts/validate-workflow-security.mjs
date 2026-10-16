@@ -24,6 +24,7 @@ import {
 } from './workflow-manifest-consistency.mjs';
 import { validateRequiredContexts } from './required-context-policy.mjs';
 import { validateRunnerLabels } from './workflow-runner-labels.mjs';
+import { isExactNativeAppleWorkflow } from './native-apple-workflow-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 import { parseDocument } from 'yaml';
 import { hostedLinuxRunner, isHostedLinuxCiRunner, isPrLinuxCiRunner } from './linux-ci-runner-policy.mjs';
@@ -358,7 +359,9 @@ function validateWorkflow(file) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (
-      trimmed.startsWith('runs-on:') && !allowedRunnerLines.has(trimmed)
+      trimmed.startsWith('runs-on:')
+      && !allowedRunnerLines.has(trimmed)
+      && !isExactNativeAppleWorkflow(text, file)
       && !(trimmed === 'runs-on: ubuntu-24.04' && (
         isReviewedGenerationJob(text, file, 'build', controlRoot)
         || isReviewedGenerationJob(text, file, 'bicep-build', controlRoot)
