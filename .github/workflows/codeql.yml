@@ -135,7 +135,7 @@ jobs:
       contents: read
       pull-requests: read
     env:
-      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}
       TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
       CODEQL_RESULTS_DIR: ${{ github.workspace }}/.codeql-results/${{ matrix.language }}
       CODEQL_BLOCKING_SECURITY_SEVERITY: "7.0"
@@ -171,9 +171,13 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
-          path: .untrusted-source
+          path: .
           persist-credentials: false
 
+      - name: Reset trusted control checkout path
+        shell: bash
+        run: >-
+          node -e 'require("node:fs").rmSync(process.env.TRUSTED_CONTROL_DIR, { recursive: true, force: true });'
       - name: Checkout immutable trusted controls
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -191,7 +195,7 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
-          source-root: .untrusted-source
+          source-root: .
           config-file: ./.trusted-control/.github/codeql/codeql-config.yml
 
       - name: Perform CodeQL analysis
@@ -217,7 +221,7 @@ jobs:
       contents: read
       security-events: write
     env:
-      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source
+      UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}
       TRUSTED_CONTROL_DIR: ${{ github.workspace }}/.trusted-control
       CODEQL_RESULTS_DIR: ${{ github.workspace }}/.codeql-results/${{ matrix.language }}
       CODEQL_BLOCKING_SECURITY_SEVERITY: "7.0"
@@ -228,8 +232,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.sha }}
-          path: .untrusted-source
+          path: .
           persist-credentials: false
+      - name: Reset trusted control checkout path
+        shell: bash
+        run: >-
+          node -e 'require("node:fs").rmSync(process.env.TRUSTED_CONTROL_DIR, { recursive: true, force: true });'
       - name: Checkout immutable trusted controls
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -245,7 +253,7 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
-          source-root: .untrusted-source
+          source-root: .
           config-file: ./.trusted-control/.github/codeql/codeql-config.yml
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6

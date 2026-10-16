@@ -26,6 +26,7 @@ test('Checkov JSON and tests run only from immutable trusted controls', () => {
   assert.ok(scan.includes('python "$TRUSTED_CONTROL_DIR/.github/scripts/checkov_report_gate.py"'));
   assert.ok(scan.includes('--output cli --output json'));
   assert.ok(scan.includes('--output-file-path "console,$CHECKOV_SCAN_LOG.json"'));
+  assert.doesNotMatch(scan, /(?:^|\s)(?:--quiet|-q)(?=\s|$)/m);
   assert.ok(workflow.jobs['iac-scan'].steps.some((step) => (
     step.run === 'python "$TRUSTED_CONTROL_DIR/.github/scripts/test_checkov_report_gate.py"'
   )));
@@ -49,7 +50,11 @@ test('actual workflow scan step rejects partial and empty scans', {
     writeFileSync(path.join(bin, 'python'), '#!/bin/sh\nexec python3 "$@"\n', { mode: 0o755 });
     writeFileSync(path.join(bin, 'checkov'), `#!/bin/sh
 set -eu
+quiet=false
 while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--quiet" ] || [ "$1" = "-q" ]; then
+    quiet=true
+  fi
   if [ "$1" = "--output-file-path" ]; then
     shift
     report="\${1#console,}"
@@ -57,7 +62,11 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 if [ "$MOCK_JSON" != "missing" ]; then
-  cp "$MOCK_FIXTURE" "$report"
+  if [ "$quiet" = "true" ]; then
+    python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); r["results"]={"failed_checks":r["results"]["failed_checks"]}; json.dump(r,open(sys.argv[2],"w"))' "$MOCK_FIXTURE" "$report"
+  else
+    cp "$MOCK_FIXTURE" "$report"
+  fi
 fi
 printf '%s\\n' "$MOCK_CLI"
 exit "$MOCK_STATUS"

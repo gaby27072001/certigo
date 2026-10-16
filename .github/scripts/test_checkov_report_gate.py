@@ -42,6 +42,16 @@ class CheckovReportGateTests(unittest.TestCase):
         self.assertIn("identities with executed checks: 1", text)
         self.assertIn("do not prove exhaustive source coverage", text)
 
+    def test_pinned_checkov_quiet_json_is_incomplete_even_with_zero_failures(self):
+        for parsing_errors in (0, 22):
+            value = report()
+            value["summary"]["parsing_errors"] = parsing_errors
+            value["results"] = {"failed_checks": []}
+            with self.subTest(parsing_errors=parsing_errors), self.assertRaisesRegex(
+                ValueError, "summary does not match report records"
+            ):
+                evaluate(value, 0)
+
     def test_nonzero_scanner_status_blocks(self):
         for status in (1, 2, 127, 255):
             with self.subTest(status=status):
