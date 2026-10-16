@@ -1189,12 +1189,20 @@ function validateRepositoryInvariants() {
     const sourceCheckout = job.steps?.find((step) => step.uses?.startsWith('actions/checkout@'));
     const init = job.steps?.find((step) => step.name === 'Initialize CodeQL');
     const source = sourceCheckout?.with?.path;
+    const reset = job.steps?.find((step) => step.name === 'Reset trusted control checkout path');
+    const trustedCheckout = job.steps?.find((step) => step.with?.path === '.trusted-control');
     const expectedDirectory = source === '.' ? '${{ github.workspace }}'
       : '${{ github.workspace }}/.untrusted-source';
     if (!['.', '.untrusted-source'].includes(source)
       || init?.with?.['source-root'] !== source
       || job.env?.UNTRUSTED_SOURCE_DIR !== expectedDirectory) {
       errors.push(`codeql.yml: ${id} must keep source checkout, extraction root and SARIF checkout coherent`);
+    }
+    if (source === '.' && (reset?.shell !== 'bash'
+      || reset.run !== 'node -e \'require("node:fs").rmSync(process.env.TRUSTED_CONTROL_DIR, { recursive: true, force: true });\''
+      || job.steps.indexOf(sourceCheckout) >= job.steps.indexOf(reset)
+      || job.steps.indexOf(reset) >= job.steps.indexOf(trustedCheckout))) {
+      errors.push(`codeql.yml: ${id} must reset candidate-controlled path before immutable control checkout`);
     }
   }
   for (const marker of [

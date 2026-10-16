@@ -18,6 +18,10 @@ import { validateRunnerLabels } from './workflow-runner-labels.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const workflowPath = '.github/workflows/codeql.yml';
 const target = fs.readFileSync(path.join(root, workflowPath), 'utf8')
+  .replaceAll('      - name: Reset trusted control checkout path\n'
+    + '        shell: bash\n'
+    + '        run: >-\n'
+    + '          node -e \'require("node:fs").rmSync(process.env.TRUSTED_CONTROL_DIR, { recursive: true, force: true });\'\n', '')
   .replaceAll('UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}\n',
     'UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}/.untrusted-source\n')
   .replaceAll('          path: .\n', '          path: .untrusted-source\n')

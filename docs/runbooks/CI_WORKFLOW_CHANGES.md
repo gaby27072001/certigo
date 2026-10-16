@@ -328,7 +328,12 @@ JavaScript et C# sans source visible depuis ce répertoire. Le correctif place l
 racine du workspace, fixe `source-root: .` et aligne `UNTRUSTED_SOURCE_DIR`/`checkout_path`
 sur cette même racine, pour PR et main. Le checkout des contrôles reste `.trusted-control`,
 immuable sur BASE pour les PR et sur `github.sha` pour main ; sa seule exclusion de scan
-existante reste inchangée. Aucun langage, filtre de sélection, analyse ou seuil n'est retiré.
+existante reste inchangée. Après le checkout source et avant celui de BASE, une commande Node
+inline du workflow supprime le chemin `.trusted-control` candidat sans suivre ses symlinks.
+Le checkout épinglé initialise alors un nouveau dépôt et récupère le ref immuable, plutôt que
+de préparer un éventuel dépôt ou lien fourni par la PR. Les fixtures fichier/répertoire/lien
+vérifient le ref et le contenu de BASE ainsi que la conservation de la cible externe du lien.
+Aucun langage, filtre de sélection, analyse ou seuil n'est retiré.
 
 Le code de contrôle accepte temporairement les deux layouts cohérents afin de permettre une
 PR A ordinaire sans changer le workflow actif. La transition CodeQL elle-même reste le seul
