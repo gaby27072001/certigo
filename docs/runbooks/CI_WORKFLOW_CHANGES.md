@@ -243,6 +243,9 @@ Ne pas remplacer le label par un runner larger, ni utiliser ce workflow dans un 
 Cette installation seule ne change pas le scan actif. Lors de son intégration future,
 `security-scan.yml` doit conserver le journal CLI et ajouter un rapport JSON du même scan,
 contrôlé par ce script depuis les contrôles de la **base**.
+Ne pas utiliser `--quiet` ou `-q` pour cette invocation : Checkov 3.2.495 retire alors
+du JSON les contrôles réussis, ignorés et les erreurs de parsing. Le garde refuse ce rapport
+incomplet ; conserver `--compact` et les deux sorties CLI/JSON du même scan.
 Il refuse un code scanner non nul, un contrôle échoué, une erreur de parsing, un rapport
 absent/malformé/incohérent et une couverture effective nulle. Un scan ne peut donc pas être déclaré
 réussi uniquement parce que Checkov renvoie zéro malgré des erreurs de parsing.
@@ -318,6 +321,43 @@ Les erreurs de parsing Checkov officielles restent ouvertes : compiler Bicep loc
 n'est pas une preuve de couverture du scanner.
 
 ## Ce que ce mécanisme ne débloque pas
+
+### Correction du répertoire d'extraction CodeQL
+
+Le mode buildless du CodeQL Action épinglé lance `database trace-command --use-build-mode`
+dans son `process.cwd()`, le workspace GitHub, même si `init` a reçu un autre `source-root`.
+Un checkout source uniquement sous `.untrusted-source` peut donc laisser les autobuilders
+JavaScript et C# sans source visible depuis ce répertoire. Le correctif place le source à la
+racine du workspace, fixe `source-root: .` et aligne `UNTRUSTED_SOURCE_DIR`/`checkout_path`
+sur cette même racine, pour PR et main. Le checkout des contrôles reste `.trusted-control`,
+immuable sur BASE pour les PR et sur `github.sha` pour main ; sa seule exclusion de scan
+existante reste inchangée. Après le checkout source et avant celui de BASE, une commande Node
+inline du workflow supprime le chemin `.trusted-control` candidat sans suivre ses symlinks.
+Le checkout épinglé initialise alors un nouveau dépôt et récupère le ref immuable, plutôt que
+de préparer un éventuel dépôt ou lien fourni par la PR. Les fixtures fichier/répertoire/lien
+vérifient le ref et le contenu de BASE ainsi que la conservation de la cible externe du lien.
+Aucun langage, filtre de sélection, analyse ou seuil n'est retiré.
+
+Le code de contrôle accepte les deux layouts cohérents sans changer les contraintes de confiance.
+La transition CodeQL elle-même reste le seul
+couple exact ancien/nouveau déclaré, avec proposition et préapprobation active dans BASE,
+puis consommation séparée B. Les tests de layout utilisent de vrais fichiers JS et C# du
+dépôt et deux checkouts ; ils ne constituent pas une extraction CodeQL réelle. La preuve
+runtime viendra de l'exécution officielle après adoption, sans rerun manuel déduit de ce test.
+
+Le premier essai officiel de ce correctif a aussi révélé SC2015 dans le workflow content
+inchangé, sous ShellCheck 0.9.0 de l'image CI (la version locale 0.11.0 ne le signale plus).
+Le lot final utilise `working-directory: backend` puis la même commande audit non bloquante,
+au même seuil `high`. Une erreur de sélection du répertoire n'est plus absorbée par `|| true`.
+Valider avec actionlint 1.7.12 et ShellCheck 0.9.0 explicite ; un résultat sans cet outil ou
+sur une autre version ne remplace pas cette preuve. Aucun scanner ni contrôle de couverture
+n'est désactivé pour corriger ce lint.
+
+Ce défaut de lint dans BASE empêche de présenter la première PR code-only comme une étape verte.
+Le lot consolidé corrige les trois workflows ensemble, mais le validateur de BASE continue à
+refuser les empreintes non préapprouvées et l'ancien contrat CodeQL. Les tests et le manifeste
+candidats ne donnent aucune autorité à ce lot : son adoption exige une décision explicite de
+l'owner sur le diff exact et les refus recensés, sans modification implicite des protections.
 
 - **Les workflows privilégiés restent figés à l'octet par défaut.** Hors `cd-backend.yml`
   et des seules transitions source/cible exactes préapprouvées décrites ci-dessus, un workflow qui

@@ -929,7 +929,9 @@ class ProjectStateTests(unittest.TestCase):
         self.assertIn("- '.github/scripts/**/*.mjs'", workflow)
         self.assertNotIn("actions/upload-artifact@", workflow)
         self.assertIn("upload: always", workflow)
-        self.assertIn("source-root: .untrusted-source", workflow)
+        self.assertEqual(2, workflow.count("source-root: .\n"))
+        self.assertEqual(2, workflow.count("UNTRUSTED_SOURCE_DIR: ${{ github.workspace }}\n"))
+        self.assertEqual(2, workflow.count("name: Reset trusted control checkout path"))
         self.assertIn(
             "config-file: ./.trusted-control/.github/codeql/codeql-config.yml",
             workflow,

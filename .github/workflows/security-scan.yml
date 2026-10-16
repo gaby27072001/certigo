@@ -90,7 +90,7 @@ jobs:
           rm -f -- "$CHECKOV_SCAN_LOG" "$CHECKOV_SCAN_LOG.json"
           set +e
           checkov --directory "$UNTRUSTED_SOURCE_DIR/infra" \
-            --framework bicep --compact --quiet \
+            --framework bicep --compact \
             --config-file "$TRUSTED_CONTROL_DIR/.checkov.yaml" \
             --output cli --output json \
             --output-file-path "console,$CHECKOV_SCAN_LOG.json" \
