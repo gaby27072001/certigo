@@ -60,3 +60,52 @@ fails closed for every symbolic expression. Real findings must remain blocking.
 Workflow installation and activation require ordinary reviewed
 preapproval/consumption; adding these files
 alone changes no CI runtime, checks, infrastructure, or dependency installation.
+
+## Separate conditional-resource adapter candidate
+
+`checkov-3.2.495-conditional.patch` changes only Checkov's ARM-resource-check
+adapter used by Bicep. The parser AST stays unchanged. Its `{condition, config}`
+wrapper is not an Azure resource body: the adapter now checks the inner body
+without interpreting, deleting, or relying on its guard. Both a literal false
+guard and an unresolved guard still cause the potentially deployable body to be
+checked. A secure body can pass those property checks; that is not a claim that
+the deployment condition is known or satisfied.
+
+Malformed wrappers and `UNKNOWN` results from checks on conditional bodies
+produce explicit failed results and warning diagnostics instead of disappearing
+from Checkov's report. Unknown property values are exercised separately from
+unknown deployment guards. This is not a general expression evaluator or a
+global repair of Checkov's UNKNOWN handling, graph checks, loop handling,
+module parameter contexts, or other rule applicability defects.
+
+Upstream is Checkov 3.2.495, <https://github.com/bridgecrewio/checkov>,
+Apache-2.0. The upstream wheel, adapter source, canonical LF patch, and resulting
+adapter source are pinned in `build_checkov_wheel.py`. Every other package file,
+including licenses and notices, is preserved. Only distribution metadata,
+RECORD, a modification notice and the reviewed adapter source change.
+The patch text alone is canonicalized from a CRLF or LF checkout to LF before
+checking its pinned digest; upstream and resulting package bytes are never
+normalized or accepted under alternate digests.
+
+The input is the unmodified `checkov-3.2.495-py3-none-any.whl`:
+SHA-256 `737f39cbab5987d49204cd5e62cfca72ffab3f01fa3314471624e1c4256268ac`.
+The builder is offline and the candidate output has local version
+`3.2.495+certigo.1`, SHA-256
+`0b85efb56fd23a5eab69a59726b4d2a47f05af84416137ede4ac14974289b3af`.
+
+```sh
+CHECKOV_ADAPTER_UPSTREAM_WHEEL=/path/checkov-3.2.495-py3-none-any.whl \
+  python tools/checkov/test_checkov_wheel.py
+python tools/checkov/build_checkov_wheel.py /path/checkov-3.2.495-py3-none-any.whl /tmp/checkov-wheel
+python -m pip install --no-deps --target /tmp/checkov-adapter /tmp/checkov-wheel/checkov-3.2.495+certigo.1-py3-none-any.whl
+PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_conditional_adapter.py
+```
+
+Use a separate environment with Checkov's pinned dependencies and the reviewed
+parser runtime. The adapter tests require the modified Checkov distribution and
+verify its installed source digest. Their synthetic controls exercise the four
+VMSS property checks, secure/insecure bodies, symbolic property values, malformed
+wrappers, preserved inputs, unchanged unconditional/existing behavior, and a real
+UNKNOWN check retained as a failed runner record. No rule ID is excluded.
+This candidate changes no official workflow or infrastructure. It requires its
+own review and explicit activation, separate from the parser-only delivery.
