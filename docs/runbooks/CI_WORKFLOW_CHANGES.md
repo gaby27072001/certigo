@@ -338,8 +338,8 @@ de préparer un éventuel dépôt ou lien fourni par la PR. Les fixtures fichier
 vérifient le ref et le contenu de BASE ainsi que la conservation de la cible externe du lien.
 Aucun langage, filtre de sélection, analyse ou seuil n'est retiré.
 
-Le code de contrôle accepte temporairement les deux layouts cohérents afin de permettre une
-PR A ordinaire sans changer le workflow actif. La transition CodeQL elle-même reste le seul
+Le code de contrôle accepte les deux layouts cohérents sans changer les contraintes de confiance.
+La transition CodeQL elle-même reste le seul
 couple exact ancien/nouveau déclaré, avec proposition et préapprobation active dans BASE,
 puis consommation séparée B. Les tests de layout utilisent de vrais fichiers JS et C# du
 dépôt et deux checkouts ; ils ne constituent pas une extraction CodeQL réelle. La preuve
@@ -352,6 +352,12 @@ au même seuil `high`. Une erreur de sélection du répertoire n'est plus absorb
 Valider avec actionlint 1.7.12 et ShellCheck 0.9.0 explicite ; un résultat sans cet outil ou
 sur une autre version ne remplace pas cette preuve. Aucun scanner ni contrôle de couverture
 n'est désactivé pour corriger ce lint.
+
+Ce défaut de lint dans BASE empêche de présenter la première PR code-only comme une étape verte.
+Le lot consolidé corrige les trois workflows ensemble, mais le validateur de BASE continue à
+refuser les empreintes non préapprouvées et l'ancien contrat CodeQL. Les tests et le manifeste
+candidats ne donnent aucune autorité à ce lot : son adoption exige une décision explicite de
+l'owner sur le diff exact et les refus recensés, sans modification implicite des protections.
 
 - **Les workflows privilégiés restent figés à l'octet par défaut.** Hors `cd-backend.yml`
   et des seules transitions source/cible exactes préapprouvées décrites ci-dessus, un workflow qui
