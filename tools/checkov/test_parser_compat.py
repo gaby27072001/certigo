@@ -15,7 +15,7 @@ from checkov.bicep.runner import Runner
 from checkov.runner_filter import RunnerFilter
 from pycep import BicepParser
 
-from build_parser_wheel import PATCHED_FILES, UPSTREAM_SHA256, VERSION, build, checked_bytes
+from build_parser_wheel import PATCHED_FILES, UPSTREAM_SHA256, VERSION, checked_bytes
 
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -143,24 +143,6 @@ var rejected = fail('not configured')
                 self.assertFalse(report.parsing_errors, name)
                 self.assertEqual(len(report.passed_checks), 0, name)
                 self.assertEqual(len(report.failed_checks), 1, name)
-
-    def test_wheel_build_is_reproducible_and_keeps_license(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            first = build(self.upstream, Path(temporary) / "first")
-            second = build(self.upstream, Path(temporary) / "second")
-            self.assertEqual(first.read_bytes(), second.read_bytes())
-            with zipfile.ZipFile(first) as archive:
-                licenses = [name for name in archive.namelist() if name.endswith("/LICENSE")]
-                self.assertEqual(len(licenses), 1)
-                self.assertIn(b"Apache License", archive.read(licenses[0]))
-
-    def test_modified_upstream_wheel_is_rejected(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            modified = Path(temporary) / self.upstream.name
-            modified.write_bytes(self.upstream.read_bytes() + b"modified")
-            with self.assertRaisesRegex(ValueError, "Unexpected SHA-256"):
-                build(modified, Path(temporary) / "output")
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

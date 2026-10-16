@@ -25,6 +25,8 @@ Run from the repository root in an isolated environment with Checkov 3.2.495 and
 Git already installed:
 
 ```sh
+CHECKOV_UPSTREAM_WHEEL=/path/pycep_parser-0.5.1-py3-none-any.whl \
+  python tools/checkov/test_parser_wheel.py
 python tools/checkov/build_parser_wheel.py /path/pycep_parser-0.5.1-py3-none-any.whl /tmp/parser-wheel
 python -m pip install --no-deps --target /tmp/parser-runtime /tmp/parser-wheel/pycep_parser-0.5.1+certigo.1-py3-none-any.whl
 CHECKOV_UPSTREAM_WHEEL=/path/pycep_parser-0.5.1-py3-none-any.whl \
@@ -37,6 +39,11 @@ unmodified package files; writes local version `0.5.1+certigo.1`; regenerates
 `RECORD`; and emits a deterministic wheel:
 `8e50661d796af4bc738294db0be82766db625b9490ff6fd59aa11363e437bc0f`.
 Changed inputs, patch drift, or unexpected outputs fail the build.
+Patch application pins Git's line endings and disables external attributes for
+that process only. ZIP entries explicitly use Unix metadata on every platform.
+The standalone builder tests require only Python's standard library and Git,
+including hostile global `autocrlf=true/false` and CRLF attributes; they require
+the same final wheel digest on Windows and Linux. They do not require Checkov.
 
 Use that same isolated runtime for the existing Checkov command, without
 `--quiet`, retaining the existing trusted configuration and strict JSON gate.
@@ -50,6 +57,6 @@ by this patch. In particular, Checkov 3.2.495's `Report.add_record` does not ret
 `UNKNOWN` results in its JSON lists. The negative controls require actual `FAILED`
 records for the unknown HTTPS parameter; they do not establish that every rule
 fails closed for every symbolic expression. Real findings must remain blocking.
-Workflow installation and
-activation require ordinary reviewed preapproval/consumption; adding these files
+Workflow installation and activation require ordinary reviewed
+preapproval/consumption; adding these files
 alone changes no CI runtime, checks, infrastructure, or dependency installation.

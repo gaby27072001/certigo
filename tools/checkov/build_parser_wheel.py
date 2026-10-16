@@ -5,6 +5,7 @@ import base64
 import csv
 import hashlib
 import io
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -48,7 +49,11 @@ def build(upstream, destination):
         patch_file.write_bytes(patch)
         for options in (["--check"], []):
             subprocess.run(
-                ["git", "apply", *options, str(patch_file)],
+                [
+                    "git", "-c", "core.autocrlf=false", "-c", "core.eol=lf",
+                    "-c", f"core.attributesFile={os.devnull}",
+                    "apply", *options, str(patch_file),
+                ],
                 cwd=root, check=True, capture_output=True, text=True,
             )
         for name, expected in PATCHED_FILES.items():
@@ -83,6 +88,7 @@ def build(upstream, destination):
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
         for name, data in sorted(files.items()):
             info = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+            info.create_system = 3
             info.external_attr = 0o100644 << 16
             info.compress_type = zipfile.ZIP_STORED
             archive.writestr(info, data)
