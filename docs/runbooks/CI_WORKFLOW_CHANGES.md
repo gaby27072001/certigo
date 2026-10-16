@@ -243,6 +243,9 @@ Ne pas remplacer le label par un runner larger, ni utiliser ce workflow dans un 
 Cette installation seule ne change pas le scan actif. Lors de son intégration future,
 `security-scan.yml` doit conserver le journal CLI et ajouter un rapport JSON du même scan,
 contrôlé par ce script depuis les contrôles de la **base**.
+Ne pas utiliser `--quiet` ou `-q` pour cette invocation : Checkov 3.2.495 retire alors
+du JSON les contrôles réussis, ignorés et les erreurs de parsing. Le garde refuse ce rapport
+incomplet ; conserver `--compact` et les deux sorties CLI/JSON du même scan.
 Il refuse un code scanner non nul, un contrôle échoué, une erreur de parsing, un rapport
 absent/malformé/incohérent et une couverture effective nulle. Un scan ne peut donc pas être déclaré
 réussi uniquement parce que Checkov renvoie zéro malgré des erreurs de parsing.
@@ -341,6 +344,14 @@ couple exact ancien/nouveau déclaré, avec proposition et préapprobation activ
 puis consommation séparée B. Les tests de layout utilisent de vrais fichiers JS et C# du
 dépôt et deux checkouts ; ils ne constituent pas une extraction CodeQL réelle. La preuve
 runtime viendra de l'exécution officielle après adoption, sans rerun manuel déduit de ce test.
+
+Le premier essai officiel de ce correctif a aussi révélé SC2015 dans le workflow content
+inchangé, sous ShellCheck 0.9.0 de l'image CI (la version locale 0.11.0 ne le signale plus).
+Le lot final utilise `working-directory: backend` puis la même commande audit non bloquante,
+au même seuil `high`. Une erreur de sélection du répertoire n'est plus absorbée par `|| true`.
+Valider avec actionlint 1.7.12 et ShellCheck 0.9.0 explicite ; un résultat sans cet outil ou
+sur une autre version ne remplace pas cette preuve. Aucun scanner ni contrôle de couverture
+n'est désactivé pour corriger ce lint.
 
 - **Les workflows privilégiés restent figés à l'octet par défaut.** Hors `cd-backend.yml`
   et des seules transitions source/cible exactes préapprouvées décrites ci-dessus, un workflow qui

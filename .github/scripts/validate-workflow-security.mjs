@@ -1733,6 +1733,9 @@ function validateRepositoryInvariants() {
       errors.push(`security-scan.yml: missing fail-closed output invariant ${marker}`);
     }
   }
+  if (/(?:^|\s)(?:--quiet|-q)(?=\s|$)/m.test(iacScan)) {
+    errors.push('security-scan.yml: quiet mode removes required JSON report records');
+  }
   if (
     !branchProtection.required_status_checks.contexts.includes('Security / Required gate')
   ) {

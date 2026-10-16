@@ -73,6 +73,7 @@ jobs:
       - name: Validate content
         run: node tools/validate_content.mjs
       - name: npm audit backend tools
-        run: cd backend && npm audit --audit-level=high 2>/dev/null || true
+        working-directory: backend
+        run: npm audit --audit-level=high 2>/dev/null || true
       - name: pip check content tools
         run: pip check 2>/dev/null || true
