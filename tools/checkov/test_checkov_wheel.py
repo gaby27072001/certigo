@@ -11,7 +11,15 @@ import zipfile
 import build_checkov_wheel as builder
 
 
-WHEEL_SHA256 = "0b85efb56fd23a5eab69a59726b4d2a47f05af84416137ede4ac14974289b3af"
+WHEEL_SHA256 = "02b5776b20c78bb7dd1c1bec68b25292082d85744a26c32ba25e530c036831ec"
+CHANGED_SOURCES = {builder.SOURCE, *(entry[0] for entry in builder.RULE_FIXES.values())}
+
+
+def copy_patches(root, newline=b"\n"):
+    for name in ("conditional", *builder.RULE_FIXES):
+        original = Path(builder.__file__).with_name(f"checkov-3.2.495-{name}.patch")
+        canonical = original.read_bytes().replace(b"\r\n", b"\n")
+        (root / original.name).write_bytes(canonical.replace(b"\n", newline))
 
 
 class WheelTests(unittest.TestCase):
@@ -26,7 +34,7 @@ class WheelTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256(result.read_bytes()).hexdigest(), WHEEL_SHA256)
             with zipfile.ZipFile(self.upstream) as original, zipfile.ZipFile(result) as modified:
                 for name in original.namelist():
-                    if name.endswith("/") or name in (builder.SOURCE, builder.OLD_INFO + "RECORD", builder.OLD_INFO + "METADATA"):
+                    if name.endswith("/") or name in CHANGED_SOURCES | {builder.OLD_INFO + "RECORD", builder.OLD_INFO + "METADATA"}:
                         continue
                     new_name = name.replace(builder.OLD_INFO, builder.NEW_INFO, 1)
                     self.assertEqual(original.read(name), modified.read(new_name), name)
@@ -34,10 +42,15 @@ class WheelTests(unittest.TestCase):
                     hashlib.sha256(modified.read(builder.SOURCE)).hexdigest(),
                     builder.PATCHED_SOURCE_SHA256,
                 )
+                for relative, _, _, digest in builder.RULE_FIXES.values():
+                    self.assertEqual(hashlib.sha256(modified.read(relative)).hexdigest(), digest)
+                expected = {
+                    name.replace(builder.OLD_INFO, builder.NEW_INFO, 1)
+                    for name in original.namelist() if not name.endswith("/")
+                } | {builder.NEW_INFO + "CERTIGO-PATCH-NOTICE"}
+                self.assertEqual(set(modified.namelist()), expected)
 
     def test_autocrlf_and_patch_checkout_line_endings_keep_exact_wheel(self):
-        original_patch = Path(builder.__file__).with_name("checkov-3.2.495-conditional.patch")
-        canonical = original_patch.read_bytes().replace(b"\r\n", b"\n")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             attributes = root / "attributes"
@@ -50,7 +63,7 @@ class WheelTests(unittest.TestCase):
                 )
                 for newline in (b"\n", b"\r\n"):
                     with self.subTest(autocrlf=setting, patch_newline=newline):
-                        (root / original_patch.name).write_bytes(canonical.replace(b"\n", newline))
+                        copy_patches(root, newline)
                         with patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(config)}), patch.object(
                             builder, "__file__", str(root / "build_checkov_wheel.py")
                         ):
@@ -64,11 +77,13 @@ class WheelTests(unittest.TestCase):
             modified.write_bytes(self.upstream.read_bytes() + b"modified")
             with self.assertRaisesRegex(ValueError, "Unexpected SHA-256"):
                 builder.build(modified, root / "output")
-            source = Path(builder.__file__).with_name("checkov-3.2.495-conditional.patch")
-            (root / source.name).write_bytes(source.read_bytes() + b"modified")
-            with patch.object(builder, "__file__", str(root / "build_checkov_wheel.py")):
-                with self.assertRaisesRegex(ValueError, "Unexpected canonical LF patch SHA-256"):
-                    builder.build(self.upstream, root / "output")
+            for name in ("conditional", *builder.RULE_FIXES):
+                copy_patches(root)
+                source = root / f"checkov-3.2.495-{name}.patch"
+                source.write_bytes(source.read_bytes() + b"modified")
+                with patch.object(builder, "__file__", str(root / "build_checkov_wheel.py")):
+                    with self.assertRaisesRegex(ValueError, "Unexpected canonical LF patch SHA-256"):
+                        builder.build(self.upstream, root / "output")
 
 
 if __name__ == "__main__":

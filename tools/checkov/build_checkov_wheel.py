@@ -1,4 +1,4 @@
-"""Build the pinned Checkov conditional-body adapter wheel, offline."""
+"""Build the pinned Checkov conditional-body and resource-rule fixes, offline."""
 
 import argparse
 import base64
@@ -19,40 +19,56 @@ SOURCE = "checkov/arm/base_resource_check.py"
 SOURCE_SHA256 = "41731d508a51a8eeda346bbd1b456187d44c3e3d6e3cbebc3b563aa4e7a58541"
 PATCH_SHA256 = "2e08c1cd70c1127e708219b9c92ec132f80d157c0cfa1634af055e60385fac0f"
 PATCHED_SOURCE_SHA256 = "c23a87b3d77f84e144a187aa3d9f540d757627062ddb50828a682833ee0327a2"
-VERSION = "3.2.495+certigo.1"
+RULE_FIXES = {
+    "identity": (
+        "checkov/arm/checks/resource/AppServiceIdentity.py",
+        "bec5f57a89ca81598736c1a02925a2c2ead99d4e304f8ca203d8cbd43fb6181c",
+        "1f37d358beb55178e4acd589e9f23089971cd50fe9c5cc5bef654da49ce2b13e",
+        "af8da9f6be016e9681131a9552c60301dec0007113b93c380813c38d8938cdf8",
+    ),
+    "cosmos": (
+        "checkov/arm/checks/resource/CosmosDBAccountsRestrictedAccess.py",
+        "86aeb6941e76526497db6db689281ca29562acd02d62eaeca1969265f8052e70",
+        "1cae31ee086c9418e6ec2e43a3d79611f154efb3872870e15836c5ec6d619efa",
+        "7143436339d7a40821227f5f99fbc07cbd77243e608ff5de27626ffe54c044fc",
+    ),
+}
+VERSION = "3.2.495+certigo.2"
 OLD_INFO = "checkov-3.2.495.dist-info/"
 NEW_INFO = f"checkov-{VERSION}.dist-info/"
 
 
 def build(upstream, destination):
-    patch_file = Path(__file__).with_name("checkov-3.2.495-conditional.patch")
-    patch = patch_file.read_bytes().replace(b"\r\n", b"\n")
-    if hashlib.sha256(patch).hexdigest() != PATCH_SHA256:
-        raise ValueError("Unexpected canonical LF patch SHA-256")
     with zipfile.ZipFile(io.BytesIO(checked_bytes(upstream, UPSTREAM_SHA256))) as archive:
         names = archive.namelist()
         if len(names) != len(set(names)):
             raise ValueError("Duplicate upstream wheel entries")
         files = {name: archive.read(name) for name in names if not name.endswith("/")}
-    if hashlib.sha256(files[SOURCE]).hexdigest() != SOURCE_SHA256:
-        raise ValueError("Unexpected upstream adapter source")
+    fixes = {"conditional": (SOURCE, SOURCE_SHA256, PATCH_SHA256, PATCHED_SOURCE_SHA256), **RULE_FIXES}
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        source = root / SOURCE
-        source.parent.mkdir(parents=True)
-        source.write_bytes(files[SOURCE])
-        reviewed_patch = root / "conditional.patch"
-        reviewed_patch.write_bytes(patch)
-        for options in (["--check"], []):
-            subprocess.run(
-                [
-                    "git", "-c", "core.autocrlf=false", "-c", "core.eol=lf",
-                    "-c", f"core.attributesFile={os.devnull}",
-                    "apply", *options, str(reviewed_patch),
-                ],
-                cwd=root, check=True, text=True,
-            )
-        files[SOURCE] = checked_bytes(source, PATCHED_SOURCE_SHA256)
+        for name, (relative, original_digest, patch_digest, result_digest) in fixes.items():
+            patch_file = Path(__file__).with_name(f"checkov-3.2.495-{name}.patch")
+            patch = patch_file.read_bytes().replace(b"\r\n", b"\n")
+            if hashlib.sha256(patch).hexdigest() != patch_digest:
+                raise ValueError(f"Unexpected canonical LF patch SHA-256: {name}")
+            if hashlib.sha256(files[relative]).hexdigest() != original_digest:
+                raise ValueError(f"Unexpected upstream source: {relative}")
+            source = root / relative
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_bytes(files[relative])
+            reviewed_patch = root / f"{name}.patch"
+            reviewed_patch.write_bytes(patch)
+            for options in (["--check"], []):
+                subprocess.run(
+                    [
+                        "git", "-c", "core.autocrlf=false", "-c", "core.eol=lf",
+                        "-c", f"core.attributesFile={os.devnull}",
+                        "apply", *options, str(reviewed_patch),
+                    ],
+                    cwd=root, check=True, text=True,
+                )
+            files[relative] = checked_bytes(source, result_digest)
     metadata = files[OLD_INFO + "METADATA"]
     if metadata.count(b"\nVersion: 3.2.495\n") != 1:
         raise ValueError("Unexpected upstream version metadata")
@@ -69,6 +85,8 @@ def build(upstream, destination):
         "Apache-2.0; upstream license and notices remain included.\n"
         "Change: analyze the body of conditional Bicep resources in the ARM check adapter;\n"
         "retain explicit blocking results when those checks return UNKNOWN.\n"
+        "Resource checks: recognize literal combined managed identities and disabled\n"
+        "Cosmos public access; keep unresolved identity/network configuration blocking.\n"
     ).encode()
     records = io.StringIO(newline="")
     writer = csv.writer(records, lineterminator="\n")

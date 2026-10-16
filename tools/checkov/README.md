@@ -61,7 +61,7 @@ Workflow installation and activation require ordinary reviewed
 preapproval/consumption; adding these files
 alone changes no CI runtime, checks, infrastructure, or dependency installation.
 
-## Separate conditional-resource adapter candidate
+## Separate conditional-resource and bounded rule-fix candidate
 
 `checkov-3.2.495-conditional.patch` changes only Checkov's ARM-resource-check
 adapter used by Bicep. The parser AST stays unchanged. Its `{condition, config}`
@@ -80,9 +80,10 @@ module parameter contexts, or other rule applicability defects.
 
 Upstream is Checkov 3.2.495, <https://github.com/bridgecrewio/checkov>,
 Apache-2.0. The upstream wheel, adapter source, canonical LF patch, and resulting
-adapter source are pinned in `build_checkov_wheel.py`. Every other package file,
+adapter source are pinned in `build_checkov_wheel.py`. The two separately pinned
+identity and Cosmos rule patches below are also applied. Every other package file,
 including licenses and notices, is preserved. Only distribution metadata,
-RECORD, a modification notice and the reviewed adapter source change.
+RECORD, a modification notice and the three reviewed source files change.
 The patch text alone is canonicalized from a CRLF or LF checkout to LF before
 checking its pinned digest; upstream and resulting package bytes are never
 normalized or accepted under alternate digests.
@@ -90,15 +91,16 @@ normalized or accepted under alternate digests.
 The input is the unmodified `checkov-3.2.495-py3-none-any.whl`:
 SHA-256 `737f39cbab5987d49204cd5e62cfca72ffab3f01fa3314471624e1c4256268ac`.
 The builder is offline and the candidate output has local version
-`3.2.495+certigo.1`, SHA-256
-`0b85efb56fd23a5eab69a59726b4d2a47f05af84416137ede4ac14974289b3af`.
+`3.2.495+certigo.2`, SHA-256
+`02b5776b20c78bb7dd1c1bec68b25292082d85744a26c32ba25e530c036831ec`.
 
 ```sh
 CHECKOV_ADAPTER_UPSTREAM_WHEEL=/path/checkov-3.2.495-py3-none-any.whl \
   python tools/checkov/test_checkov_wheel.py
 python tools/checkov/build_checkov_wheel.py /path/checkov-3.2.495-py3-none-any.whl /tmp/checkov-wheel
-python -m pip install --no-deps --target /tmp/checkov-adapter /tmp/checkov-wheel/checkov-3.2.495+certigo.1-py3-none-any.whl
+python -m pip install --no-deps --target /tmp/checkov-adapter /tmp/checkov-wheel/checkov-3.2.495+certigo.2-py3-none-any.whl
 PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_conditional_adapter.py
+PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_resource_rule_fixes.py
 ```
 
 Use a separate environment with Checkov's pinned dependencies and the reviewed
@@ -109,3 +111,31 @@ wrappers, preserved inputs, unchanged unconditional/existing behavior, and a rea
 UNKNOWN check retained as a failed runner record. No rule ID is excluded.
 This candidate changes no official workflow or infrastructure. It requires its
 own review and explicit activation, separate from the parser-only delivery.
+
+`checkov-3.2.495-identity.patch` fixes CKV_AZURE_16's exact-string rejection of
+Azure's combined `SystemAssigned, UserAssigned` identity type. A literal
+system-assigned identity establishes this rule's property independently of any
+unresolved user-assigned identity map. A user-assigned-only identity instead
+requires a nonempty map of literal, fully qualified UAMI resource IDs with empty
+configuration objects. Empty, malformed, symbolic or otherwise unknown-only
+assignments fail; this is configuration proof, not proof that an identity exists
+in Azure. Unknown identity types are explicit failures, never UNKNOWN records.
+
+`checkov-3.2.495-cosmos.patch` fixes CKV_AZURE_99's rejection of literal
+`publicNetworkAccess: 'Disabled'`. A closed public endpoint needs no public
+firewall exception to satisfy this rule. For public access, explicit VNet
+filtering and nonempty known subnet-ID or IPv4 restrictions are required.
+`enableMultipleWriteLocations: false` no longer bypasses restrictions.
+IP validation uses Python's standard `ipaddress` module, without network access
+or an expression evaluator. The all-addresses range, Azure's `0.0.0.0` exception,
+IPv6/unsupported inputs, symbolic IDs/IPs, malformed rules and unresolved flags
+remain blocked. It does not validate subnet existence, authorize an address,
+or introduce a new permitted-CIDR policy.
+
+All six appsettings-subtype findings remain unchanged and blocking. Returning
+PASSED on an inapplicable appsettings child would misrepresent the parent;
+returning UNKNOWN would silently lose the record in this Checkov version.
+Resolving them needs an explicit applicability/parent-context reporting
+contract, not a rule-ID exclusion. The other environment-dependent, platform
+UNKNOWN and product-decision findings likewise remain open. These focused
+controls do not establish any reduced total-finding count.
