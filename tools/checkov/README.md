@@ -139,3 +139,65 @@ Resolving them needs an explicit applicability/parent-context reporting
 contract, not a rule-ID exclusion. The other environment-dependent, platform
 UNKNOWN and product-decision findings likewise remain open. These focused
 controls do not establish any reduced total-finding count.
+
+### Appsettings applicability: blocked reporting contract
+
+The six unchanged upstream checks accept the shared
+`Microsoft.Web/sites/config` resource type, not a discriminated configuration
+subtype. The [2024-04-01 Microsoft schema](https://learn.microsoft.com/en-us/azure/templates/microsoft.web/2024-04-01/sites/config)
+distinguishes `appsettings` (`StringDictionaryProperties`), `web` (`SiteConfig`),
+`authsettings` (`SiteAuthSettingsProperties`) and `azurestorageaccounts`
+(`AzureStoragePropertyDictionaryResourceProperties`). Same ARM type does not
+mean same property contract.
+
+| Check | Current inspected contract | Applicability boundary |
+| --- | --- | --- |
+| CKV_AZURE_13 | `authsettings.properties.enabled` | Not application environment variables; V2 auth needs a separate contract. |
+| CKV_AZURE_80 | `properties.netFrameworkVersion == 'v8.0'` | A `web` runtime property, not an appsetting or proof of Flex runtime configuration. |
+| CKV_AZURE_66 | `properties.requestTracingEnabled` | A `web` tracing property, not an appsetting or proof of supported Flex diagnostics. |
+| CKV_AZURE_63 | `properties.httpLoggingEnabled` | A `web` logging property, not an appsetting. |
+| CKV_AZURE_222 | `properties.publicNetworkAccess == 'Disabled'` | Site/slot ingress or `web` configuration, not an appsetting. The parent site's separate result must survive. |
+| CKV_AZURE_88 | `properties.azureStorageAccounts.*.type == 'AzureFiles'` | A `web` mount shape, not appsettings; the separate `azurestorageaccounts` subtype has a different dictionary shape. It does not establish that every hosting plan needs Azure Files. |
+
+The minimal safe target would distinguish known non-applicable children from
+unknown subtypes and unresolved parent/module context, retain explicit
+applicability evidence keyed by resource/check, and independently reconcile the
+actual applicable parent or child checks. Non-applicability is not security
+success and does not certify an absent parent.
+
+That contract is **not available in the pinned runner**:
+
+- `CheckResult` has only PASSED, FAILED, UNKNOWN and SKIPPED. There is no
+  non-applicable result. `Report.add_record` retains only the first, second and
+  fourth; UNKNOWN has no output record or per-check summary.
+- The Bicep Python registry dispatches by full resource type and passes the
+  current resource AST, without resolving the referenced parent's configuration.
+  Of these six rules, only CKV_AZURE_222 is also registered on a site parent.
+  Narrowing the other rules to parent sites does not move their property lookup
+  into `siteConfig` or prove missing child configurations were checked.
+- Returning UNKNOWN for the six ordinary appsettings checks loses all six
+  records while keeping one scanned resource and zero parsing errors. This is
+  not fixed by resource counts. Returning SKIPPED is a suppression; returning
+  PASSED asserts the wrong property. Neither is an acceptable workaround.
+- Synthetic `web`/`authsettings` fixtures prove secure/insecure/unresolved
+  property results, not cloud capability or deployment validity. Deliberately
+  injecting web-shaped properties into appsettings demonstrates the missing
+  subtype gate, not a proposed schema-valid deployment fix. Even string-valued
+  environment variables named `netFrameworkVersion` and `publicNetworkAccess`
+  can produce irrelevant successes for CKV_AZURE_80 and CKV_AZURE_222.
+
+`test_appsettings_applicability.py` pins the six unchanged rule source digests
+and reproduces these boundaries using small isolated Runner fixtures, including
+secure/insecure/unresolved/absent parent cases, exact authored appsettings AST,
+and a test-only mocked UNKNOWN workaround. Its expected outcomes deliberately
+retain the six failures. It does not patch installed Checkov, change the wheel,
+or scan the infrastructure tree:
+
+```sh
+PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_appsettings_applicability.py
+```
+
+No additional scanner patch is included for these six findings. Fixing the
+report/result schema plus subtype-aware parent coverage would cross the
+bounded adapter scope and requires a separately reviewed contract; the existing
+findings remain blocking until then.
