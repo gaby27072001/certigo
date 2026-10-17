@@ -308,6 +308,47 @@ struct NativeDemoFlowTests {
                 && NativeDemoFlow.Objective.operations.rawValue == "Cloud · exploitation"
                 && NativeDemoFlow.Objective.fundamentals.displayName == "Cloud · discovery",
             "English interface labels do not rewrite persisted goal identifiers")
-        print("\(count) demo-only Foundation checks passed; no Apple UI was compiled or rendered.")
+        let browsingGoal = NativeActiveGoalPresentation(
+            targetID: "new-goal", confirmedID: "old-goal", savingID: nil, busy: false)
+        try check(
+            browsingGoal.canChoose && !browsingGoal.isConfirmed
+                && browsingGoal.status == "Viewing a goal · not selected",
+            "browsing another goal never presents it as confirmed")
+        let savingGoal = NativeActiveGoalPresentation(
+            targetID: "new-goal", confirmedID: "old-goal", savingID: "new-goal", busy: true)
+        try check(
+            !savingGoal.canChoose && !savingGoal.isConfirmed
+                && savingGoal.symbol == "clock"
+                && savingGoal.status.contains("waiting for the server"),
+            "saving blocks duplicate action without optimistic goal confirmation")
+        let confirmedGoal = NativeActiveGoalPresentation(
+            targetID: "new-goal", confirmedID: "new-goal", savingID: nil, busy: false)
+        try check(
+            confirmedGoal.isConfirmed && !confirmedGoal.canChoose
+                && confirmedGoal.symbol == "checkmark.circle",
+            "only the authoritative profile enables confirmed-goal presentation")
+        let normalizedGoal = NativeActiveGoalPresentation(
+            targetID: "New-Goal", confirmedID: "new-goal", savingID: nil, busy: false)
+        try check(
+            normalizedGoal.isConfirmed && !normalizedGoal.canChoose,
+            "confirmed-goal comparison follows the transport's case-insensitive target contract")
+        let failedGoal = NativeActiveGoalPresentation(
+            targetID: "new-goal", confirmedID: "old-goal", savingID: nil, busy: false)
+        try check(
+            failedGoal.canChoose && !failedGoal.isConfirmed,
+            "failed or conflicted goal changes do not fabricate success and allow explicit retry")
+        let busyGoal = NativeActiveGoalPresentation(
+            targetID: "new-goal", confirmedID: nil, savingID: nil, busy: true)
+        try check(
+            !busyGoal.canChoose && !busyGoal.isSaving && !busyGoal.isConfirmed,
+            "unrelated model work disables choosing without claiming a goal save")
+        let concurrentGoal = NativeActiveGoalPresentation(
+            targetID: "other-goal", confirmedID: nil, savingID: "new-goal", busy: false)
+        try check(
+            !concurrentGoal.canChoose && !concurrentGoal.isConfirmed,
+            "an in-flight UI selection cannot start another goal operation")
+        print(
+            "\(count) Foundation presentation/demo checks passed; no Apple UI was compiled or rendered."
+        )
     }
 }

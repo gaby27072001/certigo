@@ -1284,6 +1284,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @Bindable var model: NativeModel
         @State private var selectedTrack: String?
         @State private var selectedLesson: String?
+        @State private var savingGoalID: String?
 
         var body: some View {
             Group {
@@ -1340,10 +1341,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
             }
             .safeAreaInset(edge: .bottom) {
                 if model.busy {
-                    ProgressView("Operation in progress…")
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(.regularMaterial)
+                    ProgressView(
+                        savingGoalID == nil ? "Operation in progress…" : "Saving active goal…"
+                    )
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(.regularMaterial)
                 }
             }
             .alert(
@@ -1400,6 +1403,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
         private var path: some View {
             List(selection: $selectedLesson) {
                 if let path = model.path {
+                    if let track = model.tracks.first(where: { $0.id == path.trackId }) {
+                        activeGoalSection(track)
+                    }
                     Section {
                         LabeledContent("Confirmed readiness", value: "\(path.readinessScore) %")
                         Button("Refresh progress", systemImage: "arrow.clockwise") {
@@ -1462,6 +1468,39 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
             }
             .navigationTitle(model.path?.trackName ?? "Learning path")
+        }
+
+        @ViewBuilder private func activeGoalSection(_ track: Track) -> some View {
+            let state = NativeActiveGoalPresentation(
+                targetID: track.id, confirmedID: model.profile?.activeTrackId,
+                savingID: savingGoalID, busy: model.busy)
+            Section("Active learning goal") {
+                Label(state.status, systemImage: state.symbol)
+                    .accessibilityIdentifier("active-goal-status")
+                if let current = model.profile?.activeTrackId {
+                    Text(
+                        "Server-confirmed goal: \(model.tracks.first(where: { $0.id == current })?.title ?? current)"
+                    )
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text("No active goal is confirmed by the server.")
+                        .foregroundStyle(.secondary)
+                }
+                Button(state.action, systemImage: "scope") {
+                    savingGoalID = track.id
+                    Task {
+                        await model.chooseActiveTrack(track)
+                        savingGoalID = nil
+                    }
+                }
+                .frame(minHeight: 44)
+                .disabled(!state.canChoose)
+                .accessibilityIdentifier("choose-active-goal")
+                Text(
+                    "Browsing does not change your goal. This action requests a server-confirmed change; your current activity and saved submissions stay available."
+                )
+                .font(.subheadline).foregroundStyle(.secondary)
+            }
         }
 
         private var session: some View {
@@ -1556,3 +1595,23 @@ struct NativeDemoSnapshot: Codable, Equatable {
         }
     }
 #endif
+
+struct NativeActiveGoalPresentation {
+    let targetID: String
+    let confirmedID: String?
+    let savingID: String?
+    let busy: Bool
+
+    var isConfirmed: Bool {
+        confirmedID?.lowercased()
+            == targetID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+    var isSaving: Bool { savingID == targetID }
+    var canChoose: Bool { !busy && savingID == nil && !isConfirmed }
+    var status: String {
+        if isSaving { return "Goal change pending · waiting for the server" }
+        return isConfirmed ? "This is your confirmed active goal" : "Viewing a goal · not selected"
+    }
+    var symbol: String { isSaving ? "clock" : isConfirmed ? "checkmark.circle" : "eye" }
+    var action: String { isSaving ? "Saving active goal…" : "Choose as active goal" }
+}

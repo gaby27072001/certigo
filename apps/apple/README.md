@@ -26,6 +26,24 @@ relationships, memory or shared data. Learning fixtures remain in French and
 are labeled as such. Authored interface copy is English; API content is not
 silently translated.
 
+## Explicit active goal in the test connector
+
+The separate authenticated test connector now offers **Choose as active goal**
+in the browsed learning path. Browsing and loading a path remain read-only.
+The button calls the existing `NativeModel.chooseActiveTrack` wrapper only on
+an explicit tap. Saving is shown as pending, with the previous server-confirmed
+goal still visible; only `profile.activeTrackId` establishes confirmation.
+The existing model error alert exposes conflicts and uncertain outcomes.
+There is no automatic retry or client-side goal overwrite.
+
+This integration preserves the model's current activity, saved attempt and
+outbox. It does not persist an unsent draft or connect the real model to the
+synthetic four-tab demo. It does not enable production sign-in, Coach or Social.
+The source dependency was integrated explicitly from foundation commits
+`0bedcb9b` and `3339685c`; their model/transport implementation is not duplicated
+in the view. Native build, accessibility and runtime validation are still
+required for this new UI.
+
 See [NATIVE_UI_BRIEF.md](NATIVE_UI_BRIEF.md) for the capture journey and states,
 [PRODUCT.md](PRODUCT.md) for truth boundaries, and [DESIGN.md](DESIGN.md) for
 the scoped native translation of Prism.
@@ -49,8 +67,8 @@ swiftc -parse-as-library -swift-version 6 -strict-concurrency=complete \
 rm -f /tmp/certigo-native-demo-tests
 ```
 
-The Foundation harness validates only demo transitions and stored-state
-invariants. SwiftUI blocks are excluded from Linux compilation. Syntax parsing
+The Foundation harness validates demo transitions, stored-state invariants and
+active-goal presentation rules. SwiftUI blocks are excluded from Linux compilation. Syntax parsing
 and formatting do not prove SwiftUI type correctness or Apple appearance.
 The existing Linux linker can emit an RWX-segment warning independently of
 Swift's warnings-as-errors; do not report this as a warning-free Apple build.

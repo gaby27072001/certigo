@@ -70,6 +70,22 @@ Catalog and history also retain a bounded reading width on iPad.
 
 ## Boundaries
 
+### Authenticated test-connector integration
+
+The explicit active-goal UI is a separate, minimal integration behind the
+existing test connector. The path detail shows its relation to the profile's
+server-confirmed active goal and an explicit Choose as active goal action.
+Browsing still calls only loadPath. During saving, the action is disabled and
+the status stays pending; old confirmed context remains visible.
+The model's existing alert reports 409 reconciliation and uncertain responses,
+with no view-level retry or optimistic profile mutation.
+
+Pure presentation checks cover browsing, saving, confirmation, errors and
+duplicate-action prevention. Foundation model/package tests cover the actual
+request and reconciliation. Neither is a SwiftUI runtime test. This integration
+does not wire the inactive live bookmark or claim unsent-draft restoration.
+The synthetic navigation remains separate from real account state.
+
 UI owns `CertigoNative/Sources/CertigoNativeApp.swift` and scoped design files.
 Do not change NativeModel, CredentialVault, auth providers, CertigoKit public
 interfaces, Xcode project/schemes, probes, shared tools, or APPLE_NATIVE.md.
