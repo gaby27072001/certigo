@@ -195,6 +195,13 @@ Tout est exécuté par le code de la **base**, sur l'arbre de la PR, dans `Valid
 dépend de la date. Une approbation expirée n'autorise plus rien ; elle reste inerte tant qu'une PR
 ne la retire pas (`--write` retire les approbations expirées et leurs propositions).
 
+Pour calculer l'empreinte d'un workflow actif, la lecture utilise le descripteur ouvert :
+`fstat` doit confirmer un fichier régulier avec les mêmes `dev` et `ino` que le fichier
+contrôlé, puis les octets sont lus sur ce même descripteur, fermé même en cas d'erreur.
+`O_NOFOLLOW` interdit aussi de suivre le dernier composant symlink sur les plateformes qui
+le proposent. Un remplacement détecté est une erreur de validation, pas une empreinte acceptée.
+Cette lecture ne change ni le manifeste trusted de BASE ni les règles de préapprobation.
+
 **Limite connue : l'expiration est vérifiée quand le contrôle tourne, pas au moment de la fusion.**
 GitHub ne relance pas un contrôle vert parce que le temps passe : une PR B validée la veille de
 l'expiration reste fusionnable après, tant que `main` n'a pas bougé (avec `strict: true`, tout
