@@ -7,10 +7,17 @@ HTTPS transport, verified public-release readers, an owner/API-scoped submission
 outbox and runtime content storage. The staged package declares iOS 17 and macOS 14;
 these declarations are not Apple build or device evidence.
 
-`apps/apple/CertigoNative/Sources/NativeModel.swift` is an isolated model source,
-not a delivered SwiftUI app or an Xcode target. This layer does not import an
-application project, UI, signing configuration, provider SDK, native registration
-candidate or entitlement. It does not replace Flutter or an installed app.
+`apps/apple/CertigoNative` includes a SwiftUI development UI and a main-only
+Xcode project alongside the model. Its unsigned development bundle is
+`com.certigo.native.dev`, not the installed Flutter identity. No NoAuth test
+target, protection probe, private probe tool or entitlement is included. Importing
+the project does not establish that it loads, builds, links, embeds frameworks or
+runs with an Apple SDK. It does not replace Flutter or an installed app.
+
+The UI source uses SDK 26 glass APIs with availability fallbacks to iOS 17.
+Actual Apple validation needs Xcode/SDK 26 or newer and a Swift 6.2-compatible
+toolchain. Linux Foundation demo/navigation checks and syntax parsing do not
+typecheck or render the SwiftUI branch.
 
 ## Session and correction authority
 
@@ -52,6 +59,21 @@ and scheme collision. Validation does not establish registration, consent, grant
 SDK initialization, token issuance or a working native login. The failure
 classifier exposes categories instead of provider diagnostic strings.
 
+The project references the official MSAL package at exactly 2.16.0
+(`8dfe5bf41fe10e6d2afed62a72c4232adbef20f4`). Its workspace lock contains
+only that dependency and the unchanged Crypto/ASN.1 pins. No SDK binary is
+downloaded or resolved by this layer's Linux checks; its upstream checksum is
+declared, not independently verified here. Preserve the upstream Microsoft MIT
+notice when distributing MSAL.
+
+`MSALAuthenticationProvider.swift` is a source member of the main app target,
+but the app constructs `NativeModel()` without an authentication provider.
+There is no provider initialization or callback handler wired into composition.
+`CIAMDevelopmentCandidate` records dated public metadata, not active registration
+or endpoint health. The plist's callback scheme is only a declaration, not
+permission to sign in or modify cloud registrations. SDK construction would
+initialize cache state and remains outside the active app path.
+
 `CredentialVault.swift` contains an Apple Security implementation using
 `WhenUnlockedThisDeviceOnly`. It is not compiled or exercised by the Linux model
 harness. Real Keychain lifecycle, SDK cache ownership, callback handling,
@@ -79,3 +101,4 @@ journeys, stale responses, uncertain goal retry and resume-state rejection. It
 does not compile SwiftUI, Security, UIKit or MSAL, or prove Apple Keychain/file
 protection, a runtime content graph, provider activation or live service behavior.
 The package's three iOS-only protection tests require an Apple SDK test run.
+The main app scheme has no testables; this is not evidence of an Apple test pass.
