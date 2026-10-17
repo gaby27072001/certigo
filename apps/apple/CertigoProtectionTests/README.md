@@ -64,8 +64,11 @@ RESULT="$RUN/ProtectionTests-arch-retry-$STAMP.xcresult"
 LOG="$RUN/ProtectionTests-arch-retry-$STAMP.log"
 
 test ! -e "$SOURCE"
-git -C "$RUN/source" fetch --no-tags origin refs/heads/fix/ios-protection-test-arch
-git -C "$RUN/source" worktree add --detach "$SOURCE" "$FIX_COMMIT"
+git init "$SOURCE"
+git -C "$SOURCE" fetch --no-tags \
+  https://github.com/gaby27072001/certigo.git \
+  refs/heads/fix/ios-protection-test-arch
+git -C "$SOURCE" checkout --detach "$FIX_COMMIT"
 test "$(git -C "$SOURCE" rev-parse HEAD)" = "$FIX_COMMIT"
 test -d "$PACKAGES"
 test ! -e "$RESULT"
