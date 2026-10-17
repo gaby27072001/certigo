@@ -15,6 +15,17 @@ contract; JSON values, omitted keys, dates, enums and nulls are.
 | `quiz-submit-request.json` | `POST /api/quiz/demo-lesson/submit` request |
 | `quiz-submit-result.json` | The same submission's response |
 | `quiz-submit-correct-result.json` | A successful correction with nullable feedback |
+| `active-track-request.json` | Explicit `POST /api/me/active-track` request |
+| `profile.json` | Authoritative profile from `GET /api/me` or active-track selection |
+
+The two active-goal vectors are pinned to backend revision
+`ecbfb054f2474bc430856b72fd55d66a03f6e9fb`. Selection sends `trackId` and nullable
+`expectedTrackId`; no client ETag/If-Match is required. A 409 requires reloading
+the profile before a new explicit decision, not rewriting the expected goal and
+automatically forcing the request. An uncertain retry keeps the original body:
+the server succeeds idempotently if that goal is already current. Browsing a
+path does not choose a goal. `GET /api/me` can provision a profile and is not a
+read-only live probe; these fixtures authorize no real request.
 
 All these routes require a validated learner bearer. Responses use
 `application/json; charset=utf-8`. The synthetic versioned lesson has

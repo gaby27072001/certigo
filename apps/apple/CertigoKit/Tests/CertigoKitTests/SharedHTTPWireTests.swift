@@ -1,13 +1,66 @@
 import CertigoData
-
 import CertigoDomain
-
 import Foundation
-
 /// Exact synthetic serializer vectors also exercised by the real C# HTTP functions.
 import XCTest
 
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
+
+private actor GoalWireTransport: HTTPTransport {
+    let body: Data
+    var requests: [URLRequest] = []
+    init(body: Data) { self.body = body }
+    func captured() -> [URLRequest] { requests }
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        requests.append(request)
+        return (
+            body,
+            HTTPURLResponse(
+                url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json; charset=utf-8"])!
+        )
+    }
+}
+
 final class SharedHTTPWireTests: XCTestCase {
+    func testExplicitGoalRejectsResponseForAnotherTarget() async throws {
+        let transport = GoalWireTransport(body: try wire("profile"))
+        let api = try CertigoAPI(
+            baseURL: URL(string: "https://example.invalid/api")!, transport: transport)
+        do {
+            _ = try await api.setActiveTrack(
+                trackId: "different-track", expectedTrackId: "previous-track",
+                credentials: APICredentials(ownerId: "demo-owner", accessToken: "synthetic"))
+            XCTFail("Mismatched goal accepted")
+        } catch {
+            XCTAssertEqual(error as? APIError, .invalidResponse)
+        }
+    }
+
+    func testExplicitGoalUsesPinnedBackendRequestAndAuthoritativeProfileWithoutClientETag()
+        async throws
+    {
+        let transport = GoalWireTransport(body: try wire("profile"))
+        let api = try CertigoAPI(
+            baseURL: URL(string: "https://example.invalid/api")!, transport: transport)
+        let profile = try await api.setActiveTrack(
+            trackId: "demo-track", expectedTrackId: nil,
+            credentials: APICredentials(ownerId: "demo-owner", accessToken: "synthetic"))
+        XCTAssertEqual(profile.id, "demo-owner")
+        XCTAssertEqual(profile.activeTrackId, "demo-track")
+        XCTAssertEqual(profile.xp, 100)
+        let requests = await transport.captured()
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(request.url?.path, "/api/me/active-track")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertNil(request.value(forHTTPHeaderField: "If-Match"))
+        XCTAssertEqual(
+            try object(XCTUnwrap(request.httpBody)) as NSDictionary,
+            try object(wire("active-track-request")) as NSDictionary)
+    }
+
     func testSharedCatalogProjectionDecodesNullableMetadataWithoutInventingValues() throws {
         let catalog = try CertigoAPI.decoder().decode(Catalog.self, from: wire("catalog"))
             .validated()

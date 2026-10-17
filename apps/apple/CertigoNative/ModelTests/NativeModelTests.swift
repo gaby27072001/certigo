@@ -76,7 +76,7 @@
         }
     }
     private actor ModelTransport: HTTPTransport {
-        private let catalog: Data
+        private var catalog: Data
         private let lesson: Data
         private let result: Data
         let manifestId = "sha256:" + String(repeating: "a", count: 64)
@@ -90,6 +90,12 @@
         private var pauseLesson = false
         private var posts: [Data] = []
         private var replacementManifest: String?
+        private var activeGoal: String?
+        private var goalPosts: [Data] = []
+        private var goalStatus = 200
+        private var pauseGoal = false
+        private var goalResponseOwner: String?
+        private var profileStatus = 200
         init(resources: URL) throws {
             catalog = try Data(contentsOf: resources.appendingPathComponent("catalog.json"))
             lesson = try Data(contentsOf: resources.appendingPathComponent("lesson.json"))
@@ -105,6 +111,21 @@
             result = try JSONSerialization.data(withJSONObject: response)
         }
         func setOwner(_ value: String) { owner = value }
+        func addSecondGoal() throws {
+            guard var object = try JSONSerialization.jsonObject(with: catalog) as? [String: Any],
+                var tracks = object["tracks"] as? [[String: Any]], var second = tracks.first
+            else { throw ModelTestFailure.assertion("Missing synthetic catalog track") }
+            second["id"] = "fixture:second"
+            tracks.append(second)
+            object["tracks"] = tracks
+            catalog = try JSONSerialization.data(withJSONObject: object)
+        }
+        func setGoal(_ value: String?) { activeGoal = value }
+        func failGoal(_ status: Int) { goalStatus = status }
+        func failProfile(_ status: Int) { profileStatus = status }
+        func suspendGoal() { pauseGoal = true }
+        func respondAsOwner(_ value: String?) { goalResponseOwner = value }
+        func goalPayloads() -> [Data] { goalPosts }
         func pauseProfile() { pause = true }
         func suspendLesson() { pauseLesson = true }
         func setOffline(_ value: Bool) { offline = value }
@@ -118,6 +139,7 @@
             waiter = nil
             pause = false
             pauseLesson = false
+            pauseGoal = false
         }
         func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
             requests += 1
@@ -126,11 +148,36 @@
             var status = 200
             var headers = ["Content-Type": "application/json"]
             if url.path.hasSuffix("/me") {
+                status = profileStatus
                 let capturedOwner = owner
+                let goal = activeGoal.map { "\"\($0)\"" } ?? "null"
                 if pause { await withCheckedContinuation { waiter = $0 } }
                 bytes = Data(
                     """
-                    {"id":"\(capturedOwner)","displayName":"Synthetic","xp":0,"activeTrackId":null}
+                    {"id":"\(capturedOwner)","displayName":"Synthetic","xp":0,"activeTrackId":\(goal)}
+                    """.utf8)
+            } else if url.path.hasSuffix("/me/active-track"), request.httpMethod == "POST" {
+                guard let payload = request.httpBody,
+                    let object = try JSONSerialization.jsonObject(with: payload) as? [String: Any],
+                    let target = object["trackId"] as? String
+                else { throw APIError.invalidResponse }
+                goalPosts.append(payload)
+                let expected = object["expectedTrackId"] as? String
+                status = goalStatus
+                if status == 200 {
+                    if activeGoal?.lowercased() == target.lowercased() || activeGoal == expected {
+                        activeGoal = target.lowercased()
+                    } else {
+                        status = 409
+                    }
+                }
+                let capturedOwner = goalResponseOwner ?? owner
+                let capturedGoal = activeGoal.map { "\"\($0)\"" } ?? "null"
+                if pauseGoal { await withCheckedContinuation { waiter = $0 } }
+                if offline { throw URLError(.networkConnectionLost) }
+                bytes = Data(
+                    """
+                    {"id":"\(capturedOwner)","displayName":"Authoritative","xp":321,"activeTrackId":\(capturedGoal)}
                     """.utf8)
             } else if url.path.hasSuffix("/catalog/tracks") {
                 bytes = catalog
@@ -235,13 +282,156 @@
             try await lessonFailureAndLateOwner(resources)
             try await pendingReleaseAndAccountRecovery(resources)
             try await failedAndAmbiguousRecovery(resources)
+            try await explicitGoalSelection(resources)
+            try await lateGoalResponse(resources)
             try resumeNavigation(resources)
             print(
-                "NativeModel: 12 coordination/journey scenarios and resume-state checks passed."
+                "NativeModel: 14 coordination/journey scenarios and resume-state checks passed."
             )
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+        @MainActor static func explicitGoalSelection(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            try await fixture.server.addSecondGoal()
+            let model = fixture.model(authenticated: false)
+            model.baseURL = "https://example.invalid/api"
+            model.token = "synthetic-A"
+            await model.connect()
+            guard let track = model.tracks.first else {
+                throw ModelTestFailure.assertion("Missing goal")
+            }
+            await model.loadPath(track)
+            try expect(model.profile?.activeTrackId == nil, "Browsing chose an active goal")
+            let noWrites = await fixture.server.goalPayloads()
+            try expect(noWrites.isEmpty, "Browsing posted an active goal")
+            guard let node = model.path?.units.first?.lessons.first else {
+                throw ModelTestFailure.assertion("Missing lesson")
+            }
+            await model.loadLesson(node)
+            guard let question = model.lesson?.questions.first, let option = question.options.first
+            else {
+                throw ModelTestFailure.assertion("Missing exercise")
+            }
+            model.select(option, question: question)
+            await fixture.server.setOffline(true)
+            await model.submit()
+            await fixture.server.setOffline(false)
+            let saved = model.queue
+            await model.chooseActiveTrack(track)
+            try expect(
+                model.profile?.activeTrackId == track.id && model.profile?.xp == 321,
+                "Goal confirmation did not use authoritative profile")
+            try expect(
+                model.queue == saved && !saved.isEmpty && model.lesson?.id == node.id
+                    && model.outcome == .pendingCorrection && !model.canSubmit,
+                "Choosing a goal changed the existing pending activity")
+            await model.chooseActiveTrack(track)
+            let posts = await fixture.server.goalPayloads()
+            let first = try JSONSerialization.jsonObject(with: posts[0]) as? [String: Any]
+            let second = try JSONSerialization.jsonObject(with: posts[1]) as? [String: Any]
+            try expect(
+                first?["expectedTrackId"] is NSNull
+                    && second?["expectedTrackId"] as? String == track.id,
+                "Goal expected value was not the confirmed profile")
+            try expect(model.errorMessage == nil, "Same-goal idempotency failed")
+            await fixture.server.setGoal("another-goal")
+            await model.chooseActiveTrack(track)
+            try expect(
+                model.profile?.activeTrackId == "another-goal"
+                    && model.errorMessage?.contains("changed elsewhere") == true,
+                "Conflict overwrote concurrent goal or failed to reconcile profile")
+            let afterConflict = await fixture.server.goalPayloads()
+            try expect(afterConflict.count == 3, "Conflict automatically reposted a selection")
+            await model.loadPath(track)
+            try expect(
+                model.profile?.activeTrackId == "another-goal",
+                "Browsing the old goal replaced the active goal")
+            await fixture.server.setOffline(true)
+            await model.chooseActiveTrack(track)
+            try expect(
+                model.profile?.activeTrackId == "another-goal" && model.errorMessage != nil,
+                "Lost response optimistically confirmed goal")
+            guard let secondGoal = model.tracks.last, secondGoal.id != track.id else {
+                throw ModelTestFailure.assertion("Missing second goal")
+            }
+            await model.chooseActiveTrack(secondGoal)
+            let stillPending = await fixture.server.goalPayloads()
+            try expect(
+                stillPending.count == 4
+                    && model.errorMessage?.contains("previous goal selection is not confirmed")
+                        == true,
+                "Different goal overwrote the uncertain original decision")
+            await fixture.server.setOffline(false)
+            await model.chooseActiveTrack(track)
+            let retried = await fixture.server.goalPayloads()
+            try expect(retried[3] == retried[4], "Uncertain goal retry changed expected body")
+            try expect(
+                model.profile?.activeTrackId == track.id, "Already-applied goal did not reconcile")
+            await fixture.server.failGoal(404)
+            await model.chooseActiveTrack(track)
+            try expect(
+                model.profile?.activeTrackId == track.id
+                    && model.errorMessage?.contains("HTTP 404") == true,
+                "Missing goal was not an explicit English error")
+            await fixture.server.failGoal(200)
+            await fixture.server.respondAsOwner("foreign-owner")
+            await model.chooseActiveTrack(track)
+            try expect(
+                model.profile?.id == "server-owner-A" && model.errorMessage != nil,
+                "Foreign goal response replaced the profile")
+            await fixture.server.respondAsOwner(nil)
+            await fixture.server.setGoal("third-goal")
+            await fixture.server.failProfile(503)
+            await model.chooseActiveTrack(track)
+            try expect(
+                model.profile?.activeTrackId == track.id
+                    && model.errorMessage?.contains("could not be reloaded") == true,
+                "Failed conflict reload claimed an authoritative goal")
+            await fixture.server.failProfile(200)
+            await model.chooseActiveTrack(track)
+            try expect(
+                model.profile?.activeTrackId == "third-goal"
+                    && model.errorMessage?.contains("changed elsewhere") == true,
+                "Conflict reload recovery forced a new goal")
+        }
+        @MainActor static func lateGoalResponse(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model(authenticated: false)
+            model.baseURL = "https://example.invalid/api"
+            model.token = "synthetic-A"
+            await model.connect()
+            guard let track = model.tracks.first else {
+                throw ModelTestFailure.assertion("Missing goal")
+            }
+            await fixture.server.suspendGoal()
+            let task = Task { await model.chooseActiveTrack(track) }
+            while !(await fixture.server.isWaiting()) { await Task.yield() }
+            try expect(
+                model.profile?.activeTrackId == nil && model.busy, "Pending goal appeared confirmed"
+            )
+            await model.chooseActiveTrack(track)
+            let pendingPosts = await fixture.server.goalPayloads()
+            try expect(pendingPosts.count == 1, "Concurrent goal action posted twice")
+            await model.disconnect()
+            await fixture.server.setOwner("server-owner-B")
+            await fixture.server.setGoal(nil)
+            model.token = "synthetic-B"
+            await model.connect()
+            await fixture.server.resume()
+            await task.value
+            try expect(
+                model.profile?.id == "server-owner-B" && model.profile?.activeTrackId == nil
+                    && model.errorMessage == nil && !model.busy,
+                "Late old-owner goal response altered current account")
+            await model.chooseActiveTrack(track)
+            let posts = await fixture.server.goalPayloads()
+            let body = try JSONSerialization.jsonObject(with: posts[1]) as? [String: Any]
+            try expect(
+                body?["expectedTrackId"] is NSNull, "Old owner's pending decision survived logout")
         }
         static func expectResumeError(
             _ expected: NativeResumeError, _ operation: () throws -> Void

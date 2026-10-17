@@ -434,13 +434,51 @@ Late old-session responses remain generation-guarded. Selection and submission
 eligibility validate actual option membership rather than trusting UI binding.
 Model error copy is English; the UI method signatures are unchanged.
 Browsing `loadPath` does not mutate `profile.activeTrackId`: active-goal mutation
-requires its separate explicit backend contract, not navigation inference.
+requires the separate explicit action described below, not navigation inference.
 
 The portable actual-source harness covers pending model/store reopen, duplicate
 submit prevention, byte-identical retry after pin rotation, direct manual account
 switch, failed/ambiguous saved attempts and foreign option rejection. The inactive
 resume bookmark remains separate from synthetic demo navigation and from these
 model operations; no second persistence authority or UI wiring is introduced.
+
+### Explicit active-goal selection
+
+`NativeModel.chooseActiveTrack(_ track: Track) async` is a distinct, explicit user
+action for a catalog track, never an effect of loading a path or viewing Profile
+history. It calls the existing `POST /api/me/active-track` via
+`LearningClient.setActiveTrack(trackId:expectedTrackId:)`. The request includes
+the confirmed profile's current track (or explicit JSON null) as
+`expectedTrackId`. Client ETag/If-Match headers are not required: repository
+concurrency tokens stay on the server.
+
+The active goal stays unchanged while busy or after a failed/unconfirmed request.
+Only the returned profile with the authenticated owner and requested target
+updates `profile`. The model does not infer XP, navigate, reset an existing
+lesson, or rewrite its pending queue, answers, attempt ID or release pin.
+Same-goal selection still calls the server and uses its idempotent response.
+
+An uncertain response keeps the target/expected tuple in session memory; a retry
+of that same goal sends the same body. Choosing a different goal is explicitly
+blocked until reconciliation. This tuple is not a durable mutation outbox and
+does not promise replay after process death: reconnect obtains the server profile
+before a new decision. Sign-out/account switch clears it.
+
+On HTTP 409, `LearningClient.refreshProfile()` reloads the authoritative profile
+for the same owner. The model reports an English conflict message and requires a
+new explicit decision, with no forced selection or automatic rewrite/retry. If
+the reload fails, the previous profile is retained and the error explicitly says
+that the current goal could not be reloaded. Owner/session-generation guards
+reject delayed responses after account changes. This reload is part of a future
+explicit selection flow, not a read-only live probe; no live endpoint was called
+to validate this source lot.
+
+Synthetic model tests cover browsing without writes, explicit/same-goal success,
+server-profile authority, concurrent conflict and reload failure, identical
+uncertain retry, missing goal, foreign owner, duplicate action while busy,
+delayed response after logout/account switch and preservation of pending lesson
+activity. The pinned C# serializer vectors also test POST shape, null expected
+track, absent If-Match and native profile decoding. UI wiring remains separate.
 
 This portable source check does **not** compile Security/UIKit/MSAL, build the
 Apple app, or execute an Xcode test target. Apple compilation and a separately
@@ -465,13 +503,16 @@ signature or account-linking availability from repository configuration.
 
 ## Shared backend HTTP vectors
 
-`Fixtures/http-wire/v1/` copies only the six JSON vectors and README from
+`Fixtures/http-wire/v1/` originally copied the six JSON vectors and README from
 `docs/contracts/native-client/v1/` at backend revision
 `56067f1c4c57a518ff27c2527ca6edd95a1aa589`. Every copied file was checked against
 its original Git blob with `hash-object --no-filters`. No backend code or release
 workflow was cherry-picked. These public synthetic vectors were exercised by the
 backend's real HTTP functions/serializer; Swift tests independently decode the
 same bytes and retain null/omitted-field and unsupported-capability distinctions.
+The additive `active-track-request.json` and `profile.json` vectors are pinned
+separately to `ecbfb054f2474bc430856b72fd55d66a03f6e9fb`; the earlier six vectors
+remain unchanged.
 
 The fixture submission's illustrative `demo-client-attempt` is not a UUID:
 decoding it does not authorize replay under the current native creation policy.

@@ -194,6 +194,7 @@ final class NativeModel {
         (provider: any CIAMAuthenticationProvider, configuration: CIAMConfiguration)?
     private let now: () -> Date
     private var tokenExpiresAt: Date?
+    private var pendingGoal: (trackId: String, expectedTrackId: String?)?
     private static let signedOutKey = "certigo.native.dev.signed-out.v1"
 
     init(
@@ -332,6 +333,7 @@ final class NativeModel {
         submittedRequest = nil
         token = ""
         tokenExpiresAt = nil
+        pendingGoal = nil
         busy = false
     }
 
@@ -408,6 +410,57 @@ final class NativeModel {
         guard authentication != nil, profile != nil, !busy else { return }
         if let tokenExpiresAt, tokenExpiresAt > now().addingTimeInterval(30) { return }
         await connectUsingAuthentication(interactive: false)
+    }
+
+    func chooseActiveTrack(_ track: Track) async {
+        guard !busy else { return }
+        let owner = profile?.id
+        await refreshAuthenticationIfNeeded()
+        guard let client, let profile, !busy else { return }
+        guard profile.id == owner else {
+            report(APIError.staleSession)
+            return
+        }
+        guard tracks.contains(where: { $0.id == track.id }) else {
+            report(APIError.configuration)
+            return
+        }
+        if let pendingGoal, pendingGoal.trackId != track.id {
+            errorMessage =
+                "Your previous goal selection is not confirmed. Retry that same goal before choosing another."
+            return
+        }
+        let decision = pendingGoal ?? (trackId: track.id, expectedTrackId: profile.activeTrackId)
+        pendingGoal = decision
+        let marker = generation
+        busy = true
+        errorMessage = nil
+        defer { if generation == marker { busy = false } }
+        do {
+            let value = try await client.setActiveTrack(
+                trackId: decision.trackId, expectedTrackId: decision.expectedTrackId)
+            guard generation == marker else { return }
+            self.profile = value
+            pendingGoal = nil
+        } catch APIError.http(409) {
+            guard generation == marker else { return }
+            do {
+                let value = try await client.refreshProfile()
+                guard generation == marker else { return }
+                self.profile = value
+                pendingGoal = nil
+                errorMessage =
+                    "Your active goal changed elsewhere. The current goal was reloaded; choose again to confirm a different goal."
+            } catch {
+                guard generation == marker else { return }
+                errorMessage =
+                    "Your goal selection conflicted and the current goal could not be reloaded. Retry the same selection to reconcile; no change is confirmed."
+            }
+        } catch {
+            guard generation == marker else { return }
+            if case APIError.http(404) = error { pendingGoal = nil }
+            report(error)
+        }
     }
 
     func loadPath(_ track: Track) async {
