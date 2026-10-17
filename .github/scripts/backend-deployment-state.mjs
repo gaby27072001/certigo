@@ -50,10 +50,35 @@ export function validateDeploymentRelease(value, label) {
 }
 
 export function loadDeploymentState(file, environment) {
-  if (!file || !fs.existsSync(file) || fs.statSync(file).size === 0) {
+  if (!file) {
     return null;
   }
-  const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+  let descriptor;
+  try {
+    // Size-zero FIFOs historically returned null without waiting for a writer.
+    descriptor = fs.openSync(
+      file,
+      fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0),
+    );
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+  let contents;
+  try {
+    if (fs.fstatSync(descriptor).size === 0) {
+      return null;
+    }
+    contents = fs.readFileSync(descriptor, 'utf8');
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  if (contents.length === 0) {
+    return null;
+  }
+  const state = JSON.parse(contents);
   exactKeys(state, ['current', 'environment', 'previous', 'schema'], 'deployment state');
   if (state.schema !== deploymentStateSchema || state.environment !== environment) {
     fail('Existing deployment state has an unexpected schema or environment.');

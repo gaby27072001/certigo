@@ -201,12 +201,49 @@ export function writeManifestSeal(manifestPath, outputPath) {
     throw new Error('evidence manifest must be named manifest.json');
   }
   requireTrustedDirectory(path.dirname(seal), 'evidence manifest seal directory');
-  if (fs.existsSync(seal) && fs.lstatSync(seal).isSymbolicLink()) {
+  let inspected;
+  try {
+    inspected = fs.lstatSync(seal);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+  if (inspected?.isSymbolicLink()) {
     throw new Error('evidence manifest seal must not be a symbolic link');
   }
-  fs.writeFileSync(seal, `${sha256File(manifest)}  manifest.json\n`, {
-    mode: 0o600,
-  });
+  if (inspected && !inspected.isFile()) {
+    throw new Error('evidence manifest seal must be a regular file');
+  }
+  const contents = `${sha256File(manifest)}  manifest.json\n`;
+  // Never truncate a pathname before inspecting its opened object. NOFOLLOW
+  // supplements, but does not replace, the legacy trusted-directory boundary.
+  const descriptor = fs.openSync(
+    seal,
+    fs.constants.O_WRONLY
+      | (inspected ? 0 : fs.constants.O_CREAT | fs.constants.O_EXCL)
+      | (fs.constants.O_NOFOLLOW ?? 0)
+      | (fs.constants.O_NONBLOCK ?? 0),
+    0o600,
+  );
+  try {
+    const opened = fs.fstatSync(descriptor);
+    const current = fs.lstatSync(seal);
+    if (
+      !opened.isFile()
+      || !current.isFile()
+      || current.isSymbolicLink()
+      || opened.dev !== current.dev
+      || opened.ino !== current.ino
+      || (inspected && (opened.dev !== inspected.dev || opened.ino !== inspected.ino))
+    ) {
+      throw new Error('evidence manifest seal changed before writing');
+    }
+    fs.ftruncateSync(descriptor, 0);
+    fs.writeFileSync(descriptor, contents);
+  } finally {
+    fs.closeSync(descriptor);
+  }
 }
 
 export function verifyManifestSeal(manifestPath, sealPath) {
