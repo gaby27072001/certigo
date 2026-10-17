@@ -825,6 +825,145 @@ test('rejects a symlinked active workflow file', (context) => {
   });
 });
 
+test('rejects a workflow replaced between its metadata check and open', () => {
+  withFixture(['archivedLegacy', 'archivedOneShot'], (root) => {
+    const workflows = path.join(root, '.github', 'workflows');
+    const target = path.join(workflows, 'ci-infra.yml');
+    const replacement = path.join(root, 'replacement.yml');
+    const originalOpen = fs.openSync;
+    let replaced = false;
+    const watchedDescriptors = new Set();
+    let replacementRead = false;
+    const originalRead = fs.readFileSync;
+    const originalClose = fs.closeSync;
+    function replaceBeforeUse(file) {
+      if (!replaced && file === target) {
+        fs.writeFileSync(replacement, 'name: unreviewed\non: {}\njobs: {}\n');
+        fs.renameSync(target, `${target}.checked`);
+        fs.renameSync(replacement, target);
+        replaced = true;
+      }
+    }
+    fs.openSync = function openSync(file, flags, ...args) {
+      replaceBeforeUse(file);
+      const descriptor = originalOpen.call(this, file, flags, ...args);
+      if (path.resolve(String(file)) === target) {
+        watchedDescriptors.add(descriptor);
+      }
+      return descriptor;
+    };
+    fs.readFileSync = function readFileSync(file, ...args) {
+      if (!replaced && file === target) {
+        replaceBeforeUse(file);
+        replacementRead = true;
+      }
+      if (watchedDescriptors.has(file)) {
+        replacementRead = true;
+      }
+      return originalRead.call(this, file, ...args);
+    };
+    fs.closeSync = function closeSync(descriptor) {
+      watchedDescriptors.delete(descriptor);
+      return originalClose.call(this, descriptor);
+    };
+    try {
+      const errors = validate(root);
+      assert.equal(replaced, true, 'the replacement must occur after lstat');
+      assert.equal(replacementRead, false, 'changed bytes must not be read');
+      assert.equal(watchedDescriptors.size, 0, 'rejected descriptors must be closed');
+      assert.ok(
+        errors.some((error) => /changed after it was checked|file identity changed/i.test(error)),
+        errors.join('\n'),
+      );
+    } finally {
+      fs.openSync = originalOpen;
+      fs.readFileSync = originalRead;
+      fs.closeSync = originalClose;
+    }
+  });
+});
+
+test('rejects a symlink swapped in after lstat without reading its target', (context) => {
+  withFixture(['archivedLegacy', 'archivedOneShot'], (root) => {
+    const workflows = path.join(root, '.github', 'workflows');
+    const target = path.join(workflows, 'ci-infra.yml');
+    const external = path.join(root, 'external.yml');
+    const original = `${target}.checked`;
+    fs.copyFileSync(target, external);
+    const probe = path.join(root, 'symlink-probe');
+    try {
+      fs.symlinkSync(external, probe, 'file');
+      fs.unlinkSync(probe);
+    } catch (error) {
+      if (error.code === 'EPERM') {
+        context.skip('file symlinks require Windows developer mode');
+        return;
+      }
+      throw error;
+    }
+
+    const originalOpen = fs.openSync;
+    let swapped = false;
+    const watchedDescriptors = new Set();
+    let externalRead = false;
+    const originalRead = fs.readFileSync;
+    const originalClose = fs.closeSync;
+    function swapBeforeUse(file) {
+      if (!swapped && file === target) {
+        fs.renameSync(target, original);
+        fs.symlinkSync(external, target, 'file');
+        swapped = true;
+      }
+    }
+    fs.openSync = function openSync(file, flags, ...args) {
+      swapBeforeUse(file);
+      const descriptor = originalOpen.call(this, file, flags, ...args);
+      if (path.resolve(String(file)) === target) {
+        watchedDescriptors.add(descriptor);
+      }
+      return descriptor;
+    };
+    fs.readFileSync = function readFileSync(file, ...args) {
+      if (!swapped && file === target) {
+        swapBeforeUse(file);
+        externalRead = true;
+      }
+      if (watchedDescriptors.has(file)) {
+        externalRead = true;
+      }
+      return originalRead.call(this, file, ...args);
+    };
+    fs.closeSync = function closeSync(descriptor) {
+      watchedDescriptors.delete(descriptor);
+      return originalClose.call(this, descriptor);
+    };
+    try {
+      const errors = validate(root);
+      assert.equal(swapped, true, 'the symlink swap must occur after lstat');
+      assert.equal(externalRead, false, 'the symlink target must not be read');
+      assert.equal(watchedDescriptors.size, 0, 'rejected descriptors must be closed');
+      assert.notDeepEqual(errors, []);
+    } finally {
+      fs.openSync = originalOpen;
+      fs.readFileSync = originalRead;
+      fs.closeSync = originalClose;
+    }
+  });
+});
+
+test('rejects malformed workflow YAML from the validated file snapshot', () => {
+  withFixture(['archivedLegacy', 'archivedOneShot'], (root) => {
+    const workflow = path.join(root, '.github', 'workflows', 'ci-infra.yml');
+    fs.writeFileSync(workflow, 'name: broken\njobs: [unterminated\n');
+    const errors = validate(root);
+    assert.notDeepEqual(errors, []);
+    assert.ok(
+      errors.some((error) => error.includes('ci-infra.yml')),
+      errors.join('\n'),
+    );
+  });
+});
+
 test('rejects a symlinked workflows directory', (context) => {
   withFixture(['archivedLegacy', 'archivedOneShot'], (sourceRoot) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'certigo-cosmos-policy-link-'));
