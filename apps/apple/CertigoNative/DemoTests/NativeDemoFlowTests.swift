@@ -151,6 +151,104 @@ struct NativeDemoFlowTests {
             rejectedOversizedSnapshot = true
         }
         try check(rejectedOversizedSnapshot, "oversized demo snapshots are rejected")
+        let untouchedFlow = NativeDemoFlow()
+        try check(untouchedFlow.practice == nil, "empty objective never invents practice content")
+        var workshop = NativeDemoFlow()
+        workshop.choose(.fundamentals)
+        try check(
+            workshop.startRoute == .preparation
+                && workshop.startLabel == "Découvrir la situation"
+                && workshop.resumeLabel == "Commencer une question",
+            "new objective leads to preparation before the question")
+        let preparationNavigation = try NativeDemoNavigationState.make(
+            selectedTab: .objective, objectivePath: [.preparation], catalogPath: [],
+            flow: workshop)
+        let preparationSnapshot = try NativeDemoSnapshot.make(
+            flow: workshop, navigation: preparationNavigation)
+        try check(
+            try NativeDemoSnapshot.restore(JSONEncoder().encode(preparationSnapshot))
+                == preparationSnapshot,
+            "preparation route round trips without changing the storage schema")
+        var rejectedPreparationWithoutGoal = false
+        do {
+            _ = try NativeDemoNavigationState.make(
+                selectedTab: .objective, objectivePath: [.preparation], catalogPath: [],
+                flow: untouchedFlow)
+        } catch {
+            rejectedPreparationWithoutGoal = true
+        }
+        try check(
+            rejectedPreparationWithoutGoal, "preparation cannot open without an objective")
+        for goal in NativeDemoFlow.Objective.allCases {
+            workshop.choose(goal)
+            let practice = goal.practice
+            try check(
+                workshop.practice?.title == practice.title
+                    && !practice.situation.isEmpty && !practice.intent.isEmpty
+                    && !practice.question.isEmpty && !practice.constraint.isEmpty
+                    && !practice.explanation.isEmpty && !practice.takeaway.isEmpty
+                    && practice.responsibilities.count == 3
+                    && practice.responsibilities.allSatisfy {
+                        !$0.layer.isEmpty && !$0.owner.isEmpty
+                    },
+                "\(goal) has a complete preparation, decision and explanation")
+        }
+        try check(
+            NativeDemoFlow.Objective.fundamentals.practice.situation
+                != NativeDemoFlow.Objective.operations.practice.situation
+                && NativeDemoFlow.Objective.fundamentals.practice.explanation
+                    != NativeDemoFlow.Objective.operations.practice.explanation,
+            "objectives never reuse an unrelated question or explanation")
+        workshop.select(0)
+        try check(
+            workshop.startRoute == .exercise,
+            "an existing selection resumes the question instead of preparation")
+        for phase in [NativeDemoFlow.Phase.answering, .pending, .reviewed] {
+            if phase == .pending { workshop.submit() }
+            if phase == .reviewed { workshop.receiveMockExplanation(offline: false) }
+            let followUpNavigation = try NativeDemoNavigationState.make(
+                selectedTab: .followUp, objectivePath: [],
+                catalogPath: [.goalDetail(.fundamentals)],
+                flow: workshop)
+            let resumed = try followUpNavigation.resumingExercise(for: workshop)
+            try check(
+                resumed.selectedTab == .objective && resumed.objectivePath == [.exercise]
+                    && resumed.catalogPath == followUpNavigation.catalogPath
+                    && workshop.phase == phase && workshop.selection == 0,
+                "follow-up opens the owning exercise stack and preserves \(phase)")
+            let resumedSnapshot = try NativeDemoSnapshot.make(flow: workshop, navigation: resumed)
+            try check(
+                try NativeDemoSnapshot.restore(JSONEncoder().encode(resumedSnapshot))
+                    == resumedSnapshot,
+                "resumed \(phase) route persists with its exact demo state")
+        }
+        var rejectedEmptyResume = false
+        do {
+            _ = try NativeDemoNavigationState.make(
+                selectedTab: .followUp, objectivePath: [], catalogPath: [], flow: untouchedFlow
+            ).resumingExercise(for: untouchedFlow)
+        } catch {
+            rejectedEmptyResume = true
+        }
+        try check(rejectedEmptyResume, "follow-up cannot invent an exercise without an objective")
+        try check(
+            workshop.activitySummary.contains("aucun verdict"),
+            "reviewed summary cannot present a grade or certification progress")
+        for goal in NativeDemoFlow.Objective.allCases {
+            for option in NativeDemoFlow.options.indices {
+                var example = NativeDemoFlow()
+                example.choose(goal)
+                example.select(option)
+                example.submit()
+                example.receiveMockExplanation(offline: false)
+                let restoredExample = try NativeDemoFlow.restore(JSONEncoder().encode(example))
+                try check(
+                    restoredExample.phase == .reviewed && restoredExample.selection == option
+                        && restoredExample.practice?.title == goal.practice.title
+                        && restoredExample.startRoute == .exercise,
+                    "\(goal) option \(option) retains its context without local grading")
+            }
+        }
         print("\(count) demo-only Foundation checks passed; no Apple UI was compiled or rendered.")
     }
 }

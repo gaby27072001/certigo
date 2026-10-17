@@ -17,11 +17,11 @@ import Foundation
         }
     }
 
-    // THESIS: The chosen objective leads; no competing dashboard metrics.
+    // THESIS: A decision workshop extends the objective-first demo; no invented course or metrics.
     // OWN-WORLD: Prism violet, semantic surfaces, SF text, native navigation and glass controls.
-    // STORY: Choose, answer, wait, understand, resume; every demo result is explicitly synthetic.
+    // STORY: Read a situation, decide, wait, understand; every demo result is explicitly synthetic.
     // FIRST VIEWPORT: One colored objective plane, one resume action, then quiet supporting rows.
-    // FORM: Owner-approved A; objective/detail staging, bounded iPad reading width; seed c9f898fb.
+    // FORM: Reviewable extension of approved A, not a new identity; bounded iPad reading width.
     private enum NativePrism {
         static let tint = Color(
             uiColor: UIColor { traits in
@@ -204,6 +204,8 @@ import Foundation
 
         @ViewBuilder private func destination(for route: NativeDemoRoute) -> some View {
             switch route {
+            case .preparation:
+                preparation
             case .exercise:
                 exercise
             case .goalDetail(let goal):
@@ -232,6 +234,20 @@ import Foundation
             Binding(get: { issue != nil }, set: { if !$0 { issue = nil } })
         }
 
+        private func resumeExercise() {
+            do {
+                let navigation = try NativeDemoNavigationState.make(
+                    selectedTab: tab, objectivePath: objectivePath,
+                    catalogPath: catalogPath, flow: flow
+                ).resumingExercise(for: flow)
+                objectivePath = navigation.objectivePath
+                tab = navigation.selectedTab
+            } catch {
+                issue =
+                    "La question ne peut pas être rouverte. Choisissez un objectif dans Explorer."
+            }
+        }
+
         private var objective: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
@@ -240,10 +256,10 @@ import Foundation
                         VStack(alignment: .leading, spacing: 16) {
                             Text(goal.rawValue).font(.largeTitle.bold())
                             Text(goal.title).font(.title2.weight(.semibold))
-                            Text("Objectif fictif · aucun score de préparation réel")
+                            Text(flow.activitySummary)
                                 .font(.subheadline)
-                            NavigationLink(value: NativeDemoRoute.exercise) {
-                                Label(flow.resumeLabel, systemImage: "arrow.right.circle.fill")
+                            NavigationLink(value: flow.startRoute) {
+                                Label(flow.startLabel, systemImage: "arrow.right.circle.fill")
                                     .font(.headline)
                                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             }
@@ -256,10 +272,17 @@ import Foundation
                         .background(
                             NativePrism.objectiveFill, in: RoundedRectangle(cornerRadius: 24))
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Une idée à comprendre").font(.title2.bold())
-                            Text("Distinguer l’infrastructure d’une plateforme gérée.")
-                            Text("Choisir. Répondre. Comprendre l’explication.")
-                                .foregroundStyle(.secondary)
+                            Text("L’atelier des décisions").font(.title2.bold())
+                            Text(goal.practice.intent)
+                            Text(
+                                "Une situation à lire, un choix à faire, une explication à comprendre."
+                            )
+                            .foregroundStyle(.secondary)
+                            Label(
+                                "Contenu inventé · pas un cours publié",
+                                systemImage: "text.book.closed"
+                            )
+                            .font(.subheadline).foregroundStyle(.secondary)
                         }
                         Divider()
                         Button("Changer d’objectif", systemImage: "square.grid.2x2") {
@@ -275,7 +298,8 @@ import Foundation
                             "Votre prochain objectif",
                             systemImage: "scope",
                             description: Text(
-                                "Choisissez une certification de démonstration pour commencer.")
+                                "Explorez deux situations inventées. Aucun compte ni résultat réel n’est nécessaire."
+                            )
                         )
                         DemoPrimaryButton(title: "Explorer les objectifs", symbol: "arrow.right") {
                             tab = .catalog
@@ -295,7 +319,7 @@ import Foundation
                 Section { demoNotice }
                 switch scenario {
                 case .ready:
-                    Section("Objectifs fictifs") {
+                    Section("Ateliers de démonstration") {
                         ForEach(NativeDemoFlow.Objective.allCases, id: \.self) { goal in
                             NavigationLink(value: NativeDemoRoute.goalDetail(goal)) {
                                 HStack(spacing: 16) {
@@ -305,6 +329,10 @@ import Foundation
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(goal.rawValue).font(.headline)
                                         Text(goal.title).foregroundStyle(.secondary)
+                                        Text(goal.practice.intent).font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                        Text("1 situation fictive · 1 question")
+                                            .font(.subheadline).foregroundStyle(.secondary)
                                     }
                                     Spacer()
                                     if flow.objective == goal {
@@ -319,7 +347,16 @@ import Foundation
                     }
                 case .loading:
                     Section {
-                        ProgressView("Chargement simulé…").frame(minHeight: 44)
+                        ForEach(NativeDemoFlow.Objective.allCases, id: \.self) { goal in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(goal.title).font(.headline)
+                                Text("Une situation à découvrir").font(.subheadline)
+                            }
+                            .redacted(reason: .placeholder)
+                            .accessibilityHidden(true)
+                        }
+                        Label("Chargement simulé…", systemImage: "hourglass")
+                            .accessibilityIdentifier("demo-catalog-loading")
                         Button("Terminer le chargement simulé") { scenario = .ready }
                     }
                 case .empty:
@@ -343,6 +380,8 @@ import Foundation
                     }
                 }
             }
+            .frame(maxWidth: 680).frame(maxWidth: .infinity)
+            .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Explorer")
             .toolbar { demoToolbar }
         }
@@ -356,7 +395,9 @@ import Foundation
                     Text(
                         "Un scénario court pour découvrir le parcours natif. Ce n’est pas un catalogue publié."
                     )
-                    Label("Question et explication synthétiques", systemImage: "text.bubble")
+                    DemoReadingSection(title: "La décision à explorer", text: goal.practice.intent)
+                    DemoReadingSection(title: "La situation fictive", text: goal.practice.situation)
+                    Label("Lire, choisir, comprendre · sans note", systemImage: "text.bubble")
                     Label("Reprise locale de la démo", systemImage: "clock.arrow.circlepath")
                     DemoPrimaryButton(title: "Choisir cet objectif", symbol: "scope") {
                         flow.choose(goal)
@@ -371,141 +412,183 @@ import Foundation
             .navigationTitle("Choisir un objectif").navigationBarTitleDisplayMode(.inline)
         }
 
+        private var preparation: some View {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    demoNotice
+                    if let practice = flow.practice {
+                        DemoPracticeTrail(current: .situation)
+                        Text(practice.title).font(.title.bold())
+                            .accessibilityAddTraits(.isHeader)
+                        DemoReadingSection(title: "La situation", text: practice.situation)
+                        DemoReadingSection(title: "Votre mission", text: practice.intent)
+                        Divider()
+                        DemoReadingSection(
+                            title: "Avant de choisir",
+                            text:
+                                "Repérez ce que l’équipe veut prendre en charge et ce qu’elle veut déléguer. La question porte sur cette limite, pas sur un nom de fournisseur."
+                        )
+                        DemoPrimaryButton(title: "Passer à la question", symbol: "arrow.right") {
+                            objectivePath = [.exercise]
+                        }
+                        .accessibilityIdentifier("demo-open-question")
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
+            }
+            .navigationTitle("Mise en situation").navigationBarTitleDisplayMode(.inline)
+            .toolbar { demoToolbar }
+        }
+
         private var exercise: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     demoNotice
-                    switch flow.phase {
-                    case .answering:
-                        Label(
-                            flow.selection == nil
-                                ? "Choisissez une réponse" : "Réponse sélectionnée",
-                            systemImage: flow.selection == nil ? "circle" : "checkmark.circle.fill"
-                        )
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(
-                            flow.selection == nil ? Color.secondary : NativePrism.tint
-                        )
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityIdentifier("demo-answer-state")
-                        Text("Une plateforme pour l’équipe Exemple").font(.title2.bold())
-                        Text(
-                            "Scénario inventé : l’équipe Exemple veut déployer son application sans administrer le système d’exploitation des serveurs. Quel modèle de service lui proposeriez-vous ?"
-                        )
-                        .textSelection(.enabled)
-                        VStack(spacing: 12) {
-                            ForEach(Array(NativeDemoFlow.options.enumerated()), id: \.offset) {
-                                index, option in
-                                Button {
-                                    flow.select(index)
-                                } label: {
-                                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                                        Image(
-                                            systemName: flow.selection == index
-                                                ? "checkmark.circle.fill" : "circle")
-                                        Text(option).multilineTextAlignment(.leading)
-                                        Spacer(minLength: 0)
+                    if let practice = flow.practice {
+                        DemoPracticeTrail(
+                            current: flow.phase == .reviewed ? .explanation : .decision)
+                        switch flow.phase {
+                        case .answering:
+                            Label(
+                                flow.selection == nil
+                                    ? "Choisissez une réponse" : "Réponse sélectionnée",
+                                systemImage: flow.selection == nil
+                                    ? "circle" : "checkmark.circle.fill"
+                            )
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(
+                                flow.selection == nil ? Color.secondary : NativePrism.tint
+                            )
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("demo-answer-state")
+                            Text(practice.title).font(.title2.bold())
+                                .accessibilityAddTraits(.isHeader)
+                            Text(practice.situation).textSelection(.enabled)
+                            Text(practice.question).font(.headline)
+                            VStack(spacing: 12) {
+                                ForEach(Array(NativeDemoFlow.options.enumerated()), id: \.offset) {
+                                    index, option in
+                                    Button {
+                                        flow.select(index)
+                                    } label: {
+                                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                            Image(
+                                                systemName: flow.selection == index
+                                                    ? "checkmark.circle.fill" : "circle")
+                                            Text(option).multilineTextAlignment(.leading)
+                                            Spacer(minLength: 0)
+                                        }
+                                        .frame(
+                                            maxWidth: .infinity, minHeight: 44, alignment: .leading
+                                        )
+                                        .padding(12)
+                                        .contentShape(Rectangle())
                                     }
-                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                    .padding(12)
-                                    .contentShape(Rectangle())
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(
+                                        flow.selection == index ? NativePrism.tint : .primary
+                                    )
+                                    .background(
+                                        Color(uiColor: .secondarySystemGroupedBackground),
+                                        in: RoundedRectangle(cornerRadius: 16)
+                                    )
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .strokeBorder(
+                                                flow.selection == index
+                                                    ? NativePrism.tint : Color(uiColor: .separator),
+                                                lineWidth: flow.selection == index ? 2 : 1)
+                                    }
+                                    .accessibilityAddTraits(
+                                        flow.selection == index ? .isSelected : []
+                                    )
+                                    .accessibilityLabel(option)
+                                    .accessibilityValue(
+                                        flow.selection == index
+                                            ? "Sélectionnée" : "Non sélectionnée"
+                                    )
+                                    .accessibilityIdentifier("demo-option-\(index)")
                                 }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(
-                                    flow.selection == index ? NativePrism.tint : .primary
-                                )
-                                .background(
-                                    Color(uiColor: .secondarySystemGroupedBackground),
-                                    in: RoundedRectangle(cornerRadius: 16)
-                                )
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .strokeBorder(
-                                            flow.selection == index
-                                                ? NativePrism.tint : Color(uiColor: .separator),
-                                            lineWidth: flow.selection == index ? 2 : 1)
-                                }
-                                .accessibilityAddTraits(flow.selection == index ? .isSelected : [])
-                                .accessibilityLabel(option)
-                                .accessibilityValue(
-                                    flow.selection == index ? "Sélectionnée" : "Non sélectionnée"
-                                )
-                                .accessibilityIdentifier("demo-option-\(index)")
                             }
-                        }
-                        Text("Votre choix reste modifiable avant l’envoi simulé.")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                        DemoPrimaryButton(
-                            title: "Enregistrer la réponse fictive", symbol: "paperplane"
-                        ) {
-                            flow.submit()
-                        }
-                        .disabled(!flow.canSubmit)
-                        .accessibilityHint("Choisissez une réponse avant de continuer.")
-                        .accessibilityIdentifier("demo-submit")
-                    case .pending:
-                        Label {
-                            Text("Réponse fictive en attente")
-                        } icon: {
-                            Image(systemName: "clock.fill").foregroundStyle(.orange)
-                        }
-                        .font(.title2.bold())
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityIdentifier("demo-pending-state")
-                        Text("Aucun résultat n’est confirmé.")
-                            .font(.headline)
-                        selectedAnswer
-                        Text("Aucun verdict, score ou récompense n’est calculé sur cet appareil.")
-                        if offline {
-                            Label("Hors ligne · simulation", systemImage: "wifi.slash")
-                            Text(
-                                "La réponse de démonstration reste en attente. Le scénario hors ligne empêche la suite de la simulation."
-                            )
+                            Text("Votre choix reste modifiable avant l’envoi simulé.")
+                                .font(.subheadline).foregroundStyle(.secondary)
                             DemoPrimaryButton(
-                                title: "Désactiver le scénario hors ligne",
-                                symbol: "wifi"
-                            ) { offline = false }
-                        } else {
-                            Text(
-                                "La prochaine action simule une réponse serveur. Elle ne contacte aucune API."
-                            )
-                            DemoPrimaryButton(
-                                title: "Simuler l’explication fictive",
-                                symbol: "text.bubble"
+                                title: "Enregistrer la réponse fictive", symbol: "paperplane"
                             ) {
-                                flow.receiveMockExplanation(offline: offline)
+                                flow.submit()
                             }
-                            .accessibilityIdentifier("demo-receive-mock")
+                            .disabled(!flow.canSubmit)
+                            .accessibilityHint("Choisissez une réponse avant de continuer.")
+                            .accessibilityIdentifier("demo-submit")
+                        case .pending:
+                            Label {
+                                Text("Réponse fictive en attente")
+                            } icon: {
+                                Image(systemName: "clock.fill").foregroundStyle(.orange)
+                            }
+                            .font(.title2.bold())
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("demo-pending-state")
+                            Text("Votre choix est conservé dans la démo.")
+                                .font(.headline)
+                            selectedAnswer
+                            Text(
+                                "Aucun verdict, score ou récompense n’est calculé sur cet appareil."
+                            )
+                            if offline {
+                                Label("Hors ligne · simulation", systemImage: "wifi.slash")
+                                Text(
+                                    "La réponse de démonstration reste en attente. Le scénario hors ligne empêche la suite de la simulation."
+                                )
+                                DemoPrimaryButton(
+                                    title: "Désactiver le scénario hors ligne",
+                                    symbol: "wifi"
+                                ) { offline = false }
+                            } else {
+                                Text(
+                                    "La prochaine action simule une réponse serveur. Elle ne contacte aucune API."
+                                )
+                                DemoPrimaryButton(
+                                    title: "Simuler l’explication fictive",
+                                    symbol: "text.bubble"
+                                ) {
+                                    flow.receiveMockExplanation(offline: offline)
+                                }
+                                .accessibilityIdentifier("demo-receive-mock")
+                            }
+                        case .reviewed:
+                            Label(
+                                "Explication fictive affichée · sans verdict",
+                                systemImage: "text.bubble"
+                            )
+                            .font(.title2.bold())
+                            .foregroundStyle(.secondary)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("demo-explanation-state")
+                            selectedAnswer
+                            DemoReadingSection(
+                                title: "La contrainte décisive", text: practice.constraint)
+                            DemoReadingSection(
+                                title: "Comprendre la décision", text: practice.explanation)
+                            DemoResponsibilities(rows: practice.responsibilities)
+                            DemoReadingSection(title: "À retenir", text: practice.takeaway)
+                            Text(
+                                "Ce texte est une fixture de design, pas la correction d’une question publiée. Il est affiché quel que soit votre choix : la démo ne vous attribue ni verdict ni score."
+                            )
+                            .font(.subheadline).foregroundStyle(.secondary)
+                            DemoPrimaryButton(
+                                title: "Consulter le suivi fictif",
+                                symbol: "arrow.right"
+                            ) { tab = .followUp }
+                            Button(
+                                "Recommencer la question fictive",
+                                systemImage: "arrow.counterclockwise"
+                            ) {
+                                flow.restartQuestion()
+                            }
+                            .frame(minHeight: 44)
                         }
-                    case .reviewed:
-                        Label(
-                            "Explication fictive affichée · sans verdict",
-                            systemImage: "text.bubble"
-                        )
-                        .font(.title2.bold())
-                        .foregroundStyle(.secondary)
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityIdentifier("demo-explanation-state")
-                        selectedAnswer
-                        Text("Exemple pédagogique inventé").font(.headline)
-                        Text(
-                            "Dans ce scénario synthétique, une plateforme gérée (PaaS) permet à l’équipe de se concentrer sur son application. L’infrastructure (IaaS) lui laisse davantage de responsabilités sur les serveurs."
-                        )
-                        .textSelection(.enabled)
-                        Text(
-                            "Ce texte est une fixture de design, pas la correction d’une question publiée. Il est affiché quel que soit votre choix : la démo ne vous attribue ni verdict ni score."
-                        )
-                        .font(.subheadline).foregroundStyle(.secondary)
-                        DemoPrimaryButton(
-                            title: "Consulter le suivi fictif",
-                            symbol: "arrow.right"
-                        ) { tab = .followUp }
-                        Button(
-                            "Recommencer la question fictive", systemImage: "arrow.counterclockwise"
-                        ) {
-                            flow.restartQuestion()
-                        }
-                        .frame(minHeight: 44)
                     }
                 }
                 .padding(20)
@@ -534,20 +617,17 @@ import Foundation
             List {
                 Section { demoNotice }
                 Section("Reprise de démonstration") {
-                    if flow.objective != nil {
-                        NavigationLink(value: NativeDemoRoute.exercise) {
+                    if let goal = flow.objective {
+                        Text(goal.title).font(.headline)
+                        Button(action: resumeExercise) {
                             Label(flow.resumeLabel, systemImage: flow.phase.symbol)
                                 .frame(minHeight: 44)
                         }
                         .accessibilityIdentifier("resume-demo-follow-up")
-                        Text(
-                            flow.phase == .answering
-                                ? flow.selection == nil
-                                    ? "Aucune réponse choisie."
-                                    : "Votre choix reste modifiable."
-                                : flow.phase == .pending
-                                    ? "En attente · aucun résultat confirmé."
-                                    : "Explication fictive · aucun verdict confirmé.")
+                        Text(flow.activitySummary)
+                        if flow.phase == .reviewed {
+                            Text(goal.practice.takeaway)
+                        }
                         Text("Cette reprise n’est pas une progression de certification.")
                             .foregroundStyle(.secondary)
                     } else {
@@ -559,8 +639,74 @@ import Foundation
                     }
                 }
             }
+            .frame(maxWidth: 680).frame(maxWidth: .infinity)
+            .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Suivi")
             .toolbar { demoToolbar }
+        }
+
+        private struct DemoReadingSection: View {
+            let title: String
+            let text: String
+
+            var body: some View {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+                    Text(text).textSelection(.enabled)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+
+        private struct DemoPracticeTrail: View {
+            enum Step: String, CaseIterable {
+                case situation = "Situation"
+                case decision = "Décision"
+                case explanation = "Explication"
+            }
+            let current: Step
+
+            var body: some View {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 16) { steps }
+                    VStack(alignment: .leading, spacing: 8) { steps }
+                }
+                .font(.subheadline)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    "Étape actuelle : \(current.rawValue). Situation, décision, explication.")
+            }
+
+            @ViewBuilder private var steps: some View {
+                ForEach(Step.allCases, id: \.self) { step in
+                    Label(
+                        step.rawValue,
+                        systemImage: step == current ? "circle.inset.filled" : "circle"
+                    )
+                    .foregroundStyle(step == current ? NativePrism.tint : Color.secondary)
+                    .fontWeight(step == current ? .semibold : .regular)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+
+        private struct DemoResponsibilities: View {
+            let rows: [NativeDemoPractice.Responsibility]
+
+            var body: some View {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Qui prend en charge quoi ?").font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(rows, id: \.layer) { row in
+                        Divider()
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(row.layer).font(.subheadline.weight(.semibold))
+                            Text(row.owner)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
         }
 
         private var demoNotice: some View {
@@ -634,6 +780,12 @@ struct NativeDemoFlow: Codable, Equatable {
             case .operations: "server.rack"
             }
         }
+        var practice: NativeDemoPractice {
+            switch self {
+            case .fundamentals: .fundamentals
+            case .operations: .operations
+            }
+        }
     }
     enum Phase: String, Codable {
         case answering, pending, reviewed
@@ -647,7 +799,7 @@ struct NativeDemoFlow: Codable, Equatable {
     }
     enum InvalidSnapshot: Error { case inconsistentState }
     static let options = [
-        "Une infrastructure gérée par l’équipe (IaaS)",
+        "Une infrastructure à administrer (IaaS)",
         "Une plateforme gérée (PaaS)", "Un logiciel prêt à l’emploi (SaaS)",
     ]
     private(set) var objective: Objective?
@@ -655,6 +807,23 @@ struct NativeDemoFlow: Codable, Equatable {
     private(set) var phase = Phase.answering
 
     var canSubmit: Bool { objective != nil && selection != nil && phase == .answering }
+    var practice: NativeDemoPractice? { objective?.practice }
+    var startRoute: NativeDemoRoute {
+        phase == .answering && selection == nil ? .preparation : .exercise
+    }
+    var startLabel: String {
+        startRoute == .preparation ? "Découvrir la situation" : resumeLabel
+    }
+    var activitySummary: String {
+        switch phase {
+        case .answering:
+            selection == nil
+                ? "Une situation à découvrir · sans note"
+                : "Un choix modifiable · pas encore envoyé"
+        case .pending: "Réponse fictive en attente · aucun résultat confirmé"
+        case .reviewed: "Explication fictive consultable · aucun verdict"
+        }
+    }
     var resumeLabel: String {
         switch phase {
         case .answering: selection == nil ? "Commencer une question" : "Reprendre votre choix"
@@ -697,11 +866,68 @@ struct NativeDemoFlow: Codable, Equatable {
     }
 }
 
+struct NativeDemoPractice: Sendable {
+    struct Responsibility: Sendable {
+        let layer: String
+        let owner: String
+    }
+    let title: String
+    let intent: String
+    let situation: String
+    let question: String
+    let constraint: String
+    let explanation: String
+    let takeaway: String
+    let responsibilities: [Responsibility]
+
+    static let fundamentals = Self(
+        title: "Déployer sans gérer les serveurs",
+        intent: "Distinguer une plateforme gérée d’une infrastructure à administrer.",
+        situation:
+            "L’équipe Exemple veut déployer son application sans administrer le système d’exploitation des serveurs. Elle souhaite garder la responsabilité de son code et de ses données.",
+        question: "Quel modèle de service correspond à cette situation fictive ?",
+        constraint:
+            "L’équipe veut déléguer l’administration du système d’exploitation, pas son application.",
+        explanation:
+            "Dans cet exemple inventé, une plateforme gérée (PaaS) correspond à cette limite : le fournisseur prend en charge la plateforme et son système. L’équipe déploie son code. Une infrastructure (IaaS) lui laisserait la gestion du système ; un logiciel prêt à l’emploi (SaaS) ne lui fournit pas le même cadre pour déployer son application.",
+        takeaway:
+            "Le critère utile est la responsabilité conservée par l’équipe, pas seulement la présence de serveurs dans le cloud.",
+        responsibilities: [
+            .init(layer: "Application et données", owner: "L’équipe Exemple"),
+            .init(
+                layer: "Plateforme et système d’exploitation",
+                owner: "Le fournisseur, dans cet exemple PaaS"),
+            .init(layer: "Infrastructure physique", owner: "Le fournisseur"),
+        ])
+
+    static let operations = Self(
+        title: "Garder la main sur le système",
+        intent: "Identifier ce qui reste à administrer dans une infrastructure cloud.",
+        situation:
+            "L’équipe Atelier exploite une application qui exige une configuration particulière du système d’exploitation. Elle veut installer ses composants système et gérer elle-même les mises à jour, sans entretenir de serveurs physiques.",
+        question:
+            "Quel modèle de service lui laisse cette responsabilité dans ce scénario fictif ?",
+        constraint:
+            "L’équipe veut conserver le contrôle du système d’exploitation tout en déléguant le matériel.",
+        explanation:
+            "Dans cet exemple inventé, une infrastructure à administrer (IaaS) laisse à l’équipe le choix et la gestion du système d’exploitation. Le fournisseur prend en charge le matériel. Une plateforme gérée (PaaS) ou un logiciel prêt à l’emploi (SaaS) ne lui donnent pas cette même responsabilité système.",
+        takeaway:
+            "Déléguer le matériel ne signifie pas déléguer les mises à jour du système : la frontière dépend du modèle choisi.",
+        responsibilities: [
+            .init(layer: "Application et données", owner: "L’équipe Atelier"),
+            .init(
+                layer: "Système d’exploitation et mises à jour",
+                owner: "L’équipe Atelier, dans cet exemple IaaS"),
+            .init(layer: "Infrastructure physique", owner: "Le fournisseur"),
+        ])
+}
+
 enum NativeDemoTab: String, Codable, CaseIterable, Hashable {
     case objective, catalog, followUp
 }
 
 enum NativeDemoRoute: Codable, Equatable, Hashable {
+    case preparation
     case exercise
     case goalDetail(NativeDemoFlow.Objective)
 }
@@ -735,9 +961,16 @@ struct NativeDemoNavigationState: Codable, Equatable {
         return state
     }
 
+    func resumingExercise(for flow: NativeDemoFlow) throws -> Self {
+        try Self.make(
+            selectedTab: .objective, objectivePath: [.exercise],
+            catalogPath: catalogPath, flow: flow)
+    }
+
     private func validate(for flow: NativeDemoFlow) throws {
         let objectiveRoutesAreValid =
-            objectivePath.count <= 1 && objectivePath.allSatisfy { $0 == .exercise }
+            objectivePath.count <= 1
+            && objectivePath.allSatisfy { $0 == .exercise || $0 == .preparation }
             && (objectivePath.isEmpty || flow.objective != nil)
         let catalogRoutesAreValid =
             catalogPath.count <= 1

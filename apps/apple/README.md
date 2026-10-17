@@ -6,10 +6,16 @@ state. It does not sign in, instantiate NativeModel, access the developer vault,
 or contact an API. Only opening the separate developer connector creates that
 model; the existing development-only connector is retained.
 
-The demo includes objective selection, MCQ choice, pending submission, an
-explicit static mock explanation, follow-up, and persisted resume. Its question
-and explanation are invented, separate from the canonical public question bank.
+The demo includes objective selection, a preparation brief, MCQ choice, pending
+submission, an explicit static mock explanation, follow-up, and persisted
+resume. Each of the two objectives has a distinct invented situation and
+explanation, separate from the canonical public question bank.
 There is no local grade, readiness, reward, or production progression.
+
+The reviewable "decision workshop" extension presents situation, decision and
+explanation as reading stages, not mastery or completion metrics. Explanations
+separate the decisive constraint, service responsibilities and takeaway.
+Follow-up reopens the exercise in the Objective navigation stack.
 
 See [NATIVE_UI_BRIEF.md](NATIVE_UI_BRIEF.md) for the capture journey and states,
 [PRODUCT.md](PRODUCT.md) for truth boundaries, and [DESIGN.md](DESIGN.md) for
@@ -71,6 +77,15 @@ validate the demo journey, sustained runtime, authentication, XCTest UI,
 VoiceOver, iPad, or the accessibility and appearance matrix above. A different
 source revision, build configuration, dependencies, device, or runtime requires
 new evidence; do not transfer this result to a newer build.
+
+The coordinator subsequently reported a 43.585-second owner video from the same
+preview run showing Objective / Explorer / Follow-up, objective switching, a
+three-option question, selection, pending and fictive explanation, without an
+observed alert. This is the coordinator's video observation, not a new build
+receipt or this implementation session's independent video review. It extends
+the observed demo journey, not authentication, relaunch persistence, VoiceOver,
+iPad or long-term stability. The newer decision-workshop source is not covered
+by that historical video.
 
 ### Xcode 27 display host
 
