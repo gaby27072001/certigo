@@ -16,7 +16,7 @@ concurrency:
 jobs:
   trust-gate:
     name: Fork PR policy / Required gate
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions: {}
     steps:
       - name: Enforce same-repository pull requests
@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$HEAD_REPOSITORY" != "$BASE_REPOSITORY" ]; then
-            echo "::error::Fork pull requests are not supported because GitHub-hosted runners are permanently unavailable and fork code must never execute on persistent Azure runners."
+            echo "::error::Fork pull requests are not supported by the repository trust policy."
             exit 1
           fi
-          echo "Same-repository pull request accepted for Azure runner validation."
+          echo "Same-repository pull request accepted for CI validation."

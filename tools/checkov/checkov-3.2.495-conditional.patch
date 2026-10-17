@@ -1,0 +1,45 @@
+--- a/checkov/arm/base_resource_check.py
++++ b/checkov/arm/base_resource_check.py
+@@ -1,5 +1,6 @@
+ from __future__ import annotations
+ 
++import logging
+ from abc import abstractmethod
+ from collections.abc import Iterable
+ from typing import Any
+@@ -46,14 +47,33 @@
+                 return CheckResult.UNKNOWN
+ 
+             self.api_version = conf["api_version"]
+-            conf["config"]["apiVersion"] = conf["api_version"]  # set for better reusability of existing ARM checks
+ 
+             resource_conf = conf["config"]
+             if "loop_type" in resource_conf:
+                 # this means the whole resource block is surrounded by a for loop
+                 resource_conf = resource_conf["config"]
+ 
+-            return self.scan_resource_conf(resource_conf)
++            conditional = isinstance(resource_conf, dict) and "condition" in resource_conf
++            if conditional:
++                # Check every potentially deployed body; never infer safety from the guard.
++                if set(resource_conf) != {"condition", "config"} or not isinstance(resource_conf["config"], dict):
++                    self.details.append("Malformed Bicep conditional resource body; security cannot be established.")
++                    logging.warning("%s: %s", self.id, self.details[-1])
++                    return CheckResult.FAILED
++                resource_conf = resource_conf["config"]
++
++            if not isinstance(resource_conf, dict):
++                self.details.append("Invalid Bicep resource body; security cannot be established.")
++                logging.warning("%s: %s", self.id, self.details[-1])
++                return CheckResult.FAILED
++            resource_conf = {**resource_conf, "apiVersion": self.api_version}
++            result = self.scan_resource_conf(resource_conf)
++            if conditional and result == CheckResult.UNKNOWN:
++                # Report.add_record omits UNKNOWN; retain an explicit blocking diagnostic.
++                self.details.append("Conditional Bicep resource check is UNKNOWN; security cannot be established.")
++                logging.warning("%s: %s", self.id, self.details[-1])
++                return CheckResult.FAILED
++            return result
+ 
+         self.api_version = None
+ 

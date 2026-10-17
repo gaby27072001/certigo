@@ -1,6 +1,7 @@
 import { parseDocument } from 'yaml';
+import { hostedLinuxRunner } from './linux-ci-runner-policy.mjs';
 
-const persistentRunnerLabels = new Set(['certigo-pr', 'certigo-trusted']);
+const persistentRunnerLabels = new Set(['certigo-pr', 'certigo-trusted', hostedLinuxRunner]);
 
 function persistentRunner(job) {
   const labels = Array.isArray(job?.['runs-on']) ? job['runs-on'] : [job?.['runs-on']];

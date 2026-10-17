@@ -34,7 +34,7 @@ public sealed class OrganizationOffboardingRecoveryWorker(
                     && attempt < MaximumAttempts)
                 {
                     await Task.Delay(
-                        TimeSpan.FromMilliseconds(25 * (1 << attempt)),
+                        RetryDelayForAttempt(attempt),
                         cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -50,5 +50,15 @@ public sealed class OrganizationOffboardingRecoveryWorker(
                 failures);
         }
         return completed;
+    }
+
+    internal static TimeSpan RetryDelayForAttempt(int attempt)
+    {
+        if (attempt < 1 || attempt >= MaximumAttempts)
+        {
+            throw new ArgumentOutOfRangeException(nameof(attempt));
+        }
+
+        return TimeSpan.FromMilliseconds(25d * (1 << attempt));
     }
 }
