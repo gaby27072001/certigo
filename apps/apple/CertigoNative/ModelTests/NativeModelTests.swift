@@ -89,6 +89,7 @@
         private var lessonStatus = 200
         private var pauseLesson = false
         private var posts: [Data] = []
+        private var replacementManifest: String?
         init(resources: URL) throws {
             catalog = try Data(contentsOf: resources.appendingPathComponent("catalog.json"))
             lesson = try Data(contentsOf: resources.appendingPathComponent("lesson.json"))
@@ -108,6 +109,7 @@
         func suspendLesson() { pauseLesson = true }
         func setOffline(_ value: Bool) { offline = value }
         func failLesson(_ status: Int) { lessonStatus = status }
+        func setManifest(_ value: String) { replacementManifest = value }
         func payloads() -> [Data] { posts }
         func isWaiting() -> Bool { waiter != nil }
         func count() -> Int { requests }
@@ -144,8 +146,9 @@
                 if pauseLesson { await withCheckedContinuation { waiter = $0 } }
                 bytes = lesson
                 status = lessonStatus
-                headers["X-Content-Manifest-Id"] = manifestId
-                headers["ETag"] = "\"\(manifestId)\""
+                let pin = replacementManifest ?? manifestId
+                headers["X-Content-Manifest-Id"] = pin
+                headers["ETag"] = "\"\(pin)\""
             } else if url.path.hasSuffix("/quiz/fixture-lesson/submit"),
                 request.httpMethod == "POST"
             {
@@ -230,9 +233,11 @@
             try await expiryDuringProfile(resources)
             try await manualLessonJourney(resources)
             try await lessonFailureAndLateOwner(resources)
+            try await pendingReleaseAndAccountRecovery(resources)
+            try await failedAndAmbiguousRecovery(resources)
             try resumeNavigation(resources)
             print(
-                "NativeModel: 10 coordination/journey scenarios and resume-state checks passed."
+                "NativeModel: 12 coordination/journey scenarios and resume-state checks passed."
             )
         }
         static func expect(_ condition: Bool, _ message: String) throws {
@@ -257,7 +262,7 @@
             let session = NativeResumeState.Session(
                 trackId: "fixture:foundations", lessonId: "fixture-lesson",
                 publicManifestId: pin, phase: .draft, attemptId: nil)
-            for tab in [NativeResumeState.Tab.objective, .explorer, .followUp] {
+            for tab in [NativeResumeState.Tab.learn, .coach, .social, .profile] {
                 let root = try NativeResumeState(tab: tab, ownerId: owner, apiScope: scope)
                 try expect(try NativeResumeState.decode(root.encoded()) == root, "Root tab changed")
                 let draft = try NativeResumeState(
@@ -268,7 +273,7 @@
                 try expect(resumed == draft, "Draft navigation changed on relaunch")
             }
             let draft = try NativeResumeState(
-                tab: .explorer, ownerId: owner, apiScope: scope, session: session)
+                tab: .learn, ownerId: owner, apiScope: scope, session: session)
             try expectResumeError(.ownerChanged) {
                 _ = try draft.reconciled(
                     ownerId: "another-owner", apiScope: scope,
@@ -398,6 +403,10 @@
                 _ = try NativeResumeState.decode(JSONSerialization.data(withJSONObject: object))
             }
             object["schema"] = 1
+            try expectResumeError(.malformed) {
+                _ = try NativeResumeState.decode(JSONSerialization.data(withJSONObject: object))
+            }
+            object["schema"] = 2
             fields["unknown"] = true
             object["session"] = fields
             try expectResumeError(.malformed) {
@@ -426,7 +435,7 @@
                 phase: .draft, attemptId: nil)
             try expectResumeError(.malformed) {
                 _ = try NativeResumeState(
-                    tab: .objective, ownerId: owner, apiScope: scope, session: traversal)
+                    tab: .learn, ownerId: owner, apiScope: scope, session: traversal)
             }
         }
         @MainActor static func wait(_ condition: @MainActor () async -> Bool) async throws {
@@ -607,6 +616,16 @@
                 lesson.publicManifestId == fixture.server.manifestId,
                 "Header-only pin not normalized into lesson")
             try expect(!model.canSubmit, "Unanswered lesson accepted")
+            let invalidOption = try JSONDecoder().decode(
+                QuizOption.self,
+                from: Data(#"{"id":"foreign","label":"Not in this exercise"}"#.utf8))
+            model.select(invalidOption, question: question)
+            try expect(
+                model.selections.isEmpty && model.errorMessage != nil,
+                "Foreign option entered current activity")
+            model.selections[question.id] = "foreign"
+            try expect(!model.canSubmit, "Invalid directly bound option enabled submission")
+            model.selections = [:]
             model.questionAppeared(question.id)
             model.select(option, question: question)
             try expect(model.canSubmit, "Identified option did not enable submission")
@@ -627,6 +646,17 @@
             let reopened = fixture.model(authenticated: false)
             await reopened.restore()
             try expect(reopened.queue == [saved], "Manual model restart changed pending request")
+            await reopened.loadPath(track)
+            await reopened.loadLesson(node)
+            try expect(
+                reopened.outcome == .pendingCorrection && !reopened.canSubmit,
+                "Reopening a pending lesson discarded its attempt")
+            try expect(
+                reopened.selections[question.id] == option.id,
+                "Reopening did not restore the queued answer identity")
+            await reopened.submit()
+            let beforeRetry = await fixture.server.payloads()
+            try expect(beforeRetry.count == 1, "Reopened pending lesson submitted a new attempt")
             await fixture.server.setOffline(false)
             await reopened.retry(saved)
             guard let result = reopened.queue.first?.result else {
@@ -686,6 +716,107 @@
                 model.profile?.id == "server-owner-B" && model.lesson == nil
                     && model.queue.isEmpty && !model.busy,
                 "Late previous-owner lesson leaked into new model session")
+        }
+        @MainActor static func pendingReleaseAndAccountRecovery(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model(authenticated: false)
+            model.baseURL = "https://example.invalid/api"
+            model.token = "synthetic-A"
+            await model.connect()
+            guard let track = model.tracks.first else {
+                throw ModelTestFailure.assertion("Missing synthetic track")
+            }
+            await model.loadPath(track)
+            guard let node = model.path?.units.first?.lessons.first else {
+                throw ModelTestFailure.assertion("Missing synthetic node")
+            }
+            await model.loadLesson(node)
+            guard let question = model.lesson?.questions.first,
+                let option = question.options.first
+            else { throw ModelTestFailure.assertion("Missing synthetic question") }
+            model.select(option, question: question)
+            await fixture.server.setOffline(true)
+            await model.submit()
+            guard let saved = model.queue.first else {
+                throw ModelTestFailure.assertion("Missing pending attempt")
+            }
+            await fixture.server.setManifest("sha256:" + String(repeating: "b", count: 64))
+            await model.loadLesson(node)
+            try expect(
+                model.lesson == nil && !model.canSubmit && model.errorMessage != nil,
+                "Changed release reopened a pending attempt as a fresh exercise")
+            try expect(model.queue.first == saved, "Changed release rewrote original pending pin")
+            await fixture.server.setOffline(false)
+            await model.retry(saved)
+            let payloads = await fixture.server.payloads()
+            try expect(payloads.count == 2 && payloads[0] == payloads[1], "Old pin retry changed")
+            await model.loadLesson(node)
+            guard let loadedQuestion = model.lesson?.questions.first,
+                let loadedOption = loadedQuestion.options.first
+            else { throw ModelTestFailure.assertion("New practice after correction unavailable") }
+            model.select(loadedOption, question: loadedQuestion)
+            await fixture.server.setOwner("server-owner-B")
+            model.token = "synthetic-B"
+            await model.connect()
+            try expect(
+                model.profile?.id == "server-owner-B" && model.lesson == nil
+                    && model.path == nil && model.selections.isEmpty && model.queue.isEmpty
+                    && model.outcome == nil && !model.canSubmit,
+                "Manual reconnect exposed old-owner activity")
+        }
+        @MainActor static func failedAndAmbiguousRecovery(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let store = SubmissionStore(file: fixture.root.appendingPathComponent("outbox.json"))
+            func request(_ id: String) -> QuizSubmission {
+                QuizSubmission(
+                    clientAttemptId: id, trackId: "fixture:foundations",
+                    startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                    answers: [
+                        QuizAnswer(
+                            itemId: "fixture-question", itemType: "mcq", selected: ["first"],
+                            latencyMs: 10)
+                    ], publicManifestId: fixture.server.manifestId)
+            }
+            let entry = SavedSubmission(
+                ownerId: "server-owner-A", apiScope: "https://example.invalid/api",
+                lessonId: "fixture-lesson",
+                submission: request("3d78ef1a-9ea5-442d-baf6-5c2247b1ad59"))
+            _ = try await store.enqueue(entry)
+            try await store.recordFailure("synthetic-rejection", entry: entry)
+            let model = fixture.model(authenticated: false)
+            model.baseURL = "https://example.invalid/api"
+            model.token = "synthetic-A"
+            await model.connect()
+            guard let track = model.tracks.first else {
+                throw ModelTestFailure.assertion("Missing track")
+            }
+            await model.loadPath(track)
+            guard let node = model.path?.units.first?.lessons.first else {
+                throw ModelTestFailure.assertion("Missing node")
+            }
+            await model.loadLesson(node)
+            try expect(
+                model.lesson != nil && model.outcome == nil && !model.canSubmit
+                    && model.errorMessage != nil && model.queue.first?.status == .failed,
+                "Rejected attempt was converted to a new editable attempt")
+            await model.submit()
+            let noPosts = await fixture.server.payloads()
+            try expect(noPosts.isEmpty, "Rejected attempt bypassed explicit failure")
+            _ = try await store.enqueue(
+                SavedSubmission(
+                    ownerId: entry.ownerId, apiScope: entry.apiScope, lessonId: entry.lessonId,
+                    submission: request("eb1f0a2b-dc55-49ee-9d1b-a954c40fe8e6")))
+            // Reopen the model/store to read the newly persisted independent attempt.
+            let reopened = fixture.model(authenticated: false)
+            await reopened.restore()
+            await reopened.loadPath(track)
+            await reopened.loadLesson(node)
+            try expect(
+                reopened.lesson == nil && reopened.errorMessage != nil
+                    && reopened.queue.count == 2 && !reopened.canSubmit,
+                "Ambiguous pending attempts silently selected one")
         }
     }
 #endif

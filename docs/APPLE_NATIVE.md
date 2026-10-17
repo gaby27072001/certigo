@@ -371,9 +371,10 @@ It is distinct from the design branch's synthetic `NativeDemoFlow`. Its purpose
 is to make a future real-session navigation bookmark untrusted input that must
 be reconciled, not a second outbox or a local correction engine.
 
-The integration shape is `Tab.objective/explorer/followUp`, `ownerId`, exact
+The integration shape is `Tab.learn/coach/social/profile`, `ownerId`, exact
 `apiScope`, optional `Session(trackId, lessonId, publicManifestId, phase,
-attemptId)`, and schema version 1. Session phases are `draft`, `submitting`,
+attemptId)`, and schema version 2. The inactive version-1 three-tab bookmark is
+rejected rather than silently mapped into the new navigation. Session phases are `draft`, `submitting`,
 `pending`, `confirmed`, `failed`. `encoded()` / `decode(_:)` bound the bookmark to
 8 KiB and validate the closed shape, identifiers, HTTPS scope, optional manifest
 hash and phase/UUID relationship. No answers, token, feedback, readiness or
@@ -408,6 +409,38 @@ unknown/malformed/oversized metadata and double-submit transition rejection.
 These are value-level reconciliation tests, not navigation execution, scene
 storage, durable draft answers or an Apple relaunch test. UI integration and its
 explicit error/recovery presentation remain a separate design-owned lot.
+
+### Model recovery from the existing submission queue
+
+`NativeModel.loadLesson(_:)` now verifies that the node is openable in the
+currently loaded path, then reads the existing owner/scope queue. One unresolved
+attempt for that track/lesson restores its original request, attempt ID and
+already-saved selections only when the fetched lesson has the same manifest pin
+and matching MCQ question/option identities. Pending correction stays pending:
+`outcome == .pendingCorrection`, `canSubmit == false`. Repeated `submit()` does
+not post another request. Failed records retain their error and cannot become a
+fresh editable attempt. Multiple unresolved records fail explicitly rather than
+choosing one arbitrarily.
+
+After release rotation, the lesson binding is rejected while the saved queue is
+preserved; `retry(_:)` still sends the original request and pin. This is not
+offline lesson-content reconstruction or unsent-answer persistence. Corrected
+records do not force every future practice session to reopen historical results.
+Only validated server feedback can produce a correction result.
+
+Manual reconnect clears the previous profile, path, lesson, selections, feedback
+and queue before connecting, including when the replacement connection fails.
+Late old-session responses remain generation-guarded. Selection and submission
+eligibility validate actual option membership rather than trusting UI binding.
+Model error copy is English; the UI method signatures are unchanged.
+Browsing `loadPath` does not mutate `profile.activeTrackId`: active-goal mutation
+requires its separate explicit backend contract, not navigation inference.
+
+The portable actual-source harness covers pending model/store reopen, duplicate
+submit prevention, byte-identical retry after pin rotation, direct manual account
+switch, failed/ambiguous saved attempts and foreign option rejection. The inactive
+resume bookmark remains separate from synthetic demo navigation and from these
+model operations; no second persistence authority or UI wiring is introduced.
 
 This portable source check does **not** compile Security/UIKit/MSAL, build the
 Apple app, or execute an Xcode test target. Apple compilation and a separately
