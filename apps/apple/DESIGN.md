@@ -37,8 +37,11 @@ reproduce Flutter Archivo glyphs.
 
 ## Layout
 
-TabView owns Objective, Explorer, and Follow-up. Each tab uses NavigationStack
-for details with native back affordances. Reading regions are centered and
+TabView owns Learn, Coach, Social, and Profile. NavigationStack carries
+details with native back affordances. Learn retains separate My Learning and
+Explore paths behind an accessible native menu picker; Social uses the same
+local picker vocabulary for Friends / Teams. Profile opens a summary with
+pushed history and settings, not another tab strip. Reading regions are centered and
 bounded at 680 points, with flexible width and scrolling for compact iPad
 multitasking. The objective region owns emphasis; supporting content stays
 quiet rather than becoming competing metric cards.
@@ -64,6 +67,12 @@ DemoPrimaryButton uses an SF Symbol plus a wrapping label and at least a
 44-point content height. Lists carry catalog and follow-up information.
 Native sheets carry scenario settings; a full-screen demo isolates the
 synthetic journey from the explicit development connector.
+
+Interface labels are English, including the isolated entry and developer
+connector. Published API content is not translated by the interface. The
+French synthetic learning examples are identified by a visible language note.
+Coach and Social show availability boundaries, not fake conversations, people
+or teams. Their presence in this internal preview is not a delivered service.
 
 The static explanation is not a locally scored correction. Pending,
 selected, and mock explanation are separate demo states. The developer

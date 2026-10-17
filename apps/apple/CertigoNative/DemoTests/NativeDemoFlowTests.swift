@@ -157,8 +157,8 @@ struct NativeDemoFlowTests {
         workshop.choose(.fundamentals)
         try check(
             workshop.startRoute == .preparation
-                && workshop.startLabel == "Découvrir la situation"
-                && workshop.resumeLabel == "Commencer une question",
+                && workshop.startLabel == "Explore the situation"
+                && workshop.resumeLabel == "Start a question",
             "new objective leads to preparation before the question")
         let preparationNavigation = try NativeDemoNavigationState.make(
             selectedTab: .objective, objectivePath: [.preparation], catalogPath: [],
@@ -232,7 +232,7 @@ struct NativeDemoFlowTests {
         }
         try check(rejectedEmptyResume, "follow-up cannot invent an exercise without an objective")
         try check(
-            workshop.activitySummary.contains("aucun verdict"),
+            workshop.activitySummary.contains("no verdict"),
             "reviewed summary cannot present a grade or certification progress")
         for goal in NativeDemoFlow.Objective.allCases {
             for option in NativeDemoFlow.options.indices {
@@ -249,6 +249,65 @@ struct NativeDemoFlowTests {
                     "\(goal) option \(option) retains its context without local grading")
             }
         }
+        try check(
+            NativeDemoDestination.allCases.map(\.rawValue) == [
+                "learn", "coach", "social", "profile",
+            ],
+            "four main destinations match the approved navigation")
+        for (legacyTab, destination, section) in [
+            (
+                NativeDemoTab.objective, NativeDemoDestination.learn,
+                NativeDemoLearnSection.myLearning
+            ),
+            (.catalog, .learn, .explore), (.followUp, .profile, .myLearning),
+        ] {
+            let legacyJSON = """
+                {"schema":1,"flow":{"objective":"Cloud · découverte","selection":1,"phase":"pending"},
+                 "navigation":{"selectedTab":"\(legacyTab.rawValue)","objectivePath":[{"exercise":{}}],
+                 "catalogPath":[{"goalDetail":{"_0":"Cloud · exploitation"}}]}}
+                """
+            let migrated = try NativeDemoSnapshot.restore(Data(legacyJSON.utf8))
+            try check(
+                migrated.navigation.selectedTab.destination == destination
+                    && migrated.navigation.learnSection == section
+                    && migrated.flow.selection == 1 && migrated.flow.phase == .pending
+                    && migrated.navigation.objectivePath == [.exercise]
+                    && migrated.navigation.catalogPath == [.goalDetail(.operations)],
+                "legacy \(legacyTab) migrates to \(destination) without dropping work")
+        }
+        for destination in NativeDemoDestination.allCases {
+            for section in [NativeDemoLearnSection.myLearning, .explore] {
+                let state = try NativeDemoNavigationState.make(
+                    selectedTab: .selecting(destination, learnSection: section),
+                    objectivePath: [.exercise], catalogPath: [.goalDetail(.operations)],
+                    flow: workshop, learnSection: section)
+                let snapshot = try NativeDemoSnapshot.make(flow: workshop, navigation: state)
+                let restored = try NativeDemoSnapshot.restore(JSONEncoder().encode(snapshot))
+                try check(
+                    restored == snapshot
+                        && restored.navigation.selectedTab.destination == destination
+                        && restored.navigation.learnSection == section,
+                    "\(destination) preserves the \(section) Learn section and both detail routes")
+            }
+        }
+        let emptyLegacy = try NativeDemoSnapshot.restore(
+            JSONEncoder().encode(NativeDemoFlow()))
+        try check(
+            emptyLegacy.navigation.selectedTab.destination == .learn
+                && emptyLegacy.navigation.learnSection == .explore,
+            "an empty legacy demo starts in Learn Explore")
+        var rejectedConflictingSection = false
+        do {
+            _ = try NativeDemoNavigationState.make(
+                selectedTab: .catalog, objectivePath: [], catalogPath: [], flow: workshop,
+                learnSection: .myLearning)
+        } catch { rejectedConflictingSection = true }
+        try check(rejectedConflictingSection, "a conflicting Learn tab and section is rejected")
+        try check(
+            NativeDemoFlow.Objective.fundamentals.rawValue == "Cloud · découverte"
+                && NativeDemoFlow.Objective.operations.rawValue == "Cloud · exploitation"
+                && NativeDemoFlow.Objective.fundamentals.displayName == "Cloud · discovery",
+            "English interface labels do not rewrite persisted goal identifiers")
         print("\(count) demo-only Foundation checks passed; no Apple UI was compiled or rendered.")
     }
 }

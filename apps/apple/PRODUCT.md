@@ -29,6 +29,12 @@ Preparation is not a promise of exam success.
   and an appropriate Apple SDK; older systems keep native controls.
 - Account/provider integration and public-bank production wiring are separate
   workstreams, not capabilities of this demonstration.
+- The owner selected four English destinations: Learn, Coach, Social, Profile.
+  Learn contains My Learning / Explore; Profile owns history and settings.
+  Coach and Social are explicitly unavailable navigation previews until their
+  services, privacy and safety contracts are implemented.
+- Interface copy is English. Learning resources retain their actual language;
+  the synthetic examples in this slice are French and labeled accordingly.
 
 ## Brand Commitments
 
@@ -61,5 +67,7 @@ must preserve comfortable reading width and usable compact multitasking.
 ## Open Decisions
 
 Exact release scope, real-account UX, and production question-bank integration
-remain outside this first visual slice. The owner approved composition A:
-objective first, quick resume, catalog and follow-up tabs.
+remain outside this first visual slice. The earlier objective-first composition
+now lives under Learn; the former follow-up moves to Profile. The four-tab
+navigation is confirmed, but the decision-workshop art-direction extension
+remains a reviewable proposal, not a release approval.

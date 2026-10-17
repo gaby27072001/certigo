@@ -6,9 +6,41 @@ Choose an objective, answer a question, understand its correction, resume the
 work. iPhone and iPad. Native SwiftUI affordances, Prism identity, readable
 opaque exercises. A question bank is not a promise of guided courses.
 
-The owner selected A through the coordinating chat: objective first, quick
-resume, catalog and follow-up tabs. The decision schematic is a session
-artifact, not an Apple render.
+The owner selected objective-first composition A, then confirmed four English
+destinations on 2026-10-17: Learn / Coach / Social / Profile. This supersedes
+the former Objective / Explorer / Follow-up tab arrangement while preserving
+the learning flow. The decision schematic is not an Apple render.
+
+## Four-destination implementation
+
+Learn owns My Learning / Explore through a native local menu picker whose
+labels remain readable at large text sizes. It retains separate objective and
+catalog paths. With no saved goal the preview starts in Explore; a restored
+eligible demo route takes precedence. Profile provides a private preview
+summary, a pushed Progress & history screen and pushed Settings. History's
+resume action returns to Learn / My Learning with the same selection and phase.
+Viewing Profile does not choose another goal.
+
+Coach is explicitly not connected: no composer, generated messages, history or
+memory controls pretend to work. Social's Friends / Teams selector shows the
+same honest unavailable boundary without fictional people, invites or metrics.
+Both can return to Learn without changing its current section or activity.
+These are internal preview shells, not delivered Coach or Social services.
+No new endpoints, permissions, account state or saved preferences are created.
+
+All authored interface labels are English, including the opt-in entry and test
+connector. The actual learning fixture text remains French with a visible
+language note; API-provided content, errors and resource titles retain their
+source language. Interface translation does not publish translated courses.
+
+Demo storage retains the version-one key, schema, goal raw values and existing
+route identifiers. Legacy `objective` and `catalog` map to Learn / My Learning
+and Learn / Explore; `followUp` maps to Profile. A new optional `learnSection`
+field preserves the last Learn section while visiting other destinations.
+Missing fields infer the legacy section, not a discarded answer. All four
+destinations round trip with both saved learning paths; invalid section/tab
+combinations are rejected. This demo migration is separate from NativeModel's
+inactive live resume contract and never decodes or writes that bookmark.
 
 ## Decision-workshop extension
 
@@ -34,7 +66,7 @@ constraint, explanation, responsibility by layer, then takeaway. System text
 styles, an adaptive horizontal/vertical stage indicator, opaque reading
 surfaces, native transitions and the existing glass fallback carry it.
 No new motion, dependencies, auth wiring or tracking is introduced.
-Catalog and follow-up also retain a bounded reading width on iPad.
+Catalog and history also retain a bounded reading width on iPad.
 
 ## Boundaries
 
@@ -77,32 +109,33 @@ by this slice. No project wiring is added without coordination.
 
 ## Implemented entry and capture journey
 
-Launch shows `Certigo` with `Découvrir la démo`. Opening this full-screen demo
+Launch shows `Certigo` with `Explore the demo`. Opening this full-screen demo
 does not instantiate NativeModel or touch the developer vault. The explicit
-`Ouvrir le connecteur API de test` action alone presents the developer model.
+`Open the test API connector` action alone presents the developer model.
 
-Capture the empty objective, then Explorer > Cloud découverte > Choisir cet
-objectif > Objectif. Capture the violet objective plane and resume action,
-open "Decouvrir la situation", read the preparation, then use "Passer a la
-question", select an option, and record the fictive answer. Capture
-pending before using `Simuler l'explication fictive`. That explicit action
+Use Learn > Explore > Cloud discovery
+> Choose this goal > My Learning. Capture the violet objective plane and resume
+action, open "Explore the situation", read the French preparation, then use
+"Open the question", select an option, and save the demo answer. Capture
+pending before using `Simulate the fictional explanation`. That explicit action
 shows a static explanation for the invented scenario, independent of the
 selected option; it never grades the answer.
 
-Return to Suivi to reopen it; close and reopen the demo to verify local resume.
-Follow-up explicitly opens the exercise on its owning Objective navigation
-stack instead of pushing a value without a destination in the Follow-up stack.
+Return to Profile > Progress & history to reopen it; close and reopen the demo
+to verify local resume. History explicitly opens the exercise on its owning
+Learn / My Learning navigation stack.
 It preserves the selected option and pending/reviewed phase. Repeat the flow
-with Cloud exploitation: the system-administration situation and explanation
+with Cloud operations: the system-administration situation and explanation
 must differ, without any score or right/wrong verdict.
 The selected tab and the active objective/catalog route are restored with the
 synthetic answer phase; invalid route/state combinations are rejected. This is
-demo-only navigation and does not restore or persist any live answer. Options >
-Scénarios exposes catalog loading/empty/error and simulated offline. Offline
+demo-only navigation and does not restore or persist any live answer. Demo options >
+Demo settings exposes catalog loading/empty/error and simulated offline. Offline
 keeps the answer pending and offers one explicit action to leave that scenario.
 The snapshot stores flow and navigation together under the demo-only
 `certigo.native-design-demo.v1` key; older flow-only snapshots still restore to
-the objective tab. Existing version-one snapshots remain readable; the optional
+Learn / My Learning when a goal exists, otherwise Explore. Existing version-one
+snapshots remain readable; the optional
 preparation route round trips in the same demo-only snapshot. Reset requires a
 confirmation and clears only this demo key.
 
@@ -120,3 +153,9 @@ Native screenshot fidelity, contrast-at-render, SwiftUI type checking, large
 Dynamic Type, VoiceOver, iPad layout and interactive navigation remain Apple
 follow-up gates, not findings that a source review can close. Review the
 proposal before adopting its visual direction.
+
+For the four-tab extension, additionally verify switching through Coach and
+Social and back preserves both Learn detail paths, the unavailable labels are
+readable, Profile details keep native back behavior, and the English interface
+does not obscure the visible French-content provenance. Source tests do not
+prove SwiftUI navigation, material rendering or VoiceOver output.

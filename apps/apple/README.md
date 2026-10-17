@@ -1,6 +1,6 @@
 # Native Apple visual slice
 
-The first SwiftUI demonstration is opt-in from **Decouvrir la demo** on launch.
+The SwiftUI demonstration is opt-in from **Explore the demo** on launch.
 It implements the owner-approved objective-first journey with local synthetic
 state. It does not sign in, instantiate NativeModel, access the developer vault,
 or contact an API. Only opening the separate developer connector creates that
@@ -15,7 +15,16 @@ There is no local grade, readiness, reward, or production progression.
 The reviewable "decision workshop" extension presents situation, decision and
 explanation as reading stages, not mastery or completion metrics. Explanations
 separate the decisive constraint, service responsibilities and takeaway.
-Follow-up reopens the exercise in the Objective navigation stack.
+History reopens the exercise in the Learn / My Learning navigation stack.
+
+The approved English navigation now uses **Learn / Coach / Social / Profile**.
+Learn groups **My Learning / Explore**; Profile owns **Progress & history**
+and **Settings**. Existing demo snapshots preserve their goals, answers and
+routes through this relocation. Coach and Social are explicitly unavailable
+preview destinations, not working services; they create no messages,
+relationships, memory or shared data. Learning fixtures remain in French and
+are labeled as such. Authored interface copy is English; API content is not
+silently translated.
 
 See [NATIVE_UI_BRIEF.md](NATIVE_UI_BRIEF.md) for the capture journey and states,
 [PRODUCT.md](PRODUCT.md) for truth boundaries, and [DESIGN.md](DESIGN.md) for

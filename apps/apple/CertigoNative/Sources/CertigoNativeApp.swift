@@ -13,6 +13,7 @@ import Foundation
             WindowGroup {
                 NativeEntry()
                     .tint(NativePrism.tint)
+                    .environment(\.locale, Locale(identifier: "en"))
             }
         }
     }
@@ -40,30 +41,30 @@ import Foundation
             NavigationStack {
                 List {
                     Section {
-                        Text("Une question. Une idée plus claire.")
+                        Text("One question. A clearer idea.")
                             .font(.largeTitle.bold())
                             .padding(.vertical, 16)
-                        Text("Découvrez le premier parcours natif de Certigo.")
+                        Text("Explore Certigo’s native learning preview.")
                             .foregroundStyle(.secondary)
-                        Button("Découvrir la démo", systemImage: "play.circle") { showDemo = true }
+                        Button("Explore the demo", systemImage: "play.circle") { showDemo = true }
                             .frame(minHeight: 44)
                             .accessibilityIdentifier("open-native-demo")
                     }
-                    Section("Démonstration isolée") {
+                    Section("Isolated demonstration") {
                         Text(
-                            "Les objectifs, réponses et explications sont fictifs. Aucun compte, réseau ou résultat réel n’est utilisé."
+                            "Goals, answers and explanations are fictional. No account, network or real result is used."
                         )
                     }
-                    Section("Développement") {
+                    Section("Development") {
                         Button(
-                            "Ouvrir le connecteur API de test",
+                            "Open the test API connector",
                             systemImage: "wrench.and.screwdriver"
                         ) {
                             showDeveloper = true
                         }
                         .frame(minHeight: 44)
                         Text(
-                            "Réservé aux comptes de test. Ce n’est pas la connexion de production."
+                            "For test accounts only. This is not production sign-in."
                         )
                         .foregroundStyle(.secondary)
                     }
@@ -83,9 +84,9 @@ import Foundation
             NativeRoot(model: model)
                 .safeAreaInset(edge: .top) {
                     HStack {
-                        Text("Connecteur développeur").font(.subheadline)
+                        Text("Developer connector").font(.subheadline)
                         Spacer()
-                        Button("Fermer") { dismiss() }
+                        Button("Close") { dismiss() }
                     }
                     .padding()
                     .background(.background)
@@ -94,17 +95,23 @@ import Foundation
     }
 
     private enum DemoCatalogScenario: String, CaseIterable {
-        case ready = "Disponible"
-        case loading = "Chargement"
-        case empty = "Vide"
-        case error = "Erreur"
+        case ready = "Available"
+        case loading = "Loading"
+        case empty = "Empty"
+        case error = "Error"
+    }
+
+    private enum DemoSocialSection: String, CaseIterable {
+        case friends = "Friends"
+        case teams = "Teams"
     }
 
     private struct NativeDemoRoot: View {
         @Environment(\.dismiss) private var dismiss
         @AppStorage("certigo.native-design-demo.v1") private var savedState = ""
         @State private var flow = NativeDemoFlow()
-        @State private var tab = NativeDemoTab.objective
+        @State private var tab = NativeDemoTab.catalog
+        @State private var learnSection = NativeDemoLearnSection.explore
         @State private var objectivePath: [NativeDemoRoute] = []
         @State private var catalogPath: [NativeDemoRoute] = []
         @State private var scenario = DemoCatalogScenario.ready
@@ -113,67 +120,86 @@ import Foundation
         @State private var showScenarios = false
         @State private var showReset = false
         @State private var restored = false
+        @State private var socialSection = DemoSocialSection.friends
 
         var body: some View {
-            TabView(selection: $tab) {
-                NavigationStack(path: $objectivePath) {
-                    objective.navigationDestination(for: NativeDemoRoute.self) { route in
-                        destination(for: route)
+            TabView(selection: mainTabSelection) {
+                Group {
+                    if learnSection == .myLearning {
+                        NavigationStack(path: $objectivePath) {
+                            objective.navigationDestination(for: NativeDemoRoute.self) { route in
+                                destination(for: route)
+                            }
+                        }
+                    } else {
+                        NavigationStack(path: $catalogPath) {
+                            catalog.navigationDestination(for: NativeDemoRoute.self) { route in
+                                destination(for: route)
+                            }
+                        }
                     }
                 }
-                .tabItem { Label("Objectif", systemImage: "scope") }.tag(NativeDemoTab.objective)
-                NavigationStack(path: $catalogPath) {
-                    catalog.navigationDestination(for: NativeDemoRoute.self) { route in
-                        destination(for: route)
-                    }
+                .tabItem { Label("Learn", systemImage: "book") }.tag(NativeDemoDestination.learn)
+                NavigationStack {
+                    unavailableService(
+                        "Coach", symbol: "bubble.left.and.bubble.right",
+                        description:
+                            "Coach is not connected in this preview. No AI response, conversation history or saved memory is created."
+                    )
                 }
-                .tabItem { Label("Explorer", systemImage: "square.grid.2x2") }.tag(
-                    NativeDemoTab.catalog)
+                .tabItem { Label("Coach", systemImage: "bubble.left.and.bubble.right") }
+                .tag(NativeDemoDestination.coach)
+                NavigationStack {
+                    social
+                }
+                .tabItem { Label("Social", systemImage: "person.2") }.tag(
+                    NativeDemoDestination.social)
                 NavigationStack { followUp }
-                    .tabItem { Label("Suivi", systemImage: "clock.arrow.circlepath") }.tag(
-                        NativeDemoTab.followUp)
+                    .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+                    .tag(NativeDemoDestination.profile)
             }
             .tint(NativePrism.tint)
             .sheet(isPresented: $showScenarios) {
                 NavigationStack {
                     Form {
-                        Section("États du catalogue · simulation") {
-                            Picker("Catalogue", selection: $scenario) {
+                        Section("Catalog states · simulation") {
+                            Picker("Catalog", selection: $scenario) {
                                 ForEach(DemoCatalogScenario.allCases, id: \.self) {
                                     Text($0.rawValue)
                                 }
                             }
-                            Toggle("Simuler le mode hors ligne", isOn: $offline)
+                            Toggle("Simulate offline mode", isOn: $offline)
                         }
                         Section {
                             Text(
-                                "Ces réglages ne modifient ni le réseau de l’appareil ni un serveur."
+                                "These settings do not change the device network or a server."
                             )
                         }
                     }
-                    .navigationTitle("Scénarios de démo")
+                    .navigationTitle("Demo settings")
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("Terminé") { showScenarios = false }
+                            Button("Done") { showScenarios = false }
                         }
                     }
                 }
             }
             .confirmationDialog(
-                "Effacer uniquement la reprise de démonstration ?", isPresented: $showReset
+                "Clear only the saved demonstration?", isPresented: $showReset
             ) {
-                Button("Réinitialiser la démo", role: .destructive) {
+                Button("Reset the demo", role: .destructive) {
                     flow = NativeDemoFlow()
                     objectivePath = []
                     catalogPath = []
-                    tab = .objective
+                    tab = .catalog
+                    learnSection = .explore
                     scenario = .ready
                     offline = false
                     savedState = ""
                 }
             }
-            .alert("Reprise de démo indisponible", isPresented: issuePresented) {
-                Button("Compris", role: .cancel) { issue = nil }
+            .alert("Demo restoration unavailable", isPresented: issuePresented) {
+                Button("OK", role: .cancel) { issue = nil }
             } message: {
                 Text(issue ?? "")
             }
@@ -186,20 +212,104 @@ import Foundation
                         flow = snapshot.flow
                         let navigation = snapshot.navigation
                         tab = navigation.selectedTab
+                        learnSection = navigation.learnSection
                         objectivePath = navigation.objectivePath
                         catalogPath = navigation.catalogPath
+                    } else {
+                        learnSection = flow.objective == nil ? .explore : .myLearning
+                        tab = NativeDemoTab.selecting(.learn, learnSection: learnSection)
                     }
                 } catch {
                     issue =
-                        "La reprise de démonstration est illisible. Réinitialisez uniquement la démo dans les options."
+                        "The saved demonstration cannot be read. Reset only the demo in its settings."
                 }
             }
             .onChange(of: flow) { _, value in
                 persistDemoSnapshot(flow: value)
             }
             .onChange(of: tab) { _, _ in persistDemoSnapshot() }
+            .onChange(of: learnSection) { _, _ in persistDemoSnapshot() }
             .onChange(of: objectivePath) { _, _ in persistDemoSnapshot() }
             .onChange(of: catalogPath) { _, _ in persistDemoSnapshot() }
+        }
+
+        private var mainTabSelection: Binding<NativeDemoDestination> {
+            Binding(
+                get: { tab.destination },
+                set: { destination in
+                    tab = NativeDemoTab.selecting(destination, learnSection: learnSection)
+                })
+        }
+
+        private var learnSectionSelection: Binding<NativeDemoLearnSection> {
+            Binding(
+                get: { learnSection },
+                set: { section in
+                    learnSection = section
+                    tab = NativeDemoTab.selecting(.learn, learnSection: section)
+                })
+        }
+
+        private var learnSelector: some View {
+            Picker("Learn section", selection: learnSectionSelection) {
+                Text("My Learning").tag(NativeDemoLearnSection.myLearning)
+                Text("Explore").tag(NativeDemoLearnSection.explore)
+            }
+            .pickerStyle(.menu)
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("learn-section")
+        }
+
+        private func unavailableService(_ title: String, symbol: String, description: String)
+            -> some View
+        {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    demoNotice
+                    ContentUnavailableView(
+                        "\(title) is not connected", systemImage: symbol,
+                        description: Text(description))
+                    Text(
+                        "This is a navigation preview, not a working \(title.lowercased()) service."
+                    )
+                    .foregroundStyle(.secondary)
+                    DemoPrimaryButton(title: "Return to Learn", symbol: "book") {
+                        tab = NativeDemoTab.selecting(.learn, learnSection: learnSection)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: 680).frame(maxWidth: .infinity)
+            }
+            .navigationTitle(title)
+            .toolbar { demoToolbar }
+        }
+
+        private var social: some View {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    demoNotice
+                    Picker("Social section", selection: $socialSection) {
+                        ForEach(DemoSocialSection.allCases, id: \.self) { section in
+                            Text(section.rawValue).tag(section)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(minHeight: 44)
+                    ContentUnavailableView(
+                        "\(socialSection.rawValue) are not connected",
+                        systemImage: socialSection == .friends ? "person.2" : "person.3",
+                        description: Text(
+                            "Social is unavailable in this navigation preview. No real relationships, invitations, team membership or sharing are loaded."
+                        ))
+                    DemoPrimaryButton(title: "Return to Learn", symbol: "book") {
+                        tab = NativeDemoTab.selecting(.learn, learnSection: learnSection)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: 680).frame(maxWidth: .infinity)
+            }
+            .navigationTitle("Social")
+            .toolbar { demoToolbar }
         }
 
         @ViewBuilder private func destination(for route: NativeDemoRoute) -> some View {
@@ -219,14 +329,14 @@ import Foundation
                 let flowToPersist = currentFlow ?? flow
                 let navigation = try NativeDemoNavigationState.make(
                     selectedTab: tab, objectivePath: objectivePath,
-                    catalogPath: catalogPath, flow: flowToPersist)
+                    catalogPath: catalogPath, flow: flowToPersist, learnSection: learnSection)
                 let snapshot = try NativeDemoSnapshot.make(
                     flow: flowToPersist, navigation: navigation)
                 savedState = String(
                     decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)
             } catch {
                 issue =
-                    "La reprise de démonstration n’a pas pu être enregistrée. Le parcours reste ouvert."
+                    "The demonstration could not be saved. You can continue in the current session."
             }
         }
 
@@ -241,10 +351,11 @@ import Foundation
                     catalogPath: catalogPath, flow: flow
                 ).resumingExercise(for: flow)
                 objectivePath = navigation.objectivePath
+                learnSection = .myLearning
                 tab = navigation.selectedTab
             } catch {
                 issue =
-                    "La question ne peut pas être rouverte. Choisissez un objectif dans Explorer."
+                    "The question cannot be reopened. Choose a goal in Learn > Explore."
             }
         }
 
@@ -252,10 +363,11 @@ import Foundation
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     demoNotice
+                    learnSelector
                     if let goal = flow.objective {
                         VStack(alignment: .leading, spacing: 16) {
-                            Text(goal.rawValue).font(.largeTitle.bold())
-                            Text(goal.title).font(.title2.weight(.semibold))
+                            Text(goal.displayName).font(.largeTitle.bold())
+                            Text(goal.displayTitle).font(.title2.weight(.semibold))
                             Text(flow.activitySummary)
                                 .font(.subheadline)
                             NavigationLink(value: flow.startRoute) {
@@ -272,36 +384,38 @@ import Foundation
                         .background(
                             NativePrism.objectiveFill, in: RoundedRectangle(cornerRadius: 24))
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("L’atelier des décisions").font(.title2.bold())
+                            Text("The decision workshop").font(.title2.bold())
                             Text(goal.practice.intent)
                             Text(
-                                "Une situation à lire, un choix à faire, une explication à comprendre."
+                                "Read a situation, make a choice, understand the explanation."
                             )
                             .foregroundStyle(.secondary)
                             Label(
-                                "Contenu inventé · pas un cours publié",
+                                "Fictional content · not a published course",
                                 systemImage: "text.book.closed"
                             )
                             .font(.subheadline).foregroundStyle(.secondary)
                         }
                         Divider()
-                        Button("Changer d’objectif", systemImage: "square.grid.2x2") {
+                        Button("Switch goal", systemImage: "square.grid.2x2") {
+                            learnSection = .explore
                             tab = .catalog
                         }
                         .frame(minHeight: 44)
-                        Button("Voir le suivi fictif", systemImage: "clock.arrow.circlepath") {
+                        Button("View demo history", systemImage: "clock.arrow.circlepath") {
                             tab = .followUp
                         }
                         .frame(minHeight: 44)
                     } else {
                         ContentUnavailableView(
-                            "Votre prochain objectif",
+                            "Your next learning goal",
                             systemImage: "scope",
                             description: Text(
-                                "Explorez deux situations inventées. Aucun compte ni résultat réel n’est nécessaire."
+                                "Explore two fictional situations. No account or real result is needed."
                             )
                         )
-                        DemoPrimaryButton(title: "Explorer les objectifs", symbol: "arrow.right") {
+                        DemoPrimaryButton(title: "Explore goals", symbol: "arrow.right") {
+                            learnSection = .explore
                             tab = .catalog
                         }
                     }
@@ -310,16 +424,26 @@ import Foundation
                 .frame(maxWidth: 680, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
-            .navigationTitle("Votre objectif")
+            .navigationTitle("Learn")
             .toolbar { demoToolbar }
         }
 
         private var catalog: some View {
             List {
-                Section { demoNotice }
+                Section {
+                    demoNotice
+                    learnSelector
+                }
                 switch scenario {
                 case .ready:
-                    Section("Ateliers de démonstration") {
+                    if flow.objective == nil {
+                        Section {
+                            Text(
+                                "Choose a demo goal to begin. These French examples are fictional, not published courses."
+                            )
+                        }
+                    }
+                    Section("Demonstration workshops") {
                         ForEach(NativeDemoFlow.Objective.allCases, id: \.self) { goal in
                             NavigationLink(value: NativeDemoRoute.goalDetail(goal)) {
                                 HStack(spacing: 16) {
@@ -327,18 +451,18 @@ import Foundation
                                         .foregroundStyle(NativePrism.tint)
                                         .accessibilityHidden(true)
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text(goal.rawValue).font(.headline)
-                                        Text(goal.title).foregroundStyle(.secondary)
+                                        Text(goal.displayName).font(.headline)
+                                        Text(goal.displayTitle).foregroundStyle(.secondary)
                                         Text(goal.practice.intent).font(.subheadline)
                                             .foregroundStyle(.secondary)
-                                        Text("1 situation fictive · 1 question")
+                                        Text("1 fictional situation · 1 question · French")
                                             .font(.subheadline).foregroundStyle(.secondary)
                                     }
                                     Spacer()
                                     if flow.objective == goal {
                                         Image(systemName: "checkmark.circle.fill")
                                             .foregroundStyle(NativePrism.tint)
-                                            .accessibilityLabel("Objectif sélectionné")
+                                            .accessibilityLabel("Selected goal")
                                     }
                                 }
                                 .frame(minHeight: 44)
@@ -349,32 +473,32 @@ import Foundation
                     Section {
                         ForEach(NativeDemoFlow.Objective.allCases, id: \.self) { goal in
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(goal.title).font(.headline)
-                                Text("Une situation à découvrir").font(.subheadline)
+                                Text(goal.displayTitle).font(.headline)
+                                Text("A situation to explore").font(.subheadline)
                             }
                             .redacted(reason: .placeholder)
                             .accessibilityHidden(true)
                         }
-                        Label("Chargement simulé…", systemImage: "hourglass")
+                        Label("Simulated loading…", systemImage: "hourglass")
                             .accessibilityIdentifier("demo-catalog-loading")
-                        Button("Terminer le chargement simulé") { scenario = .ready }
+                        Button("Finish simulated loading") { scenario = .ready }
                     }
                 case .empty:
                     Section {
                         ContentUnavailableView(
-                            "Aucun objectif dans cet exemple", systemImage: "books.vertical",
-                            description: Text("Le catalogue vide est un scénario de démonstration.")
+                            "No goals in this example", systemImage: "books.vertical",
+                            description: Text("The empty catalog is a demonstration scenario.")
                         )
-                        Button("Afficher les objectifs fictifs") { scenario = .ready }
+                        Button("Show demo goals") { scenario = .ready }
                     }
                 case .error:
                     Section {
                         ContentUnavailableView(
-                            "Catalogue indisponible · simulation",
+                            "Catalog unavailable · simulation",
                             systemImage: "wifi.exclamationmark",
                             description: Text(
-                                "Votre reprise fictive est conservée. Aucun serveur n’est appelé."))
-                        Button("Réessayer la simulation", systemImage: "arrow.clockwise") {
+                                "Your demo state is preserved. No server is contacted."))
+                        Button("Retry the simulation", systemImage: "arrow.clockwise") {
                             scenario = .ready
                         }
                     }
@@ -382,7 +506,7 @@ import Foundation
             }
             .frame(maxWidth: 680).frame(maxWidth: .infinity)
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Explorer")
+            .navigationTitle("Learn")
             .toolbar { demoToolbar }
         }
 
@@ -390,17 +514,20 @@ import Foundation
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     demoNotice
-                    Text(goal.rawValue).font(.largeTitle.bold()).foregroundStyle(NativePrism.tint)
-                    Text(goal.title).font(.title2.bold())
+                    Text(goal.displayName).font(.largeTitle.bold()).foregroundStyle(
+                        NativePrism.tint)
+                    Text(goal.displayTitle).font(.title2.bold())
                     Text(
-                        "Un scénario court pour découvrir le parcours natif. Ce n’est pas un catalogue publié."
+                        "A short scenario to explore the native experience. This is not a published catalog."
                     )
-                    DemoReadingSection(title: "La décision à explorer", text: goal.practice.intent)
-                    DemoReadingSection(title: "La situation fictive", text: goal.practice.situation)
-                    Label("Lire, choisir, comprendre · sans note", systemImage: "text.bubble")
-                    Label("Reprise locale de la démo", systemImage: "clock.arrow.circlepath")
-                    DemoPrimaryButton(title: "Choisir cet objectif", symbol: "scope") {
+                    DemoReadingSection(title: "The decision to explore", text: goal.practice.intent)
+                    DemoReadingSection(
+                        title: "The fictional situation", text: goal.practice.situation)
+                    Label("Read, choose, understand · no grade", systemImage: "text.bubble")
+                    Label("Local demo restoration", systemImage: "clock.arrow.circlepath")
+                    DemoPrimaryButton(title: "Choose this goal", symbol: "scope") {
                         flow.choose(goal)
+                        learnSection = .myLearning
                         catalogPath = []
                         objectivePath = []
                         tab = .objective
@@ -409,7 +536,7 @@ import Foundation
                 .padding(20)
                 .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
             }
-            .navigationTitle("Choisir un objectif").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Goal overview").navigationBarTitleDisplayMode(.inline)
         }
 
         private var preparation: some View {
@@ -420,15 +547,15 @@ import Foundation
                         DemoPracticeTrail(current: .situation)
                         Text(practice.title).font(.title.bold())
                             .accessibilityAddTraits(.isHeader)
-                        DemoReadingSection(title: "La situation", text: practice.situation)
-                        DemoReadingSection(title: "Votre mission", text: practice.intent)
+                        DemoReadingSection(title: "The situation", text: practice.situation)
+                        DemoReadingSection(title: "Your task", text: practice.intent)
                         Divider()
                         DemoReadingSection(
-                            title: "Avant de choisir",
+                            title: "Before you choose",
                             text:
-                                "Repérez ce que l’équipe veut prendre en charge et ce qu’elle veut déléguer. La question porte sur cette limite, pas sur un nom de fournisseur."
+                                "Identify what the team wants to manage and what it wants to delegate. Focus on that boundary, not a provider name."
                         )
-                        DemoPrimaryButton(title: "Passer à la question", symbol: "arrow.right") {
+                        DemoPrimaryButton(title: "Open the question", symbol: "arrow.right") {
                             objectivePath = [.exercise]
                         }
                         .accessibilityIdentifier("demo-open-question")
@@ -437,7 +564,7 @@ import Foundation
                 .padding(20)
                 .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
             }
-            .navigationTitle("Mise en situation").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Preparation").navigationBarTitleDisplayMode(.inline)
             .toolbar { demoToolbar }
         }
 
@@ -452,7 +579,7 @@ import Foundation
                         case .answering:
                             Label(
                                 flow.selection == nil
-                                    ? "Choisissez une réponse" : "Réponse sélectionnée",
+                                    ? "Choose an answer" : "Answer selected",
                                 systemImage: flow.selection == nil
                                     ? "circle" : "checkmark.circle.fill"
                             )
@@ -506,51 +633,51 @@ import Foundation
                                     .accessibilityLabel(option)
                                     .accessibilityValue(
                                         flow.selection == index
-                                            ? "Sélectionnée" : "Non sélectionnée"
+                                            ? "Selected" : "Not selected"
                                     )
                                     .accessibilityIdentifier("demo-option-\(index)")
                                 }
                             }
-                            Text("Votre choix reste modifiable avant l’envoi simulé.")
+                            Text("You can change your choice before the simulated submission.")
                                 .font(.subheadline).foregroundStyle(.secondary)
                             DemoPrimaryButton(
-                                title: "Enregistrer la réponse fictive", symbol: "paperplane"
+                                title: "Save the demo answer", symbol: "paperplane"
                             ) {
                                 flow.submit()
                             }
                             .disabled(!flow.canSubmit)
-                            .accessibilityHint("Choisissez une réponse avant de continuer.")
+                            .accessibilityHint("Choose an answer before continuing.")
                             .accessibilityIdentifier("demo-submit")
                         case .pending:
                             Label {
-                                Text("Réponse fictive en attente")
+                                Text("Demo answer pending")
                             } icon: {
                                 Image(systemName: "clock.fill").foregroundStyle(.orange)
                             }
                             .font(.title2.bold())
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityIdentifier("demo-pending-state")
-                            Text("Votre choix est conservé dans la démo.")
+                            Text("Your choice is saved in the demo.")
                                 .font(.headline)
                             selectedAnswer
                             Text(
-                                "Aucun verdict, score ou récompense n’est calculé sur cet appareil."
+                                "No verdict, score or reward is calculated on this device."
                             )
                             if offline {
-                                Label("Hors ligne · simulation", systemImage: "wifi.slash")
+                                Label("Offline · simulation", systemImage: "wifi.slash")
                                 Text(
-                                    "La réponse de démonstration reste en attente. Le scénario hors ligne empêche la suite de la simulation."
+                                    "The demo answer remains pending. The offline scenario pauses the next simulation step."
                                 )
                                 DemoPrimaryButton(
-                                    title: "Désactiver le scénario hors ligne",
+                                    title: "Turn off the offline scenario",
                                     symbol: "wifi"
                                 ) { offline = false }
                             } else {
                                 Text(
-                                    "La prochaine action simule une réponse serveur. Elle ne contacte aucune API."
+                                    "The next action simulates a server response. It does not contact an API."
                                 )
                                 DemoPrimaryButton(
-                                    title: "Simuler l’explication fictive",
+                                    title: "Simulate the fictional explanation",
                                     symbol: "text.bubble"
                                 ) {
                                     flow.receiveMockExplanation(offline: offline)
@@ -559,7 +686,7 @@ import Foundation
                             }
                         case .reviewed:
                             Label(
-                                "Explication fictive affichée · sans verdict",
+                                "Fictional explanation · no verdict",
                                 systemImage: "text.bubble"
                             )
                             .font(.title2.bold())
@@ -568,21 +695,21 @@ import Foundation
                             .accessibilityIdentifier("demo-explanation-state")
                             selectedAnswer
                             DemoReadingSection(
-                                title: "La contrainte décisive", text: practice.constraint)
+                                title: "The decisive constraint", text: practice.constraint)
                             DemoReadingSection(
-                                title: "Comprendre la décision", text: practice.explanation)
+                                title: "Understanding the decision", text: practice.explanation)
                             DemoResponsibilities(rows: practice.responsibilities)
-                            DemoReadingSection(title: "À retenir", text: practice.takeaway)
+                            DemoReadingSection(title: "Takeaway", text: practice.takeaway)
                             Text(
-                                "Ce texte est une fixture de design, pas la correction d’une question publiée. Il est affiché quel que soit votre choix : la démo ne vous attribue ni verdict ni score."
+                                "This is a design fixture, not the correction of a published question. It appears for every choice: the demo gives no verdict or score."
                             )
                             .font(.subheadline).foregroundStyle(.secondary)
                             DemoPrimaryButton(
-                                title: "Consulter le suivi fictif",
+                                title: "View demo history",
                                 symbol: "arrow.right"
                             ) { tab = .followUp }
                             Button(
-                                "Recommencer la question fictive",
+                                "Practice the demo question again",
                                 systemImage: "arrow.counterclockwise"
                             ) {
                                 flow.restartQuestion()
@@ -595,17 +722,19 @@ import Foundation
                 .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Révision · démo").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Practice · demo").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Scénarios", systemImage: "slider.horizontal.3") { showScenarios = true }
+                    Button("Demo settings", systemImage: "slider.horizontal.3") {
+                        showScenarios = true
+                    }
                 }
             }
         }
 
         private var selectedAnswer: some View {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Votre choix fictif").font(.headline)
+                Text("Your demo choice").font(.headline)
                 if let selection = flow.selection {
                     Text(NativeDemoFlow.options[selection])
                 }
@@ -615,10 +744,59 @@ import Foundation
 
         private var followUp: some View {
             List {
+                Section {
+                    demoNotice
+                    Text("Preview profile").font(.title2.bold())
+                    Text("No account is signed in. This screen shows only the local demonstration.")
+                        .foregroundStyle(.secondary)
+                }
+                Section {
+                    NavigationLink {
+                        demoHistory
+                    } label: {
+                        Label("Progress & history", systemImage: "clock.arrow.circlepath")
+                            .frame(minHeight: 44)
+                    }
+                    NavigationLink {
+                        List {
+                            Section("Demonstration controls") {
+                                Button("Preview states & offline simulation") {
+                                    showScenarios = true
+                                }
+                                .frame(minHeight: 44)
+                                Button("Reset the demo", role: .destructive) { showReset = true }
+                                    .frame(minHeight: 44)
+                            }
+                            Section("Appearance & accessibility") {
+                                Text(
+                                    "The preview follows system appearance and text size. Navigation uses system transitions and controls respect Reduce Transparency."
+                                )
+                            }
+                            Section("Account") {
+                                Text(
+                                    "Account, privacy and notification settings are not connected in this preview. No account preferences are changed."
+                                )
+                            }
+                        }
+                        .navigationTitle("Settings")
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                            .frame(minHeight: 44)
+                    }
+                }
+            }
+            .frame(maxWidth: 680).frame(maxWidth: .infinity)
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle("Profile")
+            .toolbar { demoToolbar }
+        }
+
+        private var demoHistory: some View {
+            List {
                 Section { demoNotice }
-                Section("Reprise de démonstration") {
+                Section("Demo history") {
                     if let goal = flow.objective {
-                        Text(goal.title).font(.headline)
+                        Text(goal.displayTitle).font(.headline)
                         Button(action: resumeExercise) {
                             Label(flow.resumeLabel, systemImage: flow.phase.symbol)
                                 .frame(minHeight: 44)
@@ -628,20 +806,23 @@ import Foundation
                         if flow.phase == .reviewed {
                             Text(goal.practice.takeaway)
                         }
-                        Text("Cette reprise n’est pas une progression de certification.")
+                        Text("This saved demonstration is not certification progress.")
                             .foregroundStyle(.secondary)
                     } else {
                         ContentUnavailableView(
-                            "Tout commence par un objectif", systemImage: "scope",
-                            description: Text("Aucune activité fictive enregistrée."))
-                        Button("Explorer les objectifs") { tab = .catalog }
-                            .frame(minHeight: 44)
+                            "Start with a goal", systemImage: "scope",
+                            description: Text("No demo activity is saved."))
+                        Button("Explore goals") {
+                            learnSection = .explore
+                            tab = .catalog
+                        }
+                        .frame(minHeight: 44)
                     }
                 }
             }
             .frame(maxWidth: 680).frame(maxWidth: .infinity)
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Suivi")
+            .navigationTitle("Progress & history")
             .toolbar { demoToolbar }
         }
 
@@ -661,8 +842,8 @@ import Foundation
         private struct DemoPracticeTrail: View {
             enum Step: String, CaseIterable {
                 case situation = "Situation"
-                case decision = "Décision"
-                case explanation = "Explication"
+                case decision = "Decision"
+                case explanation = "Explanation"
             }
             let current: Step
 
@@ -674,7 +855,7 @@ import Foundation
                 .font(.subheadline)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(
-                    "Étape actuelle : \(current.rawValue). Situation, décision, explication.")
+                    "Current stage: \(current.rawValue). Situation, decision, explanation.")
             }
 
             @ViewBuilder private var steps: some View {
@@ -695,7 +876,7 @@ import Foundation
 
             var body: some View {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Qui prend en charge quoi ?").font(.headline)
+                    Text("Who manages what?").font(.headline)
                         .accessibilityAddTraits(.isHeader)
                     ForEach(rows, id: \.layer) { row in
                         Divider()
@@ -710,26 +891,30 @@ import Foundation
         }
 
         private var demoNotice: some View {
-            Label("Démo · données et résultats fictifs", systemImage: "testtube.2")
-                .font(.subheadline).foregroundStyle(.secondary)
-                .accessibilityIdentifier("synthetic-demo-notice")
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Demo · fictional data and results", systemImage: "testtube.2")
+                Text("Learning examples: French").font(.caption)
+            }
+            .font(.subheadline).foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("synthetic-demo-notice")
         }
 
         @ToolbarContentBuilder private var demoToolbar: some ToolbarContent {
-            ToolbarItem(placement: .topBarLeading) { Button("Fermer") { dismiss() } }
+            ToolbarItem(placement: .topBarLeading) { Button("Close") { dismiss() } }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button("Scénarios de démonstration", systemImage: "slider.horizontal.3") {
+                    Button("Demo settings", systemImage: "slider.horizontal.3") {
                         showScenarios = true
                     }
                     Button(
-                        "Réinitialiser la démo", systemImage: "arrow.counterclockwise",
+                        "Reset the demo", systemImage: "arrow.counterclockwise",
                         role: .destructive
                     ) {
                         showReset = true
                     }
                 } label: {
-                    Label("Options de démo", systemImage: "ellipsis.circle")
+                    Label("Demo options", systemImage: "ellipsis.circle")
                 }
             }
         }
@@ -759,7 +944,7 @@ import Foundation
         }
     }
 
-    #Preview("Objectif · démonstration") { NativeDemoRoot() }
+    #Preview("Learn · demonstration") { NativeDemoRoot() }
 #endif
 
 // A demo-only state machine: no API identity, scoring, answer keys, rewards or production progress.
@@ -768,6 +953,18 @@ struct NativeDemoFlow: Codable, Equatable {
         case fundamentals = "Cloud · découverte"
         case operations = "Cloud · exploitation"
 
+        var displayName: String {
+            switch self {
+            case .fundamentals: "Cloud · discovery"
+            case .operations: "Cloud · operations"
+            }
+        }
+        var displayTitle: String {
+            switch self {
+            case .fundamentals: "Cloud fundamentals"
+            case .operations: "Cloud services in practice"
+            }
+        }
         var title: String {
             switch self {
             case .fundamentals: "Les fondamentaux du cloud"
@@ -812,23 +1009,23 @@ struct NativeDemoFlow: Codable, Equatable {
         phase == .answering && selection == nil ? .preparation : .exercise
     }
     var startLabel: String {
-        startRoute == .preparation ? "Découvrir la situation" : resumeLabel
+        startRoute == .preparation ? "Explore the situation" : resumeLabel
     }
     var activitySummary: String {
         switch phase {
         case .answering:
             selection == nil
-                ? "Une situation à découvrir · sans note"
-                : "Un choix modifiable · pas encore envoyé"
-        case .pending: "Réponse fictive en attente · aucun résultat confirmé"
-        case .reviewed: "Explication fictive consultable · aucun verdict"
+                ? "A situation to explore · no grade"
+                : "An editable choice · not submitted"
+        case .pending: "Demo answer pending · no confirmed result"
+        case .reviewed: "Fictional explanation available · no verdict"
         }
     }
     var resumeLabel: String {
         switch phase {
-        case .answering: selection == nil ? "Commencer une question" : "Reprendre votre choix"
-        case .pending: "Reprendre la réponse en attente"
-        case .reviewed: "Relire l’explication fictive"
+        case .answering: selection == nil ? "Start a question" : "Resume your choice"
+        case .pending: "Resume the pending answer"
+        case .reviewed: "Read the fictional explanation again"
         }
     }
     mutating func choose(_ objective: Objective) {
@@ -922,8 +1119,37 @@ struct NativeDemoPractice: Sendable {
         ])
 }
 
+enum NativeDemoDestination: String, CaseIterable, Hashable {
+    case learn, coach, social, profile
+}
+
+enum NativeDemoLearnSection: String, Codable {
+    case myLearning, explore
+}
+
+// Retain version-one storage identifiers; visible destinations use the approved English names.
 enum NativeDemoTab: String, Codable, CaseIterable, Hashable {
-    case objective, catalog, followUp
+    case objective, catalog, followUp, coach, social
+
+    var destination: NativeDemoDestination {
+        switch self {
+        case .objective, .catalog: .learn
+        case .followUp: .profile
+        case .coach: .coach
+        case .social: .social
+        }
+    }
+
+    static func selecting(
+        _ destination: NativeDemoDestination, learnSection: NativeDemoLearnSection
+    ) -> Self {
+        switch destination {
+        case .learn: learnSection == .myLearning ? .objective : .catalog
+        case .coach: .coach
+        case .social: .social
+        case .profile: .followUp
+        }
+    }
 }
 
 enum NativeDemoRoute: Codable, Equatable, Hashable {
@@ -939,15 +1165,42 @@ struct NativeDemoNavigationState: Codable, Equatable {
     let selectedTab: NativeDemoTab
     let objectivePath: [NativeDemoRoute]
     let catalogPath: [NativeDemoRoute]
+    let learnSection: NativeDemoLearnSection
+
+    init(
+        selectedTab: NativeDemoTab, objectivePath: [NativeDemoRoute],
+        catalogPath: [NativeDemoRoute], learnSection: NativeDemoLearnSection? = nil
+    ) {
+        self.selectedTab = selectedTab
+        self.objectivePath = objectivePath
+        self.catalogPath = catalogPath
+        self.learnSection = learnSection ?? (selectedTab == .catalog ? .explore : .myLearning)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case selectedTab, objectivePath, catalogPath, learnSection
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            selectedTab: try values.decode(NativeDemoTab.self, forKey: .selectedTab),
+            objectivePath: try values.decode([NativeDemoRoute].self, forKey: .objectivePath),
+            catalogPath: try values.decode([NativeDemoRoute].self, forKey: .catalogPath),
+            learnSection: try values.decodeIfPresent(
+                NativeDemoLearnSection.self, forKey: .learnSection))
+    }
 
     static func make(
         selectedTab: NativeDemoTab,
         objectivePath: [NativeDemoRoute],
         catalogPath: [NativeDemoRoute],
-        flow: NativeDemoFlow
+        flow: NativeDemoFlow,
+        learnSection: NativeDemoLearnSection? = nil
     ) throws -> Self {
         let state = Self(
-            selectedTab: selectedTab, objectivePath: objectivePath, catalogPath: catalogPath)
+            selectedTab: selectedTab, objectivePath: objectivePath, catalogPath: catalogPath,
+            learnSection: learnSection)
         try state.validate(for: flow)
         return state
     }
@@ -977,7 +1230,10 @@ struct NativeDemoNavigationState: Codable, Equatable {
             && catalogPath.allSatisfy {
                 if case .goalDetail = $0 { true } else { false }
             }
-        guard objectiveRoutesAreValid, catalogRoutesAreValid else {
+        let sectionMatchesTab =
+            (selectedTab != .objective || learnSection == .myLearning)
+            && (selectedTab != .catalog || learnSection == .explore)
+        guard objectiveRoutesAreValid, catalogRoutesAreValid, sectionMatchesTab else {
             throw InvalidSnapshot.inconsistentRoute
         }
     }
@@ -998,7 +1254,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
             selectedTab: navigation.selectedTab,
             objectivePath: navigation.objectivePath,
             catalogPath: navigation.catalogPath,
-            flow: flow)
+            flow: flow, learnSection: navigation.learnSection)
         return Self(schema: 1, flow: flow, navigation: validatedNavigation)
     }
 
@@ -1016,7 +1272,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
         } catch DecodingError.keyNotFound(let key, _) where key.stringValue == "schema" {
             let legacyFlow = try NativeDemoFlow.restore(data)
             let legacyNavigation = try NativeDemoNavigationState.make(
-                selectedTab: .objective, objectivePath: [], catalogPath: [], flow: legacyFlow)
+                selectedTab: legacyFlow.objective == nil ? .catalog : .objective,
+                objectivePath: [], catalogPath: [], flow: legacyFlow)
             return try make(flow: legacyFlow, navigation: legacyNavigation)
         }
     }
@@ -1047,14 +1304,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 }
                             }
                             if model.tracks.isEmpty {
-                                Text("Aucune certification disponible.")
+                                Text("No certifications available.")
                             }
                         }
                         .disabled(model.busy)
-                        .navigationTitle("Bibliothèque")
+                        .navigationTitle("Library")
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
-                                Button("Déconnecter", systemImage: "person.crop.circle.badge.xmark")
+                                Button("Disconnect", systemImage: "person.crop.circle.badge.xmark")
                                 {
                                     Task { await model.disconnect() }
                                 }
@@ -1083,20 +1340,20 @@ struct NativeDemoSnapshot: Codable, Equatable {
             }
             .safeAreaInset(edge: .bottom) {
                 if model.busy {
-                    ProgressView("Opération en cours…")
+                    ProgressView("Operation in progress…")
                         .padding()
                         .frame(maxWidth: .infinity)
                         .background(.regularMaterial)
                 }
             }
             .alert(
-                "Opération non confirmée",
+                "Operation not confirmed",
                 isPresented: Binding(
                     get: { model.errorMessage != nil },
                     set: { if !$0 { model.errorMessage = nil } }
                 )
             ) {
-                Button("Compris", role: .cancel) { model.errorMessage = nil }
+                Button("OK", role: .cancel) { model.errorMessage = nil }
             } message: {
                 Text(model.errorMessage ?? "")
             }
@@ -1107,31 +1364,31 @@ struct NativeDemoSnapshot: Codable, Equatable {
             NavigationStack {
                 Form {
                     Section {
-                        Text("Connectez uniquement un compte de test à l’API de développement.")
+                        Text("Connect only a test account to the development API.")
                         Text(
-                            "Ce connecteur développeur n’est pas le parcours de connexion de la future app. Aucun compte Apple ni nouvelle identité n’est créé."
+                            "This developer connector is not production sign-in. No Apple account or new identity is created."
                         )
                         .foregroundStyle(.secondary)
                     } header: {
-                        Text("Certigo · développement")
+                        Text("Certigo · development")
                     }
-                    Section("Connexion de test") {
-                        TextField("URL API HTTPS", text: $model.baseURL)
+                    Section("Test connection") {
+                        TextField("HTTPS API URL", text: $model.baseURL)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
                             .accessibilityIdentifier("developer-api-url")
-                        SecureField("Jeton d’accès du compte de test", text: $model.token)
+                        SecureField("Test account access token", text: $model.token)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .privacySensitive()
                             .accessibilityIdentifier("developer-access-token")
-                        Button("Connecter le compte de test") { Task { await model.connect() } }
+                        Button("Connect the test account") { Task { await model.connect() } }
                             .disabled(model.busy || model.baseURL.isEmpty || model.token.isEmpty)
                     }
                     Section {
                         Text(
-                            "Le jeton reste dans le coffre sécurisé de cet appareil. Les réponses en attente ne sont jamais corrigées localement."
+                            "The token stays in this device’s secure vault. Pending answers are never graded locally."
                         )
                         .foregroundStyle(.secondary)
                     }
@@ -1144,8 +1401,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
             List(selection: $selectedLesson) {
                 if let path = model.path {
                     Section {
-                        LabeledContent("Préparation confirmée", value: "\(path.readinessScore) %")
-                        Button("Actualiser la progression", systemImage: "arrow.clockwise") {
+                        LabeledContent("Confirmed readiness", value: "\(path.readinessScore) %")
+                        Button("Refresh progress", systemImage: "arrow.clockwise") {
                             Task { await model.refreshProgress() }
                         }
                         .disabled(model.busy)
@@ -1170,32 +1427,32 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 } else {
                     ContentUnavailableView(
-                        "Choisissez une certification", systemImage: "books.vertical",
-                        description: Text("Son parcours sera chargé depuis le serveur.")
+                        "Choose a certification", systemImage: "books.vertical",
+                        description: Text("Its learning path will load from the server.")
                     )
                 }
                 if !model.queue.isEmpty {
-                    Section("Réponses enregistrées") {
+                    Section("Saved answers") {
                         ForEach(model.queue) { saved in
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(saved.lessonId).font(.headline)
                                 switch saved.status {
                                 case .pendingCorrection:
-                                    Label("Correction en attente", systemImage: "clock")
-                                    Button("Réessayer la correction") {
+                                    Label("Correction pending", systemImage: "clock")
+                                    Button("Retry correction") {
                                         Task { await model.retry(saved) }
                                     }
                                     .disabled(model.busy)
                                 case .corrected:
                                     if let result = saved.result {
-                                        Text("Score confirmé : \(result.scorePct) %")
+                                        Text("Confirmed score: \(result.scorePct) %")
                                         ForEach(result.results) { item in
                                             Text(item.explanation)
                                         }
                                     }
                                 case .failed:
                                     Label(
-                                        "Envoi refusé · réponses conservées",
+                                        "Submission rejected · answers preserved",
                                         systemImage: "exclamationmark.triangle")
                                 }
                             }
@@ -1204,7 +1461,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 }
             }
-            .navigationTitle(model.path?.trackName ?? "Parcours")
+            .navigationTitle(model.path?.trackName ?? "Learning path")
         }
 
         private var session: some View {
@@ -1214,7 +1471,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         VStack(alignment: .leading, spacing: 24) {
                             Text(lesson.title).font(.title).bold()
                             Text(
-                                "Répondez aux questions, puis envoyez vos réponses pour obtenir la correction du serveur."
+                                "Answer the questions, then submit your answers for server correction."
                             )
                             .foregroundStyle(.secondary)
                             ForEach(Array(lesson.blocks.enumerated()), id: \.offset) { _, block in
@@ -1233,18 +1490,18 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 switch outcome {
                                 case .pendingCorrection:
                                     Label(
-                                        "Réponses enregistrées. Correction à la reconnexion.",
+                                        "Answers saved. Correction will be requested after reconnecting.",
                                         systemImage: "clock"
                                     )
                                     .accessibilityIdentifier("pending-correction")
                                 case .corrected(let result):
-                                    Text("Score confirmé : \(result.scorePct) %").font(.title2)
+                                    Text("Confirmed score: \(result.scorePct) %").font(.title2)
                                         .bold()
-                                    Text("XP confirmés : \(result.rewards.xpEarned)")
+                                    Text("Confirmed XP: \(result.rewards.xpEarned)")
                                     ForEach(result.results) { item in
                                         VStack(alignment: .leading, spacing: 8) {
                                             Label(
-                                                item.correct ? "Réponse correcte" : "À revoir",
+                                                item.correct ? "Correct answer" : "Review needed",
                                                 systemImage: item.correct
                                                     ? "checkmark.circle" : "book"
                                             )
@@ -1253,7 +1510,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                     }
                                 }
                             } else {
-                                Button("Envoyer pour correction") { Task { await model.submit() } }
+                                Button("Submit for correction") { Task { await model.submit() } }
                                     .buttonStyle(.borderedProminent)
                                     .controlSize(.large)
                                     .disabled(!model.canSubmit)
@@ -1266,12 +1523,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 } else {
                     ContentUnavailableView(
-                        "Une session à la fois", systemImage: "book",
-                        description: Text("Choisissez une activité dans le parcours.")
+                        "One session at a time", systemImage: "book",
+                        description: Text("Choose an activity in the learning path.")
                     )
                 }
             }
-            .navigationTitle("Révision")
+            .navigationTitle("Practice")
         }
 
         private func questionView(_ question: QuizItem) -> some View {
