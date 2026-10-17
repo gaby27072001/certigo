@@ -203,7 +203,8 @@ internal sealed class InMemoryAttemptRepository : IAttemptRepository
 
     public Task CreateAsync(AttemptRecord attempt, CancellationToken cancellationToken = default)
     {
-        if (_store.Any(a => string.Equals(a.Id, attempt.Id, StringComparison.Ordinal)))
+        if (_store.Any(a => string.Equals(a.Id, attempt.Id, StringComparison.Ordinal)
+            && string.Equals(a.UserId, attempt.UserId, StringComparison.Ordinal)))
         {
             throw new DuplicateRecordException($"Attempt '{attempt.Id}' already exists.");
         }
@@ -282,7 +283,8 @@ internal sealed class InMemoryEventRepository : IEventRepository
 
     public Task AddAsync(LearningEvent learningEvent, CancellationToken cancellationToken = default)
     {
-        if (Events.All(existing => !string.Equals(existing.Id, learningEvent.Id, StringComparison.Ordinal)))
+        if (Events.All(existing => !string.Equals(existing.Id, learningEvent.Id, StringComparison.Ordinal)
+            || !string.Equals(existing.UserId, learningEvent.UserId, StringComparison.Ordinal)))
         {
             Events.Add(learningEvent);
         }

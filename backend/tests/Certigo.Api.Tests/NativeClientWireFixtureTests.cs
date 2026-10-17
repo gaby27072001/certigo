@@ -1,11 +1,14 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using Certigo.Api.Functions;
+using Certigo.Api.Middleware;
+using Certigo.Application.Abstractions;
 using Certigo.Application.Dtos;
 using Certigo.Application.Services;
 using Certigo.Domain.Content;
 using FluentAssertions;
 using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Certigo.Api.Tests;
@@ -14,6 +17,56 @@ public sealed class NativeClientWireFixtureTests
 {
     private const string ManifestId =
         "sha256:0000000000000000000000000000000000000000000000000000000000000000";
+
+    [Fact]
+    public async Task Active_goal_function_consumes_the_shared_request_and_emits_the_owner_profile()
+    {
+        var service = new FakeUserService
+        {
+            Result = new UserProfileDto(
+                "demo-owner", "Synthetic learner", "demo-learner", null,
+                100, 1, 0, 0, 50, 0, 0, null,
+                EconomyReceipts:
+                [
+                    new EconomyProfileReceipt(
+                        "synthetic-internal-operation", DateTimeOffset.UnixEpoch, "{}"),
+                ],
+                AppliedEconomyOperations: ["synthetic-legacy-operation"]),
+        };
+        var context = TestFunctionContext.Authenticated();
+        var response = await new UserFunctions(service).SetActiveTrack(
+            new TestHttpRequestData(
+                context, "POST", "https://localhost/api/me/active-track",
+                JsonNode.Parse(ReadFixture("active-track-request.json"))!),
+            context);
+
+        service.LastTrackId.Should().Be("demo-track");
+        service.LastExpectedTrackId.Should().BeNull();
+        await AssertFixtureAsync(response, "profile.json");
+        var reloaded = await new UserFunctions(service).GetMe(
+            new TestHttpRequestData(context, "GET", "https://localhost/api/me"), context);
+        await AssertFixtureAsync(reloaded, "profile.json");
+    }
+
+    [Theory]
+    [InlineData(false, 409, "Active track conflict")]
+    [InlineData(true, 404, "Track not found")]
+    public async Task Active_goal_errors_have_the_existing_problem_status(
+        bool missingTrack, int status, string title)
+    {
+        var invocation = FunctionTestHarness.CreateHttp();
+        var middleware = new ExceptionMiddleware(NullLogger<ExceptionMiddleware>.Instance);
+        Exception error = missingTrack
+            ? new TrackNotFoundException("unavailable-track")
+            : new ActiveTrackConflictException();
+
+        await middleware.Invoke(invocation.Context, _ => throw error);
+
+        invocation.Response!.StatusCode.Should().Be((HttpStatusCode)status);
+        var problem = await invocation.ReadProblemAsync();
+        problem!.Status.Should().Be(status);
+        problem.Title.Should().Be(title);
+    }
 
     [Fact]
     public async Task Catalog_function_emits_the_shared_native_wire_fixture()
