@@ -18,6 +18,34 @@ contract; JSON values, omitted keys, dates, enums and nulls are.
 | `active-track-request.json` | Explicit `POST /api/me/active-track` request |
 | `profile.json` | Authoritative profile from `GET /api/me` or active-track selection |
 
+## Backend parity evidence
+
+At Certigo `main` base `3b305a4093fdaba8f8cc4595ac78810c58ae38f9`,
+`NativeClientWireFixtureTests` (blob `39b1730bc0002899a95e372291d2c03bb02af0d8`)
+invokes the real active-track and profile functions and compares only
+`active-track-request.json` and `profile.json` with their serialized responses.
+Those two fixture bytes match the backend-owned contract files at
+`ecbfb054f2474bc430856b72fd55d66a03f6e9fb`.
+
+The other six files are historical synthetic Swift wire-shape vectors from
+native source commit `3339685c1ea571971875041ddbcf3d23471b3c76`. Their Git blob
+SHA-1s identify the exact historical bytes; they are decoded by Swift tests but
+are not compared with real C# function output by the backend fixture test at
+that base:
+
+| Fixture | Historical Git blob SHA-1 |
+| --- | --- |
+| `catalog.json` | `0860553b5a2a145c3b74b712d274d2fcd87c89fc` |
+| `path.json` | `bc1efaf3fcfbd60c8b0d137f4c316e0324067996` |
+| `lesson.json` | `319765ebe944cdb2b44e3e5bddcab02421ffaa33` |
+| `quiz-submit-request.json` | `ca93fa499a46c9606ba9555155b29fcdfd5c3ae3` |
+| `quiz-submit-result.json` | `d728c9f655fa8ab166d0ca984f777f2c97833abb` |
+| `quiz-submit-correct-result.json` | `8385c88f8db355a7ca1c0915d01c42fecb78c599` |
+
+Do not describe those six vectors as current backend parity or as exercised by
+the current C# fixture test. Their historical blob identity proves which bytes
+were reviewed, not which server implementation produced them.
+
 The two active-goal vectors are pinned to backend revision
 `ecbfb054f2474bc430856b72fd55d66a03f6e9fb`. Selection sends `trackId` and nullable
 `expectedTrackId`; no client ETag/If-Match is required. A 409 requires reloading
