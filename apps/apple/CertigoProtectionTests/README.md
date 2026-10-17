@@ -56,7 +56,7 @@ downloading, upgrading packages or removing the resolution guards.
 ```bash
 set -euo pipefail
 RUN=/Users/gabrielchambaud/Developer/Certigo-final-validation.miqgke
-FIX_COMMIT='<exact reviewed correction commit>'
+FIX_COMMIT='636cca591d278efd23432e051ca2a10b4fc0a56d'
 SOURCE="$RUN/source-arch-fix"
 PACKAGES="$HOME/Developer/Certigo-preview-c8f0a74f.lZNx2H/SourcePackages"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$$"
