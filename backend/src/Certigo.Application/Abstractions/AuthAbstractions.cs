@@ -177,8 +177,8 @@ public sealed record EmailMessage(
 
 /// Sends transactional email. The production binding is Azure Communication
 /// Services; when no provider is configured the binding is a logging no-op, so
-/// the whole register/verify flow still works end-to-end (the confirmation link
-/// is written to the logs) without blocking sign-up.
+/// registration is not blocked by delivery setup. The no-op logs only a static
+/// status marker and never exposes recipient data or message content.
 public interface IEmailSender
 {
     Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default);

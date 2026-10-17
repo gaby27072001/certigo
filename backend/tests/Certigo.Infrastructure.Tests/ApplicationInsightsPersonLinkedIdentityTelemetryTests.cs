@@ -1,4 +1,5 @@
 using Certigo.Application.Abstractions;
+using Certigo.Domain.Identity;
 using Certigo.Infrastructure.Observability;
 using FluentAssertions;
 using Microsoft.ApplicationInsights;
@@ -49,6 +50,34 @@ public sealed class ApplicationInsightsPersonLinkedIdentityTelemetryTests
         metric.Properties.Should().NotContainKey("userId");
         metric.Properties.Should().NotContainKey("subject");
         metric.Properties.Should().NotContainKey("email");
+    }
+
+    [Fact]
+    public void Failure_log_omits_identity_type_while_metric_keeps_bounded_dimension()
+    {
+        var channel = new RecordingTelemetryChannel();
+        var configuration = new TelemetryConfiguration
+        {
+            DisableTelemetry = false,
+            TelemetryChannel = channel,
+        };
+        var logger = new CapturingLogger<ApplicationInsightsPersonLinkedIdentityTelemetry>();
+        var telemetry = new ApplicationInsightsPersonLinkedIdentityTelemetry(
+            new TelemetryClient(configuration),
+            logger);
+
+        telemetry.Track(new PersonIdentityTelemetryEvent(
+            PersonIdentityTelemetryOperation.Reconciliation,
+            PersonIdentityTelemetryOutcome.Conflict,
+            new DateTimeOffset(2026, 8, 20, 12, 0, 0, TimeSpan.Zero),
+            IdentityLocator.LocalProvider,
+            IdentityLocator.LocalPasswordType,
+            "identity_already_linked"));
+
+        logger.Messages.Should().ContainSingle()
+            .Which.Should().NotContain(IdentityLocator.LocalPasswordType);
+        channel.Metrics.Should().ContainSingle()
+            .Which.Properties["identityType"].Should().Be(IdentityLocator.LocalPasswordType);
     }
 
     private sealed class RecordingTelemetryChannel : ITelemetryChannel
