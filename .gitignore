@@ -112,6 +112,7 @@ tools/seed_output/
 tools/__pycache__/
 __pycache__/
 *.pyc
+apps/apple/CertigoNative/ProtectionProbe/LocalLot/
 infra/ci-runner/image/evidence/
 # Pages legales generees par tools/build_public_pages.mjs. La source est
 # docs/legal/*.md ; committer le HTML genere le ferait diverger en silence.

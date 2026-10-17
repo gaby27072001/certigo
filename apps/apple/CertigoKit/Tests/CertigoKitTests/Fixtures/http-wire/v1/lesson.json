@@ -1,0 +1,57 @@
+{
+  "id": "demo-lesson",
+  "trackId": "demo-track",
+  "unitId": "demo-unit",
+  "domainId": "demo-domain",
+  "title": "Demo lesson",
+  "estMinutes": 5,
+  "blocks": [
+    {
+      "type": "concept",
+      "conceptId": "demo-concept",
+      "title": "Public synthetic content",
+      "body": "This fixture contains no answer key.",
+      "code": null,
+      "language": null,
+      "check": null
+    },
+    {
+      "type": "check",
+      "conceptId": "demo-concept",
+      "title": null,
+      "body": null,
+      "code": null,
+      "language": null,
+      "check": {
+        "id": "demo-item",
+        "conceptId": "demo-concept",
+        "type": "mcq",
+        "stem": "Choose an option.",
+        "options": [
+          { "id": "a", "label": "Option A" },
+          { "id": "b", "label": "Option B" }
+        ]
+      }
+    },
+    {
+      "type": "check",
+      "conceptId": "demo-concept",
+      "title": null,
+      "body": null,
+      "code": null,
+      "language": null,
+      "check": {
+        "id": "demo-pairs",
+        "conceptId": "demo-concept",
+        "type": "matchPairs",
+        "stem": "Match the labels.",
+        "options": [
+          { "id": "left-1", "label": "Left label" }
+        ],
+        "matches": [
+          { "id": "right-1", "label": "Right label" }
+        ]
+      }
+    }
+  ]
+}
