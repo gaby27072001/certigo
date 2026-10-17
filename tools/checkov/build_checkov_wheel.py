@@ -29,11 +29,11 @@ RULE_FIXES = {
     "cosmos": (
         "checkov/arm/checks/resource/CosmosDBAccountsRestrictedAccess.py",
         "86aeb6941e76526497db6db689281ca29562acd02d62eaeca1969265f8052e70",
-        "1cae31ee086c9418e6ec2e43a3d79611f154efb3872870e15836c5ec6d619efa",
-        "7143436339d7a40821227f5f99fbc07cbd77243e608ff5de27626ffe54c044fc",
+        "9e53cde9e2ba94003be11049fa20f8d7537220b9054c3e4862664646cdc86ba3",
+        "2a5d260ab48a02032dfed01f14ba9c4fb4d806f23414f4c12c6d1a031b1c0384",
     ),
 }
-VERSION = "3.2.495+certigo.2"
+VERSION = "3.2.495+certigo.3"
 OLD_INFO = "checkov-3.2.495.dist-info/"
 NEW_INFO = f"checkov-{VERSION}.dist-info/"
 

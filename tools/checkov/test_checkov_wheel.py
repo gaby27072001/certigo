@@ -11,7 +11,7 @@ import zipfile
 import build_checkov_wheel as builder
 
 
-WHEEL_SHA256 = "02b5776b20c78bb7dd1c1bec68b25292082d85744a26c32ba25e530c036831ec"
+WHEEL_SHA256 = "205e7b0114e2c1f08fdac93b10f2013199f7e4979fe53cb14f33258cc2f1e5af"
 CHANGED_SOURCES = {builder.SOURCE, *(entry[0] for entry in builder.RULE_FIXES.values())}
 
 

@@ -62,7 +62,7 @@
 +                else:
 +                    try:
 +                        network = ip_network(value, strict=False)
-+                        valid = valid and network.version == 4 and network.prefixlen > 0 and str(network.network_address) != "0.0.0.0"
++                        valid = valid and network.version == 4 and network.prefixlen > 1 and str(network.network_address) != "0.0.0.0"
 +                    except ValueError:
 +                        valid = False
 +            if not valid:
