@@ -16,10 +16,12 @@ let package = Package(
     targets: [
         .target(name: "CertigoCortex"),
         .target(name: "CertigoDomain"),
+        .target(name: "CertigoAppleFileIO"),
         .target(
             name: "CertigoData",
             dependencies: [
                 "CertigoDomain",
+                .target(name: "CertigoAppleFileIO", condition: .when(platforms: [.iOS])),
                 .product(
                     name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
             ]
