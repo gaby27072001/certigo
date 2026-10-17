@@ -14,6 +14,7 @@
 		000000000000000000000005 /* CertigoData in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000042 /* CertigoData */; };
 		000000000000000000000006 /* MSALAuthenticationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000015 /* MSALAuthenticationProvider.swift */; };
 		000000000000000000000007 /* MSAL in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000044 /* MSAL */; };
+		000000000000000000000008 /* Certigo.icon in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000016 /* Certigo.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -22,6 +23,7 @@
 		000000000000000000000013 /* CredentialVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialVault.swift; sourceTree = "<group>"; };
 		000000000000000000000014 /* CertigoNative.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = CertigoNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000015 /* MSALAuthenticationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MSALAuthenticationProvider.swift; sourceTree = "<group>"; };
+		000000000000000000000016 /* Certigo.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Certigo.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,8 +44,17 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000021 /* Sources */,
+				000000000000000000000023 /* Resources */,
 				000000000000000000000022 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000023 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000016 /* Certigo.icon */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		000000000000000000000021 /* Sources */ = {
@@ -127,6 +138,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				000000000000000000000008 /* Certigo.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -174,6 +186,7 @@
 		000000000000000000000082 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = Certigo;
 				CODE_SIGNING_ALLOWED = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -199,6 +212,7 @@
 		000000000000000000000083 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = Certigo;
 				CODE_SIGNING_ALLOWED = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
