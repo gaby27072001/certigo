@@ -6,10 +6,19 @@ let package = Package(
     name: "CertigoKit",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
-        .library(name: "CertigoCortex", targets: ["CertigoCortex"])
+        .library(name: "CertigoCortex", targets: ["CertigoCortex"]),
+        .library(name: "CertigoDomain", targets: ["CertigoDomain"]),
+        .library(name: "CertigoData", targets: ["CertigoData"]),
     ],
+    dependencies: [],
     targets: [
         .target(name: "CertigoCortex"),
-        .testTarget(name: "CertigoKitTests", dependencies: ["CertigoCortex"]),
+        .target(name: "CertigoDomain"),
+        .target(name: "CertigoData", dependencies: ["CertigoDomain"]),
+        .testTarget(
+            name: "CertigoKitTests",
+            dependencies: ["CertigoCortex", "CertigoDomain", "CertigoData"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )
