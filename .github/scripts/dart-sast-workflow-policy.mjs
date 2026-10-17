@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseCanonicalWorkflow } from './workflow-semantic-fingerprint.mjs';
+import {
+  parseCanonicalWorkflow,
+  readVerifiedRegularFileSync,
+} from './workflow-semantic-fingerprint.mjs';
 
 // Contrat exact de dart-sast.yml (finding D10, docs/runbooks/DART_SAST.md).
 // Le verdict du job agrégé ne vaut que si le workflow est exactement l'une des formes relues de
@@ -35,10 +38,11 @@ export function loadDartSastWorkflowForms(
   names.sort((left, right) => formNumber(left) - formNumber(right));
   return Object.freeze(names.map((name) => {
     const file = path.join(directory, name);
-    if (!fs.lstatSync(file).isFile()) {
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
       throw new Error(`${file} must be a regular file`);
     }
-    const text = fs.readFileSync(file, 'utf8');
+    const text = readVerifiedRegularFileSync(file, stat).toString('utf8');
     const parsed = parseCanonicalWorkflow(text, file);
     if (parsed.errors.length > 0) {
       throw new Error(parsed.errors.join('\n'));
