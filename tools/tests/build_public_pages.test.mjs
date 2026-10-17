@@ -234,11 +234,21 @@ test('new POSIX output stays private during writing and follows non-default umas
       process.umask(0o027);
       await buildPublicPages(config);
       const file = join(output, 'index.html');
-      assert.equal((await fs.stat(file)).mode & 0o777, 0o640);
-      await fs.chmod(file, 0o604);
+      const first = await fs.open(file, 'r+');
+      try {
+        assert.equal((await first.stat()).mode & 0o777, 0o640);
+        await first.chmod(0o604);
+      } finally {
+        await first.close();
+      }
       process.umask(0o077);
       await buildPublicPages(config);
-      assert.equal((await fs.stat(file)).mode & 0o777, 0o604);
+      const repeated = await fs.open(file, 'r');
+      try {
+        assert.equal((await repeated.stat()).mode & 0o777, 0o604);
+      } finally {
+        await repeated.close();
+      }
     `, join(output, 'different-umask')], { timeout: 15000, encoding: 'utf8' });
   } finally {
     context.mock.restoreAll();

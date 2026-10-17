@@ -573,6 +573,29 @@ function validateControlledWorkflowFile(filePath, label, errors) {
   }
 }
 
+function readCheckedFileSync(filePath, checkedStat) {
+  let descriptor;
+  try {
+    const flags = fs.constants.O_RDONLY
+      | (fs.constants.O_NOFOLLOW ?? 0)
+      | (fs.constants.O_NONBLOCK ?? 0);
+    descriptor = fs.openSync(filePath, flags);
+    const openedStat = fs.fstatSync(descriptor);
+    if (
+      !openedStat.isFile()
+      || openedStat.dev !== checkedStat.dev
+      || openedStat.ino !== checkedStat.ino
+    ) {
+      throw new Error('file changed after it was checked');
+    }
+    return fs.readFileSync(descriptor, 'utf8');
+  } finally {
+    if (descriptor !== undefined) {
+      fs.closeSync(descriptor);
+    }
+  }
+}
+
 function validateActiveWorkflowSet(root, workflows, state, errors, manifestPath, now) {
   let loaded;
   try {
@@ -675,7 +698,13 @@ function validateActiveWorkflowSet(root, workflows, state, errors, manifestPath,
       errors.push(`${canonicalPath}: must resolve to its exact repository path`);
       continue;
     }
-    const content = fs.readFileSync(filePath, 'utf8');
+    let content;
+    try {
+      content = readCheckedFileSync(filePath, fileStat);
+    } catch (error) {
+      errors.push(`${canonicalPath}: ${error.message}`);
+      continue;
+    }
     const result = fingerprintWorkflow(canonicalPath, content);
     errors.push(...result.errors);
     if (result.errors.length === 0 && !acceptedValues.get(canonicalPath).has(result.digest)) {
