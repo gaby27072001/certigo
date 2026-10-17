@@ -392,7 +392,7 @@ dépend ni de l'objet Git capturé ni de son ascendance et reste donc valide apr
 
 | Brique | Statut | Où | En clair |
 |---|:---:|---|---|
-| **API backend** | 🟢 | `backend/src/Certigo.Api` | Azure Functions .NET 8 isolé ; couvert par `ci-backend.yml`. |
+| **API backend** | 🟢 | `backend/src/Certigo.Api` | Azure Functions isolé ; cible documentée dans « Cible backend .NET 10 ». Le SDK CI reste celui du bloc technique généré. |
 | **Moteurs métier** | 🟢 | `backend/src/Certigo.Domain` | Logique **pure & testée** : contenu, progression, gamification, examen, tuteur, reco, notifications, intégrité. |
 | **Contenu pédagogique** | 🟢 | [`certigo-content`](https://github.com/gchambaud_microsoft/certigo-content) | Source éditoriale active du corpus migré : contenu public, `answerKey`, schémas et manifeste immuable. `content/` est un instantané historique. |
 | **Gamification** | 🟢 | Domain `Gamification/` | XP, streak (+réparation), ligues hebdo, **saisons**, quêtes, succès, boutique, amis. |
@@ -413,6 +413,19 @@ dépend ni de l'objet Git capturé ni de son ascendance et reste donc valide apr
 
 **Légende narrative :** 🟢 implémenté avec référence indiquée · 🟡 partiel / en cours · 🔴 absent.
 Un statut sans référence vérifiable reste **non vérifié / manuel**.
+
+### Cible backend .NET 10
+
+Fait vérifié le **2026-10-13** : les projets backend et leurs tests ciblent `net10.0`,
+l'API utilise le worker isolé Azure Functions 2.52.0 avec `Azure.Functions.Sdk` 1.0.0,
+et le module Function App déclare le runtime `10.0`. Microsoft classe .NET 10 comme LTS,
+soutenu jusqu'en novembre 2028, et prend en charge .NET 10 isolé sur Linux Flex Consumption
+([politique de support .NET](https://learn.microsoft.com/dotnet/core/releases-and-support),
+[guide Azure Functions isolated](https://learn.microsoft.com/azure/azure-functions/dotnet-isolated-process-guide)).
+
+Cette référence est invalidée si les `TargetFramework` backend, le worker/SDK Functions ou le
+runtime Bicep changent, ou si Microsoft modifie le support de .NET 10 ou de ce plan Linux.
+Le SDK des workflows est une donnée distincte, conservée dans le bloc « État technique généré ».
 
 ### Décision de release — Alpha iOS (gelée le 2026-09-04)
 
@@ -445,7 +458,7 @@ upload ou recréation de store.
 graph TD
     ROOT["📦 Certigo (monorepo)"]
 
-    ROOT --> BE["⚙️ backend/<br/>Azure Functions .NET 8"]
+    ROOT --> BE["⚙️ backend/<br/>Azure Functions isolées"]
     ROOT --> APP["📱 apps/mobile/<br/>App Flutter"]
     ROOT --> PKG["🧩 packages/<br/>Paquets Dart partagés"]
     ROOT -.-> CNT["📚 certigo-content<br/>source éditoriale active"]
@@ -619,8 +632,8 @@ graph TD
     end
 ```
 
-Pile : **Azure Functions .NET 8 (worker isolé)**, déclencheurs HTTP, middleware JWT global avec liste
-d'exemptions (endpoints anonymes), accès Cosmos via le SDK officiel.
+Pile : **Azure Functions isolées** (voir « Cible backend .NET 10 »), déclencheurs HTTP,
+middleware JWT global avec liste d'exemptions (endpoints anonymes), accès Cosmos via le SDK officiel.
 
 ---
 

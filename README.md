@@ -9,7 +9,7 @@ et atteindre la *readiness* certification sur un catalogue multi-cloud. Les parc
 existants restent disponibles ; Certigo adapte le catalogue public canonique de `certigo-content`
 avant l'arrivée progressive des contenus AWS et Google Cloud.
 
-`Flutter` · `.NET 8 isolated Functions` · `Cosmos DB` · `Entra External ID` · `Bicep`
+`Flutter` · `.NET 10 isolated Functions` · `Cosmos DB` · `Entra External ID` · `Bicep`
 
 </div>
 
@@ -52,7 +52,7 @@ certigo/
 │  ├─ core/                # Socle : env, Result, Failures, utils transverses
 │  ├─ cortex/              # Moteur FSRS / mastery / readiness (Dart pur, testable)
 │  └─ data/               # Modèles, API client, repositories (miroir des DTO backend)
-├─ backend/                # .NET 8 isolated Azure Functions — Clean Architecture
+├─ backend/                # .NET 10 isolated Azure Functions — Clean Architecture
 │  ├─ src/
 │  │  ├─ Certigo.Api/            # HTTP triggers, middleware auth/erreurs
 │  │  ├─ Certigo.Application/    # Services métier, DTO, abstractions
@@ -105,7 +105,7 @@ workflow automatisé, un test, un runbook ou un audit daté ; sinon elle est ét
 |---|---|
 | Mobile | Flutter / Dart, Riverpod, go_router, monorepo **Melos** |
 | Design | Prism (Material 3 sous-jacent, `BackdropFilter`, gradients, `CustomPaint`) |
-| API | **Azure Functions .NET 8 isolated**, HTTP triggers, Clean Architecture |
+| API | **Azure Functions .NET 10 isolated**, HTTP triggers, Clean Architecture |
 | Données | **Azure Cosmos DB** (serverless) |
 | Médias | **Azure Blob Storage** (`lesson-assets`) |
 | Identité | **Microsoft Entra External ID** (JWT validé côté Functions) |
@@ -124,10 +124,15 @@ workflow automatisé, un test, un runbook ou un audit daté ; sinon elle est ét
 |---|---|---|
 | Flutter SDK | **3.44.4** | app mobile, packages et goldens ; pin CI/release aligné |
 | Melos | `dart pub global activate melos` | orchestration monorepo Dart |
-| .NET SDK | **8.0** | backend Functions |
+| .NET SDK | **10.0** | backend Functions |
 | Azure Functions Core Tools | v4 | exécution locale des Functions |
 | Node.js | ≥ 20 | validation de contenu |
 | Python | ≥ 3.10 | seed du contenu vers Cosmos |
+
+La cible backend .NET 10 et le runtime Bicep sont des sources, pas une preuve de
+déploiement. Les workflows backend actifs utilisent encore le SDK .NET 8 ; leur
+migration suit [`CI_WORKFLOW_CHANGES.md`](docs/runbooks/CI_WORKFLOW_CHANGES.md)
+avant la fusion de la cible .NET 10. Les contrôles et scellés existants restent requis.
 | Azure CLI + Bicep | récent | déploiement infra |
 
 ### 1) Mobile
@@ -144,9 +149,11 @@ cd apps/mobile && flutter run
 
 ```bash
 cd backend
-dotnet restore
-dotnet build -warnaserror
-dotnet test                         # tests de domaine (FSRS, readiness, XP)
+dotnet restore Certigo.sln --locked-mode
+# Azure.Functions.Sdk doit aussi restaurer directement l'API et son projet d'extensions :
+dotnet restore src/Certigo.Api/Certigo.Api.csproj --locked-mode
+dotnet build Certigo.sln --configuration Release --no-restore -warnaserror
+dotnet test Certigo.sln --configuration Release --no-build
 # Exécution locale (Functions Core Tools) :
 cp src/Certigo.Api/local.settings.json.example src/Certigo.Api/local.settings.json
 # LLM tutor (optionnel) : laissez TUTOR_LLM_ENABLED=false par défaut ; pour l'activer,
@@ -200,7 +207,7 @@ az deployment sub create \
 ## 🔁 Flux de bout en bout
 
 ```
-Mobile (Flutter)  ──JWT Entra──▶  Azure Functions (.NET 8)  ──▶  Cosmos DB
+Mobile (Flutter)  ──JWT Entra──▶  Azure Functions (.NET 10)  ──▶  Cosmos DB
    Prism UI                          Clean Architecture            users · content
    Cortex (client)                   Cortex (serveur, autoritatif) progress · attempts
                                       App Insights                  events · leaderboard
@@ -279,7 +286,7 @@ Pour ajouter les intégrations réelles, démarrer l'émulateur puis définir
 > [`docs/CI_RUNNER_RESILIENCE.md`](docs/CI_RUNNER_RESILIENCE.md).
 >
 >  
-> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 8 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `certigo-ci`.
+> Sur la VM Azure du runner, installez au minimum : Flutter/Dart, .NET 10 SDK, Node 20, Azure CLI (Bicep), puis enregistrez le runner GitHub avec le label `certigo-ci`.
 
 > [!IMPORTANT]
 > **Accès sortant internet du runner.** Depuis le retrait de l'accès sortant par

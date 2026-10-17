@@ -15,7 +15,8 @@ Set-Location apps\mobile
 flutter run
 
 Set-Location backend
-dotnet restore Certigo.sln
+dotnet restore Certigo.sln --locked-mode
+dotnet restore src\Certigo.Api\Certigo.Api.csproj --locked-mode
 dotnet build Certigo.sln --configuration Release --no-restore -warnaserror
 dotnet test Certigo.sln --configuration Release --no-build --verbosity normal
 
@@ -78,7 +79,7 @@ accounts created for the test, and delete them afterwards.
 - `packages\data` - DTOs, API client, repositories, cache, and offline sync.
 - `packages\prism_ui` - Prism design tokens, themes, reusable components, lesson
   rendering, and visual golden tests.
-- `backend\src` - .NET 8 isolated Azure Functions organized as Domain,
+- `backend\src` - .NET 10 isolated Azure Functions organized as Domain,
   Application, Infrastructure, and API projects.
 - `backend\tests` - xUnit projects mirroring backend architecture.
 - `content` - certification tracks and lessons in YAML plus JSON schemas.
@@ -115,7 +116,7 @@ Key entry points are `apps\mobile\lib\main.dart`,
   `const` constructors.
 - Use Riverpod abstractions and provider overrides for dependency injection.
   Repositories return `Result<T>` so failures cross layers explicitly.
-- C# targets .NET 8 with nullable reference types and implicit usings enabled.
+- C# targets .NET 10 with nullable reference types and implicit usings enabled.
   Use file-scoped namespaces, PascalCase public members, and async methods for
   I/O.
 - Keep domain logic deterministic and pass time through `IClock` or an explicit

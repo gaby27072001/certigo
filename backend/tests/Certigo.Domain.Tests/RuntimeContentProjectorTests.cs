@@ -112,6 +112,16 @@ public sealed class RuntimeContentProjectorTests
         lesson.EstMinutes.Should().Be(2);
         lesson.Blocks.Should().ContainSingle();
         lesson.Blocks[0].Check!.Id.Should().Be("aws.clf-c02.domain-1.cloud-value.001");
+        lesson.Id.Should().Be(track.Units[0].Lessons.Single());
+        lesson.TrackId.Should().Be(track.Id);
+        lesson.UnitId.Should().Be(track.Units[0].Id);
+        var check = lesson.Blocks[0].Check!;
+        check.Options.Should().Equal(graph.Questions.Values.Single().Options);
+        var answer = first.AnswerKeys.Should().ContainSingle().Subject.AnswerKey;
+        answer.LessonId.Should().Be(lesson.Id);
+        answer.TrackId.Should().Be(track.Id);
+        answer.Items.Should().ContainSingle().Which.ItemId.Should().Be(check.Id);
+        answer.Items[0].ConceptId.Should().Be(check.ConceptId);
     }
 
     [Fact]

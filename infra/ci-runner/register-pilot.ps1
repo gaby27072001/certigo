@@ -12,7 +12,9 @@ param(
   [string] $ScaleSetName = 'vmss-certigo-pr-pilot-z1',
   [string] $NetworkSecurityGroupName = 'nsg-certigo-pr-pilot',
   [string] $Location = 'westeurope',
-  [string] $Repository = 'gchambaud_microsoft/Certigo',
+  [Parameter(Mandatory)]
+  [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$')]
+  [string] $Repository,
 
   # Registers the runner of the rebuild drill with the single label certigo-rebuild-drill and
   # no default labels, so that no workflow can target it. Allowed only on the drill resources.
@@ -26,6 +28,8 @@ $armHeaders = $null
 $registrationToken = $null
 $drillLabel = 'certigo-rebuild-drill'
 $registrationModeLine = "registration_mode='production'"
+$repositoryUrl = "https://github.com/$Repository"
+$repositoryGuard = "expected_repository_url='$repositoryUrl'`n"
 
 $targetsDrillResources = (
   $ResourceGroupName -eq 'rg-certigo-ci-rebuild-drill' -or
@@ -173,11 +177,9 @@ $identityProperty = $vm.PSObject.Properties['identity']
 if ($null -ne $identityProperty -and $null -ne $identityProperty.Value) {
   throw 'The PR-only pilot VM must not have a managed identity.'
 }
-if ($RebuildDrill) {
-  $osProfileProperty = $vm.PSObject.Properties['osProfile']
-  if ($null -eq $osProfileProperty -or [string]::IsNullOrWhiteSpace($vm.osProfile.computerName)) {
-    throw 'The drill VM must expose its computer name, which becomes the runner name.'
-  }
+$osProfileProperty = $vm.PSObject.Properties['osProfile']
+if ($null -eq $osProfileProperty -or [string]::IsNullOrWhiteSpace($vm.osProfile.computerName)) {
+  throw 'The pilot VM must expose its computer name, which becomes the runner name.'
 }
 
 $nicReferences = Invoke-NativeText -FilePath 'az' -ArgumentList @(
@@ -240,6 +242,7 @@ $armAccessToken = $null
 $preflightScript = Get-Content `
   -LiteralPath (Join-Path $PSScriptRoot 'pilot-preflight.sh') `
   -Raw
+$preflightScript = $repositoryGuard + $preflightScript
 $preflightOutput = Invoke-ManagedRunCommand `
   -Name 'certigo-pr-final-preflight' `
   -Script $preflightScript
@@ -268,6 +271,7 @@ try {
   $registerScript = Get-Content `
     -LiteralPath (Join-Path $PSScriptRoot 'pilot-register.sh') `
     -Raw
+  $registerScript = $repositoryGuard + $registerScript
   $modeLineCount = [regex]::Matches($registerScript, [regex]::Escape($registrationModeLine)).Count
   if ($modeLineCount -ne 1) {
     throw "pilot-register.sh must contain exactly one line $registrationModeLine (found $modeLineCount)."
@@ -285,7 +289,7 @@ finally {
   [GC]::Collect()
 }
 
-if ($registrationOutput -notmatch 'registered and started') {
+if ($registrationOutput -notmatch 'registered and held offline') {
   throw 'The registration command did not produce its success marker.'
 }
 
@@ -303,23 +307,34 @@ do {
     $pilot = @($ownRunners | Where-Object { (@($_.labels.name) -join ',') -eq $drillLabel })
     $unexpected = @($ownRunners | Where-Object { (@($_.labels.name) -join ',') -ne $drillLabel })
     if ($unexpected.Count -gt 0) {
-      # A drill runner with any other label could pick up a real job: remove it before failing.
-      foreach ($runner in $unexpected) {
-        $null = Invoke-NativeText -FilePath 'gh' -ArgumentList @(
-          'api', '--method', 'DELETE', "repos/$Repository/actions/runners/$($runner.id)"
-        )
-      }
-      throw "The drill runner registered with labels other than exactly '$drillLabel'; it was removed."
+      throw "The held drill runner has labels other than exactly '$drillLabel'; do not activate it. Removal requires separate authorization."
     }
   }
   else {
-    $pilot = @($newRunners | Where-Object { $_.labels.name -contains 'certigo-pr-pilot' })
+    $pilot = @($newRunners | Where-Object { $_.name -eq $vm.osProfile.computerName })
+    if ($pilot.Count -eq 1) {
+      $actualLabels = @($pilot[0].labels.name | Sort-Object)
+      $expectedLabels = @('self-hosted', 'Linux', 'X64', 'certigo-pr', 'certigo-pr-pilot' | Sort-Object)
+      if (@(Compare-Object $expectedLabels $actualLabels -CaseSensitive).Count -ne 0) {
+        throw 'The held pilot runner has unexpected labels; do not activate it.'
+      }
+    }
   }
-  if ($pilot.Count -eq 1 -and $pilot[0].status -eq 'online') {
-    break
+  if ($pilot.Count -eq 1) {
+    $busyProperty = $pilot[0].PSObject.Properties['busy']
+    if (
+      $null -eq $busyProperty -or
+      $busyProperty.Value -isnot [bool] -or
+      $busyProperty.Value
+    ) {
+      throw 'The held runner must explicitly report busy=false; do not activate or deallocate it.'
+    }
+    if ($pilot[0].status -eq 'offline') {
+      break
+    }
   }
   if ((Get-Date) -ge $deadline) {
-    throw 'The newly registered PR-only runner did not become online.'
+    throw 'The newly registered PR-only runner was not verified held offline.'
   }
   Start-Sleep -Seconds 2
 } while ($true)

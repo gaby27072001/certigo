@@ -384,6 +384,57 @@ l'owner sur le diff exact et les refus recensés, sans modification implicite de
 
 ## Un workflow modifié ne s'exécute pas dans sa propre PR
 
+### Migration vers le dépôt personnel
+
+Pour les changements de code et workflows non privilégiés, appliquer le
+[fonctionnement solo](../GOVERNANCE.md#fonctionnement-solo-du-dépôt-personnel) :
+revue technique indépendante, décision explicite du propriétaire sur la
+proposition exacte et gates A/B inchangées. Cette politique source n'est pas
+une autorisation de protection live ni une exception aux scellés de CD.
+
+La migration de `gchambaud_microsoft/Certigo` vers `gaby27072001/certigo`
+ne constitue pas une pré-approbation de workflow ou de confiance Azure.
+Le validateur Cosmos accepte temporairement les deux **conjonctions exactes**
+de propriétaire, chacune conservant `workflow_dispatch`, `main`, le flag
+d'activation et le runner dédié. Une disjonction entre propriétaires, un fork
+ou une condition moins restrictive reste interdit. Le manifeste trusted doit
+encore autoriser le contenu exact avant qu'il puisse être appliqué.
+
+Procéder dans cet ordre : fusion revue du contrat compatible de validation,
+PR A avec proposition du nouveau propriétaire, puis PR B appliquant exactement
+cette proposition. Ne pas modifier l'empreinte active pour rendre verte la
+première PR. La même séquence s'applique à la version SDK du gate Cosmos ;
+elle n'autorise pas à changer un workflow privilégié scellé à l'octet.
+
+L'autorisation du dispatch backend utilise uniquement le dépôt personnel
+canonique. Elle continue d'exiger un opérateur humain autorisé et un reviewer
+indépendant empêchant l'auto-approbation. Ce contrôle n'enregistre aucun runner,
+ne crée aucun Environment et ne modifie aucune fédération OIDC. Établir les
+protections et vérifier leur fonctionnement avant d'ajouter un sujet OIDC exact
+du nouveau dépôt ; ne retirer l'ancien qu'après preuve et approbation.
+
+### Prérequis de fusion de la cible backend .NET 10
+
+Le changement des `TargetFramework` ne met pas à jour les workflows actifs.
+Le gate backend doit installer le SDK .NET 10 approuvé et, après la restauration
+de la solution, restaurer directement `src/Certigo.Api/Certigo.Api.csproj` :
+le hook de `Azure.Functions.Sdk` restaure ainsi le projet d'extensions généré.
+L'absence de ce hook peut être masquée par un répertoire `obj` existant ; la
+preuve CI doit donc venir d'un checkout propre.
+
+L'évolution du pin Cosmos exige d'abord un contrat de validation compatible
+avec les deux pins exacts, puis les PR A/B. Le pin du CD privilégié reste soumis
+à son propre scellé : aucune mise à jour de manifeste ni de documentation ne
+constitue une autorisation de le remplacer. Ne pas fusionner la cible .NET 10
+avant que les workflows requis puissent la compiler ; ne pas promouvoir son
+artefact avant la validation et l'approbation de la transition du runtime Flex.
+
+Le contrat du one-shot Cosmos accepte uniquement les deux formes identiques
+dont le pin SDK est `8.0.424` ou `10.0.401`. La pré-approbation trusted reste
+requise pour changer le workflow actif. Aucune version flottante, option
+prerelease, modification de commande ou nouvelle permission n'est autorisée
+par cette compatibilité. Le workflow legacy archivé reste inchangé.
+
 Les workflows de PR sont chargés depuis `main` (`pull_request_target`) : la PR B tourne avec
 l'**ancien** workflow, et ses nouvelles étapes n'agissent qu'après la fusion. Une étape cassée dans
 un job requis ne peut alors être réparée que par une PR… jugée par l'étape cassée.

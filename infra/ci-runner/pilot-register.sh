@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ ! "${expected_repository_url:-}" =~ ^https://github\.com/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$ ]]; then
+  echo "An explicit canonical GitHub repository URL is required." >&2
+  exit 1
+fi
 if (( $# != 1 )); then
   echo "A single protected registration-token parameter is required." >&2
   exit 64
@@ -25,11 +29,19 @@ if [[ "${BOOT_ID:-}" != "$(cat /proc/sys/kernel/random/boot_id)" ]]; then
   echo "The pre-registration preflight must pass during the current boot." >&2
   exit 1
 fi
+if [[ "${REPOSITORY_URL:-}" != "${expected_repository_url}" ]]; then
+  echo "Preflight repository URL differs from the approved token destination." >&2
+  exit 1
+fi
 
 registration_token="$1"
 trap 'unset registration_token' EXIT
 
 source /etc/certigo-runner-bootstrap.env
+if [[ "${GITHUB_URL:-}" != "${expected_repository_url}" ]]; then
+  echo "Guest repository URL changed after preflight." >&2
+  exit 1
+fi
 [[ "${RUNNER_LABELS}" == 'certigo-pr,certigo-pr-pilot' ]]
 [[ "${RUNNER_VERSION}" == '2.336.0' ]]
 
@@ -58,6 +70,21 @@ if [[ -e "${runner_home}/.runner" ]]; then
   echo "Runner is already registered; refusing replacement." >&2
   exit 1
 fi
+runner_units="$(systemctl list-unit-files 'actions.runner.*.service' --no-legend)"
+if [[ -n "${runner_units}" ]]; then
+  echo "Existing runner service or process prevents held registration." >&2
+  exit 1
+fi
+if pgrep -f '/opt/actions-runner/bin/Runner\.(Listener|Worker)' >/dev/null; then
+  echo "Existing runner process prevents held registration." >&2
+  exit 1
+else
+  process_status=$?
+  if (( process_status != 1 )); then
+    echo "Cannot verify absence of runner processes." >&2
+    exit 1
+  fi
+fi
 
 chown -R "${runner_user}:${runner_user}" "${runner_home}"
 installed_version="$(
@@ -67,7 +94,7 @@ installed_version="$(
 
 runuser -u "${runner_user}" -- "${runner_home}/config.sh" \
   --unattended \
-  --url "${GITHUB_URL}" \
+  --url "${expected_repository_url}" \
   --token "${registration_token}" \
   --name "${runner_name}" \
   "${label_arguments[@]}" \
@@ -77,9 +104,4 @@ runuser -u "${runner_user}" -- "${runner_home}/config.sh" \
 unset registration_token
 trap - EXIT
 rm -f "${preflight_attestation}"
-(
-  cd "${runner_home}"
-  ./svc.sh install "${runner_user}"
-  ./svc.sh start
-)
-echo "Runner ${runner_name} registered and started (mode ${registration_mode})."
+echo "Runner ${runner_name} registered and held offline (mode ${registration_mode})."

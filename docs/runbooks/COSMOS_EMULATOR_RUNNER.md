@@ -142,7 +142,7 @@ view et permet de supprimer immédiatement l'enfant Run Command.
 | Docker statique x64 | `29.7.2` | SHA-256 de l'archive officielle |
 | Cosmos emulator amd64 | build `vnext-EN20260810-amd64` | digest OCI `sha256:dc583d...1669c` |
 | Bootstrap | contenu exact de `bootstrap.sh` | SHA-256 dans Bicep et test Node |
-| .NET SDK | `8.0.424` | version exacte dans le workflow |
+| .NET SDK | `8.0.424` | version exacte dans le workflow actif ; migration .NET 10 soumise à approbation |
 | Actions | SHA de commit complet | commentaire de version requis |
 
 Toute rotation met à jour le binaire ou l'image, son digest, le runbook et les
@@ -332,6 +332,9 @@ Mesures locales, émulateur `vnext-EN20260810-arm64` sous Docker Desktop :
 | Suite après isolation d'une base par test | **18/18** |
 | Script du gate, conteneur Linux `dotnet/sdk:8.0`, socket Docker de l'hôte | **18/18**, sortie 0, zéro conteneur, clé ou résultat restant après `--cleanup-only` |
 | Même script, un test `[CosmosEmulatorFact]` ajouté hors du trait | sortie 1 : `expected 19 Cosmos emulator results … found 18` |
+
+Le résultat `18/18` ci-dessus est la mesure historique avec le conteneur .NET 8. La
+validation équivalente sous .NET 10 reste à exécuter après l'approbation du nouveau pin du workflow.
 
 L'ancien sixième échec, l'agrégat `GetRecentActivityAsync` sur `vnext-preview`, ne se
 reproduit plus : la requête projette désormais ses agrégats à plat

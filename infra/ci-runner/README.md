@@ -198,7 +198,32 @@ az deployment group create \
 ```
 
 Après `Provisioning succeeded`, exécuter `pilot-preflight.sh` comme Managed Run Command
-sans paramètre protégé. Son succès prouve dans cet ordre : cloud-init terminé, service
+avec une URL de dépôt explicitement approuvée dans `expected_repository_url`.
+Le preflight et la registration refusent une URL guest différente, une
+attestation d'un autre dépôt, une registration existante ou un ancien service.
+`register-pilot.ps1` exige désormais `-Repository` et utilise cette même URL
+pour le token et la configuration guest ; il ne réécrit pas le bootstrap.
+Un ancien `GITHUB_URL` doit être corrigé dans une opération séparément approuvée.
+
+La registration configure le runner **offline**, sans installer ni démarrer
+`svc.sh`. `--disableupdate` empêche les mises à jour automatiques, pas l'admission
+des jobs : le maintien offline repose sur l'absence de listener/service et la
+vérification GitHub. Une activation ultérieure nécessite sa propre approbation,
+un nouveau contrôle isolation/destination/labels et une procédure de drain.
+Ce lot ne fournit aucune activation live ni preuve de confiance du guest.
+Le readback doit rapporter explicitement `busy=false` et `offline`; un champ
+absent, mal formé ou `busy=true` bloque toute activation/désallocation.
+Une dérive des labels de drill n'autorise plus la suppression automatique :
+l'inscription reste à inspecter, et son retrait nécessite une autorisation.
+
+Ne pas utiliser `idle-shutdown.sh` comme procédure de drain sans interruption
+pour cette restauration bornée : son contrat historique arrête les services
+et peut éteindre la machine malgré un worker encore présent après le délai.
+Une activation future exige une méthode d'admission/drain distincte vérifiée ;
+ni le readback `busy=false` seul ni `--disableupdate` ne ferme la course
+d'attribution des jobs. Le maintien offline est le seul état préparé ici.
+
+Ce preflight ne reçoit aucun token. Son succès vérifie dans cet ordre : cloud-init terminé, service
 iptables actif, IMDS inaccessible, outils/egress publics sains et absence de `.runner`.
 Ne demander aucun token avant ce marqueur.
 
@@ -242,11 +267,13 @@ silencieusement et doivent être supprimées dans une levée de verrou explicite
 ```powershell
 .\infra\ci-runner\register-pilot.ps1 `
   -SubscriptionId <SUBSCRIPTION_ID> `
-  -VmName <NEW_FLEX_VM_NAME>
+  -VmName <NEW_FLEX_VM_NAME> `
+  -Repository <OWNER/REPOSITORY>
 ```
 
-Terminer avec `pilot-health.sh` comme Managed Run Command sans secret et vérifier via
-l'API GitHub : runner `online`, labels exacts, service actif, IMDS inaccessible et egress
+Vérifier via l'API GitHub : runner `offline`, labels exacts et aucun service
+runner installé. Ne pas lancer `pilot-health.sh` comme preuve de service actif
+avant une activation séparément approuvée, avec contrôle IMDS et egress
 GitHub/NuGet/pub.dev/npm fonctionnel. Le pilote ne crée volontairement aucun runner dans
 `certigo-content`.
 
@@ -259,6 +286,7 @@ GitHub/NuGet/pub.dev/npm fonctionnel. Le pilote ne crée volontairement aucun ru
 > ```powershell
 > .\infra\ci-runner\register-pilot.ps1 `
 >   -SubscriptionId <SUBSCRIPTION_ID> -VmName <DRILL_VM_NAME> -RebuildDrill `
+>   -Repository <OWNER/REPOSITORY> `
 >   -ResourceGroupName rg-certigo-ci-rebuild-drill `
 >   -ScaleSetName vmss-certigo-pr-rebuild-drill `
 >   -NetworkSecurityGroupName nsg-certigo-pr-rebuild-drill

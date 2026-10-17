@@ -236,6 +236,7 @@ if grep -Eq 'Write-(Host|Output|Verbose|Information)[^#]*\$callbackUrl' "${regis
 fi
 node --test "${root}/infra/ci-runner/evaluate-lifecycle.test.mjs"
 node --test "${root}/infra/ci-runner/capacity-controller.test.mjs"
+node --test "${root}/infra/ci-runner/pilot-registration.test.mjs"
 node --check "${root}/infra/ci-runner/scale-in-safety.mjs"
 node "${image_dir}/generate-toolchain-sbom.mjs" --check
 bash "${image_dir}/validate-toolchain.sh" --contract
@@ -273,10 +274,11 @@ if command -v pwsh >/dev/null 2>&1; then
   done
   # The drill interlock must refuse before any Azure or GitHub call.
   drill_on_production="$(pwsh -NoProfile -NonInteractive -File "${register_pilot_ps}" \
-    -SubscriptionId 00000000-0000-0000-0000-000000000000 -VmName drill -RebuildDrill 2>&1 || true)"
+    -SubscriptionId 00000000-0000-0000-0000-000000000000 -VmName drill -Repository owner/repo -RebuildDrill 2>&1 || true)"
   grep -F 'The rebuild drill registers only on' <<<"${drill_on_production}" >/dev/null
   production_on_drill="$(pwsh -NoProfile -NonInteractive -File "${register_pilot_ps}" \
     -SubscriptionId 00000000-0000-0000-0000-000000000000 -VmName drill \
+    -Repository owner/repo \
     -ResourceGroupName rg-certigo-ci-rebuild-drill 2>&1 || true)"
   grep -F 'Drill resources must be registered with -RebuildDrill' <<<"${production_on_drill}" >/dev/null
 else
