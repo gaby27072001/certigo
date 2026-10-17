@@ -20,7 +20,7 @@ enum NativeResumeError: Error, Equatable {
 
 // Navigation metadata only; the existing outbox remains the sole persisted submission authority.
 struct NativeResumeState: Codable, Equatable, Sendable {
-    enum Tab: String, Codable, Sendable { case objective, explorer, followUp }
+    enum Tab: String, Codable, Sendable { case learn, coach, social, profile }
     enum Phase: String, Codable, Sendable { case draft, submitting, pending, confirmed, failed }
     struct Session: Codable, Equatable, Sendable {
         let trackId: String
@@ -37,7 +37,7 @@ struct NativeResumeState: Codable, Equatable, Sendable {
     var session: Session?
 
     init(tab: Tab, ownerId: String, apiScope: String, session: Session? = nil) throws {
-        schema = 1
+        schema = 2
         self.tab = tab
         self.ownerId = ownerId
         self.apiScope = apiScope
@@ -139,7 +139,7 @@ struct NativeResumeState: Codable, Equatable, Sendable {
             !value.isEmpty && value.utf8.count <= 1_024
                 && value.rangeOfCharacter(from: .controlCharacters) == nil
         }
-        guard schema == 1, identifier(ownerId), identifier(apiScope),
+        guard schema == 2, identifier(ownerId), identifier(apiScope),
             let url = URL(string: apiScope), url.scheme == "https", url.host != nil,
             url.user == nil, url.password == nil, url.query == nil, url.fragment == nil
         else { throw NativeResumeError.malformed }
@@ -194,6 +194,7 @@ final class NativeModel {
         (provider: any CIAMAuthenticationProvider, configuration: CIAMConfiguration)?
     private let now: () -> Date
     private var tokenExpiresAt: Date?
+    private var pendingGoal: (trackId: String, expectedTrackId: String?)?
     private static let signedOutKey = "certigo.native.dev.signed-out.v1"
 
     init(
@@ -225,7 +226,9 @@ final class NativeModel {
 
     var canSubmit: Bool {
         guard let lesson, !busy, outcome == nil, submittedRequest == nil else { return false }
-        return lesson.questions.allSatisfy { selections[$0.id] != nil }
+        return lesson.questions.allSatisfy { question in
+            question.options.contains { $0.id == selections[question.id] }
+        }
     }
 
     func restore() async {
@@ -243,7 +246,7 @@ final class NativeModel {
             await connect()
         } catch {
             errorMessage =
-                "La connexion de test ne peut pas être restaurée. Reconnectez le compte de test."
+                "The test connection could not be restored. Reconnect the test account."
         }
     }
 
@@ -255,9 +258,15 @@ final class NativeModel {
         }
         let marker = UUID()
         generation = marker
+        let previous = client
+        let enteredToken = token
+        clearSession()
+        token = enteredToken
         busy = true
         errorMessage = nil
         defer { if generation == marker { busy = false } }
+        await previous?.disconnect()
+        guard generation == marker else { return }
         do {
             guard let url = URL(string: baseURL.trimmingCharacters(in: .whitespacesAndNewlines))
             else {
@@ -300,12 +309,12 @@ final class NativeModel {
             } catch {
                 guard generation == marker else { return }
                 errorMessage =
-                    "La session locale est fermée, mais le retrait du compte du SDK n’est pas confirmé. Réessayez la déconnexion."
+                    "The local session is closed, but SDK account removal is not confirmed. Retry signing out."
             }
         } else {
             do { try vault.clear() } catch {
                 errorMessage =
-                    "Le coffre n’a pas confirmé la déconnexion. Réessayez avant de fermer l’app."
+                    "Secure storage did not confirm sign-out. Retry before closing the app."
             }
         }
     }
@@ -324,6 +333,7 @@ final class NativeModel {
         submittedRequest = nil
         token = ""
         tokenExpiresAt = nil
+        pendingGoal = nil
         busy = false
     }
 
@@ -402,6 +412,57 @@ final class NativeModel {
         await connectUsingAuthentication(interactive: false)
     }
 
+    func chooseActiveTrack(_ track: Track) async {
+        guard !busy else { return }
+        let owner = profile?.id
+        await refreshAuthenticationIfNeeded()
+        guard let client, let profile, !busy else { return }
+        guard profile.id == owner else {
+            report(APIError.staleSession)
+            return
+        }
+        guard tracks.contains(where: { $0.id == track.id }) else {
+            report(APIError.configuration)
+            return
+        }
+        if let pendingGoal, pendingGoal.trackId != track.id {
+            errorMessage =
+                "Your previous goal selection is not confirmed. Retry that same goal before choosing another."
+            return
+        }
+        let decision = pendingGoal ?? (trackId: track.id, expectedTrackId: profile.activeTrackId)
+        pendingGoal = decision
+        let marker = generation
+        busy = true
+        errorMessage = nil
+        defer { if generation == marker { busy = false } }
+        do {
+            let value = try await client.setActiveTrack(
+                trackId: decision.trackId, expectedTrackId: decision.expectedTrackId)
+            guard generation == marker else { return }
+            self.profile = value
+            pendingGoal = nil
+        } catch APIError.http(409) {
+            guard generation == marker else { return }
+            do {
+                let value = try await client.refreshProfile()
+                guard generation == marker else { return }
+                self.profile = value
+                pendingGoal = nil
+                errorMessage =
+                    "Your active goal changed elsewhere. The current goal was reloaded; choose again to confirm a different goal."
+            } catch {
+                guard generation == marker else { return }
+                errorMessage =
+                    "Your goal selection conflicted and the current goal could not be reloaded. Retry the same selection to reconcile; no change is confirmed."
+            }
+        } catch {
+            guard generation == marker else { return }
+            if case APIError.http(404) = error { pendingGoal = nil }
+            report(error)
+        }
+    }
+
     func loadPath(_ track: Track) async {
         guard !busy else { return }
         await refreshAuthenticationIfNeeded()
@@ -426,6 +487,11 @@ final class NativeModel {
         guard !busy else { return }
         await refreshAuthenticationIfNeeded()
         guard let client, let path, !busy else { return }
+        guard path.units.flatMap(\.lessons).contains(where: { $0.id == node.id && $0.canOpen })
+        else {
+            report(NativeResumeError.malformed)
+            return
+        }
         let marker = generation
         busy = true
         lesson = nil
@@ -434,6 +500,44 @@ final class NativeModel {
         do {
             let value = try await client.lesson(trackId: path.trackId, lessonId: node.id)
             guard generation == marker else { return }
+            let saved = try await client.savedSubmissions()
+            guard generation == marker else { return }
+            queue = saved
+            let unresolved = saved.filter {
+                $0.lessonId == value.id && $0.submission.trackId == value.trackId
+                    && $0.status != .corrected
+            }
+            guard unresolved.count <= 1 else { throw NativeResumeError.submissionUnresolved }
+            if let pending = unresolved.first {
+                guard pending.submission.publicManifestId == value.publicManifestId else {
+                    throw NativeResumeError.releaseChanged
+                }
+                guard pending.submission.answers.count == value.questions.count,
+                    pending.submission.answers.allSatisfy({ answer in
+                        value.questions.contains { question in
+                            question.id == answer.itemId && question.type == answer.itemType
+                                && answer.selected.count == 1
+                                && question.options.contains { $0.id == answer.selected[0] }
+                        }
+                    })
+                else { throw NativeResumeError.attemptMismatch }
+                lesson = value
+                submittedRequest = pending.submission
+                attemptID = pending.id
+                startedAt = pending.submission.startedAt
+                selections = Dictionary(
+                    uniqueKeysWithValues: pending.submission.answers.map {
+                        ($0.itemId, $0.selected[0])
+                    })
+                latencies = Dictionary(
+                    uniqueKeysWithValues: pending.submission.answers.map {
+                        ($0.itemId, $0.latencyMs)
+                    })
+                questionStarted = [:]
+                outcome = pending.status == .pendingCorrection ? .pendingCorrection : nil
+                if pending.status == .failed { report(StoreError.invalidRecord) }
+                return
+            }
             lesson = value
             selections = [:]
             latencies = [:]
@@ -454,6 +558,12 @@ final class NativeModel {
 
     func select(_ option: QuizOption, question: QuizItem) {
         guard outcome == nil, submittedRequest == nil, !busy else { return }
+        guard let actual = lesson?.questions.first(where: { $0.id == question.id }),
+            actual.options.contains(where: { $0.id == option.id })
+        else {
+            report(NativeResumeError.attemptMismatch)
+            return
+        }
         selections[question.id] = option.id
         if let start = questionStarted[question.id] {
             let duration = start.duration(to: ContinuousClock.now)
@@ -553,34 +663,43 @@ final class NativeModel {
 
     private func report(_ error: any Error) {
         switch error {
+        case NativeResumeError.releaseChanged:
+            errorMessage =
+                "This content version changed. Your saved attempt was preserved; retry its original submission from saved responses."
+        case is NativeResumeError:
+            errorMessage =
+                "This activity cannot be safely resumed. Your saved responses were preserved; choose a valid activity or review saved submissions."
         case CIAMAuthenticationFailure.interactionRequired:
-            errorMessage = "Une connexion explicite du compte de test est nécessaire."
+            errorMessage = "Sign in explicitly with the test account to continue."
         case is CIAMAuthenticationFailure:
             errorMessage =
-                "La connexion du compte de test n’est pas confirmée. Aucun compte ni renouvellement n’est supposé."
+                "The test account connection is not confirmed. No sign-in or renewal is assumed."
         case APIError.unauthorized:
-            errorMessage = "La connexion de test a expiré. Déconnectez puis reconnectez ce compte."
+            errorMessage = "The test connection expired. Sign out, then reconnect this account."
         case APIError.configuration:
-            errorMessage = "Indiquez une URL API HTTPS valide, sans identifiant ni paramètre."
+            errorMessage = "Enter a valid HTTPS API URL without credentials or query parameters."
         case APIError.staleSession:
-            errorMessage = "Le compte a changé. Cette réponse n’a pas été affichée."
+            errorMessage = "The account changed. This response was not displayed."
         case APIError.transport:
-            errorMessage = "Le serveur est injoignable. Vérifiez la connexion puis réessayez."
+            errorMessage = "The server is unreachable. Check the connection and retry."
         case APIError.http(let status):
             errorMessage =
-                "Le serveur a refusé la requête (HTTP \(status)). Réessayez ou contactez le support."
+                "The server rejected the request (HTTP \(status)). Retry or contact support."
         case ContractError.unsupported:
             errorMessage =
-                "Ce contenu nécessite une capacité non disponible dans cette première version native."
+                "This content requires a capability that is unavailable in this native version."
         case StoreError.corruptArchive:
             errorMessage =
-                "Les réponses locales sont illisibles. Elles ont été conservées, sans être renvoyées."
+                "Saved responses could not be read. They were preserved and were not resent."
         case StoreError.capacity:
             errorMessage =
-                "Le stockage des réponses est plein. Les réponses ne sont pas confirmées comme enregistrées."
+                "Response storage is full. Your answers are not confirmed as saved."
+        case StoreError.invalidRecord:
+            errorMessage =
+                "This saved submission cannot be retried. Your answers were preserved; review its failure before starting another attempt."
         default:
             errorMessage =
-                "L’opération n’a pas pu être confirmée. Aucune réussite n’est supposée. Réessayez."
+                "The operation could not be confirmed. No success is assumed. Retry."
         }
     }
 }

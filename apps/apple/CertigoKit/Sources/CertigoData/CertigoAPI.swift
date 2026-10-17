@@ -97,6 +97,35 @@ public struct CertigoAPI: Sendable {
         return try Self.decode(Catalog.self, from: data).validated().tracks
     }
 
+    public func setActiveTrack(
+        trackId: String, expectedTrackId: String?, credentials: APICredentials
+    ) async throws -> Profile {
+        struct Selection: Encodable {
+            let trackId: String
+            let expectedTrackId: String?
+
+            enum CodingKeys: String, CodingKey { case trackId, expectedTrackId }
+            func encode(to encoder: any Encoder) throws {
+                var values = encoder.container(keyedBy: CodingKeys.self)
+                try values.encode(trackId, forKey: .trackId)
+                try values.encode(expectedTrackId, forKey: .expectedTrackId)
+            }
+        }
+        guard !trackId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw APIError.configuration
+        }
+        let body = try Self.encoder().encode(
+            Selection(trackId: trackId, expectedTrackId: expectedTrackId))
+        let (data, _) = try await request(
+            ["me", "active-track"], token: credentials.accessToken, body: body)
+        let value = try Self.decode(Profile.self, from: data)
+        guard value.id == credentials.ownerId,
+            value.activeTrackId?.lowercased()
+                == trackId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        else { throw APIError.invalidResponse }
+        return value
+    }
+
     public func path(trackId: String, credentials: APICredentials) async throws -> LearningPath {
         let (data, _) = try await request(["me", "paths", trackId], token: credentials.accessToken)
         let path = try Self.decode(LearningPath.self, from: data)

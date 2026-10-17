@@ -371,9 +371,10 @@ It is distinct from the design branch's synthetic `NativeDemoFlow`. Its purpose
 is to make a future real-session navigation bookmark untrusted input that must
 be reconciled, not a second outbox or a local correction engine.
 
-The integration shape is `Tab.objective/explorer/followUp`, `ownerId`, exact
+The integration shape is `Tab.learn/coach/social/profile`, `ownerId`, exact
 `apiScope`, optional `Session(trackId, lessonId, publicManifestId, phase,
-attemptId)`, and schema version 1. Session phases are `draft`, `submitting`,
+attemptId)`, and schema version 2. The inactive version-1 three-tab bookmark is
+rejected rather than silently mapped into the new navigation. Session phases are `draft`, `submitting`,
 `pending`, `confirmed`, `failed`. `encoded()` / `decode(_:)` bound the bookmark to
 8 KiB and validate the closed shape, identifiers, HTTPS scope, optional manifest
 hash and phase/UUID relationship. No answers, token, feedback, readiness or
@@ -409,6 +410,76 @@ These are value-level reconciliation tests, not navigation execution, scene
 storage, durable draft answers or an Apple relaunch test. UI integration and its
 explicit error/recovery presentation remain a separate design-owned lot.
 
+### Model recovery from the existing submission queue
+
+`NativeModel.loadLesson(_:)` now verifies that the node is openable in the
+currently loaded path, then reads the existing owner/scope queue. One unresolved
+attempt for that track/lesson restores its original request, attempt ID and
+already-saved selections only when the fetched lesson has the same manifest pin
+and matching MCQ question/option identities. Pending correction stays pending:
+`outcome == .pendingCorrection`, `canSubmit == false`. Repeated `submit()` does
+not post another request. Failed records retain their error and cannot become a
+fresh editable attempt. Multiple unresolved records fail explicitly rather than
+choosing one arbitrarily.
+
+After release rotation, the lesson binding is rejected while the saved queue is
+preserved; `retry(_:)` still sends the original request and pin. This is not
+offline lesson-content reconstruction or unsent-answer persistence. Corrected
+records do not force every future practice session to reopen historical results.
+Only validated server feedback can produce a correction result.
+
+Manual reconnect clears the previous profile, path, lesson, selections, feedback
+and queue before connecting, including when the replacement connection fails.
+Late old-session responses remain generation-guarded. Selection and submission
+eligibility validate actual option membership rather than trusting UI binding.
+Model error copy is English; the UI method signatures are unchanged.
+Browsing `loadPath` does not mutate `profile.activeTrackId`: active-goal mutation
+requires the separate explicit action described below, not navigation inference.
+
+The portable actual-source harness covers pending model/store reopen, duplicate
+submit prevention, byte-identical retry after pin rotation, direct manual account
+switch, failed/ambiguous saved attempts and foreign option rejection. The inactive
+resume bookmark remains separate from synthetic demo navigation and from these
+model operations; no second persistence authority or UI wiring is introduced.
+
+### Explicit active-goal selection
+
+`NativeModel.chooseActiveTrack(_ track: Track) async` is a distinct, explicit user
+action for a catalog track, never an effect of loading a path or viewing Profile
+history. It calls the existing `POST /api/me/active-track` via
+`LearningClient.setActiveTrack(trackId:expectedTrackId:)`. The request includes
+the confirmed profile's current track (or explicit JSON null) as
+`expectedTrackId`. Client ETag/If-Match headers are not required: repository
+concurrency tokens stay on the server.
+
+The active goal stays unchanged while busy or after a failed/unconfirmed request.
+Only the returned profile with the authenticated owner and requested target
+updates `profile`. The model does not infer XP, navigate, reset an existing
+lesson, or rewrite its pending queue, answers, attempt ID or release pin.
+Same-goal selection still calls the server and uses its idempotent response.
+
+An uncertain response keeps the target/expected tuple in session memory; a retry
+of that same goal sends the same body. Choosing a different goal is explicitly
+blocked until reconciliation. This tuple is not a durable mutation outbox and
+does not promise replay after process death: reconnect obtains the server profile
+before a new decision. Sign-out/account switch clears it.
+
+On HTTP 409, `LearningClient.refreshProfile()` reloads the authoritative profile
+for the same owner. The model reports an English conflict message and requires a
+new explicit decision, with no forced selection or automatic rewrite/retry. If
+the reload fails, the previous profile is retained and the error explicitly says
+that the current goal could not be reloaded. Owner/session-generation guards
+reject delayed responses after account changes. This reload is part of a future
+explicit selection flow, not a read-only live probe; no live endpoint was called
+to validate this source lot.
+
+Synthetic model tests cover browsing without writes, explicit/same-goal success,
+server-profile authority, concurrent conflict and reload failure, identical
+uncertain retry, missing goal, foreign owner, duplicate action while busy,
+delayed response after logout/account switch and preservation of pending lesson
+activity. The pinned C# serializer vectors also test POST shape, null expected
+track, absent If-Match and native profile decoding. UI wiring remains separate.
+
 This portable source check does **not** compile Security/UIKit/MSAL, build the
 Apple app, or execute an Xcode test target. Apple compilation and a separately
 approved dedicated-account lifecycle remain required before activating this
@@ -432,13 +503,16 @@ signature or account-linking availability from repository configuration.
 
 ## Shared backend HTTP vectors
 
-`Fixtures/http-wire/v1/` copies only the six JSON vectors and README from
+`Fixtures/http-wire/v1/` originally copied the six JSON vectors and README from
 `docs/contracts/native-client/v1/` at backend revision
 `56067f1c4c57a518ff27c2527ca6edd95a1aa589`. Every copied file was checked against
 its original Git blob with `hash-object --no-filters`. No backend code or release
 workflow was cherry-picked. These public synthetic vectors were exercised by the
 backend's real HTTP functions/serializer; Swift tests independently decode the
 same bytes and retain null/omitted-field and unsupported-capability distinctions.
+The additive `active-track-request.json` and `profile.json` vectors are pinned
+separately to `ecbfb054f2474bc430856b72fd55d66a03f6e9fb`; the earlier six vectors
+remain unchanged.
 
 The fixture submission's illustrative `demo-client-attempt` is not a UUID:
 decoding it does not authorize replay under the current native creation policy.

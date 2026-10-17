@@ -56,6 +56,22 @@ public actor LearningClient {
         return value
     }
 
+    public func refreshProfile() async throws -> Profile {
+        let context = try credentials()
+        let value = try await api.profile(accessToken: context.accessToken)
+        try assertCurrent(context)
+        guard value.id == context.ownerId else { throw APIError.invalidResponse }
+        return value
+    }
+
+    public func setActiveTrack(trackId: String, expectedTrackId: String?) async throws -> Profile {
+        let context = try credentials()
+        let value = try await api.setActiveTrack(
+            trackId: trackId, expectedTrackId: expectedTrackId, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
     public func lesson(trackId: String, lessonId: String) async throws -> Lesson {
         let context = try credentials()
         let value = try await api.lesson(trackId: trackId, lessonId: lessonId, credentials: context)
