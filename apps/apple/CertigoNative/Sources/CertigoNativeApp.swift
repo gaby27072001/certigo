@@ -1285,59 +1285,63 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var selectedTrack: String?
         @State private var selectedLesson: String?
         @State private var savingGoalID: String?
+        @State private var navigation = NativeLearningNavigation()
+        @State private var columns: NavigationSplitViewVisibility = .automatic
+        @State private var compactColumn: NavigationSplitViewColumn = .sidebar
 
         var body: some View {
             Group {
                 if model.profile == nil {
                     connection
                 } else {
-                    NavigationSplitView {
-                        List(selection: $selectedTrack) {
-                            Section("Certifications") {
-                                ForEach(model.tracks) { track in
-                                    NavigationLink(value: track.id) {
-                                        VStack(alignment: .leading) {
-                                            Text(track.code).font(.headline)
-                                            Text(track.title).foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    .disabled(!track.learningAvailable)
-                                }
-                            }
-                            if model.tracks.isEmpty {
-                                Text("No certifications available.")
-                            }
-                        }
-                        .disabled(model.busy)
-                        .navigationTitle("Library")
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button("Disconnect", systemImage: "person.crop.circle.badge.xmark")
-                                {
-                                    Task { await model.disconnect() }
-                                }
-                            }
-                        }
-                    } content: {
-                        path
-                    } detail: {
-                        session
-                    }
-                    .onChange(of: selectedTrack) { _, id in
-                        selectedLesson = nil
-                        guard let track = model.tracks.first(where: { $0.id == id }) else { return }
-                        Task { await model.loadPath(track) }
-                    }
-                    .onChange(of: selectedLesson) { _, id in
-                        guard
-                            let node = model.path?.units.flatMap(\.lessons).first(where: {
-                                $0.id == id
-                            }
+                    TabView(selection: $navigation.tab) {
+                        learning
+                            .tabItem { Label("Learn", systemImage: "book") }
+                            .tag(NativeLearningNavigation.Tab.learn)
+                        NavigationStack {
+                            ContentUnavailableView(
+                                "Coach is not connected",
+                                systemImage: "bubble.left.and.bubble.right",
+                                description: Text(
+                                    "Personal assistance and conversation history are not available in this client."
+                                )
                             )
-                        else { return }
-                        Task { await model.loadLesson(node) }
+                            .navigationTitle("Coach")
+                        }
+                        .tabItem { Label("Coach", systemImage: "bubble.left.and.bubble.right") }
+                        .tag(NativeLearningNavigation.Tab.coach)
+                        NavigationStack {
+                            VStack {
+                                Picker("Social section", selection: $navigation.social) {
+                                    Text("Friends").tag(NativeLearningNavigation.Social.friends)
+                                    Text("Teams").tag(NativeLearningNavigation.Social.teams)
+                                }
+                                .pickerStyle(.segmented).padding()
+                                ContentUnavailableView(
+                                    navigation.social == .friends
+                                        ? "Friends are not connected" : "Teams are not connected",
+                                    systemImage: "person.2",
+                                    description: Text(
+                                        "Invitations, sharing and group activity are not available. No relationships are created here."
+                                    ))
+                            }
+                            .navigationTitle("Social")
+                        }
+                        .tabItem { Label("Social", systemImage: "person.2") }
+                        .tag(NativeLearningNavigation.Tab.social)
+                        NavigationStack { profile }
+                            .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+                            .tag(NativeLearningNavigation.Tab.profile)
                     }
                 }
+            }
+            .onChange(of: model.profile?.id, initial: true) { _, owner in
+                navigation = NativeLearningNavigation(hasGoal: model.profile?.activeTrackId != nil)
+                selectedTrack = nil
+                selectedLesson = nil
+                columns = .automatic
+                compactColumn = .sidebar
+                if owner == nil { savingGoalID = nil }
             }
             .safeAreaInset(edge: .bottom) {
                 if model.busy {
@@ -1361,6 +1365,132 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 Text(model.errorMessage ?? "")
             }
             .task { await model.restore() }
+        }
+
+        private var learning: some View {
+            NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn)
+            {
+                List(selection: $selectedTrack) {
+                    Section {
+                        Picker("Learn section", selection: $navigation.learn) {
+                            Text("My Learning").tag(NativeLearningNavigation.Learn.myLearning)
+                            Text("Explore").tag(NativeLearningNavigation.Learn.explore)
+                        }
+                        .pickerStyle(.menu)
+                        if model.lesson != nil {
+                            Button("Resume current activity", systemImage: "play.circle") {
+                                columns = .detailOnly
+                                compactColumn = .detail
+                            }
+                            .disabled(model.busy)
+                        }
+                        if navigation.learn == .myLearning && model.profile?.activeTrackId == nil {
+                            Text(
+                                "Choose an active goal in Explore. Browsing never changes your goal."
+                            )
+                            Button("Explore certifications") { navigation.learn = .explore }
+                        }
+                    }
+                    Section("Certifications") {
+                        ForEach(
+                            model.tracks.filter {
+                                navigation.showsTrack(
+                                    $0.id, activeID: model.profile?.activeTrackId,
+                                    openedID: selectedTrack)
+                            }
+                        ) { track in
+                            NavigationLink(value: track.id) {
+                                VStack(alignment: .leading) {
+                                    Text(track.code).font(.headline)
+                                    Text(track.title).foregroundStyle(.secondary)
+                                }
+                            }
+                            .disabled(!track.learningAvailable)
+                        }
+                    }
+                    if model.tracks.isEmpty {
+                        Text("No certifications available.")
+                    }
+                }
+                .disabled(model.busy)
+                .navigationTitle("Learn")
+            } content: {
+                path
+            } detail: {
+                session
+            }
+            .onChange(of: selectedTrack) { _, id in
+                guard let track = model.tracks.first(where: { $0.id == id }) else { return }
+                guard model.path?.trackId != track.id else { return }
+                selectedLesson = nil
+                Task { await model.loadPath(track) }
+            }
+            .onChange(of: selectedLesson) { _, id in
+                guard
+                    let node = model.path?.units.flatMap(\.lessons).first(where: {
+                        $0.id == id
+                    }
+                    )
+                else { return }
+                Task { await model.loadLesson(node) }
+            }
+        }
+
+        private var profile: some View {
+            List {
+                if let profile = model.profile {
+                    Section("Account") {
+                        Text(profile.displayName).font(.headline)
+                        LabeledContent("Confirmed XP", value: "\(profile.xp)")
+                        if let goal = profile.activeTrackId {
+                            LabeledContent(
+                                "Confirmed active goal",
+                                value: model.tracks.first(where: {
+                                    $0.id.lowercased() == goal.lowercased()
+                                })?.title ?? goal)
+                        } else {
+                            Text("No server-confirmed active goal.")
+                        }
+                    }
+                }
+                Section {
+                    NavigationLink("Progress & history") {
+                        List {
+                            if let path = model.path {
+                                Section("Last loaded path · \(path.trackName)") {
+                                    LabeledContent(
+                                        "Confirmed readiness", value: "\(path.readinessScore) %")
+                                    Text("Viewing this history does not change your active goal.")
+                                }
+                            }
+                            savedAnswers
+                            if model.queue.isEmpty { Text("No saved submissions on this device.") }
+                            if model.lesson != nil {
+                                Button("Resume current activity", systemImage: "play.circle") {
+                                    navigation.tab = .learn
+                                    columns = .detailOnly
+                                    compactColumn = .detail
+                                }
+                            }
+                        }
+                        .navigationTitle("Progress & history")
+                    }
+                    NavigationLink("Settings") {
+                        Form {
+                            Section("Development connection") {
+                                Text("Test connector only. Production sign-in is not enabled.")
+                                Button("Disconnect", systemImage: "person.crop.circle.badge.xmark")
+                                {
+                                    Task { await model.disconnect() }
+                                }
+                                .disabled(model.busy)
+                            }
+                        }
+                        .navigationTitle("Settings")
+                    }
+                }
+            }
+            .navigationTitle("Profile")
         }
 
         private var connection: some View {
@@ -1437,37 +1567,41 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         description: Text("Its learning path will load from the server.")
                     )
                 }
-                if !model.queue.isEmpty {
-                    Section("Saved answers") {
-                        ForEach(model.queue) { saved in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(saved.lessonId).font(.headline)
-                                switch saved.status {
-                                case .pendingCorrection:
-                                    Label("Correction pending", systemImage: "clock")
-                                    Button("Retry correction") {
-                                        Task { await model.retry(saved) }
-                                    }
-                                    .disabled(model.busy)
-                                case .corrected:
-                                    if let result = saved.result {
-                                        Text("Confirmed score: \(result.scorePct) %")
-                                        ForEach(result.results) { item in
-                                            Text(item.explanation)
-                                        }
-                                    }
-                                case .failed:
-                                    Label(
-                                        "Submission rejected · answers preserved",
-                                        systemImage: "exclamationmark.triangle")
+                savedAnswers
+            }
+            .navigationTitle(model.path?.trackName ?? "Learning path")
+        }
+
+        @ViewBuilder private var savedAnswers: some View {
+            if !model.queue.isEmpty {
+                Section("Saved answers") {
+                    ForEach(model.queue) { saved in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(saved.lessonId).font(.headline)
+                            switch saved.status {
+                            case .pendingCorrection:
+                                Label("Correction pending", systemImage: "clock")
+                                Button("Retry correction") {
+                                    Task { await model.retry(saved) }
                                 }
+                                .disabled(model.busy)
+                            case .corrected:
+                                if let result = saved.result {
+                                    Text("Confirmed score: \(result.scorePct) %")
+                                    ForEach(result.results) { item in
+                                        Text(item.explanation)
+                                    }
+                                }
+                            case .failed:
+                                Label(
+                                    "Submission rejected · answers preserved",
+                                    systemImage: "exclamationmark.triangle")
                             }
-                            .padding(.vertical, 4)
                         }
+                        .padding(.vertical, 4)
                     }
                 }
             }
-            .navigationTitle(model.path?.trackName ?? "Learning path")
         }
 
         @ViewBuilder private func activeGoalSection(_ track: Track) -> some View {
@@ -1606,6 +1740,7 @@ struct NativeActiveGoalPresentation {
         confirmedID?.lowercased()
             == targetID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
+
     var isSaving: Bool { savingID == targetID }
     var canChoose: Bool { !busy && savingID == nil && !isConfirmed }
     var status: String {
@@ -1614,4 +1749,21 @@ struct NativeActiveGoalPresentation {
     }
     var symbol: String { isSaving ? "clock" : isConfirmed ? "checkmark.circle" : "eye" }
     var action: String { isSaving ? "Saving active goal…" : "Choose as active goal" }
+}
+
+struct NativeLearningNavigation {
+    enum Tab: String, CaseIterable { case learn, coach, social, profile }
+    enum Learn { case myLearning, explore }
+    enum Social { case friends, teams }
+    var tab: Tab = .learn
+    var learn: Learn
+    var social: Social = .friends
+
+    init(hasGoal: Bool = false) {
+        learn = hasGoal ? .myLearning : .explore
+    }
+
+    func showsTrack(_ id: String, activeID: String?, openedID: String?) -> Bool {
+        learn == .explore || id.lowercased() == activeID?.lowercased() || id == openedID
+    }
 }

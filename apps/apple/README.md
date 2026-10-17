@@ -36,9 +36,21 @@ goal still visible; only `profile.activeTrackId` establishes confirmation.
 The existing model error alert exposes conflicts and uncertain outcomes.
 There is no automatic retry or client-side goal overwrite.
 
+The authenticated root also uses **Learn / Coach / Social / Profile**.
+Learn keeps the existing catalog/path/session split view, with My Learning
+showing the confirmed goal plus any already open path, and Explore showing
+the catalog. Changing a tab
+or local section does not load a path, change the active goal, or clear an
+answer. Resume reveals the current model activity without loading it again.
+Profile shows only the returned identity, XP, active goal, last loaded path
+readiness and device submission history. Its Settings owns Disconnect.
+Coach and Social remain explicitly unavailable, without live legacy calls.
+Navigation is in memory only and resets on account change; no new bookmark
+or unsent-answer storage is introduced.
+
 This integration preserves the model's current activity, saved attempt and
 outbox. It does not persist an unsent draft or connect the real model to the
-synthetic four-tab demo. It does not enable production sign-in, Coach or Social.
+synthetic demo state. It does not enable production sign-in, Coach or Social.
 The source dependency was integrated explicitly from foundation commits
 `0bedcb9b` and `3339685c`; their model/transport implementation is not duplicated
 in the view. Native build, accessibility and runtime validation are still

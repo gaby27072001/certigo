@@ -86,6 +86,19 @@ request and reconciliation. Neither is a SwiftUI runtime test. This integration
 does not wire the inactive live bookmark or claim unsent-draft restoration.
 The synthetic navigation remains separate from real account state.
 
+The real authenticated root now has its own four-tab shell. Learn retains
+the catalog/path/session split view; My Learning retains the confirmed goal and open path,
+Explore shows the catalog. Tab and local-selector changes never call the
+model or clear its activity. Resume reveals its existing detail column,
+including the preferred compact column on iPhone, without a second load.
+Profile owns returned account fields, last loaded readiness, device saved
+submissions, a resume shortcut and connection settings. It invents no stats
+or achievements. Coach and Social are unavailable with no endpoint calls.
+Each tab retains its native navigation container; model and selections live
+above the tab contents. Account changes reset in-memory navigation only.
+Apple validation must cover split-view compact/expanded resume, tab return
+while answering/pending/confirmed, history back stack and account switching.
+
 UI owns `CertigoNative/Sources/CertigoNativeApp.swift` and scoped design files.
 Do not change NativeModel, CredentialVault, auth providers, CertigoKit public
 interfaces, Xcode project/schemes, probes, shared tools, or APPLE_NATIVE.md.

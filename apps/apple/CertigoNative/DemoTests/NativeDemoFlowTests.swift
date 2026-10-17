@@ -347,6 +347,42 @@ struct NativeDemoFlowTests {
         try check(
             !concurrentGoal.canChoose && !concurrentGoal.isConfirmed,
             "an in-flight UI selection cannot start another goal operation")
+        var realNavigation = NativeLearningNavigation()
+        try check(
+            realNavigation.tab == .learn && realNavigation.learn == .explore,
+            "real account without a goal starts in Learn Explore without a mutation")
+        realNavigation = NativeLearningNavigation(hasGoal: true)
+        try check(
+            realNavigation.tab == .learn && realNavigation.learn == .myLearning,
+            "real account with a confirmed goal starts in My Learning")
+        realNavigation.learn = .explore
+        try check(
+            realNavigation.showsTrack("catalog", activeID: "active", openedID: "opened"),
+            "Explore lists catalog entries without selecting a goal")
+        realNavigation.learn = .myLearning
+        try check(
+            realNavigation.showsTrack("opened", activeID: "active", openedID: "opened")
+                && realNavigation.showsTrack("ACTIVE", activeID: "active", openedID: "opened")
+                && !realNavigation.showsTrack("other", activeID: "active", openedID: "opened"),
+            "My Learning keeps the open path visible alongside the confirmed goal")
+        realNavigation.learn = .explore
+        realNavigation.social = .teams
+        for destination in NativeLearningNavigation.Tab.allCases {
+            realNavigation.tab = destination
+            try check(
+                realNavigation.learn == .explore && realNavigation.social == .teams,
+                "real \(destination.rawValue) tab switch preserves local navigation choices")
+        }
+        try check(
+            NativeLearningNavigation.Tab.allCases.map(\.rawValue) == [
+                "learn", "coach", "social", "profile",
+            ],
+            "real and demo shells use the same approved four destinations")
+        realNavigation = NativeLearningNavigation(hasGoal: false)
+        try check(
+            realNavigation.tab == .learn && realNavigation.learn == .explore
+                && realNavigation.social == .friends,
+            "a new account resets only local navigation without restoring another account's tabs")
         print(
             "\(count) Foundation presentation/demo checks passed; no Apple UI was compiled or rendered."
         )
