@@ -383,6 +383,27 @@ struct NativeDemoFlowTests {
             realNavigation.tab == .learn && realNavigation.learn == .explore
                 && realNavigation.social == .friends,
             "a new account resets only local navigation without restoring another account's tabs")
+        let situationProgress = NativeDemoPracticeProgress(current: .situation)
+        try check(
+            situationProgress.state(for: .situation) == .current
+                && situationProgress.state(for: .decision) == .upcoming
+                && situationProgress.state(for: .explanation) == .upcoming,
+            "situation stage distinguishes current from upcoming without a result signal")
+        let decisionProgress = NativeDemoPracticeProgress(current: .decision)
+        try check(
+            decisionProgress.state(for: .situation) == .completed
+                && decisionProgress.state(for: .decision) == .current
+                && decisionProgress.state(for: .explanation) == .upcoming
+                && decisionProgress.state(for: .situation).symbol == "circle.fill",
+            "decision stage shows reading order with a neutral completed marker")
+        let explanationProgress = NativeDemoPracticeProgress(current: .explanation)
+        try check(
+            explanationProgress.state(for: .situation) == .completed
+                && explanationProgress.state(for: .decision) == .completed
+                && explanationProgress.state(for: .explanation) == .current
+                && explanationProgress.accessibilityLabel
+                    .contains("not whether an answer is correct"),
+            "explanation stage explicitly separates flow progress from answer correctness")
         print(
             "\(count) Foundation presentation/demo checks passed; no Apple UI was compiled or rendered."
         )

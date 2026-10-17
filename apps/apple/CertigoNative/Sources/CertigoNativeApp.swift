@@ -361,7 +361,7 @@ import Foundation
 
         private var objective: some View {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 24) {
                     demoNotice
                     learnSelector
                     if let goal = flow.objective {
@@ -541,10 +541,10 @@ import Foundation
 
         private var preparation: some View {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 24) {
                     demoNotice
                     if let practice = flow.practice {
-                        DemoPracticeTrail(current: .situation)
+                        DemoPracticeTrail(progress: NativeDemoPracticeProgress(current: .situation))
                         Text(practice.title).font(.title.bold())
                             .accessibilityAddTraits(.isHeader)
                         DemoReadingSection(title: "The situation", text: practice.situation)
@@ -574,7 +574,8 @@ import Foundation
                     demoNotice
                     if let practice = flow.practice {
                         DemoPracticeTrail(
-                            current: flow.phase == .reviewed ? .explanation : .decision)
+                            progress: NativeDemoPracticeProgress(
+                                current: flow.phase == .reviewed ? .explanation : .decision))
                         switch flow.phase {
                         case .answering:
                             Label(
@@ -592,7 +593,9 @@ import Foundation
                             Text(practice.title).font(.title2.bold())
                                 .accessibilityAddTraits(.isHeader)
                             Text(practice.situation).textSelection(.enabled)
-                            Text(practice.question).font(.headline)
+                            Text(practice.question)
+                                .font(.title3.weight(.semibold))
+                                .accessibilityAddTraits(.isHeader)
                             VStack(spacing: 12) {
                                 ForEach(Array(NativeDemoFlow.options.enumerated()), id: \.offset) {
                                     index, option in
@@ -690,7 +693,7 @@ import Foundation
                                 systemImage: "text.bubble"
                             )
                             .font(.title2.bold())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityIdentifier("demo-explanation-state")
                             selectedAnswer
@@ -699,7 +702,7 @@ import Foundation
                             DemoReadingSection(
                                 title: "Understanding the decision", text: practice.explanation)
                             DemoResponsibilities(rows: practice.responsibilities)
-                            DemoReadingSection(title: "Takeaway", text: practice.takeaway)
+                            DemoTakeaway(text: practice.takeaway)
                             Text(
                                 "This is a design fixture, not the correction of a published question. It appears for every choice: the demo gives no verdict or score."
                             )
@@ -840,12 +843,7 @@ import Foundation
         }
 
         private struct DemoPracticeTrail: View {
-            enum Step: String, CaseIterable {
-                case situation = "Situation"
-                case decision = "Decision"
-                case explanation = "Explanation"
-            }
-            let current: Step
+            let progress: NativeDemoPracticeProgress
 
             var body: some View {
                 ViewThatFits(in: .horizontal) {
@@ -854,19 +852,36 @@ import Foundation
                 }
                 .font(.subheadline)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(
-                    "Current stage: \(current.rawValue). Situation, decision, explanation.")
+                .accessibilityLabel(progress.accessibilityLabel)
             }
 
             @ViewBuilder private var steps: some View {
-                ForEach(Step.allCases, id: \.self) { step in
+                ForEach(NativeDemoPracticeStage.allCases, id: \.self) { step in
+                    let state = progress.state(for: step)
                     Label(
                         step.rawValue,
-                        systemImage: step == current ? "circle.inset.filled" : "circle"
+                        systemImage: state.symbol
                     )
-                    .foregroundStyle(step == current ? NativePrism.tint : Color.secondary)
-                    .fontWeight(step == current ? .semibold : .regular)
+                    .foregroundStyle(state == .current ? NativePrism.tint : Color.secondary)
+                    .fontWeight(state == .current ? .semibold : .regular)
                     .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+
+        private struct DemoTakeaway: View {
+            let text: String
+
+            var body: some View {
+                GroupBox {
+                    Text(text)
+                        .font(.body.weight(.medium))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                } label: {
+                    Label("Takeaway", systemImage: "lightbulb")
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
                 }
             }
         }
@@ -1060,6 +1075,47 @@ struct NativeDemoFlow: Codable, Equatable {
             throw InvalidSnapshot.inconsistentState
         }
         return flow
+    }
+}
+
+enum NativeDemoPracticeStage: String, CaseIterable {
+    case situation = "Situation"
+    case decision = "Decision"
+    case explanation = "Explanation"
+
+    var position: Int {
+        switch self {
+        case .situation: 1
+        case .decision: 2
+        case .explanation: 3
+        }
+    }
+}
+
+enum NativeDemoPracticeStepState: Equatable {
+    case completed, current, upcoming
+
+    var symbol: String {
+        switch self {
+        case .completed: "circle.fill"
+        case .current: "circle.inset.filled"
+        case .upcoming: "circle"
+        }
+    }
+}
+
+struct NativeDemoPracticeProgress {
+    let current: NativeDemoPracticeStage
+
+    func state(for stage: NativeDemoPracticeStage) -> NativeDemoPracticeStepState {
+        if stage == current { return .current }
+        return stage.position < current.position ? .completed : .upcoming
+    }
+
+    var accessibilityLabel: String {
+        let stageCount = NativeDemoPracticeStage.allCases.count
+        return "Stage \(current.position) of \(stageCount): \(current.rawValue). "
+            + "Stages describe the learning flow, not whether an answer is correct."
     }
 }
 
