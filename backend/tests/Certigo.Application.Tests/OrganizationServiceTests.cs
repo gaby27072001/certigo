@@ -12,6 +12,30 @@ public sealed class OrganizationServiceTests
     private static readonly DateTimeOffset Now =
         new(2026, 8, 20, 12, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(1, 50)]
+    [InlineData(2, 100)]
+    [InlineData(3, 200)]
+    [InlineData(4, 400)]
+    public void Offboarding_retry_delay_uses_bounded_exponential_values(
+        int attempt,
+        double expectedMilliseconds)
+    {
+        OrganizationOffboardingRecoveryWorker.RetryDelayForAttempt(attempt)
+            .Should().Be(TimeSpan.FromMilliseconds(expectedMilliseconds));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public void Offboarding_retry_delay_rejects_attempts_outside_retryable_range(int attempt)
+    {
+        var act = () => OrganizationOffboardingRecoveryWorker.RetryDelayForAttempt(attempt);
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .Which.ParamName.Should().Be("attempt");
+    }
+
     [Fact]
     public async Task Invitation_acceptance_uses_authenticated_person_and_is_single_use()
     {
