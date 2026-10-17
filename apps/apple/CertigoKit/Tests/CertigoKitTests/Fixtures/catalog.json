@@ -1,0 +1,13 @@
+{
+  "schema": "certigo.app-certification-catalog/v2",
+  "sourceSchema": "certigo.certification-catalog/v1",
+  "tracks": [
+    {
+      "id": "fixture:foundations",
+      "code": "FIXTURE",
+      "title": "Synthetic contract fixture",
+      "summary": "Test data, not an official certification.",
+      "learningAvailable": true
+    }
+  ]
+}
