@@ -2,10 +2,12 @@
 
 These synthetic public fixtures describe **existing** HTTP contracts, not new
 endpoints, published content, certification claims, or a staging configuration.
-`NativeClientWireFixtureTests` compares them with the real C# HTTP functions and
-serializer. Swift tests should consume these same files rather than copy their
-contents. Formatting and object property order are not part of this fixture
-contract; JSON values, omitted keys, dates, enums and nulls are.
+The current C# fixture test covers only the two active-goal vectors; the other
+six are historical Swift wire-shape fixtures. See [Backend parity evidence](#backend-parity-evidence)
+for the exact scope and provenance. Swift tests consume these local files rather
+than duplicating their payloads. Formatting and object property order are not
+part of this fixture contract; JSON values, omitted keys, dates, enums and nulls
+are.
 
 | Fixture | Existing route |
 | --- | --- |
@@ -17,6 +19,34 @@ contract; JSON values, omitted keys, dates, enums and nulls are.
 | `quiz-submit-correct-result.json` | A successful correction with nullable feedback |
 | `active-track-request.json` | Explicit `POST /api/me/active-track` request |
 | `profile.json` | Authoritative profile from `GET /api/me` or active-track selection |
+
+## Backend parity evidence
+
+At Certigo `main` base `3b305a4093fdaba8f8cc4595ac78810c58ae38f9`,
+`NativeClientWireFixtureTests` (blob `39b1730bc0002899a95e372291d2c03bb02af0d8`)
+invokes the real active-track function with `active-track-request.json`, verifies
+the parsed goal selection, and compares the active-track and profile function
+responses with `profile.json`. The two fixture files match the backend-owned contract files at
+`ecbfb054f2474bc430856b72fd55d66a03f6e9fb`.
+
+The other six files are historical synthetic Swift wire-shape vectors from
+native source commit `3339685c1ea571971875041ddbcf3d23471b3c76`. Their Git blob
+SHA-1s identify the exact historical bytes; they are decoded by Swift tests but
+are not compared with real C# function output by the backend fixture test at
+that base:
+
+| Fixture | Historical Git blob SHA-1 |
+| --- | --- |
+| `catalog.json` | `0860553b5a2a145c3b74b712d274d2fcd87c89fc` |
+| `path.json` | `bc1efaf3fcfbd60c8b0d137f4c316e0324067996` |
+| `lesson.json` | `319765ebe944cdb2b44e3e5bddcab02421ffaa33` |
+| `quiz-submit-request.json` | `ca93fa499a46c9606ba9555155b29fcdfd5c3ae3` |
+| `quiz-submit-result.json` | `d728c9f655fa8ab166d0ca984f777f2c97833abb` |
+| `quiz-submit-correct-result.json` | `8385c88f8db355a7ca1c0915d01c42fecb78c599` |
+
+Do not describe those six vectors as current backend parity or as exercised by
+the current C# fixture test. Their historical blob identity proves which bytes
+were reviewed, not which server implementation produced them.
 
 The two active-goal vectors are pinned to backend revision
 `ecbfb054f2474bc430856b72fd55d66a03f6e9fb`. Selection sends `trackId` and nullable

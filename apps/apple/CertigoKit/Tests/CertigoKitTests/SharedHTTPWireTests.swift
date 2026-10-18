@@ -1,7 +1,8 @@
 import CertigoData
 import CertigoDomain
 import Foundation
-/// Exact synthetic serializer vectors also exercised by the real C# HTTP functions.
+/// Historical synthetic wire-shape vectors. Current C# fixture coverage is limited
+/// to the two active-goal files.
 import XCTest
 
 #if canImport(FoundationNetworking)

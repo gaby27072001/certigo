@@ -36,7 +36,7 @@ jobs:
     name: Detect changed paths
     needs: freshness
     if: ${{ always() && github.event_name == 'pull_request_target' && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -63,7 +63,7 @@ jobs:
       && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current != 'false')
       && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -138,7 +138,7 @@ jobs:
       && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current != 'false')
       && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -186,25 +186,6 @@ jobs:
           else
             echo "All prerequisites already present."
           fi
-      - name: Clear corrupted Flutter tool cache
-        run: |
-          # subosito/flutter-action caches Flutter under _work/_tool/flutter.
-          # If a previous download was interrupted, the extracted dir exists but
-          # bin/internal/shared.sh is missing, causing every subsequent run to
-          # fail. Detect and remove such entries so the action downloads fresh.
-          TOOL_DIR="/home/runner/actions-runner/_work/_tool/flutter"
-          TOOL_DIR2="/home/runner/actions-runner-2/_work/_tool/flutter"
-          for BASE in "$TOOL_DIR" "$TOOL_DIR2"; do
-            if [ -d "$BASE" ]; then
-              for DIR in "$BASE"/stable-*; do
-                if [ -d "$DIR" ] && [ ! -f "$DIR/flutter/bin/internal/shared.sh" ]; then
-                  echo "Removing corrupted Flutter install: $DIR"
-                  rm -rf "$DIR"
-                fi
-              done
-            fi
-          done
-        continue-on-error: true
       - name: Set up repository formatter
         uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
         with:
@@ -258,7 +239,7 @@ jobs:
       && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current != 'false')
       && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -306,25 +287,6 @@ jobs:
           else
             echo "All prerequisites already present."
           fi
-      - name: Clear corrupted Flutter tool cache
-        run: |
-          # subosito/flutter-action caches Flutter under _work/_tool/flutter.
-          # If a previous download was interrupted, the extracted dir exists but
-          # bin/internal/shared.sh is missing, causing every subsequent run to
-          # fail. Detect and remove such entries so the action downloads fresh.
-          TOOL_DIR="/home/runner/actions-runner/_work/_tool/flutter"
-          TOOL_DIR2="/home/runner/actions-runner-2/_work/_tool/flutter"
-          for BASE in "$TOOL_DIR" "$TOOL_DIR2"; do
-            if [ -d "$BASE" ]; then
-              for DIR in "$BASE"/stable-*; do
-                if [ -d "$DIR" ] && [ ! -f "$DIR/flutter/bin/internal/shared.sh" ]; then
-                  echo "Removing corrupted Flutter install: $DIR"
-                  rm -rf "$DIR"
-                fi
-              done
-            fi
-          done
-        continue-on-error: true
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
