@@ -47,3 +47,15 @@ The synthetic Foundation configuration tests do not compile the iOS app or
 MSAL/UIKit adapter and do not prove an identity registration, endpoint, account,
 or live sign-in. Apple-platform build, callback, keychain, and dedicated
 test-account validation remain separate requirements.
+
+## Debug simulator builds
+
+The project-level Debug configuration uses `ONLY_ACTIVE_ARCH = YES`; the app
+target inherits it. This keeps an Xcode Run build aligned with the selected
+simulator and its Swift package modules, rather than also requesting an Intel
+slice when the packages were built only for the active Apple Silicon simulator.
+No architecture is hardcoded or excluded: an Intel destination can still select
+its own active architecture. Release settings are unchanged. A successful
+generic simulator build is not proof that Xcode Run compiled and launched the
+app for the selected destination; verify that separately without changing
+package pins, signing, or clearing caches.
