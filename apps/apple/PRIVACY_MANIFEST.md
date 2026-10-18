@@ -17,11 +17,26 @@ current `SubmissionStore` path is under Application Support. `RuntimeDisk`
 accepts a caller-provided root, so re-evaluate this reason if a future caller
 uses a user-granted location outside the app container.
 
-The project pins MSAL `2.16.0`, but its resolved package source and bundled
-manifest were not available for inspection in this checkout. This app manifest
-does not declare required-reason API use on behalf of MSAL. Verify the pinned
-SDK's own privacy manifest and bundled resources before distribution; do not
-edit the SDK or change its pin as part of this work.
+The project pins MSAL `2.16.0` as a Swift Package Manager binary target. At
+upstream commit
+[`8dfe5bf41fe10e6d2afed62a72c4232adbef20f4`](https://github.com/AzureAD/microsoft-authentication-library-for-objc/tree/8dfe5bf41fe10e6d2afed62a72c4232adbef20f4),
+`Package.swift` (blob
+`229d03c01d1f42b48f21a6ce3b64d40f1bbea46a`) declares the release `2.16.0/MSAL.zip`
+binary target and checksum
+`3bef53dae500878c2f07fd7493d54063f4fdcb057dfdb3c239256289a349edb8`. The same
+source tree contains [`MSAL/PrivacyInfo.xcprivacy`](https://github.com/AzureAD/microsoft-authentication-library-for-objc/blob/8dfe5bf41fe10e6d2afed62a72c4232adbef20f4/MSAL/PrivacyInfo.xcprivacy)
+(blob `265db1451895df461a550c6debdc613e3f20425c`), which declares UserDefaults
+reasons `1C8F.1` and `CA92.1` and eight collected-data categories: name, email
+address, other user contact information, customer support, user ID, device ID,
+diagnostic data, and phone number. Those are the upstream SDK's declarations;
+this source-file inspection does not independently verify what the release
+archive contains or establish which data the integrated app actually collects.
+
+The app manifest therefore does not copy SDK declarations or claim to speak for
+MSAL. Apple requires an SDK to report its own API and data practices in its own
+bundle manifest. Confirm that the pinned archive includes this manifest and
+inspect the archived app's aggregated privacy report before distribution; do
+not edit the SDK or change its pin as part of this work.
 
 Reason definitions and manifest requirements are from Apple's [required reason
 API guidance](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api),
