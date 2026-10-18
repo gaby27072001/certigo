@@ -404,6 +404,75 @@ struct NativeDemoFlowTests {
                 && explanationProgress.accessibilityLabel
                     .contains("not whether an answer is correct"),
             "explanation stage explicitly separates flow progress from answer correctness")
+        var persistence = NativeDemoPersistence.awaitingRestoration
+        var storedSnapshot = "not yet restored"
+        try persistence.save(snapshot, to: &storedSnapshot)
+        try check(
+            storedSnapshot == "not yet restored" && persistence == .awaitingRestoration,
+            "initial loading cannot replace stored demo data")
+        let freshSnapshot = try NativeDemoSnapshot.make(
+            flow: NativeDemoFlow(),
+            navigation: NativeDemoNavigationState(
+                selectedTab: .catalog, objectivePath: [], catalogPath: []))
+        let validSnapshot = String(decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)
+        let futureSnapshot = validSnapshot.replacingOccurrences(
+            of: "\"schema\":1", with: "\"schema\":2")
+        try check(futureSnapshot != validSnapshot, "future-schema fixture changes the schema")
+        for rejectedSnapshot in ["not json · é", futureSnapshot] {
+            persistence = .awaitingRestoration
+            storedSnapshot = rejectedSnapshot
+            var rejected = false
+            do {
+                _ = try persistence.restore(storedSnapshot)
+            } catch {
+                rejected = true
+            }
+            try check(
+                rejected && persistence == .preservingRejectedSnapshot,
+                "invalid or future demo restoration blocks automatic persistence")
+            for destination in NativeDemoDestination.allCases {
+                let changedNavigation = try NativeDemoNavigationState.make(
+                    selectedTab: .selecting(destination, learnSection: .myLearning),
+                    objectivePath: [.exercise], catalogPath: [],
+                    flow: workshop, learnSection: .myLearning)
+                let changedSnapshot = try NativeDemoSnapshot.make(
+                    flow: workshop, navigation: changedNavigation)
+                try persistence.save(changedSnapshot, to: &storedSnapshot)
+                try check(
+                    Array(storedSnapshot.utf8) == Array(rejectedSnapshot.utf8),
+                    "\(destination) navigation preserves rejected snapshot bytes")
+            }
+            try persistence.save(freshSnapshot, to: &storedSnapshot)
+            try check(
+                Array(storedSnapshot.utf8) == Array(rejectedSnapshot.utf8),
+                "new in-memory demo work cannot overwrite a rejected snapshot")
+            persistence.reset(&storedSnapshot)
+            try check(
+                storedSnapshot.isEmpty && persistence == .ready,
+                "explicit demo reset alone clears rejected storage and re-enables saving")
+            try persistence.save(freshSnapshot, to: &storedSnapshot)
+            try check(
+                try NativeDemoSnapshot.restore(Data(storedSnapshot.utf8)) == freshSnapshot,
+                "a fresh demo persists normally after explicit reset")
+        }
+        persistence = .awaitingRestoration
+        storedSnapshot = validSnapshot
+        try check(
+            try persistence.restore(storedSnapshot) == snapshot && persistence == .ready,
+            "valid restoration preserves the saved flow and enables persistence")
+        try persistence.save(freshSnapshot, to: &storedSnapshot)
+        try check(
+            try NativeDemoSnapshot.restore(Data(storedSnapshot.utf8)) == freshSnapshot,
+            "normal restored demo accepts subsequent saves")
+        persistence = .awaitingRestoration
+        storedSnapshot = ""
+        try check(
+            try persistence.restore(storedSnapshot) == nil && persistence == .ready,
+            "an empty installation finishes restoration without inventing saved activity")
+        try persistence.save(snapshot, to: &storedSnapshot)
+        try check(
+            try NativeDemoSnapshot.restore(Data(storedSnapshot.utf8)) == snapshot,
+            "first-run demo activity persists after empty restoration")
         print(
             "\(count) Foundation presentation/demo checks passed; no Apple UI was compiled or rendered."
         )
