@@ -1355,31 +1355,42 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .tabItem { Label("Learn", systemImage: "book") }
                             .tag(NativeLearningNavigation.Tab.learn)
                         NavigationStack {
-                            ContentUnavailableView(
-                                "Coach is not connected",
-                                systemImage: "bubble.left.and.bubble.right",
-                                description: Text(
-                                    "Personal assistance and conversation history are not available in this client."
+                            ScrollView {
+                                ContentUnavailableView(
+                                    "Coach is not connected",
+                                    systemImage: "bubble.left.and.bubble.right",
+                                    description: Text(
+                                        "Personal assistance and conversation history are not available in this client."
+                                    )
                                 )
-                            )
+                                .padding(20)
+                                .frame(maxWidth: 680)
+                                .frame(maxWidth: .infinity)
+                            }
                             .navigationTitle("Coach")
                         }
                         .tabItem { Label("Coach", systemImage: "bubble.left.and.bubble.right") }
                         .tag(NativeLearningNavigation.Tab.coach)
                         NavigationStack {
-                            VStack {
-                                Picker("Social section", selection: $navigation.social) {
-                                    Text("Friends").tag(NativeLearningNavigation.Social.friends)
-                                    Text("Teams").tag(NativeLearningNavigation.Social.teams)
+                            ScrollView {
+                                VStack {
+                                    Picker("Social section", selection: $navigation.social) {
+                                        Text("Friends").tag(NativeLearningNavigation.Social.friends)
+                                        Text("Teams").tag(NativeLearningNavigation.Social.teams)
+                                    }
+                                    .pickerStyle(.segmented).padding()
+                                    ContentUnavailableView(
+                                        navigation.social == .friends
+                                            ? "Friends are not connected"
+                                            : "Teams are not connected",
+                                        systemImage: "person.2",
+                                        description: Text(
+                                            "Invitations, sharing and group activity are not available. No relationships are created here."
+                                        ))
                                 }
-                                .pickerStyle(.segmented).padding()
-                                ContentUnavailableView(
-                                    navigation.social == .friends
-                                        ? "Friends are not connected" : "Teams are not connected",
-                                    systemImage: "person.2",
-                                    description: Text(
-                                        "Invitations, sharing and group activity are not available. No relationships are created here."
-                                    ))
+                                .padding(20)
+                                .frame(maxWidth: 680)
+                                .frame(maxWidth: .infinity)
                             }
                             .navigationTitle("Social")
                         }
