@@ -72,6 +72,22 @@ test('accepts the candidate script tests job', () => {
   assert.deepEqual(validateCandidateScriptTestsJob(workflowWith()), []);
 });
 
+test('accepts the fixed hosted candidate runner without relaxing read-only or enforcement', () => {
+  const hosted = (candidate) => { candidate['runs-on'] = 'ubuntu-24.04'; };
+  assert.deepEqual(validateCandidateScriptTestsJob(workflowWith(hosted)), []);
+  assert.match(
+    validateCandidateScriptTestsJob(workflowWith((candidate) => {
+      hosted(candidate);
+      candidate.permissions.contents = 'write';
+    })).join('\n'),
+    /read-only/,
+  );
+  assert.match(
+    validateCandidateScriptTestsJob(workflowWith(hosted, (gate) => { gate.steps.pop(); })).join('\n'),
+    /must fail when the tests of the pull request fail/,
+  );
+});
+
 test('the lint workflow of this tree keeps the candidate script tests job', () => {
   // Contrôle positif sur le fichier réel : le validateur de la base impose le même invariant avant
   // toute fusion, donc un lint-workflows.yml fusionné le satisfait toujours.

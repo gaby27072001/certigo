@@ -17,11 +17,11 @@ jobs:
   build:
     name: Build verified public legal pages
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: [self-hosted, Linux, X64, certigo-trusted]
+    runs-on: ubuntu-24.04
     environment: github-pages
     permissions:
       contents: read
-      pages: write
+      pages: read
     steps:
       - name: Reject unexpected payload fields
         shell: bash
@@ -35,9 +35,15 @@ jobs:
           fi
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.20.2"
       - id: pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+        with:
+          enablement: false
       - name: Require a compatible verified Pages origin
         shell: bash
         env:

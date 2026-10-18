@@ -74,7 +74,7 @@ jobs:
     name: Bicep build (lint)
     needs: freshness
     if: ${{ always() && (github.event_name != 'pull_request_target' || (needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository)) }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -143,7 +143,9 @@ jobs:
         run: node --test infra/tests/content-storage.test.mjs
       - name: Validate FinOps guardrails
         run: node --test infra/tests/finops-guardrails.test.mjs
-      - name: Validate public account-deletion policy
+      - name: Install public-page test dependencies from lock
+        run: npm ci --ignore-scripts
+      - name: Test public account-deletion policy
         run: node --test tools/tests/build_public_pages.test.mjs
       - name: Validate public-domain contract
         run: node --test .github/scripts/public-domain-contract.test.mjs

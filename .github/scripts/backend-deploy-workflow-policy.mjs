@@ -2,6 +2,139 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
+import {
+  fingerprintWorkflow,
+  isPreApprovalActive,
+  loadWorkflowManifest,
+  proposalRelativePath,
+  readRegularRepositoryFile,
+  reviewedWorkflowDigest,
+} from './workflow-semantic-fingerprint.mjs';
+
+// Exact reviewed preparation deltas, not a general privileged-workflow allowlist.
+const reviewedTransitions = Object.freeze({
+  'codeql.yml': [
+    '30cb9b1ab2d3a8d440530194b593e34bdc2623ac28b04f3fa46c391a58afa124',
+    'dc1fd62b98b5bbe676984059025e99f77aa3bf0bdfc012c69fa2d478bb28dd6e',
+  ],
+  'security-gate.yml': [
+    'f8b0c946071b40068f89e4c04a6bb3c41e260086325651788632788a1c6dbab6',
+    '17e00493c9e5e6a7c6c337ceb1706f0717419f797b5661ecb33d6e447e38a6e6',
+  ],
+  'cd-backend.yml': [
+    '586addcce22fbbc86d660e601f5e331cd267c334edf4947bc490a5ba3b68a541',
+    '05287664503833f3c2e6f7daa4c20ff7cb38584de45dccb89f02aff9401fc516',
+  ],
+  'release-android.yml': [
+    '31817ce82c352a3659fa9cf071a57031edbaed6d33e476b24cd7715680137ed8',
+    'f38ef5e57d42f98054e0525b1222386e1966e6fb699f68d0e5698225d956c31a',
+  ],
+  'release-ios.yml': [
+    '849c84a181679db1df83121286b01d5471939d763588dab81ac07b6bcd97de54',
+    'a5cbc5a0b824f645a20a32e795ed07c0b53c89366e9de6fe4915550d45a8c44e',
+  ],
+  'ci-infra.yml': [
+    'dfdd4ba04b743fdf7a92b03b5326c0bf090d0d646ce7acb9bcbcae015cca9326',
+    'a96d6a6e131e9c762a861ac763b0cd7ec3a3f284a927e124bd9c3c73d9c35494',
+  ],
+  'deploy-privacy-policy.yml': [
+    '2e988a44f5c980d82784d1d8086904ed79fa45066f4dcac2bf34e01f62f7a3ce',
+    '1ac309f8c301aa84d961445027574b7b2c20923b23010458de6cd11ed6dfafef',
+  ],
+  'publish-verified-public-pages.yml': [
+    '8461c70580527fbada9c309fbfe1a0c70c7b7b11f7c3dc98d237e493f436964d',
+    'd81e70c123dba3d8e89bf7248090937d940857a6b365e835dd66e8a91e2ac171',
+  ],
+});
+
+export function isReviewedWorkflowTransition(
+  candidateInput,
+  file,
+  trustedRoot,
+  { now = new Date() } = {},
+) {
+  if (!trustedRoot) {
+    return false;
+  }
+  const directory = path.basename(path.dirname(file));
+  if (!['workflows', 'workflows-proposed'].includes(directory)) {
+    return false;
+  }
+  const name = path.basename(file);
+  const transition = name === 'codeql.yml'
+    && sha256(candidateInput) === '5bf6faf8f8c88acaeaf185ddb01128a2c47a29d99328ebd7ba7b7048728dc8ff'
+    ? [
+      'dc1fd62b98b5bbe676984059025e99f77aa3bf0bdfc012c69fa2d478bb28dd6e',
+      '5bf6faf8f8c88acaeaf185ddb01128a2c47a29d99328ebd7ba7b7048728dc8ff',
+    ]
+    : Object.hasOwn(reviewedTransitions, name) ? reviewedTransitions[name] : null;
+  if (!transition || sha256(candidateInput) !== transition[1]) {
+    return false;
+  }
+  const workflowPath = `.github/workflows/${name}`;
+  const trusted = readRegularRepositoryFile(trustedRoot, workflowPath);
+  if (!trusted.exists || trusted.error) {
+    return false;
+  }
+  const sourceDigest = sha256(trusted.bytes);
+  if (!transition.includes(sourceDigest)) {
+    return false;
+  }
+  const proposal = directory === 'workflows-proposed';
+  if (proposal) {
+    // Reviewing a proposal grants no authority to execute it. Landing below needs BASE approval.
+    return sourceDigest === transition[0];
+  }
+  const manifestFile = readRegularRepositoryFile(
+    trustedRoot,
+    '.github/scripts/workflow-semantic-manifest.json',
+  );
+  if (!manifestFile.exists || manifestFile.error) {
+    return false;
+  }
+  let loaded;
+  try {
+    loaded = loadWorkflowManifest(path.join(
+      trustedRoot, '.github', 'scripts', 'workflow-semantic-manifest.json',
+    ));
+  } catch {
+    // The ordinary workflow/manifest validators report the rejected file.
+    return false;
+  }
+  if (loaded.errors.length > 0) {
+    return false;
+  }
+  const candidate = fingerprintWorkflow(workflowPath, candidateInput.toString('utf8'));
+  if (candidate.errors.length > 0) {
+    return false;
+  }
+  if (sourceDigest === transition[1]) {
+    return reviewedWorkflowDigest(loaded.manifest.states, workflowPath) === candidate.digest;
+  }
+  const entry = loaded.manifest.preApproved[workflowPath];
+  const approvedProposal = readRegularRepositoryFile(
+    trustedRoot, proposalRelativePath(workflowPath),
+  );
+  return entry?.digest === candidate.digest
+    && isPreApprovalActive(entry, now)
+    && approvedProposal.exists
+    && !approvedProposal.error
+    && sha256(approvedProposal.bytes) === transition[1];
+}
+
+export function isReviewedGenerationJob(candidateInput, file, jobId, trustedRoot) {
+  const expectedJob = path.basename(file) === 'ci-infra.yml' ? 'bicep-build' : 'build';
+  return ['ci-infra.yml', 'deploy-privacy-policy.yml', 'publish-verified-public-pages.yml']
+    .includes(path.basename(file))
+    && jobId === expectedJob
+    && isReviewedWorkflowTransition(candidateInput, file, trustedRoot);
+}
+
+export function isReviewedMainCodeqlJob(candidateInput, file, jobId, trustedRoot) {
+  return path.basename(file) === 'codeql.yml'
+    && jobId === 'analyze-main'
+    && isReviewedWorkflowTransition(candidateInput, file, trustedRoot);
+}
 
 export const backendDeployTrustedFiles = Object.freeze([
   '.github/scripts/backend-deploy-workflow-policy.mjs',
@@ -480,6 +613,28 @@ function workflowInput(input) {
   return undefined;
 }
 
+function exactLegacyLintTransition(candidateBytes, trustedBytes) {
+  const [source, target] = reviewedTransitions['cd-backend.yml'];
+  if (
+    candidateBytes.length !== 38056
+    || sha256(candidateBytes) !== target
+    || ![source, target].includes(sha256(trustedBytes))
+  ) {
+    return false;
+  }
+  const original = candidateBytes.toString('utf8').replace(
+    '          {\n'
+      + '            echo "environment=$TARGET"\n'
+      + '            echo "operation=$OPERATION"\n'
+      + '            echo "source-run-id=$SOURCE_RUN_ID"\n'
+      + '          } >> "$GITHUB_OUTPUT"',
+    '          echo "environment=$TARGET" >> "$GITHUB_OUTPUT"\n'
+      + '          echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"\n'
+      + '          echo "source-run-id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"',
+  );
+  return Buffer.byteLength(original) === hardenedLegacyWorkflowSize && sha256(original) === source;
+}
+
 function ancestorJobs(jobs, jobId, errors, visiting = new Set()) {
   if (visiting.has(jobId)) {
     errors.push(`cd-backend.yml: job dependency cycle reaches ${jobId}`);
@@ -848,6 +1003,11 @@ export function validateBackendDeployWorkflow(candidateInput, trustedInput, cont
     && candidateBytes.length === hardenedLegacyWorkflowSize
     && candidateDigest === hardenedLegacyWorkflowSha256
   ) {
+    return [];
+  }
+  // Only this exact grouped-redirection delta can retain A-hardened semantics.
+  // Workspace validation additionally requires prior BASE approval and unchanged inputs.
+  if (exactLegacyLintTransition(candidateBytes, trustedBytes)) {
     return [];
   }
   const parsed = parseWorkflow(candidateText, 'cd-backend.yml');
@@ -1230,9 +1390,18 @@ function revisionLocalTree(root, relativeRoot, label, errors) {
   return files;
 }
 
-function validateRevisionLocalPrivilegedInputs(candidateRoot, trustedRoot) {
+function validateRevisionLocalPrivilegedFiles(
+  candidateRoot, trustedRoot, paths, { allowAbsent = false } = {},
+) {
   const errors = [];
-  for (const relativePath of revisionLocalPrivilegedInputs) {
+  for (const relativePath of paths) {
+    if (
+      allowAbsent
+      && !readRegularRepositoryFile(candidateRoot, relativePath).exists
+      && !readRegularRepositoryFile(trustedRoot, relativePath).exists
+    ) {
+      continue;
+    }
     const candidate = regularFile(candidateRoot, relativePath, 'candidate privileged input');
     const trusted = regularFile(trustedRoot, relativePath, 'revision-local privileged input');
     if (candidate.error) {
@@ -1249,6 +1418,13 @@ function validateRevisionLocalPrivilegedInputs(candidateRoot, trustedRoot) {
       );
     }
   }
+  return errors;
+}
+
+function validateRevisionLocalPrivilegedInputs(candidateRoot, trustedRoot) {
+  const errors = validateRevisionLocalPrivilegedFiles(
+    candidateRoot, trustedRoot, revisionLocalPrivilegedInputs,
+  );
   for (const relativeRoot of revisionLocalPrivilegedTrees) {
     const candidate = revisionLocalTree(
       candidateRoot,
@@ -1264,7 +1440,9 @@ function validateRevisionLocalPrivilegedInputs(candidateRoot, trustedRoot) {
     );
     const paths = new Set([...candidate.keys(), ...trusted.keys()]);
     for (const relativePath of paths) {
-      if (!candidate.get(relativePath)?.equals(trusted.get(relativePath))) {
+      const candidateBytes = candidate.get(relativePath);
+      const trustedBytes = trusted.get(relativePath);
+      if (!candidateBytes || !trustedBytes || !candidateBytes.equals(trustedBytes)) {
         errors.push(
           `candidate privileged input: ${relativePath} must match the immutable base revision`,
         );
@@ -1358,7 +1536,10 @@ function validateNoncanonicalWorkflows(candidateRoot, trustedRoot) {
     const parsed = parseWorkflow(fs.readFileSync(candidate.path, 'utf8'), relativePath);
     if (parsed.error) {
       errors.push(parsed.error);
-    } else if (privilegedWorkflow(parsed.workflow)) {
+    } else if (
+      privilegedWorkflow(parsed.workflow)
+      && !isReviewedWorkflowTransition(fs.readFileSync(candidate.path), relativePath, trustedRoot)
+    ) {
       errors.push(
         `${relativePath}: changed or new privileged capability is forbidden outside cd-backend.yml`,
       );
@@ -1380,7 +1561,12 @@ export function validateBackendDeployWorkspace(candidateRoot, trustedRoot) {
       errors.push(trusted.error);
       continue;
     }
-    if (!fs.readFileSync(candidate.path).equals(fs.readFileSync(trusted.path))) {
+    // Policy and tests remain regular files, but are reviewable candidate code.
+    // Only the dispatch authorizer is byte-sealed here; the caller runs BASE code.
+    if (
+      relativePath === '.github/scripts/validate-backend-deploy-dispatch.mjs'
+      && !fs.readFileSync(candidate.path).equals(fs.readFileSync(trusted.path))
+    ) {
       errors.push(
         `candidate trusted control: ${relativePath} must match the immutable base revision`,
       );
@@ -1405,8 +1591,19 @@ export function validateBackendDeployWorkspace(candidateRoot, trustedRoot) {
     const isHardenedLegacy = bytes.length === hardenedLegacyWorkflowSize
       && sha256(bytes) === hardenedLegacyWorkflowSha256
       && candidateBytes.equals(trustedBytes);
+    const isLegacyLint = exactLegacyLintTransition(candidateBytes, trustedBytes);
+    if (isLegacyLint) {
+      if (!isReviewedWorkflowTransition(candidateBytes, workflowPath, trustedRoot)) {
+        errors.push('cd-backend.yml: exact legacy lint transition requires prior trusted BASE approval');
+      }
+      errors.push(...validateRevisionLocalPrivilegedInputs(candidateRoot, trustedRoot));
+      errors.push(...validateRevisionLocalPrivilegedFiles(
+        candidateRoot, trustedRoot, [...supportingControls.keys(), capacityDocumentPath],
+        { allowAbsent: true },
+      ));
+    }
     let controls;
-    if (!isLegacy && !isHardenedLegacy) {
+    if (!isLegacy && !isHardenedLegacy && !isLegacyLint) {
       errors.push(...validateRevisionLocalPrivilegedInputs(candidateRoot, trustedRoot));
       controls = new Map();
       for (const relativePath of supportingControls.keys()) {

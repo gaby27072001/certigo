@@ -87,6 +87,95 @@ dans un **commit de tête séparé** (voir `docs/GOVERNANCE.md`).
 
 ## Ce que la CI vérifie
 
+### Préparation bornée post-self-seal : lint mobile et génération publique
+
+La préparation initiale de `backend-deploy-workflow-policy.mjs` reconnaît six
+transitions exactes, avec SHA256 **des octets source et cible** : `cd-backend.yml`, `release-android.yml`,
+`release-ios.yml`, `ci-infra.yml`, `deploy-privacy-policy.yml` et
+`publish-verified-public-pages.yml`. Les deux releases gardent leurs triggers, permissions,
+secrets et déploiements ; seules les redirections groupées et la conservation des arguments
+keychain iOS changent. Les trois jobs de génération (`bicep-build` ou `build`) utilisent
+`ubuntu-24.04` ; les deux builds Pages réduisent `pages: write` à `pages: read`, épinglent
+Node et le checkout sans credentials et interdisent l'activation implicite de Pages. Les
+jobs de publication privilégiés restent inchangés. Ce n'est pas une allowlist générale de
+workflows privilégiés ni un fallback de runner.
+
+Le lot lint source est le patch SHA256
+`84e93e57aa09444b25270ecafd045a3228a47a51583ac8578c46c09c43b1f8d5`.
+Les cibles Android/iOS sont reconstruites en **LF** depuis ce patch, sans conversion
+`core.autocrlf`. Les callers publics proviennent du commit
+`a706caa8ad94d162d3a584a5ad39dbc0d8c04a6b`. Ces références désignent une préparation,
+pas une adoption. Ces six paires d'empreintes sont littérales dans le code et les tests ;
+la consolidation ci-dessous ajoute seulement les deux paires CodeQL/security-gate.
+
+Le landing exige une préapprobation non expirée **déjà dans la trusted BASE**, son manifeste
+valide, sa proposition régulière non symlink aux octets cibles exacts et le workflow source
+exact. Le manifeste candidat ne peut ni accorder ni renouveler cette autorité. Une proposition
+exacte est vérifiable avant cette approbation, mais ne donne aucune permission d'exécuter
+le workflow. Après adoption, l'héritage n'accepte que les octets cibles exacts et leur état
+BASE correspondant. Les autres contrôles (YAML, triggers, secrets, checkouts, caches,
+permissions et runners des autres jobs) continuent tous de s'exécuter.
+
+**Extension CD exacte à revoir explicitement.** La redirection groupée de `cd-backend.yml`
+n'est ni l'objet A/A-hardened original, ni B. La préparation ajoute un seul delta legacy :
+38056 octets, SHA256 `05287664503833f3c2e6f7daa4c20ff7cb38584de45dccb89f02aff9401fc516`,
+depuis les 38066 octets A-hardened existants. L'inverse de la seule redirection groupée doit
+reconstituer exactement A-hardened, dont la taille et l'empreinte existantes ne changent pas.
+Cette version reste soumise à l'approbation préalable BASE et aux mêmes sémantiques de
+déploiement A-hardened ; elle ne prétend pas satisfaire les garanties supplémentaires B.
+Tout autre octet, source ou capacité retombe dans le refus strict B. Pour ce delta, les
+entrées runtime/état/IaC, les contrôles de support et le document de capacité doivent tous
+rester identiques à la BASE (ajouts et suppressions IaC compris). Les contrôles stricts B
+qui n'existent pas dans la BASE legacy doivent rester absents des deux arbres ; leur
+introduction n'est pas autorisée par le delta lint. Les contrôles stricts B
+existants restent inchangés. Ce changement de contrat minimal est un nouveau diff à approuver :
+l'accord sur le head original de PR #18 ne l'adopte pas.
+La politique de PR #17 n'est ni importée ni implicitement autorisée ; seuls ses cinq
+fichiers réseau finaux sont réutilisés comme prérequis de code distinct.
+
+**Adoption de la consolidation : un seul bootstrap atomique à revoir.** Les états
+code, préapprobation et consommation conservés dans l'historique démontrent les frontières
+de confiance ; ils ne sont plus une route de fusions proposée. Ne pas adopter leurs cinq
+erreurs lint historiques ni leurs références de sources intermédiaires périmées. Le lot
+final contient simultanément les corrections lint, les vingt workflows hosted, l'activation
+du garde JSON Checkov et sa référence de sources générée. Il doit passer ses contrôles locaux
+comme arbre entier. Un seul merge du lot final installe cet arbre, pas chaque commit comme PR.
+L'ancienne BASE refuse toujours ce bootstrap : conserver tous ses diagnostics et obtenir
+l'accord humain sur le nouveau diff exact, sans les renommer succès ni étendre l'accord PR #18.
+La décision et l'action GitHub appartiennent au propriétaire ; aucun override administrateur,
+changement de settings, waiver scanner ou exécution Azure n'est implicite.
+
+La simulation historique suivante explique les dépendances, **pas des étapes à adopter** :
+
+1. Faire revoir explicitement le nouveau bootstrap de code : simplification self-seal,
+   politique hosted réutilisée de PR #10, code Checkov de PR #19
+   (`73f3138d444e6ee08fab606d32b760f02dfc52da`), builder public et les cinq fichiers réseau
+   finaux de `2754545998ec0f1348bdc8e9d06dbb6870004726`, sans importer la politique PR #17.
+   Dans cette simulation, le code précède les workflows. Le compare partiel `7821c4b1` n'est pas un prérequis.
+   L'accord sur le head original de PR #18 ne couvre pas ce nouveau diff ; l'ancienne BASE
+   refuse encore les deux scellés. Les workflows actifs restent ceux de la BASE : leurs
+   cinq erreurs actionlint historiques restent présentes à ce stade, non dérogées.
+   Cet ordre de préparation ne constitue donc pas une séquence de fusions déjà autorisée
+   ou intégralement verte. Aucune preuve locale ne remplace les checks GitHub exécutés.
+2. Préapprouver ensemble les vingt contenus futurs exacts, sans modifier les workflows actifs :
+   six transitions initiales, deux scanners et douze consommateurs hosted réutilisés de PR #14.
+   Cette simulation précédait l'activation du garde Checkov dans le lot atomique final. Les empreintes/golden sont des données
+   de cette PR de préapprobation distincte, pas un rafraîchissement pour verdir le code policy.
+   Ne jamais fabriquer un état `states` qui contredit les workflows actifs.
+3. Consommer ensemble les vingt approbations déjà adoptées dans la BASE, sans changer leur
+   périmètre. Le manifeste et les
+   propositions sont consommés par les outils existants. Un assemblage préparatoire dépourvu
+   d'approbation BASE doit rester refusé ; il ne s'auto-approuve pas. La combinaison du réseau
+   et du nouveau CD sans installation préalable des cinq fichiers doit également être refusée
+   par le contrôle des entrées privilégiées. Aucun nouveau SARIF ne prouve leur résolution CodeQL.
+
+Cet ordre n'annonce ni capacité runner disponible, ni checks officiels verts, ni fusion.
+Une préapprobation doit être recalculée et revue si les octets ou la source changent ; elle
+ne se transpose pas à une combinaison arbitraire de patchs. Aucune modification de settings,
+déploiement Azure, nouveau scan manuel ou changement de seuil CodeQL ne fait partie du lot.
+
+### Contrôles communs
+
 Tout est exécuté par le code de la **base**, sur l'arbre de la PR, dans `Validate workflow YAML`.
 
 | Contrôle | Code | Refuse |
@@ -125,12 +214,38 @@ approuvé, jamais un autre ; et l'écart se referme au premier mouvement de `mai
 
 ## Règle pour les tests de `.github/scripts`
 
+### Exception native Apple sans signature
+
+`native-apple-check.yml` est l'exception Apple aux labels self-hosted :
+`native-apple-workflow-policy.mjs` autorise son contenu exact par empreinte SHA-256
+des octets, sans ajouter de runner à la liste globale. Contrairement aux empreintes
+sémantiques du manifeste, cette exception refuse aussi les modifications de commentaires
+et de fins de ligne. Toute évolution exige une revue du contrat de politique et le cycle
+de pré-approbation A/B ; la pré-approbation seule ne modifie pas la politique.
+
+Le workflow proposé utilise le runner standard `macos-15` et Xcode 26.3, uniquement sur
+dispatch du propriétaire du dépôt personnel `gaby27072001/certigo`. Le champ
+`candidate_sha` doit être un SHA complet de 40 caractères hexadécimaux minuscules :
+aucune branche ni aucun tag n'est accepté. Le checkout est vérifié, sans credentials
+persistants. Les tests SPM et le build simulateur iPhone/iPad sont sans signature,
+sans environnement, secret, permission d'écriture, distribution ni publication.
+Cela ne prouve ni une installation sur appareil physique ni la validité des accès Apple.
+
+La fixture `.github/scripts/fixtures/native-apple-check.yml` rend les tests de politique
+indépendants de la présence et de l'expiration de la proposition. Les runners standard
+hébergés sont gratuits pour les dépôts publics selon
+[la documentation GitHub](https://docs.github.com/en/actions/concepts/billing-and-usage).
+Ne pas remplacer le label par un runner larger, ni utiliser ce workflow dans un dépôt privé.
+
 ### Rapports Checkov et couverture effective
 
 `checkov_report_gate.py` est installé avec ses tests avant toute modification du workflow.
 Cette installation seule ne change pas le scan actif. Lors de son intégration future,
 `security-scan.yml` doit conserver le journal CLI et ajouter un rapport JSON du même scan,
 contrôlé par ce script depuis les contrôles de la **base**.
+Ne pas utiliser `--quiet` ou `-q` pour cette invocation : Checkov 3.2.495 retire alors
+du JSON les contrôles réussis, ignorés et les erreurs de parsing. Le garde refuse ce rapport
+incomplet ; conserver `--compact` et les deux sorties CLI/JSON du même scan.
 Il refuse un code scanner non nul, un contrôle échoué, une erreur de parsing, un rapport
 absent/malformé/incohérent et une couverture effective nulle. Un scan ne peut donc pas être déclaré
 réussi uniquement parce que Checkov renvoie zéro malgré des erreurs de parsing.
@@ -160,15 +275,99 @@ Concrètement : calculer le manifeste d'un fixture à partir de **ses propres** 
 (`preApproved: {}`), passer `now` explicitement, et réserver le manifeste réel aux mutations
 imprévisibles (nonce aléatoire). `account-deletion-cosmos-policy.test.mjs` montre les deux formes.
 
+## Consolidation des contrôles PR sur runners hosted
+
+La proposition consolidée réutilise la politique de #10 et les consommateurs de #14,
+sans modifier leurs branches. Les vingt couples CI de `linux-ci-runner-policy.mjs`
+acceptent `ubuntu-24.04`, avec permissions décodées read-only, sans secrets,
+environnement ni identité cloud. Les restrictions de cache, fraîcheur et fork,
+les contrôles trusted BASE et les tests candidats distincts restent obligatoires.
+Les agrégats ne peuvent pas checkout ou lire le source PR.
+
+Les sélecteurs et agrégats de `codeql.yml` et `security-gate.yml`, ainsi que
+l'analyse CodeQL PR, rejoignent ce périmètre read-only. La transition de ces deux
+workflows auparavant scellés exige leurs octets source et cible exacts et une
+préapprobation active de BASE, via le helper existant. Ni un manifeste candidat,
+ni les tests candidats, ni une mutation du workflow ne peuvent renouveler cette
+autorité.
+
+CodeQL ne reçoit plus `security-events: write` sur une PR : `analyze` garde la
+configuration et l'enforcer de BASE, produit le SARIF local, applique le seuil
+**7.0**, et utilise `upload: never`. Le job distinct `analyze-main` conserve la
+publication SARIF uniquement sur push/schedule de `refs/heads/main`, avec les deux
+checkouts fixés à `github.sha`. Ce job privilégié hosted n'est accepté que pour
+le workflow exact préapprouvé, jamais comme permission générale de publication.
+Le gate officiel choisit explicitement le résultat de l'analyse applicable.
+Les deux analyses restent buildless, appliquent le même enforcer et ne dépendent
+pas du stockage d'artefacts. Une PR n'alimente donc plus directement le tableau
+GitHub Code scanning : son résultat bloquant est le gate SARIF local ; la
+publication est faite par l'analyse de main après adoption.
+
+Les simulations ordonnées code/BASE, préapprobation, consommation restent des preuves,
+pas une route d'adoption des états intermédiaires. Le bootstrap de consolidation est
+le lot final atomique décrit plus haut, soumis à une nouvelle décision humaine exacte ;
+ni le manifeste candidat ni ces simulations ne l'autorisent. Les SDK, noms des
+contextes officiels, déclencheurs, règles de scoring et filtres restent inchangés ;
+seuls les anciens nettoyages de caches persistants Flutter de #14 sont retirés.
+Les releases, signatures, déploiements et identités cloud restent séparés et ne
+sont pas activés par cette migration. Aucune exécution CI/CodeQL, résolution de
+findings, gratuité permanente ni capacité réelle des runners n'est déduite des
+tests locaux. Le job Checkov exécute désormais les tests du garde Python de BASE, exige
+le rapport JSON de la même invocation et refuse les erreurs de parsing, rapports absents,
+malformés, périmés ou sans couverture effective, même si le scanner renvoie zéro. Le test
+Bash du vrai script de workflow vérifie notamment que 22 erreurs de parsing font échouer
+le job et qu'un rapport complet propre passe. Ce ne sont pas de nouveaux scans.
+Les erreurs de parsing Checkov officielles restent ouvertes : compiler Bicep localement
+n'est pas une preuve de couverture du scanner.
+
 ## Ce que ce mécanisme ne débloque pas
 
-- **Les workflows privilégiés restent figés à l'octet.** Hors `cd-backend.yml`, un workflow qui
+### Correction du répertoire d'extraction CodeQL
+
+Le mode buildless du CodeQL Action épinglé lance `database trace-command --use-build-mode`
+dans son `process.cwd()`, le workspace GitHub, même si `init` a reçu un autre `source-root`.
+Un checkout source uniquement sous `.untrusted-source` peut donc laisser les autobuilders
+JavaScript et C# sans source visible depuis ce répertoire. Le correctif place le source à la
+racine du workspace, fixe `source-root: .` et aligne `UNTRUSTED_SOURCE_DIR`/`checkout_path`
+sur cette même racine, pour PR et main. Le checkout des contrôles reste `.trusted-control`,
+immuable sur BASE pour les PR et sur `github.sha` pour main ; sa seule exclusion de scan
+existante reste inchangée. Après le checkout source et avant celui de BASE, une commande Node
+inline du workflow supprime le chemin `.trusted-control` candidat sans suivre ses symlinks.
+Le checkout épinglé initialise alors un nouveau dépôt et récupère le ref immuable, plutôt que
+de préparer un éventuel dépôt ou lien fourni par la PR. Les fixtures fichier/répertoire/lien
+vérifient le ref et le contenu de BASE ainsi que la conservation de la cible externe du lien.
+Aucun langage, filtre de sélection, analyse ou seuil n'est retiré.
+
+Le code de contrôle accepte les deux layouts cohérents sans changer les contraintes de confiance.
+La transition CodeQL elle-même reste le seul
+couple exact ancien/nouveau déclaré, avec proposition et préapprobation active dans BASE,
+puis consommation séparée B. Les tests de layout utilisent de vrais fichiers JS et C# du
+dépôt et deux checkouts ; ils ne constituent pas une extraction CodeQL réelle. La preuve
+runtime viendra de l'exécution officielle après adoption, sans rerun manuel déduit de ce test.
+
+Le premier essai officiel de ce correctif a aussi révélé SC2015 dans le workflow content
+inchangé, sous ShellCheck 0.9.0 de l'image CI (la version locale 0.11.0 ne le signale plus).
+Le lot final utilise `working-directory: backend` puis la même commande audit non bloquante,
+au même seuil `high`. Une erreur de sélection du répertoire n'est plus absorbée par `|| true`.
+Valider avec actionlint 1.7.12 et ShellCheck 0.9.0 explicite ; un résultat sans cet outil ou
+sur une autre version ne remplace pas cette preuve. Aucun scanner ni contrôle de couverture
+n'est désactivé pour corriger ce lint.
+
+Ce défaut de lint dans BASE empêche de présenter la première PR code-only comme une étape verte.
+Le lot consolidé corrige les trois workflows ensemble, mais le validateur de BASE continue à
+refuser les empreintes non préapprouvées et l'ancien contrat CodeQL. Les tests et le manifeste
+candidats ne donnent aucune autorité à ce lot : son adoption exige une décision explicite de
+l'owner sur le diff exact et les refus recensés, sans modification implicite des protections.
+
+- **Les workflows privilégiés restent figés à l'octet par défaut.** Hors `cd-backend.yml`
+  et des seules transitions source/cible exactes préapprouvées décrites ci-dessus, un workflow qui
   porte `environment:`, `secrets.`, une permission `write`, `id-token: write` ou `azure/login@`
   (liste complète : `privilegedWorkflow` dans `backend-deploy-workflow-policy.mjs`) est refusé au
-  moindre octet modifié, par une règle scellée qu'aucune PR ne peut amender (voir
+  moindre octet modifié, par la politique de la trusted BASE (voir
   `docs/GOVERNANCE.md`, « Workflow privilégié »). C'est le cas de `release-android.yml` : une
   montée de `FLUTTER_VERSION`, qui doit rester alignée entre `ci-mobile.yml`,
-  `release-android.yml` et `codemagic.yaml`, **reste bloquée** par ce scellé-là.
+  `release-android.yml` et `codemagic.yaml`, **reste bloquée** : elle n'est pas le delta lint
+  exact proposé. La politique est amendable par revue explicite, pas par auto-approbation.
 - **Ne jamais renommer un job dont le nom est un contexte requis** (`Flutter app + UI packages`,
   `Build & test`, `Validate workflow YAML`, …) : la protection de `main` attendrait un contexte
   que plus aucun workflow ne produit. C'est désormais refusé automatiquement, dès la PR A
