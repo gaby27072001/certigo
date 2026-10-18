@@ -6,6 +6,7 @@ import Foundation
     import CertigoDomain
 
     import SwiftUI
+    import UIKit
 
     @main
     struct CertigoNativeApp: App {
@@ -76,21 +77,150 @@ import Foundation
         }
     }
 
+    @MainActor
     private struct NativeDeveloperConnector: View {
         @Environment(\.dismiss) private var dismiss
-        @State private var model = NativeModel()
+        @State private var model: NativeModel
+        @State private var usesCIAM: Bool
+        @State private var ciamProvider: MSALAuthenticationProvider?
+        @State private var configurationIssue: String?
+
+        init() {
+            #if DEBUG
+                let isDevelopmentBuild = true
+            #else
+                let isDevelopmentBuild = false
+            #endif
+            do {
+                let configured = try CIAMConfigurationEnvironment.configuredProvider(
+                    environment: ProcessInfo.processInfo.environment,
+                    bundleIdentifier: Bundle.main.bundleIdentifier,
+                    infoDictionary: Bundle.main.infoDictionary ?? [:],
+                    isDevelopmentBuild: isDevelopmentBuild
+                ) { configuration in
+                    try MSALAuthenticationProvider(
+                        configuration: configuration,
+                        presentation: Self.authenticationPresentationController
+                    )
+                }
+                if let configured {
+                    _model = State(
+                        initialValue: NativeModel(
+                            authentication: (configured.provider, configured.configuration)))
+                    _usesCIAM = State(initialValue: true)
+                    _ciamProvider = State(initialValue: configured.provider)
+                } else {
+                    _model = State(initialValue: NativeModel())
+                    _usesCIAM = State(initialValue: false)
+                    _ciamProvider = State(initialValue: nil)
+                }
+                _configurationIssue = State(initialValue: nil)
+            } catch {
+                _model = State(initialValue: NativeModel())
+                _usesCIAM = State(initialValue: true)
+                _ciamProvider = State(initialValue: nil)
+                _configurationIssue = State(
+                    initialValue: Self.safeConfigurationMessage(for: error))
+            }
+        }
 
         var body: some View {
-            NativeRoot(model: model)
-                .safeAreaInset(edge: .top) {
-                    HStack {
-                        Text("Developer connector").font(.subheadline)
-                        Spacer()
-                        Button("Close") { dismiss() }
-                    }
-                    .padding()
-                    .background(.background)
+            Group {
+                if let configurationIssue {
+                    ContentUnavailableView(
+                        "CIAM test sign-in is unavailable",
+                        systemImage: "person.crop.circle.badge.exclamationmark",
+                        description: Text(configurationIssue)
+                    )
+                    .accessibilityIdentifier("ciam-configuration-error")
+                } else if usesCIAM && model.profile == nil {
+                    ciamSignIn
+                } else {
+                    NativeRoot(model: model)
                 }
+            }
+            .onOpenURL { url in
+                _ = ciamProvider?.handleCallback(url, sourceApplication: nil)
+            }
+            .safeAreaInset(edge: .top) {
+                HStack {
+                    Text("Developer connector").font(.subheadline)
+                    Spacer()
+                    Button("Close") { dismiss() }
+                }
+                .padding()
+                .background(.background)
+            }
+        }
+
+        private var ciamSignIn: some View {
+            NavigationStack {
+                Form {
+                    Section("CIAM test sign-in") {
+                        Text("Sign in explicitly with the locally configured test identity.")
+                        Button("Sign in with CIAM", systemImage: "person.crop.circle") {
+                            Task { await model.connect() }
+                        }
+                        .disabled(model.busy)
+                    }
+                }
+                .navigationTitle("Certigo")
+                .alert(
+                    "CIAM sign-in did not complete",
+                    isPresented: Binding(
+                        get: { model.errorMessage != nil },
+                        set: { if !$0 { model.errorMessage = nil } }
+                    )
+                ) {
+                    Button("OK", role: .cancel) { model.errorMessage = nil }
+                } message: {
+                    Text(model.errorMessage ?? "")
+                }
+            }
+        }
+
+        @MainActor
+        private static func authenticationPresentationController() throws -> UIViewController {
+            let windows = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+            guard var controller = windows.first(where: \.isKeyWindow)?.rootViewController else {
+                throw CIAMAuthenticationFailure.configuration
+            }
+            while let presented = controller.presentedViewController {
+                controller = presented
+            }
+            return controller
+        }
+
+        private static func safeConfigurationMessage(for error: Error) -> String {
+            if let error = error as? CIAMConfigurationEnvironmentError {
+                return error.localizedDescription
+            }
+            if let error = error as? CIAMConfigurationError {
+                switch error {
+                case .invalidIdentity:
+                    return
+                        "Set valid client, tenant, and API audience identifiers in the local Xcode scheme."
+                case .invalidAuthority:
+                    return "Correct the CIAM authority in the local Xcode scheme."
+                case .issuerMismatch:
+                    return "Set the issuer matching the configured CIAM tenant and authority."
+                case .invalidAPIScope:
+                    return
+                        "Set one API scope for the configured audience in the local Xcode scheme."
+                case .invalidAPIURL:
+                    return "Set the existing API HTTPS base URL, including its /api path."
+                case .invalidRedirect, .redirectNotRegistered:
+                    return "Set the exact CIAM redirect registered for this app."
+                case .callbackNotDeclared:
+                    return "The callback scheme must already be declared in this app's Info.plist."
+                case .callbackCollision:
+                    return "The CIAM callback scheme collides with another app callback scheme."
+                }
+            }
+            return
+                "Review the local Xcode scheme and registered app callback. Manual token sign-in is disabled while CIAM is opted in."
         }
     }
 
