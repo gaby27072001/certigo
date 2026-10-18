@@ -91,14 +91,14 @@ normalized or accepted under alternate digests.
 The input is the unmodified `checkov-3.2.495-py3-none-any.whl`:
 SHA-256 `737f39cbab5987d49204cd5e62cfca72ffab3f01fa3314471624e1c4256268ac`.
 The builder is offline and the candidate output has local version
-`3.2.495+certigo.2`, SHA-256
-`02b5776b20c78bb7dd1c1bec68b25292082d85744a26c32ba25e530c036831ec`.
+`3.2.495+certigo.3`, SHA-256
+`205e7b0114e2c1f08fdac93b10f2013199f7e4979fe53cb14f33258cc2f1e5af`.
 
 ```sh
 CHECKOV_ADAPTER_UPSTREAM_WHEEL=/path/checkov-3.2.495-py3-none-any.whl \
   python tools/checkov/test_checkov_wheel.py
 python tools/checkov/build_checkov_wheel.py /path/checkov-3.2.495-py3-none-any.whl /tmp/checkov-wheel
-python -m pip install --no-deps --target /tmp/checkov-adapter /tmp/checkov-wheel/checkov-3.2.495+certigo.2-py3-none-any.whl
+python -m pip install --no-deps --target /tmp/checkov-adapter /tmp/checkov-wheel/checkov-3.2.495+certigo.3-py3-none-any.whl
 PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_conditional_adapter.py
 PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_resource_rule_fixes.py
 ```
@@ -127,10 +127,17 @@ firewall exception to satisfy this rule. For public access, explicit VNet
 filtering and nonempty known subnet-ID or IPv4 restrictions are required.
 `enableMultipleWriteLocations: false` no longer bypasses restrictions.
 IP validation uses Python's standard `ipaddress` module, without network access
-or an expression evaluator. The all-addresses range, Azure's `0.0.0.0` exception,
+or an expression evaluator. The all-addresses range, both IPv4 `/1` halves,
+Azure's `0.0.0.0` exception,
 IPv6/unsupported inputs, symbolic IDs/IPs, malformed rules and unresolved flags
 remain blocked. It does not validate subnet existence, authorize an address,
 or introduce a new permitted-CIDR policy.
+
+Revision `certigo.3` rejects both `0.0.0.0/1` and `128.0.0.0/1` symmetrically;
+the earlier `certigo.2` candidate rejected only the former. Direct-rule and real
+runner controls retain explicit failures for both halves. No additional CIDR
+size threshold or address allowlist is introduced. Any consumption proposal
+pinning the earlier wheel is stale and must be reviewed again before activation.
 
 All six appsettings-subtype findings remain unchanged and blocking. Returning
 PASSED on an inapplicable appsettings child would misrepresent the parent;

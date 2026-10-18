@@ -103,7 +103,7 @@ class RuleTests(unittest.TestCase):
     def test_all_ips_azure_services_unknown_and_malformed_network_rules_fail(self):
         cases = (
             {"ipRules": [{"ipAddressOrRange": value}]}
-            for value in ("0.0.0.0", "0.0.0.0/0", "0.0.0.0/1", "::/0",
+            for value in ("0.0.0.0", "0.0.0.0/0", "0.0.0.0/1", "128.0.0.0/1", "::/0",
                           "not-an-IP", BicepElement("203.0.113.42"), {"function": {"type": "unknown"}})
         )
         others = (
@@ -159,6 +159,22 @@ class RuleTests(unittest.TestCase):
             records = report.passed_checks + report.failed_checks
             self.assertEqual(len(records), 1)
             self.assertEqual(records[0].check_result["result"], expected)
+
+    def test_real_runner_cosmos_both_ipv4_halves_remain_blocking(self):
+        for cidr in ("0.0.0.0/1", "128.0.0.0/1"):
+            with self.subTest(cidr=cidr):
+                source = (
+                    "resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {\n"
+                    " name: 'fixture'\n properties: {\n publicNetworkAccess: 'Enabled'\n"
+                    " isVirtualNetworkFilterEnabled: true\n"
+                    " ipRules: [{ ipAddressOrRange: '" + cidr + "' }]\n }\n}\n"
+                )
+                report = run_fixture(source, cosmos)
+                self.assertFalse(report.parsing_errors)
+                self.assertFalse(report.skipped_checks)
+                self.assertFalse(report.passed_checks)
+                self.assertEqual(len(report.failed_checks), 1)
+                self.assertEqual(report.failed_checks[0].check_result["result"], CheckResult.FAILED)
 
 
 if __name__ == "__main__":

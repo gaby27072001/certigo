@@ -1,0 +1,24 @@
+{
+  "id": "fixture-lesson",
+  "trackId": "fixture:foundations",
+  "unitId": "fixture-unit",
+  "domainId": "fixture-domain",
+  "title": "Synthetic contract fixture",
+  "estMinutes": 1,
+  "blocks": [
+    {
+      "type": "check",
+      "conceptId": "fixture-concept",
+      "check": {
+        "id": "fixture-question",
+        "conceptId": "fixture-concept",
+        "type": "mcq",
+        "stem": "Synthetic question for transport and presentation tests.",
+        "options": [
+          { "id": "first", "label": "First synthetic option" },
+          { "id": "second", "label": "Second synthetic option" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "clientAttemptId": "demo-client-attempt",
+  "trackId": "demo-track",
+  "startedAt": "2026-10-01T12:00:00+00:00",
+  "answers": [
+    { "itemId": "demo-item", "itemType": "mcq", "selected": ["b"], "latencyMs": 4200 }
+  ],
+  "publicManifestId": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}
