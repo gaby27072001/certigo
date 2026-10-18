@@ -409,8 +409,39 @@ export function loadWorkflowManifest(manifestPath) {
   return { manifest, errors: validateWorkflowManifest(manifest) };
 }
 
-// Lit un fichier du dépôt sans jamais suivre de lien symbolique, y compris sur un répertoire
-// parent : l'arbre lu peut être celui d'une PR non fiable.
+export function readVerifiedRegularFileSync(filePath, expectedStat) {
+  const absolutePath = path.resolve(filePath);
+  if (!expectedStat.isFile() || expectedStat.isSymbolicLink()) {
+    throw new Error('must be a real regular non-symlink file');
+  }
+  if (fs.realpathSync(absolutePath) !== absolutePath) {
+    throw new Error('must resolve to its exact repository path');
+  }
+  const flags = fs.constants.O_RDONLY
+    | (fs.constants.O_NOFOLLOW ?? 0)
+    | (fs.constants.O_NONBLOCK ?? 0);
+  const descriptor = fs.openSync(absolutePath, flags);
+  try {
+    const opened = fs.fstatSync(descriptor);
+    if (!opened.isFile() || opened.dev !== expectedStat.dev || opened.ino !== expectedStat.ino) {
+      throw new Error('file changed while opening');
+    }
+    const current = fs.lstatSync(absolutePath);
+    if (
+      fs.realpathSync(absolutePath) !== absolutePath
+      || !current.isFile() || current.isSymbolicLink()
+      || current.dev !== opened.dev || current.ino !== opened.ino
+    ) {
+      throw new Error('file path changed while opening');
+    }
+    return fs.readFileSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
+// Bind bytes to the inspected inode and reject observed final/parent symlinks.
+// Portable Node cannot atomically confine mutable ancestors; validation requires a stable checkout.
 export function readRegularRepositoryFile(root, relativePath) {
   const filePath = path.join(root, ...relativePath.split('/'));
   let stat;
@@ -425,15 +456,18 @@ export function readRegularRepositoryFile(root, relativePath) {
   if (!stat.isFile() || stat.isSymbolicLink()) {
     return { exists: true, error: `${relativePath}: must be a real regular non-symlink file` };
   }
-  if (fs.realpathSync(filePath) !== path.resolve(filePath)) {
-    return { exists: true, error: `${relativePath}: must resolve to its exact repository path` };
+  try {
+    const bytes = readVerifiedRegularFileSync(filePath, stat);
+    return { exists: true, bytes, content: bytes.toString('utf8') };
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') {
+      return { exists: false };
+    }
+    return { exists: true, error: `${relativePath}: ${error.message}` };
   }
-  const bytes = fs.readFileSync(filePath);
-  return { exists: true, bytes, content: bytes.toString('utf8') };
 }
 
-// Calcule, à partir d'un arbre, les états A/B/C exactement comme le générateur les écrit.
-// Ne suit aucun lien symbolique : l'arbre peut être celui d'une PR non fiable.
+// Calcule les états A/B/C d'un arbre stable, en refusant les liens symboliques présents.
 export function computeWorkflowStates(root) {
   const errors = [];
   const workflowsRelative = '.github/workflows';
