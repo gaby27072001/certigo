@@ -3,7 +3,7 @@ import Foundation
 import MSAL
 import UIKit
 
-/// Unwired Apple-only candidate. Compilation, callbacks/cache and live auth still require Apple proof.
+/// Development-only Apple adapter; compilation, callbacks/cache and live auth still require Apple proof.
 @MainActor
 final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
     private let application: MSALPublicClientApplication
@@ -17,8 +17,17 @@ final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
         configuration: CIAMConfiguration,
         presentation: @escaping @MainActor () throws -> UIViewController
     ) throws {
-        guard Bundle.main.bundleIdentifier == CIAMDevelopmentCandidate.bundleIdentifier,
-            configuration.redirectURI.absoluteString == CIAMDevelopmentCandidate.redirect
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier,
+            configuration.redirectURI.absoluteString
+                == "msauth.\(bundleIdentifier)://auth",
+            let callbackScheme = configuration.redirectURI.scheme,
+            let urlTypes = Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes")
+                as? [[String: Any]],
+            urlTypes.contains(where: {
+                ($0["CFBundleURLSchemes"] as? [String] ?? []).contains {
+                    $0.caseInsensitiveCompare(callbackScheme) == .orderedSame
+                }
+            })
         else { throw CIAMAuthenticationFailure.configuration }
         let authority: MSALCIAMAuthority
         do {
@@ -30,7 +39,7 @@ final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
             clientId: configuration.clientID, redirectUri: configuration.redirectURI.absoluteString,
             authority: authority)
         // Official SDK private-group option; no shared Keychain entitlement or broker is enabled.
-        parameters.cacheConfig.keychainSharingGroup = CIAMDevelopmentCandidate.bundleIdentifier
+        parameters.cacheConfig.keychainSharingGroup = bundleIdentifier
         MSALGlobalConfig.brokerAvailability = .none
         MSALGlobalConfig.loggerConfig.logLevel = .nothing
         // Redirect verification stays enabled; knownAuthorities is not used to bypass validation.

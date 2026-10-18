@@ -6,6 +6,7 @@ final class CIAMConfigurationTests: XCTestCase {
     private let tenant = "11111111-1111-4111-8111-111111111111"
     private let audience = "22222222-2222-4222-8222-222222222222"
     private let callback = "msauth.example.native.dev://auth"
+    private let bundleIdentifier = "example.native.dev"
 
     func testSuppliedStandardPublicConfigurationDoesNotNormalizeTheIssuerIntoTheSDKAuthority()
         throws
@@ -128,6 +129,227 @@ final class CIAMConfigurationTests: XCTestCase {
             value: "synthetic-not-a-token", expiresAt: Date(timeIntervalSince1970: 10))
         XCTAssertEqual(value.description, "CIAMAccessToken(redacted)")
         XCTAssertEqual(value.debugDescription, value.description)
+    }
+
+    func testMissingOrDisabledOptInLeavesTheManualConnectorSelectionUnchanged() async throws {
+        let bundleIdentifier = self.bundleIdentifier
+        try await MainActor.run {
+            var providerCalls = 0
+            let absent = try CIAMConfigurationEnvironment.configuredProvider(
+                environment: [:], bundleIdentifier: bundleIdentifier, infoDictionary: [:],
+                isDevelopmentBuild: true
+            ) { _ in
+                providerCalls += 1
+                return "unexpected"
+            }
+            let disabled = try CIAMConfigurationEnvironment.configuredProvider(
+                environment: ["CERTIGO_CIAM_ENABLED": "false"],
+                bundleIdentifier: bundleIdentifier,
+                infoDictionary: [:],
+                isDevelopmentBuild: true
+            ) { _ in
+                providerCalls += 1
+                return "unexpected"
+            }
+
+            XCTAssertNil(absent)
+            XCTAssertNil(disabled)
+            XCTAssertEqual(providerCalls, 0)
+        }
+    }
+
+    func testInvalidOptInFailsInsteadOfSelectingTheManualConnector() {
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.configuration(
+                environment: ["CERTIGO_CIAM_ENABLED": "yes"],
+                bundleIdentifier: bundleIdentifier,
+                infoDictionary: infoDictionary,
+                isDevelopmentBuild: true
+            )
+        ) {
+            XCTAssertEqual($0 as? CIAMConfigurationEnvironmentError, .invalidOptIn)
+        }
+    }
+
+    func testEnabledOptInRequiresEveryLocalValue() {
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.configuration(
+                environment: ["CERTIGO_CIAM_ENABLED": "true"],
+                bundleIdentifier: bundleIdentifier,
+                infoDictionary: infoDictionary,
+                isDevelopmentBuild: true
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? CIAMConfigurationEnvironmentError,
+                .missingValue("CERTIGO_CIAM_CLIENT_ID")
+            )
+        }
+    }
+
+    func testReleaseBuildCannotEnableTheDevelopmentProvider() {
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.configuration(
+                environment: ["CERTIGO_CIAM_ENABLED": "true"],
+                bundleIdentifier: bundleIdentifier,
+                infoDictionary: infoDictionary,
+                isDevelopmentBuild: false
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? CIAMConfigurationEnvironmentError, .releaseOptInNotAllowed)
+        }
+    }
+
+    func testEnabledOptInBuildsOnlyTheLocallySuppliedValidatedConfiguration() async throws {
+        let localEnvironment = self.localEnvironment
+        let bundleIdentifier = self.bundleIdentifier
+        let tenant = self.tenant
+        try await MainActor.run {
+            let infoDictionary: [String: Any] = [
+                "CFBundleURLTypes": [
+                    ["CFBundleURLSchemes": ["msauth.\(bundleIdentifier)"]]
+                ]
+            ]
+            let selected = try CIAMConfigurationEnvironment.configuredProvider(
+                environment: localEnvironment,
+                bundleIdentifier: bundleIdentifier,
+                infoDictionary: infoDictionary,
+                isDevelopmentBuild: true
+            ) { configuration in
+                configuration.apiBaseURL.absoluteString
+            }
+
+            XCTAssertEqual(selected?.configuration.clientID, "33333333-3333-4333-8333-333333333333")
+            XCTAssertEqual(selected?.configuration.tenantID, tenant)
+            XCTAssertEqual(
+                selected?.configuration.apiBaseURL.absoluteString, "https://api.example.invalid/api"
+            )
+            XCTAssertEqual(selected?.provider, "https://api.example.invalid/api")
+        }
+    }
+
+    func testRedirectMustMatchThisBundleAndBeUniquelyDeclaredByItsInfoPlist() {
+        var wrongBundle = localEnvironment
+        wrongBundle["CERTIGO_CIAM_REDIRECT_URI"] = "msauth.other.native.dev://auth"
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.configuration(
+                environment: wrongBundle,
+                bundleIdentifier: bundleIdentifier,
+                infoDictionary: infoDictionary,
+                isDevelopmentBuild: true
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? CIAMConfigurationEnvironmentError, .redirectDoesNotMatchBundle)
+        }
+
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.configuration(
+                environment: localEnvironment,
+                bundleIdentifier: bundleIdentifier,
+                infoDictionary: [:],
+                isDevelopmentBuild: true
+            )
+        ) {
+            XCTAssertEqual($0 as? CIAMConfigurationEnvironmentError, .callbackNotDeclared)
+        }
+
+        var duplicatedCallback = infoDictionary
+        duplicatedCallback["CFBundleURLTypes"] = [
+            ["CFBundleURLSchemes": ["msauth.\(bundleIdentifier)"]],
+            ["CFBundleURLSchemes": ["MSAUTH.\(bundleIdentifier)"]],
+        ]
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.configuration(
+                environment: localEnvironment,
+                bundleIdentifier: bundleIdentifier,
+                infoDictionary: duplicatedCallback,
+                isDevelopmentBuild: true
+            )
+        ) {
+            XCTAssertEqual($0 as? CIAMConfigurationEnvironmentError, .callbackCollision)
+        }
+    }
+
+    func testConfigurationNeedsNoSelfAttestedIdentityProviderRegistrationValue() throws {
+        let configured = try CIAMConfigurationEnvironment.configuration(
+            environment: localEnvironment,
+            bundleIdentifier: bundleIdentifier,
+            infoDictionary: infoDictionary,
+            isDevelopmentBuild: true
+        )
+        XCTAssertEqual(configured?.redirectURI.absoluteString, callback)
+    }
+
+    func testInvalidConfigurationDoesNotInvokeProviderFactory() async throws {
+        let bundleIdentifier = self.bundleIdentifier
+        try await MainActor.run {
+            var providerCalls = 0
+            XCTAssertThrowsError(
+                try CIAMConfigurationEnvironment.configuredProvider(
+                    environment: ["CERTIGO_CIAM_ENABLED": "true"],
+                    bundleIdentifier: bundleIdentifier,
+                    infoDictionary: [:],
+                    isDevelopmentBuild: true
+                ) { _ in
+                    providerCalls += 1
+                    return "unexpected"
+                }
+            )
+            XCTAssertEqual(providerCalls, 0)
+        }
+    }
+
+    func testProviderConstructionFailurePropagatesWithoutManualFallback() async throws {
+        let localEnvironment = self.localEnvironment
+        let bundleIdentifier = self.bundleIdentifier
+        try await MainActor.run {
+            enum ProviderFailure: Error { case initialization }
+            var providerCalls = 0
+
+            XCTAssertThrowsError(
+                try CIAMConfigurationEnvironment.configuredProvider(
+                    environment: localEnvironment,
+                    bundleIdentifier: bundleIdentifier,
+                    infoDictionary: [
+                        "CFBundleURLTypes": [
+                            ["CFBundleURLSchemes": ["msauth.\(bundleIdentifier)"]]
+                        ]
+                    ],
+                    isDevelopmentBuild: true
+                ) { _ -> String in
+                    providerCalls += 1
+                    throw ProviderFailure.initialization
+                }
+            ) {
+                XCTAssertEqual($0 as? ProviderFailure, .initialization)
+            }
+            XCTAssertEqual(providerCalls, 1)
+        }
+    }
+
+    private var localEnvironment: [String: String] {
+        [
+            "CERTIGO_CIAM_ENABLED": "true",
+            "CERTIGO_CIAM_CLIENT_ID": "33333333-3333-4333-8333-333333333333",
+            "CERTIGO_CIAM_TENANT_ID": tenant,
+            "CERTIGO_CIAM_AUTHORITY": "https://synthetic.ciamlogin.com",
+            "CERTIGO_CIAM_ISSUER": "https://synthetic.ciamlogin.com/\(tenant)/v2.0",
+            "CERTIGO_CIAM_AUTHORITY_KIND": "standard",
+            "CERTIGO_CIAM_API_BASE_URL": "https://api.example.invalid/api",
+            "CERTIGO_CIAM_API_SCOPE": "api://\(audience)/user_impersonation",
+            "CERTIGO_CIAM_API_AUDIENCE": audience,
+            "CERTIGO_CIAM_REDIRECT_URI": callback,
+        ]
+    }
+
+    private var infoDictionary: [String: Any] {
+        [
+            "CFBundleURLTypes": [
+                ["CFBundleURLSchemes": ["msauth.\(bundleIdentifier)"]]
+            ]
+        ]
     }
 
     private func config(
