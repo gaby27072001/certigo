@@ -22,6 +22,13 @@ depends on the host target and uses `TEST_HOST`/`BUNDLE_LOADER`; the scheme's
 test action expands the host app. This is an app-hosted XCTest configuration,
 not a hostless logic-test bundle.
 
+The host adopts the UIKit scene-based life cycle. Both host configurations
+generate the scene manifest, and the app delegate supplies a `UIWindowScene`
+configuration with `ProtectionTestHostSceneDelegate`. The scene delegate retains
+a window with an empty root view controller; it starts no product behavior.
+These APIs are available at the existing iOS 17 deployment target. The test
+target, selectors, package pins and signing identities are unchanged.
+
 Automatic signing style is available as a project configuration choice, but
 this source does **not** select a development team, signing identity,
 provisioning profile, device identifier, entitlement, or signing certificate.
@@ -34,9 +41,16 @@ authorized or performed by this preparation.
 
 ## Scope and evidence limit
 
-This is project-source preparation only. No Xcode project-load check, Apple
-SDK build, signature, install, app launch, test execution, or physical-device
-file-protection observation was performed. A later authorized device test must
+On 2026-10-18, the user reported a physical-device attempt with iOS 27.0.1 and
+Xcode 27.1 that reached build/sign/install but failed host launch with
+`UIScene life cycle is required for apps built with this SDK`. No test executed
+in that attempt. Apple's transition documentation requires scene adoption for
+apps built with the latest SDK on iOS 27; the previous host had neither a scene
+manifest nor a scene configuration callback.
+
+The scene-lifecycle correction has only source/static validation here, not an
+Apple SDK build, generated-plist inspection, launch or physical test result.
+A later authorized device test must
 report all three original methods as executed, with exact Xcode/iOS/device
 context and its result bundle. It must preserve any failure; these tests must
 not be skipped, substituted, weakened, or treated as passing merely because
@@ -48,6 +62,7 @@ content activation, or production app startup.
 
 Apple references:
 
+- [Transitioning to the UIKit scene-based life cycle](https://developer.apple.com/documentation/uikit/transitioning-to-the-uikit-scene-based-life-cycle)
 - [Adding tests to your Xcode project](https://developer.apple.com/documentation/xcode/adding-tests-to-your-xcode-project)
 - [Running your app on simulated or physical devices](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices)
 - [Managing devices in Device Hub](https://developer.apple.com/documentation/xcode/managing-your-simulated-and-physical-devices-in-device-hub)
