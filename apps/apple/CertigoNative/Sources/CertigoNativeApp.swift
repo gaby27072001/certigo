@@ -119,7 +119,7 @@ import Foundation
         @State private var issue: String?
         @State private var showScenarios = false
         @State private var showReset = false
-        @State private var restored = false
+        @State private var persistence = NativeDemoPersistence.awaitingRestoration
         @State private var socialSection = DemoSocialSection.friends
 
         var body: some View {
@@ -195,7 +195,7 @@ import Foundation
                     learnSection = .explore
                     scenario = .ready
                     offline = false
-                    savedState = ""
+                    persistence.reset(&savedState)
                 }
             }
             .alert("Demo restoration unavailable", isPresented: issuePresented) {
@@ -204,11 +204,9 @@ import Foundation
                 Text(issue ?? "")
             }
             .task {
-                guard !restored else { return }
-                restored = true
+                guard persistence == .awaitingRestoration else { return }
                 do {
-                    if !savedState.isEmpty {
-                        let snapshot = try NativeDemoSnapshot.restore(Data(savedState.utf8))
+                    if let snapshot = try persistence.restore(savedState) {
                         flow = snapshot.flow
                         let navigation = snapshot.navigation
                         tab = navigation.selectedTab
@@ -324,7 +322,7 @@ import Foundation
         }
 
         private func persistDemoSnapshot(flow currentFlow: NativeDemoFlow? = nil) {
-            guard restored else { return }
+            guard persistence == .ready else { return }
             do {
                 let flowToPersist = currentFlow ?? flow
                 let navigation = try NativeDemoNavigationState.make(
@@ -332,8 +330,7 @@ import Foundation
                     catalogPath: catalogPath, flow: flowToPersist, learnSection: learnSection)
                 let snapshot = try NativeDemoSnapshot.make(
                     flow: flowToPersist, navigation: navigation)
-                savedState = String(
-                    decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)
+                try persistence.save(snapshot, to: &savedState)
             } catch {
                 issue =
                     "The demonstration could not be saved. You can continue in the current session."
@@ -1292,6 +1289,28 @@ struct NativeDemoNavigationState: Codable, Equatable {
         guard objectiveRoutesAreValid, catalogRoutesAreValid, sectionMatchesTab else {
             throw InvalidSnapshot.inconsistentRoute
         }
+    }
+}
+
+enum NativeDemoPersistence {
+    case awaitingRestoration, ready, preservingRejectedSnapshot
+
+    mutating func restore(_ savedState: String) throws -> NativeDemoSnapshot? {
+        self = .preservingRejectedSnapshot
+        let snapshot =
+            savedState.isEmpty ? nil : try NativeDemoSnapshot.restore(Data(savedState.utf8))
+        self = .ready
+        return snapshot
+    }
+
+    func save(_ snapshot: NativeDemoSnapshot, to savedState: inout String) throws {
+        guard self == .ready else { return }
+        savedState = String(decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)
+    }
+
+    mutating func reset(_ savedState: inout String) {
+        savedState = ""
+        self = .ready
     }
 }
 
