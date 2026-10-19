@@ -75,9 +75,10 @@ test('builds public privacy and account-deletion routes without a data form', as
     assert.match(lesson, /Une réponse convaincante n&#39;est pas une preuve/);
     assert.match(lesson, /Apprentissage, pas certification/);
     assert.match(lesson, /La lecture web ne crée pas de compte/);
-    assert.match(
-      lesson,
-      /<link rel="canonical" href="https:\/\/github\.com\/learn\/responsible-ai-assistants\/verify-claims\/">/,
+    assert.ok(
+      lesson.includes(
+        '<link rel="canonical" href="https://github.com/learn/responsible-ai-assistants/verify-claims/">',
+      ),
     );
     assert.match(lesson, /https:\/\/docs\.aws\.amazon\.com/);
     assert.deepEqual(config.routes, []);
@@ -315,15 +316,18 @@ test('new POSIX output stays private during writing and follows non-default umas
   const output = await mkdtemp(join(tmpdir(), 'certigo-public-modes-'));
   try {
     const originalWrite = fs.writeFileSync;
-    let writes = 0;
+    const descriptorTypes = [];
+    const modes = [];
     context.mock.method(fs, 'writeFileSync', (descriptor, ...args) => {
-      assert.equal(typeof descriptor, 'number');
-      assert.equal(fs.fstatSync(descriptor).mode & 0o777, 0o600 & ~process.umask());
-      writes += 1;
-      return originalWrite(descriptor, ...args);
+      descriptorTypes.push(typeof descriptor);
+      const result = originalWrite(descriptor, ...args);
+      modes.push(fs.fstatSync(descriptor).mode & 0o777);
+      return result;
     });
     await buildPublicPages(configuration(output));
-    assert.equal(writes, generatedFiles.length);
+    assert.equal(descriptorTypes.length, generatedFiles.length);
+    assert.ok(descriptorTypes.every((type) => type === 'number'));
+    assert.deepEqual(modes, modes.map(() => 0o600 & ~process.umask()));
     context.mock.restoreAll();
     execFileSync(process.execPath, ['--input-type=module', '-e', `
       import assert from 'node:assert/strict';
