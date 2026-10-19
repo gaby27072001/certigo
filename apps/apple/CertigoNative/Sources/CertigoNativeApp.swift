@@ -1859,12 +1859,16 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
                             Text(lesson.title).font(.title).bold()
+                                .accessibilityAddTraits(.isHeader)
                             Text(
                                 "Answer the questions, then submit your answers for server correction."
                             )
                             .foregroundStyle(.secondary)
                             ForEach(Array(lesson.blocks.enumerated()), id: \.offset) { _, block in
-                                if let title = block.title { Text(title).font(.headline) }
+                                if let title = block.title {
+                                    Text(title).font(.headline)
+                                        .accessibilityAddTraits(.isHeader)
+                                }
                                 if let body = block.body {
                                     Text(.init(body)).textSelection(.enabled)
                                 }
@@ -1923,6 +1927,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
         private func questionView(_ question: QuizItem) -> some View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(.init(question.stem)).font(.headline)
+                    .accessibilityAddTraits(.isHeader)
                 ForEach(question.options) { option in
                     Button {
                         model.select(option, question: question)
