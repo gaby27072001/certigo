@@ -1,5 +1,8 @@
 # Native Apple model boundary
 
+For the delivery sequence, Mac-versus-portable validation gates, accessibility
+acceptance and conditional Apple integrations, see [the delivery plan](APPLE_DELIVERY_PLAN.md).
+
 ## Imported foundations
 
 `apps/apple/CertigoKit` provides portable Swift domain contracts, Cortex predictions,
