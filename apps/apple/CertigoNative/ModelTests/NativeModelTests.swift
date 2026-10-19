@@ -81,6 +81,7 @@
         private let result: Data
         let manifestId = "sha256:" + String(repeating: "a", count: 64)
         private var owner = "server-owner-A"
+        private var pathRequests = 0
         private var pause = false
         private var waiter: CheckedContinuation<Void, Never>?
         private var requests = 0
@@ -111,6 +112,7 @@
             result = try JSONSerialization.data(withJSONObject: response)
         }
         func setOwner(_ value: String) { owner = value }
+        func pathRequestCount() -> Int { pathRequests }
         func addSecondGoal() throws {
             guard var object = try JSONSerialization.jsonObject(with: catalog) as? [String: Any],
                 var tracks = object["tracks"] as? [[String: Any]], var second = tracks.first
@@ -182,6 +184,7 @@
             } else if url.path.hasSuffix("/catalog/tracks") {
                 bytes = catalog
             } else if url.path.hasSuffix("/me/paths/fixture:foundations") {
+                pathRequests += 1
                 let state = corrected ? "completed" : "available"
                 bytes = Data(
                     """
@@ -272,6 +275,7 @@
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
             try await manualConnection(resources)
             try await authoritativeOwnerAndRefresh(resources)
+            try await stalePathSelectionAfterOwnerRefresh(resources)
             try await expiredTokenAndSilentFailure(resources)
             try await logoutDuringLogin(resources)
             try await logoutDuringRefresh(resources)
@@ -708,6 +712,27 @@
             await model.refreshAuthenticationIfNeeded()
             try expect(model.profile == nil && model.errorMessage != nil, "Refresh failure hidden")
             try expect(fixture.provider.interactiveCalls == 2, "Silent failure opened interaction")
+        }
+        @MainActor static func stalePathSelectionAfterOwnerRefresh(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            await model.connect()
+            guard let previousOwnerTrack = model.tracks.first else {
+                throw ModelTestFailure.assertion("Missing previous-owner track")
+            }
+            fixture.time = Date(timeIntervalSince1970: 1_990)
+            fixture.provider.token = CIAMAccessToken(
+                value: "synthetic-owner-B", expiresAt: Date(timeIntervalSince1970: 3_000))
+            await fixture.server.setOwner("server-owner-B")
+
+            await model.loadPath(previousOwnerTrack)
+
+            try expect(model.profile?.id == "server-owner-B", "Silent refresh did not switch owner")
+            try expect(
+                await fixture.server.pathRequestCount() == 0 && model.path == nil,
+                "Stale track selection loaded a path after the account changed")
+            try expect(model.errorMessage != nil, "Stale track selection was silently dropped")
         }
         @MainActor static func logoutDuringLogin(_ resources: URL) async throws {
             let fixture = try ModelFixture(resources: resources)
