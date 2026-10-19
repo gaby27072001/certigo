@@ -43,6 +43,36 @@ reverting to manual-token sign-in.
 
 The opt-in is rejected in Release builds. This is development-only plumbing, not
 a production sign-in default.
+
+## Optional local scheme helper
+
+Close Xcode before running the helper from the repository root. Put exactly the
+ten variables above in a local JSON object whose values are strings, outside
+the checkout. Do not include credentials, tokens, or a client secret. This file
+contains operator-selected configuration, not proof of identity registration,
+SDK compatibility, consent, or the deployed backend configuration.
+
+```sh
+python3 tools/native_ciam_scheme.py --config "$HOME/Certigo-ciam-local.json"
+```
+
+The helper copies the shared scheme to the current user's ignored
+`xcuserdata/<user>.xcuserdatad/xcschemes/CertigoNative Local.xcscheme` and adds
+the ten enabled variables only to its Debug Run action. It preserves the shared
+scheme, other actions, signing, project file and package pins. It refuses unknown,
+missing or duplicate keys, whitespace, escaped underscores, Xcode variable
+expansion, a non-Debug Run action, an unignored/tracked destination, or any
+existing local scheme. It never overwrites a manually prepared local scheme;
+keep using that scheme instead. Remove the local JSON yourself when no longer
+needed, and do not force-add ignored Xcode user data to Git.
+
+Reopen the same project and select **CertigoNative Local**. No build, network
+request, sign-in, account creation, or cloud change is performed by the helper.
+The app's existing configuration loader remains authoritative for semantic
+validation. First open the developer connector without signing in to check
+initialization on Apple. An interactive test is separate and uses an authorized
+dedicated test identity; its first profile request can provision staging data.
+
 The synthetic Foundation configuration tests do not compile the iOS app or
 MSAL/UIKit adapter and do not prove an identity registration, endpoint, account,
 or live sign-in. Apple-platform build, callback, keychain, and dedicated
