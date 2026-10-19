@@ -35,6 +35,30 @@ unread version and does not rewrite older version records. The UI labels the
 read marker as self-declared; opening, reading, practice prompts and feedback
 are not evidence of mastery.
 
+## Public lesson links
+
+The stable web routes are
+`https://www.certigo-app.com/learn/responsible-ai-assistants/{lessonId}/`,
+where `{lessonId}` is one of `verify-claims`, `retrieval-not-training`, or
+`stop-and-escalate`. The web fallback is generated from the same embedded
+editorial JSON and does not create an account or record activity.
+
+The native client accepts only HTTPS links on the exact `www.certigo-app.com`
+host, with this pilot ID and one of those lesson IDs. It rejects credentials,
+ports, query strings, fragments, encoded path data and unknown IDs. Receiving a
+link stores only the validated public pilot/lesson IDs in volatile UI state;
+the user must choose to continue and open the lesson. The link itself does not
+authenticate, select a certification or write history. Once the authenticated
+lesson view is actually displayed, the existing V1 access operation records the
+consultation; marking a lesson read remains a separate explicit action.
+
+The generated AASA contains only the verified production app identifier
+`FFQPC7NC68.com.certigo.mobileapp` and this pilot's lesson route. Its output and
+the Azure Static Web Apps rewrite are disabled by default. They may be enabled
+only after a compatible production app build is verified to handle these exact
+routes. The separate native development target is `com.certigo.native.dev`;
+this contract does not infer or publish its App ID prefix.
+
 `ApiSurfaceContractTests` compares all four routes with the actual Functions.
 Focused API, service, source-byte and native transport tests use synthetic
 identities and responses only. They do not call a real sign-in flow or a live

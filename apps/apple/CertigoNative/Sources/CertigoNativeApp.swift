@@ -37,6 +37,8 @@ import Foundation
     private struct NativeEntry: View {
         @State private var showDemo = false
         @State private var showDeveloper = false
+        @State private var pendingLessonLink: EditorialPilotLessonLink?
+        @State private var invalidLessonLink = false
 
         var body: some View {
             NavigationStack {
@@ -56,6 +58,15 @@ import Foundation
                             "Goals, answers and explanations are fictional. No account, network or real result is used."
                         )
                     }
+                    if let pendingLessonLink {
+                        Section("Shared lesson link") {
+                            Text("Non-certifying editorial pilot · \(pendingLessonLink.lessonID)")
+                            Button("Continue to linked lesson", systemImage: "book") {
+                                showDeveloper = true
+                            }
+                            .accessibilityIdentifier("continue-to-linked-lesson")
+                        }
+                    }
                     Section("Development") {
                         Button(
                             "Open the test API connector",
@@ -72,20 +83,40 @@ import Foundation
                 }
                 .navigationTitle("Certigo")
                 .fullScreenCover(isPresented: $showDemo) { NativeDemoRoot() }
-                .sheet(isPresented: $showDeveloper) { NativeDeveloperConnector() }
+                .sheet(isPresented: $showDeveloper) {
+                    NativeDeveloperConnector(pendingLessonLink: $pendingLessonLink)
+                }
             }
+            .onOpenURL(perform: handleIncomingURL)
+            .alert("Lesson link unavailable", isPresented: $invalidLessonLink) {
+                Button("OK", role: .cancel) { invalidLessonLink = false }
+            } message: {
+                Text("This link does not identify a supported editorial pilot lesson.")
+            }
+        }
+
+        private func handleIncomingURL(_ url: URL) {
+            guard url.scheme == "https", url.host == EditorialPilotLessonLink.host else { return }
+            guard let link = EditorialPilotLessonLink(url: url) else {
+                pendingLessonLink = nil
+                invalidLessonLink = true
+                return
+            }
+            pendingLessonLink = link
         }
     }
 
     @MainActor
     private struct NativeDeveloperConnector: View {
         @Environment(\.dismiss) private var dismiss
+        @Binding private var pendingLessonLink: EditorialPilotLessonLink?
         @State private var model: NativeModel
         @State private var usesCIAM: Bool
         @State private var ciamProvider: MSALAuthenticationProvider?
         @State private var configurationIssue: String?
 
-        init() {
+        init(pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil)) {
+            self._pendingLessonLink = pendingLessonLink
             #if DEBUG
                 let isDevelopmentBuild = true
             #else
@@ -136,7 +167,7 @@ import Foundation
                 } else if usesCIAM && model.profile == nil {
                     ciamSignIn
                 } else {
-                    NativeRoot(model: model)
+                    NativeRoot(model: model, pendingLessonLink: $pendingLessonLink)
                 }
             }
             .onOpenURL { url in
@@ -1487,6 +1518,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
 #if canImport(SwiftUI)
     private struct NativeRoot: View {
         @Bindable var model: NativeModel
+        @Binding var pendingLessonLink: EditorialPilotLessonLink?
         @State private var selectedTrack: String?
         @State private var selectedLesson: String?
         @State private var savingGoalID: String?
@@ -1494,6 +1526,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var columns: NavigationSplitViewVisibility = .automatic
         @State private var compactColumn: NavigationSplitViewColumn = .sidebar
         @State private var showEditorialPilot = false
+        @State private var requestedLessonID: String?
+
+        init(
+            model: NativeModel,
+            pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil)
+        ) {
+            self.model = model
+            self._pendingLessonLink = pendingLessonLink
+        }
 
         var body: some View {
             Group {
@@ -1583,7 +1624,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
             }
             .task { await model.restore() }
             .sheet(isPresented: $showEditorialPilot) {
-                NativeEditorialPilotView(model: model)
+                NativeEditorialPilotView(
+                    model: model,
+                    requestedLessonID: requestedLessonID
+                )
             }
         }
 
@@ -1613,11 +1657,24 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                     Section("Lecture guidée") {
                         Button("Assistants IA responsables", systemImage: "text.book.closed") {
+                            requestedLessonID = nil
                             showEditorialPilot = true
                         }
                         Text("Pilote éditorial de 18 minutes, distinct des certifications.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                    }
+                    if let pendingLessonLink {
+                        Section("Shared lesson link") {
+                            Text("Editorial pilot · \(pendingLessonLink.lessonID)")
+                            Button("Open linked lesson", systemImage: "arrow.up.right.square") {
+                                requestedLessonID = pendingLessonLink.lessonID
+                                self.pendingLessonLink = nil
+                                showEditorialPilot = true
+                            }
+                            .disabled(model.busy)
+                            .accessibilityIdentifier("open-linked-editorial-lesson")
+                        }
                     }
                     Section("Certifications") {
                         ForEach(

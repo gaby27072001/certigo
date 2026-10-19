@@ -5,13 +5,32 @@
     struct NativeEditorialPilotView: View {
         @Environment(\.dismiss) private var dismiss
         @Bindable var model: NativeModel
+        let requestedLessonID: String?
         @State private var issue: String?
+        @State private var navigationPath: [String] = []
+        @State private var requestedLessonResolutionAttempted = false
+        @State private var requestedLessonUnavailable = false
+
+        init(model: NativeModel, requestedLessonID: String? = nil) {
+            self.model = model
+            self.requestedLessonID = requestedLessonID
+        }
 
         var body: some View {
-            NavigationStack {
+            NavigationStack(path: $navigationPath) {
                 Group {
                     if let snapshot = model.editorialPilot {
-                        pilotContent(snapshot)
+                        if requestedLessonUnavailable {
+                            ContentUnavailableView(
+                                "Linked lesson unavailable",
+                                systemImage: "book.closed",
+                                description: Text(
+                                    "This lesson is not present in the current pilot version."
+                                )
+                            )
+                        } else {
+                            pilotContent(snapshot)
+                        }
                     } else if issue != nil {
                         ContentUnavailableView(
                             "Le pilote n’est pas disponible",
@@ -128,6 +147,18 @@
             issue = nil
             do {
                 try await model.loadEditorialPilot()
+                guard let requestedLessonID,
+                    !requestedLessonResolutionAttempted
+                else { return }
+                requestedLessonResolutionAttempted = true
+                guard model.editorialPilot?.pilot.lessons.contains(where: {
+                    $0.id == requestedLessonID
+                }) == true
+                else {
+                    requestedLessonUnavailable = true
+                    return
+                }
+                navigationPath = [requestedLessonID]
             } catch {
                 issue = "Le chargement ou la vérification du contenu a échoué. Réessayez."
             }
