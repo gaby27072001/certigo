@@ -9,7 +9,7 @@ permissions: {}
 jobs:
   iac-scan:
     name: Bicep IaC scan (Checkov)
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -49,6 +49,8 @@ jobs:
           python-version: "3.12"
       - name: Install pinned Checkov
         run: python -m pip install --disable-pip-version-check checkov==3.2.495
+      - name: Test trusted Checkov report gate
+        run: python "$TRUSTED_CONTROL_DIR/.github/scripts/test_checkov_report_gate.py"
       - name: Compile immutable runner image templates
         shell: bash
         run: |
@@ -85,11 +87,13 @@ jobs:
         run: |
           set -uo pipefail
           mkdir -p -- "$(dirname "$CHECKOV_SCAN_LOG")"
-          rm -f -- "$CHECKOV_SCAN_LOG"
+          rm -f -- "$CHECKOV_SCAN_LOG" "$CHECKOV_SCAN_LOG.json"
           set +e
           checkov --directory "$UNTRUSTED_SOURCE_DIR/infra" \
-            --framework bicep --compact --quiet \
+            --framework bicep --compact \
             --config-file "$TRUSTED_CONTROL_DIR/.checkov.yaml" \
+            --output cli --output json \
+            --output-file-path "console,$CHECKOV_SCAN_LOG.json" \
             > "$CHECKOV_SCAN_LOG" 2>&1
           scan_status=$?
           set -e
@@ -122,6 +126,12 @@ jobs:
             echo "- Scanner exit code: \`$scan_status\`"
             echo "- Complete scanner output is available in this job's immutable logs."
           } >> "$GITHUB_STEP_SUMMARY"
+
+          if ! python "$TRUSTED_CONTROL_DIR/.github/scripts/checkov_report_gate.py" \
+            "$CHECKOV_SCAN_LOG.json" "$scan_status" | tee -a "$GITHUB_STEP_SUMMARY"; then
+            echo "::error::Checkov report is incomplete, has blocking findings, or has zero effective coverage."
+            exit 1
+          fi
 
           if [ "$scan_status" -ne 0 ] || [ "$failed_checks" -ne 0 ]; then
             echo "::error::Checkov found a blocking IaC issue or could not complete."

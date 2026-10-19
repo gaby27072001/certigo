@@ -5,6 +5,37 @@ app, change an App Store record, alter Azure, or enable new server capabilities.
 The initial deployment target is **iOS/iPadOS 17**. This is a development
 assumption, not an approved decision to drop support on users' devices.
 
+## Current integrated baseline (2026-10-18)
+
+The detailed implementation and experiment record below originated on a
+long-lived development branch. For the merged `main` baseline at
+`86084f47`, use this current source map where older project/target descriptions
+differ:
+
+- `CertigoKit` contains the portable domain, data and Cortex packages; the
+  native SwiftUI app retains the development connector and the current
+  objective-first demonstration. The primary `CertigoNative.xcodeproj` is the
+  app project and does not host the historical no-auth or protection-probe
+  targets.
+- Protection tests are separate projects. `CertigoProtectionTests` is the
+  simulator-only harness. `CertigoProtectionDeviceTests` is the app-hosted
+  device-capable harness and selects exactly the three existing
+  `RuntimeDiskProtectionTests` methods; it references the original source
+  instead of copying or modifying it.
+- The historical unhosted `CertigoNoAuthTests` and `CertigoProtectionProbe`
+  procedures later in this document are retained as evidence, not as current
+  commands or test targets. Do not use their schemes or private-lot tooling for
+  current validation.
+- This merge has not received a post-merge Apple SDK build or device test.
+  Earlier results in this document apply only to their stated source revisions
+  and must not be presented as evidence for this integrated tree.
+
+Any physical-device run is a separate, explicitly scoped operation. Use only an
+already available authorized team, signing certificate and provisioning
+profile. Stop if a compatible profile is not already present; do not create or
+update profiles, register a device, enable Developer Mode, or change device
+settings as part of this validation.
+
 ## Current boundary
 
 `apps/apple/CertigoKit` contains Swift 6 package targets:
@@ -819,10 +850,15 @@ composition activated and no Graph registration/signing changed.
 Conditional DEV callback consent remains unconsumed until the remaining
 Apple/bundle/collision checks and owner review actually pass.
 
-### Source-only unhosted no-auth test preparation
+### Historical (retired) source-only unhosted no-auth test preparation
 
-`CertigoNoAuthTests` is a distinct unhosted XCTest target and shared scheme in
-the existing Xcode project, reusing the exact MSAL/CertigoData products.
+This is a record of the earlier development branch only. Its target and scheme
+are not part of the current primary Xcode project; use the current separate
+protection harnesses described above instead. Do not run the historical
+commands in this section.
+
+`CertigoNoAuthTests` was a distinct unhosted XCTest target and shared scheme in
+the earlier Xcode project, reusing the exact MSAL/CertigoData products.
 Its source test bundle identifier is `com.certigo.native.noauth-tests`;
 it has no `TEST_HOST`, `BUNDLE_LOADER`, callback declaration or added
 entitlement, and signing remains disabled. The DEV application target/scheme,
@@ -1065,11 +1101,15 @@ device pairing/trust/developer mode, signing/provisioning and any paid
 enrollment require their own user decisions and are not performed in this
 documentation-only lot.
 
-### Dedicated physical-test host source preparation (historical source 25e736)
+### Retired physical-test probe source preparation (historical source 25e736)
 
 The fixed identities and remote command templates from this initial source
 candidate are superseded by **Direct Xcode private-lot preparation** below.
 Approval of source `25e736` does not authorize the new source or a new lot.
+This probe project is not the current hosted device harness. The current
+`CertigoProtectionDeviceTests` project selects three original tests and is the
+only device-test project described by the integrated baseline above. The
+remaining probe workflow below is historical evidence and must not be run.
 
 `CertigoProtectionProbe` is a new minimal SwiftUI application target, separate
 from DEV and the unhosted simulator harness. It displays an inert test-host
@@ -1175,6 +1215,10 @@ source validator; the application/package/project/scheme diff against exact
 real signed artifacts or execution. No Apple/device command was run.
 
 ### Direct Xcode private-lot preparation
+
+This section refers to the retired `CertigoProtectionProbe` target, not the
+current `CertigoProtectionDeviceTests` project. Preserve it as historical
+provenance; do not follow its commands for the current test run.
 
 **Physical diagnostic result, 2026-10-14:** the user-supplied test log for
 prepared source `1c31486405f289f210b031dddd9d7d77a00b3397` reports successful

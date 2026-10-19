@@ -242,68 +242,79 @@ y compris celle qui devait réparer. Le validateur juge désormais aussi le mani
 avec le code de la base : une PR dont le manifeste ne décrit pas ses propres workflows, ou dont le
 golden digest ne correspond pas, est refusée **avant** de pouvoir casser `main`.
 
-### Workflow privilégié : ni ajout, ni modification — la règle est scellée
+### Workflow privilégié : refus par défaut, politique amendable par revue explicite
 
-> **Avant de concevoir quoi que ce soit : un workflow qui parle à Azure ne peut plus être ajouté
-> ni modifié dans ce dépôt, et cette contrainte ne peut être levée par aucune PR.** Mesuré le
-> 2026-09-08 sur `main` = `9c438660`. **Invalidé si** `backend-deploy-workflow-policy.mjs`
-> disparaît de `backendDeployTrustedFiles`, si `Validate workflow YAML` cesse d'être un contexte
-> requis, ou si `enforce_admins` repasse à `false`.
+**Contrat du code proposé.** `validateBackendDeployWorkspace` conserve le refus des workflows
+privilégiés ajoutés ou modifiés hors `cd-backend.yml`, sauf les seules transitions
+source/cible exactes et préapprouvées décrites dans `docs/runbooks/CI_WORKFLOW_CHANGES.md`,
+« Préparation bornée post-self-seal » et « Consolidation des contrôles PR sur runners hosted ».
+Pour les fichiers de contrôle, seule l'égalité binaire de
+`backend-deploy-workflow-policy.mjs` et `backend-deploy-gate.test.mjs` est retirée : ces deux
+fichiers restent obligatoires, réguliers et non symlinks, dans le candidat comme dans la base.
+`validate-backend-deploy-dispatch.mjs` reste obligatoire **et byte-identique à la base**.
+Ce changement ne crée ni nouvel objet de déploiement, ni exemption, ni autorisation générale.
 
-**Symptôme.** Une PR qui ajoute un workflow, ou qui modifie d'une seule ligne l'un des cinq
-workflows utilisant `azure/login@`, échoue sur `Validate workflow YAML` avec :
+**Symptôme.** Une PR qui ajoute ou modifie un workflow portant une capacité privilégiée
+hors `cd-backend.yml` échoue sur `Validate workflow YAML` avec :
 
 ```
 .github/workflows/<nom>.yml: changed or new privileged capability is forbidden outside cd-backend.yml
 ```
 
-Un commentaire suffit à le déclencher : la comparaison porte sur les **octets** du fichier, pas
-sur les capacités qu'il ajoute. Les cinq workflows concernés — `ci-content-drift.yml`,
+Hors de ces transitions exactes, un commentaire suffit à le déclencher : la comparaison porte sur les **octets** du fichier, pas
+sur les capacités qu'il ajoute. Exemples concernés : `ci-content-drift.yml`,
 `content-infra-apply.yml`, `content-infra-what-if.yml`,
-`governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml` — sont
-donc figés à l'octet.
+`governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`.
+Leur contenu doit donc rester identique à celui de la base.
 
 **Ce qui déclenche.** `privilegedWorkflow` dans
 `.github/scripts/backend-deploy-workflow-policy.mjs` signale un workflow dès qu'il porte une
 permission `write` ou `write-all`, un `id-token: write`, un `environment:`, un `secrets:` de job,
 ou l'un de dix-sept marqueurs textuels (`azure/login@`, `secrets.`, `az deployment`,
-`management.azure.com`, …). L'unique exemption est le nom de fichier `cd-backend.yml`, en dur.
+`management.azure.com`, …). `cd-backend.yml` suit son contrat dédié ; les autres transitions
+reconnues sont uniquement les paires exactes déjà préapprouvées par BASE, pas une exemption
+réutilisable pour une nouvelle capacité privilégiée.
 
-**La règle ne peut pas être amendée.** `validateBackendDeployWorkspace` exige que trois fichiers
-soient **byte-identiques entre la PR et sa révision de base** :
-
-```
-.github/scripts/backend-deploy-workflow-policy.mjs
-.github/scripts/backend-deploy-gate.test.mjs
-.github/scripts/validate-backend-deploy-dispatch.mjs
-```
-
-Toute modification, fût-elle d'un commentaire, produit :
+**Le dispatch reste scellé.** Toute modification de son contenu, fût-elle d'un commentaire,
+produit :
 
 ```
 candidate trusted control: <chemin> must match the immutable base revision
 ```
 
-Ajouter une liste d'exemptions, exempter un workflow nommément, ou remplacer la comparaison
-d'octets par une comparaison de capacités exigent tous d'éditer ces fichiers. **Aucune PR ne le
-peut.** Et il n'existe pas de contournement : `Validate workflow YAML` est un contexte requis sur
-`main`, `enforce_admins` vaut `true`, `allow_force_pushes` vaut `false`.
+**Frontière de confiance inchangée.** `lint-workflows.yml` (`validate`) et `ci-preflight.yml`
+exécutent le validateur de la **trusted BASE** contre l'arbre candidat. Ils n'importent pas la
+politique de la PR. Le job séparé `candidate-script-tests` exécute le code candidat en lecture
+seule, sans secret : ses tests prouvent son comportement, pas son autorité. Des tests candidats
+verts ne pré-approuvent ni la politique, ni un workflow, ni un déploiement. Les tests négatifs
+doivent toujours refuser le dispatch modifié, les workflows fantômes, les secrets et permissions
+privilégiées ; les fixtures strictes gardent leurs contraintes de triggers, runners, runtime,
+état et IaC. Les octets A/A-hardened/B, les contrôles de support et contrats de capacité,
+les garanties des releases/CD et le seuil CodeQL de 7 ne changent pas. Les seuls deltas
+workflow et la séparation CodeQL PR/main sont explicités dans le runbook cité.
 
-**Comment le scellé a pu être posé.** `validate-workflow-security.mjs` importe la politique et
-l'appelle sans condition. Lorsque la PR #357 l'a introduite, la révision de base ne contenait pas
-le module : le validateur de la base n'a donc jamais appliqué la règle à la PR qui l'apportait.
+**Adoption initiale : décision humaine, pas auto-approbation.** La base antérieure qui scelle
+encore les trois fichiers refuse normalement la PR retirant ces deux égalités. Il faut conserver
+ce résultat négatif, à côté du résultat du validateur candidat, et présenter au propriétaire
+le diff exact base/head, ses empreintes et les preuves positives et négatives. L'adoption d'un
+assouplissement exige sa revue et son accord explicite sur **ce diff exact**. Le modèle solo-owner
+n'impose pas un second reviewer ; aucun agent, test ou digest ne remplace cet accord. Préparer
+une PR draft ne constitue pas une adoption, une fusion ou une modification des settings.
+Ne pas rafraîchir un digest/golden pour masquer le refus de l'ancienne base.
 
-> **Une PR n'est jamais soumise à la règle qu'elle introduit.** C'est la même propriété que celle
-> décrite plus haut pour le contrat de package — le validateur de la base juge les données du
-> candidat — mais elle a ici un effet à sens unique : #357 a pu poser un scellé qu'elle-même ne
-> pourrait plus poser aujourd'hui, et que personne ne peut retirer.
+**Évolutions suivantes, sans confiance circulaire.** Une fois ce code adopté, une PR limitée à
+la politique et ses tests peut être évaluée par la politique déjà présente dans la base, avec
+les workflows et entrées privilégiées inchangés. Exécuter séparément cette validation trusted,
+la suite du candidat et ses fixtures négatives. Toute évolution de règle reste un diff de
+gouvernance à revoir explicitement, pas une permission de changer les données privilégiées
+dans la même PR. Les empreintes de fixtures ne se régénèrent qu'avec une raison explicite et
+une revue de l'objet exact. L'échec d'un test candidat ne doit pas être neutralisé pour passer.
 
-**Le scellé n'est pas le défaut.** Son intention est déclarée par son propre test
-(`backend-deploy-gate.test.mjs`, `workspace rejects a symlink trust root and privileged shadow
-workflows`), qui construit le cas visé en copiant `cd-backend.yml` vers `cd-backend-shadow.yml` :
-empêcher qu'un workflow fantôme contourne les scellés du pipeline de déploiement. Sceller la garde
-contre son propre désarmement est cohérent avec ce but. **C'est la règle scellée qui est plus large
-que son intention — et le scellé est précisément ce qui interdit de la resserrer.**
+Les anciennes affirmations selon lesquelles aucune PR ne pourrait modifier la règle, ou que
+les settings de protection interdiraient tout contournement, décrivaient une observation
+historique, pas une garantie de configuration actuelle. Ce contrat décrit le code ; il ne
+prouve ni les required checks live, ni sept contextes officiellement verts. Vérifier les
+protections effectives séparément avant une adoption, sans les modifier dans cette préparation.
 
 **Ce qui reste possible.** Un workflow qui n'utilise que le jeton GitHub automatique ne déclenche
 aucun des marqueurs : ni `github.token`, ni `permissions: contents: read` n'y figurent. Mesuré le

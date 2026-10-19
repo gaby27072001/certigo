@@ -63,6 +63,53 @@ avant la création de l'artefact. Ce chemin est toutefois **inexploitable sur ce
 dépôt** pour une raison de type de compte : voir « Où héberger les pages
 légales : GitHub Pages est exclu sur ce dépôt ».
 
+## Frontière de génération des fichiers publics
+
+Le builder exige un espace de travail stable : aucun processus hostile ne doit
+pouvoir remplacer ses parents ou modifier ses fichiers pendant la génération.
+La préparation des callers utilise un job GitHub-hosted `ubuntu-24.04` éphémère,
+un checkout de `github.sha` sur `main` sans credentials persistants, les seules
+permissions `contents: read` et `pages: read`, et aucun secret référencé. `configure-pages`
+lit les métadonnées avec `enablement: false` ; il ne doit pas activer le site.
+Le job de déploiement reste séparé, attend la génération et ne checkout ni
+n'exécute les sources du builder. Cette préparation ne constitue ni une adoption
+par les contrôles trusted ni une preuve d'exécution de ce workflow.
+
+Les deux callers de publication sont `publish-verified-public-pages.yml` et
+`deploy-privacy-policy.yml`. Le caller de test `ci-infra.yml` / `bicep-build`
+passe aussi sur un runner éphémère, avec seulement `contents: read` et
+`pull-requests: read`, en conservant les gardes de fork et de fraîcheur et le
+checkout du SHA candidat. Son code de PR n'est pas une source de publication ;
+aucune sortie de ce test n'est transférée au deploy. Les dépendances de test
+sont restaurées depuis le lock sans scripts d'installation. Les appels locaux
+directs, `check_public_pages_drift.mjs` et les deux suites de tests exigent eux
+aussi un workspace dont les sources et les parents de sortie ne sont pas
+modifiés par un processus hostile ; un répertoire temporaire seul ne prouve
+pas cette condition.
+
+Dans cet espace isolé, le writer refuse les liens symboliques présents dans les
+parents et les fichiers de sortie, les liens physiques multiples et les objets
+non réguliers. Une nouvelle sortie est créée exclusivement en mode privé ;
+les octets sont écrits par le descripteur vérifié, puis les permissions de
+création ordinaires `0666 & umask` sont appliquées sur ce même descripteur.
+Une relance conserve les permissions existantes et vérifie le fichier ouvert
+avant toute troncature. Aucun renommage ou nettoyage par chemin temporaire ne
+peut substituer une source homonyme. Les chemins Windows 8.3 légitimes restent
+acceptés : une différence textuelle avec `realpath` n'est pas considérée comme
+la preuve d'un lien symbolique. Le mode POSIX final est inchangé par rapport
+au builder précédent ; les tests POSIX ne prétendent pas vérifier les ACL Windows.
+
+Ces contrôles **ne garantissent pas un confinement atomique face à des parents
+modifiés concurremment**. `O_NOFOLLOW` ne protège que le dernier composant et
+n'est pas disponible partout. Le contrat portable Node ne remplace donc pas
+l'isolation du caller. Un répertoire partagé avec du code de PR persistant
+n'est pas un caller pris en charge ; ne pas y invoquer le builder comme un
+contrôle de sécurité. Les tests locaux Windows/Linux vérifient les refus, les
+octets, les permissions et les relances, pas l'existence d'un runner isolé en
+production. Les contrôles trusted et le manifeste des workflows nécessitent
+leur adoption indépendante avant toute activation ; leur refus n'est pas
+une erreur à contourner.
+
 ## Interface attendue par la PR #298
 
 La PR #298 reste propriétaire des fichiers mobiles et des générateurs

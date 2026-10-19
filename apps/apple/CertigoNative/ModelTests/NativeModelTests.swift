@@ -409,7 +409,7 @@
             }
             await fixture.server.suspendGoal()
             let task = Task { await model.chooseActiveTrack(track) }
-            while !(await fixture.server.isWaiting()) { await Task.yield() }
+            try await wait { await fixture.server.isWaiting() }
             try expect(
                 model.profile?.activeTrackId == nil && model.busy, "Pending goal appeared confirmed"
             )

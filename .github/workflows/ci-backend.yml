@@ -33,7 +33,7 @@ jobs:
     name: Detect changed paths
     needs: freshness
     if: ${{ always() && github.event_name == 'pull_request_target' && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -58,13 +58,13 @@ jobs:
     name: Build & test
     needs: [freshness, changes]
     # pull_request_target loads this definition from main. Only internal head SHAs
-    # can reach the persistent Azure pool; forks are rejected by fork-pr-policy.yml.
+    # execute here; forks are rejected by fork-pr-policy.yml.
     if: >-
       always()
       && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current != 'false')
       && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read

@@ -85,9 +85,11 @@ jobs:
           # Base-validator compatibility markers for the former promotion payload:
           # keys == ["environment"]
           # .environment == "staging" or .environment == "prod"
-          echo "environment=$TARGET" >> "$GITHUB_OUTPUT"
-          echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"
-          echo "source-run-id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
+          {
+            echo "environment=$TARGET"
+            echo "operation=$OPERATION"
+            echo "source-run-id=$SOURCE_RUN_ID"
+          } >> "$GITHUB_OUTPUT"
 
   validate-public-domain:
     name: Validate public-domain deployment gate
