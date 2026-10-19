@@ -1,5 +1,8 @@
 # Native Apple model boundary
 
+For the delivery sequence, Mac-versus-portable validation gates, accessibility
+acceptance and conditional Apple integrations, see [the delivery plan](APPLE_DELIVERY_PLAN.md).
+
 ## Imported foundations
 
 `apps/apple/CertigoKit` provides portable Swift domain contracts, Cortex predictions,
@@ -51,7 +54,7 @@ ACK. Reconciliation checks owner, API scope, lesson, attempt and original manife
 pin against the existing outbox. Unknown fields, unsupported schemas, ambiguous
 attempts and mismatched identities fail closed without fabricating a new attempt.
 
-## Inactive authentication and storage adapters
+## Opt-in development authentication and storage adapters
 
 `CIAMConfiguration` validates supplied public metadata: authority versus issuer,
 tenant/audience identity, protected API scope, HTTPS URL, exact registered callback
@@ -66,13 +69,17 @@ downloaded or resolved by this layer's Linux checks; its upstream checksum is
 declared, not independently verified here. Preserve the upstream Microsoft MIT
 notice when distributing MSAL.
 
-`MSALAuthenticationProvider.swift` is a source member of the main app target,
-but the app constructs `NativeModel()` without an authentication provider.
-There is no provider initialization or callback handler wired into composition.
+The developer connector defaults to manual test-token sign-in. In Debug, a valid
+local opt-in constructs `MSALAuthenticationProvider`, injects it into `NativeModel`
+and routes callbacks through `.onOpenURL`. Invalid or incomplete opt-in
+configuration fails closed with a setup error instead of falling back to manual
+sign-in; Release rejects the opt-in. There is no automatic account restore on
+startup. See [local CIAM development](../apps/apple/CIAM_LOCAL_DEVELOPMENT.md)
+for the unshared Xcode scheme configuration and its limits.
 `CIAMDevelopmentCandidate` records dated public metadata, not active registration
 or endpoint health. The plist's callback scheme is only a declaration, not
-permission to sign in or modify cloud registrations. SDK construction would
-initialize cache state and remains outside the active app path.
+permission to sign in or modify cloud registrations. This source wiring does not
+prove an Apple build, provider initialization on Apple or live authentication.
 
 `CredentialVault.swift` contains an Apple Security implementation using
 `WhenUnlockedThisDeviceOnly`. It is not compiled or exercised by the Linux model
