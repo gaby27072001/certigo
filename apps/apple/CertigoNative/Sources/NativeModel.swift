@@ -476,8 +476,13 @@ final class NativeModel {
 
     func loadPath(_ track: Track) async {
         guard !busy else { return }
+        let owner = profile?.id
         await refreshAuthenticationIfNeeded()
-        guard let client, !busy else { return }
+        guard let client, let profile, !busy else { return }
+        guard profile.id == owner else {
+            report(APIError.staleSession)
+            return
+        }
         let marker = generation
         busy = true
         path = nil
