@@ -201,12 +201,32 @@ export function writeManifestSeal(manifestPath, outputPath) {
     throw new Error('evidence manifest must be named manifest.json');
   }
   requireTrustedDirectory(path.dirname(seal), 'evidence manifest seal directory');
-  if (fs.existsSync(seal) && fs.lstatSync(seal).isSymbolicLink()) {
-    throw new Error('evidence manifest seal must not be a symbolic link');
+  const content = `${sha256File(manifest)}  manifest.json\n`;
+  let descriptor;
+  try {
+    descriptor = fs.openSync(
+      seal,
+      fs.constants.O_WRONLY | fs.constants.O_CREAT
+        | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK,
+      0o600,
+    );
+    const opened = fs.fstatSync(descriptor);
+    const current = fs.lstatSync(seal);
+    requireTrustedDirectory(path.dirname(seal), 'evidence manifest seal directory');
+    if (
+      !opened.isFile() || current.isSymbolicLink() || opened.nlink !== 1
+      || opened.dev !== current.dev || opened.ino !== current.ino
+      || (typeof process.geteuid === 'function' && opened.uid !== process.geteuid())
+    ) {
+      throw new Error('evidence manifest seal must be an owned regular non-symlink file');
+    }
+    fs.ftruncateSync(descriptor, 0);
+    fs.writeFileSync(descriptor, content);
+  } finally {
+    if (descriptor !== undefined) {
+      fs.closeSync(descriptor);
+    }
   }
-  fs.writeFileSync(seal, `${sha256File(manifest)}  manifest.json\n`, {
-    mode: 0o600,
-  });
 }
 
 export function verifyManifestSeal(manifestPath, sealPath) {
