@@ -89,6 +89,33 @@ integration evidence. No credentials belong in resources, defaults or logs.
 
 ## Local validation and its limits
 
+### Optional title reading
+
+The connected lesson UI source prepares explicit title reading using
+`AVSpeechSynthesizer`; its Apple compilation and runtime acceptance are separate.
+It reads only the loaded lesson title and titles from hook, concept, example and
+recap blocks. Paragraph Markdown, code, questions, answers and corrections are
+excluded. This limited scope avoids inventing a Markdown-to-speech conversion.
+
+There is no preselected voice or automatic playback. The user chooses a voice
+from the system's available voices; that choice is not a claim about the content's
+language. Voice and speed are in-memory only. No voice download, microphone,
+permission, audio-session category, background audio or account setting is added.
+Pause, resume and stop are explicit controls; speed changes apply to the next
+reading. Reading stops on view disappearance, lesson/text or owner change, and
+when the scene becomes inactive. When VoiceOver is active, optional speech stays
+stopped and the UI explains that VoiceOver can read the accessible content.
+Enabling VoiceOver also stops any current optional reading.
+
+Foundation checks cover title selection, ordering, empty inputs and preservation
+of original text only. They do not exercise the synthesizer or lifecycle hooks.
+Before Apple acceptance, compile with the documented SDK and verify voice
+availability, completion/cancellation callbacks, pause/resume, unavailable-voice
+errors, VoiceOver coexistence, scene/tab/lesson/account changes and dismissal.
+Also check the controls at accessibility text sizes on iPhone and iPad.
+
+### Existing portable checks
+
 Use an existing Swift 6.2-compatible toolchain. The package lock pins
 `swift-crypto` 5.0.1 and `swift-asn1` 1.7.3; do not upgrade them as a validation
 side effect.

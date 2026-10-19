@@ -1,10 +1,13 @@
 import Foundation
 
 #if canImport(SwiftUI)
+    import AVFoundation
+
     import CertigoData
 
     import CertigoDomain
 
+    import Observation
     import SwiftUI
     import UIKit
 
@@ -1860,6 +1863,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         VStack(alignment: .leading, spacing: 24) {
                             Text(lesson.title).font(.title).bold()
                                 .accessibilityAddTraits(.isHeader)
+                            NativeLessonAudioControls(
+                                text: NativeLessonReadingTitles.text(
+                                    lessonTitle: lesson.title,
+                                    blocks: lesson.blocks.map { (type: $0.type, title: $0.title) }),
+                                ownerID: model.profile?.id
+                            )
+                            .id(lesson.id)
                             Text(
                                 "Answer the questions, then submit your answers for server correction."
                             )
@@ -1949,7 +1959,220 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .onAppear { model.questionAppeared(question.id) }
         }
     }
+
+    @MainActor
+    private struct NativeLessonAudioControls: View {
+        @Environment(\.scenePhase) private var scenePhase
+        @State private var speech = NativeLessonSpeech()
+        let text: String
+        let ownerID: String?
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Read titles aloud").font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text(
+                    "Reads the lesson and section titles only. Paragraphs, code, questions and corrections are not read. Choose a reading voice; the content language is not detected."
+                )
+                .font(.subheadline).foregroundStyle(.secondary)
+                Picker("Reading voice", selection: $speech.voiceID) {
+                    Text("Choose a voice").tag("")
+                    ForEach(speech.voices, id: \.identifier) { voice in
+                        Text("\(voice.name) · \(voice.language)").tag(voice.identifier)
+                    }
+                }
+                .disabled(speech.state != .idle)
+                if speech.voices.isEmpty {
+                    Text("No reading voices are available on this device.")
+                }
+                Picker("Reading speed", selection: $speech.rate) {
+                    Text("Slower").tag(AVSpeechUtteranceDefaultSpeechRate * 0.8)
+                    Text("Standard").tag(AVSpeechUtteranceDefaultSpeechRate)
+                }
+                .disabled(speech.state != .idle)
+                Text(speech.state.label).font(.subheadline)
+                    .accessibilityIdentifier("lesson-audio-state")
+                ViewThatFits(in: .horizontal) {
+                    HStack { playbackButtons }
+                    VStack(alignment: .leading) { playbackButtons }
+                }
+                if let issue = speech.issue {
+                    Text(issue).foregroundStyle(.primary)
+                        .accessibilityIdentifier("lesson-audio-error")
+                }
+            }
+            .onDisappear { speech.stop() }
+            .onChange(of: text) { _, _ in speech.stop() }
+            .onChange(of: ownerID) { _, _ in speech.reset() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { speech.stop() }
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: UIAccessibility.voiceOverStatusDidChangeNotification)
+            ) { _ in
+                if UIAccessibility.isVoiceOverRunning { speech.stop() }
+            }
+        }
+
+        @ViewBuilder private var playbackButtons: some View {
+            switch speech.state {
+            case .idle:
+                Button("Read titles", systemImage: "speaker.wave.2") {
+                    speech.read(text)
+                }
+                .frame(minHeight: 44)
+            case .reading:
+                Button("Pause reading", systemImage: "pause") { speech.pause() }
+                    .frame(minHeight: 44)
+            case .paused:
+                Button("Resume reading", systemImage: "play") { speech.resume() }
+                    .frame(minHeight: 44)
+            }
+            if speech.state != .idle {
+                Button("Stop reading", systemImage: "stop") { speech.stop() }
+                    .frame(minHeight: 44)
+            }
+        }
+    }
+
+    @MainActor
+    @Observable
+    private final class NativeLessonSpeech: NSObject, AVSpeechSynthesizerDelegate {
+        enum State {
+            case idle, reading, paused
+
+            var label: String {
+                switch self {
+                case .idle: "Audio stopped"
+                case .reading: "Reading titles"
+                case .paused: "Audio paused"
+                }
+            }
+        }
+
+        let voices = AVSpeechSynthesisVoice.speechVoices().sorted {
+            ($0.language, $0.name, $0.identifier) < ($1.language, $1.name, $1.identifier)
+        }
+        var voiceID = ""
+        var rate = AVSpeechUtteranceDefaultSpeechRate
+        private(set) var state = State.idle
+        private(set) var issue: String?
+        private let synthesizer = AVSpeechSynthesizer()
+        private var utteranceID: ObjectIdentifier?
+
+        override init() {
+            super.init()
+            synthesizer.delegate = self
+            synthesizer.usesApplicationAudioSession = false
+        }
+
+        func read(_ text: String) {
+            guard state == .idle else { return }
+            issue = nil
+            guard !voices.isEmpty else {
+                issue = "No reading voices are available on this device."
+                return
+            }
+            guard !UIAccessibility.isVoiceOverRunning else {
+                issue =
+                    "VoiceOver is active. Use VoiceOver to read this content; optional audio stays stopped to avoid overlapping speech."
+                return
+            }
+            guard !voiceID.isEmpty else {
+                issue = "Choose a reading voice before starting."
+                return
+            }
+            guard let voice = AVSpeechSynthesisVoice(identifier: voiceID) else {
+                issue = "That voice is unavailable. Choose an available reading voice."
+                return
+            }
+            guard !text.isEmpty else {
+                issue = "No lesson or section titles are available to read."
+                return
+            }
+            let utterance = AVSpeechUtterance(string: text)
+            utterance.voice = voice
+            utterance.rate = rate
+            utteranceID = ObjectIdentifier(utterance)
+            state = .reading
+            synthesizer.speak(utterance)
+        }
+
+        func pause() {
+            guard state == .reading else { return }
+            if synthesizer.pauseSpeaking(at: .immediate) {
+                state = .paused
+            } else {
+                issue = "Reading could not be paused. Stop reading and try again."
+            }
+        }
+
+        func resume() {
+            guard state == .paused else { return }
+            guard !UIAccessibility.isVoiceOverRunning else {
+                stop()
+                issue =
+                    "VoiceOver is active. Optional audio stays stopped to avoid overlapping speech."
+                return
+            }
+            if synthesizer.continueSpeaking() {
+                state = .reading
+            } else {
+                issue = "Reading could not be resumed. Stop reading and try again."
+            }
+        }
+
+        func stop() {
+            utteranceID = nil
+            synthesizer.stopSpeaking(at: .immediate)
+            state = .idle
+            issue = nil
+        }
+
+        func reset() {
+            stop()
+            voiceID = ""
+            rate = AVSpeechUtteranceDefaultSpeechRate
+        }
+
+        nonisolated func speechSynthesizer(
+            _ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance
+        ) {
+            let id = ObjectIdentifier(utterance)
+            Task { @MainActor [weak self] in self?.finished(id) }
+        }
+
+        nonisolated func speechSynthesizer(
+            _ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance
+        ) {
+            let id = ObjectIdentifier(utterance)
+            Task { @MainActor [weak self] in self?.finished(id) }
+        }
+
+        private func finished(_ id: ObjectIdentifier) {
+            guard utteranceID == id else { return }
+            utteranceID = nil
+            state = .idle
+        }
+    }
 #endif
+
+enum NativeLessonReadingTitles {
+    static func text(
+        lessonTitle: String, blocks: [(type: String, title: String?)]
+    ) -> String {
+        let readableTypes: Set<String> = ["hook", "concept", "example", "recap"]
+        let titles =
+            [lessonTitle]
+            + blocks.compactMap { block in
+                readableTypes.contains(block.type) ? block.title : nil
+            }
+        return titles.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+    }
+}
 
 struct NativeActiveGoalPresentation {
     let targetID: String

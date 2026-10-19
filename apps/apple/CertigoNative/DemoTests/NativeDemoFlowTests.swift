@@ -473,6 +473,32 @@ struct NativeDemoFlowTests {
         try check(
             try NativeDemoSnapshot.restore(Data(storedSnapshot.utf8)) == snapshot,
             "first-run demo activity persists after empty restoration")
+        let readingTitles = NativeLessonReadingTitles.text(
+            lessonTitle: "  Loaded lesson  ",
+            blocks: [
+                (type: "hook", title: "Situation"),
+                (type: "concept", title: "Concept"),
+                (type: "example", title: "Example"),
+                (type: "code", title: "Do not read code"),
+                (type: "check", title: "Do not read questions"),
+                (type: "recap", title: "Takeaway"),
+                (type: "unknown", title: "Do not read unknown blocks"),
+            ])
+        try check(
+            readingTitles == "Loaded lesson\n\nSituation\n\nConcept\n\nExample\n\nTakeaway",
+            "audio title allowlist preserves reading order and excludes code and check blocks")
+        try check(
+            NativeLessonReadingTitles.text(
+                lessonTitle: "", blocks: [(type: "concept", title: nil)]) == "",
+            "missing titles do not invent audio content")
+        try check(
+            NativeLessonReadingTitles.text(
+                lessonTitle: " \n ", blocks: [(type: "recap", title: "\t")]) == "",
+            "whitespace-only titles do not create an empty spoken item")
+        try check(
+            NativeLessonReadingTitles.text(
+                lessonTitle: "Équipe — 日本語", blocks: []) == "Équipe — 日本語",
+            "reading titles preserve the original language without translation or inference")
         print(
             "\(count) Foundation presentation/demo checks passed; no Apple UI was compiled or rendered."
         )
