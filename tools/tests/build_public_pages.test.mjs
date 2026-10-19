@@ -80,7 +80,7 @@ test('builds public privacy and account-deletion routes without a data form', as
         '<link rel="canonical" href="https://github.com/learn/responsible-ai-assistants/verify-claims/">',
       ),
     );
-    assert.match(lesson, /https:\/\/docs\.aws\.amazon\.com/);
+    assert.ok(lesson.includes('href="https://docs.aws.amazon.com/'));
     assert.deepEqual(config.routes, []);
     await assert.rejects(
       readFile(join(output, '.well-known/apple-app-site-association.json')),
