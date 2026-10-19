@@ -89,13 +89,20 @@ integration evidence. No credentials belong in resources, defaults or logs.
 
 ## Local validation and its limits
 
-### Optional title reading
+### Optional lesson reading
 
-The connected lesson UI source prepares explicit title reading using
+The connected lesson UI source prepares explicit lesson reading using
 `AVSpeechSynthesizer`; its Apple compilation and runtime acceptance are separate.
-It reads only the loaded lesson title and titles from hook, concept, example and
-recap blocks. Paragraph Markdown, code, questions, answers and corrections are
-excluded. This limited scope avoids inventing a Markdown-to-speech conversion.
+It selects the loaded lesson title, then the titles and bodies of hook, concept,
+example and recap blocks in order. Code/check/unknown blocks, questions, answers
+and corrections are excluded. Apple Foundation's `AttributedString(markdown:)`
+extracts body text with inline syntax and preserved whitespace, matching the
+existing `Text(.init(body))` presentation rather than introducing a new full-block
+Markdown interpretation. Formatting and link destinations are not spoken; link
+labels and paragraph breaks remain. Literal titles are not interpreted as Markdown.
+Parser errors abort preparation of the entire reading and produce a visible error;
+there is no silent paragraph skip or raw-Markdown fallback. CommonMark accepts many
+unmatched delimiters as literal text, so these are not necessarily parser errors.
 
 There is no preselected voice or automatic playback. The user chooses a voice
 from the system's available voices; that choice is not a claim about the content's
@@ -107,8 +114,12 @@ when the scene becomes inactive. When VoiceOver is active, optional speech stays
 stopped and the UI explains that VoiceOver can read the accessible content.
 Enabling VoiceOver also stops any current optional reading.
 
-Foundation checks cover title selection, ordering, empty inputs and preservation
-of original text only. They do not exercise the synthesizer or lifecycle hooks.
+Portable Foundation checks cover block selection, title/body ordering, paragraph
+boundaries, empty inputs, original text and propagation of a renderer failure.
+The injected identity/failing renderers in those tests are not Markdown conversion
+evidence. Darwin-conditional checks in `DemoTests/NativeDemoFlowTests.swift` exercise
+the real Apple Markdown conversion and link-label/paragraph behavior, but must be
+executed on Apple. Neither harness exercises the synthesizer or lifecycle hooks.
 Before Apple acceptance, compile with the documented SDK and verify voice
 availability, completion/cancellation callbacks, pause/resume, unavailable-voice
 errors, VoiceOver coexistence, scene/tab/lesson/account changes and dismissal.

@@ -1864,9 +1864,11 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             Text(lesson.title).font(.title).bold()
                                 .accessibilityAddTraits(.isHeader)
                             NativeLessonAudioControls(
-                                text: NativeLessonReadingTitles.text(
+                                content: NativeLessonReadingContent(
                                     lessonTitle: lesson.title,
-                                    blocks: lesson.blocks.map { (type: $0.type, title: $0.title) }),
+                                    blocks: lesson.blocks.map {
+                                        (type: $0.type, title: $0.title, body: $0.body)
+                                    }),
                                 ownerID: model.profile?.id
                             )
                             .id(lesson.id)
@@ -1964,15 +1966,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
     private struct NativeLessonAudioControls: View {
         @Environment(\.scenePhase) private var scenePhase
         @State private var speech = NativeLessonSpeech()
-        let text: String
+        let content: NativeLessonReadingContent
         let ownerID: String?
 
         var body: some View {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Read titles aloud").font(.headline)
+                Text("Read lesson aloud").font(.headline)
                     .accessibilityAddTraits(.isHeader)
                 Text(
-                    "Reads the lesson and section titles only. Paragraphs, code, questions and corrections are not read. Choose a reading voice; the content language is not detected."
+                    "Reads lesson titles and learning paragraphs. Code blocks, questions and corrections are not read. Choose a reading voice; the content language is not detected."
                 )
                 .font(.subheadline).foregroundStyle(.secondary)
                 Picker("Reading voice", selection: $speech.voiceID) {
@@ -2002,7 +2004,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
             }
             .onDisappear { speech.stop() }
-            .onChange(of: text) { _, _ in speech.stop() }
+            .onChange(of: content) { _, _ in speech.stop() }
             .onChange(of: ownerID) { _, _ in speech.reset() }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { speech.stop() }
@@ -2018,8 +2020,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @ViewBuilder private var playbackButtons: some View {
             switch speech.state {
             case .idle:
-                Button("Read titles", systemImage: "speaker.wave.2") {
-                    speech.read(text)
+                Button("Read lesson", systemImage: "speaker.wave.2") {
+                    speech.read(content)
                 }
                 .frame(minHeight: 44)
             case .reading:
@@ -2045,7 +2047,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
             var label: String {
                 switch self {
                 case .idle: "Audio stopped"
-                case .reading: "Reading titles"
+                case .reading: "Reading lesson"
                 case .paused: "Audio paused"
                 }
             }
@@ -2067,7 +2069,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
             synthesizer.usesApplicationAudioSession = false
         }
 
-        func read(_ text: String) {
+        func read(_ content: NativeLessonReadingContent) {
             guard state == .idle else { return }
             issue = nil
             guard !voices.isEmpty else {
@@ -2087,8 +2089,17 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 issue = "That voice is unavailable. Choose an available reading voice."
                 return
             }
+            let text: String
+            do {
+                text = try content.spokenText(
+                    renderingMarkdown: NativeLessonReadingContent.plainText)
+            } catch {
+                issue =
+                    "The lesson text could not be prepared for reading. No audio was started; you can still read the lesson on screen."
+                return
+            }
             guard !text.isEmpty else {
-                issue = "No lesson or section titles are available to read."
+                issue = "No lesson text is available to read."
                 return
             }
             let utterance = AVSpeechUtterance(string: text)
@@ -2158,20 +2169,48 @@ struct NativeDemoSnapshot: Codable, Equatable {
     }
 #endif
 
-enum NativeLessonReadingTitles {
-    static func text(
-        lessonTitle: String, blocks: [(type: String, title: String?)]
-    ) -> String {
-        let readableTypes: Set<String> = ["hook", "concept", "example", "recap"]
-        let titles =
-            [lessonTitle]
-            + blocks.compactMap { block in
-                readableTypes.contains(block.type) ? block.title : nil
-            }
-        return titles.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n\n")
+struct NativeLessonReadingContent: Equatable {
+    enum Part: Equatable {
+        case title(String)
+        case markdown(String)
     }
+
+    let parts: [Part]
+
+    init(lessonTitle: String, blocks: [(type: String, title: String?, body: String?)]) {
+        let readableTypes: Set<String> = ["hook", "concept", "example", "recap"]
+        var parts: [Part] = [.title(lessonTitle)]
+        for block in blocks where readableTypes.contains(block.type) {
+            if let title = block.title { parts.append(.title(title)) }
+            if let body = block.body { parts.append(.markdown(body)) }
+        }
+        self.parts = parts
+    }
+
+    func spokenText(renderingMarkdown: (String) throws -> String) throws -> String {
+        try parts.map { part in
+            let text: String
+            switch part {
+            case .title(let title): text = title
+            case .markdown(let body): text = try renderingMarkdown(body)
+            }
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        .filter { !$0.isEmpty }
+        .joined(separator: "\n\n")
+    }
+
+    #if canImport(Darwin)
+        static func plainText(_ markdown: String) throws -> String {
+            // Match Text's inline Markdown while preserving paragraph whitespace.
+            let value = try AttributedString(
+                markdown: markdown,
+                options: .init(
+                    interpretedSyntax: .inlineOnlyPreservingWhitespace,
+                    failurePolicy: .throwError))
+            return String(value.characters)
+        }
+    #endif
 }
 
 struct NativeActiveGoalPresentation {

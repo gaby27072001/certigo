@@ -473,32 +473,90 @@ struct NativeDemoFlowTests {
         try check(
             try NativeDemoSnapshot.restore(Data(storedSnapshot.utf8)) == snapshot,
             "first-run demo activity persists after empty restoration")
-        let readingTitles = NativeLessonReadingTitles.text(
+        let readingContent = NativeLessonReadingContent(
             lessonTitle: "  Loaded lesson  ",
             blocks: [
-                (type: "hook", title: "Situation"),
-                (type: "concept", title: "Concept"),
-                (type: "example", title: "Example"),
-                (type: "code", title: "Do not read code"),
-                (type: "check", title: "Do not read questions"),
-                (type: "recap", title: "Takeaway"),
-                (type: "unknown", title: "Do not read unknown blocks"),
+                (type: "hook", title: "Situation", body: "Hook paragraph"),
+                (type: "concept", title: "Concept", body: "Concept paragraph\n\nSecond paragraph"),
+                (type: "example", title: nil, body: "Example paragraph"),
+                (type: "code", title: "Do not read code", body: "Excluded code"),
+                (type: "check", title: "Do not read questions", body: "Excluded question"),
+                (type: "recap", title: "Takeaway", body: "Recap paragraph"),
+                (type: "unknown", title: "Do not read unknown blocks", body: "Excluded unknown"),
             ])
         try check(
-            readingTitles == "Loaded lesson\n\nSituation\n\nConcept\n\nExample\n\nTakeaway",
-            "audio title allowlist preserves reading order and excludes code and check blocks")
+            readingContent.parts == [
+                .title("  Loaded lesson  "), .title("Situation"), .markdown("Hook paragraph"),
+                .title("Concept"), .markdown("Concept paragraph\n\nSecond paragraph"),
+                .markdown("Example paragraph"), .title("Takeaway"), .markdown("Recap paragraph"),
+            ],
+            "audio selects pedagogical titles and bodies in order, excluding code/check/unknown")
+        var renderedBodies: [String] = []
         try check(
-            NativeLessonReadingTitles.text(
-                lessonTitle: "", blocks: [(type: "concept", title: nil)]) == "",
-            "missing titles do not invent audio content")
+            try readingContent.spokenText { body in
+                renderedBodies.append(body)
+                return body
+            } == """
+                Loaded lesson
+
+                Situation
+
+                Hook paragraph
+
+                Concept
+
+                Concept paragraph
+
+                Second paragraph
+
+                Example paragraph
+
+                Takeaway
+
+                Recap paragraph
+                """,
+            "audio assembles every selected paragraph in reading order")
         try check(
-            NativeLessonReadingTitles.text(
-                lessonTitle: " \n ", blocks: [(type: "recap", title: "\t")]) == "",
-            "whitespace-only titles do not create an empty spoken item")
+            renderedBodies == [
+                "Hook paragraph", "Concept paragraph\n\nSecond paragraph",
+                "Example paragraph", "Recap paragraph",
+            ],
+            "only body Markdown is sent to the renderer; literal titles are preserved")
+        enum ReadingFailure: Error { case invalidMarkdown }
+        var renderingFailed = false
+        do {
+            _ = try readingContent.spokenText { _ in throw ReadingFailure.invalidMarkdown }
+        } catch ReadingFailure.invalidMarkdown {
+            renderingFailed = true
+        }
         try check(
-            NativeLessonReadingTitles.text(
-                lessonTitle: "Équipe — 日本語", blocks: []) == "Équipe — 日本語",
-            "reading titles preserve the original language without translation or inference")
+            renderingFailed,
+            "renderer failure aborts the complete reading rather than skipping a body")
+        try check(
+            try NativeLessonReadingContent(
+                lessonTitle: " \n ", blocks: [(type: "recap", title: nil, body: "\t")]
+            ).spokenText { $0 } == "",
+            "missing and whitespace-only lesson text never invents audio content")
+        try check(
+            try NativeLessonReadingContent(
+                lessonTitle: "Équipe — 日本語",
+                blocks: [(type: "concept", title: nil, body: "Données\n\n学習")]
+            ).spokenText { $0 } == "Équipe — 日本語\n\nDonnées\n\n学習",
+            "portable assembly preserves original multilingual text and paragraph boundaries")
+        #if canImport(Darwin)
+            let markdownText = try NativeLessonReadingContent.plainText(
+                "**Comprendre** le [cloud](https://example.invalid/hidden-url).\n\n次の段落")
+            try check(
+                markdownText == "Comprendre le cloud.\n\n次の段落",
+                "Apple Markdown extraction strips markup and link targets but preserves paragraphs")
+            try check(
+                try NativeLessonReadingContent(
+                    lessonTitle: "Lesson",
+                    blocks: [(type: "concept", title: "Section", body: "*First*.\n\nSecond.")]
+                ).spokenText(renderingMarkdown: NativeLessonReadingContent.plainText)
+                    == "Lesson\n\nSection\n\nFirst.\n\nSecond.",
+                "Apple Markdown renderer is wired into full lesson assembly")
+        #endif
         print(
             "\(count) Foundation presentation/demo checks passed; no Apple UI was compiled or rendered."
         )
