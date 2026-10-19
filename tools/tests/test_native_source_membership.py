@@ -1,6 +1,7 @@
 import re
 import unittest
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 
 APP = Path(__file__).resolve().parents[2] / "apps" / "apple" / "CertigoNative"
@@ -28,6 +29,33 @@ def references(body, field):
 
 
 class NativeSourceMembershipTests(unittest.TestCase):
+    def test_shared_profile_action_runs_the_release_app_target(self):
+        scheme = ET.parse(
+            APP / "CertigoNative.xcodeproj" / "xcshareddata" / "xcschemes"
+            / "CertigoNative.xcscheme"
+        ).getroot()
+        profiles = scheme.findall("ProfileAction")
+        self.assertEqual(len(profiles), 1)
+        profile = profiles[0]
+        self.assertEqual(profile.get("buildConfiguration"), "Release")
+        runnables = profile.findall("BuildableProductRunnable")
+        self.assertEqual(len(runnables), 1)
+        self.assertEqual(runnables[0].get("runnableDebuggingMode"), "0")
+        refs = runnables[0].findall("BuildableReference")
+        self.assertEqual(len(refs), 1)
+        reference = refs[0]
+        self.assertEqual(reference.get("BuildableIdentifier"), "primary")
+        self.assertEqual(reference.get("BuildableName"), "CertigoNative.app")
+        self.assertEqual(reference.get("BlueprintName"), "CertigoNative")
+        self.assertEqual(
+            reference.get("ReferencedContainer"), "container:CertigoNative.xcodeproj"
+        )
+        targets = objects_of_type(PROJECT.read_text(encoding="utf-8"), "PBXNativeTarget")
+        self.assertIn(reference.get("BlueprintIdentifier"), targets)
+        launch = scheme.find("LaunchAction/BuildableProductRunnable/BuildableReference")
+        self.assertIsNotNone(launch)
+        self.assertEqual(reference.attrib, launch.attrib)
+
     def test_every_app_swift_file_is_in_the_target_sources_phase_and_group(self):
         project = PROJECT.read_text(encoding="utf-8")
         targets = objects_of_type(project, "PBXNativeTarget")
