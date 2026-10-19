@@ -522,6 +522,68 @@ struct NativeDemoFlowTests {
                 "Example paragraph", "Recap paragraph",
             ],
             "only body Markdown is sent to the renderer; literal titles are preserved")
+        let editorialReading = NativeLessonReadingContent(
+            editorialTitle: "Assistants responsables",
+            objective: "Repérer les responsabilités humaines.",
+            hook: "Un assistant propose une réponse.",
+            keyIdeas: ["Définir le périmètre.", "Prévoir une supervision."],
+            exampleSituation: "Une équipe automatise un tri.",
+            exampleSteps: ["Vérifier les données.", "Prévoir une escalade."],
+            exampleDecision: "Une personne garde la décision finale.",
+            recap: "L’automatisation reste sous contrôle humain."
+        )
+        try check(
+            editorialReading.parts == [
+                .title("Assistants responsables"),
+                .text("Repérer les responsabilités humaines."),
+                .text("Un assistant propose une réponse."),
+                .title("Idées clés"),
+                .text("Définir le périmètre."),
+                .text("Prévoir une supervision."),
+                .title("Exemple résolu"),
+                .text("Une équipe automatise un tri."),
+                .text("1. Vérifier les données."),
+                .text("2. Prévoir une escalade."),
+                .text("Une personne garde la décision finale."),
+                .title("À retenir"),
+                .text("L’automatisation reste sous contrôle humain."),
+            ],
+            "editorial audio follows only the displayed pedagogical allowlist in order")
+        var editorialMarkdownBodies: [String] = []
+        let editorialSpeech = try editorialReading.spokenText { body in
+            editorialMarkdownBodies.append(body)
+            return body
+        }
+        try check(
+            editorialMarkdownBodies.isEmpty
+                && editorialSpeech == """
+                    Assistants responsables
+
+                    Repérer les responsabilités humaines.
+
+                    Un assistant propose une réponse.
+
+                    Idées clés
+
+                    Définir le périmètre.
+
+                    Prévoir une supervision.
+
+                    Exemple résolu
+
+                    Une équipe automatise un tri.
+
+                    1. Vérifier les données.
+
+                    2. Prévoir une escalade.
+
+                    Une personne garde la décision finale.
+
+                    À retenir
+
+                    L’automatisation reste sous contrôle humain.
+                    """,
+            "editorial audio preserves plain text without Markdown conversion")
         enum ReadingFailure: Error { case invalidMarkdown }
         var renderingFailed = false
         do {

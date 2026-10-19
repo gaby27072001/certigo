@@ -151,6 +151,20 @@
                     Text(lesson.title)
                         .font(.title2.bold())
                         .accessibilityAddTraits(.isHeader)
+                    NativeLessonAudioControls(
+                        content: NativeLessonReadingContent(
+                            editorialTitle: lesson.title,
+                            objective: lesson.objective,
+                            hook: lesson.hook,
+                            keyIdeas: lesson.keyIdeas,
+                            exampleSituation: lesson.workedExample.situation,
+                            exampleSteps: lesson.workedExample.steps,
+                            exampleDecision: lesson.workedExample.decision,
+                            recap: lesson.recap
+                        ),
+                        ownerID: model.profile?.id
+                    )
+                    .id(lesson.id)
                     Text(lesson.objective)
                         .font(.headline)
                     Text(lesson.hook)
