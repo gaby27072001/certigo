@@ -87,6 +87,32 @@ harness. Real Keychain lifecycle, SDK cache ownership, callback handling,
 PKCE/nonce/state and interactive authentication require separate Apple/provider
 integration evidence. No credentials belong in resources, defaults or logs.
 
+## Non-certifying editorial pilot
+
+The Learn sidebar includes the original French `responsible-ai-assistants` pilot
+as a separate reading path, not as a certification track. The backend embeds the
+exact source bytes from `gaby27072001/certigo-content` commit
+`c8b13a86fa1cc5917bbfd795f5404727ea732505`; its authenticated content response
+is digest-checked by the native client before decoding. The UI preserves the
+source's `draft` status, French text, estimated durations, review date, source
+links and stated limitations.
+
+The new [editorial-pilot API contract](contracts/editorial-pilot/v1/README.md)
+stores only owner-scoped last access and a voluntary, explicit “mark as read”
+declaration in the existing `progress` container. Records are keyed by the
+exact content digest, excluded from mastery queries, and removed by the existing
+account-deletion partition cleanup. No free-text answer is collected or
+persisted. Opening a lesson does not mark it read; neither the marker nor the
+practice prompt is a score, mastery claim, readiness value, XP, reward or
+certification. A new digest starts with no read marker while prior-version
+records remain separate.
+
+The native API transport and backend behavior tests use synthetic tokens,
+identities and responses. They do not perform CIAM sign-in, create test accounts
+or call a live `/me` endpoint. Linux Swift validation covers Foundation code
+only; it does not typecheck or render the SwiftUI screen on Apple platforms or
+prove a staging deployment.
+
 ## Local validation and its limits
 
 Use an existing Swift 6.2-compatible toolchain. The package lock pins

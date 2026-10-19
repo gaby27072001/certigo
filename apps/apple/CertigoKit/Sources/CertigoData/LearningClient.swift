@@ -79,6 +79,40 @@ public actor LearningClient {
         return value
     }
 
+    public func editorialPilot(pilotId: String) async throws -> EditorialPilotSnapshot {
+        let context = try credentials()
+        let value = try await api.editorialPilot(pilotId: pilotId, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func pilotHistory(_ snapshot: EditorialPilotSnapshot) async throws -> PilotHistory {
+        let context = try credentials()
+        let value = try await api.pilotHistory(snapshot, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func recordPilotLessonAccess(
+        _ snapshot: EditorialPilotSnapshot, lessonId: String
+    ) async throws -> PilotLessonProgress {
+        let context = try credentials()
+        let value = try await api.recordPilotLessonAccess(
+            snapshot, lessonId: lessonId, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func markPilotLessonRead(
+        _ snapshot: EditorialPilotSnapshot, lessonId: String
+    ) async throws -> PilotLessonProgress {
+        let context = try credentials()
+        let value = try await api.markPilotLessonRead(
+            snapshot, lessonId: lessonId, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
     public func savedSubmissions() async throws -> [SavedSubmission] {
         let context = try credentials()
         let entries = try await store.entries(ownerId: context.ownerId, apiScope: api.scope)

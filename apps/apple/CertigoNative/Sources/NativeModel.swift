@@ -18,6 +18,13 @@ enum NativeResumeError: Error, Equatable {
     case submissionUnresolved, attemptMismatch, duplicateSubmission
 }
 
+enum NativePilotError: Error {
+    case connectionRequired
+    case operationInProgress
+    case ownerChanged
+    case lessonUnavailable
+}
+
 // Navigation metadata only; the existing outbox remains the sole persisted submission authority.
 struct NativeResumeState: Codable, Equatable, Sendable {
     enum Tab: String, Codable, Sendable { case learn, coach, social, profile }
@@ -175,6 +182,8 @@ final class NativeModel {
     private(set) var tracks: [Track] = []
     private(set) var path: LearningPath?
     private(set) var lesson: Lesson?
+    private(set) var editorialPilot: EditorialPilotSnapshot?
+    private(set) var pilotHistory: PilotHistory?
     private(set) var queue: [SavedSubmission] = []
     private(set) var outcome: SubmissionOutcome?
     private(set) var busy = false
@@ -325,6 +334,8 @@ final class NativeModel {
         tracks = []
         path = nil
         lesson = nil
+        editorialPilot = nil
+        pilotHistory = nil
         selections = [:]
         questionStarted = [:]
         latencies = [:]
@@ -549,6 +560,64 @@ final class NativeModel {
         } catch {
             guard generation == marker else { return }
             report(error)
+        }
+    }
+
+    func loadEditorialPilot() async throws {
+        guard !busy else { throw NativePilotError.operationInProgress }
+        guard let owner = profile?.id else { throw NativePilotError.connectionRequired }
+        await refreshAuthenticationIfNeeded()
+        guard let client, profile?.id == owner, !busy else {
+            throw NativePilotError.ownerChanged
+        }
+        let marker = generation
+        busy = true
+        editorialPilot = nil
+        pilotHistory = nil
+        defer { if generation == marker { busy = false } }
+        let snapshot = try await client.editorialPilot(pilotId: "responsible-ai-assistants")
+        guard generation == marker, profile?.id == owner else {
+            throw NativePilotError.ownerChanged
+        }
+        let history = try await client.pilotHistory(snapshot)
+        guard generation == marker, profile?.id == owner else {
+            throw NativePilotError.ownerChanged
+        }
+        editorialPilot = snapshot
+        pilotHistory = history
+    }
+
+    func accessEditorialPilotLesson(_ lessonId: String) async throws {
+        try await updateEditorialPilotLesson(lessonId, markRead: false)
+    }
+
+    func markEditorialPilotLessonRead(_ lessonId: String) async throws {
+        try await updateEditorialPilotLesson(lessonId, markRead: true)
+    }
+
+    private func updateEditorialPilotLesson(_ lessonId: String, markRead: Bool) async throws {
+        guard !busy else { throw NativePilotError.operationInProgress }
+        guard let owner = profile?.id, let snapshot = editorialPilot,
+            snapshot.pilot.lessons.contains(where: { $0.id == lessonId })
+        else { throw NativePilotError.lessonUnavailable }
+        await refreshAuthenticationIfNeeded()
+        guard let client, profile?.id == owner, !busy else {
+            throw NativePilotError.ownerChanged
+        }
+        let marker = generation
+        busy = true
+        defer { if generation == marker { busy = false } }
+        if markRead {
+            _ = try await client.markPilotLessonRead(snapshot, lessonId: lessonId)
+        } else {
+            _ = try await client.recordPilotLessonAccess(snapshot, lessonId: lessonId)
+        }
+        guard generation == marker, profile?.id == owner else {
+            throw NativePilotError.ownerChanged
+        }
+        pilotHistory = try await client.pilotHistory(snapshot)
+        guard generation == marker, profile?.id == owner else {
+            throw NativePilotError.ownerChanged
         }
     }
 

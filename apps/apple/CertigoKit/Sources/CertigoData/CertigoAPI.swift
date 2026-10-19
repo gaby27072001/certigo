@@ -150,6 +150,76 @@ public struct CertigoAPI: Sendable {
         return try lesson.validated(trackId: trackId, lessonId: lessonId)
     }
 
+    public func editorialPilot(
+        pilotId: String, credentials: APICredentials
+    ) async throws -> EditorialPilotSnapshot {
+        let (data, response) = try await request(
+            ["pilots", pilotId, "content"], token: credentials.accessToken)
+        guard let digest = response.value(forHTTPHeaderField: "x-certigo-pilot-content-digest"),
+            response.value(forHTTPHeaderField: "etag") == "\"\(digest)\"",
+            digest.range(of: "^sha256:[0-9a-f]{64}$", options: .regularExpression) != nil
+        else { throw ContractError.malformed("editorial pilot response headers") }
+        do {
+            let actual = try CanonicalQuestionReader.digest(data)
+            guard digest == "sha256:\(actual.sha256)" else {
+                throw ContractError.malformed("editorial pilot content digest")
+            }
+            let pilot = try Self.decode(EditorialPilot.self, from: data).validated()
+            guard pilot.id == pilotId else {
+                throw ContractError.malformed("editorial pilot response identity")
+            }
+            return try EditorialPilotSnapshot(pilot: pilot, contentDigest: digest).validated()
+        } catch is DecodingError {
+            throw APIError.invalidResponse
+        }
+    }
+
+    public func pilotHistory(
+        _ snapshot: EditorialPilotSnapshot, credentials: APICredentials
+    ) async throws -> PilotHistory {
+        _ = try snapshot.validated()
+        let (data, _) = try await request(
+            ["me", "pilots", snapshot.pilot.id, "history", snapshot.contentDigest],
+            token: credentials.accessToken)
+        return try Self.decode(PilotHistory.self, from: data).validated(for: snapshot)
+    }
+
+    public func recordPilotLessonAccess(
+        _ snapshot: EditorialPilotSnapshot, lessonId: String, credentials: APICredentials
+    ) async throws -> PilotLessonProgress {
+        try await recordPilotLessonActivity(
+            snapshot, lessonId: lessonId, activity: "access", credentials: credentials)
+    }
+
+    public func markPilotLessonRead(
+        _ snapshot: EditorialPilotSnapshot, lessonId: String, credentials: APICredentials
+    ) async throws -> PilotLessonProgress {
+        try await recordPilotLessonActivity(
+            snapshot, lessonId: lessonId, activity: "read", credentials: credentials)
+    }
+
+    private func recordPilotLessonActivity(
+        _ snapshot: EditorialPilotSnapshot,
+        lessonId: String,
+        activity: String,
+        credentials: APICredentials
+    ) async throws -> PilotLessonProgress {
+        _ = try snapshot.validated()
+        guard snapshot.pilot.lessons.contains(where: { $0.id == lessonId }),
+            activity == "access" || activity == "read"
+        else { throw ContractError.malformed("editorial pilot activity") }
+        let (data, _) = try await request(
+            ["me", "pilots", snapshot.pilot.id, "lessons", lessonId,
+             activity, snapshot.contentDigest],
+            token: credentials.accessToken,
+            method: "POST")
+        let result = try Self.decode(PilotLessonProgress.self, from: data)
+        guard result.lessonId == lessonId,
+            activity != "read" || result.markedReadAt != nil
+        else { throw ContractError.malformed("editorial pilot activity response") }
+        return result
+    }
+
     public func submit(
         lessonId: String, submission: QuizSubmission, credentials: APICredentials
     ) async throws -> QuizResult {
@@ -162,7 +232,7 @@ public struct CertigoAPI: Sendable {
     }
 
     private func request(
-        _ segments: [String], token: String, body: Data? = nil
+        _ segments: [String], token: String, body: Data? = nil, method: String? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         guard !token.isEmpty, !token.contains("\r"), !token.contains("\n") else {
             throw APIError.unauthorized
@@ -177,7 +247,7 @@ public struct CertigoAPI: Sendable {
             url.appendPathComponent(segment)
         }
         var request = URLRequest(url: url)
-        request.httpMethod = body == nil ? "GET" : "POST"
+        request.httpMethod = method ?? (body == nil ? "GET" : "POST")
         request.httpBody = body
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
