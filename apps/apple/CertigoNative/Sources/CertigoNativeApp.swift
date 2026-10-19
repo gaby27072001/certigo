@@ -1496,6 +1496,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var navigation = NativeLearningNavigation()
         @State private var columns: NavigationSplitViewVisibility = .automatic
         @State private var compactColumn: NavigationSplitViewColumn = .sidebar
+        @State private var showEditorialPilot = false
 
         var body: some View {
             Group {
@@ -1584,6 +1585,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 Text(model.errorMessage ?? "")
             }
             .task { await model.restore() }
+            .sheet(isPresented: $showEditorialPilot) {
+                NativeEditorialPilotView(model: model)
+            }
         }
 
         private var learning: some View {
@@ -1609,6 +1613,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             )
                             Button("Explore certifications") { navigation.learn = .explore }
                         }
+                    }
+                    Section("Lecture guidée") {
+                        Button("Assistants IA responsables", systemImage: "text.book.closed") {
+                            showEditorialPilot = true
+                        }
+                        Text("Pilote éditorial de 18 minutes, distinct des certifications.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                     Section("Certifications") {
                         ForEach(

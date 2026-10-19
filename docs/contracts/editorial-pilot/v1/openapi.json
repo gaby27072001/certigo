@@ -1,0 +1,451 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Certigo editorial pilot",
+    "version": "1.0.0",
+    "description": "Authenticated distribution and owner-scoped history for non-certifying editorial learning pilots."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/pilots/{pilotId}/content": {
+      "get": {
+        "operationId": "getEditorialPilotContent",
+        "summary": "Get the current public editorial pilot",
+        "parameters": [
+          {
+            "name": "pilotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact JSON source bytes, with a sha256 content digest in ETag and X-Certigo-Pilot-Content-Digest.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Certigo-Pilot-Content-Digest": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "schema",
+                    "id",
+                    "locale",
+                    "status",
+                    "purpose",
+                    "sources",
+                    "lessons"
+                  ],
+                  "properties": {
+                    "schema": {
+                      "const": "certigo.editorial.pilot/v1"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "locale": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Editorial status; draft is not a certification or verified credential."
+                    },
+                    "purpose": {
+                      "const": "learning-not-certification"
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PilotSource"
+                      }
+                    },
+                    "lessons": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PilotLesson"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "404": {
+            "description": "Pilot not found."
+          }
+        }
+      }
+    },
+    "/me/pilots/{pilotId}/history/{contentDigest}": {
+      "get": {
+        "operationId": "getEditorialPilotHistory",
+        "summary": "Get this authenticated owner's history for one exact content version",
+        "parameters": [
+          {
+            "name": "pilotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contentDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owner-scoped consultation and explicitly self-declared read markers. Empty history is not written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PilotHistory"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "404": {
+            "description": "Pilot version not found."
+          }
+        }
+      }
+    },
+    "/me/pilots/{pilotId}/lessons/{lessonId}/access/{contentDigest}": {
+      "post": {
+        "operationId": "recordEditorialPilotLessonAccess",
+        "summary": "Record that the authenticated owner opened a lesson",
+        "description": "Upserts one record per owner, pilot, exact content digest and lesson, so retries cannot create duplicate records. A later successful open advances lastAccessedAt. Opening never sets markedReadAt.",
+        "parameters": [
+          {
+            "name": "pilotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lessonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contentDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated access metadata; markedReadAt remains null unless explicitly set by the read operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PilotLessonProgress"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "404": {
+            "description": "Pilot version or lesson not found."
+          }
+        }
+      }
+    },
+    "/me/pilots/{pilotId}/lessons/{lessonId}/read/{contentDigest}": {
+      "post": {
+        "operationId": "markEditorialPilotLessonRead",
+        "summary": "Explicitly let the authenticated owner mark a lesson as read",
+        "description": "Idempotent self-declaration. It does not store answers or assert mastery, score, readiness, XP or certification.",
+        "parameters": [
+          {
+            "name": "pilotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lessonId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contentDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated access metadata with a non-null self-declared markedReadAt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PilotLessonProgress"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "404": {
+            "description": "Pilot version or lesson not found."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "PilotSource": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "url",
+          "checkedOn",
+          "supports",
+          "limits"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "checkedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "supports": {
+            "type": "string"
+          },
+          "limits": {
+            "type": "string"
+          }
+        }
+      },
+      "PilotLesson": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "objective",
+          "estimatedMinutes",
+          "hook",
+          "keyIdeas",
+          "workedExample",
+          "practice",
+          "recap",
+          "sourceIds"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "estimatedMinutes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "hook": {
+            "type": "string"
+          },
+          "keyIdeas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "workedExample": {
+            "type": "object",
+            "required": [
+              "situation",
+              "steps",
+              "decision"
+            ],
+            "properties": {
+              "situation": {
+                "type": "string"
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "decision": {
+                "type": "string"
+              }
+            }
+          },
+          "practice": {
+            "type": "object",
+            "required": [
+              "prompt",
+              "successCriteria",
+              "feedback"
+            ],
+            "properties": {
+              "prompt": {
+                "type": "string"
+              },
+              "successCriteria": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "feedback": {
+                "type": "string"
+              }
+            }
+          },
+          "recap": {
+            "type": "string"
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PilotLessonProgress": {
+        "type": "object",
+        "required": [
+          "lessonId",
+          "lastAccessedAt",
+          "markedReadAt"
+        ],
+        "properties": {
+          "lessonId": {
+            "type": "string"
+          },
+          "lastAccessedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "markedReadAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "PilotHistory": {
+        "type": "object",
+        "required": [
+          "pilotId",
+          "contentDigest",
+          "lastLessonId",
+          "lessons"
+        ],
+        "properties": {
+          "pilotId": {
+            "type": "string"
+          },
+          "contentDigest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "lastLessonId": {
+            "type": "string",
+            "nullable": true
+          },
+          "lessons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PilotLessonProgress"
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-certigo-authorization": {
+    "ownerAcceptedFromRequestBody": false,
+    "ownerSource": "validated-bearer-jwt",
+    "profileProvisioning": false,
+    "answersStored": false
+  },
+  "x-certigo-learning": {
+    "certifying": false,
+    "score": false,
+    "readiness": false,
+    "xp": false,
+    "readStatus": "explicit-self-declaration"
+  }
+}

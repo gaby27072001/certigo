@@ -58,6 +58,135 @@ public struct PathLesson: Decodable, Identifiable, Sendable {
 
     public var canOpen: Bool { status != .locked }
 }
+
+public struct EditorialPilot: Decodable, Identifiable, Sendable {
+    public let schema: String
+    public let id: String
+    public let locale: String
+    public let status: String
+    public let purpose: String
+    public let title: String
+    public let audience: String
+    public let prerequisites: String
+    public let estimatedMinutes: Int
+    public let asOf: String
+    public let scope: String
+    public let sources: [EditorialPilotSource]
+    public let lessons: [EditorialPilotLesson]
+
+    public func validated() throws -> Self {
+        guard schema == "certigo.editorial.pilot/v1",
+            id == "responsible-ai-assistants", locale == "fr-FR",
+            status == "draft", purpose == "learning-not-certification",
+            !title.isEmpty, !audience.isEmpty, !prerequisites.isEmpty, !scope.isEmpty,
+            estimatedMinutes > 0,
+            sources.count == 4, Set(sources.map(\.id)).count == sources.count,
+            lessons.count == 3, Set(lessons.map(\.id)).count == lessons.count
+        else { throw ContractError.malformed("editorial pilot identity") }
+
+        let sourceIDs = Set(sources.map(\.id))
+        guard sources.allSatisfy({
+            !$0.title.isEmpty && $0.url.hasPrefix("https://")
+                && !$0.checkedOn.isEmpty && !$0.supports.isEmpty && !$0.limits.isEmpty
+        }), lessons.allSatisfy({ lesson in
+            !lesson.title.isEmpty && !lesson.objective.isEmpty && !lesson.hook.isEmpty
+                && !lesson.recap.isEmpty && lesson.estimatedMinutes > 0
+                && !lesson.keyIdeas.isEmpty && !lesson.workedExample.situation.isEmpty
+                && !lesson.workedExample.steps.isEmpty && !lesson.workedExample.decision.isEmpty
+                && !lesson.practice.prompt.isEmpty && !lesson.practice.successCriteria.isEmpty
+                && !lesson.practice.feedback.isEmpty && !lesson.sourceIDs.isEmpty
+                && lesson.sourceIDs.allSatisfy(sourceIDs.contains)
+        }) else {
+            throw ContractError.malformed("editorial pilot content")
+        }
+        return self
+    }
+}
+
+public struct EditorialPilotSource: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let url: String
+    public let checkedOn: String
+    public let supports: String
+    public let limits: String
+}
+
+public struct EditorialPilotLesson: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let objective: String
+    public let estimatedMinutes: Int
+    public let hook: String
+    public let keyIdeas: [String]
+    public let workedExample: EditorialPilotWorkedExample
+    public let practice: EditorialPilotPractice
+    public let recap: String
+    public let sourceIDs: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, objective, estimatedMinutes, hook, keyIdeas, workedExample, practice, recap
+        case sourceIDs = "sourceIds"
+    }
+}
+
+public struct EditorialPilotWorkedExample: Decodable, Sendable {
+    public let situation: String
+    public let steps: [String]
+    public let decision: String
+}
+
+public struct EditorialPilotPractice: Decodable, Sendable {
+    public let prompt: String
+    public let successCriteria: [String]
+    public let feedback: String
+}
+
+public struct EditorialPilotSnapshot: Sendable {
+    public let pilot: EditorialPilot
+    public let contentDigest: String
+
+    public init(pilot: EditorialPilot, contentDigest: String) {
+        self.pilot = pilot
+        self.contentDigest = contentDigest
+    }
+
+    public func validated() throws -> Self {
+        guard contentDigest.range(
+            of: "^sha256:[0-9a-f]{64}$",
+            options: .regularExpression
+        ) != nil else {
+            throw ContractError.malformed("editorial pilot digest")
+        }
+        _ = try pilot.validated()
+        return self
+    }
+}
+
+public struct PilotLessonProgress: Decodable, Identifiable, Sendable {
+    public let lessonId: String
+    public let lastAccessedAt: Date
+    public let markedReadAt: Date?
+    public var id: String { lessonId }
+}
+
+public struct PilotHistory: Decodable, Sendable {
+    public let pilotId: String
+    public let contentDigest: String
+    public let lastLessonId: String?
+    public let lessons: [PilotLessonProgress]
+
+    public func validated(for snapshot: EditorialPilotSnapshot) throws -> Self {
+        let lessonIDs = Set(snapshot.pilot.lessons.map(\.id))
+        guard pilotId == snapshot.pilot.id, contentDigest == snapshot.contentDigest,
+            Set(lessons.map(\.lessonId)).count == lessons.count,
+            lessons.allSatisfy({ lessonIDs.contains($0.lessonId) }),
+            lessons.first?.lessonId == lastLessonId
+        else { throw ContractError.malformed("editorial pilot history") }
+        return self
+    }
+}
+
 public struct Lesson: Codable, Sendable {
     public let id: String
     public let trackId: String
