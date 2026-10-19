@@ -2233,7 +2233,7 @@ struct NativeLessonReadingContent: Equatable {
             let text: String
             switch part {
             case .title(let title): text = title
-            case .text(let text): text = text
+            case .text(let value): text = value
             case .markdown(let body): text = try renderingMarkdown(body)
             }
             return text.trimmingCharacters(in: .whitespacesAndNewlines)
