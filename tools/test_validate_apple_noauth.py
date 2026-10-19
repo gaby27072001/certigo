@@ -19,6 +19,32 @@ PROBE_BUNDLE, PROBE_TEST_BUNDLE = probe_bundles(LOT_SUFFIX)
 
 
 class AppleNoAuthMetadataTests(unittest.TestCase):
+    def test_app_links_msal_without_copying_package_aggregate_and_searches_frameworks(self):
+        native = Path(__file__).resolve().parents[1] / "apps" / "apple" / "CertigoNative"
+        objects = parse_project(
+            (native / "CertigoNative.xcodeproj" / "project.pbxproj").read_text()
+        )["objects"]
+        app = objects["000000000000000000000050"]
+        linked = objects["000000000000000000000007"]
+        self.assertIn(linked["productRef"], app["packageProductDependencies"])
+        self.assertEqual(objects[linked["productRef"]]["productName"], "MSAL")
+        phases = [objects[identifier] for identifier in app["buildPhases"]]
+        frameworks = [phase for phase in phases if phase["isa"] == "PBXFrameworksBuildPhase"]
+        self.assertEqual(len(frameworks), 1)
+        self.assertIn("000000000000000000000007", frameworks[0]["files"])
+        for phase in phases:
+            if phase["isa"] == "PBXCopyFilesBuildPhase":
+                for identifier in phase["files"]:
+                    self.assertNotEqual(
+                        objects[identifier].get("productRef"), linked["productRef"],
+                        "A SwiftPM productRef resolves to MSAL-product, not MSAL.framework",
+                    )
+        for identifier in ("000000000000000000000082", "000000000000000000000083"):
+            settings = objects[identifier]["buildSettings"]
+            self.assertEqual(settings["LD_RUNPATH_SEARCH_PATHS"],
+                             ["$(inherited)", "@executable_path/Frameworks"])
+            self.assertEqual(settings["CODE_SIGNING_ALLOWED"], "NO")
+
     def signing(self):
         now = datetime(2026, 10, 13, tzinfo=timezone.utc)
         team, prefix = "A" * 10, "B" * 10

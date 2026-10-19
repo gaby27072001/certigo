@@ -361,7 +361,7 @@ import Foundation
 
         private var objective: some View {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 28) {
                     demoNotice
                     learnSelector
                     if let goal = flow.objective {
@@ -541,7 +541,7 @@ import Foundation
 
         private var preparation: some View {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 28) {
                     demoNotice
                     if let practice = flow.practice {
                         DemoPracticeTrail(progress: NativeDemoPracticeProgress(current: .situation))
