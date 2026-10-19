@@ -89,6 +89,44 @@ integration evidence. No credentials belong in resources, defaults or logs.
 
 ## Local validation and its limits
 
+### Optional lesson reading
+
+The connected lesson UI source prepares explicit lesson reading using
+`AVSpeechSynthesizer`; its Apple compilation and runtime acceptance are separate.
+It selects the loaded lesson title, then the titles and bodies of hook, concept,
+example and recap blocks in order. Code/check/unknown blocks, questions, answers
+and corrections are excluded. Apple Foundation's `AttributedString(markdown:)`
+extracts body text with inline syntax and preserved whitespace, matching the
+existing `Text(.init(body))` presentation rather than introducing a new full-block
+Markdown interpretation. Formatting and link destinations are not spoken; link
+labels and paragraph breaks remain. Literal titles are not interpreted as Markdown.
+Parser errors abort preparation of the entire reading and produce a visible error;
+there is no silent paragraph skip or raw-Markdown fallback. CommonMark accepts many
+unmatched delimiters as literal text, so these are not necessarily parser errors.
+
+There is no preselected voice or automatic playback. The user chooses a voice
+from the system's available voices; that choice is not a claim about the content's
+language. Voice and speed are in-memory only. No voice download, microphone,
+permission, audio-session category, background audio or account setting is added.
+Pause, resume and stop are explicit controls; speed changes apply to the next
+reading. Reading stops on view disappearance, lesson/text or owner change, and
+when the scene becomes inactive. When VoiceOver is active, optional speech stays
+stopped and the UI explains that VoiceOver can read the accessible content.
+Enabling VoiceOver also stops any current optional reading.
+
+Portable Foundation checks cover block selection, title/body ordering, paragraph
+boundaries, empty inputs, original text and propagation of a renderer failure.
+The injected identity/failing renderers in those tests are not Markdown conversion
+evidence. Darwin-conditional checks in `DemoTests/NativeDemoFlowTests.swift` exercise
+the real Apple Markdown conversion and link-label/paragraph behavior, but must be
+executed on Apple. Neither harness exercises the synthesizer or lifecycle hooks.
+Before Apple acceptance, compile with the documented SDK and verify voice
+availability, completion/cancellation callbacks, pause/resume, unavailable-voice
+errors, VoiceOver coexistence, scene/tab/lesson/account changes and dismissal.
+Also check the controls at accessibility text sizes on iPhone and iPad.
+
+### Existing portable checks
+
 Use an existing Swift 6.2-compatible toolchain. The package lock pins
 `swift-crypto` 5.0.1 and `swift-asn1` 1.7.3; do not upgrade them as a validation
 side effect.
@@ -105,7 +143,10 @@ The Linux harness compiles the actual model with strict concurrency and
 warnings-as-errors, a memory vault, synthetic provider/HTTP responses and a
 throw-only stand-in for the default Security vault. It checks coordination,
 journeys, stale responses, uncertain goal retry and resume-state rejection. It
-does not compile SwiftUI, Security, UIKit or MSAL, or prove Apple Keychain/file
+also rejects a retained track selection if silent authentication refresh changes
+the account: the old selection must not send a path request as the new owner,
+and the model surfaces a stale-session error instead. It does not compile
+SwiftUI, Security, UIKit or MSAL, or prove Apple Keychain/file
 protection, a runtime content graph, provider activation or live service behavior.
 The package's three iOS-only protection tests require an Apple SDK test run.
 The main app scheme has no testables; this is not evidence of an Apple test pass.
