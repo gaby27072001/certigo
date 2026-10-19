@@ -1508,7 +1508,15 @@ function revisionLocalTree(root, relativeRoot, label, errors) {
       if (stats.isDirectory()) {
         visit(declared);
       } else if (stats.isFile()) {
-        files.set(path.relative(root, declared).split(path.sep).join('/'), fs.readFileSync(declared));
+        const relativePath = path.relative(root, declared).split(path.sep).join('/');
+        const file = readRegularRepositoryFile(root, relativePath);
+        if (file.error || !file.exists) {
+          errors.push(
+            `${label}: ${file.error ?? `${relativePath} disappeared while being inspected`}`,
+          );
+          continue;
+        }
+        files.set(relativePath, file.bytes);
       } else {
         errors.push(`${label}: ${declared} must be a regular file or directory`);
       }
