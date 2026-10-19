@@ -1975,7 +1975,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
     }
 
     @MainActor
-    private struct NativeLessonAudioControls: View {
+    struct NativeLessonAudioControls: View {
         @Environment(\.scenePhase) private var scenePhase
         @State private var speech = NativeLessonSpeech()
         let content: NativeLessonReadingContent
@@ -1986,7 +1986,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 Text("Read lesson aloud").font(.headline)
                     .accessibilityAddTraits(.isHeader)
                 Text(
-                    "Reads lesson titles and learning paragraphs. Code blocks, questions and corrections are not read. Choose a reading voice; the content language is not detected."
+                    "Reads selected learning text only. Code, questions and corrections are not read. Choose a reading voice; the content language is not detected."
                 )
                 .font(.subheadline).foregroundStyle(.secondary)
                 Picker("Reading voice", selection: $speech.voiceID) {
@@ -2184,6 +2184,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
 struct NativeLessonReadingContent: Equatable {
     enum Part: Equatable {
         case title(String)
+        case text(String)
         case markdown(String)
     }
 
@@ -2199,11 +2200,40 @@ struct NativeLessonReadingContent: Equatable {
         self.parts = parts
     }
 
+    init(
+        editorialTitle: String,
+        objective: String,
+        hook: String,
+        keyIdeas: [String],
+        exampleSituation: String,
+        exampleSteps: [String],
+        exampleDecision: String,
+        recap: String
+    ) {
+        var parts: [Part] = [
+            .title(editorialTitle),
+            .text(objective),
+            .text(hook),
+            .title("Idées clés"),
+        ]
+        parts.append(contentsOf: keyIdeas.map(Part.text))
+        parts.append(.title("Exemple résolu"))
+        parts.append(.text(exampleSituation))
+        parts.append(contentsOf: exampleSteps.enumerated().map {
+            .text("\($0.offset + 1). \($0.element)")
+        })
+        parts.append(.text(exampleDecision))
+        parts.append(.title("À retenir"))
+        parts.append(.text(recap))
+        self.parts = parts
+    }
+
     func spokenText(renderingMarkdown: (String) throws -> String) throws -> String {
         try parts.map { part in
             let text: String
             switch part {
             case .title(let title): text = title
+            case .text(let text): text = text
             case .markdown(let body): text = try renderingMarkdown(body)
             }
             return text.trimmingCharacters(in: .whitespacesAndNewlines)
