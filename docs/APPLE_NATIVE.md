@@ -143,7 +143,10 @@ The Linux harness compiles the actual model with strict concurrency and
 warnings-as-errors, a memory vault, synthetic provider/HTTP responses and a
 throw-only stand-in for the default Security vault. It checks coordination,
 journeys, stale responses, uncertain goal retry and resume-state rejection. It
-does not compile SwiftUI, Security, UIKit or MSAL, or prove Apple Keychain/file
+also rejects a retained track selection if silent authentication refresh changes
+the account: the old selection must not send a path request as the new owner,
+and the model surfaces a stale-session error instead. It does not compile
+SwiftUI, Security, UIKit or MSAL, or prove Apple Keychain/file
 protection, a runtime content graph, provider activation or live service behavior.
 The package's three iOS-only protection tests require an Apple SDK test run.
 The main app scheme has no testables; this is not evidence of an Apple test pass.
