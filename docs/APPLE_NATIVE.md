@@ -148,6 +148,13 @@ Parser errors abort preparation of the entire reading and produce a visible erro
 there is no silent paragraph skip or raw-Markdown fallback. CommonMark accepts many
 unmatched delimiters as literal text, so these are not necessarily parser errors.
 
+The French editorial pilot uses the same controls and speech controller. Its
+allowlist is the displayed lesson title, objective, hook, key ideas, worked-example
+situation/numbered steps/decision, and recap, in screen order. These contract
+fields are plain text in the UI and are passed through without Markdown
+interpretation. Practice prompts, success criteria, feedback, sources, progress
+metadata and history are excluded; reading does not mark a lesson as read.
+
 There is no preselected voice or automatic playback. The user chooses a voice
 from the system's available voices; that choice is not a claim about the content's
 language. Voice and speed are in-memory only. No voice download, microphone,
@@ -158,8 +165,9 @@ when the scene becomes inactive. When VoiceOver is active, optional speech stays
 stopped and the UI explains that VoiceOver can read the accessible content.
 Enabling VoiceOver also stops any current optional reading.
 
-Portable Foundation checks cover block selection, title/body ordering, paragraph
-boundaries, empty inputs, original text and propagation of a renderer failure.
+Portable Foundation checks cover block selection, title/body ordering, editorial
+allowlist and ordering, paragraph boundaries, empty inputs, original text and
+propagation of a renderer failure.
 The injected identity/failing renderers in those tests are not Markdown conversion
 evidence. Darwin-conditional checks in `DemoTests/NativeDemoFlowTests.swift` exercise
 the real Apple Markdown conversion and link-label/paragraph behavior, but must be
