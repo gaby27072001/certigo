@@ -76,7 +76,8 @@
             if busy || rejectRemoval { throw CIAMAuthenticationFailure.operationInProgress }
         }
     }
-    private actor ModelTransport: HTTPTransport {
+    private actor ModelTransport: HTTPTransport, BoundedHTTPTransport {
+        private let offlineFixture: OfflinePackFixture
         private var catalog: Data
         private let lesson: Data
         private let result: Data
@@ -109,6 +110,7 @@
         private var pausePilotHistory = false
         private var pilotHistoryStatus = 200
         init(resources: URL) throws {
+            offlineFixture = try OfflinePackFixture(resources: resources)
             catalog = try Data(contentsOf: resources.appendingPathComponent("catalog.json"))
             lesson = try Data(contentsOf: resources.appendingPathComponent("lesson.json"))
             let object = try JSONSerialization.jsonObject(
@@ -121,6 +123,41 @@
             response["results"] = items
             response["scorePct"] = 0
             result = try JSONSerialization.data(withJSONObject: response)
+        }
+        func send(_ request: URLRequest, maximumBytes: Int) async throws
+            -> (Data, HTTPURLResponse)
+        {
+            guard !offline else { throw URLError(.notConnectedToInternet) }
+            guard let url = request.url else { throw APIError.invalidResponse }
+            let manifest = try PublicReleaseContracts.manifest(offlineFixture.manifest)
+            var headers = [
+                "X-Content-Release-Id": offlineFixture.releaseId,
+                "X-Content-Manifest-Id": manifest.manifestId,
+                "Content-Type": "application/json",
+            ]
+            let bytes: Data
+            if url.path.hasSuffix("/active/manifest") {
+                bytes = offlineFixture.manifest
+                headers["ETag"] = "\"\(manifest.manifestId)\""
+                headers["Cache-Control"] = "private, no-cache"
+            } else {
+                guard
+                    let file = manifest.files.first(where: {
+                        url.path.hasSuffix("/\($0.hash)/\($0.path)")
+                    }), let data = offlineFixture.files[file.path]
+                else { throw APIError.invalidResponse }
+                bytes = data
+                headers["ETag"] = "\"sha256:\(file.hash)\""
+                headers["X-Content-SHA256"] = file.hash
+                headers["Content-Length"] = String(file.size)
+                headers["Accept-Ranges"] = "none"
+                headers["Cache-Control"] = "private, max-age=31536000, immutable"
+            }
+            guard bytes.count <= maximumBytes,
+                let response = HTTPURLResponse(
+                    url: url, statusCode: 200, httpVersion: nil, headerFields: headers)
+            else { throw APIError.invalidResponse }
+            return (bytes, response)
         }
         func setOwner(_ value: String) { owner = value }
         func enablePilot(_ content: Data) { pilotContent = content }
@@ -279,6 +316,21 @@
                 let pin = replacementManifest ?? manifestId
                 headers["X-Content-Manifest-Id"] = pin
                 headers["ETag"] = "\"\(pin)\""
+            } else if url.path.hasSuffix("/quiz/fixture-track.lesson.section-1.practice/submit"),
+                request.httpMethod == "POST"
+            {
+                guard let payload = request.httpBody else { throw APIError.invalidResponse }
+                posts.append(payload)
+                if offline { throw URLError(.notConnectedToInternet) }
+                guard
+                    var response = try JSONSerialization.jsonObject(with: result)
+                        as? [String: Any],
+                    var items = response["results"] as? [[String: Any]], !items.isEmpty
+                else { throw APIError.invalidResponse }
+                items[0]["itemId"] = "az900-l-cloud-models-check-1"
+                items[0]["correctAnswer"] = ["paas"]
+                response["results"] = items
+                bytes = try JSONSerialization.data(withJSONObject: response)
             } else if url.path.hasSuffix("/quiz/fixture-lesson/submit"),
                 request.httpMethod == "POST"
             {
@@ -345,7 +397,10 @@
                 clientFactory: { [server, root] url in
                     LearningClient(
                         api: try CertigoAPI(baseURL: url, transport: server),
-                        store: SubmissionStore(file: root.appendingPathComponent("outbox.json")))
+                        store: SubmissionStore(file: root.appendingPathComponent("outbox.json")),
+                        runtimeStore: try RuntimeContentStore(
+                            root: root.appendingPathComponent("public-content")),
+                        runtimeTransport: server)
                 },
                 authentication: authenticated ? (provider, configuration) : nil,
                 now: { self.time })
@@ -362,6 +417,7 @@
     @main private struct NativeModelTests {
         @MainActor static func main() async throws {
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
+            try await downloadedDraftRestoresWithoutLessonOrPath(resources)
             try await rejectedRetryRefreshesSavedState(resources)
             try await confirmedProfileAfterCorrection(resources)
             try await confirmedProfileAfterPendingRetry(resources)
@@ -397,6 +453,74 @@
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+        @MainActor static func downloadedDraftRestoresWithoutLessonOrPath(_ resources: URL)
+            async throws
+        {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            await model.connect()
+            let track = try JSONDecoder().decode(
+                Track.self,
+                from: Data(
+                    """
+                    {"id":"fixture-track","code":"SYNTHETIC","title":"Synthetic","summary":"Synthetic","learningAvailable":true}
+                    """.utf8))
+            await model.downloadQuestionPack(track)
+            guard let pack = model.offlinePack, let cached = pack.lessons.first else {
+                throw ModelTestFailure.assertion(
+                    "Opt-in download did not make a public pack available")
+            }
+            await fixture.server.setOffline(true)
+            await model.openCachedLesson(cached.id)
+            guard let question = model.lesson?.questions.first, let option = question.options.first
+            else { throw ModelTestFailure.assertion("Cached practice was not opened offline") }
+            model.select(option, question: question)
+            let before = try Data(contentsOf: fixture.activityFile)
+            let snapshot = try NativeActivitySnapshot.decode(before)
+            let count = await fixture.server.pathRequestCount()
+            await fixture.server.failLesson(503)
+            await fixture.server.failPath(503)
+            let reopened = fixture.model()
+            await reopened.connect()
+            try expect(
+                reopened.lesson?.publicManifestId == cached.publicManifestId
+                    && reopened.selections == model.selections && reopened.canSubmit,
+                "Downloaded draft required a network path or lesson")
+            let after = try NativeActivitySnapshot.decode(Data(contentsOf: fixture.activityFile))
+            try expect(
+                snapshot.draft?.attemptId == after.draft?.attemptId,
+                "Restoration rewrote the local attempt")
+            let afterCount = await fixture.server.pathRequestCount()
+            try expect(count == afterCount, "Cached restoration fetched the path")
+            let posts = await fixture.server.payloads()
+            try expect(posts.isEmpty, "Download/open/restore implicitly submitted")
+            try expect(reopened.profile?.xp == 0, "Offline answers granted XP")
+            await reopened.restoreDownloadedActivity()
+            try expect(
+                reopened.selections == model.selections, "Explicit offline restore lost draft")
+            await reopened.submit()
+            try expect(
+                reopened.outcome == .pendingCorrection && reopened.profile?.xp == 0,
+                "Offline submission was not kept pending without XP")
+            guard let saved = reopened.queue.first else {
+                throw ModelTestFailure.assertion("Offline submit did not enqueue")
+            }
+            await fixture.server.setOffline(false)
+            await reopened.retry(saved)
+            let payloads = await fixture.server.payloads()
+            try expect(
+                payloads.count == 2 && payloads[0] == payloads[1],
+                "Explicit retry did not preserve exact submission bytes")
+            guard case .corrected = reopened.outcome else {
+                throw ModelTestFailure.assertion("Server correction was not restored")
+            }
+            await fixture.server.setOwner("server-owner-B")
+            await reopened.connect()
+            try expect(
+                reopened.lesson == nil && reopened.offlinePack == nil,
+                "Another owner accessed a downloaded draft")
         }
         @MainActor static func rejectedRetryRefreshesSavedState(_ resources: URL) async throws {
             for status in [403, 422, 401, 503] {
