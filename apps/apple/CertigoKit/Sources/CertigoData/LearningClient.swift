@@ -156,6 +156,25 @@ public actor LearningClient {
         return try runtimeStore.active(ownerId: context.ownerId, apiScope: api.scope)
     }
 
+    public func cachedQuestionPack(trackId: String, manifestId: String? = nil) throws
+        -> OfflineQuestionPack?
+    {
+        let context = try credentials()
+        guard let runtimeStore else { return nil }
+        return try runtimeStore.questionPack(
+            trackId: trackId, ownerId: context.ownerId, apiScope: api.scope,
+            manifestId: manifestId)
+    }
+
+    public func pinPublicContent(manifestId: String) throws {
+        let context = try credentials()
+        guard let runtimeStore else { throw APIError.configuration }
+        try runtimeStore.retainPins([
+            RuntimeManifestPin(
+                ownerId: context.ownerId, apiScope: api.scope, manifestId: manifestId)
+        ])
+    }
+
     public func restorePreviousPublicContent() throws -> RuntimeContentSnapshot {
         let context = try credentials()
         guard let runtimeStore else { throw APIError.configuration }
