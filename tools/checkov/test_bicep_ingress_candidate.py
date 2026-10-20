@@ -18,9 +18,9 @@ from checkov.arm.checks.resource.AppServiceHttpLoggingEnabled import check as lo
 
 from bicep_ingress_candidate import (
     CONFIG_CHECKS, COSMOS_CHECKS, FUNCTION_CHECKS, FUNCTION_RULE_SOURCES, RULE_SOURCES, UPSTREAM_PARSER_SOURCES,
-    _verify_cosmos_dispatch, _verify_parser, inventory, qualify, qualify_cosmos_snapshot,
-    _function_inventory, _verify_function_dispatch, qualify_function_snapshot,
-    qualify_local_module, qualify_local_modules,
+    Runner, _function_inventory, _parse_source, _parser_source, _verify_cosmos_dispatch,
+    _verify_function_dispatch, _verify_parser, inventory, qualify, qualify_cosmos_snapshot,
+    qualify_function_snapshot, qualify_local_module, qualify_local_modules,
     reconcile, resolve_local_module_bindings,
 )
 from build_parser_wheel import PATCHED_FILES, VERSION as COMPAT_PARSER_VERSION
@@ -699,8 +699,7 @@ class CandidateTests(unittest.TestCase):
             self.assertIn("missing, duplicate or unexpected resource/check obligation", result["blockers"])
 
     def test_resolved_snapshot_lost_child_blocks_ast_round_trip_before_second_runner(self):
-        import bicep_ingress_candidate as candidate
-        original = candidate._parse_source
+        original = _parse_source
 
         def lose_child(source):
             tree = original(source)
@@ -708,7 +707,7 @@ class CandidateTests(unittest.TestCase):
                 tree["resources"].pop("containerResources_12")
             return tree
 
-        with snapshot_fixture() as root, patch.object(candidate, "_parse_source", side_effect=lose_child):
+        with snapshot_fixture() as root, patch("bicep_ingress_candidate._parse_source", side_effect=lose_child):
             result = qualify_cosmos_snapshot(root, "prod", "Continuous")
         self.assert_blocked(result)
         self.assertIsNone(result["resolved_report"])
@@ -876,11 +875,9 @@ class CandidateTests(unittest.TestCase):
             self.assertEqual(result["provenance"]["root_sha256"], hashlib.sha256(root.read_bytes()).hexdigest())
 
     def test_all_selected_module_inventories_exist_before_first_runner(self):
-        import bicep_ingress_candidate as candidate
-
         events = []
-        original_inventory = candidate.inventory
-        original_run = candidate.Runner.run
+        original_inventory = inventory
+        original_run = Runner.run
 
         def observed_inventory(*args, **kwargs):
             events.append("inventory")
@@ -890,9 +887,9 @@ class CandidateTests(unittest.TestCase):
             events.append("runner")
             return original_run(*args, **kwargs)
 
-        with module_fixture() as root, patch.object(
-            candidate, "inventory", side_effect=observed_inventory
-        ), patch.object(candidate.Runner, "run", side_effect=observed_run, autospec=True):
+        with module_fixture() as root, patch(
+            "bicep_ingress_candidate.inventory", side_effect=observed_inventory
+        ), patch.object(Runner, "run", side_effect=observed_run, autospec=True):
             result = qualify_local_modules(root, "prod", ["api", "data"])
         self.assertEqual(result["status"], "QUALIFIED_SUBSET", result["blockers"])
         self.assertEqual(events, ["inventory", "inventory", "runner", "runner"])
@@ -996,13 +993,11 @@ class CandidateTests(unittest.TestCase):
                     _verify_parser()
 
     def test_compatibility_parser_consumes_unmodified_authored_source(self):
-        import bicep_ingress_candidate as candidate
-
         source = MODULE_ROOT.replace(" ? [ '*' ] : []", "\n  ? [ '*' ]\n  : []")
         options = (
             {"side_effect": AssertionError("compatibility parser must not normalize source")}
             if version("pycep-parser") == COMPAT_PARSER_VERSION
-            else {"wraps": candidate._parser_source}
+            else {"wraps": _parser_source}
         )
         with module_fixture(root_source=source) as root, patch(
             "bicep_ingress_candidate._parser_source", **options
@@ -1202,11 +1197,9 @@ FUNCTION_RUNNER_SOURCE = MODULE_SOURCE.replace(
 
 class FunctionModuleTests(unittest.TestCase):
     def test_bound_snapshot_executes_both_runners_without_suppressing_flex_failures(self):
-        import bicep_ingress_candidate as candidate
-
         events = []
-        original_inventory = candidate._function_inventory
-        original_run = candidate.Runner.run
+        original_inventory = _function_inventory
+        original_run = Runner.run
 
         def observed_inventory(*args, **kwargs):
             events.append("inventory")
@@ -1216,9 +1209,9 @@ class FunctionModuleTests(unittest.TestCase):
             events.append("runner")
             return original_run(*args, **kwargs)
 
-        with module_fixture(app_source=FUNCTION_RUNNER_SOURCE) as root, patch.object(
-            candidate, "_function_inventory", side_effect=observed_inventory,
-        ), patch.object(candidate.Runner, "run", side_effect=observed_run, autospec=True):
+        with module_fixture(app_source=FUNCTION_RUNNER_SOURCE) as root, patch(
+            "bicep_ingress_candidate._function_inventory", side_effect=observed_inventory,
+        ), patch.object(Runner, "run", side_effect=observed_run, autospec=True):
             before = (root.parent / "modules" / "functionApp.bicep").read_bytes()
             result = qualify_function_snapshot(root, "staging")
             self.assertEqual(before, (root.parent / "modules" / "functionApp.bicep").read_bytes())
@@ -1296,9 +1289,7 @@ class FunctionModuleTests(unittest.TestCase):
             self.assertEqual(result["resolved_report"] is None, unknown_pass == 1)
 
     def test_snapshot_round_trip_cannot_lose_a_declared_child(self):
-        import bicep_ingress_candidate as candidate
-
-        original = candidate._parse_source
+        original = _parse_source
 
         def lose_child(source):
             tree = original(source)
@@ -1306,8 +1297,8 @@ class FunctionModuleTests(unittest.TestCase):
                 tree["resources"].pop("settings", None)
             return tree
 
-        with module_fixture(app_source=FUNCTION_RUNNER_SOURCE) as root, patch.object(
-            candidate, "_parse_source", side_effect=lose_child,
+        with module_fixture(app_source=FUNCTION_RUNNER_SOURCE) as root, patch(
+            "bicep_ingress_candidate._parse_source", side_effect=lose_child,
         ):
             result = qualify_function_snapshot(root, "staging")
         self.assertIsNotNone(result["authored_report"])

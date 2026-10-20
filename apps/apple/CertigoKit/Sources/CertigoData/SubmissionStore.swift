@@ -36,6 +36,8 @@ public actor SubmissionStore {
 
     private let file: URL
     private var loaded: [SavedSubmission]?
+    private var suspendedScopes: Set<[String]> = []
+    private var purgedScopes: Set<[String]> = []
     private static let schema = "certigo.apple.submissions/v1"
 
     public init(file: URL) { self.file = file }
@@ -53,6 +55,7 @@ public actor SubmissionStore {
     }
 
     public func enqueue(_ entry: SavedSubmission) throws -> SavedSubmission {
+        try requireWritable(entry)
         try validate(entry)
         var entries = try read()
         if let existing = entries.first(where: { $0.id == entry.id }) {
@@ -86,6 +89,7 @@ public actor SubmissionStore {
     }
 
     private func update(_ entry: SavedSubmission, change: (inout SavedSubmission) -> Void) throws {
+        try requireWritable(entry)
         var entries = try read()
         guard
             let index = entries.firstIndex(where: {
@@ -94,6 +98,29 @@ public actor SubmissionStore {
         else { throw StoreError.invalidRecord }
         change(&entries[index])
         try persist(entries)
+    }
+
+    public func suspend(ownerId: String, apiScope: String, suspended: Bool) {
+        if suspended {
+            suspendedScopes.insert([ownerId, apiScope])
+        } else {
+            suspendedScopes.remove([ownerId, apiScope])
+        }
+    }
+
+    public func purge(ownerId: String, apiScope: String) throws {
+        guard !ownerId.isEmpty, !apiScope.isEmpty else { throw StoreError.invalidRecord }
+        purgedScopes.insert([ownerId, apiScope])
+        suspendedScopes.insert([ownerId, apiScope])
+        let entries = try read().filter { $0.ownerId != ownerId || $0.apiScope != apiScope }
+        try persist(entries)
+    }
+
+    private func requireWritable(_ entry: SavedSubmission) throws {
+        let scope = [entry.ownerId, entry.apiScope]
+        guard !suspendedScopes.contains(scope), !purgedScopes.contains(scope) else {
+            throw APIError.staleSession
+        }
     }
 
     private func read() throws -> [SavedSubmission] {

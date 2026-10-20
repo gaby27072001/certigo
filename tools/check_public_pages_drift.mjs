@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Compare le contenu servi en production au rendu des sources docs/legal/*.md.
+// Compare le contenu public servi au rendu des documents légaux et du pilote éditorial.
 //
 // Invariant que ce script existe pour couvrir : la publication des pages
 // legales est manuelle et aucun workflow ne peut la declencher (le scelle des
@@ -14,7 +14,14 @@ import { fileURLToPath } from 'node:url';
 
 import { buildPublicPages } from './build_public_pages.mjs';
 
-export const publishedRoutes = ['privacy-policy', 'account-deletion'];
+export const publishedRoutes = [
+  'privacy-policy',
+  'account-deletion',
+  'learn/responsible-ai-assistants',
+  'learn/responsible-ai-assistants/verify-claims',
+  'learn/responsible-ai-assistants/retrieval-not-training',
+  'learn/responsible-ai-assistants/stop-and-escalate',
+];
 
 // La comparaison porte sur le texte rendu, pas sur les octets : la mise en page
 // et les styles ne sont pas ce qui doit declencher une republication.
@@ -137,7 +144,7 @@ async function main() {
 
   if (drifted) {
     console.error(
-      'Republier les pages legales, puis relancer ce controle. Voir docs/legal/README.md.',
+      'Republier les pages publiques, puis relancer ce controle. Voir docs/legal/README.md.',
     );
     process.exitCode = 1;
   }
