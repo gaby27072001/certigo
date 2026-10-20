@@ -74,6 +74,45 @@ class RuleTests(unittest.TestCase):
         for conf in ({}, {"identity": None}, {"identity": "SystemAssigned"}):
             self.assertEqual(identity.scan_resource_conf(conf), CheckResult.FAILED)
 
+    def test_line_metadata_is_bounded_and_never_an_identity_assignment(self):
+        metadata = {"__startline__": 2, "__endline__": 3}
+        conf = {
+            "__startline__": 1, "__endline__": 4,
+            "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {UAMI: dict(metadata), **metadata},
+            },
+        }
+        original = deepcopy(conf)
+        self.assertEqual(identity.scan_resource_conf(conf), CheckResult.PASSED)
+        self.assertEqual(conf, original)
+        for invalid in (
+            {"__startline__": 2}, {"__endline__": 3},
+            {"__startline__": True, "__endline__": 3},
+            {"__startline__": "2", "__endline__": 3},
+            {"__startline__": 0, "__endline__": 3},
+            {"__startline__": 3, "__endline__": 2},
+            {"__startline__": 2, "__endline__": 5},
+            {**metadata, "__file__": "unknown"}, {**metadata, "unexpected": True},
+        ):
+            for target in ("assignments", "configuration"):
+                with self.subTest(invalid=invalid, target=target):
+                    changed = deepcopy(conf)
+                    changed["identity"]["userAssignedIdentities"] = (
+                        {UAMI: {}, **invalid} if target == "assignments" else {UAMI: invalid, **metadata}
+                    )
+                    self.assertEqual(identity.scan_resource_conf(changed), CheckResult.FAILED)
+        for assignments in (metadata, {}):
+            changed = deepcopy(conf)
+            changed["identity"]["userAssignedIdentities"] = assignments
+            self.assertEqual(identity.scan_resource_conf(changed), CheckResult.FAILED)
+        for key in ("__startline__", "__endline__"):
+            changed = deepcopy(conf)
+            changed.pop(key)
+            self.assertEqual(identity.scan_resource_conf(changed), CheckResult.FAILED)
+        unanchored = {"identity": deepcopy(conf["identity"])}
+        self.assertEqual(identity.scan_resource_conf(unanchored), CheckResult.FAILED)
+
     def test_cosmos_disabled_literal_proves_public_endpoint_closed(self):
         for multiple in (True, False, None):
             conf = {"properties": {"publicNetworkAccess": "Disabled", "enableMultipleWriteLocations": multiple}}

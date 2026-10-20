@@ -729,6 +729,31 @@ test('manifest seal rejects symlinks, parent symlinks and nonregular outputs wit
   assert.equal(fs.existsSync(path.join(directory, 'new.sha256')), false);
 });
 
+test('manifest seal rejects hard links and foreign ownership before truncating', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-ownership-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const manifest = path.join(directory, 'manifest.json');
+  const seal = path.join(directory, 'manifest.sha256');
+  const target = path.join(directory, 'target');
+  fs.writeFileSync(manifest, '{}\n');
+  fs.writeFileSync(target, 'untouched');
+  fs.linkSync(target, seal);
+  assert.throws(() => writeManifestSeal(manifest, seal), /owned regular/);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'untouched');
+  fs.unlinkSync(seal);
+  fs.writeFileSync(seal, 'original');
+  if (typeof process.geteuid === 'function') {
+    const inspect = fs.fstatSync;
+    t.mock.method(fs, 'fstatSync', (descriptor) => {
+      const stats = inspect(descriptor);
+      stats.uid = process.geteuid() + 1;
+      return stats;
+    });
+    assert.throws(() => writeManifestSeal(manifest, seal), /owned regular/);
+    assert.equal(fs.readFileSync(seal, 'utf8'), 'original');
+  }
+});
+
 test('manifest seal detects object substitution before truncation and closes the rejected object', (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-swap-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));

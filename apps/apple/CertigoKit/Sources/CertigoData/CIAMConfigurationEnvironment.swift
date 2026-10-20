@@ -5,6 +5,8 @@ public enum CIAMConfigurationEnvironmentError: Error, Equatable, LocalizedError,
     case missingValue(String)
     case invalidValue(String)
     case releaseOptInNotAllowed
+    case productionBuildRequired
+    case unsupportedProductionBundle
     case missingBundleIdentifier
     case callbackNotDeclared
     case callbackCollision
@@ -20,6 +22,10 @@ public enum CIAMConfigurationEnvironmentError: Error, Equatable, LocalizedError,
             "Correct the local Xcode scheme value \(name)."
         case .releaseOptInNotAllowed:
             "CIAM test sign-in can only be enabled in a development build."
+        case .productionBuildRequired:
+            "Microsoft production sign-in is available only in the Distribution build."
+        case .unsupportedProductionBundle:
+            "Microsoft production sign-in requires the Certigo App Store bundle identifier."
         case .missingBundleIdentifier:
             "The app bundle identifier is unavailable; CIAM sign-in cannot be initialized."
         case .callbackNotDeclared:
@@ -62,6 +68,65 @@ public enum CIAMConfigurationEnvironment {
             throw CIAMConfigurationEnvironmentError.releaseOptInNotAllowed
         }
 
+        return try validatedConfiguration(
+            environment: environment, bundleIdentifier: bundleIdentifier,
+            infoDictionary: infoDictionary)
+    }
+
+    public static func productionConfiguration(
+        infoDictionary: [String: Any],
+        bundleIdentifier: String?,
+        isDevelopmentBuild: Bool
+    ) throws -> CIAMConfiguration {
+        guard !isDevelopmentBuild else {
+            throw CIAMConfigurationEnvironmentError.productionBuildRequired
+        }
+        guard let bundleIdentifier else {
+            throw CIAMConfigurationEnvironmentError.missingBundleIdentifier
+        }
+        guard bundleIdentifier == "com.certigo.mobileapp" else {
+            throw CIAMConfigurationEnvironmentError.unsupportedProductionBundle
+        }
+        guard infoDictionary["CertigoProductionAuthMode"] as? String == "microsoft" else {
+            throw CIAMConfigurationEnvironmentError.missingValue("CertigoProductionAuthMode")
+        }
+        var environment: [String: String] = [:]
+        for name in [
+            "CLIENT_ID", "TENANT_ID", "AUTHORITY", "ISSUER", "AUTHORITY_KIND",
+            "API_BASE_URL", "API_SCOPE", "API_AUDIENCE",
+        ] {
+            let key = "CertigoProductionCIAM\(name)"
+            guard let value = infoDictionary[key] as? String,
+                !value.isEmpty, !value.contains("$(")
+            else { throw CIAMConfigurationEnvironmentError.missingValue(key) }
+            environment["CERTIGO_CIAM_\(name)"] = value
+        }
+        let callbackScheme = "msauth.\(bundleIdentifier)"
+        environment["CERTIGO_CIAM_REDIRECT_URI"] = "\(callbackScheme)://auth"
+        return try validatedConfiguration(
+            environment: environment, bundleIdentifier: bundleIdentifier,
+            infoDictionary: infoDictionary)
+    }
+
+    @MainActor
+    public static func configuredProductionProvider<Provider>(
+        infoDictionary: [String: Any],
+        bundleIdentifier: String?,
+        isDevelopmentBuild: Bool,
+        makeProvider: @MainActor (CIAMConfiguration) throws -> Provider
+    ) throws -> (configuration: CIAMConfiguration, provider: Provider) {
+        let configuration = try productionConfiguration(
+            infoDictionary: infoDictionary,
+            bundleIdentifier: bundleIdentifier,
+            isDevelopmentBuild: isDevelopmentBuild)
+        return (configuration, try makeProvider(configuration))
+    }
+
+    private static func validatedConfiguration(
+        environment: [String: String],
+        bundleIdentifier: String?,
+        infoDictionary: [String: Any]
+    ) throws -> CIAMConfiguration {
         guard let bundleIdentifier, !bundleIdentifier.isEmpty else {
             throw CIAMConfigurationEnvironmentError.missingBundleIdentifier
         }

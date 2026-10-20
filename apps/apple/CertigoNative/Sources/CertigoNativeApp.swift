@@ -38,10 +38,20 @@ import Foundation
     }
 
     private struct NativeEntry: View {
-        @State private var showDemo = false
-        @State private var showDeveloper = false
-
         var body: some View {
+            #if CERTIGO_PRODUCTION_DISTRIBUTION
+                NativeProductionEntry()
+            #else
+                developmentEntry
+            #endif
+        }
+
+        @State private var showDemo = false
+        #if DEBUG
+        @State private var showDeveloper = false
+        #endif
+
+        private var developmentEntry: some View {
             NavigationStack {
                 List {
                     Section {
@@ -59,6 +69,7 @@ import Foundation
                             "Goals, answers and explanations are fictional. No account, network or real result is used."
                         )
                     }
+                    #if DEBUG
                     Section("Development") {
                         Button(
                             "Open the test API connector",
@@ -72,14 +83,135 @@ import Foundation
                         )
                         .foregroundStyle(.secondary)
                     }
+                    #endif
                 }
                 .navigationTitle("Certigo")
                 .fullScreenCover(isPresented: $showDemo) { NativeDemoRoot() }
+                #if DEBUG
                 .sheet(isPresented: $showDeveloper) { NativeDeveloperConnector() }
+                #endif
             }
         }
     }
 
+    #if CERTIGO_PRODUCTION_DISTRIBUTION
+    @MainActor
+    private struct NativeProductionEntry: View {
+        @State private var model: NativeModel
+        @State private var provider: MSALAuthenticationProvider?
+        @State private var configurationIssue: String?
+
+        init() {
+            do {
+                let configured = try CIAMConfigurationEnvironment.configuredProductionProvider(
+                    infoDictionary: Bundle.main.infoDictionary ?? [:],
+                    bundleIdentifier: Bundle.main.bundleIdentifier,
+                    isDevelopmentBuild: false
+                ) { configuration in
+                    try MSALAuthenticationProvider(
+                        configuration: configuration,
+                        presentation: Self.authenticationPresentationController)
+                }
+                _model = State(
+                    initialValue: NativeModel(
+                        authentication: (configured.provider, configured.configuration)))
+                _provider = State(initialValue: configured.provider)
+                _configurationIssue = State(initialValue: nil)
+            } catch {
+                _model = State(initialValue: NativeModel())
+                _provider = State(initialValue: nil)
+                _configurationIssue = State(initialValue: Self.safeMessage(for: error))
+            }
+        }
+
+        var body: some View {
+            Group {
+                if let configurationIssue {
+                    ContentUnavailableView(
+                        "Microsoft sign-in is not configured",
+                        systemImage: "person.crop.circle.badge.exclamationmark",
+                        description: Text(configurationIssue))
+                    } else if model.profile == nil && model.deletionStage == nil {
+                        NavigationStack {
+                            Form {
+                                Section("Certigo") {
+                                    Text("Sign in with your Microsoft account to continue.")
+                                Button("Sign in with Microsoft", systemImage: "person.crop.circle") {
+                                    Task { await model.connect() }
+                                }
+                                .disabled(model.busy)
+                                if model.busy { ProgressView() }
+                            }
+                        }
+                        .navigationTitle("Certigo")
+                        .alert(
+                            "Microsoft sign-in did not complete",
+                            isPresented: Binding(
+                                get: { model.errorMessage != nil },
+                                set: { if !$0 { model.errorMessage = nil } }
+                            )
+                        ) {
+                            Button("OK", role: .cancel) { model.errorMessage = nil }
+                        } message: {
+                            Text(model.errorMessage ?? "")
+                        }
+                    }
+                } else {
+                    NativeRoot(model: model)
+                }
+            }
+            .onOpenURL { url in
+                _ = provider?.handleCallback(url, sourceApplication: nil)
+            }
+                .task {
+                    if configurationIssue == nil {
+                        _ = await model.restoreAccountDeletionIfNeeded()
+                    }
+                }
+            }
+
+            @MainActor
+            private static func authenticationPresentationController() throws -> UIViewController {
+                let windows = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+            guard var controller = windows.first(where: \.isKeyWindow)?.rootViewController else {
+                throw CIAMAuthenticationFailure.configuration
+            }
+            while let presented = controller.presentedViewController {
+                controller = presented
+            }
+            return controller
+        }
+
+        private static func safeMessage(for error: Error) -> String {
+            switch error {
+            case CIAMConfigurationEnvironmentError.productionBuildRequired:
+                "Microsoft sign-in is only enabled for the Distribution build."
+            case CIAMConfigurationEnvironmentError.unsupportedProductionBundle:
+                "Use the existing Certigo App Store bundle identifier."
+            case CIAMConfigurationEnvironmentError.missingValue(let key):
+                "Distribution is missing \(key). Configure the verified production identity before sign-in."
+            case CIAMConfigurationEnvironmentError.invalidValue(let key):
+                "Distribution has an invalid \(key). Correct the verified production configuration."
+            case CIAMConfigurationEnvironmentError.callbackNotDeclared:
+                "Declare the app-derived Microsoft callback in the Distribution Info.plist."
+            case CIAMConfigurationEnvironmentError.callbackCollision:
+                "The Microsoft callback is duplicated in the Distribution Info.plist."
+            case CIAMConfigurationEnvironmentError.redirectDoesNotMatchBundle:
+                "The Microsoft callback must match this app's bundle identifier."
+            case is CIAMConfigurationEnvironmentError:
+                "Correct the Distribution Microsoft sign-in configuration."
+            case is CIAMConfigurationError:
+                "The Distribution Microsoft sign-in configuration failed validation."
+            default:
+                "Microsoft sign-in could not be initialized. No manual-token fallback is available."
+            }
+        }
+    }
+    #endif
+
+    #if DEBUG
     @MainActor
     private struct NativeDeveloperConnector: View {
         @Environment(\.dismiss) private var dismiss
@@ -89,17 +221,12 @@ import Foundation
         @State private var configurationIssue: String?
 
         init() {
-            #if DEBUG
-                let isDevelopmentBuild = true
-            #else
-                let isDevelopmentBuild = false
-            #endif
             do {
                 let configured = try CIAMConfigurationEnvironment.configuredProvider(
                     environment: ProcessInfo.processInfo.environment,
                     bundleIdentifier: Bundle.main.bundleIdentifier,
                     infoDictionary: Bundle.main.infoDictionary ?? [:],
-                    isDevelopmentBuild: isDevelopmentBuild
+                    isDevelopmentBuild: true
                 ) { configuration in
                     try MSALAuthenticationProvider(
                         configuration: configuration,
@@ -226,6 +353,7 @@ import Foundation
                 "Review the local Xcode scheme and registered app callback. Manual token sign-in is disabled while CIAM is opted in."
         }
     }
+    #endif
 
     private enum DemoCatalogScenario: String, CaseIterable {
         case ready = "Available"
@@ -1488,6 +1616,162 @@ struct NativeDemoSnapshot: Codable, Equatable {
 }
 
 #if canImport(SwiftUI)
+    private struct NativeAccountDeletionView: View {
+        @Bindable var model: NativeModel
+        @Environment(\.dismiss) private var dismiss
+        @Environment(\.scenePhase) private var scenePhase
+        private enum Focus: Hashable { case status, error }
+        @AccessibilityFocusState private var focused: Focus?
+
+        var body: some View {
+            Form {
+                Section {
+                    Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($focused, equals: .status)
+                    if model.deletionBusy { ProgressView("Account operation in progress") }
+                    if let message = model.deletionMessage {
+                        Text(message).accessibilityIdentifier("account-deletion-message")
+                            .accessibilityFocused($focused, equals: .error)
+                    }
+                }
+                if [.explanation, .verifying, .confirmation].contains(
+                    model.deletionStage ?? .explanation)
+                {
+                    Section("Before you continue") {
+                        Text(
+                            "Permanently delete your Certigo account, confirmed learning and progression. Local drafts and downloaded account references are removed only after the server confirms completion."
+                        )
+                        Text(
+                            "This is irreversible. There is no cancellation endpoint after submission. Residual production backups may rotate for up to 30 days, a pseudonymous tombstone remains for 30 days and identity-free deletion audit logs for 90 days. These are not an undo period."
+                        )
+                        if model.canReauthenticateForDeletion {
+                            Button(
+                                "Continue to verify identity",
+                                systemImage: "person.badge.shield.checkmark"
+                            ) {
+                                Task { await model.verifyDeletionIdentity() }
+                            }
+                            .disabled(model.deletionBusy)
+                        } else {
+                            Text(
+                                "Remote deletion requires configured Microsoft sign-in. It is unavailable for the demo and manual development connector."
+                            )
+                        }
+                    }
+                } else if model.deletionStage == .pending || model.deletionStage == .unconfirmed
+                    || model.deletionStage == .checking
+                {
+                    Section("Server status") {
+                        if let status = model.deletionStatus, status.status == .pending {
+                            Text(
+                                "\(status.completedSteps) of \(status.totalSteps) server steps confirmed."
+                            )
+                            Text(
+                                "Deletion is pending, not completed. Learning is paused and local data is retained. Status checks do not advance unfinished deletion steps."
+                            )
+                            if status.retryAfterSeconds != nil {
+                                Text(
+                                    "The server requested a retry delay. Refresh status before retrying if the action is not available yet."
+                                )
+                            }
+                        }
+                        Button("Check status", systemImage: "arrow.clockwise") {
+                            Task { await model.refreshDeletionStatus() }
+                        }
+                        .disabled(model.deletionBusy)
+                        Button(
+                            "Sign in to check the same account", systemImage: "person.crop.circle"
+                        ) {
+                            Task { await model.recoverDeletionConnection(interactive: true) }
+                        }
+                        .disabled(model.deletionBusy)
+                        Button("Retry deletion", role: .destructive) {
+                            Task { await model.retryAccountDeletion() }
+                        }
+                        .disabled(!model.canRetryDeletion)
+                        if model.deletionStatus?.status == .notRequested {
+                            Button("Resume account to verify identity") {
+                                Task { await model.resumeAccountAfterStatusCheck() }
+                            }
+                            .disabled(model.deletionBusy)
+                        }
+                    }
+                } else if model.deletionStage == .cleanupFailed {
+                    Section {
+                        Text(
+                            "Account deletion is confirmed. Cleanup on this device is not complete."
+                        )
+                        Button("Retry local cleanup", systemImage: "arrow.clockwise") {
+                            Task { await model.retryDeletionCleanup() }
+                        }
+                        .disabled(model.deletionBusy)
+                    }
+                } else if model.deletionStage == .completed {
+                    Section {
+                        Text(
+                            "The server confirmed account deletion and this device confirmed local cleanup. Residual retention periods still apply."
+                        )
+                        Button("Return to sign-in") { model.acknowledgeAccountDeletion() }
+                    }
+                }
+            }
+            .navigationTitle("Delete account")
+            .navigationBarBackButtonHidden(model.deletionBusy || !model.canCancelDeletion)
+            .toolbar {
+                if model.canCancelDeletion {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            Task {
+                                await model.cancelAccountDeletion()
+                                if model.deletionStage == nil { dismiss() }
+                            }
+                        }
+                    }
+                }
+            }
+            .alert(
+                "Permanently delete this Certigo account?",
+                isPresented: Binding(
+                    get: { model.deletionStage == .confirmation },
+                    set: { _ in })
+            ) {
+                Button("Delete account", role: .destructive) {
+                    Task { await model.confirmAccountDeletion() }
+                }
+                Button("Cancel", role: .cancel) { model.discardDeletionProof() }
+            } message: {
+                Text(
+                    "Microsoft verified the same account. Only Delete account submits the irreversible request. Completion may require retries."
+                )
+            }
+            .onChange(of: model.deletionStage) { _, _ in focused = .status }
+            .onChange(of: model.deletionMessage) { _, message in
+                focused = message == nil ? .status : .error
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { model.discardDeletionProof() }
+            }
+            .onAppear { if model.deletionStage == nil { model.showAccountDeletion() } }
+            .onDisappear {
+                model.discardDeletionProof()
+                if model.canCancelDeletion { Task { await model.cancelAccountDeletion() } }
+            }
+        }
+
+        private var title: String {
+            switch model.deletionStage {
+            case .verifying: "Verify your Microsoft identity"
+            case .confirmation: "Identity verified"
+            case .checking: "Checking account deletion"
+            case .pending: "Deletion pending"
+            case .unconfirmed: "Account status unconfirmed"
+            case .cleanupFailed: "Local cleanup requires attention"
+            case .completed: "Account deleted"
+            default: "Delete your Certigo account"
+            }
+        }
+    }
+
     private struct NativeRoot: View {
         @Bindable var model: NativeModel
         @State private var selectedTrack: String?
@@ -1497,16 +1781,23 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var columns: NavigationSplitViewVisibility = .automatic
         @State private var compactColumn: NavigationSplitViewColumn = .sidebar
         @State private var showEditorialPilot = false
+        @State private var loadingTrackID: String?
+        @State private var loadingPathRequestID: UUID?
+        @State private var loadingLessonID: String?
+        @State private var loadingLessonRequestID: UUID?
+        @State private var downloadTrack: Track?
 
         var body: some View {
             Group {
-                if model.profile == nil {
+                if model.requiresDeletionSurface {
+                    NavigationStack { NativeAccountDeletionView(model: model) }
+                } else if model.profile == nil {
                     connection
                 } else {
-                    TabView(selection: $navigation.tab) {
+                    TabView(selection: $model.selectedTab) {
                         learning
                             .tabItem { Label("Learn", systemImage: "book") }
-                            .tag(NativeLearningNavigation.Tab.learn)
+                            .tag(NativeResumeState.Tab.learn)
                         NavigationStack {
                             ScrollView {
                                 ContentUnavailableView(
@@ -1523,7 +1814,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .navigationTitle("Coach")
                         }
                         .tabItem { Label("Coach", systemImage: "bubble.left.and.bubble.right") }
-                        .tag(NativeLearningNavigation.Tab.coach)
+                        .tag(NativeResumeState.Tab.coach)
                         NavigationStack {
                             ScrollView {
                                 VStack {
@@ -1548,10 +1839,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .navigationTitle("Social")
                         }
                         .tabItem { Label("Social", systemImage: "person.2") }
-                        .tag(NativeLearningNavigation.Tab.social)
+                        .tag(NativeResumeState.Tab.social)
                         NavigationStack { profile }
                             .tabItem { Label("Profile", systemImage: "person.crop.circle") }
-                            .tag(NativeLearningNavigation.Tab.profile)
+                            .tag(NativeResumeState.Tab.profile)
                     }
                 }
             }
@@ -1561,7 +1852,19 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 selectedLesson = nil
                 columns = .automatic
                 compactColumn = .sidebar
+                loadingTrackID = nil
+                loadingPathRequestID = nil
+                loadingLessonID = nil
+                loadingLessonRequestID = nil
                 if owner == nil { savingGoalID = nil }
+            }
+            .onChange(of: model.restorationRevision) { _, _ in
+                selectedTrack = model.path?.trackId ?? model.offlinePack?.trackId
+                selectedLesson = model.lesson?.id
+                if model.lesson != nil {
+                    columns = .detailOnly
+                    compactColumn = .detail
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 if model.busy {
@@ -1607,6 +1910,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                             .disabled(model.busy)
                         }
+                        Button("Restore downloaded activity", systemImage: "internaldrive") {
+                            Task { await model.restoreDownloadedActivity() }
+                        }
+                        .disabled(model.busy)
                         if navigation.learn == .myLearning && model.profile?.activeTrackId == nil {
                             Text(
                                 "Choose an active goal in Explore. Browsing never changes your goal."
@@ -1643,7 +1950,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         Text("No certifications available.")
                     }
                 }
-                .disabled(model.busy)
+                .disabled(
+                    model.busy || loadingTrackID != nil || loadingLessonID != nil
+                )
                 .navigationTitle("Learn")
             } content: {
                 path
@@ -1653,17 +1962,64 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .onChange(of: selectedTrack) { _, id in
                 guard let track = model.tracks.first(where: { $0.id == id }) else { return }
                 guard model.path?.trackId != track.id else { return }
+                if model.offlinePack?.trackId == track.id && model.lesson != nil { return }
                 selectedLesson = nil
-                Task { await model.loadPath(track) }
+                requestPath(track)
             }
             .onChange(of: selectedLesson) { _, id in
+                guard model.lesson?.id != id else { return }
+                if let id, model.offlinePack?.lessons.contains(where: { $0.id == id }) == true {
+                    Task { await model.openCachedLesson(id) }
+                    return
+                }
                 guard
                     let node = model.path?.units.flatMap(\.lessons).first(where: {
                         $0.id == id
                     }
                     )
                 else { return }
-                Task { await model.loadLesson(node) }
+                requestLesson(node)
+            }
+            .confirmationDialog(
+                "Download public question packs?",
+                isPresented: Binding(
+                    get: { downloadTrack != nil },
+                    set: { if !$0 { downloadTrack = nil } })
+            ) {
+                if let track = downloadTrack {
+                    Button("Download public content") {
+                        downloadTrack = nil
+                        Task { await model.downloadQuestionPack(track) }
+                    }
+                }
+            } message: {
+                Text(
+                    "This downloads the whole current public release, not just this certification. No solutions are downloaded. Answers stay local until you choose Submit; correction and XP require the server."
+                )
+            }
+        }
+
+        private func requestPath(_ track: Track) {
+            let requestID = UUID()
+            loadingTrackID = track.id
+            loadingPathRequestID = requestID
+            Task {
+                await model.loadPath(track)
+                guard loadingPathRequestID == requestID else { return }
+                loadingTrackID = nil
+                loadingPathRequestID = nil
+            }
+        }
+
+        private func requestLesson(_ node: PathLesson) {
+            let requestID = UUID()
+            loadingLessonID = node.id
+            loadingLessonRequestID = requestID
+            Task {
+                await model.loadLesson(node)
+                guard loadingLessonRequestID == requestID else { return }
+                loadingLessonID = nil
+                loadingLessonRequestID = nil
             }
         }
 
@@ -1698,7 +2054,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             if model.queue.isEmpty { Text("No saved submissions on this device.") }
                             if model.lesson != nil {
                                 Button("Resume current activity", systemImage: "play.circle") {
-                                    navigation.tab = .learn
+                                    model.selectedTab = .learn
                                     columns = .detailOnly
                                     compactColumn = .detail
                                 }
@@ -1708,8 +2064,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                     NavigationLink("Settings") {
                         Form {
-                            Section("Development connection") {
-                                Text("Test connector only. Production sign-in is not enabled.")
+                            Section("Account") {
+                                NavigationLink("Delete account") {
+                                    NativeAccountDeletionView(model: model)
+                                }
+                                .disabled(model.busy)
+                            }
+                            Section(connectionSectionTitle) {
+                                Text(connectionDescription)
                                 Button("Disconnect", systemImage: "person.crop.circle.badge.xmark")
                                 {
                                     Task { await model.disconnect() }
@@ -1722,6 +2084,22 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
             }
             .navigationTitle("Profile")
+        }
+
+        private var connectionSectionTitle: String {
+            #if DEBUG
+                "Development connection"
+            #else
+                "Microsoft account"
+            #endif
+        }
+
+        private var connectionDescription: String {
+            #if DEBUG
+                "Test connector only. Production sign-in is not enabled."
+            #else
+                "Connected with your Microsoft account."
+            #endif
         }
 
         private var connection: some View {
@@ -1763,7 +2141,29 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var path: some View {
             List(selection: $selectedLesson) {
-                if let path = model.path {
+                if let track = model.tracks.first(where: {
+                    $0.id == (selectedTrack ?? model.offlinePack?.trackId ?? model.path?.trackId)
+                }) {
+                    Section("Offline question pack") {
+                        Button("Download public question packs", systemImage: "arrow.down.circle") {
+                            downloadTrack = track
+                        }
+                        .disabled(model.busy)
+                        if let pack = model.offlinePack, pack.trackId == track.id {
+                            Text("Downloaded public content. No local correction or XP.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                            ForEach(pack.lessons, id: \.id) { lesson in
+                                NavigationLink(value: lesson.id) {
+                                    Label(lesson.title, systemImage: "internaldrive")
+                                }
+                                .disabled(model.busy)
+                            }
+                        }
+                    }
+                }
+                if let path = model.path,
+                    selectedTrack == nil || selectedTrack == path.trackId
+                {
                     if let track = model.tracks.first(where: { $0.id == path.trackId }) {
                         activeGoalSection(track)
                     }
@@ -1788,8 +2188,32 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                         Image(systemName: lesson.canOpen ? "book" : "lock")
                                     }
                                 }
-                                .disabled(!lesson.canOpen || model.busy)
+                                .disabled(
+                                    !lesson.canOpen || model.busy || loadingLessonID != nil)
                             }
+                        }
+                    }
+                } else if let selectedTrack,
+                    let track = model.tracks.first(where: { $0.id == selectedTrack })
+                {
+                    if loadingTrackID == track.id {
+                        Section {
+                            ProgressView("Loading learning path…")
+                                .frame(maxWidth: .infinity, minHeight: 88)
+                        }
+                    } else {
+                        Section {
+                            ContentUnavailableView(
+                                "Learning path unavailable",
+                                systemImage: "wifi.exclamationmark",
+                                description: Text(
+                                    "The selected certification’s learning path could not be loaded."
+                                )
+                            )
+                            Button("Retry loading path", systemImage: "arrow.clockwise") {
+                                requestPath(track)
+                            }
+                            .disabled(model.busy || loadingTrackID != nil)
                         }
                     }
                 } else {
@@ -1870,7 +2294,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var session: some View {
             Group {
-                if let lesson = model.lesson {
+                if let lesson = model.lesson,
+                    selectedTrack == nil || selectedTrack == lesson.trackId,
+                    selectedLesson == nil || selectedLesson == lesson.id
+                {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
                             Text(lesson.title).font(.title).bold()
@@ -1937,6 +2364,31 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         .padding()
                         .frame(maxWidth: 700, alignment: .leading)
                         .frame(maxWidth: .infinity)
+                    }
+                } else if let selectedLesson,
+                    let node = model.path?.units.flatMap(\.lessons).first(where: {
+                        $0.id == selectedLesson
+                    })
+                {
+                    if loadingLessonID == node.id {
+                        ProgressView("Loading lesson…")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        VStack(spacing: 16) {
+                            ContentUnavailableView(
+                                "Lesson unavailable",
+                                systemImage: "wifi.exclamationmark",
+                                description: Text(
+                                    "The selected lesson could not be loaded."
+                                )
+                            )
+                            Button("Retry loading lesson", systemImage: "arrow.clockwise") {
+                                requestLesson(node)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(model.busy || loadingLessonID != nil)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else {
                     ContentUnavailableView(

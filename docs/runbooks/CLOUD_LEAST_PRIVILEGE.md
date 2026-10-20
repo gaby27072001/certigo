@@ -224,6 +224,13 @@ node infra/governance/planner-pim-contract.mjs \
   b1a-pim-contract.json
 ```
 
+Le sceau `manifest.sha256` est créé en mode `0600`. Sa réécriture exige un fichier régulier,
+sans lien symbolique ni lien physique supplémentaire et, sur POSIX, appartenant à l'utilisateur
+effectif. Les contrôles et l'écriture portent sur le même descripteur, sans troncature avant
+validation. Conserver le répertoire de preuves privé, sans autre processus pouvant modifier
+ses parents pendant l'opération : les API Node utilisées ne fournissent pas de résolution
+atomique de tous les composants parents.
+
 Le générateur réexécute le binding Phase A complet via `prepare-phase-b.sh` à partir des variables
 `PHASE_A_*`; il n'accepte aucun fichier Phase A fourni directement. Il refuse aussi tout accès
 RBAC actif, hérité, éligible ou activé déjà présent sur le principal planner. Le contrat doit être

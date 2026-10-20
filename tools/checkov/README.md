@@ -91,14 +91,14 @@ normalized or accepted under alternate digests.
 The input is the unmodified `checkov-3.2.495-py3-none-any.whl`:
 SHA-256 `737f39cbab5987d49204cd5e62cfca72ffab3f01fa3314471624e1c4256268ac`.
 The builder is offline and the candidate output has local version
-`3.2.495+certigo.3`, SHA-256
-`205e7b0114e2c1f08fdac93b10f2013199f7e4979fe53cb14f33258cc2f1e5af`.
+`3.2.495+certigo.4`, SHA-256
+`6309f6782d64568ee03648bb8ec7b6e5b0839ccde4f335c4f1cba8f7486e8c69`.
 
 ```sh
 CHECKOV_ADAPTER_UPSTREAM_WHEEL=/path/checkov-3.2.495-py3-none-any.whl \
   python tools/checkov/test_checkov_wheel.py
 python tools/checkov/build_checkov_wheel.py /path/checkov-3.2.495-py3-none-any.whl /tmp/checkov-wheel
-python -m pip install --no-deps --target /tmp/checkov-adapter /tmp/checkov-wheel/checkov-3.2.495+certigo.3-py3-none-any.whl
+python -m pip install --no-deps --target /tmp/checkov-adapter /tmp/checkov-wheel/checkov-3.2.495+certigo.4-py3-none-any.whl
 PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_conditional_adapter.py
 PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_resource_rule_fixes.py
 ```
@@ -139,15 +139,208 @@ runner controls retain explicit failures for both halves. No additional CIDR
 size threshold or address allowlist is introduced. Any consumption proposal
 pinning the earlier wheel is stale and must be reviewed again before activation.
 
-All six appsettings-subtype findings remain unchanged and blocking. Returning
-PASSED on an inapplicable appsettings child would misrepresent the parent;
-returning UNKNOWN would silently lose the record in this Checkov version.
-Resolving them needs an explicit applicability/parent-context reporting
-contract, not a rule-ID exclusion. The other environment-dependent, platform
-UNKNOWN and product-decision findings likewise remain open. These focused
-controls do not establish any reduced total-finding count.
+### ARM composition qualification, not ARM gate adoption
 
-### Appsettings applicability: blocked reporting contract
+Revision `certigo.4` corrects an ARM-only false rejection in the existing identity
+predicate; it does not introduce a second rule engine or a framework switch.
+`checkov/arm/parser/parser.py:load` uses
+`checkov/common/parsers/yaml/loader.py:SafeLineLoader.construct_mapping` even for
+ordinary JSON templates. The loader inserts integer `__startline__` and
+`__endline__` keys in **every** mapping, including `{}`. A fully qualified UAMI
+map consequently has two extra entries, and each empty identity configuration
+also has two entries. Revision `certigo.3` incorrectly rejected both shapes.
+
+The identity predicate now removes exactly these two reserved keys at the
+assignment-map and assignment-configuration levels, only when their integer,
+positive, ordered bounds are contained in the resource's own line bounds.
+Missing, noninteger, Boolean, reversed, out-of-resource or unanchored markers
+fail. `__file__` and all other unknown keys remain failures. The resulting
+assignment map must still be nonempty, all identity IDs must be fully qualified,
+and every configuration must be empty after this bounded normalization.
+Inputs are not mutated. This relies on the pinned loader's reserved-key
+contract; it is not raw ARM schema validation and cannot recover authored
+reserved keys overwritten by that loader.
+
+`test_arm_composition.py` runs the real ARM Runner against the original 18
+probe shapes with candidate expectations, plus paired literal-ID and malformed
+controls. In particular, empty user-assigned maps and unrestricted public
+Cosmos with `enableMultipleWriteLocations=false` now produce actual FAILED
+records. Private Cosmos and mixed/system identities produce PASSED records.
+The original short `/identities/example` and `/subnets/example` pseudo-IDs now
+fail deliberately; separate fully qualified IDs provide the positive controls.
+All six appsettings failures, sibling/parent results, unresolved ingress
+failure and empty-template lack of coverage remain observable.
+
+```sh
+PYTHONPATH=/tmp/checkov-adapter python tools/checkov/test_arm_composition.py
+```
+
+This test needs the existing candidate wheel and Checkov's pinned dependencies;
+it does not need a parser override or scan `infra`. An empty ARM template still
+has no executed checks: the fixture records that limitation, never conformity.
+No gate may accept it or drop UNKNOWN/parse/skipped records as coverage.
+This bounded fix does **not** implement the missing environment/module binding,
+parent/subtype applicability ledger, Flex capability predicates or exhaustive
+source-to-ARM coverage reconciliation. Those remain blockers, not implicit
+exceptions. In particular, this candidate is not adoptable as an ARM replacement
+for the active Bicep gate. A proposal must separately approve the coverage/report
+contract and its fail-closed negative controls before changing any workflow,
+trusted-control manifest, framework, scanner consumption or gate version pin.
+No such protected file is changed here; proposals pinning `certigo.3` must be
+updated and re-reviewed rather than silently consuming this revision.
+
+### Exact fixture coverage is distinct from a successful scan
+
+The inactive composition harness now uses `require_fixture_coverage` for
+explicit `(resource, check)` obligations. This is deliberately a **single-file
+fixture assertion**, not a production inventory, applicability ledger, new
+policy evaluator, or replacement for `.github/scripts/checkov_report_gate.py`.
+It rejects empty/duplicate obligations, missing/extra/duplicate evidence,
+inconsistent statuses, parsing errors, skips and a report without executed
+checks. It returns the retained PASSED/FAILED evidence; a FAILED record is
+coverage, never security success. The fully qualified identity/subnet positive
+controls exercise the assertion directly.
+
+The concrete missing-coverage regression is a real ARM template with a
+`Microsoft.Web/sites` parent whose ingress is Disabled and an embedded short-type
+`config` child named `appsettings`. With only checks 13 and 222 selected, the
+pinned candidate produces **one PASSED parent record, zero failed/skipped/parse
+records and two scanner resources**. No child-13 record survives. The expected
+child obligation makes the fixture assertion fail even though a coarse
+nonempty-resource/nonempty-check test would pass. This is a qualification
+boundary of the runner, not a claim that the active Bicep gate accepts ARM
+reports: that gate explicitly requires the Bicep framework.
+
+A paired control starts from two actual successful site checks, then injects a
+test-only UNKNOWN response for one check. The report loses only that check,
+leaving the other success intact; exact obligations reject the loss. Additional
+controls retain an unsafe parent's ingress failure and all six ordinary
+appsettings failures, and reject damaged report evidence. No UNKNOWN is changed
+to PASSED, no child failure is removed, and installed scanner code is not patched
+by these tests.
+
+Run just the new coverage qualification and its directly affected positive
+control, without rerunning the 18-shape suite or scanning the repository:
+
+```sh
+cd tools/checkov
+python -m unittest -v \
+  test_arm_composition.CompositionTests.test_nested_short_type_child_disappears_despite_success_and_two_resources \
+  test_arm_composition.CompositionTests.test_unknown_check_with_other_success_cannot_meet_exact_obligations \
+  test_arm_composition.CompositionTests.test_failed_parent_and_all_six_child_failures_remain_coverage_not_success \
+  test_arm_composition.CompositionTests.test_exact_fixture_obligations_reject_empty_duplicate_skip_parse_and_foreign \
+  test_arm_composition.CompositionTests.test_literal_qualified_user_and_subnet_positive_controls
+```
+
+Use an isolated environment containing the existing digest-verified
+`3.2.495+certigo.4` wheel and its dependencies. These controls were also run with
+CPython 3.12.15 on Linux aarch64, pycep-parser 0.5.1 and PyYAML 6.0.3. This closes
+the Python-minor qualification gap for these fixtures only; it is not CI x64
+or deployment evidence and does not validate other policies.
+
+Before adopting a production coverage contract, an independently derived
+inventory must bind source revision, environment and module instance to each
+required resource/check pair, retaining explicit non-applicability separately
+from parent security verdicts. An inventory derived only from returned records
+cannot detect omitted checks. Parameter/default evaluation is not evidence of
+the selected environment's module arguments. Unknown subtype, unresolved
+binding, missing parent/module, UNKNOWN response, parse error and zero effective
+coverage must each remain blocking. Neither that architecture nor a runtime
+or gate change is implemented by this fixture-only delivery.
+
+### Inactive Bicep applicability adapter: literal root subtypes and identity
+
+`bicep_ingress_candidate.py` extends the first ingress-only lot using the
+**existing Bicep Runner and candidate predicates**, not another policy engine.
+It parses authored source before scanning to derive independent resource/check
+obligations, and pins all eight installed rule source digests plus the Bicep
+registry, candidate and parser versions. Both parser and scanner
+consume the same captured source bytes (the Runner uses a temporary snapshot).
+The `certigo.bicep-appservice-qualification/v2` JSON includes the source path/hash, explicit environment,
+root module instance, independent obligations, unmodified raw scanner report,
+separate applicability records and blockers.
+
+The bounded literal resource contracts are:
+
+| Resource | Accepted shape and obligations |
+| --- | --- |
+| `Microsoft.Web/sites@2024-04-01` | `name`, explicit `properties.publicNetworkAccess`, and literal `identity`; site checks 16 and 222. |
+| `Microsoft.Web/sites/config@2024-04-01`, `appsettings` | Symbolic site parent and literal string dictionary; all six config check obligations, never site-property proof from environment-variable names. |
+| Same type, `web` | Symbolic site parent; only explicit literal `netFrameworkVersion`, `requestTracingEnabled`, `httpLoggingEnabled`, `publicNetworkAccess`, `azureStorageAccounts.*.type`; all six obligations. |
+| Same type, `authsettings` | Symbolic site parent and only literal `properties.enabled`; all six obligations. V2 is not qualified. |
+| `Microsoft.DocumentDB/databaseAccounts@2024-11-15` | Literal account name and explicit public access; optional literal multiwrite/filter flags and literal IP/subnet rule lists; only check 99. It is not a Web site rule. |
+
+Site/account names and each per-site config subtype must be unique. Parameters,
+variables, modules, outputs, conditions, loops, existing resources,
+unresolved values and unknown properties/subtypes fail closed **before** the Runner.
+An environment label does not resolve a parameter: this lot rejects all
+parameter declarations and supports only the root module instance.
+The tool does not compile Bicep, validate complete Azure schemas, or establish
+cloud runtime capability. In particular the minimal `web` Azure Files control
+is a synthetic predicate fixture, not a proposed valid mount/deployment or a
+requirement for Flex hosting.
+
+For each config resource, the adapter declares only the properties owned by
+its known subtype applicable. `NOT_APPLICABLE` on another subtype requires a
+real, separately reconciled **PASSED** proof for the same site, same file,
+module and environment: check 13 from `authsettings`, checks 80/66/63/88 from
+`web`, and check 222 from the site plus any authored `web` child. The other
+five checks do not dispatch on a site parent in this Checkov version; the tool
+does not fabricate parent PASSED records or project properties into a fake
+resource. Missing sibling proof remains BLOCKED. A passing sibling belonging to
+another site cannot satisfy the obligation. The same subtype discrimination
+applies to unrelated rules emitted on the proof siblings themselves.
+
+All raw records and the raw summary stay in `scanner_report`, including every
+appsettings FAILED record and the spurious cross-subtype sibling failures.
+They are not deleted, changed to PASSED, skipped or returned as UNKNOWN.
+An unsafe or unknown corresponding proof blocks the child's applicability,
+and every applicable FAILED result blocks the entire qualification.
+Missing child or parent evidence, duplicate/unexpected obligations, UNKNOWN
+omissions, parsing/skipped records and inconsistent cardinality/status block.
+This custom applicability schema is experimental, **not** an existing Checkov
+result status or an adopted production report contract.
+
+Check 16 uses the existing `certigo.4` predicate unchanged. Literal mixed
+`SystemAssigned, UserAssigned` passes because the system identity establishes
+that property's configuration; empty user-assigned-only maps remain actual
+FAILED records. The pinned Bicep parser retains single quotes in literal map
+keys, so even a fully qualified literal UAMI ID in Bicep still fails the
+user-only predicate. This remaining false rejection is preserved, not
+normalized or labelled non-applicable. The earlier ARM positive does not prove
+Bicep equivalence. Explicit malformed or unresolved identities block.
+
+Check 99 also uses the unchanged candidate on actual Cosmos resources.
+Disabled public access passes, while unrestricted Enabled public access still
+fails with `enableMultipleWriteLocations: false`; it cannot bypass the network
+predicate. Network existence, deployment and approved address policy are not
+inferred by these fixtures.
+
+```sh
+python tools/checkov/bicep_ingress_candidate.py /path/literal-fixture.bicep --environment staging
+python tools/checkov/test_bicep_ingress_candidate.py
+```
+
+Exit 0 means only `QUALIFIED_SUBSET` under that narrow contract; every report
+sets `production_adoptable: false` and names the restricted control scope.
+It does not claim every security control on these resources was checked.
+Exit 1 means BLOCKED. The actual `infra/modules/functionApp.bicep` is outside
+this literal-only contract and must remain blocked: parameters, module binding,
+Flex runtime/diagnostics and ingress decisions are not implemented or inferred.
+There is no active gate/workflow, dependency
+pin, infrastructure, cloud access or scanner installation change.
+
+Tests execute real positive/negative Bicep fixtures, plus controlled record
+damage and UNKNOWN injection. The complete safe shape produces 20 exact
+resource/check records on four resources: eight PASSED and twelve FAILED raw
+records (six on appsettings). Qualification separates the twelve justified
+non-applicabilities only with the applicable proofs above. Each insecure
+property, missing/foreign proof, lost record, unknown value, empty user identity
+and unrestricted Cosmos negative remains blocking. The raw report is never
+mutated by reconciliation. These focused controls do not establish a reduced
+infrastructure-finding count or global scanner equivalence.
+
+### Pinned runner applicability limits retained by the adapter
 
 The six unchanged upstream checks accept the shared
 `Microsoft.Web/sites/config` resource type, not a discriminated configuration
@@ -204,7 +397,9 @@ or scan the infrastructure tree:
 PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_appsettings_applicability.py
 ```
 
-No additional scanner patch is included for these six findings. Fixing the
-report/result schema plus subtype-aware parent coverage would cross the
-bounded adapter scope and requires a separately reviewed contract; the existing
-findings remain blocking until then.
+No additional scanner patch is included for these six findings. The inactive
+adapter above implements a bounded external report contract, not a new status
+in the pinned runner or a complete production parent/module inventory.
+The active Bicep report gate is unchanged and still treats its raw findings as
+blocking. Runtime/Flex, module/parameter binding, comprehensive source coverage
+and adoption remain separate work; no fixture result authorizes an exemption.

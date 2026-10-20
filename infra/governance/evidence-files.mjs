@@ -218,17 +218,30 @@ export function writeManifestSeal(manifestPath, outputPath) {
   const contents = `${sha256File(manifest)}  manifest.json\n`;
   // Never truncate a pathname before inspecting its opened object. NOFOLLOW
   // supplements, but does not replace, the legacy trusted-directory boundary.
-  const descriptor = fs.openSync(
-    seal,
-    fs.constants.O_WRONLY
-      | (inspected ? 0 : fs.constants.O_CREAT | fs.constants.O_EXCL)
-      | (fs.constants.O_NOFOLLOW ?? 0)
-      | (fs.constants.O_NONBLOCK ?? 0),
-    0o600,
-  );
+  let descriptor;
+  try {
+    descriptor = fs.openSync(
+      seal,
+      fs.constants.O_WRONLY
+        | (inspected ? 0 : fs.constants.O_CREAT | fs.constants.O_EXCL)
+        | (fs.constants.O_NOFOLLOW ?? 0)
+        | (fs.constants.O_NONBLOCK ?? 0),
+      0o600,
+    );
+  } catch (error) {
+    requireTrustedDirectory(path.dirname(seal), 'evidence manifest seal directory');
+    throw error;
+  }
   try {
     const opened = fs.fstatSync(descriptor);
     const current = fs.lstatSync(seal);
+    requireTrustedDirectory(path.dirname(seal), 'evidence manifest seal directory');
+    if (
+      opened.nlink !== 1
+      || (typeof process.geteuid === 'function' && opened.uid !== process.geteuid())
+    ) {
+      throw new Error('evidence manifest seal must be an owned regular non-symlink file');
+    }
     if (
       !opened.isFile()
       || !current.isFile()

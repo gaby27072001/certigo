@@ -3,15 +3,16 @@ import Foundation
 import MSAL
 import UIKit
 
-/// Development-only Apple adapter; compilation, callbacks/cache and live auth still require Apple proof.
+/// MSAL adapter; Apple compilation, callback/cache and live identity validation remain separate gates.
 @MainActor
-final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
+final class MSALAuthenticationProvider: CIAMAccountDeletionProvider {
     private let application: MSALPublicClientApplication
     private let configuration: CIAMConfiguration
     private let presentation: @MainActor () throws -> UIViewController
     private var accountIdentifier: String?
     private var returnedAuthority: MSALAuthority?
     private var busy = false
+    var deletionAccountIdentifier: String? { accountIdentifier }
 
     init(
         configuration: CIAMConfiguration,
@@ -110,6 +111,62 @@ final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
         }
         guard !Task.isCancelled else { throw CIAMAuthenticationFailure.cancelled }
         return try accept(result)
+    }
+
+    func reauthenticateForAccountDeletion() async throws -> CIAMDeletionProof {
+        guard !busy else { throw CIAMAuthenticationFailure.operationInProgress }
+        guard !Task.isCancelled else { throw CIAMAuthenticationFailure.cancelled }
+        guard let identifier = accountIdentifier else {
+            throw CIAMAuthenticationFailure.accountMissing
+        }
+        let controller = try presentation()
+        guard controller.viewIfLoaded?.window != nil else {
+            throw CIAMAuthenticationFailure.configuration
+        }
+        let web = MSALWebviewParameters(authPresentationViewController: controller)
+        web.webviewType = .authenticationSession
+        web.prefersEphemeralWebBrowserSession = true
+        let parameters = MSALInteractiveTokenParameters(
+            scopes: [configuration.apiScope], webviewParameters: web)
+        parameters.account = try application.account(forIdentifier: identifier)
+        parameters.authority = returnedAuthority
+        parameters.promptType = .login
+        parameters.extraQueryParameters = ["max_age": "0"]
+        busy = true
+        defer { busy = false }
+        let result: MSALResult = try await withCheckedThrowingContinuation { continuation in
+            application.acquireToken(with: parameters) { result, error in
+                Self.complete(result, error, continuation)
+            }
+        }
+        guard !Task.isCancelled else { throw CIAMAuthenticationFailure.cancelled }
+        guard result.account.identifier == identifier else {
+            throw CIAMAuthenticationFailure.accountChanged
+        }
+        guard let idToken = result.idToken, !idToken.isEmpty else {
+            throw CIAMAuthenticationFailure.invalidToken
+        }
+        let proof = CIAMDeletionProof(
+            accessToken: try accept(result), idToken: idToken, accountIdentifier: identifier)
+        return try proof.validated(
+            expectedAccount: identifier, clientID: configuration.clientID, now: Date())
+    }
+
+    func removeAccountForDeletion(identifier: String) async throws {
+        guard !busy else { throw CIAMAuthenticationFailure.operationInProgress }
+        guard !identifier.isEmpty else { throw CIAMAuthenticationFailure.accountMissing }
+        do {
+            let accounts = try application.allAccounts()
+            if let account = accounts.first(where: { $0.identifier == identifier }) {
+                try application.remove(account)
+            }
+            if accountIdentifier == identifier {
+                accountIdentifier = nil
+                returnedAuthority = nil
+            }
+        } catch {
+            throw Self.failure(error)
+        }
     }
 
     func removeLocalAccount() async throws {

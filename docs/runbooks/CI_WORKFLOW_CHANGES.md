@@ -38,6 +38,13 @@ l'empreinte actuelle reste dans `states`, l'empreinte future attend dans `preApp
 Prérequis : Node **20.20.2** (la version épinglée par `lint-workflows.yml`) et `npm ci --ignore-scripts`
 à la racine.
 
+Le lecteur commun des fichiers de contrôle (`readRegularRepositoryFile`) refuse les liens
+symboliques, y compris dans les parents, et les fichiers de plus de **16 MiB**. Il valide
+l'identité du descripteur ouvert avant de lire au plus la taille inspectée, puis refuse un
+changement de métadonnées pendant la lecture. Les liens physiques restent acceptés en lecture,
+comme auparavant. L'arbre doit rester sans autre écrivain pendant le contrôle : ces API Node
+ne garantissent pas la résolution atomique des parents face à leurs renommages concurrents.
+
 ### PR A — pré-approuver (aucun workflow modifié)
 
 ```bash
