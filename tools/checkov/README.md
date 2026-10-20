@@ -253,7 +253,8 @@ or gate change is implemented by this fixture-only delivery.
 `bicep_ingress_candidate.py` extends the first ingress-only lot using the
 **existing Bicep Runner and candidate predicates**, not another policy engine.
 It parses authored source before scanning to derive independent resource/check
-obligations, and pins all eight installed rule source digests plus the Bicep
+obligations, and pins the installed rule source digests and the reviewed ARM
+input-extraction base class plus the Bicep
 registry, candidate and parser versions. The Runner consumes the original
 captured module bytes; no source flattening or rewriting is used. Reports keep
 the independent inventory, unmodified raw scanner report, separate
@@ -273,6 +274,8 @@ parser source files/grammar are SHA-256 checked, not just distribution metadata.
 The compatibility version reuses the builder's reviewed patched-file digests.
 Each report records the parser version and seals. Other versions or changed
 source bytes are rejected; this does not change any CI pin or install a runtime.
+The real Cosmos module requires the compatibility parser; upstream 0.5.1
+returns a blocking `UnexpectedToken` before any Runner or JSON input is read.
 
 The bounded literal resource contracts are:
 
@@ -282,24 +285,63 @@ The bounded literal resource contracts are:
 | `Microsoft.Web/sites/config@2024-04-01`, `appsettings` | Symbolic site parent and literal string dictionary; all six config check obligations, never site-property proof from environment-variable names. |
 | Same type, `web` | Symbolic site parent; only explicit literal `netFrameworkVersion`, `requestTracingEnabled`, `httpLoggingEnabled`, `publicNetworkAccess`, `azureStorageAccounts.*.type`; all six obligations. |
 | Same type, `authsettings` | Symbolic site parent and only literal `properties.enabled`; all six obligations. V2 is not qualified. |
-| `Microsoft.DocumentDB/databaseAccounts@2024-11-15` | Literal account name and explicit public access; optional literal multiwrite/filter flags and literal IP/subnet rule lists; only check 99. It is not a Web site rule. |
+| `Microsoft.DocumentDB/databaseAccounts@2024-11-15` | `GlobalDocumentDB`, resolved name, optional resolved location/tags, explicit public access and bounded literal account properties; **all four** dispatched checks 99, 101, 132 and 140. It is not a Web site rule. |
+| `.../sqlDatabases@2024-11-15` | Explicit account parent, resolved name/id; inventoried with `NO_POLICY_IN_PINNED_RUNNER`, not a passed security verdict. |
+| `.../sqlDatabases/containers@2024-11-15` | Explicit database parent, resolved name/id/properties; optional bounded array loop over the captured Cosmos contract. Each instance is inventoried separately with `NO_POLICY_IN_PINNED_RUNNER`. |
 
 Site/account names and each per-site config subtype must be unique. For a
-single-file qualification, parameters, variables, modules, outputs, conditions,
-loops, existing resources, unresolved values and unknown properties/subtypes
+single-file qualification, parameters, variables, modules, conditions,
+existing resources, unresolved values and unknown properties/subtypes
 fail closed **before** the Runner. The optional `--module-symbol` mode accepts
 one explicit local root-to-module call when every target-module parameter and
-variable resolves from a literal/default or a bounded environment ternary.
+variable resolves from a literal/default or the bounded expressions below.
 It requires a root `env` parameter whose allowed values are exactly
 `dev`, `staging`, and `prod`. Any unresolved, secure,
 unknown, cyclic or type-mismatched binding blocks the whole qualification.
 Secure root/module parameters are not evaluated even when they have defaults:
 they require external deployment evidence. Transitive references cannot expose
-them in non-secure binding evidence. Arbitrary function calls, including
-`uniqueString`, `loadJsonContent` and module output access, remain unresolved.
-Nested modules, dynamic module paths/scopes, loops, module conditions,
+them in non-secure binding evidence. Supported deterministic expressions are
+scalar equality/inequality, boolean ternaries, explicit object-member access,
+`empty` on a literal string/array/object, and two-object `union` (including
+recursive object merging). Array union, arbitrary function calls, including
+`uniqueString` and module output access, remain unresolved.
+Nested modules, dynamic module paths/scopes, other loops, module conditions,
 parameters-file inference and resources outside the bounded inventory remain
 unsupported and blocked.
+
+The only `loadJsonContent` input accepted is the local
+`contracts/cosmos-containers.json` relative to the supplied root's repository
+layout, from either the root or the module. No arbitrary file, JSON selector,
+encoding override, symlink or remote input is accepted. Its schema marker,
+fields, unique container names/symbols, partition paths and nullable/integer TTL
+shape are checked before use. Duplicate JSON members, empty inventories and
+oversized/unavailable/malformed inputs block. Bytes are captured once and their
+SHA-256 and container count retained in `binding_resolution.source_inputs`;
+the root and module use the same snapshot. The supported container array loop
+must have no condition and at most 1,000 instances. Every name, parent and body
+must resolve; a dynamic body, unknown parent or duplicate name blocks. The three
+existing Cosmos output references (endpoint, accountName, backupMode) are
+accepted only in their exact reference shapes, not evaluated as deployed
+values or consumed as security evidence.
+
+Cosmos dispatch is independently checked against the pinned Python **and graph**
+registries before scanning: the account must dispatch exactly 99/101/132/140,
+and database/container children must dispatch no policies. A new, duplicate,
+wildcard or graph policy affecting these types blocks rather than silently
+falling outside the selected checks. Thus an account has four check obligations,
+and the database plus each container have explicit no-policy inventory entries.
+Those entries are **coverage limitations, not NOT_APPLICABLE security success**.
+The report's scanner `resource_count` counts checked entities, not all authored
+or expanded instances; the independent inventory retains the unchecked children.
+An empty/no-policy-only source cannot qualify.
+
+For bound Cosmos accounts, `scanner_input_provenance` compares the Runner's
+effective policy inputs with the independently bound AST using type-strict
+literal equality. It does not evaluate any policy. A symbolic flag that the
+upstream predicate happens to treat as truthy can produce raw PASSED despite a
+root argument of `false`; that raw result is preserved but cannot qualify the
+bound instance. A mismatch blocks and no input/value is substituted in the
+Runner. FAILED, lost/UNKNOWN and missing records stay blocking independently.
 
 The only explicit cross-scope form supported is a symbolic reference to an
 existing `Microsoft.Resources/resourceGroups@2024-03-01` root resource with
@@ -323,6 +365,25 @@ They still remain **BLOCKED**: unresolved names/module outputs/functions,
 secure parameters and resource types/properties outside this candidate are not
 qualified. Known CORS/auth-mode bindings and source/scope provenance remain
 visible without claiming that those modules or deployments are compliant.
+For `data`, database/contract, location, tags and the environment-derived
+`disableLocalAuth` now resolve, and the real database plus thirteen container
+instances are inventoried. The real root still lacks a supplied value for its
+required `cosmosBackupMode`, and its account name uses
+`uniqueString(subscription().id, ...)`. Neither a subscription/name nor a
+backup decision is invented, so no Runner is invoked on these incomplete
+bindings. The CLI exits 1 with explicit blockers for all three environments.
+
+An isolated fixture binds the **unchanged real Cosmos module** from an explicit
+root with supplied non-secret name/backup literals. It obtains all four raw
+account records and fourteen no-policy child entries: 99/101 pass, while 132
+fails because `disableKeyBasedMetadataWriteAccess` is absent. The raw 140 failure
+cannot prove the staging/prod root's `true` argument because the unchanged module
+Runner has not consumed that binding. Neither failure is removed or relabelled
+as a policy success. A test-only authored-literal positive control executes all
+four checks successfully; it is not an infrastructure change or deployment
+recommendation. Any resolved-snapshot Runner/report contract, external
+deployment inputs or metadata-write policy change needs separate approval;
+this lot implements none of them.
 No Runner record is invented from an AST-resolved value: when the unchanged
 module scan cannot resolve it, missing/UNKNOWN evidence still blocks.
 The tool does not compile Bicep, validate complete Azure schemas, or establish

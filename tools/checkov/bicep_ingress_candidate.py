@@ -1,6 +1,7 @@
 """Inactive Bicep applicability qualification with explicit local-module provenance."""
 
 import argparse
+from fnmatch import fnmatchcase
 import hashlib
 from importlib import import_module
 from importlib.metadata import version
@@ -16,13 +17,24 @@ from checkov.runner_filter import RunnerFilter
 from pycep import BicepParser
 from pycep.transformer import BicepElement
 
-from build_checkov_wheel import VERSION
+from build_checkov_wheel import PATCHED_SOURCE_SHA256, SOURCE as CHECKOV_BASE_SOURCE, VERSION
 from build_parser_wheel import PATCHED_FILES, VERSION as COMPAT_PARSER_VERSION
 
 
 SITE = "Microsoft.Web/sites"
 CONFIG = SITE + "/config"
 COSMOS = "Microsoft.DocumentDB/databaseAccounts"
+COSMOS_DATABASE = COSMOS + "/sqlDatabases"
+COSMOS_CONTAINER = COSMOS_DATABASE + "/containers"
+COSMOS_CHECKS = ("CKV_AZURE_99", "CKV_AZURE_101", "CKV_AZURE_132", "CKV_AZURE_140")
+COSMOS_INPUTS = {
+    "CKV_AZURE_99": (
+        "publicNetworkAccess", "isVirtualNetworkFilterEnabled", "virtualNetworkRules", "ipRules",
+    ),
+    "CKV_AZURE_101": ("publicNetworkAccess",),
+    "CKV_AZURE_132": ("disableKeyBasedMetadataWriteAccess",),
+    "CKV_AZURE_140": ("disableLocalAuth",),
+}
 SITE_CHECKS = ("CKV_AZURE_16", "CKV_AZURE_222")
 CONFIG_CHECKS = {
     "CKV_AZURE_13": "authsettings",
@@ -32,11 +44,12 @@ CONFIG_CHECKS = {
     "CKV_AZURE_222": "web",
     "CKV_AZURE_88": "web",
 }
-CHECKS = tuple(sorted({*SITE_CHECKS, *CONFIG_CHECKS, "CKV_AZURE_99"}))
+CHECKS = tuple(sorted({*SITE_CHECKS, *CONFIG_CHECKS, *COSMOS_CHECKS}))
 API_VERSION = "2024-04-01"
 COSMOS_API_VERSION = "2024-11-15"
 
 RULE_SOURCES = {
+    CHECKOV_BASE_SOURCE: PATCHED_SOURCE_SHA256,
     "checkov/arm/checks/resource/AppServiceIdentity.py":
         "f36911729b239513c83641ed171b86518227e92af0b97b618821143189a4010d",
     "checkov/arm/checks/resource/AppServiceAuthentication.py":
@@ -53,6 +66,12 @@ RULE_SOURCES = {
         "1e9c1452bed550c63b48a973abe164b9d011b9de102ce652c09b6a7f450f1b48",
     "checkov/arm/checks/resource/CosmosDBAccountsRestrictedAccess.py":
         "2a5d260ab48a02032dfed01f14ba9c4fb4d806f23414f4c12c6d1a031b1c0384",
+    "checkov/arm/checks/resource/CosmosDBDisablesPublicNetwork.py":
+        "38ab0e3f9cc81dc49d7f46651c82599d31887e54fe0cd34d69356a5b8b331cd4",
+    "checkov/arm/checks/resource/CosmosDBDisableAccessKeyWrite.py":
+        "98f3ee479408dd484baf0f69daec580ae388fb18cb2eef0051f4b671e4a7ae50",
+    "checkov/arm/checks/resource/CosmosDBLocalAuthDisabled.py":
+        "9926eb784559162b38b115c49a720f13a2c53cc9226b1272f05539bd3547e67e",
 }
 REGISTRY_SHA256 = "35a84e2225433f4529efcfdeebc6fe872e8ebca50674ab03717aff3d33d44fd0"
 UPSTREAM_PARSER_SOURCES = {
@@ -133,7 +152,10 @@ def _parse_source(source):
     return BicepParser().parse(text=text)
 
 
-def _resolve_expression(expression, resolve_symbol, environment):
+def _resolve_expression(expression, resolve_symbol, environment, json_loader=None):
+    def resolve(value):
+        return _resolve_expression(value, resolve_symbol, environment, json_loader)
+
     if isinstance(expression, BicepElement):
         return resolve_symbol(str(expression))
     if type(expression) is str:
@@ -155,40 +177,114 @@ def _resolve_expression(expression, resolve_symbol, environment):
     if type(expression) in (bool, int):
         return expression
     if isinstance(expression, list):
-        return [_resolve_expression(value, resolve_symbol, environment) for value in expression]
+        return [resolve(value) for value in expression]
     if isinstance(expression, dict):
         if "function" in expression:
+            function = expression["function"]
+            if set(expression) != {"function"} or not isinstance(function, dict):
+                raise BindingResolutionError("malformed bounded function")
+            kind = function.get("type")
+            params = function.get("parameters")
+            if not isinstance(params, dict) or set(function) - {"type", "parameters", "property_name"}:
+                raise BindingResolutionError("malformed bounded function arguments")
+            if kind == "empty" and set(params) == {"item_to_test"} and "property_name" not in function:
+                value = resolve(params["item_to_test"])
+                if type(value) not in (str, list, dict):
+                    raise BindingResolutionError("empty requires a resolved string, array or object")
+                return not value
+            if kind == "union" and set(params) == {"arg_1", "arg_2"} and "property_name" not in function:
+                left, right = resolve(params["arg_1"]), resolve(params["arg_2"])
+                if not isinstance(left, dict) or not isinstance(right, dict):
+                    raise BindingResolutionError("only literal object union is supported")
+
+                def merge(first, second):
+                    result = dict(first)
+                    for key, value in second.items():
+                        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                            result[key] = merge(result[key], value)
+                        else:
+                            result[key] = value
+                    return result
+
+                return merge(left, right)
+            if (
+                kind == "load_json_content" and json_loader is not None
+                and set(params) == {"file_path", "json_path", "encoding"}
+                and _literal_string(params["file_path"])
+                and params["json_path"] is None and params["encoding"] is None
+            ):
+                value = json_loader(params["file_path"])
+                if "property_name" in function:
+                    member = function["property_name"]
+                    if type(member) is not str or not isinstance(value, dict) or member not in value:
+                        raise BindingResolutionError("JSON member is not explicitly present")
+                    value = value[member]
+                return value
             raise BindingResolutionError("function calls are outside the static binding contract")
         operator = expression.get("operator")
         if isinstance(operator, dict):
             operands = operator.get("operands")
+            kind = operator.get("type")
             if (
-                operator.get("type") == "equals"
-                and isinstance(operands, dict)
-                and set(operands) == {"operand_1", "operand_2"}
-                and isinstance(operands["operand_1"], BicepElement)
-                and str(operands["operand_1"]) == "env"
-                and isinstance(operands["operand_2"], dict)
+                set(expression) != {"operator"} or set(operator) != {"type", "operands"}
+                or not isinstance(operands, dict)
             ):
-                conditional = operands["operand_2"].get("operator")
-                branches = conditional.get("operands") if isinstance(conditional, dict) else None
-                if (
-                    isinstance(conditional, dict)
-                    and conditional.get("type") == "conditional"
-                    and isinstance(branches, dict)
-                    and set(branches) == {"condition", "true_value", "false_value"}
-                    and type(branches["condition"]) is str
-                    and branches["condition"] in ("dev", "staging", "prod")
-                ):
-                    branch = "true_value" if environment == branches["condition"] else "false_value"
-                    return _resolve_expression(branches[branch], resolve_symbol, environment)
+                raise BindingResolutionError("malformed bounded operator")
+            if kind == "conditional" and set(operands) == {"condition", "true_value", "false_value"}:
+                condition = resolve(operands["condition"])
+                if type(condition) is not bool:
+                    raise BindingResolutionError("conditional requires an explicit boolean")
+                return resolve(operands["true_value" if condition else "false_value"])
+            if set(operands) == {"operand_1", "operand_2"}:
+                left, right = operands["operand_1"], operands["operand_2"]
+                nested = right.get("operator") if isinstance(right, dict) else None
+                # pycep associates a trailing ternary with the RHS of equality/access.
+                if kind in ("equals", "not_equals") and isinstance(nested, dict) and nested.get("type") == "conditional":
+                    branches = nested.get("operands", {})
+                    if set(branches) == {"condition", "true_value", "false_value"}:
+                        return resolve({"operator": {
+                            "type": "conditional", "operands": {
+                                **branches,
+                                "condition": {"operator": {"type": kind, "operands": {
+                                    "operand_1": left, "operand_2": branches["condition"],
+                                }}},
+                            },
+                        }})
+                if kind == "property_accessor":
+                    if isinstance(nested, dict) and nested.get("type") in ("equals", "not_equals"):
+                        comparison = nested.get("operands", {})
+                        if set(comparison) == {"operand_1", "operand_2"}:
+                            return resolve({"operator": {
+                                "type": nested["type"], "operands": {
+                                    **comparison,
+                                    "operand_1": {"operator": {"type": kind, "operands": {
+                                        "operand_1": left, "operand_2": comparison["operand_1"],
+                                    }}},
+                                },
+                            }})
+                    value = resolve(left)
+                    if (
+                        type(right) not in (str, BicepElement)
+                        or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", right) is None
+                        or not isinstance(value, dict) or right not in value
+                    ):
+                        raise BindingResolutionError("property access requires an explicit object member")
+                    return value[right]
+                if kind in ("equals", "not_equals"):
+                    first, second = resolve(left), resolve(right)
+                    if type(first) not in (str, bool, int, type(None)) or type(second) not in (
+                        str, bool, int, type(None),
+                    ):
+                        raise BindingResolutionError("equality requires literal scalars")
+                    equal = type(first) is type(second) and first == second
+                    return equal if kind == "equals" else not equal
             raise BindingResolutionError("operator is outside the literal/environment contract")
         return {
-            key: _resolve_expression(value, resolve_symbol, environment)
+            key: resolve(value)
             for key, value in expression.items()
         }
     if expression is None:
-        raise BindingResolutionError("null is not a resolved parameter value")
+        return None
     raise BindingResolutionError("value is outside the literal/environment contract")
 
 
@@ -210,10 +306,115 @@ def _raise_unresolved_symbol(name):
     raise BindingResolutionError("module symbol has no explicit binding: " + name)
 
 
+def _cosmos_contract_loader(root_path, source_path, snapshots, evidence):
+    """Only the repository's non-secret authored Cosmos contract may be loaded."""
+    expected = root_path.parent.parent / "contracts" / "cosmos-containers.json"
+
+    def unique_object(pairs):
+        value = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError("duplicate JSON member")
+            value[key] = item
+        return value
+
+    def load(relative):
+        candidate = source_path.parent / relative
+        if (
+            candidate.resolve() != expected
+            or expected.is_symlink() or expected.parent.is_symlink()
+        ):
+            raise BindingResolutionError("only the local Cosmos source contract is supported")
+        if expected not in snapshots:
+            try:
+                with expected.open("rb") as stream:
+                    contents = stream.read(1024 * 1024 + 1)
+                if len(contents) > 1024 * 1024:
+                    raise ValueError("oversized source contract")
+                contract = json.loads(contents, object_pairs_hook=unique_object)
+                if (
+                    not isinstance(contract, dict)
+                    or set(contract) != {"schema", "databaseName", "containers"}
+                    or contract["schema"] != "certigo.source-contract/cosmos-containers/v1"
+                    or not _literal_string(contract["databaseName"]) or not contract["databaseName"]
+                    or not isinstance(contract["containers"], list) or not contract["containers"]
+                ):
+                    raise ValueError("unsupported Cosmos contract")
+                names, symbols = set(), set()
+                for item in contract["containers"]:
+                    if (
+                        not isinstance(item, dict)
+                        or set(item) != {"symbol", "name", "partitionKeyPath", "defaultTimeToLive"}
+                        or any(not _literal_string(item[k]) or not item[k] for k in (
+                            "symbol", "name", "partitionKeyPath",
+                        ))
+                        or not item["partitionKeyPath"].startswith("/")
+                        or item["name"] in names or item["symbol"] in symbols
+                        or not (
+                            item["defaultTimeToLive"] is None
+                            or (type(item["defaultTimeToLive"]) is int and (
+                                item["defaultTimeToLive"] == -1 or item["defaultTimeToLive"] > 0
+                            ))
+                        )
+                    ):
+                        raise ValueError("malformed or duplicate Cosmos container")
+                    names.add(item["name"])
+                    symbols.add(item["symbol"])
+                snapshots[expected] = (contents, contract)
+            except (OSError, UnicodeError, ValueError) as error:
+                raise BindingResolutionError("Cosmos contract unavailable or invalid: " + type(error).__name__) from error
+        contents, contract = snapshots[expected]
+        evidence[str(expected)] = {
+            "source": str(expected), "sha256": hashlib.sha256(contents).hexdigest(),
+            "schema": contract["schema"], "container_count": len(contract["containers"]),
+        }
+        return contract
+
+    return load
+
+
+def _bounded_cosmos_outputs(tree):
+    outputs = tree.get("outputs", {})
+    if not outputs:
+        return True
+
+    def access(first, second):
+        return {"operator": {"type": "property_accessor", "operands": {
+            "operand_1": first, "operand_2": second,
+        }}}
+
+    expected = {
+        "endpoint": access(BicepElement("account"), access("properties", "documentEndpoint")),
+        "accountName": access(BicepElement("account"), "name"),
+        "backupMode": BicepElement("backupMode"),
+    }
+    account = tree.get("resources", {}).get("account", {})
+    if (
+        account.get("type") != COSMOS
+        or not isinstance(outputs, dict) or set(outputs) != set(expected)
+    ):
+        return False
+    for name, expression in expected.items():
+        item = outputs[name]
+        if (
+            not isinstance(item, dict) or set(item) != {"decorators", "type", "value"}
+            or item["decorators"] != [] or item["type"] != "string"
+            or item["value"] != expression
+        ):
+            return False
+        # BicepElement inherits str; reject a quoted pseudo-reference.
+        value = item["value"]
+        root = value if name == "backupMode" else value["operator"]["operands"]["operand_1"]
+        if type(root) is not BicepElement:
+            return False
+    return True
+
+
 def resolve_local_module_bindings(
     root_path, environment, module_symbol="api", *, _snapshot=None, _module_snapshots=None,
+    _json_snapshots=None,
 ):
-    """Resolve one local module call using only literals and bounded env ternaries."""
+    """Resolve one local call using bounded literals, expressions and Cosmos JSON."""
     root_path = Path(root_path).resolve(strict=True)
     root_bytes = root_path.read_bytes() if _snapshot is None else _snapshot[0]
     result = {
@@ -228,6 +429,7 @@ def resolve_local_module_bindings(
         "dependencies": [],
         "parameters": [],
         "values": {},
+        "source_inputs": {},
         "blockers": [],
     }
     if environment not in ("dev", "staging", "prod"):
@@ -305,13 +507,23 @@ def resolve_local_module_bindings(
     if not isinstance(module, dict):
         result["blockers"].append("module source AST is malformed")
         return result
-    if set(module) - {"globals", "parameters", "variables", "resources"}:
+    if (
+        set(module) - {"globals", "parameters", "variables", "resources", "outputs"}
+        or not _bounded_cosmos_outputs(module)
+    ):
         result["blockers"].append("nested modules and outputs are outside this module contract")
     if not isinstance(module.get("resources"), dict) or not module["resources"]:
         result["blockers"].append("module has no statically inventoried resources")
 
     root_parameters = root.get("parameters", {})
     root_variables = root.get("variables", {})
+    json_snapshots = {} if _json_snapshots is None else _json_snapshots
+    root_loader = _cosmos_contract_loader(
+        root_path, root_path, json_snapshots, result["source_inputs"],
+    )
+    module_loader = _cosmos_contract_loader(
+        root_path, module_path, json_snapshots, result["source_inputs"],
+    )
 
     def resolve_root_symbol(name, active=()):
         if name == "env":
@@ -331,7 +543,8 @@ def resolve_local_module_bindings(
         else:
             raise BindingResolutionError("root symbol is not a literal parameter or variable")
         resolved = _resolve_expression(
-            value, lambda nested: resolve_root_symbol(nested, active + (name,)), environment
+            value, lambda nested: resolve_root_symbol(nested, active + (name,)), environment,
+            root_loader,
         )
         if name in root_parameters and not _matches_parameter_type(resolved, spec.get("type")):
             raise BindingResolutionError("root default does not match its declared parameter type")
@@ -417,7 +630,9 @@ def resolve_local_module_bindings(
             if expression is None:
                 resolving.remove(name)
                 raise BindingResolutionError("required module parameter is not explicitly bound")
-            value = _resolve_expression(expression, resolver, environment)
+            value = _resolve_expression(
+                expression, resolver, environment, root_loader if name in passed else module_loader,
+            )
             if not _matches_parameter_type(value, spec.get("type")):
                 resolving.remove(name)
                 raise BindingResolutionError("resolved value does not match the declared module type")
@@ -427,7 +642,8 @@ def resolve_local_module_bindings(
         if name in module.get("variables", {}):
             resolving.add(name)
             value = _resolve_expression(
-                module["variables"][name].get("value"), resolve_module_symbol, environment
+                module["variables"][name].get("value"), resolve_module_symbol, environment,
+                module_loader,
             )
             values[name] = value
             resolving.remove(name)
@@ -514,6 +730,9 @@ def _literal_cosmos(properties):
     allowed = {
         "publicNetworkAccess", "enableMultipleWriteLocations",
         "isVirtualNetworkFilterEnabled", "virtualNetworkRules", "ipRules",
+        "disableLocalAuth", "disableKeyBasedMetadataWriteAccess",
+        "databaseAccountOfferType", "enableAutomaticFailover", "capabilities",
+        "consistencyPolicy", "locations", "minimalTlsVersion", "backupPolicy",
     }
     if (
         not isinstance(properties, dict)
@@ -522,7 +741,10 @@ def _literal_cosmos(properties):
         or properties["publicNetworkAccess"] not in ("Enabled", "Disabled")
     ):
         return False
-    for key in ("enableMultipleWriteLocations", "isVirtualNetworkFilterEnabled"):
+    for key in (
+        "enableMultipleWriteLocations", "isVirtualNetworkFilterEnabled",
+        "disableLocalAuth", "disableKeyBasedMetadataWriteAccess", "enableAutomaticFailover",
+    ):
         if key in properties and type(properties[key]) is not bool:
             return False
     for key, value_key in (
@@ -538,6 +760,10 @@ def _literal_cosmos(properties):
             )
         ):
             return False
+    try:
+        _resolve_expression(properties, _raise_unresolved_symbol, None)
+    except BindingResolutionError:
+        return False
     return True
 
 
@@ -559,9 +785,11 @@ def inventory(source, environment, instance, resolved_values=None):
         return [], 0, ["malformed source AST"]
     allowed_tree_keys = {"globals", "resources"}
     if resolved_values is not None:
-        allowed_tree_keys |= {"parameters", "variables"}
+        allowed_tree_keys |= {"parameters", "variables", "outputs"}
     if set(tree) - allowed_tree_keys:
         problems.append("outputs and nested modules are outside this qualification")
+    if not _bounded_cosmos_outputs(tree):
+        problems.append("outputs are outside the bounded Cosmos provenance contract")
     if resolved_values is not None:
         declared_parameters = tree.get("parameters", {})
         declared_variables = tree.get("variables", {})
@@ -596,6 +824,9 @@ def inventory(source, environment, instance, resolved_values=None):
 
     parents = {}
     children = []
+    cosmos_parents = {}
+    cosmos_children = []
+    no_policy_symbols = set()
     cosmos_names = set()
     site_names = set()
     for symbol, resource in resources.items():
@@ -676,8 +907,16 @@ def inventory(source, environment, instance, resolved_values=None):
                 problems.append("unsupported Cosmos API version: " + key)
             name = resolve(conf.get("name"), key)
             properties = resolve(conf.get("properties"), key)
+            location = resolve(conf.get("location"), key) if "location" in conf else None
+            tags = resolve(conf.get("tags"), key) if "tags" in conf else None
             if (
-                set(conf) != {"name", "properties"}
+                set(conf) - {"name", "properties", "location", "tags", "kind"}
+                or not _literal_string(conf.get("kind")) or conf["kind"] != "GlobalDocumentDB"
+                or ("location" in conf and (not _literal_string(location) or not location))
+                or ("tags" in conf and (
+                    not isinstance(tags, dict)
+                    or any(not _literal_string(k) or not _literal_string(v) for k, v in tags.items())
+                ))
                 or type(name) is not str or not name or "${" in name
                 or not _literal_cosmos(properties)
             ):
@@ -686,9 +925,107 @@ def inventory(source, environment, instance, resolved_values=None):
                 problems.append("duplicate authored Cosmos account name: " + key)
             if type(name) is str:
                 cosmos_names.add(name)
-            entries.append(dict(resource=key, check="CKV_AZURE_99", expected="APPLICABLE", parent=None))
+            cosmos_parents[symbol] = key
+            entries.extend(
+                dict(
+                    resource=key, check=check, expected="APPLICABLE", parent=None,
+                    policy_inputs={
+                        **({"kind": conf.get("kind")} if check == "CKV_AZURE_140" else {}),
+                        "properties": {
+                            field: properties[field] for field in COSMOS_INPUTS[check]
+                            if isinstance(properties, dict) and field in properties
+                        },
+                    },
+                )
+                for check in COSMOS_CHECKS
+            )
+        elif kind in (COSMOS_DATABASE, COSMOS_CONTAINER):
+            no_policy_symbols.add(symbol)
+            if resource.get("api_version") != COSMOS_API_VERSION:
+                problems.append("unsupported Cosmos child API version: " + key)
+            loop = conf.get("loop_type")
+            if loop is None:
+                configurations = [(key, conf)]
+            elif kind == COSMOS_CONTAINER:
+                detail = loop.get("detail") if isinstance(loop, dict) else None
+                values = resolved_values or {}
+                if (
+                    set(conf) != {"loop_type", "condition", "config"}
+                    or conf["condition"] is not None
+                    or not isinstance(loop, dict) or set(loop) != {"type", "detail"}
+                    or loop["type"] != "array" or not isinstance(detail, dict)
+                    or set(detail) != {"item_name", "array_name"}
+                    or type(detail["item_name"]) is not str
+                    or type(detail["array_name"]) is not BicepElement
+                    or not isinstance(values.get(str(detail["array_name"])), list)
+                    or not 0 < len(values[str(detail["array_name"])]) <= 1000
+                ):
+                    problems.append("unresolved or unsupported Cosmos container loop: " + key)
+                    continue
+                configurations = []
+                for index, item in enumerate(values[str(detail["array_name"])]):
+                    instance_key = key + "[" + str(index) + "]"
+                    body = conf["config"]
+                    if not isinstance(body, dict):
+                        problems.append("malformed Cosmos loop body: " + key)
+                        break
+                    try:
+                        resolved = _resolve_expression(
+                            {k: v for k, v in body.items() if k != "parent"},
+                            lambda name: item if name == detail["item_name"] else (
+                                values[name] if name in values else _raise_unresolved_symbol(name)
+                            ),
+                            environment,
+                        )
+                        configurations.append((instance_key, {**resolved, "parent": body.get("parent")}))
+                    except BindingResolutionError:
+                        problems.append("unresolved Cosmos container body: " + instance_key)
+            else:
+                problems.append("Cosmos database loops are outside this contract: " + key)
+                continue
+            for instance_key, body in configurations:
+                if not isinstance(body, dict):
+                    problems.append("malformed Cosmos child body: " + instance_key)
+                    continue
+                name = resolve(body.get("name"), instance_key)
+                properties = resolve(body.get("properties"), instance_key)
+                parent = body.get("parent")
+                if (
+                    set(body) != {"name", "parent", "properties"}
+                    or type(parent) is not BicepElement
+                    or not _literal_string(name) or not name
+                    or not isinstance(properties, dict) or set(properties) != {"resource"}
+                    or not isinstance(properties["resource"], dict)
+                    or properties["resource"].get("id") != name
+                    or (kind == COSMOS_DATABASE and set(properties["resource"]) != {"id"})
+                    or (kind == COSMOS_CONTAINER and set(properties["resource"]) - {
+                        "id", "partitionKey", "indexingPolicy", "defaultTtl",
+                    })
+                ):
+                    problems.append("Cosmos child is outside the bounded literal contract: " + instance_key)
+                cosmos_children.append((symbol, instance_key, kind, name, parent))
         else:
             problems.append("resource type has no qualified mapping: " + key)
+
+    databases = {
+        symbol: key for symbol, key, kind, _, _ in cosmos_children
+        if kind == COSMOS_DATABASE
+    }
+    child_identities = set()
+    for symbol, key, kind, name, parent in cosmos_children:
+        parent_map = cosmos_parents if kind == COSMOS_DATABASE else databases
+        if type(parent) is not BicepElement or str(parent) not in parent_map:
+            problems.append("missing or unresolved Cosmos child parent: " + key)
+            continue
+        if type(name) is str:
+            identity = (kind, str(parent), name)
+            if identity in child_identities:
+                problems.append("duplicate Cosmos child name: " + key)
+            child_identities.add(identity)
+        entries.append(dict(
+            resource=key, check=None, expected="NO_POLICY_IN_PINNED_RUNNER",
+            parent=parent_map[str(parent)], source_symbol=symbol, name=name,
+        ))
 
     child_names = set()
     for symbol, key, name, parent in children:
@@ -712,7 +1049,7 @@ def inventory(source, environment, instance, resolved_values=None):
             )
             for check in sorted(CONFIG_CHECKS)
         )
-    return entries, len(resources), problems
+    return entries, len(resources) - len(no_policy_symbols), problems
 
 
 def _required_proofs(entry, entries):
@@ -782,14 +1119,21 @@ def reconcile(entries, resource_count, report):
         count = summary.get(count_key)
         if results.get(key) != [] or type(count) is not int or count != 0:
             problems.append("parsing or skipped evidence")
-    expected = {(entry["resource"], entry["check"]) for entry in entries}
-    if not expected or len(expected) != len(entries) or set(raw) != expected:
+    checked = [entry for entry in entries if entry["expected"] != "NO_POLICY_IN_PINNED_RUNNER"]
+    expected = {(entry["resource"], entry["check"]) for entry in checked}
+    if not expected or len(expected) != len(checked) or set(raw) != expected:
         problems.append("missing, duplicate or unexpected resource/check obligation")
     if type(summary.get("resource_count")) is not int or summary["resource_count"] != resource_count:
         problems.append("source/report resource cardinality mismatch")
 
     qualified = []
     for entry in entries:
+        if entry["expected"] == "NO_POLICY_IN_PINNED_RUNNER":
+            qualified.append({
+                **entry, "status": "NO_POLICY_IN_PINNED_RUNNER", "scanner_status": None,
+                "reason": "sealed dispatch has no Python/graph policy for this type; not a security verdict",
+            })
+            continue
         pair = (entry["resource"], entry["check"])
         outcome = raw.get(pair)
         if outcome is None:
@@ -829,6 +1173,67 @@ def _verify_runtime():
         path = Path(import_module(module_name).__file__)
         if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
             raise ValueError("unexpected installed Checkov resource rule: " + relative)
+    _verify_cosmos_dispatch()
+
+
+def _verify_cosmos_dispatch():
+    """Reject new/wildcard dispatch before a pinned no-policy child can be claimed."""
+    from checkov.bicep.checks.resource.registry import registry
+
+    def graph_matches(check, kind):
+        return (
+            any(fnmatchcase(kind, pattern) for pattern in (
+                *check.resource_types, *check.connected_resources_types,
+            ))
+            or any(graph_matches(child, kind) for child in check.sub_checks)
+        )
+
+    for kind, expected in (
+        (COSMOS, set(COSMOS_CHECKS)), (COSMOS_DATABASE, set()), (COSMOS_CONTAINER, set()),
+    ):
+        actual = [check.id for check in registry.get_checks(kind)]
+        if len(actual) != len(set(actual)) or set(actual) != expected or any(
+            graph_matches(check, kind) for check in registry.graph_registry.checks
+        ):
+            raise ValueError("unqualified Cosmos policy dispatch: " + kind)
+
+
+def _cosmos_runner_inputs(entries, definitions):
+    """Compare input provenance, not policy outcomes, with type-strict literals."""
+    def literal_equal(left, right):
+        if type(left) is not type(right):
+            return False
+        if type(left) is dict:
+            return set(left) == set(right) and all(literal_equal(left[k], right[k]) for k in left)
+        if type(left) is list:
+            return len(left) == len(right) and all(literal_equal(a, b) for a, b in zip(left, right))
+        return type(left) in (str, bool, int, type(None)) and left == right
+
+    resources = {}
+    for source in definitions.values():
+        for symbol, node in source.get("resources", {}).items():
+            if node.get("type") == COSMOS:
+                resources.setdefault(COSMOS + "." + symbol, []).append(node.get("config"))
+    proofs = []
+    for entry in entries:
+        if "policy_inputs" not in entry:
+            continue
+        candidates = resources.get(entry["resource"], [])
+        config = candidates[0] if len(candidates) == 1 and isinstance(candidates[0], dict) else {}
+        properties = config.get("properties")
+        actual = {
+            **({"kind": config.get("kind")} if entry["check"] == "CKV_AZURE_140" else {}),
+            "properties": {
+                field: properties[field] for field in COSMOS_INPUTS[entry["check"]]
+                if isinstance(properties, dict) and field in properties
+            },
+        }
+        proofs.append({
+            "resource": entry["resource"], "check": entry["check"],
+            "matches_bound_ast": len(candidates) == 1 and isinstance(properties, dict)
+            and literal_equal(entry["policy_inputs"], actual),
+        })
+    return proofs
 
 
 def qualify(path, environment, instance="root"):
@@ -849,7 +1254,7 @@ def qualify(path, environment, instance="root"):
     except UnicodeError as error:
         return dict(
             schema="certigo.bicep-appservice-qualification/v2",
-            scope="literal root App Service applicability, managed identity and Cosmos network rules",
+            scope="bounded App Service controls and all pinned Cosmos account rules",
             production_adoptable=False,
             provenance=provenance,
             obligations=[],
@@ -874,7 +1279,7 @@ def qualify(path, environment, instance="root"):
         qualified, problems = reconcile(entries, resource_count, raw)
     return dict(
         schema="certigo.bicep-appservice-qualification/v2",
-        scope="literal root App Service subtype applicability, identity and Cosmos network controls only",
+        scope="bounded App Service controls and all pinned Cosmos account rules; not global compliance",
         production_adoptable=False,
         provenance=provenance,
         obligations=entries,
@@ -903,7 +1308,7 @@ def _qualify_bound_module(binding):
     if module_source is None:
         return {
             "schema": "certigo.bicep-appservice-qualification/v3",
-            "scope": "one local root-to-module binding and literal resource subset",
+            "scope": "one local binding, bounded App Service/Cosmos resources and explicit no-policy children",
             "production_adoptable": False,
             "provenance": {
                 "root_source": binding["root_source"],
@@ -935,21 +1340,36 @@ def _qualify_bound_module(binding):
     blockers.extend(inventory_problems)
     raw = None
     qualified = []
+    input_proofs = []
     if not blockers:
         with tempfile.TemporaryDirectory(prefix="certigo-bicep-module-") as temporary:
             snapshot = Path(temporary) / module_path.name
             snapshot.write_bytes(module_bytes)
-            report = Runner().run(
+            runner = Runner()
+            report = runner.run(
                 root_folder=temporary,
                 files=[str(snapshot)],
                 runner_filter=RunnerFilter(checks=list(CHECKS), show_progress_bar=False),
             )
             raw = report.get_dict()
+            input_proofs = _cosmos_runner_inputs(entries, runner.definitions)
         qualified, report_problems = reconcile(entries, resource_count, raw)
         blockers.extend(report_problems)
+        mismatched = {
+            (proof["resource"], proof["check"]) for proof in input_proofs
+            if not proof["matches_bound_ast"]
+        }
+        blockers.extend(
+            "Runner inputs differ from bound AST: " + resource + "/" + check
+            for resource, check in sorted(mismatched)
+        )
+        for row in qualified:
+            if (row["resource"], row["check"]) in mismatched and row["status"] == "PASSED":
+                row["status"] = "BLOCKED"
+                row["reason"] = "raw PASSED does not prove the explicitly bound policy inputs"
     return {
         "schema": "certigo.bicep-appservice-qualification/v3",
-        "scope": "one local root-to-module binding and literal resource subset; not root-wide",
+        "scope": "one local binding, bounded App Service/Cosmos resources and explicit no-policy children; not root-wide",
         "production_adoptable": False,
         "provenance": {
             "root_source": binding["root_source"],
@@ -966,6 +1386,7 @@ def _qualify_bound_module(binding):
         "status": "BLOCKED" if blockers else "QUALIFIED_SUBSET",
         "blockers": list(dict.fromkeys(blockers)),
         "applicability": qualified,
+        "scanner_input_provenance": input_proofs,
         "scanner_report": raw,
     }
 
@@ -1014,9 +1435,11 @@ def qualify_local_modules(path, environment, module_symbols):
         for symbol, node in root.get("resources", {}).items()
     ]
     module_snapshots = {}
+    json_snapshots = {}
     bindings = [
         resolve_local_module_bindings(
-            path, environment, symbol, _snapshot=(contents, root), _module_snapshots=module_snapshots
+            path, environment, symbol, _snapshot=(contents, root), _module_snapshots=module_snapshots,
+            _json_snapshots=json_snapshots,
         )
         for symbol in module_symbols
     ]
