@@ -271,6 +271,23 @@ struct NativeActivityStore {
 
     func save(_ bytes: Data) throws {
         _ = try NativeActivitySnapshot.decode(bytes)
+        try writeProtected(bytes)
+    }
+
+    func saveDeletionReceipt(_ receipt: NativeDeletionReceipt) throws {
+        _ = try receipt.validated()
+        let bytes = try CertigoAPI.encoder().encode(receipt)
+        guard bytes.count <= 8_192 else { throw APIError.invalidResponse }
+        try writeProtected(bytes)
+    }
+
+    func readDeletionReceipt() throws -> NativeDeletionReceipt? {
+        guard let bytes = try read() else { return nil }
+        guard bytes.count <= 8_192 else { throw APIError.invalidResponse }
+        return try CertigoAPI.decoder().decode(NativeDeletionReceipt.self, from: bytes).validated()
+    }
+
+    private func writeProtected(_ bytes: Data) throws {
         try FileManager.default.createDirectory(
             at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         #if os(iOS)
@@ -293,6 +310,36 @@ struct NativeActivityStore {
     }
 }
 
+enum NativeDeletionStage: String {
+    case explanation, verifying, confirmation, checking, pending, unconfirmed, cleanupFailed,
+        completed
+}
+
+struct NativeDeletionReceipt: Codable {
+    enum Phase: String, Codable { case unconfirmed, pending, completed }
+    let schema: Int
+    let ownerId: String?
+    let apiScope: String
+    let accountIdentifier: String
+    var phase: Phase
+    var remainingCleanup: [String]
+    var retryAt: Date?
+
+    func validated() throws -> Self {
+        guard schema == 1, let url = URL(string: apiScope),
+            try CertigoAPI(baseURL: url).scope == apiScope,
+            url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "api",
+            apiScope.utf8.count <= 2_048, !accountIdentifier.isEmpty,
+            accountIdentifier.utf8.count <= 1_024,
+            ownerId.map({ !$0.isEmpty && $0.utf8.count <= 1_024 }) ?? true,
+            Set(remainingCleanup).count == remainingCleanup.count,
+            Set(remainingCleanup).isSubset(of: ["learning", "activity", "vault", "msal"]),
+            phase == .completed || remainingCleanup.isEmpty
+        else { throw APIError.invalidResponse }
+        return self
+    }
+}
+
 @Observable @MainActor
 final class NativeModel {
     var baseURL = ""
@@ -307,6 +354,15 @@ final class NativeModel {
     private(set) var queue: [SavedSubmission] = []
     private(set) var outcome: SubmissionOutcome?
     private(set) var busy = false
+    private(set) var deletionStage: NativeDeletionStage?
+    private(set) var deletionStatus: AccountDeletion?
+    private(set) var deletionMessage: String?
+    private(set) var deletionBusy = false
+    private var deletionReceipt: NativeDeletionReceipt?
+    private var deletionClient: LearningClient?
+    private var deletionProof: CIAMDeletionProof?
+    private var deletionVerification = UUID()
+    private var deletionCanCancel = false
     var errorMessage: String?
     var selections: [String: String] = [:]
     var selectedTab: NativeResumeState.Tab = .learn {
@@ -366,13 +422,36 @@ final class NativeModel {
     }
 
     var canSubmit: Bool {
-        guard let lesson, !busy, outcome == nil, submittedRequest == nil else { return false }
+        guard deletionStage == nil, let lesson, !busy, outcome == nil, submittedRequest == nil
+        else { return false }
         return lesson.questions.allSatisfy { question in
             question.options.contains { $0.id == selections[question.id] }
         }
     }
 
+    func restoreAccountDeletionIfNeeded() async -> Bool {
+        guard authentication != nil else { return false }
+        guard !deletionBusy else { return deletionStage != nil }
+        do {
+            guard let receipt = try deletionStore().readDeletionReceipt() else { return false }
+            deletionReceipt = receipt
+            deletionStage = receipt.phase == .completed ? .cleanupFailed : .unconfirmed
+            if receipt.phase == .completed {
+                await retryDeletionCleanup()
+            } else {
+                await recoverDeletionConnection(interactive: false)
+            }
+            return true
+        } catch {
+            deletionStage = .unconfirmed
+            deletionMessage =
+                "The saved deletion state could not be read. Learning stays closed. Contact support; no completion is assumed."
+            return true
+        }
+    }
+
     func restore() async {
+        if await restoreAccountDeletionIfNeeded() { return }
         guard profile == nil, !busy,
             !defaults.bool(forKey: Self.signedOutKey)
         else { return }
@@ -392,7 +471,7 @@ final class NativeModel {
     }
 
     func connect() async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         if authentication != nil {
             await connectUsingAuthentication(interactive: true)
             return
@@ -437,6 +516,7 @@ final class NativeModel {
     }
 
     func disconnect() async {
+        guard deletionStage == nil else { return }
         let previous = client
         defaults.set(true, forKey: Self.signedOutKey)
         generation = UUID()
@@ -467,7 +547,391 @@ final class NativeModel {
         }
     }
 
+    var canReauthenticateForDeletion: Bool {
+        authentication?.provider is any CIAMAccountDeletionProvider
+    }
+
+    var canCancelDeletion: Bool { deletionCanCancel && !deletionBusy }
+
+    var requiresDeletionSurface: Bool {
+        guard let deletionStage else { return false }
+        return ![.explanation, .verifying, .confirmation].contains(deletionStage)
+    }
+
+    var canRetryDeletion: Bool {
+        deletionStage == .pending && !deletionBusy
+            && (deletionReceipt?.retryAt.map { $0 <= now() } ?? true)
+    }
+
+    func showAccountDeletion() {
+        guard !busy, deletionStage == nil else { return }
+        deletionMessage = nil
+        deletionCanCancel = true
+        deletionStage = .explanation
+    }
+
+    private func deletionStore() throws -> NativeActivityStore {
+        NativeActivityStore(
+            file: try activityStore().file.deletingLastPathComponent()
+                .appendingPathComponent("account-deletion-v1.json"))
+    }
+
+    private func saveDeletionReceipt(_ value: NativeDeletionReceipt) throws {
+        try deletionStore().saveDeletionReceipt(value)
+        deletionReceipt = value
+    }
+
+    func verifyDeletionIdentity() async {
+        guard !deletionBusy, !busy, deletionCanCancel,
+            let authentication,
+            let provider = authentication.provider as? any CIAMAccountDeletionProvider,
+            let account = provider.deletionAccountIdentifier,
+            let profile, let apiScope
+        else {
+            deletionMessage =
+                "Remote deletion requires a configured Microsoft sign-in. Demo and manual development tokens cannot verify recent identity."
+            return
+        }
+        let marker = generation
+        let verification = UUID()
+        deletionVerification = verification
+        deletionBusy = true
+        deletionStage = .verifying
+        deletionMessage = nil
+        defer { deletionBusy = false }
+        do {
+            if deletionClient == nil {
+                guard let active = client else { throw APIError.unauthorized }
+                client = nil
+                resumeReady = false
+                deletionClient = active
+                let owner = try await active.pauseForAccountDeletion()
+                guard generation == marker, owner == profile.id else { throw APIError.staleSession }
+            }
+            guard let deletionClient else { throw APIError.unauthorized }
+            let receipt = NativeDeletionReceipt(
+                schema: 1, ownerId: profile.id, apiScope: apiScope,
+                accountIdentifier: account, phase: .unconfirmed, remainingCleanup: [])
+            deletionReceipt = receipt
+            let status = try await deletionClient.accountDeletion()
+            guard generation == marker, deletionVerification == verification else { return }
+            if status.status != .notRequested {
+                try await acceptDeletionStatus(status)
+                return
+            }
+            let proof = try await provider.reauthenticateForAccountDeletion()
+            guard generation == marker, deletionVerification == verification,
+                provider.deletionAccountIdentifier == account
+            else { return }
+            deletionProof = try proof.validated(
+                expectedAccount: account, clientID: authentication.configuration.clientID,
+                now: now())
+            deletionStage = .confirmation
+        } catch {
+            guard generation == marker, deletionVerification == verification else { return }
+            deletionProof = nil
+            deletionStage = deletionCanCancel ? .explanation : .unconfirmed
+            deletionMessage = deletionError(error)
+        }
+    }
+
+    func discardDeletionProof() {
+        deletionVerification = UUID()
+        deletionProof = nil
+        if deletionStage == .confirmation || deletionStage == .verifying {
+            deletionStage = .explanation
+            deletionMessage =
+                "Identity verification was cancelled. Verify again before confirming deletion."
+        }
+    }
+
+    func cancelAccountDeletion() async {
+        guard deletionCanCancel, !deletionBusy else { return }
+        discardDeletionProof()
+        deletionBusy = true
+        defer { deletionBusy = false }
+        do {
+            if let deletionClient {
+                try await deletionClient.cancelAccountDeletion()
+                client = deletionClient
+            }
+            try deletionStore().clear()
+            deletionClient = nil
+            deletionReceipt = nil
+            deletionStatus = nil
+            deletionStage = nil
+            deletionMessage = nil
+            resumeReady = true
+        } catch {
+            deletionMessage =
+                "Deletion was not submitted, but the local session could not be resumed. Retry cancellation."
+        }
+    }
+
+    func confirmAccountDeletion() async {
+        guard deletionStage == .confirmation, !deletionBusy,
+            let authentication,
+            let provider = authentication.provider as? any CIAMAccountDeletionProvider,
+            let proof = deletionProof, var receipt = deletionReceipt,
+            provider.deletionAccountIdentifier == receipt.accountIdentifier,
+            let deletionClient
+        else { return }
+        let marker = generation
+        deletionBusy = true
+        deletionMessage = nil
+        defer { deletionBusy = false }
+        do {
+            _ = try proof.validated(
+                expectedAccount: receipt.accountIdentifier,
+                clientID: authentication.configuration.clientID, now: now())
+            receipt.phase = .unconfirmed
+            try saveDeletionReceipt(receipt)
+            deletionCanCancel = false
+            deletionProof = nil
+            deletionStage = .checking
+            let status = try await deletionClient.accountDeletion(
+                submit: true, proof: proof.idToken)
+            guard generation == marker else { return }
+            try await acceptDeletionStatus(status)
+        } catch {
+            guard generation == marker else { return }
+            deletionProof = nil
+            deletionStage = deletionCanCancel ? .explanation : .unconfirmed
+            deletionMessage = deletionError(error)
+        }
+    }
+
+    func refreshDeletionStatus() async {
+        guard !deletionBusy, deletionReceipt?.phase != .completed, let deletionClient else {
+            return
+        }
+        deletionBusy = true
+        deletionMessage = nil
+        let marker = generation
+        defer { deletionBusy = false }
+        do {
+            let status = try await deletionClient.accountDeletion()
+            guard generation == marker else { return }
+            try await acceptDeletionStatus(status)
+        } catch {
+            guard generation == marker else { return }
+            deletionStage = .unconfirmed
+            deletionMessage = deletionError(error)
+        }
+    }
+
+    func retryAccountDeletion() async {
+        guard canRetryDeletion, let deletionClient else { return }
+        deletionBusy = true
+        deletionMessage = nil
+        let marker = generation
+        defer { deletionBusy = false }
+        do {
+            let status = try await deletionClient.accountDeletion(submit: true)
+            guard generation == marker else { return }
+            try await acceptDeletionStatus(status)
+        } catch {
+            guard generation == marker else { return }
+            deletionStage = .unconfirmed
+            deletionMessage = deletionError(error)
+        }
+    }
+
+    private func acceptDeletionStatus(_ status: AccountDeletion) async throws {
+        guard var receipt = deletionReceipt else { throw APIError.invalidResponse }
+        deletionStatus = status
+        deletionProof = nil
+        switch status.status {
+        case .notRequested:
+            deletionStage = .unconfirmed
+            deletionMessage =
+                "The server reports no deletion request. Sign in to the same account and verify identity before a new confirmation."
+        // A deletion-only recovery does not fabricate a learning profile.
+        case .pending:
+            receipt.phase = .pending
+            receipt.retryAt = status.retryAfterSeconds.map { now().addingTimeInterval(Double($0)) }
+            deletionCanCancel = false
+            deletionReceipt = receipt
+            try saveDeletionReceipt(receipt)
+            deletionStage = .pending
+        case .completed:
+            receipt.phase = .completed
+            receipt.retryAt = nil
+            receipt.remainingCleanup = ["learning", "activity", "vault", "msal"]
+            // The durable completion receipt precedes every local destructive action.
+            deletionReceipt = receipt
+            deletionCanCancel = false
+            generation = UUID()
+            clearSession()
+            defaults.set(true, forKey: Self.signedOutKey)
+            await performDeletionCleanup()
+        }
+    }
+
+    func recoverDeletionConnection(interactive: Bool) async {
+        guard !deletionBusy, let receipt = deletionReceipt, receipt.phase != .completed,
+            let authentication,
+            let provider = authentication.provider as? any CIAMAccountDeletionProvider,
+            authentication.configuration.apiBaseURL.absoluteString == receipt.apiScope
+        else { return }
+        deletionBusy = true
+        deletionCanCancel = false
+        deletionMessage = nil
+        let marker = generation
+        do {
+            let acquired: CIAMAccessToken
+            if interactive {
+                acquired = try await provider.acquireInteractively()
+            } else {
+                acquired = try await provider.acquireSilently()
+            }
+
+            guard generation == marker else {
+                deletionBusy = false
+                return
+            }
+            guard provider.deletionAccountIdentifier == receipt.accountIdentifier else {
+                throw CIAMAuthenticationFailure.accountChanged
+            }
+            guard acquired.expiresAt > now() else { throw CIAMAuthenticationFailure.invalidToken }
+            let next = try makeClient(authentication.configuration.apiBaseURL)
+            await next.recoverAccountDeletion(accessToken: acquired.value, ownerId: receipt.ownerId)
+            guard generation == marker else {
+                deletionBusy = false
+                return
+            }
+            deletionClient = next
+            deletionBusy = false
+            await refreshDeletionStatus()
+        } catch {
+            deletionBusy = false
+            guard generation == marker else { return }
+            deletionStage = .unconfirmed
+            deletionMessage = deletionError(error)
+        }
+    }
+
+    func resumeAccountAfterStatusCheck() async {
+        guard deletionStatus?.status == .notRequested, !deletionBusy,
+            deletionReceipt?.phase != .completed
+        else { return }
+        do {
+            try deletionStore().clear()
+            await deletionClient?.disconnect()
+            deletionClient = nil
+            deletionReceipt = nil
+            deletionStage = nil
+            deletionStatus = nil
+            deletionMessage = nil
+            await connectUsingAuthentication(interactive: false)
+        } catch {
+            deletionMessage =
+                "No deletion is recorded, but local recovery could not finish. Retry; no data was removed."
+        }
+    }
+
+    func retryDeletionCleanup() async {
+        guard !deletionBusy, deletionReceipt?.phase == .completed else { return }
+        deletionBusy = true
+        generation = UUID()
+        clearSession()
+        defaults.set(true, forKey: Self.signedOutKey)
+        await performDeletionCleanup()
+        deletionBusy = false
+    }
+
+    private func performDeletionCleanup() async {
+        deletionStage = .cleanupFailed
+        do {
+            guard var receipt = deletionReceipt, receipt.phase == .completed else {
+                throw APIError.invalidResponse
+            }
+            try saveDeletionReceipt(receipt)
+            guard let owner = receipt.ownerId, let url = URL(string: receipt.apiScope) else {
+                deletionMessage =
+                    "Account deletion is confirmed, but this device has no verified local owner binding. Local cleanup is unconfirmed; contact support."
+                return
+            }
+            while let target = receipt.remainingCleanup.first {
+                switch target {
+                case "learning":
+                    let cleaner = try deletionClient ?? makeClient(url)
+                    deletionClient = cleaner
+                    try await cleaner.purgeDeletedAccount(ownerId: owner)
+                case "activity":
+                    let store = try activityStore()
+                    if let bytes = try store.read() {
+                        let saved = try NativeActivitySnapshot.decode(bytes)
+                        if saved.navigation.ownerId == owner
+                            && saved.navigation.apiScope == receipt.apiScope
+                        {
+                            try store.clear()
+                        }
+                    }
+                case "vault":
+                    try vault.clear()
+                case "msal":
+                    guard
+                        let provider = authentication?.provider as? any CIAMAccountDeletionProvider
+                    else {
+                        throw CIAMAuthenticationFailure.configuration
+                    }
+                    try await provider.removeAccountForDeletion(
+                        identifier: receipt.accountIdentifier)
+                default: throw APIError.invalidResponse
+                }
+                receipt.remainingCleanup.removeFirst()
+                try saveDeletionReceipt(receipt)
+            }
+            deletionClient = nil
+            deletionStage = .completed
+            deletionMessage = nil
+        } catch {
+            deletionStage = .cleanupFailed
+            deletionMessage =
+                "Account deleted; some data on this device could not be removed. Retry cleanup. No further server deletion request will be sent."
+        }
+    }
+
+    func acknowledgeAccountDeletion() {
+        guard deletionStage == .completed, !deletionBusy else { return }
+        do {
+            try deletionStore().clear()
+            deletionReceipt = nil
+            deletionStatus = nil
+            deletionStage = nil
+            deletionMessage = nil
+        } catch {
+            deletionMessage = "The completion receipt could not be cleared. Retry acknowledgement."
+        }
+    }
+
+    private func deletionError(_ error: Error) -> String {
+        switch error {
+        case CIAMAuthenticationFailure.cancelled:
+            return "Microsoft verification was cancelled. Nothing was submitted."
+        case CIAMAuthenticationFailure.accountChanged:
+            return
+                "A different Microsoft account was returned. Sign in with the original account; no deletion was submitted for this identity."
+        case APIError.unauthorized:
+            return
+                "Account status is unconfirmed. Sign in with the same Microsoft account to check it. A rejected token does not prove deletion."
+        case APIError.http(403), CIAMAuthenticationFailure.invalidToken:
+            return
+                "Recent Microsoft authentication was not accepted. Verify identity again. No deletion is confirmed."
+        case APIError.http(503):
+            return "Account deletion is unavailable on this service. No local data was removed."
+        case APIError.configuration:
+            return
+                "Account deletion requires the verified /api service configuration. Contact support; no request was sent."
+        default:
+            return
+                "The account operation was not confirmed. Check status before retrying. Local data was preserved."
+        }
+    }
+
     private func clearSession() {
+        deletionProof = nil
         resumeReady = false
         apiScope = nil
         selectedTab = .learn
@@ -492,7 +956,7 @@ final class NativeModel {
     }
 
     private func connectUsingAuthentication(interactive: Bool) async {
-        guard let authentication, !busy else { return }
+        guard deletionStage == nil, let authentication, !busy else { return }
         let previous = client
         let marker = UUID()
         generation = marker
@@ -519,7 +983,26 @@ final class NativeModel {
                 acquired.value.rangeOfCharacter(from: .whitespacesAndNewlines) == nil
             else { throw CIAMAuthenticationFailure.invalidToken }
             let next = try makeClient(authentication.configuration.apiBaseURL)
-            let loadedProfile = try await next.connect(accessToken: acquired.value)
+            let loadedProfile: Profile
+            do {
+                loadedProfile = try await next.connect(accessToken: acquired.value)
+            } catch APIError.http(423) {
+                guard generation == marker,
+                    let provider = authentication.provider as? any CIAMAccountDeletionProvider,
+                    let account = provider.deletionAccountIdentifier
+                else { throw CIAMAuthenticationFailure.accountMissing }
+                let receipt = NativeDeletionReceipt(
+                    schema: 1, ownerId: nil,
+                    apiScope: authentication.configuration.apiBaseURL.absoluteString,
+                    accountIdentifier: account, phase: .unconfirmed, remainingCleanup: [])
+                try saveDeletionReceipt(receipt)
+                clearSession()
+                deletionStage = .unconfirmed
+                deletionClient = next
+                await next.recoverAccountDeletion(accessToken: acquired.value, ownerId: nil)
+                await refreshDeletionStatus()
+                return
+            }
             guard generation == marker else {
                 await next.disconnect()
                 return
@@ -571,13 +1054,13 @@ final class NativeModel {
     }
 
     func refreshAuthenticationIfNeeded() async {
-        guard authentication != nil, profile != nil, !busy else { return }
+        guard deletionStage == nil, authentication != nil, profile != nil, !busy else { return }
         if let tokenExpiresAt, tokenExpiresAt > now().addingTimeInterval(30) { return }
         await connectUsingAuthentication(interactive: false)
     }
 
     func chooseActiveTrack(_ track: Track) async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         let owner = profile?.id
         await refreshAuthenticationIfNeeded()
         guard let client, let profile, !busy else { return }
@@ -628,7 +1111,7 @@ final class NativeModel {
     }
 
     func loadPath(_ track: Track) async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         let owner = profile?.id
         await refreshAuthenticationIfNeeded()
         guard let client, let profile, !busy else { return }
@@ -657,7 +1140,7 @@ final class NativeModel {
     }
 
     func downloadQuestionPack(_ track: Track) async {
-        guard let client, !busy else { return }
+        guard deletionStage == nil, let client, !busy else { return }
         let marker = generation
         busy = true
         errorMessage = nil
@@ -677,6 +1160,7 @@ final class NativeModel {
     }
 
     func openCachedLesson(_ id: String) async {
+        guard deletionStage == nil else { return }
         guard let pack = offlinePack, pack.lessons.contains(where: { $0.id == id }) else {
             report(RuntimeStoreError.missingFile)
             return
@@ -685,7 +1169,7 @@ final class NativeModel {
     }
 
     func restoreDownloadedActivity() async {
-        guard !busy, client != nil, profile != nil else { return }
+        guard deletionStage == nil, !busy, client != nil, profile != nil else { return }
         let marker = generation
         busy = true
         errorMessage = nil
@@ -694,6 +1178,7 @@ final class NativeModel {
     }
 
     func loadLesson(_ node: PathLesson) async {
+        guard deletionStage == nil else { return }
         guard let path,
             path.units.flatMap(\.lessons).contains(where: { $0.id == node.id && $0.canOpen })
         else {
@@ -704,7 +1189,7 @@ final class NativeModel {
     }
 
     private func loadLessonValue(id: String, cachedPack: OfflineQuestionPack?) async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         let owner = profile?.id
         if cachedPack == nil { await refreshAuthenticationIfNeeded() }
         guard let client, !busy else { return }
@@ -785,7 +1270,7 @@ final class NativeModel {
     }
 
     func loadEditorialPilot() async throws {
-        guard !busy else { throw NativePilotError.operationInProgress }
+        guard deletionStage == nil, !busy else { throw NativePilotError.operationInProgress }
         guard let owner = profile?.id else { throw NativePilotError.connectionRequired }
         await refreshAuthenticationIfNeeded()
         guard let client, profile?.id == owner, !busy else {
@@ -817,7 +1302,7 @@ final class NativeModel {
     }
 
     private func updateEditorialPilotLesson(_ lessonId: String, markRead: Bool) async throws {
-        guard !busy else { throw NativePilotError.operationInProgress }
+        guard deletionStage == nil, !busy else { throw NativePilotError.operationInProgress }
         guard let owner = profile?.id, let snapshot = editorialPilot,
             snapshot.pilot.lessons.contains(where: { $0.id == lessonId })
         else { throw NativePilotError.lessonUnavailable }
@@ -843,11 +1328,12 @@ final class NativeModel {
     }
 
     func questionAppeared(_ id: String) {
+        guard deletionStage == nil else { return }
         if questionStarted[id] == nil { questionStarted[id] = ContinuousClock.now }
     }
 
     func select(_ option: QuizOption, question: QuizItem) {
-        guard outcome == nil, submittedRequest == nil, !busy else { return }
+        guard deletionStage == nil, outcome == nil, submittedRequest == nil, !busy else { return }
         guard let actual = lesson?.questions.first(where: { $0.id == question.id }),
             actual.options.contains(where: { $0.id == option.id })
         else {
@@ -866,7 +1352,7 @@ final class NativeModel {
     }
 
     func submit() async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         let owner = profile?.id
         await refreshAuthenticationIfNeeded()
         guard profile?.id == owner else {
@@ -924,7 +1410,7 @@ final class NativeModel {
     }
 
     func retry(_ saved: SavedSubmission) async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         await refreshAuthenticationIfNeeded()
         guard let client, !busy else { return }
         let marker = generation
@@ -970,7 +1456,7 @@ final class NativeModel {
     }
 
     func refreshProgress() async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         await refreshAuthenticationIfNeeded()
         guard let client, let path, !busy else { return }
         let marker = generation
@@ -1021,6 +1507,7 @@ final class NativeModel {
     }
 
     private func persistActivity() {
+        guard deletionStage == nil else { return }
         do { try saveActivity() } catch {
             errorMessage =
                 "This activity could not be saved for reopening. Keep the app open and retry your selection."

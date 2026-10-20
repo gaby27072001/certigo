@@ -231,8 +231,28 @@ public struct CertigoAPI: Sendable {
         return try Self.decode(QuizResult.self, from: data).validated(for: submission)
     }
 
+    public func accountDeletion(accessToken: String, proof: String? = nil, submit: Bool = false)
+        async throws -> AccountDeletion
+    {
+        // Functions exposes this route under /api, not the versioned learning prefix.
+        guard baseURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "api"
+        else { throw APIError.configuration }
+        let (data, response) = try await request(
+            ["account", "deletion"], token: accessToken, method: submit ? "POST" : "GET",
+            reauthentication: proof)
+        let value = try Self.decode(AccountDeletion.self, from: data).validated()
+        guard
+            submit
+                ? ((response.statusCode == 202 && value.status == .pending)
+                    || (response.statusCode == 200 && value.status == .completed))
+                : response.statusCode == 200
+        else { throw APIError.invalidResponse }
+        return value
+    }
+
     private func request(
-        _ segments: [String], token: String, body: Data? = nil, method: String? = nil
+        _ segments: [String], token: String, body: Data? = nil, method: String? = nil,
+        reauthentication: String? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         guard !token.isEmpty, !token.contains("\r"), !token.contains("\n") else {
             throw APIError.unauthorized
@@ -252,6 +272,13 @@ public struct CertigoAPI: Sendable {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(UUID().uuidString, forHTTPHeaderField: "x-correlation-id")
+        if let reauthentication {
+            guard !reauthentication.isEmpty,
+                reauthentication.utf8.count <= 32_768,
+                reauthentication.rangeOfCharacter(from: .whitespacesAndNewlines) == nil
+            else { throw APIError.configuration }
+            request.setValue(reauthentication, forHTTPHeaderField: "X-Certigo-Reauthentication")
+        }
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let data: Data
         let response: HTTPURLResponse
