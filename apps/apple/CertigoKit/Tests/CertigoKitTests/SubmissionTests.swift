@@ -14,6 +14,7 @@ actor RoutingTransport: HTTPTransport {
     var profileWaiter: CheckedContinuation<Void, Never>?
     var pauseProfile = false
     private var resultBody: Data?
+    private var postFailure: URLError.Code?
 
     func setOwner(_ value: String) { owner = value }
     func setOffline(_ value: Bool) { offline = value }
@@ -25,6 +26,7 @@ actor RoutingTransport: HTTPTransport {
     func isWaiting() -> Bool { profileWaiter != nil }
     func posts() -> [Data] { postPayloads }
     func setResult(_ body: Data) { resultBody = body }
+    func setPostFailure(_ code: URLError.Code?) { postFailure = code }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let body: Data
@@ -32,6 +34,7 @@ actor RoutingTransport: HTTPTransport {
             postCount += 1
             postPayloads.append(request.httpBody!)
             if offline { throw URLError(.notConnectedToInternet) }
+            if let postFailure { throw URLError(postFailure) }
             body = try resultBody ?? fixture("result")
         } else {
             let capturedOwner = owner
@@ -52,7 +55,6 @@ actor RoutingTransport: HTTPTransport {
         )
     }
 }
-@MainActor
 final class SubmissionTests: XCTestCase {
     private func withFile(
         _ operation: (URL) async throws -> Void
@@ -182,6 +184,93 @@ final class SubmissionTests: XCTestCase {
             }
             let payloads = await transport.posts()
             XCTAssertEqual(payloads.count, 1)
+        }
+    }
+
+    func testCancelledSubmissionRemainsPendingAndCanReplayAfterRestart() async throws {
+        try await checkCancelledRequest(retrying: false)
+    }
+
+    func testCancelledRetryRemainsPendingAndCanReplayAfterRestart() async throws {
+        try await checkCancelledRequest(retrying: true)
+    }
+
+    func testNonCancellationTransportFailureStillRequiresReview() async throws {
+        try await withFile { file in
+            let transport = RoutingTransport()
+            let api = try CertigoAPI(
+                baseURL: URL(string: "https://example.invalid/api")!, transport: transport)
+            let client = LearningClient(api: api, store: SubmissionStore(file: file))
+            _ = try await client.connect(accessToken: "test-only")
+            await transport.setPostFailure(.secureConnectionFailed)
+            do {
+                _ = try await client.submit(
+                    lessonId: "fixture-lesson", submission: submission())
+                XCTFail("An unsafe connection must not become a successful outcome")
+            } catch let error as APIError {
+                XCTAssertEqual(error, .transport(URLError.secureConnectionFailed.rawValue))
+            }
+            let entries = try await SubmissionStore(file: file).entries(
+                ownerId: "owner-A", apiScope: api.scope)
+            let entry = try XCTUnwrap(entries.first)
+            XCTAssertEqual(entry.status, .failed)
+            XCTAssertNil(entry.result)
+            XCTAssertNotNil(entry.failureCategory)
+        }
+    }
+
+    private func checkCancelledRequest(retrying: Bool) async throws {
+        try await withFile { file in
+            let transport = RoutingTransport()
+            let api = try CertigoAPI(
+                baseURL: URL(string: "https://example.invalid/api")!, transport: transport)
+            let client = LearningClient(api: api, store: SubmissionStore(file: file))
+            _ = try await client.connect(accessToken: "test-only")
+            if retrying {
+                await transport.setOffline(true)
+                let pending = try await client.submit(
+                    lessonId: "fixture-lesson", submission: submission())
+                XCTAssertEqual(pending, .pendingCorrection)
+                await transport.setOffline(false)
+            }
+            await transport.setPostFailure(.cancelled)
+            do {
+                if retrying {
+                    _ = try await client.retry(attemptId: submission().clientAttemptId)
+                } else {
+                    _ = try await client.submit(
+                        lessonId: "fixture-lesson", submission: submission())
+                }
+                XCTFail("Cancellation must propagate, not become a successful outcome")
+            } catch let error as APIError {
+                XCTAssertEqual(error, .transport(URLError.cancelled.rawValue))
+                XCTAssertFalse(error.isRetryable)
+            }
+            await client.disconnect()
+            let reopened = LearningClient(api: api, store: SubmissionStore(file: file))
+            _ = try await reopened.connect(accessToken: "test-only")
+            let entries = try await reopened.savedSubmissions()
+            XCTAssertEqual(entries.count, 1)
+            let entry = try XCTUnwrap(entries.first)
+            XCTAssertEqual(entry.submission, submission())
+            XCTAssertNil(entry.result)
+            XCTAssertNil(entry.failureCategory)
+            guard entry.status == .pendingCorrection else {
+                return XCTFail("Cancellation permanently rejected an unconfirmed submission")
+            }
+            await transport.setPostFailure(nil)
+            let corrected = try await reopened.retry(attemptId: entry.id)
+            guard case .corrected(let result) = corrected else {
+                return XCTFail("Preserved attempt could not be corrected")
+            }
+            XCTAssertEqual(result.rewards.xpEarned, 10)
+            let replayed = try await reopened.retry(attemptId: entry.id)
+            XCTAssertEqual(replayed, corrected)
+            let payloads = await transport.posts()
+            XCTAssertEqual(payloads.count, retrying ? 3 : 2)
+            XCTAssertTrue(payloads.allSatisfy { $0 == payloads.first })
+            let saved = try await reopened.savedSubmissions()
+            XCTAssertEqual(saved.first?.status, .corrected)
         }
     }
 
