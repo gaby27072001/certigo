@@ -283,6 +283,39 @@ public final class RuntimeContentStore: @unchecked Sendable {
         }
     }
 
+    public func purge(ownerId: String, apiScope: String) throws {
+        try transaction {
+            try scope(ownerId, apiScope)
+            var state = try archive()
+            let entries = try disk.entries()
+            var removed: [String] = []
+            var retainedBlobs: Set<String> = []
+            for entry in entries where entry.name.hasPrefix("x-") {
+                let capsule = try readCapsule(entry.name)
+                if capsule.ownerId == ownerId && capsule.apiScope == apiScope {
+                    removed.append(entry.name)
+                } else {
+                    let value = try snapshot(
+                        entry.name, ownerId: capsule.ownerId, apiScope: capsule.apiScope)
+                    for file in value.manifest.files {
+                        retainedBlobs.insert(try blobName(file.hash))
+                    }
+                }
+            }
+            state.scopes.removeAll { $0.ownerId == ownerId && $0.apiScope == apiScope }
+            state.pins.removeAll { $0.ownerId == ownerId && $0.apiScope == apiScope }
+            // Commit revocation before removing capsules; retry can finish interrupted cleanup.
+            try persist(&state)
+            for name in removed { try disk.remove(name) }
+            for entry in entries
+            where entry.name.hasPrefix("b-")
+                && !retainedBlobs.contains(entry.name)
+            {
+                try disk.remove(entry.name)
+            }
+        }
+    }
+
     private func verifiedFile(_ file: PublicPackageFile) throws -> Data? {
         guard
             let bytes = try disk.read(

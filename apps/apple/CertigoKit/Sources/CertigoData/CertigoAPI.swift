@@ -231,8 +231,44 @@ public struct CertigoAPI: Sendable {
         return try Self.decode(QuizResult.self, from: data).validated(for: submission)
     }
 
+    public func history(
+        credentials: APICredentials, limit: Int = 20, cursor: String? = nil
+    ) async throws -> LearningHistoryPage {
+        guard baseURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "api",
+            (1...50).contains(limit), LearningHistoryPage.validCursor(cursor)
+        else { throw APIError.configuration }
+        var query = [URLQueryItem(name: "limit", value: String(limit))]
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        let (data, response) = try await request(
+            ["me", "history"], token: credentials.accessToken, query: query)
+        guard response.statusCode == 200 else { throw APIError.invalidResponse }
+        let page = try Self.decode(LearningHistoryPage.self, from: data)
+        guard page.items.count <= limit else { throw APIError.invalidResponse }
+        return page
+    }
+
+    public func accountDeletion(accessToken: String, proof: String? = nil, submit: Bool = false)
+        async throws -> AccountDeletion
+    {
+        // Functions exposes this route under /api, not the versioned learning prefix.
+        guard baseURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "api"
+        else { throw APIError.configuration }
+        let (data, response) = try await request(
+            ["account", "deletion"], token: accessToken, method: submit ? "POST" : "GET",
+            reauthentication: proof)
+        let value = try Self.decode(AccountDeletion.self, from: data).validated()
+        guard
+            submit
+                ? ((response.statusCode == 202 && value.status == .pending)
+                    || (response.statusCode == 200 && value.status == .completed))
+                : response.statusCode == 200
+        else { throw APIError.invalidResponse }
+        return value
+    }
+
     private func request(
-        _ segments: [String], token: String, body: Data? = nil, method: String? = nil
+        _ segments: [String], token: String, body: Data? = nil, method: String? = nil,
+        reauthentication: String? = nil, query: [URLQueryItem] = []
     ) async throws -> (Data, HTTPURLResponse) {
         guard !token.isEmpty, !token.contains("\r"), !token.contains("\n") else {
             throw APIError.unauthorized
@@ -246,12 +282,28 @@ public struct CertigoAPI: Sendable {
             }
             url.appendPathComponent(segment)
         }
+        if !query.isEmpty {
+            guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+                throw APIError.configuration
+            }
+            components.queryItems = query
+            guard let queryURL = components.url else { throw APIError.configuration }
+            url = queryURL
+        }
         var request = URLRequest(url: url)
+        if !query.isEmpty { request.cachePolicy = .reloadIgnoringLocalCacheData }
         request.httpMethod = method ?? (body == nil ? "GET" : "POST")
         request.httpBody = body
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(UUID().uuidString, forHTTPHeaderField: "x-correlation-id")
+        if let reauthentication {
+            guard !reauthentication.isEmpty,
+                reauthentication.utf8.count <= 32_768,
+                reauthentication.rangeOfCharacter(from: .whitespacesAndNewlines) == nil
+            else { throw APIError.configuration }
+            request.setValue(reauthentication, forHTTPHeaderField: "X-Certigo-Reauthentication")
+        }
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let data: Data
         let response: HTTPURLResponse

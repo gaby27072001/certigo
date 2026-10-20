@@ -15,7 +15,8 @@ from checkov.arm.checks.resource.AppServicePublicAccessDisabled import check as 
 from checkov.arm.checks.resource.AppServiceHttpLoggingEnabled import check as logging
 
 from bicep_ingress_candidate import (
-    CONFIG_CHECKS, RULE_SOURCES, inventory, qualify, reconcile,
+    CONFIG_CHECKS, RULE_SOURCES, inventory, qualify, qualify_local_module,
+    reconcile, resolve_local_module_bindings,
 )
 
 
@@ -67,6 +68,36 @@ COSMOS = """resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' 
 FULL = SITE + WEB + AUTH + CHILD
 PARENT = "Microsoft.Web/sites.site"
 SETTINGS = "Microsoft.Web/sites/config.settings"
+MODULE_ROOT = """@allowed([ 'dev', 'staging', 'prod' ])
+param env string
+var authMode = env == 'dev' ? 'dev' : 'prod'
+module api './modules/functionApp.bicep' = {
+ name: 'api'
+ params: {
+  allowedCorsOrigins: env == 'dev' ? [ '*' ] : []
+  authMode: authMode
+ }
+}
+"""
+MODULE_SOURCE = """param allowedCorsOrigins array
+param authMode string
+resource site 'Microsoft.Web/sites@2024-04-01' = {
+ name: 'fixture'
+ properties: {
+  publicNetworkAccess: 'Disabled'
+  siteConfig: { cors: { allowedOrigins: allowedCorsOrigins } }
+ }
+ identity: {
+  type: 'SystemAssigned, UserAssigned'
+  userAssignedIdentities: { 'UAMI_ID': {} }
+ }
+}
+""".replace("UAMI_ID", UAMI) + WEB + AUTH + """resource settings 'Microsoft.Web/sites/config@2024-04-01' = {
+ parent: site
+ name: 'appsettings'
+ properties: { AUTH_MODE: authMode }
+}
+"""
 
 
 class CandidateTests(unittest.TestCase):
@@ -214,12 +245,93 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual(len(secure["obligations"]), 1)
         self.assertEqual(secure["obligations"][0]["check"], "CKV_AZURE_99")
         self.assertEqual(secure["obligations"][0]["resource"], "Microsoft.DocumentDB/databaseAccounts.account")
+        safe_record = next(
+            row for row in secure["scanner_report"]["results"]["passed_checks"]
+            if row["check_id"] == "CKV_AZURE_99"
+        )
+        self.assertEqual(safe_record["check_result"]["result"], "PASSED")
         unsafe = self.run_source(COSMOS.replace("'Disabled'", "'Enabled'"))
         self.assert_blocked(unsafe)
         self.assertEqual(unsafe["applicability"][0]["status"], "FAILED")
+        unsafe_record = next(
+            row for row in unsafe["scanner_report"]["results"]["failed_checks"]
+            if row["check_id"] == "CKV_AZURE_99"
+        )
+        self.assertEqual(unsafe_record["check_result"]["result"], "FAILED")
         combined = self.run_source(FULL + COSMOS)
         self.assertEqual(combined["status"], "QUALIFIED_SUBSET", combined["blockers"])
         self.assertEqual(len(combined["obligations"]), 21)
+
+    def test_local_module_resolves_explicit_environment_bindings_before_real_runner(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "main.bicep"
+            module_dir = Path(temporary) / "modules"
+            module_dir.mkdir()
+            module_path = module_dir / "functionApp.bicep"
+            root.write_text(MODULE_ROOT, encoding="utf-8")
+            module_path.write_text(MODULE_SOURCE, encoding="utf-8")
+            expected = {
+                "dev": (["*"], "dev"),
+                "staging": ([], "prod"),
+                "prod": ([], "prod"),
+            }
+            for environment, (origins, auth_mode) in expected.items():
+                bindings = resolve_local_module_bindings(root, environment)
+                self.assertEqual(bindings["blockers"], [])
+                values = bindings["values"]
+                self.assertEqual(values["allowedCorsOrigins"], origins)
+                self.assertEqual(values["authMode"], auth_mode)
+            result = qualify_local_module(root, "staging")
+            self.assertEqual(result["status"], "QUALIFIED_SUBSET", result["blockers"])
+            self.assertEqual(result["schema"], "certigo.bicep-appservice-qualification/v3")
+            self.assertFalse(result["production_adoptable"])
+            self.assertEqual(result["binding_resolution"]["module_sha256"],
+                             hashlib.sha256(module_path.read_bytes()).hexdigest())
+            self.assertEqual(result["provenance"]["root_sha256"],
+                             hashlib.sha256(root.read_bytes()).hexdigest())
+            self.assertEqual(result["provenance"]["module_instance"], "root/api")
+            settings = next(row for row in result["obligations"]
+                            if row["resource"] == SETTINGS)
+            self.assertEqual(settings["subtype"], "appsettings")
+            self.assertEqual(result["scanner_report"]["summary"]["resource_count"], 4)
+
+    def test_unresolved_local_module_binding_blocks_before_runner_and_redacts_secure_values(self):
+        root_source = MODULE_ROOT.replace(
+            "param env string",
+            "param env string\n@secure()\nparam deploymentSecret string",
+        ).replace(
+            "authMode: authMode",
+            "authMode: authMode\n deploymentSecret: deploymentSecret",
+        )
+        module_source = MODULE_SOURCE.replace(
+            "param authMode string",
+            "@secure()\nparam deploymentSecret string\nparam authMode string",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "main.bicep"
+            module_dir = Path(temporary) / "modules"
+            module_dir.mkdir()
+            (module_dir / "functionApp.bicep").write_text(module_source, encoding="utf-8")
+            root.write_text(root_source, encoding="utf-8")
+            result = qualify_local_module(root, "prod")
+            self.assertEqual(result["status"], "BLOCKED")
+            self.assertIsNone(result["scanner_report"])
+            binding = result["binding_resolution"]
+            secret = next(item for item in binding["parameters"]
+                          if item["parameter"] == "deploymentSecret")
+            self.assertFalse(secret["resolved"])
+            self.assertTrue(secret["secure"])
+            self.assertNotIn("value", secret)
+            self.assertTrue(any("deploymentSecret" in blocker
+                                for blocker in result["blockers"]))
+
+    def test_repository_function_app_binding_stays_blocked_on_unsupported_root_syntax(self):
+        infra = Path(__file__).resolve().parents[2] / "infra"
+        result = qualify_local_module(infra / "main.bicep", "staging")
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIsNone(result["scanner_report"])
+        self.assertTrue(any("root source parsing failed" in blocker
+                            for blocker in result["blockers"]))
 
     def test_unknown_bindings_subtypes_or_properties_block_before_runner(self):
         for source in (

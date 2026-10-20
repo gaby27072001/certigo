@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import { chmod, link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, link, mkdir, mkdtemp, open, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -324,10 +324,28 @@ test('new POSIX output stays private during writing and follows non-default umas
       modes.push(fs.fstatSync(descriptor).mode & 0o777);
       return result;
     });
+    const originalTruncate = fs.ftruncateSync;
+    const originalChmod = fs.fchmodSync;
+    let truncations = 0;
+    let publications = 0;
+    context.mock.method(fs, 'ftruncateSync', (descriptor, ...args) => {
+      assert.equal(typeof descriptor, 'number');
+      assert.equal(fs.fstatSync(descriptor).mode & 0o777, 0o600 & ~process.umask());
+      truncations += 1;
+      return originalTruncate(descriptor, ...args);
+    });
+    context.mock.method(fs, 'fchmodSync', (descriptor, ...args) => {
+      assert.equal(fs.fstatSync(descriptor).mode & 0o777, 0o600 & ~process.umask());
+      assert.ok(fs.fstatSync(descriptor).size > 0);
+      publications += 1;
+      return originalChmod(descriptor, ...args);
+    });
     await buildPublicPages(configuration(output));
     assert.equal(descriptorTypes.length, generatedFiles.length);
     assert.ok(descriptorTypes.every((type) => type === 'number'));
     assert.deepEqual(modes, modes.map(() => 0o600 & ~process.umask()));
+    assert.equal(truncations, generatedFiles.length);
+    assert.equal(publications, generatedFiles.length);
     context.mock.restoreAll();
     execFileSync(process.execPath, ['--input-type=module', '-e', `
       import assert from 'node:assert/strict';
@@ -339,15 +357,103 @@ test('new POSIX output stays private during writing and follows non-default umas
         root: process.cwd(), output, publicWebOrigin: 'https://github.com',
         publicDomainVerified: true, appleCiamDomainReconfigured: false,
       };
+      async function assertModeAndChmod(file, expected, mode) {
+        const handle = await fs.open(file, 'r');
+        try {
+          assert.equal((await handle.stat()).mode & 0o777, expected);
+          await handle.chmod(mode);
+        } finally {
+          await handle.close();
+        }
+      }
       process.umask(0o027);
       await buildPublicPages(config);
       const file = join(output, 'index.html');
-      assert.equal((await fs.stat(file)).mode & 0o777, 0o640);
-      await fs.chmod(file, 0o604);
+      await assertModeAndChmod(file, 0o640, 0o604);
       process.umask(0o077);
       await buildPublicPages(config);
       assert.equal((await fs.stat(file)).mode & 0o777, 0o604);
+
+      const originalOpen = fs.open;
+      const original = join(output, 'original-index.html');
+      const victim = join(output, 'victim');
+      await fs.writeFile(victim, 'untouched', { mode: 0o600 });
+      let substituted = false;
+      let closed = false;
+      fs.open = async (...args) => {
+        const handle = await originalOpen(...args);
+        const originalStat = handle.stat.bind(handle);
+        const originalClose = handle.close.bind(handle);
+        handle.stat = async () => {
+          const stats = await originalStat();
+          await fs.rename(file, original);
+          await fs.symlink(victim, file);
+          substituted = true;
+          return stats;
+        };
+        handle.close = async () => {
+          closed = true;
+          return originalClose();
+        };
+        return handle;
+      };
+      try {
+        await assertModeAndChmod(file, 0o604, 0o640);
+      } finally {
+        fs.open = originalOpen;
+      }
+      assert.equal(substituted, true);
+      assert.equal(closed, true);
+      assert.equal((await fs.stat(original)).mode & 0o777, 0o640);
+      assert.equal((await fs.stat(victim)).mode & 0o777, 0o600);
+      assert.equal(await fs.readFile(victim, 'utf8'), 'untouched');
     `, join(output, 'different-umask')], { timeout: 15000, encoding: 'utf8' });
+  } finally {
+    context.mock.restoreAll();
+    await rm(output, { recursive: true, force: true });
+  }
+});
+
+test('replacement after descriptor validation cannot redirect truncation, writing or mode changes', {
+  skip: process.platform === 'win32' && 'POSIX mode and symlink substitution fixture',
+}, async (context) => {
+  const output = await mkdtemp(join(tmpdir(), 'certigo-public-write-substitute-'));
+  try {
+    const destination = join(output, 'staticwebapp.config.json');
+    const original = join(output, 'original-config');
+    const victim = join(output, 'victim');
+    await writeFile(victim, 'untouched', { mode: 0o600 });
+    const originalOpen = fs.openSync;
+    const originalTruncate = fs.ftruncateSync;
+    let descriptor;
+    let substituted = false;
+    context.mock.method(fs, 'openSync', (file, ...args) => {
+      const opened = originalOpen(file, ...args);
+      if (file === destination) descriptor = opened;
+      return opened;
+    });
+    context.mock.method(fs, 'ftruncateSync', (opened, ...args) => {
+      if (opened === descriptor && !substituted) {
+        fs.renameSync(destination, original);
+        fs.symlinkSync(victim, destination);
+        substituted = true;
+      }
+      return originalTruncate(opened, ...args);
+    });
+    await buildPublicPages(configuration(output));
+    assert.equal(substituted, true);
+    assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+    assert.equal(await readFile(victim, 'utf8'), 'untouched');
+    assert.equal((await stat(victim)).mode & 0o777, 0o600 & ~process.umask());
+    const handle = await open(original, 'r');
+    try {
+      assert.equal((await handle.stat()).mode & 0o777, 0o666 & ~process.umask());
+      const generated = JSON.parse(await handle.readFile('utf8'));
+      assert.deepEqual(generated.mimeTypes, { '.json': 'application/json' });
+      assert.equal(generated.routes[0].route, '/.well-known/apple-app-site-association');
+    } finally {
+      await handle.close();
+    }
   } finally {
     context.mock.restoreAll();
     await rm(output, { recursive: true, force: true });

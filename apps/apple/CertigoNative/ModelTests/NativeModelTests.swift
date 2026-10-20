@@ -39,7 +39,7 @@
             saved = nil
         }
     }
-    @MainActor private final class AuthenticationMock: CIAMAuthenticationProvider {
+    @MainActor private final class AuthenticationMock: CIAMAccountDeletionProvider {
         var token = CIAMAccessToken(
             value: "synthetic-auth-token", expiresAt: Date(timeIntervalSince1970: 2_000))
         var interactiveCalls = 0
@@ -50,6 +50,30 @@
         var failure: CIAMAuthenticationFailure?
         var waiter: CheckedContinuation<Void, Never>?
         private var busy = false
+        var deletionAccountIdentifier: String? = "synthetic-msal-A"
+        var reauthAccount = "synthetic-msal-A"
+        var reauthTime = 1_000
+        var reauthCalls = 0
+        var deletedIdentifiers: [String] = []
+
+        func reauthenticateForAccountDeletion() async throws -> CIAMDeletionProof {
+            reauthCalls += 1
+            let acquired = try await acquire()
+            let claims = Data(
+                """
+                {"aud":"11111111-1111-4111-8111-111111111111","auth_time":\(reauthTime),"exp":2000}
+                """.utf8
+            ).base64EncodedString().replacingOccurrences(of: "=", with: "")
+                .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            return CIAMDeletionProof(
+                accessToken: acquired, idToken: "synthetic.\(claims).signature",
+                accountIdentifier: reauthAccount)
+        }
+
+        func removeAccountForDeletion(identifier: String) async throws {
+            if busy || rejectRemoval { throw CIAMAuthenticationFailure.operationInProgress }
+            deletedIdentifiers.append(identifier)
+        }
 
         func acquireInteractively() async throws -> CIAMAccessToken {
             interactiveCalls += 1
@@ -77,6 +101,25 @@
         }
     }
     private actor ModelTransport: HTTPTransport, BoundedHTTPTransport {
+        private var historyPages: [String: Data] = [:]
+        private var historyStatus = 200
+        private var historyRequests = 0
+        private var pauseHistory = false
+        private var historyWaiters: [CheckedContinuation<Void, Never>] = []
+        func setHistory(_ data: Data, cursor: String = "") { historyPages[cursor] = data }
+        func failHistory(_ status: Int) { historyStatus = status }
+        func suspendHistory(_ value: Bool) { pauseHistory = value }
+        func historyWaiting() -> Int { historyWaiters.count }
+        func historyCount() -> Int { historyRequests }
+        func resumeHistory() { historyWaiters.removeFirst().resume() }
+        private var deletionState = "notRequested"
+        private var deletionHTTP = 200
+        private var deletionPosts = 0
+        private var loseDeletionResponse = false
+        func setDeletion(_ value: String) { deletionState = value }
+        func failDeletion(_ code: Int) { deletionHTTP = code }
+        func loseNextDeletionResponse() { loseDeletionResponse = true }
+        func deletionPostCount() -> Int { deletionPosts }
         private let offlineFixture: OfflinePackFixture
         private var catalog: Data
         private let lesson: Data
@@ -231,7 +274,48 @@
             let bytes: Data
             var status = 200
             var headers = ["Content-Type": "application/json"]
-            if url.path.hasSuffix("/me") {
+            if url.path.hasSuffix("/me/history") {
+                historyRequests += 1
+                let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+                let cursor = query?.first(where: { $0.name == "cursor" })?.value ?? ""
+                let captured = historyPages[cursor] ?? Data(#"{"items":[],"nextCursor":null}"#.utf8)
+                status = historyStatus
+                if offline { throw URLError(.notConnectedToInternet) }
+                if pauseHistory {
+                    await withCheckedContinuation { historyWaiters.append($0) }
+                }
+                bytes = captured
+            } else if url.path == "/api/account/deletion" {
+                if request.httpMethod == "POST" {
+                    deletionPosts += 1
+                    guard request.httpBody == nil else { throw APIError.invalidResponse }
+                    if deletionState == "notRequested" {
+                        guard request.value(forHTTPHeaderField: "X-Certigo-Reauthentication") != nil
+                        else {
+                            throw ModelTestFailure.assertion("First deletion POST omitted proof")
+                        }
+                        deletionState = "pending"
+                    }
+                    if loseDeletionResponse {
+                        loseDeletionResponse = false
+                        throw URLError(.networkConnectionLost)
+                    }
+                }
+                status =
+                    deletionHTTP == 200
+                    ? (request.httpMethod == "POST" && deletionState == "pending" ? 202 : 200)
+                    : deletionHTTP
+                let requested =
+                    deletionState == "notRequested" ? "null" : "\"1970-01-01T00:16:40Z\""
+                let completed = deletionState == "completed" ? "\"1970-01-01T00:16:41Z\"" : "null"
+                let steps = deletionState == "completed" ? 6 : deletionState == "pending" ? 2 : 0
+                bytes = Data(
+                    """
+                    {"status":"\(deletionState)","completedSteps":\(steps),"totalSteps":6,
+                    "requestedAt":\(requested),"completedAt":\(completed),"failureCode":null,
+                    "retryAfterSeconds":\(deletionState == "pending" ? "5" : "null")}
+                    """.utf8)
+            } else if url.path.hasSuffix("/me") {
                 profileRequests += 1
                 status = profileStatus
                 let capturedOwner = owner
@@ -417,6 +501,17 @@
     @main private struct NativeModelTests {
         @MainActor static func main() async throws {
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
+            try await historyPaginationAndLocalWork(resources)
+            try await historyErrorsAndDeletion(resources)
+            try await historyRefreshAndOwnerRaces(resources)
+            try await deletionProofAndCancellation(resources)
+            try await deletionPendingRecoveryAndCleanup(resources)
+            try await deletionLostResponse(resources)
+            try await deletionMissingRequestRecovery(resources)
+            try await deletionRecoveryWithoutOwner(resources)
+            try await deletionUnavailable(resources)
+            try await deletionReceiptWriteFailure(resources)
+            try await deletionFirstLaunchAndCorruptReceipt(resources)
             try await downloadedDraftRestoresWithoutLessonOrPath(resources)
             try await rejectedRetryRefreshesSavedState(resources)
             try await confirmedProfileAfterCorrection(resources)
@@ -448,11 +543,472 @@
             try await activityStorageFailure(resources)
             try await sameOwnerRefreshKeepsDraft(resources)
             print(
-                "NativeModel: coordination/journeys, pilot-history isolation, resume-state and cold activity restoration checks passed."
+                "NativeModel: history pagination/merge/errors/deletion recovery/owner races and existing coordination/journey/restoration checks passed."
             )
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+
+        static func historyPage(
+            id: String? = nil, track: String = "track", lesson: String = "lesson",
+            manifest: String? = nil, cursor: String? = nil, score: Int = 80
+        ) throws -> Data {
+            var rows: [[String: Any]] = []
+            if let id {
+                rows = [
+                    [
+                        "kind": "quiz", "attemptId": "server-\(QuizAttemptHistoryItem.key(id))",
+                        "clientAttemptId": id,
+                        "trackId": track, "lessonId": lesson, "submittedAt": "2026-10-20T14:00:00Z",
+                        "scorePct": score, "answeredCount": 1, "correctCount": 0,
+                        "xpEarned": 25, "gemsEarned": 0,
+                        "publicManifestId": manifest as Any? ?? NSNull(),
+                    ]
+                ]
+            }
+            return try JSONSerialization.data(withJSONObject: [
+                "items": rows, "nextCursor": cursor as Any? ?? NSNull(),
+            ])
+        }
+
+        static func waitForHistory(_ server: ModelTransport) async throws {
+            for _ in 0..<10_000 {
+                if await server.historyWaiting() > 0 { return }
+                await Task.yield()
+            }
+            throw ModelTestFailure.assertion("History request did not reach bounded suspension")
+        }
+
+        @MainActor static func historyPaginationAndLocalWork(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            let draft = try Data(contentsOf: fixture.activityFile)
+            await model.refreshHistory()
+            try expect(
+                model.historyRefreshedAt != nil && model.serverHistory.isEmpty,
+                "Verified empty history was not distinguishable from unloaded")
+            try expect(
+                try Data(contentsOf: fixture.activityFile) == draft,
+                "Viewing history rewrote an unsent draft")
+            let requestsBefore = await fixture.server.payloads().count
+            try expect(requestsBefore == 0, "History submitted the draft")
+            await fixture.server.setOffline(true)
+            await model.submit()
+            guard let saved = model.queue.first else {
+                throw ModelTestFailure.assertion("Missing pending submission")
+            }
+            let outbox = try Data(contentsOf: fixture.root.appendingPathComponent("outbox.json"))
+            await fixture.server.setOffline(false)
+            try await fixture.server.setHistory(
+                historyPage(
+                    id: saved.id, track: saved.submission.trackId, lesson: saved.lessonId,
+                    manifest: saved.submission.publicManifestId, cursor: "page2"))
+            await fixture.server.setHistory(try historyPage(cursor: "page3"), cursor: "page2")
+            try await fixture.server.setHistory(
+                historyPage(
+                    id: saved.id.uppercased(), track: saved.submission.trackId,
+                    lesson: saved.lessonId, manifest: saved.submission.publicManifestId),
+                cursor: "page3")
+            await model.refreshHistory()
+            try expect(model.serverHistory.count == 1, "Server confirmation not shown")
+            try expect(
+                model.historyPresentation?.onDevice.isEmpty == true,
+                "Matching pending was duplicated under local history")
+            try expect(
+                model.queue == [saved] && model.outcome == .pendingCorrection,
+                "Summary fabricated a correction or changed the outbox")
+            await model.loadMoreHistory()
+            try expect(model.historyNextCursor == "page3", "Empty nonterminal page ended history")
+            await model.loadMoreHistory()
+            try expect(
+                model.serverHistory.count == 1 && model.historyNextCursor == nil,
+                "Repeated page was not deduplicated")
+            try expect(
+                try Data(contentsOf: fixture.root.appendingPathComponent("outbox.json")) == outbox,
+                "History changed persistent submissions")
+            try expect(model.profile?.xp == 0, "History awarded XP")
+            try await fixture.server.setHistory(
+                historyPage(
+                    id: saved.id, track: "wrong-track", lesson: saved.lessonId,
+                    manifest: saved.submission.publicManifestId))
+            await model.refreshHistory()
+            try expect(
+                model.historyError != nil && model.serverHistory.count == 1,
+                "Conflict erased verified history or was silently accepted")
+
+            let correctedFixture = try ModelFixture(resources: resources)
+            defer { correctedFixture.cleanup() }
+            let corrected = try await prepareDraft(correctedFixture)
+            await corrected.submit()
+            await corrected.refreshHistory()
+            try expect(
+                corrected.historyPresentation?.confirmedOnDevice.count == 1,
+                "Local server ACK absent from loaded page was hidden")
+        }
+
+        @MainActor static func historyErrorsAndDeletion(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            await fixture.server.setHistory(try historyPage(id: "opaque-remote"))
+            await model.refreshHistory()
+            let verified = model.serverHistory
+            await fixture.server.setOffline(true)
+            await model.refreshHistory()
+            try expect(
+                model.historyOffline && model.historyError != nil
+                    && model.serverHistory == verified,
+                "Offline erased history or became empty")
+            await fixture.server.setOffline(false)
+            for code in [401, 503] {
+                await fixture.server.failHistory(code)
+                await model.refreshHistory()
+                try expect(
+                    model.historyError != nil && model.serverHistory == verified,
+                    "HTTP failure erased history or became empty")
+                if code == 401 {
+                    try expect(model.historyError?.contains("Sign in") == true, "401 needs sign-in")
+                }
+            }
+            await fixture.server.failHistory(200)
+            await model.reconnectHistory()
+            try expect(
+                !model.historyNeedsSignIn && model.historyError == nil
+                    && fixture.provider.interactiveCalls == 2 && model.serverHistory == verified,
+                "Explicit history sign-in did not restore a verified traversal")
+            await fixture.server.setHistory(try historyPage(cursor: "loop"))
+            await fixture.server.setHistory(try historyPage(cursor: "loop"), cursor: "loop")
+            await model.refreshHistory()
+            await model.loadMoreHistory()
+            try expect(
+                model.historyError != nil && model.historyNextCursor == "loop",
+                "A nonadvancing cursor was accepted")
+            await fixture.server.setDeletion("pending")
+            await fixture.server.failHistory(423)
+            await model.refreshHistory()
+            try expect(
+                model.deletionStage == .pending && model.serverHistory.isEmpty && !model.canSubmit,
+                "History423 did not enter deletion-only recovery")
+            let posts = await fixture.server.deletionPostCount()
+            try expect(posts == 0, "History423 sent destructive POST")
+        }
+
+        @MainActor static func historyRefreshAndOwnerRaces(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            await fixture.server.setHistory(try historyPage(id: "old", cursor: "old_next"))
+            await fixture.server.suspendHistory(true)
+            let old = Task { await model.refreshHistory() }
+            try await waitForHistory(fixture.server)
+            await fixture.server.suspendHistory(false)
+            await fixture.server.setHistory(try historyPage(id: "new", cursor: "new_next"))
+            await model.refreshHistory()
+            await fixture.server.resumeHistory()
+            await old.value
+            try expect(
+                model.serverHistory.first?.clientAttemptId == "new"
+                    && model.historyNextCursor == "new_next",
+                "Old refresh replaced a newer traversal")
+            await fixture.server.setHistory(try historyPage(id: "late-page"), cursor: "new_next")
+            await fixture.server.suspendHistory(true)
+            let more = Task { await model.loadMoreHistory() }
+            try await waitForHistory(fixture.server)
+            let before = await fixture.server.historyCount()
+            await model.loadMoreHistory()
+            let after = await fixture.server.historyCount()
+            try expect(before == after, "Double load-more was not serialized")
+            await fixture.server.suspendHistory(false)
+            await fixture.server.setHistory(try historyPage(id: "refresh"))
+            await model.refreshHistory()
+            await fixture.server.resumeHistory()
+            await more.value
+            try expect(
+                model.serverHistory.map(\.clientAttemptId) == ["refresh"],
+                "Late load-more appended into a replacement traversal")
+            await fixture.server.suspendHistory(true)
+            let cancelled = Task { await model.refreshHistory() }
+            try await waitForHistory(fixture.server)
+            cancelled.cancel()
+            await fixture.server.resumeHistory()
+            await cancelled.value
+            try expect(
+                model.serverHistory.map(\.clientAttemptId) == ["refresh"]
+                    && model.historyError == nil && !model.historyLoading,
+                "Cancellation erased verified history or left loading stuck")
+            await fixture.server.suspendHistory(true)
+            let lateOwner = Task { await model.refreshHistory() }
+            try await waitForHistory(fixture.server)
+            await model.disconnect()
+            try expect(
+                model.serverHistory.isEmpty && model.historyNextCursor == nil,
+                "Sign-out retained personal history")
+            await fixture.server.setOwner("server-owner-B")
+            await fixture.server.suspendHistory(false)
+            model.baseURL = "https://different.invalid/api"
+            model.token = "synthetic-B"
+            await model.connect()
+            await fixture.server.resumeHistory()
+            await lateOwner.value
+            try expect(
+                model.profile?.id == "server-owner-B" && model.serverHistory.isEmpty
+                    && model.historyRefreshedAt == nil,
+                "Late owner/API response leaked history")
+            await fixture.server.setOffline(true)
+            await model.refreshHistory()
+            try expect(
+                model.historyRefreshedAt == nil && model.historyError != nil,
+                "Fresh offline session claimed verified empty history")
+        }
+        @MainActor static func deletionProofAndCancellation(_ resources: URL) async throws {
+            for failure in ["cancel", "mismatch", "stale", "background", "valid"] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture, authenticated: true)
+                let before = try Data(contentsOf: fixture.activityFile)
+                model.showAccountDeletion()
+                if failure == "cancel" { fixture.provider.failure = .cancelled }
+                if failure == "mismatch" { fixture.provider.reauthAccount = "synthetic-msal-B" }
+                if failure == "stale" { fixture.provider.reauthTime = 1 }
+                if failure == "background" {
+                    fixture.provider.pause = true
+                    let task = Task { await model.verifyDeletionIdentity() }
+                    for _ in 0..<10_000 {
+                        if fixture.provider.waiter != nil { break }
+                        await Task.yield()
+                    }
+                    try expect(
+                        fixture.provider.waiter != nil, "Dedicated reauthentication did not start")
+                    model.discardDeletionProof()
+                    fixture.provider.resume()
+                    await task.value
+                } else {
+                    await model.verifyDeletionIdentity()
+                }
+                try expect(
+                    model.deletionStage == (failure == "valid" ? .confirmation : .explanation),
+                    "Unexpected proof stage for \(failure)")
+                let count = await fixture.server.deletionPostCount()
+                try expect(count == 0, "Reauthentication implicitly submitted deletion")
+                model.discardDeletionProof()
+                await model.confirmAccountDeletion()
+                let after = await fixture.server.deletionPostCount()
+                try expect(after == 0, "Cancelled/stale proof posted deletion")
+                await model.cancelAccountDeletion()
+                try expect(
+                    model.deletionStage == nil && model.canSubmit,
+                    "Cancelled verification failed to resume the learning session")
+                try expect(
+                    try Data(contentsOf: fixture.activityFile) == before,
+                    "Cancellation removed or rewrote the local draft")
+            }
+        }
+
+        @MainActor static func deletionPendingRecoveryAndCleanup(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            let before = try Data(contentsOf: fixture.activityFile)
+            model.showAccountDeletion()
+            await model.verifyDeletionIdentity()
+            try expect(
+                model.deletionStage == .confirmation, "Proof did not require final confirmation")
+            await model.confirmAccountDeletion()
+            let posts = await fixture.server.deletionPostCount()
+            try expect(posts == 1 && model.deletionStage == .pending, "202 was not pending")
+            try expect(
+                !model.canSubmit && !model.canRetryDeletion,
+                "Pending failed to freeze learning/backoff")
+            let frozenCount = await fixture.server.count()
+            if let track = model.tracks.first {
+                await model.chooseActiveTrack(track)
+                await model.loadPath(track)
+                await model.downloadQuestionPack(track)
+            }
+            await model.submit()
+            await model.refreshProgress()
+            let afterFrozen = await fixture.server.count()
+            try expect(frozenCount == afterFrozen, "Pending deletion allowed learning network work")
+            try expect(
+                try Data(contentsOf: fixture.activityFile) == before && fixture.vault.clears == 0,
+                "202 purged local state")
+            await model.retryAccountDeletion()
+            let backedOff = await fixture.server.deletionPostCount()
+            try expect(backedOff == 1, "Backoff did not prevent duplicate deletion POST")
+            await fixture.server.failProfile(423)
+            let profileCount = await fixture.server.profileRequestCount()
+            let reopened = fixture.model()
+            await reopened.restore()
+            let afterProfile = await fixture.server.profileRequestCount()
+            try expect(
+                afterProfile == profileCount && reopened.profile == nil
+                    && reopened.deletionStage == .pending,
+                "Pending restart depended on /me or fabricated a learning session")
+            fixture.provider.deletionAccountIdentifier = "synthetic-msal-B"
+            await reopened.recoverDeletionConnection(interactive: true)
+            try expect(
+                reopened.deletionStage == .unconfirmed,
+                "Different account was accepted for recovery")
+            fixture.provider.deletionAccountIdentifier = "synthetic-msal-A"
+            await reopened.recoverDeletionConnection(interactive: true)
+            fixture.time = fixture.time.addingTimeInterval(6)
+            fixture.vault.rejectClear = true
+            await fixture.server.setDeletion("completed")
+            await reopened.retryAccountDeletion()
+            try expect(
+                reopened.deletionStage == .cleanupFailed && reopened.profile == nil,
+                "Cleanup failure was hidden or profile remained active")
+            try expect(
+                !FileManager.default.fileExists(atPath: fixture.activityFile.path),
+                "Confirmed owner draft was not removed")
+            let completedPosts = await fixture.server.deletionPostCount()
+            let marker = fixture.root.appendingPathComponent("account-deletion-v1.json")
+            let receiptBytes = try Data(contentsOf: marker)
+            let receipt = try CertigoAPI.decoder().decode(
+                NativeDeletionReceipt.self, from: receiptBytes)
+            try expect(
+                receipt.phase == .completed && receipt.remainingCleanup == ["vault", "msal"],
+                "Cleanup receipt did not persist acknowledged local targets")
+            let text = String(decoding: receiptBytes, as: UTF8.self)
+            try expect(
+                !text.contains("synthetic-auth-token") && !text.contains("signature"),
+                "Durable deletion receipt persisted a credential")
+            fixture.vault.rejectClear = false
+            let cleanupRestart = fixture.model()
+            await cleanupRestart.restore()
+            let finalPosts = await fixture.server.deletionPostCount()
+            try expect(
+                cleanupRestart.deletionStage == .completed && finalPosts == completedPosts,
+                "Restarted local cleanup repeated POST or did not finish")
+            try expect(
+                fixture.provider.deletedIdentifiers == ["synthetic-msal-A"],
+                "Cleanup did not target the captured SDK account")
+            cleanupRestart.acknowledgeAccountDeletion()
+            try expect(
+                cleanupRestart.deletionStage == nil
+                    && !FileManager.default.fileExists(atPath: marker.path),
+                "Completion did not wait for acknowledgement")
+        }
+
+        @MainActor static func deletionLostResponse(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            model.showAccountDeletion()
+            await model.verifyDeletionIdentity()
+            await fixture.server.loseNextDeletionResponse()
+            await model.confirmAccountDeletion()
+            try expect(
+                model.deletionStage == .unconfirmed && fixture.vault.clears == 0,
+                "Lost POST response became successful deletion")
+            await model.refreshDeletionStatus()
+            let count = await fixture.server.deletionPostCount()
+            try expect(
+                model.deletionStage == .pending && count == 1,
+                "Lost POST was not reconciled with GET for the same subject")
+        }
+
+        @MainActor static func deletionRecoveryWithoutOwner(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            await fixture.server.failProfile(423)
+            await fixture.server.setDeletion("pending")
+            let model = fixture.model()
+            await model.connect()
+            try expect(
+                model.profile == nil && model.deletionStage == .pending,
+                "/me423 did not expose deletion-only status")
+            await fixture.server.setDeletion("completed")
+            await model.refreshDeletionStatus()
+            try expect(
+                model.deletionStage == .cleanupFailed && fixture.vault.clears == 0,
+                "Unknown owner caused an invented purge or fake completion")
+        }
+
+        @MainActor static func deletionMissingRequestRecovery(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            model.showAccountDeletion()
+            await model.verifyDeletionIdentity()
+            await fixture.server.loseNextDeletionResponse()
+            await model.confirmAccountDeletion()
+            await fixture.server.setDeletion("notRequested")
+            await model.refreshDeletionStatus()
+            try expect(
+                model.deletionStatus?.status == .notRequested
+                    && model.deletionStage == .unconfirmed,
+                "Absent request did not remain explicit")
+            await model.resumeAccountAfterStatusCheck()
+            let posts = await fixture.server.deletionPostCount()
+            try expect(
+                model.deletionStage == nil && model.canSubmit && posts == 1,
+                "Status-checked absent request did not resume without another POST")
+        }
+
+        @MainActor static func deletionUnavailable(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            await fixture.server.failDeletion(503)
+            model.showAccountDeletion()
+            await model.verifyDeletionIdentity()
+            let count = await fixture.server.deletionPostCount()
+            try expect(
+                model.deletionStage == .explanation
+                    && model.deletionMessage?.contains("unavailable") == true && count == 0,
+                "Unavailable backend was represented as deletion success")
+            try expect(
+                fixture.vault.clears == 0
+                    && FileManager.default.fileExists(atPath: fixture.activityFile.path),
+                "Unavailable backend removed local work")
+            await model.cancelAccountDeletion()
+            try expect(model.canSubmit, "Unavailable deletion could not return to learning")
+        }
+        @MainActor static func deletionReceiptWriteFailure(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            model.showAccountDeletion()
+            await model.verifyDeletionIdentity()
+            await model.confirmAccountDeletion()
+            await fixture.server.setDeletion("completed")
+            fixture.rejectActivityAccess = true
+            await model.refreshDeletionStatus()
+            try expect(
+                model.deletionStage == .cleanupFailed && model.profile == nil
+                    && model.deletionStatus?.status == .completed && fixture.vault.clears == 0,
+                "Completion receipt write failure became success or lost confirmed server status")
+            fixture.rejectActivityAccess = false
+            let before = await fixture.server.deletionPostCount()
+            await model.retryDeletionCleanup()
+            let after = await fixture.server.deletionPostCount()
+            try expect(
+                model.deletionStage == .completed && before == after,
+                "Cleanup retry after receipt failure repeated server deletion")
+        }
+        @MainActor static func deletionFirstLaunchAndCorruptReceipt(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            let restored = await model.restoreAccountDeletionIfNeeded()
+            try expect(
+                !restored && fixture.provider.silentCalls == 0
+                    && fixture.provider.interactiveCalls == 0
+                    && model.errorMessage == nil,
+                "First launch without a deletion receipt started authentication")
+            try FileManager.default.createDirectory(
+                at: fixture.root, withIntermediateDirectories: true)
+            try Data("{}".utf8).write(
+                to: fixture.root.appendingPathComponent("account-deletion-v1.json"))
+            let corrupt = await model.restoreAccountDeletionIfNeeded()
+            let requests = await fixture.server.count()
+            try expect(
+                corrupt && model.deletionStage == .unconfirmed && model.profile == nil
+                    && requests == 0 && fixture.vault.clears == 0,
+                "Corrupt receipt invented completion, authenticated or purged data")
         }
         @MainActor static func downloadedDraftRestoresWithoutLessonOrPath(_ resources: URL)
             async throws
@@ -697,8 +1253,10 @@
                     "Account switch lost the original owner's ACK")
             }
         }
-        @MainActor static func prepareDraft(_ fixture: ModelFixture) async throws -> NativeModel {
-            let model = fixture.model(authenticated: false)
+        @MainActor static func prepareDraft(_ fixture: ModelFixture, authenticated: Bool = false)
+            async throws -> NativeModel
+        {
+            let model = fixture.model(authenticated: authenticated)
             model.baseURL = "https://example.invalid/api"
             model.token = "synthetic-A"
             await model.connect()

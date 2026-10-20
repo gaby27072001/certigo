@@ -332,10 +332,9 @@ or permission was changed for this source preparation.
 The provider's account selection is held in memory. After app relaunch, the
 user must explicitly sign in again; silent account restoration is not claimed.
 The test connector's device-only vault remains unchanged, with no migration or
-access to the legacy Flutter app's credential cache. This lot does not implement
-in-app account deletion or cross-device attempt history; those
-remain separate work dependent on the verified production identity and their
-existing service contracts.
+access to the legacy Flutter app's credential cache. Read-only quiz history and
+account deletion use the separate workflows below;
+its source implementation does not establish live service availability.
 
 ### Downloaded public question packs
 
@@ -383,8 +382,119 @@ SwiftUI/UIKit/MSAL, effective file protection, airplane-mode reading and explici
 queue/retry behavior on iPhone/iPad, owner switching, navigation and VoiceOver.
 Linux model/package tests do not establish those Apple runtime properties.
 
+### Account deletion and recovery
+
+Connected Profile > Settings has a separate Delete account destination, not a
+replacement for Disconnect. The first Form explains irreversible deletion and
+residual retention. Continue only verifies identity; the subsequent destructive
+system alert is the only action that submits a first deletion request. The demo
+and manual DEV connector cannot perform recent Microsoft authentication and do
+not offer executable deletion. Cancel, backgrounding or a different returned
+account discards the memory-only proof without submitting or removing drafts.
+
+The dedicated MSAL operation uses `.login`, `max_age=0`, an ephemeral
+authentication session, and the captured SDK account. It checks that account
+before accepting a result and requires a nonempty ID token. Local proof checks
+reject stale/missing `auth_time`, wrong native audience and expired credentials;
+they do not replace server signature/issuer/subject/freshness validation. The
+POST keeps the original session bearer and supplies the ID token only in
+`X-Certigo-Reauthentication`. It never persists proof tokens or displays raw
+SDK errors, response bodies or endpoint URLs.
+
+GET and bodyless POST target exactly `/api/account/deletion` on a configured
+`/api` base; a versioned base fails closed. `202/pending` freezes learning but
+retains credentials, drafts, outbox and downloads. Server step counts are
+displayed as counts, not elapsed-time estimates. GET checks status only;
+explicit Retry deletion advances unfinished steps after the server's bounded
+retry delay. A lost POST response or a later 401 is unconfirmed, not completed.
+There is no cancellation endpoint once the request has been recorded.
+
+A bounded, atomically written protected receipt contains only local
+owner/scope/SDK-account binding and workflow/cleanup state. Pending restart
+obtains credentials for the same SDK account and uses deletion GET without
+requiring `/me`, catalog or learning restoration; these can already return 423.
+A first sign-in encountering `/me` 423 also enters deletion-only recovery.
+If that device has no verified backend-owner binding, status is available but
+local owner-scoped cleanup remains unconfirmed and requests support rather
+than deriving an owner from email, JWT payload or the opaque SDK account ID.
+
+Only validated server `completed` creates the durable cleanup receipt.
+Generation invalidation and the outbox's suspended-scope barrier prevent late
+enqueue/ACK/download writes. Cleanup removes this owner/scope's outbox records,
+runtime references/pins/capsules and unshared blobs, matching activity, the
+owned Certigo DEV vault entry and the exact saved MSAL account. Other owners,
+API scopes and their shared public bytes remain. Local targets acknowledge
+individually in the receipt: failure leaves learning closed and exposes Retry
+local cleanup, including after restart, without repeating POST or reauth.
+The completed surface remains visible until explicit acknowledgement.
+
+**External gates remain:** production native identity/configuration, native
+ID-token audience accepted by `ENTRA_REAUTH_AUDIENCE`, live `auth_time`,
+and the existing backend deletion activation/Cosmos gate. No SDK dependency,
+Graph grant, flag, app registration, cloud resource or signing setting is
+changed by this source work. MSAL 2.16.0 public headers at the pinned revision
+confirm `promptType`, `extraQueryParameters`, `idToken`, account enumeration
+and scoped removal; they do not prove Apple compilation or forced reauth.
+Apple acceptance must separately verify SwiftUI/UIKit/MSAL typechecking,
+Keychain removal, pending restart and account selection, interrupted cleanup,
+Dynamic Type/VoiceOver focus, and iPhone/iPad confirmation presentation with
+sacrificial accounts. No live destructive request is part of portable tests.
+
+### Confirmed quiz history across devices
+
+Profile > Progress & history reads the paginated `/api/me/history` lesson-quiz
+summary contract. It sends only `limit` (default 20, range 1...50) and an opaque,
+bounded continuation cursor with the existing bearer/correlation headers.
+The response is decoded into dedicated, closed summary/page DTOs, never
+`QuizResult`. Unknown/private fields, invalid identifiers, score/count/reward
+ranges, unsupported kinds, malformed manifests/cursors and inconsistent
+duplicate summaries fail explicitly. The endpoint is `/api`, not `/api/v1`.
+The client does not read or repair economy journals or infer confirmation from
+stored attempt rows; the backend owns those confirmation semantics.
+
+"Confirmed across your devices" uses server submission dates, recorded scores
+and earned XP, not current names from a different content release. Refresh
+starts a replacement traversal; Load more appears for any non-null cursor,
+including an empty continuing page. Identical repeated summaries collapse by
+client attempt identity (canonical UUIDs, opaque IDs otherwise unchanged).
+Track, lesson, manifest when both known, and full local correction identity
+must agree. Conflicts preserve the previous verified page and report an error,
+not last-writer wins. A cursor that does not advance is rejected.
+
+A matching server summary takes presentation precedence over pending/failed
+local state without mutating the outbox, manufacturing correction details,
+unpinning content or awarding XP. Pending attempts can explicitly retrieve
+their full correction using the existing same-ID idempotent retry. A failed
+local record is not silently re-enabled for submission by viewing a summary.
+Local full server ACKs absent from the loaded pages stay visible as
+"Confirmed on this device"; absence from partial pages does not imply deletion.
+Unmatched pending/failed records and the current activity remain explicitly
+device-local. Their dates are local activity starts, not fabricated server
+submission times. Viewing history never uploads drafts or retries submissions.
+Current progress stays a separately labeled last-loaded profile/path reading;
+paginated rewards are never summed into XP balance or readiness.
+
+History is held only in memory, with no new personal-data cache. Account/API
+changes synchronously clear rows and cursors. Independent request generations
+discard old refresh/load-more responses; double load-more is serialized.
+Offline and HTTP errors retain verified rows with an explicit stale/unavailable
+message. A fresh offline session does not claim empty remote history. A 401
+requests explicit sign-in; a 423 freezes learning and enters the existing
+deletion-status recovery without sending a deletion POST. Cancellation does not
+erase previously verified rows.
+
+Portable tests cover the wire allowlist/query, invalid fields, scoped merge,
+pending/server precedence without outbox changes, local ACKs outside loaded
+pages, tied/repeated/conflicting rows, empty continuing pages, cursor loops,
+offline/401/423 errors and late account/refresh/load-more responses. This is
+source integration against the backend contract, not evidence that the history
+endpoint or its Cosmos query/index requirements are deployed. Apple acceptance
+still requires SwiftUI typechecking/build, long identifiers/Dynamic Type,
+VoiceOver, iPhone/iPad navigation, offline presentation and explicit retry.
+Exam and editorial-pilot history remain outside this lesson-quiz summary.
+
 The existing Flutter TestFlight build is not this native candidate. Do not claim
-production login, in-app account deletion, validated accessibility, App Review
+production login, live account deletion, validated accessibility, App Review
 acceptance or a privacy label from this configuration alone.
 
 ### Existing portable checks
