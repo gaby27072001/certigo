@@ -1660,7 +1660,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 }
                 .disabled(
-                    model.busy || loadingTrackID != nil || loadingLessonID != nil)
+                    model.busy || loadingTrackID != nil || loadingLessonID != nil
+                )
                 .navigationTitle("Learn")
             } content: {
                 path
@@ -1939,6 +1940,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
         private var session: some View {
             Group {
                 if let lesson = model.lesson,
+                    selectedTrack == nil || selectedTrack == lesson.trackId,
                     selectedLesson == nil || selectedLesson == lesson.id
                 {
                     ScrollView {

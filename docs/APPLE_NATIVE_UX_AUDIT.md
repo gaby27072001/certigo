@@ -102,7 +102,8 @@ submission behavior, or server authority.
 Source-level acceptance for the Apple follow-up:
 
 - Select a different certification while delaying the API: show “Loading
-  learning path…” until the requested path arrives.
+  learning path…” and never show a lesson from the previously selected track
+  until the requested path arrives.
 - Fail that request: show “Learning path unavailable”; retry loads the same
   certification and success replaces the state with its path.
 - Select an open lesson while delaying the API: show “Loading lesson…” rather
