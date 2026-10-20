@@ -2042,25 +2042,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
                 Section {
                     NavigationLink("Progress & history") {
-                        List {
-                            if let path = model.path {
-                                Section("Last loaded path · \(path.trackName)") {
-                                    LabeledContent(
-                                        "Confirmed readiness", value: "\(path.readinessScore) %")
-                                    Text("Viewing this history does not change your active goal.")
-                                }
-                            }
-                            savedAnswers
-                            if model.queue.isEmpty { Text("No saved submissions on this device.") }
-                            if model.lesson != nil {
-                                Button("Resume current activity", systemImage: "play.circle") {
-                                    model.selectedTab = .learn
-                                    columns = .detailOnly
-                                    compactColumn = .detail
-                                }
-                            }
-                        }
-                        .navigationTitle("Progress & history")
+                        progressHistory
                     }
                     NavigationLink("Settings") {
                         Form {
@@ -2227,15 +2209,161 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .navigationTitle(model.path?.trackName ?? "Learning path")
         }
 
+        private var progressHistory: some View {
+            List {
+                Section("Confirmed across your devices") {
+                    if model.historyLoading {
+                        ProgressView("Loading confirmed history")
+                    }
+                    if let error = model.historyError {
+                        Label(
+                            error,
+                            systemImage: model.historyOffline
+                                ? "wifi.slash" : "exclamationmark.triangle"
+                        )
+                        .accessibilityIdentifier("history-error")
+                    }
+                    if let refreshedAt = model.historyRefreshedAt {
+                        Text(
+                            "Last loaded \(refreshedAt.formatted(date: .abbreviated, time: .shortened))"
+                        )
+                        .font(.caption).foregroundStyle(.secondary)
+                        if model.serverHistory.isEmpty && model.historyError == nil {
+                            Text(
+                                model.historyNextCursor == nil
+                                    ? "No confirmed quiz attempts."
+                                    : "No confirmed attempts in this page. More history is available."
+                            )
+                        }
+                    } else if !model.historyLoading && model.historyError == nil {
+                        Text("Confirmed history has not been loaded.")
+                    }
+                    if let presentation = model.historyPresentation {
+                        ForEach(presentation.confirmed) { item in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(item.lessonId).font(.headline)
+                                Text(item.trackId).foregroundStyle(.secondary)
+                                Text(
+                                    item.submittedAt,
+                                    format: .dateTime.year().month().day().hour().minute())
+                                Text(
+                                    "Recorded score: \(item.scorePct) % · Earned XP: \(item.xpEarned)"
+                                )
+                                Text(
+                                    "Server-confirmed summary · full correction is in saved answers when available."
+                                )
+                                .font(.caption).foregroundStyle(.secondary)
+                                if let saved = model.localHistorySubmission(for: item),
+                                    saved.status == .pendingCorrection && saved.result == nil
+                                {
+                                    Button("Retrieve full correction") {
+                                        Task { await model.retry(saved) }
+                                    }
+                                    .disabled(model.busy)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    Button("Refresh history", systemImage: "arrow.clockwise") {
+                        Task { await model.refreshHistory() }
+                    }
+                    .disabled(model.historyLoading)
+                    if model.historyNeedsSignIn && model.canReconnectHistory {
+                        Button("Sign in again", systemImage: "person.crop.circle") {
+                            Task { await model.reconnectHistory() }
+                        }
+                        .disabled(model.busy || model.historyLoading)
+                    }
+                    if model.historyNextCursor != nil {
+                        Button("Load more", systemImage: "chevron.down") {
+                            Task { await model.loadMoreHistory() }
+                        }
+                        .disabled(model.historyLoading)
+                    }
+                }
+                Section("On this device") {
+                    Text(
+                        "Drafts are never uploaded by viewing history. Local dates are activity start dates, not server submission times."
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
+                    if let presentation = model.historyPresentation {
+                        ForEach(presentation.confirmedOnDevice) { saved in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label("Confirmed on this device", systemImage: "checkmark.circle")
+                                Text(saved.lessonId).font(.headline)
+                                Text(
+                                    saved.submission.startedAt,
+                                    format: .dateTime.year().month().day())
+                                if let result = saved.result {
+                                    Text(
+                                        "Confirmed score: \(result.scorePct) % · Earned XP: \(result.rewards.xpEarned)"
+                                    )
+                                }
+                                Text(
+                                    "Server acknowledgement saved locally; not in the loaded history pages."
+                                )
+                                .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        ForEach(presentation.onDevice) { saved in
+                            savedAnswer(saved)
+                        }
+                        if presentation.onDevice.isEmpty && presentation.confirmedOnDevice.isEmpty {
+                            Text("No additional saved submissions on this device.")
+                        }
+                    } else if model.historyError != nil {
+                        Text(
+                            "The local history presentation could not be verified. Saved answers remain available in Learn."
+                        )
+                    }
+                    if model.lesson != nil {
+                        Label(
+                            model.outcome == nil
+                                ? "Current local activity" : "Current submitted activity",
+                            systemImage: "doc.text")
+                        Button("Resume current activity", systemImage: "play.circle") {
+                            model.selectedTab = .learn
+                            columns = .detailOnly
+                            compactColumn = .detail
+                        }
+                    }
+                }
+                Section("Current progress · last loaded") {
+                    if let profile = model.profile {
+                        LabeledContent("Confirmed XP", value: "\(profile.xp)")
+                    }
+                    if let path = model.path {
+                        Text(path.trackName)
+                        LabeledContent("Confirmed readiness", value: "\(path.readinessScore) %")
+                    }
+                    Text(
+                        "History pages do not update your balance, readiness or active learning goal."
+                    )
+                }
+            }
+            .navigationTitle("Progress & history")
+            .task {
+                if !model.historyAttempted { await model.refreshHistory() }
+            }
+        }
+
         @ViewBuilder private var savedAnswers: some View {
             if !model.queue.isEmpty {
                 Section("Saved answers") {
                     ForEach(model.queue) { saved in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(saved.lessonId).font(.headline)
-                            switch saved.status {
-                            case .pendingCorrection:
-                                Label("Correction pending", systemImage: "clock")
+                        savedAnswer(saved)
+                    }
+                }
+            }
+        }
+
+        private func savedAnswer(_ saved: SavedSubmission) -> some View {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(saved.lessonId).font(.headline)
+                switch saved.status {
+                case .pendingCorrection:
+                    Label("Correction pending", systemImage: "clock")
                                 Button("Retry correction") {
                                     Task { await model.retry(saved) }
                                 }
@@ -2251,12 +2379,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 Label(
                                     "Submission rejected · answers preserved",
                                     systemImage: "exclamationmark.triangle")
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
+                    Text(
+                        "This is a local status; the server may already have recorded the attempt."
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
                 }
             }
+            .padding(.vertical, 4)
         }
 
         @ViewBuilder private func activeGoalSection(_ track: Track) -> some View {

@@ -101,6 +101,17 @@
         }
     }
     private actor ModelTransport: HTTPTransport, BoundedHTTPTransport {
+        private var historyPages: [String: Data] = [:]
+        private var historyStatus = 200
+        private var historyRequests = 0
+        private var pauseHistory = false
+        private var historyWaiters: [CheckedContinuation<Void, Never>] = []
+        func setHistory(_ data: Data, cursor: String = "") { historyPages[cursor] = data }
+        func failHistory(_ status: Int) { historyStatus = status }
+        func suspendHistory(_ value: Bool) { pauseHistory = value }
+        func historyWaiting() -> Int { historyWaiters.count }
+        func historyCount() -> Int { historyRequests }
+        func resumeHistory() { historyWaiters.removeFirst().resume() }
         private var deletionState = "notRequested"
         private var deletionHTTP = 200
         private var deletionPosts = 0
@@ -263,7 +274,18 @@
             let bytes: Data
             var status = 200
             var headers = ["Content-Type": "application/json"]
-            if url.path == "/api/account/deletion" {
+            if url.path.hasSuffix("/me/history") {
+                historyRequests += 1
+                let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+                let cursor = query?.first(where: { $0.name == "cursor" })?.value ?? ""
+                let captured = historyPages[cursor] ?? Data(#"{"items":[],"nextCursor":null}"#.utf8)
+                status = historyStatus
+                if offline { throw URLError(.notConnectedToInternet) }
+                if pauseHistory {
+                    await withCheckedContinuation { historyWaiters.append($0) }
+                }
+                bytes = captured
+            } else if url.path == "/api/account/deletion" {
                 if request.httpMethod == "POST" {
                     deletionPosts += 1
                     guard request.httpBody == nil else { throw APIError.invalidResponse }
@@ -479,6 +501,9 @@
     @main private struct NativeModelTests {
         @MainActor static func main() async throws {
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
+            try await historyPaginationAndLocalWork(resources)
+            try await historyErrorsAndDeletion(resources)
+            try await historyRefreshAndOwnerRaces(resources)
             try await deletionProofAndCancellation(resources)
             try await deletionPendingRecoveryAndCleanup(resources)
             try await deletionLostResponse(resources)
@@ -518,11 +543,224 @@
             try await activityStorageFailure(resources)
             try await sameOwnerRefreshKeepsDraft(resources)
             print(
-                "NativeModel: coordination/journeys, pilot-history isolation, resume-state and cold activity restoration checks passed."
+                "NativeModel: history pagination/merge/errors/deletion recovery/owner races and existing coordination/journey/restoration checks passed."
             )
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+
+        static func historyPage(
+            id: String? = nil, track: String = "track", lesson: String = "lesson",
+            manifest: String? = nil, cursor: String? = nil, score: Int = 80
+        ) throws -> Data {
+            var rows: [[String: Any]] = []
+            if let id {
+                rows = [
+                    [
+                        "kind": "quiz", "attemptId": "server-\(QuizAttemptHistoryItem.key(id))",
+                        "clientAttemptId": id,
+                        "trackId": track, "lessonId": lesson, "submittedAt": "2026-10-20T14:00:00Z",
+                        "scorePct": score, "answeredCount": 1, "correctCount": 0,
+                        "xpEarned": 25, "gemsEarned": 0,
+                        "publicManifestId": manifest as Any? ?? NSNull(),
+                    ]
+                ]
+            }
+            return try JSONSerialization.data(withJSONObject: [
+                "items": rows, "nextCursor": cursor as Any? ?? NSNull(),
+            ])
+        }
+
+        static func waitForHistory(_ server: ModelTransport) async throws {
+            for _ in 0..<10_000 {
+                if await server.historyWaiting() > 0 { return }
+                await Task.yield()
+            }
+            throw ModelTestFailure.assertion("History request did not reach bounded suspension")
+        }
+
+        @MainActor static func historyPaginationAndLocalWork(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            let draft = try Data(contentsOf: fixture.activityFile)
+            await model.refreshHistory()
+            try expect(
+                model.historyRefreshedAt != nil && model.serverHistory.isEmpty,
+                "Verified empty history was not distinguishable from unloaded")
+            try expect(
+                try Data(contentsOf: fixture.activityFile) == draft,
+                "Viewing history rewrote an unsent draft")
+            let requestsBefore = await fixture.server.payloads().count
+            try expect(requestsBefore == 0, "History submitted the draft")
+            await fixture.server.setOffline(true)
+            await model.submit()
+            guard let saved = model.queue.first else {
+                throw ModelTestFailure.assertion("Missing pending submission")
+            }
+            let outbox = try Data(contentsOf: fixture.root.appendingPathComponent("outbox.json"))
+            await fixture.server.setOffline(false)
+            try await fixture.server.setHistory(
+                historyPage(
+                    id: saved.id, track: saved.submission.trackId, lesson: saved.lessonId,
+                    manifest: saved.submission.publicManifestId, cursor: "page2"))
+            await fixture.server.setHistory(try historyPage(cursor: "page3"), cursor: "page2")
+            try await fixture.server.setHistory(
+                historyPage(
+                    id: saved.id.uppercased(), track: saved.submission.trackId,
+                    lesson: saved.lessonId, manifest: saved.submission.publicManifestId),
+                cursor: "page3")
+            await model.refreshHistory()
+            try expect(model.serverHistory.count == 1, "Server confirmation not shown")
+            try expect(
+                model.historyPresentation?.onDevice.isEmpty == true,
+                "Matching pending was duplicated under local history")
+            try expect(
+                model.queue == [saved] && model.outcome == .pendingCorrection,
+                "Summary fabricated a correction or changed the outbox")
+            await model.loadMoreHistory()
+            try expect(model.historyNextCursor == "page3", "Empty nonterminal page ended history")
+            await model.loadMoreHistory()
+            try expect(
+                model.serverHistory.count == 1 && model.historyNextCursor == nil,
+                "Repeated page was not deduplicated")
+            try expect(
+                try Data(contentsOf: fixture.root.appendingPathComponent("outbox.json")) == outbox,
+                "History changed persistent submissions")
+            try expect(model.profile?.xp == 0, "History awarded XP")
+            try await fixture.server.setHistory(
+                historyPage(
+                    id: saved.id, track: "wrong-track", lesson: saved.lessonId,
+                    manifest: saved.submission.publicManifestId))
+            await model.refreshHistory()
+            try expect(
+                model.historyError != nil && model.serverHistory.count == 1,
+                "Conflict erased verified history or was silently accepted")
+
+            let correctedFixture = try ModelFixture(resources: resources)
+            defer { correctedFixture.cleanup() }
+            let corrected = try await prepareDraft(correctedFixture)
+            await corrected.submit()
+            await corrected.refreshHistory()
+            try expect(
+                corrected.historyPresentation?.confirmedOnDevice.count == 1,
+                "Local server ACK absent from loaded page was hidden")
+        }
+
+        @MainActor static func historyErrorsAndDeletion(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            await fixture.server.setHistory(try historyPage(id: "opaque-remote"))
+            await model.refreshHistory()
+            let verified = model.serverHistory
+            await fixture.server.setOffline(true)
+            await model.refreshHistory()
+            try expect(
+                model.historyOffline && model.historyError != nil
+                    && model.serverHistory == verified,
+                "Offline erased history or became empty")
+            await fixture.server.setOffline(false)
+            for code in [401, 503] {
+                await fixture.server.failHistory(code)
+                await model.refreshHistory()
+                try expect(
+                    model.historyError != nil && model.serverHistory == verified,
+                    "HTTP failure erased history or became empty")
+                if code == 401 {
+                    try expect(model.historyError?.contains("Sign in") == true, "401 needs sign-in")
+                }
+            }
+            await fixture.server.failHistory(200)
+            await model.reconnectHistory()
+            try expect(
+                !model.historyNeedsSignIn && model.historyError == nil
+                    && fixture.provider.interactiveCalls == 2 && model.serverHistory == verified,
+                "Explicit history sign-in did not restore a verified traversal")
+            await fixture.server.setHistory(try historyPage(cursor: "loop"))
+            await fixture.server.setHistory(try historyPage(cursor: "loop"), cursor: "loop")
+            await model.refreshHistory()
+            await model.loadMoreHistory()
+            try expect(
+                model.historyError != nil && model.historyNextCursor == "loop",
+                "A nonadvancing cursor was accepted")
+            await fixture.server.setDeletion("pending")
+            await fixture.server.failHistory(423)
+            await model.refreshHistory()
+            try expect(
+                model.deletionStage == .pending && model.serverHistory.isEmpty && !model.canSubmit,
+                "History423 did not enter deletion-only recovery")
+            let posts = await fixture.server.deletionPostCount()
+            try expect(posts == 0, "History423 sent destructive POST")
+        }
+
+        @MainActor static func historyRefreshAndOwnerRaces(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            await fixture.server.setHistory(try historyPage(id: "old", cursor: "old_next"))
+            await fixture.server.suspendHistory(true)
+            let old = Task { await model.refreshHistory() }
+            try await waitForHistory(fixture.server)
+            await fixture.server.suspendHistory(false)
+            await fixture.server.setHistory(try historyPage(id: "new", cursor: "new_next"))
+            await model.refreshHistory()
+            await fixture.server.resumeHistory()
+            await old.value
+            try expect(
+                model.serverHistory.first?.clientAttemptId == "new"
+                    && model.historyNextCursor == "new_next",
+                "Old refresh replaced a newer traversal")
+            await fixture.server.setHistory(try historyPage(id: "late-page"), cursor: "new_next")
+            await fixture.server.suspendHistory(true)
+            let more = Task { await model.loadMoreHistory() }
+            try await waitForHistory(fixture.server)
+            let before = await fixture.server.historyCount()
+            await model.loadMoreHistory()
+            let after = await fixture.server.historyCount()
+            try expect(before == after, "Double load-more was not serialized")
+            await fixture.server.suspendHistory(false)
+            await fixture.server.setHistory(try historyPage(id: "refresh"))
+            await model.refreshHistory()
+            await fixture.server.resumeHistory()
+            await more.value
+            try expect(
+                model.serverHistory.map(\.clientAttemptId) == ["refresh"],
+                "Late load-more appended into a replacement traversal")
+            await fixture.server.suspendHistory(true)
+            let cancelled = Task { await model.refreshHistory() }
+            try await waitForHistory(fixture.server)
+            cancelled.cancel()
+            await fixture.server.resumeHistory()
+            await cancelled.value
+            try expect(
+                model.serverHistory.map(\.clientAttemptId) == ["refresh"]
+                    && model.historyError == nil && !model.historyLoading,
+                "Cancellation erased verified history or left loading stuck")
+            await fixture.server.suspendHistory(true)
+            let lateOwner = Task { await model.refreshHistory() }
+            try await waitForHistory(fixture.server)
+            await model.disconnect()
+            try expect(
+                model.serverHistory.isEmpty && model.historyNextCursor == nil,
+                "Sign-out retained personal history")
+            await fixture.server.setOwner("server-owner-B")
+            await fixture.server.suspendHistory(false)
+            model.baseURL = "https://different.invalid/api"
+            model.token = "synthetic-B"
+            await model.connect()
+            await fixture.server.resumeHistory()
+            await lateOwner.value
+            try expect(
+                model.profile?.id == "server-owner-B" && model.serverHistory.isEmpty
+                    && model.historyRefreshedAt == nil,
+                "Late owner/API response leaked history")
+            await fixture.server.setOffline(true)
+            await model.refreshHistory()
+            try expect(
+                model.historyRefreshedAt == nil && model.historyError != nil,
+                "Fresh offline session claimed verified empty history")
         }
         @MainActor static func deletionProofAndCancellation(_ resources: URL) async throws {
             for failure in ["cancel", "mismatch", "stale", "background", "valid"] {
