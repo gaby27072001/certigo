@@ -189,6 +189,65 @@ trusted-control manifest, framework, scanner consumption or gate version pin.
 No such protected file is changed here; proposals pinning `certigo.3` must be
 updated and re-reviewed rather than silently consuming this revision.
 
+### Exact fixture coverage is distinct from a successful scan
+
+The inactive composition harness now uses `require_fixture_coverage` for
+explicit `(resource, check)` obligations. This is deliberately a **single-file
+fixture assertion**, not a production inventory, applicability ledger, new
+policy evaluator, or replacement for `.github/scripts/checkov_report_gate.py`.
+It rejects empty/duplicate obligations, missing/extra/duplicate evidence,
+inconsistent statuses, parsing errors, skips and a report without executed
+checks. It returns the retained PASSED/FAILED evidence; a FAILED record is
+coverage, never security success. The fully qualified identity/subnet positive
+controls exercise the assertion directly.
+
+The concrete missing-coverage regression is a real ARM template with a
+`Microsoft.Web/sites` parent whose ingress is Disabled and an embedded short-type
+`config` child named `appsettings`. With only checks 13 and 222 selected, the
+pinned candidate produces **one PASSED parent record, zero failed/skipped/parse
+records and two scanner resources**. No child-13 record survives. The expected
+child obligation makes the fixture assertion fail even though a coarse
+nonempty-resource/nonempty-check test would pass. This is a qualification
+boundary of the runner, not a claim that the active Bicep gate accepts ARM
+reports: that gate explicitly requires the Bicep framework.
+
+A paired control starts from two actual successful site checks, then injects a
+test-only UNKNOWN response for one check. The report loses only that check,
+leaving the other success intact; exact obligations reject the loss. Additional
+controls retain an unsafe parent's ingress failure and all six ordinary
+appsettings failures, and reject damaged report evidence. No UNKNOWN is changed
+to PASSED, no child failure is removed, and installed scanner code is not patched
+by these tests.
+
+Run just the new coverage qualification and its directly affected positive
+control, without rerunning the 18-shape suite or scanning the repository:
+
+```sh
+cd tools/checkov
+python -m unittest -v \
+  test_arm_composition.CompositionTests.test_nested_short_type_child_disappears_despite_success_and_two_resources \
+  test_arm_composition.CompositionTests.test_unknown_check_with_other_success_cannot_meet_exact_obligations \
+  test_arm_composition.CompositionTests.test_failed_parent_and_all_six_child_failures_remain_coverage_not_success \
+  test_arm_composition.CompositionTests.test_exact_fixture_obligations_reject_empty_duplicate_skip_parse_and_foreign \
+  test_arm_composition.CompositionTests.test_literal_qualified_user_and_subnet_positive_controls
+```
+
+Use an isolated environment containing the existing digest-verified
+`3.2.495+certigo.4` wheel and its dependencies. These controls were also run with
+CPython 3.12.15 on Linux aarch64, pycep-parser 0.5.1 and PyYAML 6.0.3. This closes
+the Python-minor qualification gap for these fixtures only; it is not CI x64
+or deployment evidence and does not validate other policies.
+
+Before adopting a production coverage contract, an independently derived
+inventory must bind source revision, environment and module instance to each
+required resource/check pair, retaining explicit non-applicability separately
+from parent security verdicts. An inventory derived only from returned records
+cannot detect omitted checks. Parameter/default evaluation is not evidence of
+the selected environment's module arguments. Unknown subtype, unresolved
+binding, missing parent/module, UNKNOWN response, parse error and zero effective
+coverage must each remain blocking. Neither that architecture nor a runtime
+or gate change is implemented by this fixture-only delivery.
+
 All six appsettings-subtype findings remain unchanged and blocking. Returning
 PASSED on an inapplicable appsettings child would misrepresent the parent;
 returning UNKNOWN would silently lose the record in this Checkov version.
