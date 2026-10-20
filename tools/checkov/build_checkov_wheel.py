@@ -23,8 +23,8 @@ RULE_FIXES = {
     "identity": (
         "checkov/arm/checks/resource/AppServiceIdentity.py",
         "bec5f57a89ca81598736c1a02925a2c2ead99d4e304f8ca203d8cbd43fb6181c",
-        "1f37d358beb55178e4acd589e9f23089971cd50fe9c5cc5bef654da49ce2b13e",
-        "af8da9f6be016e9681131a9552c60301dec0007113b93c380813c38d8938cdf8",
+        "4f449ea7fd4cf99f55a9dac1672e5b17e0d6482618fb08aecf7419249ef2fc64",
+        "f36911729b239513c83641ed171b86518227e92af0b97b618821143189a4010d",
     ),
     "cosmos": (
         "checkov/arm/checks/resource/CosmosDBAccountsRestrictedAccess.py",
@@ -33,7 +33,7 @@ RULE_FIXES = {
         "2a5d260ab48a02032dfed01f14ba9c4fb4d806f23414f4c12c6d1a031b1c0384",
     ),
 }
-VERSION = "3.2.495+certigo.3"
+VERSION = "3.2.495+certigo.4"
 OLD_INFO = "checkov-3.2.495.dist-info/"
 NEW_INFO = f"checkov-{VERSION}.dist-info/"
 
@@ -87,6 +87,8 @@ def build(upstream, destination):
         "retain explicit blocking results when those checks return UNKNOWN.\n"
         "Resource checks: recognize literal combined managed identities and disabled\n"
         "Cosmos public access; keep unresolved identity/network configuration blocking.\n"
+        "Identity: discard only bounded ARM loader line markers when validating\n"
+        "nonempty user-assigned identity maps and their empty configuration objects.\n"
     ).encode()
     records = io.StringIO(newline="")
     writer = csv.writer(records, lineterminator="\n")
