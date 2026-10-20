@@ -45,6 +45,35 @@
         }
       }
     },
+    "/me/history": {
+      "get": {
+        "operationId": "getMyAttemptHistoryV1",
+        "summary": "Lit un historique borne des tentatives de quiz confirmees du learner.",
+        "description": "Le proprietaire vient exclusivement du JWT verifie. Le curseur est lie a cet utilisateur et le parcours est borne a 200 tentatives candidates par appel. Seuls les resumes de quiz sont exposes; les reponses, solutions et explications privees sont exclues. Une tentative journalisee n'apparait qu'apres completion de toutes les projections durables; les tentatives legacy deja enregistrees suivent le contrat historique de rejeu.",
+        "parameters": [
+          { "$ref": "#/components/parameters/HistoryLimit" },
+          { "$ref": "#/components/parameters/HistoryCursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page d'historique confirmee; nextCursor null indique la fin.",
+            "headers": {
+              "Cache-Control": {
+                "schema": { "type": "string", "const": "no-store" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AttemptHistoryPage" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "423": { "$ref": "#/components/responses/AccountDeletionInProgress" }
+        }
+      }
+    },
     "/me/paths/{trackId}": {
       "get": {
         "operationId": "getMyLearningPathV1",
@@ -221,6 +250,20 @@
         "in": "path",
         "required": true,
         "schema": { "type": "string" }
+      },
+      "HistoryLimit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Nombre maximal de resumes retournes; valeur par defaut 20.",
+        "schema": { "type": "integer", "default": 20, "minimum": 1, "maximum": 50 }
+      },
+      "HistoryCursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "description": "Curseur opaque retourne par la page precedente, valable uniquement pour le compte authentifie courant.",
+        "schema": { "type": "string", "minLength": 1, "maxLength": 2048 }
       }
     },
     "responses": {
@@ -427,6 +470,52 @@
             "format": "date-time",
             "description": "Echeance FSRS calculee par le serveur."
           }
+        },
+        "additionalProperties": false
+      },
+      "AttemptHistorySummary": {
+        "type": "object",
+        "description": "Resume en lecture seule d'une tentative de quiz dont les projections durables sont confirmees. N'expose ni reponse, ni solution, ni explication.",
+        "required": [
+          "kind",
+          "attemptId",
+          "clientAttemptId",
+          "trackId",
+          "lessonId",
+          "submittedAt",
+          "scorePct",
+          "answeredCount",
+          "correctCount",
+          "xpEarned",
+          "gemsEarned",
+          "publicManifestId"
+        ],
+        "properties": {
+          "kind": { "type": "string", "const": "quiz" },
+          "attemptId": { "type": "string" },
+          "clientAttemptId": { "type": "string" },
+          "trackId": { "type": "string" },
+          "lessonId": { "type": "string" },
+          "submittedAt": { "type": "string", "format": "date-time" },
+          "scorePct": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "answeredCount": { "type": "integer", "minimum": 0 },
+          "correctCount": { "type": "integer", "minimum": 0 },
+          "xpEarned": { "type": "integer", "minimum": 0 },
+          "gemsEarned": { "type": "integer", "minimum": 0 },
+          "publicManifestId": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "AttemptHistoryPage": {
+        "type": "object",
+        "required": ["items", "nextCursor"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": { "$ref": "#/components/schemas/AttemptHistorySummary" }
+          },
+          "nextCursor": { "type": ["string", "null"], "maxLength": 2048 }
         },
         "additionalProperties": false
       },
