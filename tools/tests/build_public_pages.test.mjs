@@ -210,16 +210,25 @@ test('new POSIX output stays private during writing and follows non-default umas
 }, async (context) => {
   const output = await mkdtemp(join(tmpdir(), 'certigo-public-modes-'));
   try {
-    const originalWrite = fs.writeFileSync;
-    let writes = 0;
-    context.mock.method(fs, 'writeFileSync', (descriptor, ...args) => {
+    const originalTruncate = fs.ftruncateSync;
+    const originalChmod = fs.fchmodSync;
+    let truncations = 0;
+    let publications = 0;
+    context.mock.method(fs, 'ftruncateSync', (descriptor, ...args) => {
       assert.equal(typeof descriptor, 'number');
       assert.equal(fs.fstatSync(descriptor).mode & 0o777, 0o600 & ~process.umask());
-      writes += 1;
-      return originalWrite(descriptor, ...args);
+      truncations += 1;
+      return originalTruncate(descriptor, ...args);
+    });
+    context.mock.method(fs, 'fchmodSync', (descriptor, ...args) => {
+      assert.equal(fs.fstatSync(descriptor).mode & 0o777, 0o600 & ~process.umask());
+      assert.ok(fs.fstatSync(descriptor).size > 0);
+      publications += 1;
+      return originalChmod(descriptor, ...args);
     });
     await buildPublicPages(configuration(output));
-    assert.equal(writes, generatedFiles.length);
+    assert.equal(truncations, generatedFiles.length);
+    assert.equal(publications, generatedFiles.length);
     context.mock.restoreAll();
     execFileSync(process.execPath, ['--input-type=module', '-e', `
       import assert from 'node:assert/strict';
@@ -282,6 +291,47 @@ test('new POSIX output stays private during writing and follows non-default umas
       assert.equal((await fs.stat(victim)).mode & 0o777, 0o600);
       assert.equal(await fs.readFile(victim, 'utf8'), 'untouched');
     `, join(output, 'different-umask')], { timeout: 15000, encoding: 'utf8' });
+  } finally {
+    context.mock.restoreAll();
+    await rm(output, { recursive: true, force: true });
+  }
+});
+
+test('replacement after descriptor validation cannot redirect truncation, writing or mode changes', {
+  skip: process.platform === 'win32' && 'POSIX mode and symlink substitution fixture',
+}, async (context) => {
+  const output = await mkdtemp(join(tmpdir(), 'certigo-public-write-substitute-'));
+  try {
+    const destination = join(output, 'staticwebapp.config.json');
+    const original = join(output, 'original-config');
+    const victim = join(output, 'victim');
+    await writeFile(victim, 'untouched', { mode: 0o600 });
+    const originalOpen = fs.openSync;
+    const originalTruncate = fs.ftruncateSync;
+    let descriptor;
+    let substituted = false;
+    context.mock.method(fs, 'openSync', (file, ...args) => {
+      const opened = originalOpen(file, ...args);
+      if (file === destination) descriptor = opened;
+      return opened;
+    });
+    context.mock.method(fs, 'ftruncateSync', (opened, ...args) => {
+      if (opened === descriptor && !substituted) {
+        fs.renameSync(destination, original);
+        fs.symlinkSync(victim, destination);
+        substituted = true;
+      }
+      return originalTruncate(opened, ...args);
+    });
+    await buildPublicPages(configuration(output));
+    assert.equal(substituted, true);
+    assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+    assert.equal(await readFile(victim, 'utf8'), 'untouched');
+    assert.equal((await stat(victim)).mode & 0o777, 0o600 & ~process.umask());
+    assert.equal((await stat(original)).mode & 0o777, 0o666 & ~process.umask());
+    const generated = JSON.parse(await readFile(original, 'utf8'));
+    assert.deepEqual(generated.mimeTypes, { '.json': 'application/json' });
+    assert.equal(generated.routes[0].route, '/.well-known/apple-app-site-association');
   } finally {
     context.mock.restoreAll();
     await rm(output, { recursive: true, force: true });
