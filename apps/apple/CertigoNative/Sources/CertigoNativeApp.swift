@@ -39,11 +39,21 @@ import Foundation
 
     private struct NativeEntry: View {
         @State private var showDemo = false
+        #if DEBUG
         @State private var showDeveloper = false
+        #endif
         @State private var pendingLessonLink: EditorialPilotLessonLink?
         @State private var invalidLessonLink = false
 
         var body: some View {
+            #if CERTIGO_PRODUCTION_DISTRIBUTION
+                NativeProductionEntry(pendingLessonLink: $pendingLessonLink)
+            #else
+                developmentEntry
+            #endif
+        }
+
+        private var developmentEntry: some View {
             NavigationStack {
                 List {
                     Section {
@@ -61,6 +71,7 @@ import Foundation
                             "Goals, answers and explanations are fictional. No account, network or real result is used."
                         )
                     }
+                    #if DEBUG
                     if let pendingLessonLink {
                         Section("Shared lesson link") {
                             Text("Non-certifying editorial pilot · \(pendingLessonLink.lessonID)")
@@ -83,12 +94,15 @@ import Foundation
                         )
                         .foregroundStyle(.secondary)
                     }
+                    #endif
                 }
                 .navigationTitle("Certigo")
                 .fullScreenCover(isPresented: $showDemo) { NativeDemoRoot() }
+                #if DEBUG
                 .sheet(isPresented: $showDeveloper) {
                     NativeDeveloperConnector(pendingLessonLink: $pendingLessonLink)
                 }
+                #endif
             }
             .onOpenURL(perform: handleIncomingURL)
             .alert("Lesson link unavailable", isPresented: $invalidLessonLink) {
@@ -109,6 +123,121 @@ import Foundation
         }
     }
 
+    #if CERTIGO_PRODUCTION_DISTRIBUTION
+    @MainActor
+    private struct NativeProductionEntry: View {
+        @Binding private var pendingLessonLink: EditorialPilotLessonLink?
+        @State private var model: NativeModel
+        @State private var provider: MSALAuthenticationProvider?
+        @State private var configurationIssue: String?
+
+        init(pendingLessonLink: Binding<EditorialPilotLessonLink?>) {
+            self._pendingLessonLink = pendingLessonLink
+            do {
+                let configured = try CIAMConfigurationEnvironment.configuredProductionProvider(
+                    infoDictionary: Bundle.main.infoDictionary ?? [:],
+                    bundleIdentifier: Bundle.main.bundleIdentifier,
+                    isDevelopmentBuild: false
+                ) { configuration in
+                    try MSALAuthenticationProvider(
+                        configuration: configuration,
+                        presentation: Self.authenticationPresentationController)
+                }
+                _model = State(
+                    initialValue: NativeModel(
+                        authentication: (configured.provider, configured.configuration)))
+                _provider = State(initialValue: configured.provider)
+                _configurationIssue = State(initialValue: nil)
+            } catch {
+                _model = State(initialValue: NativeModel())
+                _provider = State(initialValue: nil)
+                _configurationIssue = State(initialValue: Self.safeMessage(for: error))
+            }
+        }
+
+        var body: some View {
+            Group {
+                if let configurationIssue {
+                    ContentUnavailableView(
+                        "Microsoft sign-in is not configured",
+                        systemImage: "person.crop.circle.badge.exclamationmark",
+                        description: Text(configurationIssue))
+                } else if model.profile == nil {
+                    NavigationStack {
+                        Form {
+                            Section("Certigo") {
+                                Text("Sign in with your Microsoft account to continue.")
+                                Button("Sign in with Microsoft", systemImage: "person.crop.circle") {
+                                    Task { await model.connect() }
+                                }
+                                .disabled(model.busy)
+                                if model.busy { ProgressView() }
+                            }
+                        }
+                        .navigationTitle("Certigo")
+                        .alert(
+                            "Microsoft sign-in did not complete",
+                            isPresented: Binding(
+                                get: { model.errorMessage != nil },
+                                set: { if !$0 { model.errorMessage = nil } }
+                            )
+                        ) {
+                            Button("OK", role: .cancel) { model.errorMessage = nil }
+                        } message: {
+                            Text(model.errorMessage ?? "")
+                        }
+                    }
+                } else {
+                    NativeRoot(model: model, pendingLessonLink: $pendingLessonLink)
+                }
+            }
+            .onOpenURL { url in
+                _ = provider?.handleCallback(url, sourceApplication: nil)
+            }
+        }
+
+        @MainActor
+        private static func authenticationPresentationController() throws -> UIViewController {
+            let windows = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+            guard var controller = windows.first(where: \.isKeyWindow)?.rootViewController else {
+                throw CIAMAuthenticationFailure.configuration
+            }
+            while let presented = controller.presentedViewController {
+                controller = presented
+            }
+            return controller
+        }
+
+        private static func safeMessage(for error: Error) -> String {
+            switch error {
+            case CIAMConfigurationEnvironmentError.productionBuildRequired:
+                "Microsoft sign-in is only enabled for the Distribution build."
+            case CIAMConfigurationEnvironmentError.unsupportedProductionBundle:
+                "Use the existing Certigo App Store bundle identifier."
+            case CIAMConfigurationEnvironmentError.missingValue(let key):
+                "Distribution is missing \(key). Configure the verified production identity before sign-in."
+            case CIAMConfigurationEnvironmentError.invalidValue(let key):
+                "Distribution has an invalid \(key). Correct the verified production configuration."
+            case CIAMConfigurationEnvironmentError.callbackNotDeclared:
+                "Declare the app-derived Microsoft callback in the Distribution Info.plist."
+            case CIAMConfigurationEnvironmentError.callbackCollision:
+                "The Microsoft callback is duplicated in the Distribution Info.plist."
+            case CIAMConfigurationEnvironmentError.redirectDoesNotMatchBundle:
+                "The Microsoft callback must match this app's bundle identifier."
+            case is CIAMConfigurationEnvironmentError:
+                "Correct the Distribution Microsoft sign-in configuration."
+            case is CIAMConfigurationError:
+                "The Distribution Microsoft sign-in configuration failed validation."
+            default:
+                "Microsoft sign-in could not be initialized. No manual-token fallback is available."
+            }
+        }
+    }
+    #endif
+
+    #if DEBUG
     @MainActor
     private struct NativeDeveloperConnector: View {
         @Environment(\.dismiss) private var dismiss
@@ -120,17 +249,12 @@ import Foundation
 
         init(pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil)) {
             self._pendingLessonLink = pendingLessonLink
-            #if DEBUG
-                let isDevelopmentBuild = true
-            #else
-                let isDevelopmentBuild = false
-            #endif
             do {
                 let configured = try CIAMConfigurationEnvironment.configuredProvider(
                     environment: ProcessInfo.processInfo.environment,
                     bundleIdentifier: Bundle.main.bundleIdentifier,
                     infoDictionary: Bundle.main.infoDictionary ?? [:],
-                    isDevelopmentBuild: isDevelopmentBuild
+                    isDevelopmentBuild: true
                 ) { configuration in
                     try MSALAuthenticationProvider(
                         configuration: configuration,
@@ -257,6 +381,7 @@ import Foundation
                 "Review the local Xcode scheme and registered app callback. Manual token sign-in is disabled while CIAM is opted in."
         }
     }
+    #endif
 
     private enum DemoCatalogScenario: String, CaseIterable {
         case ready = "Available"
@@ -1808,8 +1933,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                     NavigationLink("Settings") {
                         Form {
-                            Section("Development connection") {
-                                Text("Test connector only. Production sign-in is not enabled.")
+                            Section(connectionSectionTitle) {
+                                Text(connectionDescription)
                                 Button("Disconnect", systemImage: "person.crop.circle.badge.xmark")
                                 {
                                     Task { await model.disconnect() }
@@ -1822,6 +1947,22 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
             }
             .navigationTitle("Profile")
+        }
+
+        private var connectionSectionTitle: String {
+            #if DEBUG
+                "Development connection"
+            #else
+                "Microsoft account"
+            #endif
+        }
+
+        private var connectionDescription: String {
+            #if DEBUG
+                "Test connector only. Production sign-in is not enabled."
+            #else
+                "Connected with your Microsoft account."
+            #endif
         }
 
         private var connection: some View {

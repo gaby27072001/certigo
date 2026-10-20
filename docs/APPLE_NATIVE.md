@@ -135,6 +135,43 @@ sign-out removes the activity, reports removal failure and blocks automatic
 connection restoration. Generation guards discard late restoration responses
 after sign-out or account replacement.
 
+## Development connector support and recovery
+
+Retry failures reconcile the displayed saved-answer queue with the durable
+outbox before the operation finishes. A terminal rejection clears the current
+activity's pending indicator, not its saved answers, and does not enable another
+submission of that attempt. Reopening must show the same durable status.
+
+| Observed state | Recovery and evidence boundary |
+| --- | --- |
+| Pending correction, offline, timeout, throttling or server outage | Keep the saved attempt. Retry correction explicitly after connectivity/service recovery; the original attempt ID, answers and release pin must not change. No local verdict is available. |
+| Cancelled request | Acceptance is unknown. Keep the pending attempt; explicit retry reconciles it with the server. Cancellation does not justify creating another attempt. |
+| HTTP 401 | The connection is not authorized; reconnect the same authorized test account. Sign-out clears the activity snapshot, not the durable submission outbox. Do not paste a token into a support report. |
+| Terminal rejection or incompatible response/content | Review the failure before another attempt. The existing failed row is not retryable; do not edit its archive/status, remove its pin or relabel it pending to force a resend. |
+| Confirmed correction, failed profile refresh | The correction remains confirmed; profile XP can still be the previous server total. Rechecking the corrected saved entry refreshes the profile without another quiz POST or local reward credit. |
+| Unreadable/full storage or failed activity save | Saving is not confirmed. Preserve the existing files; do not reset the outbox as troubleshooting. Resolve device storage or obtain a scoped recovery decision. |
+| Restoration cannot verify account/content | Do not submit automatically or display an unverified draft. A transient failure keeps the snapshot for reconnect; incompatible activity is cleared explicitly without changing saved submissions. |
+
+For support, record only the app version/build, operation name (connect, load,
+submit, retry, refresh or restore), approximate time, displayed category/HTTP
+status and whether the row is pending, failed or corrected. Do not attach the
+local Xcode scheme, credentials, API URL, request/response body, answer selections,
+account identifiers or raw outbox/activity files. No automatic support export,
+analytics pipeline or production observability is enabled by this client.
+`NativeModel` uses fixed error messages; API errors carry status/numeric transport
+codes rather than server response text, and the MSAL adapter disables SDK logging
+and classifies errors instead of displaying SDK diagnostics.
+
+An API `x-correlation-id` is generated per request, but the native client does not
+retain or expose it for support. Do not claim end-to-end request tracing from
+these messages alone. The connected model does not currently wire the runtime
+content store: reopening a draft needs profile/catalogue and path/lesson
+verification over the network. The outbox is not full offline learning or a
+cross-device history. Keep release/manifest identity with each saved submission;
+a newer catalogue or a separate guided pilot is not evidence that an old
+attempt can be regraded against different content. The synthetic demonstration
+does not prove any connected recovery or published curriculum.
+
 ## Opt-in development authentication and storage adapters
 
 `CIAMConfiguration` validates supplied public metadata: authority versus issuer,
@@ -267,13 +304,38 @@ authorized Apple step; do not enable automatic provisioning to bypass this gate.
 The current first-party manifest and pinned MSAL dependency are unchanged;
 inspect the final aggregated archive privacy report before distribution.
 
-The app remains a preview with fictional offline demonstration and a separately
-accessible test API/token connector. This identity does not turn that connector
-into production authentication. CIAM opt-in remains Debug-only; Distribution
-must reject it. No production callback or shared Keychain entitlement is added.
-The test connector's device-only vault remains unchanged: no migration or access
-to the legacy Flutter app's credential cache is claimed. A future connected
-production product requires its own authentication/data-flow decision.
+Debug and ordinary Release builds keep the current fictional demonstration.
+The manual test-token connector is compiled only into Debug, and the local CIAM
+opt-in remains development-only. Only the explicit `Distribution` Xcode
+configuration defines `CERTIGO_PRODUCTION_DISTRIBUTION` and routes to the
+Microsoft production sign-in entry for bundle `com.certigo.mobileapp`. It never
+offers the manual-token connector as a fallback. Missing or invalid
+Distribution metadata blocks sign-in explicitly. This code path is not yet a
+configured or verified production identity.
+
+The Distribution Info.plist declares the local callback
+`msauth.com.certigo.mobileapp://auth` and requires these public Xcode build
+settings to be supplied from an owner-verified production configuration:
+`CERTIGO_PRODUCTION_CIAM_CLIENT_ID`, `CERTIGO_PRODUCTION_CIAM_TENANT_ID`,
+`CERTIGO_PRODUCTION_CIAM_AUTHORITY`, `CERTIGO_PRODUCTION_CIAM_ISSUER`,
+`CERTIGO_PRODUCTION_CIAM_AUTHORITY_KIND`, `CERTIGO_PRODUCTION_CIAM_API_BASE_URL`,
+`CERTIGO_PRODUCTION_CIAM_API_SCOPE` and
+`CERTIGO_PRODUCTION_CIAM_API_AUDIENCE`. They have no development or staging
+defaults. An unresolved Xcode substitution, wrong bundle, invalid authority,
+scope, audience, endpoint or local callback declaration fails closed before
+provider construction. The plist declaration does not prove that the callback
+is registered in Entra, that the app identity and API permission are correct,
+or that consent/backend audience validation is configured. Those require
+separate owner verification and Apple/provider validation; no cloud registration
+or permission was changed for this source preparation.
+
+The provider's account selection is held in memory. After app relaunch, the
+user must explicitly sign in again; silent account restoration is not claimed.
+The test connector's device-only vault remains unchanged, with no migration or
+access to the legacy Flutter app's credential cache. This lot does not implement
+in-app account deletion, offline learning or cross-device attempt history; those
+remain separate work dependent on the verified production identity and their
+existing service contracts.
 
 The existing Flutter TestFlight build is not this native candidate. Do not claim
 production login, in-app account deletion, validated accessibility, App Review
