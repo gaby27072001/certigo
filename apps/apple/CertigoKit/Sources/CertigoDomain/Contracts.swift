@@ -329,3 +329,101 @@ public struct QuizRewards: Codable, Equatable, Sendable {
     public let gemsEarned: Int
     public let achievementsUnlocked: [String]
 }
+
+public struct LearningHistoryPage: Decodable, Equatable, Sendable {
+    public let items: [QuizAttemptHistoryItem]
+    public let nextCursor: String?
+
+    enum CodingKeys: String, CodingKey, CaseIterable { case items, nextCursor }
+
+    public init(from decoder: any Decoder) throws {
+        try historyFields(decoder, allowed: CodingKeys.allCases.map(\.rawValue))
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        items = try values.decode([QuizAttemptHistoryItem].self, forKey: .items)
+        nextCursor = try values.decodeIfPresent(String.self, forKey: .nextCursor)
+        guard items.count <= 50, Self.validCursor(nextCursor) else {
+            throw ContractError.malformed("history page")
+        }
+    }
+
+    public static func validCursor(_ cursor: String?) -> Bool {
+        guard let cursor else { return true }
+        return !cursor.isEmpty && cursor.utf8.count <= 2_048
+            && cursor.utf8.allSatisfy {
+                (65...90).contains($0) || (97...122).contains($0)
+                    || (48...57).contains($0) || $0 == 45 || $0 == 95
+            }
+    }
+}
+
+public struct QuizAttemptHistoryItem: Decodable, Equatable, Identifiable, Sendable {
+    public let kind: String
+    public let attemptId: String
+    public let clientAttemptId: String
+    public let trackId: String
+    public let lessonId: String
+    public let submittedAt: Date
+    public let scorePct: Int
+    public let answeredCount: Int
+    public let correctCount: Int
+    public let xpEarned: Int
+    public let gemsEarned: Int
+    public let publicManifestId: String?
+    public var id: String { Self.key(clientAttemptId) }
+
+    public static func key(_ value: String) -> String {
+        UUID(uuidString: value)?.uuidString ?? value
+    }
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind, attemptId, clientAttemptId, trackId, lessonId, submittedAt
+        case scorePct, answeredCount, correctCount, xpEarned, gemsEarned, publicManifestId
+    }
+
+    public init(from decoder: any Decoder) throws {
+        try historyFields(decoder, allowed: CodingKeys.allCases.map(\.rawValue))
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try values.decode(String.self, forKey: .kind)
+        attemptId = try values.decode(String.self, forKey: .attemptId)
+        clientAttemptId = try values.decode(String.self, forKey: .clientAttemptId)
+        trackId = try values.decode(String.self, forKey: .trackId)
+        lessonId = try values.decode(String.self, forKey: .lessonId)
+        submittedAt = try values.decode(Date.self, forKey: .submittedAt)
+        scorePct = try values.decode(Int.self, forKey: .scorePct)
+        answeredCount = try values.decode(Int.self, forKey: .answeredCount)
+        correctCount = try values.decode(Int.self, forKey: .correctCount)
+        xpEarned = try values.decode(Int.self, forKey: .xpEarned)
+        gemsEarned = try values.decode(Int.self, forKey: .gemsEarned)
+        publicManifestId = try values.decodeIfPresent(String.self, forKey: .publicManifestId)
+        guard kind == "quiz",
+            [attemptId, clientAttemptId, trackId, lessonId].allSatisfy({
+                !$0.isEmpty && $0.utf8.count <= 256
+                    && $0.rangeOfCharacter(from: .whitespacesAndNewlines.union(.controlCharacters))
+                        == nil
+            }),
+            submittedAt.timeIntervalSince1970 >= -62_135_596_800,
+            submittedAt.timeIntervalSince1970 < 253_402_300_800,
+            (0...100).contains(scorePct),
+            [answeredCount, correctCount, xpEarned, gemsEarned].allSatisfy({
+                (0...Int(Int32.max)).contains($0)
+            }), correctCount <= answeredCount,
+            publicManifestId == nil
+                || publicManifestId?.range(
+                    of: "^sha256:[0-9a-f]{64}$", options: .regularExpression) != nil
+        else { throw ContractError.malformed("history summary") }
+    }
+}
+
+private struct HistoryField: CodingKey {
+    let stringValue: String
+    var intValue: Int? { nil }
+    init?(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue: Int) { return nil }
+}
+
+private func historyFields(_ decoder: any Decoder, allowed: [String]) throws {
+    let values = try decoder.container(keyedBy: HistoryField.self)
+    guard Set(values.allKeys.map(\.stringValue)) == Set(allowed) else {
+        throw ContractError.malformed("history fields")
+    }
+}

@@ -218,6 +218,28 @@ internal sealed class InMemoryAttemptRepository : IAttemptRepository
         var recent = _store.Where(a => a.UserId == userId && a.SubmittedAt >= since).ToList();
         return Task.FromResult(new RecentActivity(recent.Count, recent.Sum(a => a.Result.Rewards.XpEarned)));
     }
+
+    public Task<AttemptHistoryWindow> ListHistoryWindowAsync(
+        string userId,
+        AttemptHistoryPosition? after,
+        int maximumRecords,
+        CancellationToken cancellationToken = default)
+    {
+        var records = _store
+            .Where(attempt => attempt.UserId == userId
+                && attempt.Id.StartsWith("attempt::", StringComparison.Ordinal)
+                && (after is null
+                    || attempt.SubmittedAt < after.SubmittedAt
+                    || (attempt.SubmittedAt == after.SubmittedAt
+                        && string.CompareOrdinal(attempt.Id, after.Id) < 0)))
+            .OrderByDescending(attempt => attempt.SubmittedAt)
+            .ThenByDescending(attempt => attempt.Id, StringComparer.Ordinal)
+            .Take(maximumRecords + 1)
+            .ToArray();
+        return Task.FromResult(new AttemptHistoryWindow(
+            records.Take(maximumRecords).ToArray(),
+            records.Length > maximumRecords));
+    }
 }
 
 internal sealed class InMemoryExamAttemptRepository : IExamAttemptRepository

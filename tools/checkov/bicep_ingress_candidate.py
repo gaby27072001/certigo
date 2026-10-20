@@ -589,6 +589,7 @@ def resolve_local_module_bindings(
             return environment
         if name in active:
             raise BindingResolutionError("cyclic root parameter/variable reference")
+        spec = None
         if name in root_parameters:
             spec = root_parameters[name]
             if any(item.get("type") == "secure" for item in spec.get("decorators", [])):
@@ -617,7 +618,7 @@ def resolve_local_module_bindings(
             value, lambda nested: resolve_root_symbol(nested, active + (name,)), environment,
             root_loader,
         )
-        if name in root_parameters and not _matches_parameter_type(resolved, spec.get("type")):
+        if spec is not None and not _matches_parameter_type(resolved, spec.get("type")):
             raise BindingResolutionError("root default does not match its declared parameter type")
         return resolved
 

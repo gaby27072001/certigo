@@ -85,6 +85,46 @@ public final class RuntimeContentStore: @unchecked Sendable {
         }
     }
 
+    public func questionPack(
+        trackId: String, ownerId: String, apiScope: String, manifestId: String? = nil
+    ) throws -> OfflineQuestionPack? {
+        try transaction {
+            let state = try archive()
+            try scope(ownerId, apiScope)
+            let key: String
+            if let manifestId {
+                try PublicReleaseContracts.digestId(manifestId)
+                let keys = try disk.entries().map(\.name).filter { $0.hasPrefix("x-") }
+                var matching: String?
+                for candidate in keys {
+                    let capsule = try readCapsule(candidate)
+                    if capsule.ownerId == ownerId && capsule.apiScope == apiScope
+                        && capsule.manifestId == manifestId
+                    {
+                        matching = candidate
+                    }
+                }
+                guard let matching else { throw RuntimeStoreError.missingFile }
+                key = matching
+            } else {
+                guard
+                    let active = state.scopes.first(where: {
+                        $0.ownerId == ownerId && $0.apiScope == apiScope
+                    })?.active
+                else { return nil }
+                key = active
+            }
+            let value = try snapshot(key, ownerId: ownerId, apiScope: apiScope)
+            try verifyComplete(value)
+            return try OfflineQuestionPackReader.read(trackId: trackId, snapshot: value) { file in
+                guard let bytes = try verifiedFile(file) else {
+                    throw RuntimeStoreError.missingFile
+                }
+                return bytes
+            }
+        }
+    }
+
     /// Explicit recovery only: a corrupt active snapshot never silently becomes the previous one.
     public func restorePrevious(ownerId: String, apiScope: String) throws -> RuntimeContentSnapshot
     {
@@ -240,6 +280,39 @@ public final class RuntimeContentStore: @unchecked Sendable {
             }.sorted()
             for name in candidates.prefix(32) { try disk.remove(name) }
             return min(32, candidates.count)
+        }
+    }
+
+    public func purge(ownerId: String, apiScope: String) throws {
+        try transaction {
+            try scope(ownerId, apiScope)
+            var state = try archive()
+            let entries = try disk.entries()
+            var removed: [String] = []
+            var retainedBlobs: Set<String> = []
+            for entry in entries where entry.name.hasPrefix("x-") {
+                let capsule = try readCapsule(entry.name)
+                if capsule.ownerId == ownerId && capsule.apiScope == apiScope {
+                    removed.append(entry.name)
+                } else {
+                    let value = try snapshot(
+                        entry.name, ownerId: capsule.ownerId, apiScope: capsule.apiScope)
+                    for file in value.manifest.files {
+                        retainedBlobs.insert(try blobName(file.hash))
+                    }
+                }
+            }
+            state.scopes.removeAll { $0.ownerId == ownerId && $0.apiScope == apiScope }
+            state.pins.removeAll { $0.ownerId == ownerId && $0.apiScope == apiScope }
+            // Commit revocation before removing capsules; retry can finish interrupted cleanup.
+            try persist(&state)
+            for name in removed { try disk.remove(name) }
+            for entry in entries
+            where entry.name.hasPrefix("b-")
+                && !retainedBlobs.contains(entry.name)
+            {
+                try disk.remove(entry.name)
+            }
         }
     }
 
