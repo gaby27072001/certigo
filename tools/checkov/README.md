@@ -248,38 +248,73 @@ binding, missing parent/module, UNKNOWN response, parse error and zero effective
 coverage must each remain blocking. Neither that architecture nor a runtime
 or gate change is implemented by this fixture-only delivery.
 
-### First inactive Bicep applicability adapter: literal root ingress
+### Inactive Bicep applicability adapter: literal root subtypes and identity
 
-`bicep_ingress_candidate.py` implements a deliberately small next step using
-the **existing Bicep Runner and unchanged CKV_AZURE_222 predicate**, not another
-policy engine. It parses authored source before scanning to derive independent
-resource/check obligations, and pins the installed ingress and registry source
-digests as well as candidate and parser versions. Both parser and scanner
+`bicep_ingress_candidate.py` extends the first ingress-only lot using the
+**existing Bicep Runner and candidate predicates**, not another policy engine.
+It parses authored source before scanning to derive independent resource/check
+obligations, and pins all eight installed rule source digests plus the Bicep
+registry, candidate and parser versions. Both parser and scanner
 consume the same captured source bytes (the Runner uses a temporary snapshot).
-The versioned JSON includes the original source path/hash, explicit environment,
+The `certigo.bicep-appservice-qualification/v2` JSON includes the source path/hash, explicit environment,
 root module instance, independent obligations, unmodified raw scanner report,
 separate applicability records and blockers.
 
-Only API `2024-04-01`, resource-group scope, a literal
-`Microsoft.Web/sites` resource containing just `name` and
-`properties.publicNetworkAccess`, and its symbolic-parent-linked literal
-`Microsoft.Web/sites/config` `appsettings` StringDictionary are qualified.
-Site names and per-site appsettings children must be unique. Parameters,
-variables, modules, outputs, conditions, loops, other properties/resources,
-unresolved values and other subtypes fail closed **before** the Runner.
+The bounded literal resource contracts are:
+
+| Resource | Accepted shape and obligations |
+| --- | --- |
+| `Microsoft.Web/sites@2024-04-01` | `name`, explicit `properties.publicNetworkAccess`, and literal `identity`; site checks 16 and 222. |
+| `Microsoft.Web/sites/config@2024-04-01`, `appsettings` | Symbolic site parent and literal string dictionary; all six config check obligations, never site-property proof from environment-variable names. |
+| Same type, `web` | Symbolic site parent; only explicit literal `netFrameworkVersion`, `requestTracingEnabled`, `httpLoggingEnabled`, `publicNetworkAccess`, `azureStorageAccounts.*.type`; all six obligations. |
+| Same type, `authsettings` | Symbolic site parent and only literal `properties.enabled`; all six obligations. V2 is not qualified. |
+| `Microsoft.DocumentDB/databaseAccounts@2024-11-15` | Literal account name and explicit public access; optional literal multiwrite/filter flags and literal IP/subnet rule lists; only check 99. It is not a Web site rule. |
+
+Site/account names and each per-site config subtype must be unique. Parameters,
+variables, modules, outputs, conditions, loops, existing resources,
+unresolved values and unknown properties/subtypes fail closed **before** the Runner.
 An environment label does not resolve a parameter: this lot rejects all
 parameter declarations and supports only the root module instance.
+The tool does not compile Bicep, validate complete Azure schemas, or establish
+cloud runtime capability. In particular the minimal `web` Azure Files control
+is a synthetic predicate fixture, not a proposed valid mount/deployment or a
+requirement for Flex hosting.
 
-For each appsettings child, ingress applicability is explicitly
-`NOT_APPLICABLE` with a typed-contract reason and the separately reconciled site
-obligation. The child's raw CKV_AZURE_222 FAILED record remains in
-`scanner_report`, including its raw summary; it is not deleted, changed to
-PASSED or returned as UNKNOWN. The parent's actual predicate result remains
-independent: an Enabled parent blocks even with a non-applicable child.
+For each config resource, the adapter declares only the properties owned by
+its known subtype applicable. `NOT_APPLICABLE` on another subtype requires a
+real, separately reconciled **PASSED** proof for the same site, same file,
+module and environment: check 13 from `authsettings`, checks 80/66/63/88 from
+`web`, and check 222 from the site plus any authored `web` child. The other
+five checks do not dispatch on a site parent in this Checkov version; the tool
+does not fabricate parent PASSED records or project properties into a fake
+resource. Missing sibling proof remains BLOCKED. A passing sibling belonging to
+another site cannot satisfy the obligation. The same subtype discrimination
+applies to unrelated rules emitted on the proof siblings themselves.
+
+All raw records and the raw summary stay in `scanner_report`, including every
+appsettings FAILED record and the spurious cross-subtype sibling failures.
+They are not deleted, changed to PASSED, skipped or returned as UNKNOWN.
+An unsafe or unknown corresponding proof blocks the child's applicability,
+and every applicable FAILED result blocks the entire qualification.
 Missing child or parent evidence, duplicate/unexpected obligations, UNKNOWN
 omissions, parsing/skipped records and inconsistent cardinality/status block.
 This custom applicability schema is experimental, **not** an existing Checkov
 result status or an adopted production report contract.
+
+Check 16 uses the existing `certigo.4` predicate unchanged. Literal mixed
+`SystemAssigned, UserAssigned` passes because the system identity establishes
+that property's configuration; empty user-assigned-only maps remain actual
+FAILED records. The pinned Bicep parser retains single quotes in literal map
+keys, so even a fully qualified literal UAMI ID in Bicep still fails the
+user-only predicate. This remaining false rejection is preserved, not
+normalized or labelled non-applicable. The earlier ARM positive does not prove
+Bicep equivalence. Explicit malformed or unresolved identities block.
+
+Check 99 also uses the unchanged candidate on actual Cosmos resources.
+Disabled public access passes, while unrestricted Enabled public access still
+fails with `enableMultipleWriteLocations: false`; it cannot bypass the network
+predicate. Network existence, deployment and approved address policy are not
+inferred by these fixtures.
 
 ```sh
 python tools/checkov/bicep_ingress_candidate.py /path/literal-fixture.bicep --environment staging
@@ -292,19 +327,20 @@ It does not claim every security control on these resources was checked.
 Exit 1 means BLOCKED. The actual `infra/modules/functionApp.bicep` is outside
 this literal-only contract and must remain blocked: parameters, module binding,
 Flex runtime/diagnostics and ingress decisions are not implemented or inferred.
-The other five appsettings checks retain their prior findings; this tool does
-not run, suppress or resolve them. There is no active gate/workflow, dependency
+There is no active gate/workflow, dependency
 pin, infrastructure, cloud access or scanner installation change.
 
-All six appsettings-subtype findings remain unchanged and blocking. Returning
-PASSED on an inapplicable appsettings child would misrepresent the parent;
-returning UNKNOWN would silently lose the record in this Checkov version.
-Resolving them needs an explicit applicability/parent-context reporting
-contract, not a rule-ID exclusion. The other environment-dependent, platform
-UNKNOWN and product-decision findings likewise remain open. These focused
-controls do not establish any reduced total-finding count.
+Tests execute real positive/negative Bicep fixtures, plus controlled record
+damage and UNKNOWN injection. The complete safe shape produces 20 exact
+resource/check records on four resources: eight PASSED and twelve FAILED raw
+records (six on appsettings). Qualification separates the twelve justified
+non-applicabilities only with the applicable proofs above. Each insecure
+property, missing/foreign proof, lost record, unknown value, empty user identity
+and unrestricted Cosmos negative remains blocking. The raw report is never
+mutated by reconciliation. These focused controls do not establish a reduced
+infrastructure-finding count or global scanner equivalence.
 
-### Appsettings applicability: blocked reporting contract
+### Pinned runner applicability limits retained by the adapter
 
 The six unchanged upstream checks accept the shared
 `Microsoft.Web/sites/config` resource type, not a discriminated configuration
@@ -361,7 +397,9 @@ or scan the infrastructure tree:
 PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_appsettings_applicability.py
 ```
 
-No additional scanner patch is included for these six findings. Fixing the
-report/result schema plus subtype-aware parent coverage would cross the
-bounded adapter scope and requires a separately reviewed contract; the existing
-findings remain blocking until then.
+No additional scanner patch is included for these six findings. The inactive
+adapter above implements a bounded external report contract, not a new status
+in the pinned runner or a complete production parent/module inventory.
+The active Bicep report gate is unchanged and still treats its raw findings as
+blocking. Runtime/Flex, module/parameter binding, comprehensive source coverage
+and adoption remain separate work; no fixture result authorizes an exemption.
