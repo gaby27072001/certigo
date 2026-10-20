@@ -1,0 +1,8 @@
+{
+  "schema": "certigo.content.release/v1",
+  "algorithm": "sha256",
+  "canonicalization": "json-sorted-keys-compact-utf8",
+  "publicManifestId": "sha256:248eb967705fb7126a7eaf159a68ac9b51c61ff8170b2ed6b62ae7c036f350c0",
+  "privateManifestId": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "releaseId": "sha256:92bde38713c6a4671428994a32b85ea385904a509efe818d85ccf7b430962a66"
+}

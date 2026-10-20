@@ -859,6 +859,7 @@ test('workspace requires each control but byte-seals only the dispatch authorize
 test('BASE policy permits policy/test evolution without executing or trusting candidate code', () => {
   const trusted = candidateWorkspace();
   const candidate = candidateWorkspace();
+  const strictCandidate = candidateWorkspace(strictWorkflow);
   try {
     fs.writeFileSync(
       path.join(candidate, '.github', 'scripts', 'backend-deploy-workflow-policy.mjs'),
@@ -872,6 +873,20 @@ test('BASE policy permits policy/test evolution without executing or trusting ca
       'utf8',
     );
     assert.deepEqual(validateBackendDeployWorkspace(candidate, trusted), []);
+    copyFile(strictCandidate, '.github/scripts/backend-deployment-state.mjs');
+    fs.appendFileSync(
+      path.join(strictCandidate, '.github', 'scripts', 'backend-deployment-state.mjs'),
+      '\n// candidate policy edits cannot authorize this protected input\n',
+    );
+    fs.writeFileSync(
+      path.join(strictCandidate, '.github', 'scripts', 'backend-deploy-workflow-policy.mjs'),
+      'export function validateBackendDeployWorkspace() { return []; }\n',
+      'utf8',
+    );
+    assert.match(
+      validateBackendDeployWorkspace(strictCandidate, repositoryRoot).join('\n'),
+      /backend-deployment-state\.mjs must match the immutable base revision/u,
+    );
 
     fs.copyFileSync(
       workflowPath,
@@ -893,6 +908,7 @@ test('BASE policy permits policy/test evolution without executing or trusting ca
   } finally {
     fs.rmSync(trusted, { force: true, recursive: true });
     fs.rmSync(candidate, { force: true, recursive: true });
+    fs.rmSync(strictCandidate, { force: true, recursive: true });
   }
 });
 

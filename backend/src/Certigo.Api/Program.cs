@@ -435,6 +435,9 @@ var host = new HostBuilder()
             sp.GetRequiredService<CosmosVersionedContentRepository>(),
             configuration[ConfigurationKeys.ContentRepositoryMode] ?? "legacy"));
         services.AddScoped<IProgressRepository, CosmosProgressRepository>();
+        services.AddScoped<IPilotHistoryRepository, CosmosPilotHistoryRepository>();
+        services.AddSingleton<IPilotContentCatalog, EmbeddedPilotContentCatalog>();
+        services.AddScoped<IPilotLearningService, PilotLearningService>();
         services.AddScoped<IAttemptRepository, CosmosAttemptRepository>();
         services.AddScoped<IExamAttemptRepository, CosmosExamAttemptRepository>();
         services.AddScoped<IExamRepository, CosmosExamRepository>();

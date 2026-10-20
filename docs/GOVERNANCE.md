@@ -302,6 +302,16 @@ n'impose pas un second reviewer ; aucun agent, test ou digest ne remplace cet ac
 une PR draft ne constitue pas une adoption, une fusion ou une modification des settings.
 Ne pas rafraîchir un digest/golden pour masquer le refus de l'ancienne base.
 
+**Transitions temporaires d'entrées privilégiées.** Une exception d'égalité binaire ne peut
+porter que sur les paires source/cible exactes décrites dans
+[`runbooks/CI_WORKFLOW_CHANGES.md`](runbooks/CI_WORKFLOW_CHANGES.md), avec expiration fixée par la
+politique de la BASE. Les corrections CodeQL et la préparation staging sont deux lots séparés ;
+leur combinaison, tout autre octet, une source inattendue et toute transition expirée restent
+refusés. Les ajouts du vérificateur d'identité et du workflow inactif sont également scellés.
+L'activation future du workflow exige toujours le cycle de pré-approbation A/B et ne découle pas
+de cette préparation. L'ancienne BASE continue de refuser les deltas de fichiers privilégiés
+jusqu'à l'adoption de cet amendement ; seul l'accord humain sur le diff exact peut l'adopter.
+
 **Évolutions suivantes, sans confiance circulaire.** Une fois ce code adopté, une PR limitée à
 la politique et ses tests peut être évaluée par la politique déjà présente dans la base, avec
 les workflows et entrées privilégiées inchangés. Exécuter séparément cette validation trusted,

@@ -1,0 +1,324 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 60;
+	objects = {
+		B10000000000000000000001 /* ProtectionTestHostAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011; };
+		B10000000000000000000002 /* RuntimeDiskProtectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012; };
+		B10000000000000000000003 /* CertigoData in Frameworks */ = {isa = PBXBuildFile; productRef = B10000000000000000000041; };
+		B10000000000000000000011 /* ProtectionTestHostAppDelegate.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = ProtectionTestHostAppDelegate.swift;
+			sourceTree = "<group>";
+		};
+		B10000000000000000000012 /* RuntimeDiskProtectionTests.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = ../CertigoKit/Tests/CertigoKitTests/RuntimeDiskProtectionTests.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		B10000000000000000000013 /* CertigoProtectionTestHost.app */ = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			path = CertigoProtectionTestHost.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		B10000000000000000000014 /* CertigoProtectionDeviceTests.xctest */ = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.cfbundle;
+			path = CertigoProtectionDeviceTests.xctest;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		B10000000000000000000020 = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000021 /* ProtectionTestHost */,
+				B10000000000000000000022 /* ProtectionTests */,
+				B10000000000000000000023 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B10000000000000000000021 /* ProtectionTestHost */ = {
+			isa = PBXGroup;
+			children = (B10000000000000000000011,);
+			path = ProtectionTestHost;
+			sourceTree = "<group>";
+		};
+		B10000000000000000000022 /* ProtectionTests */ = {
+			isa = PBXGroup;
+			children = (B10000000000000000000012,);
+			path = ProtectionTests;
+			sourceTree = "<group>";
+		};
+		B10000000000000000000023 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000013,
+				B10000000000000000000014,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B10000000000000000000030 /* Host Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B10000000000000000000001,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000031 /* Host Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000032 /* Host Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000033 /* Test Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B10000000000000000000002,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000034 /* Test Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B10000000000000000000003,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000035 /* Test Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000040 /* CertigoKit */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../CertigoKit;
+		};
+		B10000000000000000000041 /* CertigoData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B10000000000000000000040;
+			productName = CertigoData;
+		};
+		B10000000000000000000050 /* CertigoProtectionTestHost */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B10000000000000000000070;
+			buildPhases = (
+				B10000000000000000000030,
+				B10000000000000000000031,
+				B10000000000000000000032,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = CertigoProtectionTestHost;
+			packageProductDependencies = ();
+			productName = CertigoProtectionTestHost;
+			productReference = B10000000000000000000013;
+			productType = "com.apple.product-type.application";
+		};
+		B10000000000000000000051 /* CertigoProtectionDeviceTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B10000000000000000000071;
+			buildPhases = (
+				B10000000000000000000033,
+				B10000000000000000000034,
+				B10000000000000000000035,
+			);
+			buildRules = ();
+			dependencies = (B10000000000000000000052,);
+			name = CertigoProtectionDeviceTests;
+			packageProductDependencies = (B10000000000000000000041,);
+			productName = CertigoProtectionDeviceTests;
+			productReference = B10000000000000000000014;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		B10000000000000000000060 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					B10000000000000000000050 = { CreatedOnToolsVersion = 27.0; };
+					B10000000000000000000051 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = B10000000000000000000050;
+					};
+				};
+			};
+			buildConfigurationList = B10000000000000000000072;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base,);
+			mainGroup = B10000000000000000000020;
+			packageReferences = (B10000000000000000000040,);
+			productRefGroup = B10000000000000000000023;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B10000000000000000000050,
+				B10000000000000000000051,
+			);
+		};
+		B10000000000000000000070 /* Host Configurations */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000080,
+				B10000000000000000000081,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B10000000000000000000071 /* Test Configurations */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000082,
+				B10000000000000000000083,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B10000000000000000000072 /* Project Configurations */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000084,
+				B10000000000000000000085,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B10000000000000000000080 /* Host Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.protection-test-host;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B10000000000000000000081 /* Host Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.protection-test-host;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B10000000000000000000082 /* Test Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.protection-device-tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CertigoProtectionTestHost.app/CertigoProtectionTestHost";
+			};
+			name = Debug;
+		};
+		B10000000000000000000083 /* Test Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.protection-device-tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CertigoProtectionTestHost.app/CertigoProtectionTestHost";
+			};
+			name = Release;
+		};
+		B10000000000000000000084 /* Project Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				ENABLE_TESTABILITY = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		B10000000000000000000085 /* Project Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		B10000000000000000000090 /* Host dependency proxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B10000000000000000000060;
+			proxyType = 1;
+			remoteGlobalIDString = B10000000000000000000050;
+			remoteInfo = CertigoProtectionTestHost;
+		};
+		B10000000000000000000052 /* Host target dependency */ = {
+			isa = PBXTargetDependency;
+			target = B10000000000000000000050;
+			targetProxy = B10000000000000000000090;
+		};
+	};
+	rootObject = B10000000000000000000060;
+}
