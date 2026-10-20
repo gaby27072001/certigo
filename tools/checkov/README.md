@@ -248,33 +248,50 @@ binding, missing parent/module, UNKNOWN response, parse error and zero effective
 coverage must each remain blocking. Neither that architecture nor a runtime
 or gate change is implemented by this fixture-only delivery.
 
-### Inactive Bicep applicability adapter: literal root subtypes and identity
+### Inactive Bicep applicability adapter: literal resources and local module bindings
 
 `bicep_ingress_candidate.py` extends the first ingress-only lot using the
 **existing Bicep Runner and candidate predicates**, not another policy engine.
 It parses authored source before scanning to derive independent resource/check
 obligations, and pins all eight installed rule source digests plus the Bicep
-registry, candidate and parser versions. Both parser and scanner
-consume the same captured source bytes (the Runner uses a temporary snapshot).
-The `certigo.bicep-appservice-qualification/v2` JSON includes the source path/hash, explicit environment,
-root module instance, independent obligations, unmodified raw scanner report,
-separate applicability records and blockers.
+registry, candidate and parser versions. The Runner consumes the original
+captured module bytes; no source flattening or rewriting is used. Reports keep
+the independent inventory, unmodified raw scanner report, separate
+applicability records and blockers. Literal single-file inputs use schema v2;
+the optional local-module path uses schema v3 with both source hashes.
 
 The bounded literal resource contracts are:
 
 | Resource | Accepted shape and obligations |
 | --- | --- |
-| `Microsoft.Web/sites@2024-04-01` | `name`, explicit `properties.publicNetworkAccess`, and literal `identity`; site checks 16 and 222. |
+| `Microsoft.Web/sites@2024-04-01` | `name`, explicit `properties.publicNetworkAccess`, literal `identity`, and optionally only `siteConfig.cors.allowedOrigins`; site checks 16 and 222. |
 | `Microsoft.Web/sites/config@2024-04-01`, `appsettings` | Symbolic site parent and literal string dictionary; all six config check obligations, never site-property proof from environment-variable names. |
 | Same type, `web` | Symbolic site parent; only explicit literal `netFrameworkVersion`, `requestTracingEnabled`, `httpLoggingEnabled`, `publicNetworkAccess`, `azureStorageAccounts.*.type`; all six obligations. |
 | Same type, `authsettings` | Symbolic site parent and only literal `properties.enabled`; all six obligations. V2 is not qualified. |
 | `Microsoft.DocumentDB/databaseAccounts@2024-11-15` | Literal account name and explicit public access; optional literal multiwrite/filter flags and literal IP/subnet rule lists; only check 99. It is not a Web site rule. |
 
-Site/account names and each per-site config subtype must be unique. Parameters,
-variables, modules, outputs, conditions, loops, existing resources,
-unresolved values and unknown properties/subtypes fail closed **before** the Runner.
-An environment label does not resolve a parameter: this lot rejects all
-parameter declarations and supports only the root module instance.
+Site/account names and each per-site config subtype must be unique. For a
+single-file qualification, parameters, variables, modules, outputs, conditions,
+loops, existing resources, unresolved values and unknown properties/subtypes
+fail closed **before** the Runner. The optional `--module-symbol` mode accepts
+one explicit local root-to-module call when every target-module parameter and
+variable resolves from a literal/default or a bounded environment ternary.
+It requires a root `env` parameter whose allowed values are exactly
+`dev`, `staging`, and `prod`. Any unresolved, secure-without-a-static-value,
+unknown, cyclic or type-mismatched binding blocks the whole qualification.
+Nested modules, dynamic module paths/scopes, loops, module conditions,
+parameters-file inference and resources outside the bounded inventory remain
+unsupported and blocked. Secure values are omitted from the JSON binding
+evidence.
+
+The parser-only whitespace normalization for line-wrapped ternary punctuation
+does not alter the captured bytes sent to Checkov. The module report identifies
+the root and child hashes, module instance and per-parameter resolution. This
+is a module-local subset, not qualification of sibling root resources or a
+deployment.
+The current repository `infra/main.bicep` remains `BLOCKED` because the pinned
+upstream parser rejects root syntax before module bindings can be established;
+the adapter does not switch parser runtimes or infer bindings from text.
 The tool does not compile Bicep, validate complete Azure schemas, or establish
 cloud runtime capability. In particular the minimal `web` Azure Files control
 is a synthetic predicate fixture, not a proposed valid mount/deployment or a
@@ -299,7 +316,11 @@ and every applicable FAILED result blocks the entire qualification.
 Missing child or parent evidence, duplicate/unexpected obligations, UNKNOWN
 omissions, parsing/skipped records and inconsistent cardinality/status block.
 This custom applicability schema is experimental, **not** an existing Checkov
-result status or an adopted production report contract.
+result status or an adopted production report contract. Cosmos check 99 still
+requires explicit authored public-network evidence: `Disabled` is evaluated as
+private even when multiple write locations are disabled, while `Enabled` remains
+unsafe regardless of that setting. The regression asserts the actual raw
+Checkov result in both cases.
 
 Check 16 uses the existing `certigo.4` predicate unchanged. Literal mixed
 `SystemAssigned, UserAssigned` passes because the system identity establishes
@@ -319,6 +340,13 @@ inferred by these fixtures.
 ```sh
 python tools/checkov/bicep_ingress_candidate.py /path/literal-fixture.bicep --environment staging
 python tools/checkov/test_bicep_ingress_candidate.py
+```
+
+To bind one local module call, pass its root source and symbol:
+
+```sh
+python tools/checkov/bicep_ingress_candidate.py infra/main.bicep \
+  --environment staging --module-symbol api
 ```
 
 Exit 0 means only `QUALIFIED_SUBSET` under that narrow contract; every report
