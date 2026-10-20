@@ -835,6 +835,7 @@ final class NativeModel {
             guard generation == marker else { return }
             queue = values
             persistActivity()
+            try await refreshConfirmedProfile(after: response, client: client, marker: marker)
         } catch {
             guard generation == marker else { return }
             report(error)
@@ -871,10 +872,20 @@ final class NativeModel {
             guard generation == marker else { return }
             queue = values
             persistActivity()
+            try await refreshConfirmedProfile(after: response, client: client, marker: marker)
         } catch {
             guard generation == marker else { return }
             report(error)
         }
+    }
+
+    private func refreshConfirmedProfile(
+        after response: SubmissionOutcome, client: LearningClient, marker: UUID
+    ) async throws {
+        guard case .corrected = response else { return }
+        let value = try await client.refreshProfile()
+        guard generation == marker else { return }
+        profile = value
     }
 
     func refreshProgress() async {
