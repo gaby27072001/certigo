@@ -1,5 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict/>
+<dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.certigo.mobileapp.microsoft</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>msauth.com.certigo.mobileapp</string>
+			</array>
+		</dict>
+	</array>
+	<key>CertigoProductionAuthMode</key>
+	<string>microsoft</string>
+	<key>CertigoProductionCIAMCLIENT_ID</key>
+	<string>$(CERTIGO_PRODUCTION_CIAM_CLIENT_ID)</string>
+	<key>CertigoProductionCIAMTENANT_ID</key>
+	<string>$(CERTIGO_PRODUCTION_CIAM_TENANT_ID)</string>
+	<key>CertigoProductionCIAMAUTHORITY</key>
+	<string>$(CERTIGO_PRODUCTION_CIAM_AUTHORITY)</string>
+	<key>CertigoProductionCIAMISSUER</key>
+	<string>$(CERTIGO_PRODUCTION_CIAM_ISSUER)</string>
+	<key>CertigoProductionCIAMAUTHORITY_KIND</key>
+	<string>$(CERTIGO_PRODUCTION_CIAM_AUTHORITY_KIND)</string>
+	<key>CertigoProductionCIAMAPI_BASE_URL</key>
+	<string>$(CERTIGO_PRODUCTION_CIAM_API_BASE_URL)</string>
+	<key>CertigoProductionCIAMAPI_SCOPE</key>
+	<string>$(CERTIGO_PRODUCTION_CIAM_API_SCOPE)</string>
+	<key>CertigoProductionCIAMAPI_AUDIENCE</key>
+	<string>$(CERTIGO_PRODUCTION_CIAM_API_AUDIENCE)</string>
+</dict>
 </plist>

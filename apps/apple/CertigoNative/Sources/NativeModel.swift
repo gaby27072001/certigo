@@ -374,7 +374,7 @@ final class NativeModel {
             await connect()
         } catch {
             errorMessage =
-                "The test connection could not be restored. Reconnect the test account."
+                "The saved connection could not be restored. Reconnect your account."
         }
     }
 
@@ -1095,12 +1095,12 @@ final class NativeModel {
             errorMessage =
                 "This activity cannot be safely resumed. Your saved responses were preserved; choose a valid activity or review saved submissions."
         case CIAMAuthenticationFailure.interactionRequired:
-            errorMessage = "Sign in explicitly with the test account to continue."
+            errorMessage = "Reconnect your account to continue."
         case is CIAMAuthenticationFailure:
             errorMessage =
-                "The test account connection is not confirmed. No sign-in or renewal is assumed."
+                "The account connection could not be confirmed. No account or access is assumed."
         case APIError.unauthorized:
-            errorMessage = "The test connection expired. Sign out, then reconnect this account."
+            errorMessage = "Your connection expired. Reconnect your account to continue."
         case APIError.configuration:
             errorMessage = "Enter a valid HTTPS API URL without credentials or query parameters."
         case APIError.staleSession:
