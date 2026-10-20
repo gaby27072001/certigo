@@ -286,13 +286,38 @@ authorized Apple step; do not enable automatic provisioning to bypass this gate.
 The current first-party manifest and pinned MSAL dependency are unchanged;
 inspect the final aggregated archive privacy report before distribution.
 
-The app remains a preview with fictional offline demonstration and a separately
-accessible test API/token connector. This identity does not turn that connector
-into production authentication. CIAM opt-in remains Debug-only; Distribution
-must reject it. No production callback or shared Keychain entitlement is added.
-The test connector's device-only vault remains unchanged: no migration or access
-to the legacy Flutter app's credential cache is claimed. A future connected
-production product requires its own authentication/data-flow decision.
+Debug and ordinary Release builds keep the current fictional demonstration.
+The manual test-token connector is compiled only into Debug, and the local CIAM
+opt-in remains development-only. Only the explicit `Distribution` Xcode
+configuration defines `CERTIGO_PRODUCTION_DISTRIBUTION` and routes to the
+Microsoft production sign-in entry for bundle `com.certigo.mobileapp`. It never
+offers the manual-token connector as a fallback. Missing or invalid
+Distribution metadata blocks sign-in explicitly. This code path is not yet a
+configured or verified production identity.
+
+The Distribution Info.plist declares the local callback
+`msauth.com.certigo.mobileapp://auth` and requires these public Xcode build
+settings to be supplied from an owner-verified production configuration:
+`CERTIGO_PRODUCTION_CIAM_CLIENT_ID`, `CERTIGO_PRODUCTION_CIAM_TENANT_ID`,
+`CERTIGO_PRODUCTION_CIAM_AUTHORITY`, `CERTIGO_PRODUCTION_CIAM_ISSUER`,
+`CERTIGO_PRODUCTION_CIAM_AUTHORITY_KIND`, `CERTIGO_PRODUCTION_CIAM_API_BASE_URL`,
+`CERTIGO_PRODUCTION_CIAM_API_SCOPE` and
+`CERTIGO_PRODUCTION_CIAM_API_AUDIENCE`. They have no development or staging
+defaults. An unresolved Xcode substitution, wrong bundle, invalid authority,
+scope, audience, endpoint or local callback declaration fails closed before
+provider construction. The plist declaration does not prove that the callback
+is registered in Entra, that the app identity and API permission are correct,
+or that consent/backend audience validation is configured. Those require
+separate owner verification and Apple/provider validation; no cloud registration
+or permission was changed for this source preparation.
+
+The provider's account selection is held in memory. After app relaunch, the
+user must explicitly sign in again; silent account restoration is not claimed.
+The test connector's device-only vault remains unchanged, with no migration or
+access to the legacy Flutter app's credential cache. This lot does not implement
+in-app account deletion, offline learning or cross-device attempt history; those
+remain separate work dependent on the verified production identity and their
+existing service contracts.
 
 The existing Flutter TestFlight build is not this native candidate. Do not claim
 production login, in-app account deletion, validated accessibility, App Review
