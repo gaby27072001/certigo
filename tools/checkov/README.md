@@ -91,14 +91,14 @@ normalized or accepted under alternate digests.
 The input is the unmodified `checkov-3.2.495-py3-none-any.whl`:
 SHA-256 `737f39cbab5987d49204cd5e62cfca72ffab3f01fa3314471624e1c4256268ac`.
 The builder is offline and the candidate output has local version
-`3.2.495+certigo.3`, SHA-256
-`205e7b0114e2c1f08fdac93b10f2013199f7e4979fe53cb14f33258cc2f1e5af`.
+`3.2.495+certigo.4`, SHA-256
+`6309f6782d64568ee03648bb8ec7b6e5b0839ccde4f335c4f1cba8f7486e8c69`.
 
 ```sh
 CHECKOV_ADAPTER_UPSTREAM_WHEEL=/path/checkov-3.2.495-py3-none-any.whl \
   python tools/checkov/test_checkov_wheel.py
 python tools/checkov/build_checkov_wheel.py /path/checkov-3.2.495-py3-none-any.whl /tmp/checkov-wheel
-python -m pip install --no-deps --target /tmp/checkov-adapter /tmp/checkov-wheel/checkov-3.2.495+certigo.3-py3-none-any.whl
+python -m pip install --no-deps --target /tmp/checkov-adapter /tmp/checkov-wheel/checkov-3.2.495+certigo.4-py3-none-any.whl
 PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_conditional_adapter.py
 PYTHONPATH=/tmp/checkov-adapter:/tmp/parser-runtime python tools/checkov/test_resource_rule_fixes.py
 ```
@@ -138,6 +138,56 @@ the earlier `certigo.2` candidate rejected only the former. Direct-rule and real
 runner controls retain explicit failures for both halves. No additional CIDR
 size threshold or address allowlist is introduced. Any consumption proposal
 pinning the earlier wheel is stale and must be reviewed again before activation.
+
+### ARM composition qualification, not ARM gate adoption
+
+Revision `certigo.4` corrects an ARM-only false rejection in the existing identity
+predicate; it does not introduce a second rule engine or a framework switch.
+`checkov/arm/parser/parser.py:load` uses
+`checkov/common/parsers/yaml/loader.py:SafeLineLoader.construct_mapping` even for
+ordinary JSON templates. The loader inserts integer `__startline__` and
+`__endline__` keys in **every** mapping, including `{}`. A fully qualified UAMI
+map consequently has two extra entries, and each empty identity configuration
+also has two entries. Revision `certigo.3` incorrectly rejected both shapes.
+
+The identity predicate now removes exactly these two reserved keys at the
+assignment-map and assignment-configuration levels, only when their integer,
+positive, ordered bounds are contained in the resource's own line bounds.
+Missing, noninteger, Boolean, reversed, out-of-resource or unanchored markers
+fail. `__file__` and all other unknown keys remain failures. The resulting
+assignment map must still be nonempty, all identity IDs must be fully qualified,
+and every configuration must be empty after this bounded normalization.
+Inputs are not mutated. This relies on the pinned loader's reserved-key
+contract; it is not raw ARM schema validation and cannot recover authored
+reserved keys overwritten by that loader.
+
+`test_arm_composition.py` runs the real ARM Runner against the original 18
+probe shapes with candidate expectations, plus paired literal-ID and malformed
+controls. In particular, empty user-assigned maps and unrestricted public
+Cosmos with `enableMultipleWriteLocations=false` now produce actual FAILED
+records. Private Cosmos and mixed/system identities produce PASSED records.
+The original short `/identities/example` and `/subnets/example` pseudo-IDs now
+fail deliberately; separate fully qualified IDs provide the positive controls.
+All six appsettings failures, sibling/parent results, unresolved ingress
+failure and empty-template lack of coverage remain observable.
+
+```sh
+PYTHONPATH=/tmp/checkov-adapter python tools/checkov/test_arm_composition.py
+```
+
+This test needs the existing candidate wheel and Checkov's pinned dependencies;
+it does not need a parser override or scan `infra`. An empty ARM template still
+has no executed checks: the fixture records that limitation, never conformity.
+No gate may accept it or drop UNKNOWN/parse/skipped records as coverage.
+This bounded fix does **not** implement the missing environment/module binding,
+parent/subtype applicability ledger, Flex capability predicates or exhaustive
+source-to-ARM coverage reconciliation. Those remain blockers, not implicit
+exceptions. In particular, this candidate is not adoptable as an ARM replacement
+for the active Bicep gate. A proposal must separately approve the coverage/report
+contract and its fail-closed negative controls before changing any workflow,
+trusted-control manifest, framework, scanner consumption or gate version pin.
+No such protected file is changed here; proposals pinning `certigo.3` must be
+updated and re-reviewed rather than silently consuming this revision.
 
 All six appsettings-subtype findings remain unchanged and blocking. Returning
 PASSED on an inapplicable appsettings child would misrepresent the parent;

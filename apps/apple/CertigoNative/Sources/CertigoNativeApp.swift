@@ -1544,10 +1544,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 if model.profile == nil {
                     connection
                 } else {
-                    TabView(selection: $navigation.tab) {
+                    TabView(selection: $model.selectedTab) {
                         learning
                             .tabItem { Label("Learn", systemImage: "book") }
-                            .tag(NativeLearningNavigation.Tab.learn)
+                            .tag(NativeResumeState.Tab.learn)
                         NavigationStack {
                             ScrollView {
                                 ContentUnavailableView(
@@ -1564,7 +1564,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .navigationTitle("Coach")
                         }
                         .tabItem { Label("Coach", systemImage: "bubble.left.and.bubble.right") }
-                        .tag(NativeLearningNavigation.Tab.coach)
+                        .tag(NativeResumeState.Tab.coach)
                         NavigationStack {
                             ScrollView {
                                 VStack {
@@ -1589,10 +1589,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .navigationTitle("Social")
                         }
                         .tabItem { Label("Social", systemImage: "person.2") }
-                        .tag(NativeLearningNavigation.Tab.social)
+                        .tag(NativeResumeState.Tab.social)
                         NavigationStack { profile }
                             .tabItem { Label("Profile", systemImage: "person.crop.circle") }
-                            .tag(NativeLearningNavigation.Tab.profile)
+                            .tag(NativeResumeState.Tab.profile)
                     }
                 }
             }
@@ -1603,6 +1603,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 columns = .automatic
                 compactColumn = .sidebar
                 if owner == nil { savingGoalID = nil }
+            }
+            .onChange(of: model.restorationRevision) { _, _ in
+                selectedTrack = model.path?.trackId
+                selectedLesson = model.lesson?.id
+                if model.lesson != nil {
+                    columns = .detailOnly
+                    compactColumn = .detail
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 if model.busy {
@@ -1714,6 +1722,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 Task { await model.loadPath(track) }
             }
             .onChange(of: selectedLesson) { _, id in
+                guard model.lesson?.id != id else { return }
                 guard
                     let node = model.path?.units.flatMap(\.lessons).first(where: {
                         $0.id == id
@@ -1755,7 +1764,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             if model.queue.isEmpty { Text("No saved submissions on this device.") }
                             if model.lesson != nil {
                                 Button("Resume current activity", systemImage: "play.circle") {
-                                    navigation.tab = .learn
+                                    model.selectedTab = .learn
                                     columns = .detailOnly
                                     compactColumn = .detail
                                 }

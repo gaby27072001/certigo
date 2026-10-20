@@ -6,7 +6,7 @@ used by the native app and its linked first-party `CertigoKit` code:
 | API category | Reason | Code path and purpose |
 | --- | --- | --- |
 | `NSPrivacyAccessedAPICategoryUserDefaults` | `CA92.1` | `CertigoNative/Sources/CertigoNativeApp.swift` (`@AppStorage`) and `NativeModel.swift` (default `UserDefaults`) keep demo and sign-out state app-only. |
-| `NSPrivacyAccessedAPICategoryFileTimestamp` | `C617.1` | `CertigoKit/Sources/CertigoData/RuntimeDisk.swift` and `SubmissionStore.swift` inspect file size, type, identity, and link metadata in app-managed storage. |
+| `NSPrivacyAccessedAPICategoryFileTimestamp` | `C617.1` | `CertigoKit/Sources/CertigoData/RuntimeDisk.swift`, `SubmissionStore.swift`, and `CertigoNative/Sources/NativeModel.swift` inspect file size, type, identity, and link metadata in app-managed storage. The native activity snapshot uses only file size. |
 
 The manifest is included in the `CertigoNative` app target's resources. It
 intentionally omits data-collection and tracking declarations; this change does
