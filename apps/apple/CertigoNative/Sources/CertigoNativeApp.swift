@@ -131,11 +131,11 @@ import Foundation
                         "Microsoft sign-in is not configured",
                         systemImage: "person.crop.circle.badge.exclamationmark",
                         description: Text(configurationIssue))
-                } else if model.profile == nil {
-                    NavigationStack {
-                        Form {
-                            Section("Certigo") {
-                                Text("Sign in with your Microsoft account to continue.")
+                    } else if model.profile == nil && model.deletionStage == nil {
+                        NavigationStack {
+                            Form {
+                                Section("Certigo") {
+                                    Text("Sign in with your Microsoft account to continue.")
                                 Button("Sign in with Microsoft", systemImage: "person.crop.circle") {
                                     Task { await model.connect() }
                                 }
@@ -163,11 +163,16 @@ import Foundation
             .onOpenURL { url in
                 _ = provider?.handleCallback(url, sourceApplication: nil)
             }
-        }
+                .task {
+                    if configurationIssue == nil {
+                        _ = await model.restoreAccountDeletionIfNeeded()
+                    }
+                }
+            }
 
-        @MainActor
-        private static func authenticationPresentationController() throws -> UIViewController {
-            let windows = UIApplication.shared.connectedScenes
+            @MainActor
+            private static func authenticationPresentationController() throws -> UIViewController {
+                let windows = UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
                 .flatMap(\.windows)
             guard var controller = windows.first(where: \.isKeyWindow)?.rootViewController else {
@@ -1611,6 +1616,162 @@ struct NativeDemoSnapshot: Codable, Equatable {
 }
 
 #if canImport(SwiftUI)
+    private struct NativeAccountDeletionView: View {
+        @Bindable var model: NativeModel
+        @Environment(\.dismiss) private var dismiss
+        @Environment(\.scenePhase) private var scenePhase
+        private enum Focus: Hashable { case status, error }
+        @AccessibilityFocusState private var focused: Focus?
+
+        var body: some View {
+            Form {
+                Section {
+                    Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($focused, equals: .status)
+                    if model.deletionBusy { ProgressView("Account operation in progress") }
+                    if let message = model.deletionMessage {
+                        Text(message).accessibilityIdentifier("account-deletion-message")
+                            .accessibilityFocused($focused, equals: .error)
+                    }
+                }
+                if [.explanation, .verifying, .confirmation].contains(
+                    model.deletionStage ?? .explanation)
+                {
+                    Section("Before you continue") {
+                        Text(
+                            "Permanently delete your Certigo account, confirmed learning and progression. Local drafts and downloaded account references are removed only after the server confirms completion."
+                        )
+                        Text(
+                            "This is irreversible. There is no cancellation endpoint after submission. Residual production backups may rotate for up to 30 days, a pseudonymous tombstone remains for 30 days and identity-free deletion audit logs for 90 days. These are not an undo period."
+                        )
+                        if model.canReauthenticateForDeletion {
+                            Button(
+                                "Continue to verify identity",
+                                systemImage: "person.badge.shield.checkmark"
+                            ) {
+                                Task { await model.verifyDeletionIdentity() }
+                            }
+                            .disabled(model.deletionBusy)
+                        } else {
+                            Text(
+                                "Remote deletion requires configured Microsoft sign-in. It is unavailable for the demo and manual development connector."
+                            )
+                        }
+                    }
+                } else if model.deletionStage == .pending || model.deletionStage == .unconfirmed
+                    || model.deletionStage == .checking
+                {
+                    Section("Server status") {
+                        if let status = model.deletionStatus, status.status == .pending {
+                            Text(
+                                "\(status.completedSteps) of \(status.totalSteps) server steps confirmed."
+                            )
+                            Text(
+                                "Deletion is pending, not completed. Learning is paused and local data is retained. Status checks do not advance unfinished deletion steps."
+                            )
+                            if status.retryAfterSeconds != nil {
+                                Text(
+                                    "The server requested a retry delay. Refresh status before retrying if the action is not available yet."
+                                )
+                            }
+                        }
+                        Button("Check status", systemImage: "arrow.clockwise") {
+                            Task { await model.refreshDeletionStatus() }
+                        }
+                        .disabled(model.deletionBusy)
+                        Button(
+                            "Sign in to check the same account", systemImage: "person.crop.circle"
+                        ) {
+                            Task { await model.recoverDeletionConnection(interactive: true) }
+                        }
+                        .disabled(model.deletionBusy)
+                        Button("Retry deletion", role: .destructive) {
+                            Task { await model.retryAccountDeletion() }
+                        }
+                        .disabled(!model.canRetryDeletion)
+                        if model.deletionStatus?.status == .notRequested {
+                            Button("Resume account to verify identity") {
+                                Task { await model.resumeAccountAfterStatusCheck() }
+                            }
+                            .disabled(model.deletionBusy)
+                        }
+                    }
+                } else if model.deletionStage == .cleanupFailed {
+                    Section {
+                        Text(
+                            "Account deletion is confirmed. Cleanup on this device is not complete."
+                        )
+                        Button("Retry local cleanup", systemImage: "arrow.clockwise") {
+                            Task { await model.retryDeletionCleanup() }
+                        }
+                        .disabled(model.deletionBusy)
+                    }
+                } else if model.deletionStage == .completed {
+                    Section {
+                        Text(
+                            "The server confirmed account deletion and this device confirmed local cleanup. Residual retention periods still apply."
+                        )
+                        Button("Return to sign-in") { model.acknowledgeAccountDeletion() }
+                    }
+                }
+            }
+            .navigationTitle("Delete account")
+            .navigationBarBackButtonHidden(model.deletionBusy || !model.canCancelDeletion)
+            .toolbar {
+                if model.canCancelDeletion {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            Task {
+                                await model.cancelAccountDeletion()
+                                if model.deletionStage == nil { dismiss() }
+                            }
+                        }
+                    }
+                }
+            }
+            .alert(
+                "Permanently delete this Certigo account?",
+                isPresented: Binding(
+                    get: { model.deletionStage == .confirmation },
+                    set: { _ in })
+            ) {
+                Button("Delete account", role: .destructive) {
+                    Task { await model.confirmAccountDeletion() }
+                }
+                Button("Cancel", role: .cancel) { model.discardDeletionProof() }
+            } message: {
+                Text(
+                    "Microsoft verified the same account. Only Delete account submits the irreversible request. Completion may require retries."
+                )
+            }
+            .onChange(of: model.deletionStage) { _, _ in focused = .status }
+            .onChange(of: model.deletionMessage) { _, message in
+                focused = message == nil ? .status : .error
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { model.discardDeletionProof() }
+            }
+            .onAppear { if model.deletionStage == nil { model.showAccountDeletion() } }
+            .onDisappear {
+                model.discardDeletionProof()
+                if model.canCancelDeletion { Task { await model.cancelAccountDeletion() } }
+            }
+        }
+
+        private var title: String {
+            switch model.deletionStage {
+            case .verifying: "Verify your Microsoft identity"
+            case .confirmation: "Identity verified"
+            case .checking: "Checking account deletion"
+            case .pending: "Deletion pending"
+            case .unconfirmed: "Account status unconfirmed"
+            case .cleanupFailed: "Local cleanup requires attention"
+            case .completed: "Account deleted"
+            default: "Delete your Certigo account"
+            }
+        }
+    }
+
     private struct NativeRoot: View {
         @Bindable var model: NativeModel
         @State private var selectedTrack: String?
@@ -1624,10 +1785,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var loadingPathRequestID: UUID?
         @State private var loadingLessonID: String?
         @State private var loadingLessonRequestID: UUID?
+        @State private var downloadTrack: Track?
 
         var body: some View {
             Group {
-                if model.profile == nil {
+                if model.requiresDeletionSurface {
+                    NavigationStack { NativeAccountDeletionView(model: model) }
+                } else if model.profile == nil {
                     connection
                 } else {
                     TabView(selection: $model.selectedTab) {
@@ -1695,7 +1859,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 if owner == nil { savingGoalID = nil }
             }
             .onChange(of: model.restorationRevision) { _, _ in
-                selectedTrack = model.path?.trackId
+                selectedTrack = model.path?.trackId ?? model.offlinePack?.trackId
                 selectedLesson = model.lesson?.id
                 if model.lesson != nil {
                     columns = .detailOnly
@@ -1746,6 +1910,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                             .disabled(model.busy)
                         }
+                        Button("Restore downloaded activity", systemImage: "internaldrive") {
+                            Task { await model.restoreDownloadedActivity() }
+                        }
+                        .disabled(model.busy)
                         if navigation.learn == .myLearning && model.profile?.activeTrackId == nil {
                             Text(
                                 "Choose an active goal in Explore. Browsing never changes your goal."
@@ -1794,11 +1962,16 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .onChange(of: selectedTrack) { _, id in
                 guard let track = model.tracks.first(where: { $0.id == id }) else { return }
                 guard model.path?.trackId != track.id else { return }
+                if model.offlinePack?.trackId == track.id && model.lesson != nil { return }
                 selectedLesson = nil
                 requestPath(track)
             }
             .onChange(of: selectedLesson) { _, id in
                 guard model.lesson?.id != id else { return }
+                if let id, model.offlinePack?.lessons.contains(where: { $0.id == id }) == true {
+                    Task { await model.openCachedLesson(id) }
+                    return
+                }
                 guard
                     let node = model.path?.units.flatMap(\.lessons).first(where: {
                         $0.id == id
@@ -1806,6 +1979,23 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     )
                 else { return }
                 requestLesson(node)
+            }
+            .confirmationDialog(
+                "Download public question packs?",
+                isPresented: Binding(
+                    get: { downloadTrack != nil },
+                    set: { if !$0 { downloadTrack = nil } })
+            ) {
+                if let track = downloadTrack {
+                    Button("Download public content") {
+                        downloadTrack = nil
+                        Task { await model.downloadQuestionPack(track) }
+                    }
+                }
+            } message: {
+                Text(
+                    "This downloads the whole current public release, not just this certification. No solutions are downloaded. Answers stay local until you choose Submit; correction and XP require the server."
+                )
             }
         }
 
@@ -1852,28 +2042,16 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
                 Section {
                     NavigationLink("Progress & history") {
-                        List {
-                            if let path = model.path {
-                                Section("Last loaded path · \(path.trackName)") {
-                                    LabeledContent(
-                                        "Confirmed readiness", value: "\(path.readinessScore) %")
-                                    Text("Viewing this history does not change your active goal.")
-                                }
-                            }
-                            savedAnswers
-                            if model.queue.isEmpty { Text("No saved submissions on this device.") }
-                            if model.lesson != nil {
-                                Button("Resume current activity", systemImage: "play.circle") {
-                                    model.selectedTab = .learn
-                                    columns = .detailOnly
-                                    compactColumn = .detail
-                                }
-                            }
-                        }
-                        .navigationTitle("Progress & history")
+                        progressHistory
                     }
                     NavigationLink("Settings") {
                         Form {
+                            Section("Account") {
+                                NavigationLink("Delete account") {
+                                    NativeAccountDeletionView(model: model)
+                                }
+                                .disabled(model.busy)
+                            }
                             Section(connectionSectionTitle) {
                                 Text(connectionDescription)
                                 Button("Disconnect", systemImage: "person.crop.circle.badge.xmark")
@@ -1945,6 +2123,26 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var path: some View {
             List(selection: $selectedLesson) {
+                if let track = model.tracks.first(where: {
+                    $0.id == (selectedTrack ?? model.offlinePack?.trackId ?? model.path?.trackId)
+                }) {
+                    Section("Offline question pack") {
+                        Button("Download public question packs", systemImage: "arrow.down.circle") {
+                            downloadTrack = track
+                        }
+                        .disabled(model.busy)
+                        if let pack = model.offlinePack, pack.trackId == track.id {
+                            Text("Downloaded public content. No local correction or XP.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                            ForEach(pack.lessons, id: \.id) { lesson in
+                                NavigationLink(value: lesson.id) {
+                                    Label(lesson.title, systemImage: "internaldrive")
+                                }
+                                .disabled(model.busy)
+                            }
+                        }
+                    }
+                }
                 if let path = model.path,
                     selectedTrack == nil || selectedTrack == path.trackId
                 {
@@ -2011,15 +2209,161 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .navigationTitle(model.path?.trackName ?? "Learning path")
         }
 
+        private var progressHistory: some View {
+            List {
+                Section("Confirmed across your devices") {
+                    if model.historyLoading {
+                        ProgressView("Loading confirmed history")
+                    }
+                    if let error = model.historyError {
+                        Label(
+                            error,
+                            systemImage: model.historyOffline
+                                ? "wifi.slash" : "exclamationmark.triangle"
+                        )
+                        .accessibilityIdentifier("history-error")
+                    }
+                    if let refreshedAt = model.historyRefreshedAt {
+                        Text(
+                            "Last loaded \(refreshedAt.formatted(date: .abbreviated, time: .shortened))"
+                        )
+                        .font(.caption).foregroundStyle(.secondary)
+                        if model.serverHistory.isEmpty && model.historyError == nil {
+                            Text(
+                                model.historyNextCursor == nil
+                                    ? "No confirmed quiz attempts."
+                                    : "No confirmed attempts in this page. More history is available."
+                            )
+                        }
+                    } else if !model.historyLoading && model.historyError == nil {
+                        Text("Confirmed history has not been loaded.")
+                    }
+                    if let presentation = model.historyPresentation {
+                        ForEach(presentation.confirmed) { item in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(item.lessonId).font(.headline)
+                                Text(item.trackId).foregroundStyle(.secondary)
+                                Text(
+                                    item.submittedAt,
+                                    format: .dateTime.year().month().day().hour().minute())
+                                Text(
+                                    "Recorded score: \(item.scorePct) % · Earned XP: \(item.xpEarned)"
+                                )
+                                Text(
+                                    "Server-confirmed summary · full correction is in saved answers when available."
+                                )
+                                .font(.caption).foregroundStyle(.secondary)
+                                if let saved = model.localHistorySubmission(for: item),
+                                    saved.status == .pendingCorrection && saved.result == nil
+                                {
+                                    Button("Retrieve full correction") {
+                                        Task { await model.retry(saved) }
+                                    }
+                                    .disabled(model.busy)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    Button("Refresh history", systemImage: "arrow.clockwise") {
+                        Task { await model.refreshHistory() }
+                    }
+                    .disabled(model.historyLoading)
+                    if model.historyNeedsSignIn && model.canReconnectHistory {
+                        Button("Sign in again", systemImage: "person.crop.circle") {
+                            Task { await model.reconnectHistory() }
+                        }
+                        .disabled(model.busy || model.historyLoading)
+                    }
+                    if model.historyNextCursor != nil {
+                        Button("Load more", systemImage: "chevron.down") {
+                            Task { await model.loadMoreHistory() }
+                        }
+                        .disabled(model.historyLoading)
+                    }
+                }
+                Section("On this device") {
+                    Text(
+                        "Drafts are never uploaded by viewing history. Local dates are activity start dates, not server submission times."
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
+                    if let presentation = model.historyPresentation {
+                        ForEach(presentation.confirmedOnDevice) { saved in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label("Confirmed on this device", systemImage: "checkmark.circle")
+                                Text(saved.lessonId).font(.headline)
+                                Text(
+                                    saved.submission.startedAt,
+                                    format: .dateTime.year().month().day())
+                                if let result = saved.result {
+                                    Text(
+                                        "Confirmed score: \(result.scorePct) % · Earned XP: \(result.rewards.xpEarned)"
+                                    )
+                                }
+                                Text(
+                                    "Server acknowledgement saved locally; not in the loaded history pages."
+                                )
+                                .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        ForEach(presentation.onDevice) { saved in
+                            savedAnswer(saved)
+                        }
+                        if presentation.onDevice.isEmpty && presentation.confirmedOnDevice.isEmpty {
+                            Text("No additional saved submissions on this device.")
+                        }
+                    } else if model.historyError != nil {
+                        Text(
+                            "The local history presentation could not be verified. Saved answers remain available in Learn."
+                        )
+                    }
+                    if model.lesson != nil {
+                        Label(
+                            model.outcome == nil
+                                ? "Current local activity" : "Current submitted activity",
+                            systemImage: "doc.text")
+                        Button("Resume current activity", systemImage: "play.circle") {
+                            model.selectedTab = .learn
+                            columns = .detailOnly
+                            compactColumn = .detail
+                        }
+                    }
+                }
+                Section("Current progress · last loaded") {
+                    if let profile = model.profile {
+                        LabeledContent("Confirmed XP", value: "\(profile.xp)")
+                    }
+                    if let path = model.path {
+                        Text(path.trackName)
+                        LabeledContent("Confirmed readiness", value: "\(path.readinessScore) %")
+                    }
+                    Text(
+                        "History pages do not update your balance, readiness or active learning goal."
+                    )
+                }
+            }
+            .navigationTitle("Progress & history")
+            .task {
+                if !model.historyAttempted { await model.refreshHistory() }
+            }
+        }
+
         @ViewBuilder private var savedAnswers: some View {
             if !model.queue.isEmpty {
                 Section("Saved answers") {
                     ForEach(model.queue) { saved in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(saved.lessonId).font(.headline)
-                            switch saved.status {
-                            case .pendingCorrection:
-                                Label("Correction pending", systemImage: "clock")
+                        savedAnswer(saved)
+                    }
+                }
+            }
+        }
+
+        private func savedAnswer(_ saved: SavedSubmission) -> some View {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(saved.lessonId).font(.headline)
+                switch saved.status {
+                case .pendingCorrection:
+                    Label("Correction pending", systemImage: "clock")
                                 Button("Retry correction") {
                                     Task { await model.retry(saved) }
                                 }
@@ -2035,12 +2379,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 Label(
                                     "Submission rejected · answers preserved",
                                     systemImage: "exclamationmark.triangle")
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
+                    Text(
+                        "This is a local status; the server may already have recorded the attempt."
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
                 }
             }
+            .padding(.vertical, 4)
         }
 
         @ViewBuilder private func activeGoalSection(_ track: Track) -> some View {

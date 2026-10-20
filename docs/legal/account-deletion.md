@@ -1,19 +1,35 @@
 # Suppression de compte — Certigo
 
-Dernière mise à jour : 19 août 2026
+Dernière mise à jour : 20 octobre 2026
 
 ## Depuis l’application
 
-Dans Certigo, ouvrez **Profil > Mon compte > Supprimer le compte**. L’application
-demande une confirmation explicite et une authentification récente avant
-d’enregistrer la demande.
+Dans les versions de Certigo proposant la suppression dans l’application,
+ouvrez la rubrique de compte du profil, puis **Supprimer le compte**.
+Cette action est distincte de **Se déconnecter**. L’application demande une
+confirmation explicite et une authentification récente avant d’enregistrer la
+demande. Si votre version ne propose pas encore ce parcours, utilisez la voie
+sans application ci-dessous.
+
+Pour le client Apple natif connecté avec Microsoft Entra CIAM via MSAL,
+le parcours de suppression doit demander une ré-authentification interactive.
+Le serveur vérifie une preuve d’authentification dans une fenêtre de dix minutes ;
+un jeton simplement encore valide ne remplace pas cette preuve.
 
 La suppression retire les données actives associées au compte : profil,
 progression, tentatives, événements d’apprentissage, économie virtuelle,
 classements, relations sociales et identifiants de connexion gérés par Certigo.
 Ces données actives sont supprimées immédiatement après la vérification et
 l’exécution de la demande. La session locale et la file de synchronisation hors
-ligne sont effacées uniquement après confirmation du serveur.
+ligne du compte et du service concernés sont effacées uniquement après
+confirmation de l’achèvement par le serveur. Cela comprend les identifiants
+locaux, l’activité, les brouillons et les soumissions en attente de ce compte.
+Une erreur ou un état « en cours » ne confirme pas l’achèvement : consultez
+l’état de la demande ou réessayez sans changer de compte.
+
+Le mode démo ne possède pas de compte serveur à supprimer. Le connecteur
+manuel de développement ne remplace pas la ré-authentification Microsoft
+requise en production.
 
 ## Sans l’application
 
