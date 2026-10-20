@@ -76,7 +76,8 @@
             if busy || rejectRemoval { throw CIAMAuthenticationFailure.operationInProgress }
         }
     }
-    private actor ModelTransport: HTTPTransport {
+    private actor ModelTransport: HTTPTransport, BoundedHTTPTransport {
+        private let offlineFixture: OfflinePackFixture
         private var catalog: Data
         private let lesson: Data
         private let result: Data
@@ -102,11 +103,14 @@
         private var pauseGoal = false
         private var goalResponseOwner: String?
         private var profileStatus = 200
+        private var profileXP = 0
+        private var profileRequests = 0
         private var pilotContent: Data?
         private var pilotLessonID = "verify-claims"
         private var pausePilotHistory = false
         private var pilotHistoryStatus = 200
         init(resources: URL) throws {
+            offlineFixture = try OfflinePackFixture(resources: resources)
             catalog = try Data(contentsOf: resources.appendingPathComponent("catalog.json"))
             lesson = try Data(contentsOf: resources.appendingPathComponent("lesson.json"))
             let object = try JSONSerialization.jsonObject(
@@ -119,6 +123,41 @@
             response["results"] = items
             response["scorePct"] = 0
             result = try JSONSerialization.data(withJSONObject: response)
+        }
+        func send(_ request: URLRequest, maximumBytes: Int) async throws
+            -> (Data, HTTPURLResponse)
+        {
+            guard !offline else { throw URLError(.notConnectedToInternet) }
+            guard let url = request.url else { throw APIError.invalidResponse }
+            let manifest = try PublicReleaseContracts.manifest(offlineFixture.manifest)
+            var headers = [
+                "X-Content-Release-Id": offlineFixture.releaseId,
+                "X-Content-Manifest-Id": manifest.manifestId,
+                "Content-Type": "application/json",
+            ]
+            let bytes: Data
+            if url.path.hasSuffix("/active/manifest") {
+                bytes = offlineFixture.manifest
+                headers["ETag"] = "\"\(manifest.manifestId)\""
+                headers["Cache-Control"] = "private, no-cache"
+            } else {
+                guard
+                    let file = manifest.files.first(where: {
+                        url.path.hasSuffix("/\($0.hash)/\($0.path)")
+                    }), let data = offlineFixture.files[file.path]
+                else { throw APIError.invalidResponse }
+                bytes = data
+                headers["ETag"] = "\"sha256:\(file.hash)\""
+                headers["X-Content-SHA256"] = file.hash
+                headers["Content-Length"] = String(file.size)
+                headers["Accept-Ranges"] = "none"
+                headers["Cache-Control"] = "private, max-age=31536000, immutable"
+            }
+            guard bytes.count <= maximumBytes,
+                let response = HTTPURLResponse(
+                    url: url, statusCode: 200, httpVersion: nil, headerFields: headers)
+            else { throw APIError.invalidResponse }
+            return (bytes, response)
         }
         func setOwner(_ value: String) { owner = value }
         func enablePilot(_ content: Data) { pilotContent = content }
@@ -138,6 +177,9 @@
         func setGoal(_ value: String?) { activeGoal = value }
         func failGoal(_ status: Int) { goalStatus = status }
         func failProfile(_ status: Int) { profileStatus = status }
+        func setProfileXP(_ value: Int) { profileXP = value }
+        func profileRequestCount() -> Int { profileRequests }
+        func allowProfiles() { pause = false }
         func suspendGoal() { pauseGoal = true }
         func respondAsOwner(_ value: String?) { goalResponseOwner = value }
         func goalPayloads() -> [Data] { goalPosts }
@@ -190,13 +232,15 @@
             var status = 200
             var headers = ["Content-Type": "application/json"]
             if url.path.hasSuffix("/me") {
+                profileRequests += 1
                 status = profileStatus
                 let capturedOwner = owner
+                let capturedXP = profileXP
                 let goal = activeGoal.map { "\"\($0)\"" } ?? "null"
                 if pause { await withCheckedContinuation { waiter = $0 } }
                 bytes = Data(
                     """
-                    {"id":"\(capturedOwner)","displayName":"Synthetic","xp":0,"activeTrackId":\(goal)}
+                    {"id":"\(capturedOwner)","displayName":"Synthetic","xp":\(capturedXP),"activeTrackId":\(goal)}
                     """.utf8)
             } else if url.path.hasSuffix("/me/active-track"), request.httpMethod == "POST" {
                 guard let payload = request.httpBody,
@@ -272,6 +316,21 @@
                 let pin = replacementManifest ?? manifestId
                 headers["X-Content-Manifest-Id"] = pin
                 headers["ETag"] = "\"\(pin)\""
+            } else if url.path.hasSuffix("/quiz/fixture-track.lesson.section-1.practice/submit"),
+                request.httpMethod == "POST"
+            {
+                guard let payload = request.httpBody else { throw APIError.invalidResponse }
+                posts.append(payload)
+                if offline { throw URLError(.notConnectedToInternet) }
+                guard
+                    var response = try JSONSerialization.jsonObject(with: result)
+                        as? [String: Any],
+                    var items = response["results"] as? [[String: Any]], !items.isEmpty
+                else { throw APIError.invalidResponse }
+                items[0]["itemId"] = "az900-l-cloud-models-check-1"
+                items[0]["correctAnswer"] = ["paas"]
+                response["results"] = items
+                bytes = try JSONSerialization.data(withJSONObject: response)
             } else if url.path.hasSuffix("/quiz/fixture-lesson/submit"),
                 request.httpMethod == "POST"
             {
@@ -338,7 +397,10 @@
                 clientFactory: { [server, root] url in
                     LearningClient(
                         api: try CertigoAPI(baseURL: url, transport: server),
-                        store: SubmissionStore(file: root.appendingPathComponent("outbox.json")))
+                        store: SubmissionStore(file: root.appendingPathComponent("outbox.json")),
+                        runtimeStore: try RuntimeContentStore(
+                            root: root.appendingPathComponent("public-content")),
+                        runtimeTransport: server)
                 },
                 authentication: authenticated ? (provider, configuration) : nil,
                 now: { self.time })
@@ -355,6 +417,12 @@
     @main private struct NativeModelTests {
         @MainActor static func main() async throws {
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
+            try await downloadedDraftRestoresWithoutLessonOrPath(resources)
+            try await rejectedRetryRefreshesSavedState(resources)
+            try await confirmedProfileAfterCorrection(resources)
+            try await confirmedProfileAfterPendingRetry(resources)
+            try await confirmedProfileFailurePreservesCorrection(resources)
+            try await lateConfirmedProfileIsNotRepublished(resources)
             try await manualConnection(resources)
             try await authoritativeOwnerAndRefresh(resources)
             try await stalePathSelectionAfterOwnerRefresh(resources)
@@ -385,6 +453,249 @@
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+        @MainActor static func downloadedDraftRestoresWithoutLessonOrPath(_ resources: URL)
+            async throws
+        {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            await model.connect()
+            let track = try JSONDecoder().decode(
+                Track.self,
+                from: Data(
+                    """
+                    {"id":"fixture-track","code":"SYNTHETIC","title":"Synthetic","summary":"Synthetic","learningAvailable":true}
+                    """.utf8))
+            await model.downloadQuestionPack(track)
+            guard let pack = model.offlinePack, let cached = pack.lessons.first else {
+                throw ModelTestFailure.assertion(
+                    "Opt-in download did not make a public pack available")
+            }
+            await fixture.server.setOffline(true)
+            await model.openCachedLesson(cached.id)
+            guard let question = model.lesson?.questions.first, let option = question.options.first
+            else { throw ModelTestFailure.assertion("Cached practice was not opened offline") }
+            model.select(option, question: question)
+            let before = try Data(contentsOf: fixture.activityFile)
+            let snapshot = try NativeActivitySnapshot.decode(before)
+            let count = await fixture.server.pathRequestCount()
+            await fixture.server.failLesson(503)
+            await fixture.server.failPath(503)
+            let reopened = fixture.model()
+            await reopened.connect()
+            try expect(
+                reopened.lesson?.publicManifestId == cached.publicManifestId
+                    && reopened.selections == model.selections && reopened.canSubmit,
+                "Downloaded draft required a network path or lesson")
+            let after = try NativeActivitySnapshot.decode(Data(contentsOf: fixture.activityFile))
+            try expect(
+                snapshot.draft?.attemptId == after.draft?.attemptId,
+                "Restoration rewrote the local attempt")
+            let afterCount = await fixture.server.pathRequestCount()
+            try expect(count == afterCount, "Cached restoration fetched the path")
+            let posts = await fixture.server.payloads()
+            try expect(posts.isEmpty, "Download/open/restore implicitly submitted")
+            try expect(reopened.profile?.xp == 0, "Offline answers granted XP")
+            await reopened.restoreDownloadedActivity()
+            try expect(
+                reopened.selections == model.selections, "Explicit offline restore lost draft")
+            await reopened.submit()
+            try expect(
+                reopened.outcome == .pendingCorrection && reopened.profile?.xp == 0,
+                "Offline submission was not kept pending without XP")
+            guard let saved = reopened.queue.first else {
+                throw ModelTestFailure.assertion("Offline submit did not enqueue")
+            }
+            await fixture.server.setOffline(false)
+            await reopened.retry(saved)
+            let payloads = await fixture.server.payloads()
+            try expect(
+                payloads.count == 2 && payloads[0] == payloads[1],
+                "Explicit retry did not preserve exact submission bytes")
+            guard case .corrected = reopened.outcome else {
+                throw ModelTestFailure.assertion("Server correction was not restored")
+            }
+            await fixture.server.setOwner("server-owner-B")
+            await reopened.connect()
+            try expect(
+                reopened.lesson == nil && reopened.offlinePack == nil,
+                "Another owner accessed a downloaded draft")
+        }
+        @MainActor static func rejectedRetryRefreshesSavedState(_ resources: URL) async throws {
+            for status in [403, 422, 401, 503] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture)
+                await fixture.server.setOffline(true)
+                await model.submit()
+                guard let pending = model.queue.first else {
+                    throw ModelTestFailure.assertion("Missing pending recovery fixture")
+                }
+                await fixture.server.setOffline(false)
+                await fixture.server.failSubmission(status)
+                await model.retry(pending)
+                let terminal = status == 403 || status == 422
+                let expectedStatus: SubmissionStatus = terminal ? .failed : .pendingCorrection
+                try expect(
+                    model.queue.first?.status == expectedStatus,
+                    "Rejected retry left a stale pending row instead of durable failed state")
+                try expect(
+                    model.outcome == (terminal ? nil : .pendingCorrection) && !model.canSubmit
+                        && !model.busy && model.queue.first?.result == nil,
+                    "Rejected retry retained a false pending outcome or became editable")
+                if terminal {
+                    try expect(
+                        model.errorMessage?.contains("HTTP \(status)") == true,
+                        "Rejected retry lost its explicit HTTP feedback")
+                }
+                let reopened = fixture.model(authenticated: false)
+                await reopened.restore()
+                try expect(
+                    reopened.queue == model.queue,
+                    "Displayed retry status disagrees with the reopened durable outbox")
+                try expect(
+                    reopened.outcome == model.outcome && !reopened.canSubmit,
+                    "Saved activity restored a rejected retry as pending or editable")
+                if terminal {
+                    await model.retry(pending)
+                    let posts = await fixture.server.payloads()
+                    try expect(
+                        posts.count == 2 && model.queue.first?.status == .failed,
+                        "Terminal retry was posted again or reverted to pending")
+                }
+                let feedback = model.errorMessage ?? ""
+                try expect(
+                    !feedback.contains("synthetic-A")
+                        && !feedback.contains("https://example.invalid")
+                        && !feedback.contains(pending.submission.clientAttemptId)
+                        && !feedback.contains("fixture-question"),
+                    "Recovery feedback exposed connection or answer details")
+            }
+        }
+        @MainActor static func confirmedProfileAfterCorrection(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            try expect(model.profile?.xp == 0, "Unexpected initial synthetic profile")
+            await fixture.server.setProfileXP(963)
+            await model.submit()
+            guard let saved = model.queue.first, case .corrected(let result) = model.outcome else {
+                throw ModelTestFailure.assertion("Missing server correction")
+            }
+            try expect(
+                model.profile?.xp == 963 && result.rewards.xpEarned == 10,
+                "Confirmed profile XP remained stale or was computed from quiz rewards")
+            try expect(
+                saved.status == .corrected && !model.busy && !model.canSubmit,
+                "Profile refresh lost correction state")
+            let profiles = await fixture.server.profileRequestCount()
+            try expect(profiles == 2, "Confirmed correction did not reload /me once")
+            await fixture.server.setProfileXP(1_007)
+            await model.retry(saved)
+            let posts = await fixture.server.payloads()
+            try expect(
+                model.profile?.xp == 1_007 && posts.count == 1,
+                "Rechecking an ACK added local XP or resubmitted the quiz")
+        }
+        @MainActor static func confirmedProfileAfterPendingRetry(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            await fixture.server.setProfileXP(963)
+            await fixture.server.setOffline(true)
+            await model.submit()
+            let profiles = await fixture.server.profileRequestCount()
+            try expect(
+                model.outcome == .pendingCorrection && model.profile?.xp == 0 && profiles == 1,
+                "Pending correction refreshed or awarded unconfirmed XP")
+            guard let saved = model.queue.first else {
+                throw ModelTestFailure.assertion("Missing pending request")
+            }
+            await fixture.server.setOffline(false)
+            await model.retry(saved)
+            let posts = await fixture.server.payloads()
+            try expect(
+                model.profile?.xp == 963 && model.queue.first?.status == .corrected,
+                "Confirmed retry did not reload authoritative profile")
+            try expect(
+                posts.count == 2 && posts[0] == posts[1],
+                "Profile refresh changed the pending attempt or posted twice")
+        }
+        @MainActor static func confirmedProfileFailurePreservesCorrection(_ resources: URL)
+            async throws
+        {
+            for status in [401, 503, 200] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture)
+                await fixture.server.setProfileXP(963)
+                await fixture.server.failProfile(status)
+                if status == 200 { await fixture.server.setOwner("unexpected-owner") }
+                await model.submit()
+                guard let saved = model.queue.first, case .corrected = model.outcome else {
+                    throw ModelTestFailure.assertion("Profile failure rolled back a valid ACK")
+                }
+                try expect(
+                    saved.status == .corrected && saved.result != nil && !model.canSubmit
+                        && !model.busy && model.errorMessage != nil,
+                    "Profile failure hid error or removed durable correction")
+                try expect(
+                    model.profile?.id == "server-owner-A" && model.profile?.xp == 0,
+                    "Failed or foreign profile replaced authoritative account/XP")
+                await fixture.server.failProfile(200)
+                await fixture.server.setOwner("server-owner-A")
+                await model.retry(saved)
+                let posts = await fixture.server.payloads()
+                try expect(
+                    model.profile?.xp == 963 && model.errorMessage == nil && posts.count == 1,
+                    "Profile recovery failed or credited the ACK a second time")
+            }
+        }
+        @MainActor static func lateConfirmedProfileIsNotRepublished(_ resources: URL) async throws {
+            for retrying in [false, true] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture)
+                if retrying {
+                    await fixture.server.setOffline(true)
+                    await model.submit()
+                    await fixture.server.setOffline(false)
+                }
+                let pending = model.queue.first
+                await fixture.server.setProfileXP(963)
+                await fixture.server.pauseProfile()
+                let late = Task {
+                    if let pending {
+                        await model.retry(pending)
+                    } else {
+                        await model.submit()
+                    }
+                }
+                try await wait { await fixture.server.isWaiting() }
+                try expect(
+                    model.queue.first?.status == .corrected && model.busy,
+                    "ACK was not retained while profile refresh was pending")
+                await model.disconnect()
+                await fixture.server.allowProfiles()
+                await fixture.server.setOwner("server-owner-B")
+                await fixture.server.setProfileXP(1_729)
+                model.token = "synthetic-B"
+                await model.connect()
+                await fixture.server.resume()
+                await late.value
+                try expect(
+                    model.profile?.id == "server-owner-B" && model.profile?.xp == 1_729
+                        && model.queue.isEmpty && model.outcome == nil
+                        && model.errorMessage == nil && !model.busy,
+                    "Old correction/profile refresh leaked into the replacement session")
+                let entries = try await SubmissionStore(
+                    file: fixture.root.appendingPathComponent("outbox.json")
+                ).entries(ownerId: "server-owner-A", apiScope: "https://example.invalid/api")
+                try expect(
+                    entries.count == 1 && entries.first?.status == .corrected,
+                    "Account switch lost the original owner's ACK")
+            }
         }
         @MainActor static func prepareDraft(_ fixture: ModelFixture) async throws -> NativeModel {
             let model = fixture.model(authenticated: false)

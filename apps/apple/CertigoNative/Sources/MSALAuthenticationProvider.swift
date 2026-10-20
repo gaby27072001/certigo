@@ -3,7 +3,7 @@ import Foundation
 import MSAL
 import UIKit
 
-/// Development-only Apple adapter; compilation, callbacks/cache and live auth still require Apple proof.
+/// MSAL adapter; Apple compilation, callback/cache and live identity validation remain separate gates.
 @MainActor
 final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
     private let application: MSALPublicClientApplication

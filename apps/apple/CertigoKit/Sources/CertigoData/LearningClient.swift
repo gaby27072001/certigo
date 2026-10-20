@@ -156,6 +156,25 @@ public actor LearningClient {
         return try runtimeStore.active(ownerId: context.ownerId, apiScope: api.scope)
     }
 
+    public func cachedQuestionPack(trackId: String, manifestId: String? = nil) throws
+        -> OfflineQuestionPack?
+    {
+        let context = try credentials()
+        guard let runtimeStore else { return nil }
+        return try runtimeStore.questionPack(
+            trackId: trackId, ownerId: context.ownerId, apiScope: api.scope,
+            manifestId: manifestId)
+    }
+
+    public func pinPublicContent(manifestId: String) throws {
+        let context = try credentials()
+        guard let runtimeStore else { throw APIError.configuration }
+        try runtimeStore.retainPins([
+            RuntimeManifestPin(
+                ownerId: context.ownerId, apiScope: api.scope, manifestId: manifestId)
+        ])
+    }
+
     public func restorePreviousPublicContent() throws -> RuntimeContentSnapshot {
         let context = try credentials()
         guard let runtimeStore else { throw APIError.configuration }
@@ -226,7 +245,8 @@ public actor LearningClient {
             try assertCurrent(context)
             return .pendingCorrection
         } catch let error as APIError {
-            if error != .unauthorized {
+            // Cancellation does not establish whether the server committed this attempt.
+            if error != .unauthorized && error != .transport(URLError.cancelled.rawValue) {
                 try await store.recordFailure("api:\(error)", entry: entry)
             }
             try assertCurrent(context)
