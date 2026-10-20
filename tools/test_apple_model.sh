@@ -21,5 +21,6 @@ swiftc -parse-as-library -swift-version 6 -strict-concurrency=complete \
   -warnings-as-errors -I "$build/Modules" \
   "$root/apps/apple/CertigoNative/Sources/NativeModel.swift" \
   "$root/apps/apple/CertigoNative/ModelTests/NativeModelTests.swift" \
+  "$root/apps/apple/CertigoKit/Tests/CertigoKitTests/OfflinePackFixture.swift" \
   "${objects[@]}" -lstdc++ -o "$temporary/model-tests"
 "$temporary/model-tests" "$root/apps/apple/CertigoKit/Tests/CertigoKitTests/Fixtures"

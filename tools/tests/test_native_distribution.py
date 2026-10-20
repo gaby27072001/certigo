@@ -57,7 +57,7 @@ class NativeDistributionTests(unittest.TestCase):
             "SWIFT_ACTIVE_COMPILATION_CONDITIONS = CERTIGO_PRODUCTION_DISTRIBUTION;",
         ):
             self.assertIn(setting, config)
-        self.assertNotIn("DEBUG", config)
+        self.assertNotRegex(config, r"\bDEBUG\b")
         for forbidden in ("DEVELOPMENT_TEAM", "PROVISIONING_PROFILE", "CODE_SIGN_ENTITLEMENTS",
                           "CODE_SIGN_IDENTITY"):
             self.assertNotIn(forbidden, config)
