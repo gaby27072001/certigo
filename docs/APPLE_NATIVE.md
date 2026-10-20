@@ -50,24 +50,109 @@ uses the server-authoritative profile and an expected previous goal. An uncertai
 response retains the original decision for retry; a conflict reloads the profile
 rather than silently overwriting a concurrent choice.
 
+After a confirmed correction, initial submission and explicit retry reload the
+authenticated profile from `/me`; displayed XP is the returned server total,
+never the previous total plus a locally applied reward. Pending correction does
+not refresh or award XP. If profile refresh fails, the existing error feedback
+is shown and the last confirmed profile remains unchanged, while the durable
+quiz correction stays available. Retrying an already corrected entry can refresh
+the profile without submitting or crediting the quiz again. Session-generation
+and owner checks prevent a late profile from replacing a signed-out or different
+account.
+
 The outbox remains authoritative for persisted attempts, owner/API scope,
 `clientAttemptId`, original answers and release pin. Pending correction has no
 local verdict. Authorized server feedback can include explanations and corrected
 answer IDs; this does not permit shipping a private answer-key bank.
+
+A cancelled submission or retry propagates the cancellation error and leaves its
+outbox entry pending: cancellation is not proof that the server rejected or did
+not receive the request. After reopening, an explicit retry sends the same
+`clientAttemptId` and original payload for server reconciliation. Cancellation
+does not become an automatic retry or a local correction.
 
 `SubmissionStore` uses Foundation path-based access, an actor-local cache and
 atomic file replacement. It does **not** inherit `RuntimeDisk` cross-process
 locking, symlink/hard-link hardening or power-loss guarantees. Runtime activation
 process-death tests must not be presented as outbox durability evidence.
 
-## Inactive resume-state contract
+## Activity restoration
 
-`NativeResumeState` is a bounded, closed schema-2 navigation value. It is not wired
-to UI persistence or an automatic restore lifecycle in this layer. A submitting
-marker is not evidence that the outbox committed an attempt or received a server
-ACK. Reconciliation checks owner, API scope, lesson, attempt and original manifest
-pin against the existing outbox. Unknown fields, unsupported schemas, ambiguous
-attempts and mismatched identities fail closed without fabricating a new attempt.
+The connected native model saves one active activity in
+`Application Support/CertigoNative/activity-v1.json`, separately from the submission
+outbox. The bounded, closed schema-1 snapshot contains schema-2 `NativeResumeState`
+navigation, the opened track, and an optional unsent draft: selected option IDs,
+completed answer latencies, attempt UUID and start date. A digest of the exact
+public lesson projection binds even unpinned lessons to their original content.
+No token, private answer key or local grading result is stored there.
+
+Selections and navigation changes replace the file atomically. Write failures are
+visible; a failed pre-submission save prevents sending the request. Like the outbox,
+this Foundation path-based store does not provide cross-process locking,
+`RuntimeDisk` link hardening or power-loss guarantees. Unselected elapsed reading
+time is not reconstructed after termination; already recorded latencies and the
+original attempt start remain intact.
+
+After a successful connection, restoration checks the authenticated `/me` owner
+and normalized API scope, reloads the current catalog/path/lesson, and requires an
+available track, an openable lesson, the original manifest and exact lesson digest
+for a draft. Empty and partially answered lessons can reopen without submitting.
+The UI restores the top-level tab and selected track/lesson, opening the activity
+detail when appropriate. Browsing a path retains the active activity; reopening
+prefers that activity's path over a different last-browsed track. Opening another
+lesson explicitly replaces the single active draft. Demo navigation, editorial
+reading position, social subsection, speech playback and scroll offsets are not
+part of this connected activity snapshot.
+
+A submitting marker is not evidence that the outbox committed an attempt or
+received a server ACK. Reconciliation checks owner, API scope, lesson, attempt and
+original manifest pin against the outbox; pending, corrected and failed attempts
+remain non-editable and are never automatically resent. An unresolved in-flight
+marker is rejected rather than converted into a fresh draft or a success.
+Unknown fields, unsupported schemas, incompatible selections, missing/locked
+content and changed owner/scope/content clear the activity with a visible message,
+without changing submitted responses. Transient verification failures preserve
+the file without displaying it; reconnecting retries verification. Explicit
+sign-out removes the activity, reports removal failure and blocks automatic
+connection restoration. Generation guards discard late restoration responses
+after sign-out or account replacement.
+
+## Development connector support and recovery
+
+Retry failures reconcile the displayed saved-answer queue with the durable
+outbox before the operation finishes. A terminal rejection clears the current
+activity's pending indicator, not its saved answers, and does not enable another
+submission of that attempt. Reopening must show the same durable status.
+
+| Observed state | Recovery and evidence boundary |
+| --- | --- |
+| Pending correction, offline, timeout, throttling or server outage | Keep the saved attempt. Retry correction explicitly after connectivity/service recovery; the original attempt ID, answers and release pin must not change. No local verdict is available. |
+| Cancelled request | Acceptance is unknown. Keep the pending attempt; explicit retry reconciles it with the server. Cancellation does not justify creating another attempt. |
+| HTTP 401 | The connection is not authorized; reconnect the same authorized test account. Sign-out clears the activity snapshot, not the durable submission outbox. Do not paste a token into a support report. |
+| Terminal rejection or incompatible response/content | Review the failure before another attempt. The existing failed row is not retryable; do not edit its archive/status, remove its pin or relabel it pending to force a resend. |
+| Confirmed correction, failed profile refresh | The correction remains confirmed; profile XP can still be the previous server total. Rechecking the corrected saved entry refreshes the profile without another quiz POST or local reward credit. |
+| Unreadable/full storage or failed activity save | Saving is not confirmed. Preserve the existing files; do not reset the outbox as troubleshooting. Resolve device storage or obtain a scoped recovery decision. |
+| Restoration cannot verify account/content | Do not submit automatically or display an unverified draft. A transient failure keeps the snapshot for reconnect; incompatible activity is cleared explicitly without changing saved submissions. |
+
+For support, record only the app version/build, operation name (connect, load,
+submit, retry, refresh or restore), approximate time, displayed category/HTTP
+status and whether the row is pending, failed or corrected. Do not attach the
+local Xcode scheme, credentials, API URL, request/response body, answer selections,
+account identifiers or raw outbox/activity files. No automatic support export,
+analytics pipeline or production observability is enabled by this client.
+`NativeModel` uses fixed error messages; API errors carry status/numeric transport
+codes rather than server response text, and the MSAL adapter disables SDK logging
+and classifies errors instead of displaying SDK diagnostics.
+
+An API `x-correlation-id` is generated per request, but the native client does not
+retain or expose it for support. Do not claim end-to-end request tracing from
+these messages alone. The connected model does not currently wire the runtime
+content store: reopening a draft needs profile/catalogue and path/lesson
+verification over the network. The outbox is not full offline learning or a
+cross-device history. Keep release/manifest identity with each saved submission;
+a newer catalogue or a separate guided pilot is not evidence that an old
+attempt can be regraded against different content. The synthetic demonstration
+does not prove any connected recovery or published curriculum.
 
 ## Opt-in development authentication and storage adapters
 
@@ -88,8 +173,9 @@ The developer connector defaults to manual test-token sign-in. In Debug, a valid
 local opt-in constructs `MSALAuthenticationProvider`, injects it into `NativeModel`
 and routes callbacks through `.onOpenURL`. Invalid or incomplete opt-in
 configuration fails closed with a setup error instead of falling back to manual
-sign-in; Release rejects the opt-in. There is no automatic account restore on
-startup. See [local CIAM development](../apps/apple/CIAM_LOCAL_DEVELOPMENT.md)
+sign-in; Release rejects the opt-in. Startup restoration uses only an existing
+local connection or silent acquisition; it never starts interactive sign-in.
+See [local CIAM development](../apps/apple/CIAM_LOCAL_DEVELOPMENT.md)
 for the unshared Xcode scheme configuration and its limits.
 `CIAMDevelopmentCandidate` records dated public metadata, not active registration
 or endpoint health. The plist's callback scheme is only a declaration, not
@@ -174,6 +260,172 @@ availability, completion/cancellation callbacks, pause/resume, unavailable-voice
 errors, VoiceOver coexistence, scene/tab/lesson/account changes and dismissal.
 Also check the controls at accessibility text sizes on iPhone and iPad.
 
+### Native distribution identity preparation
+
+The separate **CertigoNative Distribution** scheme archives the **Distribution**
+configuration for the existing App Store app identity `com.certigo.mobileapp`.
+Debug and Release remain `com.certigo.native.dev`; the development scheme, local
+CIAM callback and opt-in stay unchanged. Distribution has no development callback,
+no `DEBUG` condition, and uses `-O`. This is source configuration preparation, not
+a signed archive, processed TestFlight build or authorization to upload.
+
+Before a future archive, the owner must confirm the marketing version and unused,
+increasing build number in App Store Connect. Pass both as explicit Xcode build
+settings: `CERTIGO_DISTRIBUTION_VERSION` (numeric `major.minor.patch`, each
+component up to four digits) and `CERTIGO_DISTRIBUTION_BUILD` (integer 1-9999).
+There are no default or reserved numbers. `MARKETING_VERSION` and
+`CURRENT_PROJECT_VERSION` must resolve to these values without separate overrides.
+The archive pre-action validates them before the archive build; an always-running
+target phase also fails closed for direct Distribution builds. Local validation
+checks syntax and consistency only, not availability or monotonicity on Apple.
+Missing values are intentional errors, not permission to reuse development `0.1.0 (1)`.
+
+`CODE_SIGNING_ALLOWED=NO` remains explicit. No team, identity, profile or
+entitlement is added. Signing, archive validation and upload require a separate
+authorized Apple step; do not enable automatic provisioning to bypass this gate.
+The current first-party manifest and pinned MSAL dependency are unchanged;
+inspect the final aggregated archive privacy report before distribution.
+
+Debug and ordinary Release builds keep the current fictional demonstration.
+The manual test-token connector is compiled only into Debug, and the local CIAM
+opt-in remains development-only. Only the explicit `Distribution` Xcode
+configuration defines `CERTIGO_PRODUCTION_DISTRIBUTION` and routes to the
+Microsoft production sign-in entry for bundle `com.certigo.mobileapp`. It never
+offers the manual-token connector as a fallback. Missing or invalid
+Distribution metadata blocks sign-in explicitly. This code path is not yet a
+configured or verified production identity.
+
+The Distribution Info.plist declares the local callback
+`msauth.com.certigo.mobileapp://auth` and requires these public Xcode build
+settings to be supplied from an owner-verified production configuration:
+`CERTIGO_PRODUCTION_CIAM_CLIENT_ID`, `CERTIGO_PRODUCTION_CIAM_TENANT_ID`,
+`CERTIGO_PRODUCTION_CIAM_AUTHORITY`, `CERTIGO_PRODUCTION_CIAM_ISSUER`,
+`CERTIGO_PRODUCTION_CIAM_AUTHORITY_KIND`, `CERTIGO_PRODUCTION_CIAM_API_BASE_URL`,
+`CERTIGO_PRODUCTION_CIAM_API_SCOPE` and
+`CERTIGO_PRODUCTION_CIAM_API_AUDIENCE`. They have no development or staging
+defaults. An unresolved Xcode substitution, wrong bundle, invalid authority,
+scope, audience, endpoint or local callback declaration fails closed before
+provider construction. The plist declaration does not prove that the callback
+is registered in Entra, that the app identity and API permission are correct,
+or that consent/backend audience validation is configured. Those require
+separate owner verification and Apple/provider validation; no cloud registration
+or permission was changed for this source preparation.
+
+The provider's account selection is held in memory. After app relaunch, the
+user must explicitly sign in again; silent account restoration is not claimed.
+The test connector's device-only vault remains unchanged, with no migration or
+access to the legacy Flutter app's credential cache. This lot does not implement
+cross-device attempt history. Account deletion uses the separate workflow below;
+its source implementation does not establish live service availability.
+
+### Downloaded public question packs
+
+In an authenticated session, Learn offers an explicit download confirmation.
+The current download granularity is the **whole public release**, not one
+certification. The dialogue discloses that scope before network access. It
+reuses the bounded manifest/file downloader, digest and public-resource
+validators, and atomic active/previous snapshot activation. No private
+solution, answer key, explanation or correction is part of the downloaded pack.
+The current corpus is bank-first: locally projected practice sessions are
+question packs, not authored courses or certification-readiness evidence.
+
+Downloaded practice is resolved locally from the verified track/domain/question
+graph (or authored unit/lesson blocks when present). Legacy question and concept
+aliases, v3 option IDs and question-bank session IDs match the existing backend
+projection. Cached reading never invents progression, readiness, correction or
+XP; those remain server-confirmed. Unknown resources, unsupported question types,
+incomplete graphs and damaged bytes fail closed with recovery feedback.
+
+Opening cached practice pins its exact manifest for the current owner and API
+scope before saving a local draft. Draft restoration uses that snapshot, not
+the newest release, and checks the original lesson digest and attempt identity.
+It does not require a path/lesson HTTP refetch when the pinned pack is present.
+Learn also has an explicit local restoration action. If a pack is unavailable,
+this action preserves the saved activity and reports the failure rather than
+silently substituting another release. Normal connected restoration may still
+validate an online-only activity against its original digest. Downloaded content
+and drafts are not exposed to another signed-in owner or another API scope.
+
+Selecting answers, downloading, opening and restoring never submit implicitly.
+Submit still writes the existing durable outbox before requesting correction;
+a network failure leaves it pending. Reconnect does not automatically replay it:
+the learner explicitly retries the same attempt and bytes. Only a server ACK
+exposes feedback and rewards, followed by the existing authoritative profile
+refresh. Drafts stay device-local and are not multi-device history.
+The activity directory and atomically written activity file explicitly use the
+same iOS `completeUntilFirstUserAuthentication` policy as the outbox.
+
+This is **not offline identity restoration**: a cold app launch still needs the
+existing verified sign-in/profile and catalog bootstrap. Cached learning works
+without path/lesson HTTP in an already-established account session, including
+restoring its local draft. No cached token/profile is treated as a newly
+authenticated identity. Apple acceptance must separately verify compilation of
+SwiftUI/UIKit/MSAL, effective file protection, airplane-mode reading and explicit
+queue/retry behavior on iPhone/iPad, owner switching, navigation and VoiceOver.
+Linux model/package tests do not establish those Apple runtime properties.
+
+### Account deletion and recovery
+
+Connected Profile > Settings has a separate Delete account destination, not a
+replacement for Disconnect. The first Form explains irreversible deletion and
+residual retention. Continue only verifies identity; the subsequent destructive
+system alert is the only action that submits a first deletion request. The demo
+and manual DEV connector cannot perform recent Microsoft authentication and do
+not offer executable deletion. Cancel, backgrounding or a different returned
+account discards the memory-only proof without submitting or removing drafts.
+
+The dedicated MSAL operation uses `.login`, `max_age=0`, an ephemeral
+authentication session, and the captured SDK account. It checks that account
+before accepting a result and requires a nonempty ID token. Local proof checks
+reject stale/missing `auth_time`, wrong native audience and expired credentials;
+they do not replace server signature/issuer/subject/freshness validation. The
+POST keeps the original session bearer and supplies the ID token only in
+`X-Certigo-Reauthentication`. It never persists proof tokens or displays raw
+SDK errors, response bodies or endpoint URLs.
+
+GET and bodyless POST target exactly `/api/account/deletion` on a configured
+`/api` base; a versioned base fails closed. `202/pending` freezes learning but
+retains credentials, drafts, outbox and downloads. Server step counts are
+displayed as counts, not elapsed-time estimates. GET checks status only;
+explicit Retry deletion advances unfinished steps after the server's bounded
+retry delay. A lost POST response or a later 401 is unconfirmed, not completed.
+There is no cancellation endpoint once the request has been recorded.
+
+A bounded, atomically written protected receipt contains only local
+owner/scope/SDK-account binding and workflow/cleanup state. Pending restart
+obtains credentials for the same SDK account and uses deletion GET without
+requiring `/me`, catalog or learning restoration; these can already return 423.
+A first sign-in encountering `/me` 423 also enters deletion-only recovery.
+If that device has no verified backend-owner binding, status is available but
+local owner-scoped cleanup remains unconfirmed and requests support rather
+than deriving an owner from email, JWT payload or the opaque SDK account ID.
+
+Only validated server `completed` creates the durable cleanup receipt.
+Generation invalidation and the outbox's suspended-scope barrier prevent late
+enqueue/ACK/download writes. Cleanup removes this owner/scope's outbox records,
+runtime references/pins/capsules and unshared blobs, matching activity, the
+owned Certigo DEV vault entry and the exact saved MSAL account. Other owners,
+API scopes and their shared public bytes remain. Local targets acknowledge
+individually in the receipt: failure leaves learning closed and exposes Retry
+local cleanup, including after restart, without repeating POST or reauth.
+The completed surface remains visible until explicit acknowledgement.
+
+**External gates remain:** production native identity/configuration, native
+ID-token audience accepted by `ENTRA_REAUTH_AUDIENCE`, live `auth_time`,
+and the existing backend deletion activation/Cosmos gate. No SDK dependency,
+Graph grant, flag, app registration, cloud resource or signing setting is
+changed by this source work. MSAL 2.16.0 public headers at the pinned revision
+confirm `promptType`, `extraQueryParameters`, `idToken`, account enumeration
+and scoped removal; they do not prove Apple compilation or forced reauth.
+Apple acceptance must separately verify SwiftUI/UIKit/MSAL typechecking,
+Keychain removal, pending restart and account selection, interrupted cleanup,
+Dynamic Type/VoiceOver focus, and iPhone/iPad confirmation presentation with
+sacrificial accounts. No live destructive request is part of portable tests.
+
+The existing Flutter TestFlight build is not this native candidate. Do not claim
+production login, live account deletion, validated accessibility, App Review
+acceptance or a privacy label from this configuration alone.
+
 ### Existing portable checks
 
 Use an existing Swift 6.2-compatible toolchain. The package lock pins
@@ -191,7 +443,15 @@ swift build --package-path apps/apple/CertigoKit --scratch-path <scratch> \
 The Linux harness compiles the actual model with strict concurrency and
 warnings-as-errors, a memory vault, synthetic provider/HTTP responses and a
 throw-only stand-in for the default Security vault. It checks coordination,
-journeys, stale responses, uncertain goal retry and resume-state rejection. It
+journeys, stale responses, uncertain goal retry and resume-state rejection. Its
+activity tests reopen fresh model/client/store instances against an actual
+temporary snapshot file: empty/partial/full drafts, tab/path/lesson selection,
+stable attempt/timing/answer identity, pending/corrected/failed outbox authority,
+account/scope/content invalidation, transient failures, interrupted restoration,
+storage failures and sign-out removal. These deterministic Foundation checks are
+not an Apple process-kill/relaunch or SwiftUI navigation test. On Mac/iPhone,
+separately verify selecting answers, closing/relaunching, re-opening the correct
+detail/tab and submitting only after an explicit action. It
 also rejects a retained track selection if silent authentication refresh changes
 the account: the old selection must not send a path request as the new owner,
 and the model surfaces a stale-session error instead. It does not compile

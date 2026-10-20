@@ -6,7 +6,7 @@
 +import re
  from typing import Any, List
  
-@@ -18,14 +19,30 @@
+@@ -18,14 +19,48 @@
          super().__init__(name=name, id=id, categories=categories, supported_resources=supported_resources)
  
      def scan_resource_conf(self, conf: dict[str, Any]) -> CheckResult:
@@ -30,7 +30,25 @@
 +            return CheckResult.FAILED
 +        if "SystemAssigned" in types:
 +            return CheckResult.PASSED
-+        assignments = identity.get("userAssignedIdentities")
++        def without_line_metadata(value: Any) -> Any:
++            if not isinstance(value, dict):
++                return value
++            fields = {"__startline__", "__endline__"}
++            if not fields.intersection(value):
++                return value
++            start, end = conf.get("__startline__"), conf.get("__endline__")
++            first, last = value.get("__startline__"), value.get("__endline__")
++            if (
++                type(start) is not int or type(end) is not int
++                or type(first) is not int or type(last) is not int
++                or not 1 <= start <= first <= last <= end
++            ):
++                return None
++            # SafeLineLoader annotates even empty ARM mappings. No other keys
++            # or malformed/unanchored line markers are ignored.
++            return {key: item for key, item in value.items() if key not in fields}
++
++        assignments = without_line_metadata(identity.get("userAssignedIdentities"))
 +        if not isinstance(assignments, dict) or not assignments:
 +            return CheckResult.FAILED
 +        identity_id = (
@@ -41,7 +59,7 @@
 +        for resource_id, configuration in assignments.items():
 +            if type(resource_id) is not str or re.fullmatch(identity_id, resource_id, re.IGNORECASE) is None:
 +                return CheckResult.FAILED
-+            if configuration != {}:
++            if without_line_metadata(configuration) != {}:
 +                return CheckResult.FAILED
 +        return CheckResult.PASSED
  

@@ -25,9 +25,9 @@ enum NativePilotError: Error {
     case lessonUnavailable
 }
 
-// Navigation metadata only; the existing outbox remains the sole persisted submission authority.
+// The outbox remains the sole persisted submission authority.
 struct NativeResumeState: Codable, Equatable, Sendable {
-    enum Tab: String, Codable, Sendable { case learn, coach, social, profile }
+    enum Tab: String, Codable, CaseIterable, Sendable { case learn, coach, social, profile }
     enum Phase: String, Codable, Sendable { case draft, submitting, pending, confirmed, failed }
     struct Session: Codable, Equatable, Sendable {
         let trackId: String
@@ -174,6 +174,172 @@ struct NativeResumeState: Codable, Equatable, Sendable {
     }
 }
 
+struct NativeActivitySnapshot: Codable {
+    struct Draft: Codable {
+        let lessonDigest: String
+        let attemptId: String
+        let startedAt: Date
+        let selections: [String: String]
+        let latencies: [String: Int]
+    }
+
+    let schema: Int
+    let navigation: NativeResumeState
+    let trackId: String?
+    let draft: Draft?
+
+    static func digest(_ lesson: Lesson) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try CanonicalQuestionReader.digest(encoder.encode(lesson)).sha256
+    }
+
+    func encoded() throws -> Data {
+        let bytes = try JSONEncoder().encode(self)
+        _ = try Self.decode(bytes)
+        return bytes
+    }
+
+    static func decode(_ bytes: Data) throws -> Self {
+        do { return try decodeValue(bytes) } catch {
+            throw NativeResumeError.malformed
+        }
+    }
+
+    private static func decodeValue(_ bytes: Data) throws -> Self {
+        guard bytes.count <= 65_536,
+            let object = try JSONSerialization.jsonObject(with: bytes) as? [String: Any],
+            Set(object.keys).isSubset(of: ["schema", "navigation", "trackId", "draft"]),
+            let navigation = object["navigation"] as? [String: Any]
+        else { throw NativeResumeError.malformed }
+        _ = try NativeResumeState.decode(JSONSerialization.data(withJSONObject: navigation))
+        if let draft = object["draft"], !(draft is NSNull) {
+            guard let fields = draft as? [String: Any],
+                Set(fields.keys) == [
+                    "lessonDigest", "attemptId", "startedAt", "selections", "latencies",
+                ]
+            else { throw NativeResumeError.malformed }
+        }
+        let value = try JSONDecoder().decode(Self.self, from: bytes)
+        guard value.schema == 1 else { throw NativeResumeError.malformed }
+        if let track = value.trackId {
+            _ = try NativeResumeState(
+                tab: .learn, ownerId: value.navigation.ownerId,
+                apiScope: value.navigation.apiScope,
+                session: .init(
+                    trackId: track, lessonId: "navigation", publicManifestId: nil,
+                    phase: .draft, attemptId: nil))
+        }
+        if let draft = value.draft {
+            guard value.navigation.session?.phase == .draft,
+                UUID(uuidString: draft.attemptId) != nil,
+                draft.startedAt.timeIntervalSince1970.isFinite,
+                draft.lessonDigest.count == 64,
+                draft.lessonDigest.utf8.allSatisfy({
+                    (48...57).contains($0) || (97...102).contains($0)
+                }),
+                Set(draft.latencies.keys).isSubset(of: Set(draft.selections.keys)),
+                draft.latencies.values.allSatisfy({ $0 >= 0 })
+            else { throw NativeResumeError.malformed }
+        } else if value.navigation.session?.phase == .draft {
+            throw NativeResumeError.malformed
+        }
+        return value
+    }
+}
+
+struct NativeActivityStore {
+    let file: URL
+
+    static func applicationStore() throws -> Self {
+        let directory = try FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: true)
+        return Self(file: directory.appendingPathComponent("CertigoNative/activity-v1.json"))
+    }
+
+    func read() throws -> Data? {
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
+        guard let size = attributes[.size] as? NSNumber, size.intValue <= 65_536 else {
+            throw NativeResumeError.malformed
+        }
+        let bytes = try Data(contentsOf: file)
+        guard bytes.count <= 65_536 else { throw NativeResumeError.malformed }
+        return bytes
+    }
+
+    func save(_ bytes: Data) throws {
+        _ = try NativeActivitySnapshot.decode(bytes)
+        try writeProtected(bytes)
+    }
+
+    func saveDeletionReceipt(_ receipt: NativeDeletionReceipt) throws {
+        _ = try receipt.validated()
+        let bytes = try CertigoAPI.encoder().encode(receipt)
+        guard bytes.count <= 8_192 else { throw APIError.invalidResponse }
+        try writeProtected(bytes)
+    }
+
+    func readDeletionReceipt() throws -> NativeDeletionReceipt? {
+        guard let bytes = try read() else { return nil }
+        guard bytes.count <= 8_192 else { throw APIError.invalidResponse }
+        return try CertigoAPI.decoder().decode(NativeDeletionReceipt.self, from: bytes).validated()
+    }
+
+    private func writeProtected(_ bytes: Data) throws {
+        try FileManager.default.createDirectory(
+            at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        #if os(iOS)
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: file.deletingLastPathComponent().path)
+        #endif
+        try bytes.write(to: file, options: .atomic)
+        #if os(iOS)
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: file.path)
+        #endif
+    }
+
+    func clear() throws {
+        if FileManager.default.fileExists(atPath: file.path) {
+            try FileManager.default.removeItem(at: file)
+        }
+    }
+}
+
+enum NativeDeletionStage: String {
+    case explanation, verifying, confirmation, checking, pending, unconfirmed, cleanupFailed,
+        completed
+}
+
+struct NativeDeletionReceipt: Codable {
+    enum Phase: String, Codable { case unconfirmed, pending, completed }
+    let schema: Int
+    let ownerId: String?
+    let apiScope: String
+    let accountIdentifier: String
+    var phase: Phase
+    var remainingCleanup: [String]
+    var retryAt: Date?
+
+    func validated() throws -> Self {
+        guard schema == 1, let url = URL(string: apiScope),
+            try CertigoAPI(baseURL: url).scope == apiScope,
+            url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "api",
+            apiScope.utf8.count <= 2_048, !accountIdentifier.isEmpty,
+            accountIdentifier.utf8.count <= 1_024,
+            ownerId.map({ !$0.isEmpty && $0.utf8.count <= 1_024 }) ?? true,
+            Set(remainingCleanup).count == remainingCleanup.count,
+            Set(remainingCleanup).isSubset(of: ["learning", "activity", "vault", "msal"]),
+            phase == .completed || remainingCleanup.isEmpty
+        else { throw APIError.invalidResponse }
+        return self
+    }
+}
+
 @Observable @MainActor
 final class NativeModel {
     var baseURL = ""
@@ -182,13 +348,29 @@ final class NativeModel {
     private(set) var tracks: [Track] = []
     private(set) var path: LearningPath?
     private(set) var lesson: Lesson?
+    private(set) var offlinePack: OfflineQuestionPack?
     private(set) var editorialPilot: EditorialPilotSnapshot?
     private(set) var pilotHistory: PilotHistory?
     private(set) var queue: [SavedSubmission] = []
     private(set) var outcome: SubmissionOutcome?
     private(set) var busy = false
+    private(set) var deletionStage: NativeDeletionStage?
+    private(set) var deletionStatus: AccountDeletion?
+    private(set) var deletionMessage: String?
+    private(set) var deletionBusy = false
+    private var deletionReceipt: NativeDeletionReceipt?
+    private var deletionClient: LearningClient?
+    private var deletionProof: CIAMDeletionProof?
+    private var deletionVerification = UUID()
+    private var deletionCanCancel = false
     var errorMessage: String?
     var selections: [String: String] = [:]
+    var selectedTab: NativeResumeState.Tab = .learn {
+        didSet { if !busy { persistActivity() } }
+    }
+    private(set) var restorationRevision = 0
+    private var resumeReady = false
+    private var apiScope: String?
     private var latencies: [String: Int] = [:]
     private var questionStarted: [String: ContinuousClock.Instant] = [:]
     private var attemptID = UUID().uuidString
@@ -198,6 +380,7 @@ final class NativeModel {
     private var client: LearningClient?
     private let vault: any DeveloperConnectionVault
     private let defaults: UserDefaults
+    private let activityStore: () throws -> NativeActivityStore
     private let makeClient: (URL) throws -> LearningClient
     private let authentication:
         (provider: any CIAMAuthenticationProvider, configuration: CIAMConfiguration)?
@@ -209,6 +392,8 @@ final class NativeModel {
     init(
         vault: any DeveloperConnectionVault = CredentialVault(),
         defaults: UserDefaults = .standard,
+        activityStore: @escaping () throws -> NativeActivityStore = NativeActivityStore
+            .applicationStore,
         clientFactory: ((URL) throws -> LearningClient)? = nil,
         authentication: (
             provider: any CIAMAuthenticationProvider, configuration: CIAMConfiguration
@@ -217,6 +402,7 @@ final class NativeModel {
     ) {
         self.vault = vault
         self.defaults = defaults
+        self.activityStore = activityStore
         self.authentication = authentication
         self.now = now
         makeClient =
@@ -228,19 +414,44 @@ final class NativeModel {
                 return LearningClient(
                     api: api,
                     store: SubmissionStore(
-                        file: directory.appendingPathComponent("CertigoNative/submissions-v1.json"))
+                        file: directory.appendingPathComponent("CertigoNative/submissions-v1.json")),
+                    runtimeStore: try RuntimeContentStore(
+                        root: directory.appendingPathComponent("CertigoNative/public-content"))
                 )
             }
     }
 
     var canSubmit: Bool {
-        guard let lesson, !busy, outcome == nil, submittedRequest == nil else { return false }
+        guard deletionStage == nil, let lesson, !busy, outcome == nil, submittedRequest == nil
+        else { return false }
         return lesson.questions.allSatisfy { question in
             question.options.contains { $0.id == selections[question.id] }
         }
     }
 
+    func restoreAccountDeletionIfNeeded() async -> Bool {
+        guard authentication != nil else { return false }
+        guard !deletionBusy else { return deletionStage != nil }
+        do {
+            guard let receipt = try deletionStore().readDeletionReceipt() else { return false }
+            deletionReceipt = receipt
+            deletionStage = receipt.phase == .completed ? .cleanupFailed : .unconfirmed
+            if receipt.phase == .completed {
+                await retryDeletionCleanup()
+            } else {
+                await recoverDeletionConnection(interactive: false)
+            }
+            return true
+        } catch {
+            deletionStage = .unconfirmed
+            deletionMessage =
+                "The saved deletion state could not be read. Learning stays closed. Contact support; no completion is assumed."
+            return true
+        }
+    }
+
     func restore() async {
+        if await restoreAccountDeletionIfNeeded() { return }
         guard profile == nil, !busy,
             !defaults.bool(forKey: Self.signedOutKey)
         else { return }
@@ -255,12 +466,12 @@ final class NativeModel {
             await connect()
         } catch {
             errorMessage =
-                "The test connection could not be restored. Reconnect the test account."
+                "The saved connection could not be restored. Reconnect your account."
         }
     }
 
     func connect() async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         if authentication != nil {
             await connectUsingAuthentication(interactive: true)
             return
@@ -289,12 +500,15 @@ final class NativeModel {
             let loadedQueue = try await next.savedSubmissions()
             guard generation == marker else { return }
             try vault.save(DeveloperConnection(baseURL: api.scope, accessToken: accessToken))
+            if defaults.bool(forKey: Self.signedOutKey) { try activityStore().clear() }
             defaults.set(false, forKey: Self.signedOutKey)
             client = next
             profile = loadedProfile
             tracks = loadedTracks
             queue = loadedQueue
             token = ""
+            apiScope = api.scope
+            await restoreActivity(marker: marker)
         } catch {
             guard generation == marker else { return }
             report(error)
@@ -302,6 +516,7 @@ final class NativeModel {
     }
 
     func disconnect() async {
+        guard deletionStage == nil else { return }
         let previous = client
         defaults.set(true, forKey: Self.signedOutKey)
         generation = UUID()
@@ -309,6 +524,10 @@ final class NativeModel {
         clearSession()
         busy = true
         errorMessage = nil
+        do { try activityStore().clear() } catch {
+            errorMessage =
+                "The local session is closed, but saved activity removal is not confirmed. Retry signing out."
+        }
         defer { if generation == marker { busy = false } }
         await previous?.disconnect()
         guard generation == marker else { return }
@@ -328,12 +547,400 @@ final class NativeModel {
         }
     }
 
+    var canReauthenticateForDeletion: Bool {
+        authentication?.provider is any CIAMAccountDeletionProvider
+    }
+
+    var canCancelDeletion: Bool { deletionCanCancel && !deletionBusy }
+
+    var requiresDeletionSurface: Bool {
+        guard let deletionStage else { return false }
+        return ![.explanation, .verifying, .confirmation].contains(deletionStage)
+    }
+
+    var canRetryDeletion: Bool {
+        deletionStage == .pending && !deletionBusy
+            && (deletionReceipt?.retryAt.map { $0 <= now() } ?? true)
+    }
+
+    func showAccountDeletion() {
+        guard !busy, deletionStage == nil else { return }
+        deletionMessage = nil
+        deletionCanCancel = true
+        deletionStage = .explanation
+    }
+
+    private func deletionStore() throws -> NativeActivityStore {
+        NativeActivityStore(
+            file: try activityStore().file.deletingLastPathComponent()
+                .appendingPathComponent("account-deletion-v1.json"))
+    }
+
+    private func saveDeletionReceipt(_ value: NativeDeletionReceipt) throws {
+        try deletionStore().saveDeletionReceipt(value)
+        deletionReceipt = value
+    }
+
+    func verifyDeletionIdentity() async {
+        guard !deletionBusy, !busy, deletionCanCancel,
+            let authentication,
+            let provider = authentication.provider as? any CIAMAccountDeletionProvider,
+            let account = provider.deletionAccountIdentifier,
+            let profile, let apiScope
+        else {
+            deletionMessage =
+                "Remote deletion requires a configured Microsoft sign-in. Demo and manual development tokens cannot verify recent identity."
+            return
+        }
+        let marker = generation
+        let verification = UUID()
+        deletionVerification = verification
+        deletionBusy = true
+        deletionStage = .verifying
+        deletionMessage = nil
+        defer { deletionBusy = false }
+        do {
+            if deletionClient == nil {
+                guard let active = client else { throw APIError.unauthorized }
+                client = nil
+                resumeReady = false
+                deletionClient = active
+                let owner = try await active.pauseForAccountDeletion()
+                guard generation == marker, owner == profile.id else { throw APIError.staleSession }
+            }
+            guard let deletionClient else { throw APIError.unauthorized }
+            let receipt = NativeDeletionReceipt(
+                schema: 1, ownerId: profile.id, apiScope: apiScope,
+                accountIdentifier: account, phase: .unconfirmed, remainingCleanup: [])
+            deletionReceipt = receipt
+            let status = try await deletionClient.accountDeletion()
+            guard generation == marker, deletionVerification == verification else { return }
+            if status.status != .notRequested {
+                try await acceptDeletionStatus(status)
+                return
+            }
+            let proof = try await provider.reauthenticateForAccountDeletion()
+            guard generation == marker, deletionVerification == verification,
+                provider.deletionAccountIdentifier == account
+            else { return }
+            deletionProof = try proof.validated(
+                expectedAccount: account, clientID: authentication.configuration.clientID,
+                now: now())
+            deletionStage = .confirmation
+        } catch {
+            guard generation == marker, deletionVerification == verification else { return }
+            deletionProof = nil
+            deletionStage = deletionCanCancel ? .explanation : .unconfirmed
+            deletionMessage = deletionError(error)
+        }
+    }
+
+    func discardDeletionProof() {
+        deletionVerification = UUID()
+        deletionProof = nil
+        if deletionStage == .confirmation || deletionStage == .verifying {
+            deletionStage = .explanation
+            deletionMessage =
+                "Identity verification was cancelled. Verify again before confirming deletion."
+        }
+    }
+
+    func cancelAccountDeletion() async {
+        guard deletionCanCancel, !deletionBusy else { return }
+        discardDeletionProof()
+        deletionBusy = true
+        defer { deletionBusy = false }
+        do {
+            if let deletionClient {
+                try await deletionClient.cancelAccountDeletion()
+                client = deletionClient
+            }
+            try deletionStore().clear()
+            deletionClient = nil
+            deletionReceipt = nil
+            deletionStatus = nil
+            deletionStage = nil
+            deletionMessage = nil
+            resumeReady = true
+        } catch {
+            deletionMessage =
+                "Deletion was not submitted, but the local session could not be resumed. Retry cancellation."
+        }
+    }
+
+    func confirmAccountDeletion() async {
+        guard deletionStage == .confirmation, !deletionBusy,
+            let authentication,
+            let provider = authentication.provider as? any CIAMAccountDeletionProvider,
+            let proof = deletionProof, var receipt = deletionReceipt,
+            provider.deletionAccountIdentifier == receipt.accountIdentifier,
+            let deletionClient
+        else { return }
+        let marker = generation
+        deletionBusy = true
+        deletionMessage = nil
+        defer { deletionBusy = false }
+        do {
+            _ = try proof.validated(
+                expectedAccount: receipt.accountIdentifier,
+                clientID: authentication.configuration.clientID, now: now())
+            receipt.phase = .unconfirmed
+            try saveDeletionReceipt(receipt)
+            deletionCanCancel = false
+            deletionProof = nil
+            deletionStage = .checking
+            let status = try await deletionClient.accountDeletion(
+                submit: true, proof: proof.idToken)
+            guard generation == marker else { return }
+            try await acceptDeletionStatus(status)
+        } catch {
+            guard generation == marker else { return }
+            deletionProof = nil
+            deletionStage = deletionCanCancel ? .explanation : .unconfirmed
+            deletionMessage = deletionError(error)
+        }
+    }
+
+    func refreshDeletionStatus() async {
+        guard !deletionBusy, deletionReceipt?.phase != .completed, let deletionClient else {
+            return
+        }
+        deletionBusy = true
+        deletionMessage = nil
+        let marker = generation
+        defer { deletionBusy = false }
+        do {
+            let status = try await deletionClient.accountDeletion()
+            guard generation == marker else { return }
+            try await acceptDeletionStatus(status)
+        } catch {
+            guard generation == marker else { return }
+            deletionStage = .unconfirmed
+            deletionMessage = deletionError(error)
+        }
+    }
+
+    func retryAccountDeletion() async {
+        guard canRetryDeletion, let deletionClient else { return }
+        deletionBusy = true
+        deletionMessage = nil
+        let marker = generation
+        defer { deletionBusy = false }
+        do {
+            let status = try await deletionClient.accountDeletion(submit: true)
+            guard generation == marker else { return }
+            try await acceptDeletionStatus(status)
+        } catch {
+            guard generation == marker else { return }
+            deletionStage = .unconfirmed
+            deletionMessage = deletionError(error)
+        }
+    }
+
+    private func acceptDeletionStatus(_ status: AccountDeletion) async throws {
+        guard var receipt = deletionReceipt else { throw APIError.invalidResponse }
+        deletionStatus = status
+        deletionProof = nil
+        switch status.status {
+        case .notRequested:
+            deletionStage = .unconfirmed
+            deletionMessage =
+                "The server reports no deletion request. Sign in to the same account and verify identity before a new confirmation."
+        // A deletion-only recovery does not fabricate a learning profile.
+        case .pending:
+            receipt.phase = .pending
+            receipt.retryAt = status.retryAfterSeconds.map { now().addingTimeInterval(Double($0)) }
+            deletionCanCancel = false
+            deletionReceipt = receipt
+            try saveDeletionReceipt(receipt)
+            deletionStage = .pending
+        case .completed:
+            receipt.phase = .completed
+            receipt.retryAt = nil
+            receipt.remainingCleanup = ["learning", "activity", "vault", "msal"]
+            // The durable completion receipt precedes every local destructive action.
+            deletionReceipt = receipt
+            deletionCanCancel = false
+            generation = UUID()
+            clearSession()
+            defaults.set(true, forKey: Self.signedOutKey)
+            await performDeletionCleanup()
+        }
+    }
+
+    func recoverDeletionConnection(interactive: Bool) async {
+        guard !deletionBusy, let receipt = deletionReceipt, receipt.phase != .completed,
+            let authentication,
+            let provider = authentication.provider as? any CIAMAccountDeletionProvider,
+            authentication.configuration.apiBaseURL.absoluteString == receipt.apiScope
+        else { return }
+        deletionBusy = true
+        deletionCanCancel = false
+        deletionMessage = nil
+        let marker = generation
+        do {
+            let acquired: CIAMAccessToken
+            if interactive {
+                acquired = try await provider.acquireInteractively()
+            } else {
+                acquired = try await provider.acquireSilently()
+            }
+
+            guard generation == marker else {
+                deletionBusy = false
+                return
+            }
+            guard provider.deletionAccountIdentifier == receipt.accountIdentifier else {
+                throw CIAMAuthenticationFailure.accountChanged
+            }
+            guard acquired.expiresAt > now() else { throw CIAMAuthenticationFailure.invalidToken }
+            let next = try makeClient(authentication.configuration.apiBaseURL)
+            await next.recoverAccountDeletion(accessToken: acquired.value, ownerId: receipt.ownerId)
+            guard generation == marker else {
+                deletionBusy = false
+                return
+            }
+            deletionClient = next
+            deletionBusy = false
+            await refreshDeletionStatus()
+        } catch {
+            deletionBusy = false
+            guard generation == marker else { return }
+            deletionStage = .unconfirmed
+            deletionMessage = deletionError(error)
+        }
+    }
+
+    func resumeAccountAfterStatusCheck() async {
+        guard deletionStatus?.status == .notRequested, !deletionBusy,
+            deletionReceipt?.phase != .completed
+        else { return }
+        do {
+            try deletionStore().clear()
+            await deletionClient?.disconnect()
+            deletionClient = nil
+            deletionReceipt = nil
+            deletionStage = nil
+            deletionStatus = nil
+            deletionMessage = nil
+            await connectUsingAuthentication(interactive: false)
+        } catch {
+            deletionMessage =
+                "No deletion is recorded, but local recovery could not finish. Retry; no data was removed."
+        }
+    }
+
+    func retryDeletionCleanup() async {
+        guard !deletionBusy, deletionReceipt?.phase == .completed else { return }
+        deletionBusy = true
+        generation = UUID()
+        clearSession()
+        defaults.set(true, forKey: Self.signedOutKey)
+        await performDeletionCleanup()
+        deletionBusy = false
+    }
+
+    private func performDeletionCleanup() async {
+        deletionStage = .cleanupFailed
+        do {
+            guard var receipt = deletionReceipt, receipt.phase == .completed else {
+                throw APIError.invalidResponse
+            }
+            try saveDeletionReceipt(receipt)
+            guard let owner = receipt.ownerId, let url = URL(string: receipt.apiScope) else {
+                deletionMessage =
+                    "Account deletion is confirmed, but this device has no verified local owner binding. Local cleanup is unconfirmed; contact support."
+                return
+            }
+            while let target = receipt.remainingCleanup.first {
+                switch target {
+                case "learning":
+                    let cleaner = try deletionClient ?? makeClient(url)
+                    deletionClient = cleaner
+                    try await cleaner.purgeDeletedAccount(ownerId: owner)
+                case "activity":
+                    let store = try activityStore()
+                    if let bytes = try store.read() {
+                        let saved = try NativeActivitySnapshot.decode(bytes)
+                        if saved.navigation.ownerId == owner
+                            && saved.navigation.apiScope == receipt.apiScope
+                        {
+                            try store.clear()
+                        }
+                    }
+                case "vault":
+                    try vault.clear()
+                case "msal":
+                    guard
+                        let provider = authentication?.provider as? any CIAMAccountDeletionProvider
+                    else {
+                        throw CIAMAuthenticationFailure.configuration
+                    }
+                    try await provider.removeAccountForDeletion(
+                        identifier: receipt.accountIdentifier)
+                default: throw APIError.invalidResponse
+                }
+                receipt.remainingCleanup.removeFirst()
+                try saveDeletionReceipt(receipt)
+            }
+            deletionClient = nil
+            deletionStage = .completed
+            deletionMessage = nil
+        } catch {
+            deletionStage = .cleanupFailed
+            deletionMessage =
+                "Account deleted; some data on this device could not be removed. Retry cleanup. No further server deletion request will be sent."
+        }
+    }
+
+    func acknowledgeAccountDeletion() {
+        guard deletionStage == .completed, !deletionBusy else { return }
+        do {
+            try deletionStore().clear()
+            deletionReceipt = nil
+            deletionStatus = nil
+            deletionStage = nil
+            deletionMessage = nil
+        } catch {
+            deletionMessage = "The completion receipt could not be cleared. Retry acknowledgement."
+        }
+    }
+
+    private func deletionError(_ error: Error) -> String {
+        switch error {
+        case CIAMAuthenticationFailure.cancelled:
+            return "Microsoft verification was cancelled. Nothing was submitted."
+        case CIAMAuthenticationFailure.accountChanged:
+            return
+                "A different Microsoft account was returned. Sign in with the original account; no deletion was submitted for this identity."
+        case APIError.unauthorized:
+            return
+                "Account status is unconfirmed. Sign in with the same Microsoft account to check it. A rejected token does not prove deletion."
+        case APIError.http(403), CIAMAuthenticationFailure.invalidToken:
+            return
+                "Recent Microsoft authentication was not accepted. Verify identity again. No deletion is confirmed."
+        case APIError.http(503):
+            return "Account deletion is unavailable on this service. No local data was removed."
+        case APIError.configuration:
+            return
+                "Account deletion requires the verified /api service configuration. Contact support; no request was sent."
+        default:
+            return
+                "The account operation was not confirmed. Check status before retrying. Local data was preserved."
+        }
+    }
+
     private func clearSession() {
+        deletionProof = nil
+        resumeReady = false
+        apiScope = nil
+        selectedTab = .learn
         client = nil
         profile = nil
         tracks = []
         path = nil
         lesson = nil
+        offlinePack = nil
         editorialPilot = nil
         pilotHistory = nil
         selections = [:]
@@ -349,7 +956,7 @@ final class NativeModel {
     }
 
     private func connectUsingAuthentication(interactive: Bool) async {
-        guard let authentication, !busy else { return }
+        guard deletionStage == nil, let authentication, !busy else { return }
         let previous = client
         let marker = UUID()
         generation = marker
@@ -376,7 +983,26 @@ final class NativeModel {
                 acquired.value.rangeOfCharacter(from: .whitespacesAndNewlines) == nil
             else { throw CIAMAuthenticationFailure.invalidToken }
             let next = try makeClient(authentication.configuration.apiBaseURL)
-            let loadedProfile = try await next.connect(accessToken: acquired.value)
+            let loadedProfile: Profile
+            do {
+                loadedProfile = try await next.connect(accessToken: acquired.value)
+            } catch APIError.http(423) {
+                guard generation == marker,
+                    let provider = authentication.provider as? any CIAMAccountDeletionProvider,
+                    let account = provider.deletionAccountIdentifier
+                else { throw CIAMAuthenticationFailure.accountMissing }
+                let receipt = NativeDeletionReceipt(
+                    schema: 1, ownerId: nil,
+                    apiScope: authentication.configuration.apiBaseURL.absoluteString,
+                    accountIdentifier: account, phase: .unconfirmed, remainingCleanup: [])
+                try saveDeletionReceipt(receipt)
+                clearSession()
+                deletionStage = .unconfirmed
+                deletionClient = next
+                await next.recoverAccountDeletion(accessToken: acquired.value, ownerId: nil)
+                await refreshDeletionStatus()
+                return
+            }
             guard generation == marker else {
                 await next.disconnect()
                 return
@@ -400,16 +1026,26 @@ final class NativeModel {
                 if generation == marker { throw CIAMAuthenticationFailure.invalidToken }
                 return
             }
+            let loadedScope = try CertigoAPI(baseURL: authentication.configuration.apiBaseURL).scope
+            let needsRestoration =
+                interactive || profile?.id != loadedProfile.id || apiScope != loadedScope
             if profile?.id != loadedProfile.id {
                 clearSession()
                 busy = true
             }
+            if defaults.bool(forKey: Self.signedOutKey) { try activityStore().clear() }
             defaults.set(false, forKey: Self.signedOutKey)
             client = next
             profile = loadedProfile
             tracks = loadedTracks
             queue = loadedQueue
             tokenExpiresAt = acquired.expiresAt
+            apiScope = loadedScope
+            if needsRestoration {
+                await restoreActivity(marker: marker)
+            } else {
+                persistActivity()
+            }
         } catch {
             guard generation == marker else { return }
             clearSession()
@@ -418,13 +1054,13 @@ final class NativeModel {
     }
 
     func refreshAuthenticationIfNeeded() async {
-        guard authentication != nil, profile != nil, !busy else { return }
+        guard deletionStage == nil, authentication != nil, profile != nil, !busy else { return }
         if let tokenExpiresAt, tokenExpiresAt > now().addingTimeInterval(30) { return }
         await connectUsingAuthentication(interactive: false)
     }
 
     func chooseActiveTrack(_ track: Track) async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         let owner = profile?.id
         await refreshAuthenticationIfNeeded()
         guard let client, let profile, !busy else { return }
@@ -475,7 +1111,7 @@ final class NativeModel {
     }
 
     func loadPath(_ track: Track) async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         let owner = profile?.id
         await refreshAuthenticationIfNeeded()
         guard let client, let profile, !busy else { return }
@@ -486,35 +1122,96 @@ final class NativeModel {
         let marker = generation
         busy = true
         path = nil
-        lesson = nil
+        offlinePack = nil
         errorMessage = nil
         defer { if generation == marker { busy = false } }
         do {
+            let cachedPack = try await client.cachedQuestionPack(trackId: track.id)
+            guard generation == marker else { return }
+            offlinePack = cachedPack
             let value = try await client.path(trackId: track.id)
             guard generation == marker else { return }
             path = value
+            persistActivity()
         } catch {
             guard generation == marker else { return }
             report(error)
         }
     }
 
+    func downloadQuestionPack(_ track: Track) async {
+        guard deletionStage == nil, let client, !busy else { return }
+        let marker = generation
+        busy = true
+        errorMessage = nil
+        defer { if generation == marker { busy = false } }
+        do {
+            _ = try await client.synchronizePublicContent()
+            guard generation == marker else { return }
+            guard let pack = try await client.cachedQuestionPack(trackId: track.id) else {
+                throw RuntimeStoreError.missingFile
+            }
+            guard generation == marker else { return }
+            offlinePack = pack
+        } catch {
+            guard generation == marker else { return }
+            report(error)
+        }
+    }
+
+    func openCachedLesson(_ id: String) async {
+        guard deletionStage == nil else { return }
+        guard let pack = offlinePack, pack.lessons.contains(where: { $0.id == id }) else {
+            report(RuntimeStoreError.missingFile)
+            return
+        }
+        await loadLessonValue(id: id, cachedPack: pack)
+    }
+
+    func restoreDownloadedActivity() async {
+        guard deletionStage == nil, !busy, client != nil, profile != nil else { return }
+        let marker = generation
+        busy = true
+        errorMessage = nil
+        defer { if generation == marker { busy = false } }
+        await restoreActivity(marker: marker, requireDownloadedContent: true)
+    }
+
     func loadLesson(_ node: PathLesson) async {
-        guard !busy else { return }
-        await refreshAuthenticationIfNeeded()
-        guard let client, let path, !busy else { return }
-        guard path.units.flatMap(\.lessons).contains(where: { $0.id == node.id && $0.canOpen })
+        guard deletionStage == nil else { return }
+        guard let path,
+            path.units.flatMap(\.lessons).contains(where: { $0.id == node.id && $0.canOpen })
         else {
             report(NativeResumeError.malformed)
             return
         }
+        await loadLessonValue(id: node.id, cachedPack: nil)
+    }
+
+    private func loadLessonValue(id: String, cachedPack: OfflineQuestionPack?) async {
+        guard deletionStage == nil, !busy else { return }
+        let owner = profile?.id
+        if cachedPack == nil { await refreshAuthenticationIfNeeded() }
+        guard let client, !busy else { return }
+        guard profile?.id == owner else {
+            report(APIError.staleSession)
+            return
+        }
         let marker = generation
         busy = true
+        resumeReady = false
         lesson = nil
         errorMessage = nil
         defer { if generation == marker { busy = false } }
         do {
-            let value = try await client.lesson(trackId: path.trackId, lessonId: node.id)
+            let value: Lesson
+            if let cachedPack, let cached = cachedPack.lessons.first(where: { $0.id == id }) {
+                try await client.pinPublicContent(manifestId: cachedPack.manifestId)
+                value = cached
+            } else {
+                guard let path else { throw NativeResumeError.malformed }
+                value = try await client.lesson(trackId: path.trackId, lessonId: id)
+            }
             guard generation == marker else { return }
             let saved = try await client.savedSubmissions()
             guard generation == marker else { return }
@@ -552,6 +1249,8 @@ final class NativeModel {
                 questionStarted = [:]
                 outcome = pending.status == .pendingCorrection ? .pendingCorrection : nil
                 if pending.status == .failed { report(StoreError.invalidRecord) }
+                resumeReady = true
+                persistActivity()
                 return
             }
             lesson = value
@@ -561,7 +1260,9 @@ final class NativeModel {
             outcome = nil
             submittedRequest = nil
             attemptID = UUID().uuidString
-            startedAt = Date()
+            startedAt = now()
+            resumeReady = true
+            persistActivity()
         } catch {
             guard generation == marker else { return }
             report(error)
@@ -569,7 +1270,7 @@ final class NativeModel {
     }
 
     func loadEditorialPilot() async throws {
-        guard !busy else { throw NativePilotError.operationInProgress }
+        guard deletionStage == nil, !busy else { throw NativePilotError.operationInProgress }
         guard let owner = profile?.id else { throw NativePilotError.connectionRequired }
         await refreshAuthenticationIfNeeded()
         guard let client, profile?.id == owner, !busy else {
@@ -601,7 +1302,7 @@ final class NativeModel {
     }
 
     private func updateEditorialPilotLesson(_ lessonId: String, markRead: Bool) async throws {
-        guard !busy else { throw NativePilotError.operationInProgress }
+        guard deletionStage == nil, !busy else { throw NativePilotError.operationInProgress }
         guard let owner = profile?.id, let snapshot = editorialPilot,
             snapshot.pilot.lessons.contains(where: { $0.id == lessonId })
         else { throw NativePilotError.lessonUnavailable }
@@ -627,11 +1328,12 @@ final class NativeModel {
     }
 
     func questionAppeared(_ id: String) {
+        guard deletionStage == nil else { return }
         if questionStarted[id] == nil { questionStarted[id] = ContinuousClock.now }
     }
 
     func select(_ option: QuizOption, question: QuizItem) {
-        guard outcome == nil, submittedRequest == nil, !busy else { return }
+        guard deletionStage == nil, outcome == nil, submittedRequest == nil, !busy else { return }
         guard let actual = lesson?.questions.first(where: { $0.id == question.id }),
             actual.options.contains(where: { $0.id == option.id })
         else {
@@ -646,11 +1348,17 @@ final class NativeModel {
                 / 1_000_000_000_000_000
             latencies[question.id] = Int(clamping: max(0, milliseconds))
         }
+        persistActivity()
     }
 
     func submit() async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
+        let owner = profile?.id
         await refreshAuthenticationIfNeeded()
+        guard profile?.id == owner else {
+            report(APIError.staleSession)
+            return
+        }
         guard let client, let lesson, canSubmit else { return }
         let marker = generation
         busy = true
@@ -670,6 +1378,8 @@ final class NativeModel {
                 clientAttemptId: attemptID, trackId: lesson.trackId, startedAt: startedAt,
                 answers: answers, publicManifestId: lesson.publicManifestId
             )
+            // Persist the in-flight fence before the outbox transaction, never infer an ACK from it.
+            try saveActivity(submitting: request)
             let response = try await client.submit(lessonId: lesson.id, submission: request)
             guard generation == marker else { return }
             submittedRequest = request
@@ -677,6 +1387,8 @@ final class NativeModel {
             let values = try await client.savedSubmissions()
             guard generation == marker else { return }
             queue = values
+            persistActivity()
+            try await refreshConfirmedProfile(after: response, client: client, marker: marker)
         } catch {
             guard generation == marker else { return }
             report(error)
@@ -689,6 +1401,7 @@ final class NativeModel {
                     if saved.status == .pendingCorrection { outcome = .pendingCorrection }
                     if let result = saved.result { outcome = .corrected(result) }
                 }
+                persistActivity()
             } catch {
                 guard generation == marker else { return }
                 report(error)
@@ -697,7 +1410,7 @@ final class NativeModel {
     }
 
     func retry(_ saved: SavedSubmission) async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         await refreshAuthenticationIfNeeded()
         guard let client, !busy else { return }
         let marker = generation
@@ -711,14 +1424,39 @@ final class NativeModel {
             let values = try await client.savedSubmissions()
             guard generation == marker else { return }
             queue = values
+            persistActivity()
+            try await refreshConfirmedProfile(after: response, client: client, marker: marker)
         } catch {
             guard generation == marker else { return }
             report(error)
+            do {
+                let values = try await client.savedSubmissions()
+                guard generation == marker else { return }
+                queue = values
+                if saved.id == attemptID,
+                    values.first(where: { $0.id == saved.id })?.status == .failed
+                {
+                    outcome = nil
+                }
+                persistActivity()
+            } catch {
+                guard generation == marker else { return }
+                report(error)
+            }
         }
     }
 
+    private func refreshConfirmedProfile(
+        after response: SubmissionOutcome, client: LearningClient, marker: UUID
+    ) async throws {
+        guard case .corrected = response else { return }
+        let value = try await client.refreshProfile()
+        guard generation == marker else { return }
+        profile = value
+    }
+
     func refreshProgress() async {
-        guard !busy else { return }
+        guard deletionStage == nil, !busy else { return }
         await refreshAuthenticationIfNeeded()
         guard let client, let path, !busy else { return }
         let marker = generation
@@ -735,6 +1473,192 @@ final class NativeModel {
         }
     }
 
+    private func saveActivity(submitting request: QuizSubmission? = nil) throws {
+        guard resumeReady, let profile, let apiScope else { return }
+        var session: NativeResumeState.Session?
+        var draft: NativeActivitySnapshot.Draft?
+        if let lesson {
+            session = .init(
+                trackId: lesson.trackId, lessonId: lesson.id,
+                publicManifestId: lesson.publicManifestId,
+                phase: .draft, attemptId: nil)
+            if submittedRequest != nil {
+                session?.phase = .submitting
+                session?.attemptId = attemptID
+            } else {
+                draft = .init(
+                    lessonDigest: try NativeActivitySnapshot.digest(lesson), attemptId: attemptID,
+                    startedAt: startedAt, selections: selections, latencies: latencies)
+            }
+        }
+        var navigation = try NativeResumeState(
+            tab: selectedTab, ownerId: profile.id, apiScope: apiScope, session: session)
+        if let request {
+            navigation = try navigation.beginningSubmission(request)
+            draft = nil
+        } else if submittedRequest != nil {
+            navigation = try navigation.reconciled(
+                ownerId: profile.id, apiScope: apiScope,
+                currentManifestId: lesson?.publicManifestId, submissions: queue)
+        }
+        let snapshot = NativeActivitySnapshot(
+            schema: 1, navigation: navigation, trackId: path?.trackId, draft: draft)
+        try activityStore().save(snapshot.encoded())
+    }
+
+    private func persistActivity() {
+        guard deletionStage == nil else { return }
+        do { try saveActivity() } catch {
+            errorMessage =
+                "This activity could not be saved for reopening. Keep the app open and retry your selection."
+        }
+    }
+
+    private func restoreActivity(marker: UUID, requireDownloadedContent: Bool = false) async {
+        guard let client, let profile, let apiScope else { return }
+        resumeReady = false
+        do {
+            guard let bytes = try activityStore().read() else {
+                resumeReady = true
+                return
+            }
+            let snapshot = try NativeActivitySnapshot.decode(bytes)
+            let navigation = snapshot.navigation
+            guard navigation.ownerId == profile.id else { throw NativeResumeError.ownerChanged }
+            guard navigation.apiScope == apiScope else { throw NativeResumeError.scopeChanged }
+            let trackID = navigation.session?.trackId ?? snapshot.trackId
+            var loadedPath: LearningPath?
+            var loadedLesson: Lesson?
+            var cachedPack: OfflineQuestionPack?
+            if let trackID {
+                do {
+                    cachedPack = try await client.cachedQuestionPack(
+                        trackId: trackID, manifestId: navigation.session?.publicManifestId)
+                } catch RuntimeStoreError.missingFile {
+                    // An online-only activity may never have downloaded its manifest.
+                    cachedPack = nil
+                }
+                guard generation == marker else { return }
+            }
+            if let session = navigation.session, let cachedPack {
+                guard let cached = cachedPack.lessons.first(where: { $0.id == session.lessonId })
+                else { throw NativeResumeError.releaseChanged }
+                try await client.pinPublicContent(manifestId: cachedPack.manifestId)
+                guard generation == marker else { return }
+                loadedLesson = cached
+            } else if let trackID {
+                guard !requireDownloadedContent else { throw RuntimeStoreError.missingFile }
+                guard tracks.contains(where: { $0.id == trackID && $0.learningAvailable }) else {
+                    throw NativeResumeError.releaseChanged
+                }
+                loadedPath = try await client.path(trackId: trackID)
+                guard generation == marker else { return }
+            }
+            if let session = navigation.session, loadedLesson == nil {
+                guard
+                    loadedPath?.units.flatMap(\.lessons).contains(where: {
+                        $0.id == session.lessonId && $0.canOpen
+                    }) == true
+                else { throw NativeResumeError.releaseChanged }
+                loadedLesson = try await client.lesson(
+                    trackId: session.trackId, lessonId: session.lessonId)
+                guard generation == marker else { return }
+            }
+            let reconciled = try navigation.reconciled(
+                ownerId: profile.id, apiScope: apiScope,
+                currentManifestId: loadedLesson?.publicManifestId, submissions: queue)
+            var restoredSelections: [String: String] = [:]
+            var restoredLatencies: [String: Int] = [:]
+            var restoredRequest: QuizSubmission?
+            var restoredOutcome: SubmissionOutcome?
+            var restoredAttempt = UUID().uuidString
+            var restoredStart = now()
+            if let draft = snapshot.draft, let loadedLesson {
+                guard try draft.lessonDigest == NativeActivitySnapshot.digest(loadedLesson),
+                    draft.startedAt <= now(),
+                    draft.selections.allSatisfy({ id, option in
+                        loadedLesson.questions.contains {
+                            $0.id == id && $0.options.contains { $0.id == option }
+                        }
+                    }),
+                    !queue.contains(where: {
+                        $0.id == draft.attemptId
+                            || ($0.lessonId == loadedLesson.id
+                                && $0.submission.trackId == loadedLesson.trackId
+                                && $0.status != .corrected)
+                    })
+                else { throw NativeResumeError.attemptMismatch }
+                restoredSelections = draft.selections
+                restoredLatencies = draft.latencies
+                restoredAttempt = draft.attemptId
+                restoredStart = draft.startedAt
+            } else if let session = reconciled.session, let loadedLesson {
+                guard let saved = queue.first(where: { $0.id == session.attemptId }),
+                    saved.submission.publicManifestId == loadedLesson.publicManifestId,
+                    saved.submission.answers.count == loadedLesson.questions.count,
+                    saved.submission.answers.allSatisfy({ answer in
+                        loadedLesson.questions.contains {
+                            $0.id == answer.itemId && $0.type == answer.itemType
+                                && answer.selected.count == 1
+                                && $0.options.contains { $0.id == answer.selected[0] }
+                        }
+                    })
+                else { throw NativeResumeError.attemptMismatch }
+                restoredRequest = saved.submission
+                restoredAttempt = saved.id
+                restoredStart = saved.submission.startedAt
+                restoredSelections = Dictionary(
+                    uniqueKeysWithValues: saved.submission.answers.map {
+                        ($0.itemId, $0.selected[0])
+                    })
+                restoredLatencies = Dictionary(
+                    uniqueKeysWithValues: saved.submission.answers.map { ($0.itemId, $0.latencyMs) }
+                )
+                if let result = saved.result { restoredOutcome = .corrected(result) }
+                if saved.status == .pendingCorrection { restoredOutcome = .pendingCorrection }
+            }
+            path = loadedPath
+            offlinePack = cachedPack
+            lesson = loadedLesson
+            selections = restoredSelections
+            latencies = restoredLatencies
+            questionStarted = [:]
+            attemptID = restoredAttempt
+            startedAt = restoredStart
+            submittedRequest = restoredRequest
+            outcome = restoredOutcome
+            selectedTab = navigation.tab
+            resumeReady = true
+            restorationRevision += 1
+            if reconciled.session?.phase == .failed { report(StoreError.invalidRecord) }
+        } catch {
+            guard generation == marker else { return }
+            path = nil
+            lesson = nil
+            selections = [:]
+            latencies = [:]
+            questionStarted = [:]
+            submittedRequest = nil
+            outcome = nil
+            if error is NativeResumeError || error is DecodingError || error is ContractError
+                || (error as? APIError) == .http(404)
+            {
+                do {
+                    try activityStore().clear()
+                    resumeReady = true
+                    errorMessage =
+                        "The saved activity is no longer compatible with this account or content and was cleared. Saved submissions were not changed."
+                } catch {
+                    errorMessage =
+                        "The saved activity is incompatible and could not be removed. It was not reopened. Sign out again to clear it."
+                }
+            } else {
+                errorMessage =
+                    "The saved activity could not be checked. It was kept without reopening or submitting it. Reconnect to retry restoration."
+            }
+        }
+    }
+
     private func report(_ error: any Error) {
         switch error {
         case NativeResumeError.releaseChanged:
@@ -744,16 +1668,25 @@ final class NativeModel {
             errorMessage =
                 "This activity cannot be safely resumed. Your saved responses were preserved; choose a valid activity or review saved submissions."
         case CIAMAuthenticationFailure.interactionRequired:
-            errorMessage = "Sign in explicitly with the test account to continue."
+            errorMessage = "Reconnect your account to continue."
         case is CIAMAuthenticationFailure:
             errorMessage =
-                "The test account connection is not confirmed. No sign-in or renewal is assumed."
+                "The account connection could not be confirmed. No account or access is assumed."
         case APIError.unauthorized:
-            errorMessage = "The test connection expired. Sign out, then reconnect this account."
+            errorMessage = "Your connection expired. Reconnect your account to continue."
         case APIError.configuration:
             errorMessage = "Enter a valid HTTPS API URL without credentials or query parameters."
         case APIError.staleSession:
             errorMessage = "The account changed. This response was not displayed."
+        case RuntimeStoreError.capacity:
+            errorMessage =
+                "The downloaded content storage limit was reached. Saved attempts were preserved; contact support before removing their pinned content."
+        case RuntimeStoreError.busy, RuntimeStoreError.staleActivation:
+            errorMessage =
+                "The downloaded content changed during this operation. Retry explicitly; nothing was submitted."
+        case is RuntimeStoreError, is PublicReleaseError, is CanonicalContentError:
+            errorMessage =
+                "The downloaded question pack is missing, incompatible or damaged. Reconnect and download it again. Saved submissions were not changed."
         case APIError.transport:
             errorMessage = "The server is unreachable. Check the connection and retry."
         case APIError.http(let status):
