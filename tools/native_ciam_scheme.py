@@ -1,6 +1,7 @@
 """Create a new ignored, user-local Debug scheme without changing shared files."""
 
 import argparse
+import copy
 import getpass
 import json
 import os
@@ -8,6 +9,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 
 
@@ -52,6 +54,27 @@ def load_values(path):
     return values
 
 
+def application_reference(action, expected=None):
+    runners = action.findall("BuildableProductRunnable")
+    if len(runners) != 1 or len(runners[0].findall("BuildableReference")) != 1:
+        raise ValueError("Expected exactly one application reference in " + action.tag + ".")
+    reference = runners[0].find("BuildableReference")
+    if (
+        reference.get("BlueprintName") not in (
+            ("CertigoNative", None) if expected is not None else ("CertigoNative",)
+        )
+        or reference.get("BuildableName") != "CertigoNative.app"
+        or reference.get("ReferencedContainer") != "container:CertigoNative.xcodeproj"
+        or not reference.get("BlueprintIdentifier")
+        or (expected is not None and any(
+            reference.get(key) != expected.get(key)
+            for key in ("BlueprintIdentifier", "BuildableName", "ReferencedContainer")
+        ))
+    ):
+        raise ValueError("Unexpected or mismatched application reference in " + action.tag + ".")
+    return reference
+
+
 def create_scheme(project, values, username):
     if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", username):
         raise ValueError("Unsupported local username.")
@@ -76,10 +99,33 @@ def create_scheme(project, values, username):
     if root.tag != "Scheme" or len(launches) != 1:
         raise ValueError("Expected exactly one shared scheme Run action.")
     launch = launches[0]
-    if launch.get("buildConfiguration") != "Debug":
-        raise ValueError("Only a Debug Run action can be configured.")
-    if launch.find("BuildableProductRunnable/BuildableReference") is None:
-        raise ValueError("Shared Run action does not reference an application.")
+    if launch.get("buildConfiguration") not in ("Debug", "Release"):
+        raise ValueError("Expected a Debug or Release source Run action.")
+    reference = application_reference(launch)
+    for field in ("EnvironmentVariables", "CommandLineArguments"):
+        if len(launch.findall(field)) > 1:
+            raise ValueError("Ambiguous shared Run " + field + ".")
+    for tag in ("TestAction", "ProfileAction"):
+        actions = root.findall(tag)
+        if len(actions) != 1:
+            raise ValueError("Expected exactly one " + tag + ".")
+        action = actions[0]
+        if tag == "ProfileAction":
+            application_reference(action, reference)
+        if any(
+            node.get("key", "").startswith("CERTIGO_CIAM_")
+            for node in action.findall("EnvironmentVariables/EnvironmentVariable")
+        ):
+            raise ValueError("CIAM values already present outside Run in " + tag + ".")
+        if action.get("shouldUseLaunchSchemeArgsEnv") == "YES":
+            for field in ("EnvironmentVariables", "CommandLineArguments"):
+                if action.find(field) is not None:
+                    raise ValueError("Ambiguous inherited Run settings in " + tag + ".")
+                inherited = launch.find(field)
+                if inherited is not None:
+                    action.append(copy.deepcopy(inherited))
+            # Profile may use Release: never inherit the new Run-only CIAM opt-in.
+            action.set("shouldUseLaunchSchemeArgsEnv", "NO")
     environments = launch.findall("EnvironmentVariables")
     if len(environments) > 1:
         raise ValueError("Ambiguous shared Run environment.")
@@ -93,19 +139,28 @@ def create_scheme(project, values, username):
         ET.SubElement(environment, "EnvironmentVariable", {
             "key": key, "value": values[key], "isEnabled": "YES",
         })
+    launch.set("buildConfiguration", "Debug")
     ET.indent(root, space="   ")
     result = ET.tostring(root, encoding="utf-8", xml_declaration=True) + b"\n"
+    if target.exists() or target.is_symlink():
+        raise FileExistsError("Local scheme already exists.")
     target.parent.mkdir(parents=True, exist_ok=True)
-    # Exclusive creation protects an existing user's scheme, including a dangling symlink.
-    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    temporary = None
     try:
-        with os.fdopen(fd, "wb") as output:
+        with tempfile.NamedTemporaryFile(
+            prefix=".certigo-ciam-", suffix=".tmp", dir=target.parent, delete=False,
+        ) as output:
+            temporary = Path(output.name)
             output.write(result)
             output.flush()
             os.fsync(output.fileno())
-    except OSError:
-        target.unlink()
-        raise
+        if source.read_bytes() != data:
+            raise ValueError("Shared scheme changed during preparation; no local scheme published.")
+        # Publish complete bytes atomically, without replacing even a concurrently created file.
+        os.link(temporary, target)
+    finally:
+        if temporary is not None:
+            temporary.unlink()
     return target
 
 
