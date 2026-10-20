@@ -57,10 +57,25 @@ class NativeDistributionTests(unittest.TestCase):
         ):
             self.assertIn(setting, config)
         for forbidden in ("DEVELOPMENT_TEAM", "PROVISIONING_PROFILE", "CODE_SIGN_ENTITLEMENTS",
-                          "SWIFT_ACTIVE_COMPILATION_CONDITIONS", "CODE_SIGN_IDENTITY"):
+                          "CODE_SIGN_IDENTITY"):
             self.assertNotIn(forbidden, config)
+        conditions = re.search(
+            r"\bSWIFT_ACTIVE_COMPILATION_CONDITIONS = ([^;]+);", config
+        )
+        self.assertIsNotNone(conditions)
+        symbols = set(re.split(r"[\s,]+", conditions[1].strip()))
+        self.assertIn("CERTIGO_PRODUCTION_DISTRIBUTION", symbols)
+        self.assertNotIn("DEBUG", symbols)
         with (APP / "DistributionInfo.plist").open("rb") as file:
-            self.assertEqual(plistlib.load(file), {})
+            distribution_info = plistlib.load(file)
+        self.assertEqual(
+            distribution_info["CFBundleURLTypes"][0]["CFBundleURLSchemes"],
+            ["msauth.com.certigo.mobileapp"],
+        )
+        self.assertEqual(distribution_info["CertigoProductionAuthMode"], "microsoft")
+        for key, value in distribution_info.items():
+            if key.startswith("CertigoProductionCIAM"):
+                self.assertRegex(value, r"^\$\([A-Z0-9_]+\)$")
         with (APP / "DevelopmentInfo.plist").open("rb") as file:
             self.assertEqual(
                 plistlib.load(file)["CFBundleURLTypes"][0]["CFBundleURLSchemes"],

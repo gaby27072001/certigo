@@ -6,6 +6,7 @@ from importlib import import_module
 from importlib.metadata import version
 import json
 from pathlib import Path
+import re
 import sys
 import tempfile
 
@@ -55,8 +56,311 @@ RULE_SOURCES = {
 REGISTRY_SHA256 = "35a84e2225433f4529efcfdeebc6fe872e8ebca50674ab03717aff3d33d44fd0"
 
 
+class BindingResolutionError(ValueError):
+    """An authored Bicep expression is outside the bounded static resolver."""
+
+
 def _literal_string(value):
     return type(value) is str and "${" not in value
+
+
+def _contains_comment(text):
+    quote = None
+    index = 0
+    while index < len(text):
+        character = text[index]
+        if quote is not None:
+            if character == quote:
+                if index + 1 < len(text) and text[index + 1] == quote:
+                    index += 2
+                    continue
+                quote = None
+        elif character in ("'", '"'):
+            quote = character
+        elif text.startswith("//", index) or text.startswith("/*", index):
+            return True
+        index += 1
+    return False
+
+
+def _parser_source(source):
+    """Join Bicep's line-wrapped ternary punctuation without changing scanner input."""
+    lines = source.splitlines(keepends=True)
+    normalized = []
+    for line in lines:
+        stripped = line.lstrip(" \t")
+        if (
+            normalized
+            and stripped.startswith(("?", ":"))
+            and not _contains_comment(normalized[-1])
+        ):
+            previous = normalized.pop().rstrip("\r\n")
+            newline = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else ""
+            normalized.append(previous + " " + stripped.rstrip("\r\n") + newline)
+        else:
+            normalized.append(line)
+    return "".join(normalized)
+
+
+def _parse_source(source):
+    return BicepParser().parse(text=_parser_source(source))
+
+
+def _resolve_expression(expression, resolve_symbol, environment):
+    if isinstance(expression, BicepElement):
+        return resolve_symbol(str(expression))
+    if type(expression) is str:
+        if "${" not in expression:
+            return expression
+
+        def replace(match):
+            value = resolve_symbol(match.group(1))
+            if type(value) is bool:
+                return "true" if value else "false"
+            if type(value) not in (str, int):
+                raise BindingResolutionError("interpolation is not a scalar literal")
+            return str(value)
+
+        rendered = re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", replace, expression)
+        if "${" in rendered:
+            raise BindingResolutionError("interpolation is not a simple symbol")
+        return rendered
+    if type(expression) in (bool, int):
+        return expression
+    if isinstance(expression, list):
+        return [_resolve_expression(value, resolve_symbol, environment) for value in expression]
+    if isinstance(expression, dict):
+        operator = expression.get("operator")
+        if isinstance(operator, dict):
+            operands = operator.get("operands")
+            if (
+                operator.get("type") == "equals"
+                and isinstance(operands, dict)
+                and set(operands) == {"operand_1", "operand_2"}
+                and isinstance(operands["operand_1"], BicepElement)
+                and str(operands["operand_1"]) == "env"
+                and isinstance(operands["operand_2"], dict)
+            ):
+                conditional = operands["operand_2"].get("operator")
+                branches = conditional.get("operands") if isinstance(conditional, dict) else None
+                if (
+                    isinstance(conditional, dict)
+                    and conditional.get("type") == "conditional"
+                    and isinstance(branches, dict)
+                    and set(branches) == {"condition", "true_value", "false_value"}
+                    and type(branches["condition"]) is str
+                    and branches["condition"] in ("dev", "staging", "prod")
+                ):
+                    branch = "true_value" if environment == branches["condition"] else "false_value"
+                    return _resolve_expression(branches[branch], resolve_symbol, environment)
+            raise BindingResolutionError("operator is outside the literal/environment contract")
+        return {
+            key: _resolve_expression(value, resolve_symbol, environment)
+            for key, value in expression.items()
+        }
+    if expression is None:
+        raise BindingResolutionError("null is not a resolved parameter value")
+    raise BindingResolutionError("value is outside the literal/environment contract")
+
+
+def _matches_parameter_type(value, type_name):
+    if type_name == "string":
+        return type(value) is str
+    if type_name == "bool":
+        return type(value) is bool
+    if type_name == "int":
+        return type(value) is int
+    if type_name == "array":
+        return isinstance(value, list)
+    if type_name == "object":
+        return isinstance(value, dict)
+    return False
+
+
+def _raise_unresolved_symbol(name):
+    raise BindingResolutionError("module symbol has no explicit binding: " + name)
+
+
+def resolve_local_module_bindings(root_path, environment, module_symbol="api"):
+    """Resolve one local module call using only literals and bounded env ternaries."""
+    root_path = Path(root_path).resolve(strict=True)
+    root_bytes = root_path.read_bytes()
+    result = {
+        "root_source": str(root_path),
+        "root_sha256": hashlib.sha256(root_bytes).hexdigest(),
+        "environment": environment,
+        "module_symbol": module_symbol,
+        "module_source": None,
+        "module_sha256": None,
+        "parameters": [],
+        "values": {},
+        "blockers": [],
+    }
+    if environment not in ("dev", "staging", "prod"):
+        result["blockers"].append("only dev, staging or prod can be resolved")
+        return result
+    try:
+        root = _parse_source(root_bytes.decode("utf-8"))
+    except (UnicodeError, Exception) as error:
+        result["blockers"].append("root source parsing failed: " + type(error).__name__)
+        return result
+    if not isinstance(root, dict):
+        result["blockers"].append("root source AST is malformed")
+        return result
+    env_parameter = root.get("parameters", {}).get("env")
+    allowed = [
+        tuple(decorator["argument"])
+        for decorator in env_parameter.get("decorators", [])
+        if decorator.get("type") == "allowed"
+        and isinstance(decorator.get("argument"), list)
+    ] if isinstance(env_parameter, dict) else []
+    if (
+        not isinstance(env_parameter, dict)
+        or env_parameter.get("type") != "string"
+        or allowed != [("dev", "staging", "prod")]
+    ):
+        result["blockers"].append("root env must be a string with exactly dev/staging/prod allowed")
+        return result
+
+    modules = root.get("modules")
+    node = modules.get(module_symbol) if isinstance(modules, dict) else None
+    if not isinstance(node, dict) or node.get("type") != "local":
+        result["blockers"].append("requested local module call is absent or unsupported")
+        return result
+    config = node.get("config")
+    detail = node.get("detail")
+    if (
+        not isinstance(config, dict)
+        or not isinstance(detail, dict)
+        or not isinstance(detail.get("path"), str)
+        or not isinstance(config.get("name"), str)
+    ):
+        result["blockers"].append("module call has malformed source or configuration")
+        return result
+    unsupported_module_fields = set(config) - {"name", "params"}
+    if unsupported_module_fields:
+        result["blockers"].append(
+            "module scope, condition, loop or dependency fields are outside the binding contract"
+        )
+    relative_module = Path(detail["path"])
+    if relative_module.is_absolute() or ".." in relative_module.parts:
+        result["blockers"].append("local module path must remain below the root source directory")
+        return result
+    try:
+        module_path = (root_path.parent / relative_module).resolve(strict=True)
+    except OSError as error:
+        result["blockers"].append("local module source is unavailable: " + type(error).__name__)
+        return result
+    if not module_path.is_relative_to(root_path.parent):
+        result["blockers"].append("local module path escapes the root source directory")
+        return result
+    result["module_source"] = str(module_path)
+    module_bytes = module_path.read_bytes()
+    result["module_sha256"] = hashlib.sha256(module_bytes).hexdigest()
+    try:
+        module = _parse_source(module_bytes.decode("utf-8"))
+    except (UnicodeError, Exception) as error:
+        result["blockers"].append("module source parsing failed: " + type(error).__name__)
+        return result
+    if not isinstance(module, dict):
+        result["blockers"].append("module source AST is malformed")
+        return result
+    if set(module) - {"globals", "parameters", "variables", "resources"}:
+        result["blockers"].append("nested modules and outputs are outside this module contract")
+    if not isinstance(module.get("resources"), dict) or not module["resources"]:
+        result["blockers"].append("module has no statically inventoried resources")
+
+    root_parameters = root.get("parameters", {})
+    root_variables = root.get("variables", {})
+
+    def resolve_root_symbol(name, active=()):
+        if name == "env":
+            return environment
+        if name in active:
+            raise BindingResolutionError("cyclic root parameter/variable reference")
+        if name in root_parameters:
+            default = root_parameters[name].get("default")
+            if default is None:
+                raise BindingResolutionError("root parameter has no literal deployment value")
+            value = default
+        elif name in root_variables:
+            value = root_variables[name].get("value")
+        else:
+            raise BindingResolutionError("root symbol is not a literal parameter or variable")
+        return _resolve_expression(
+            value, lambda nested: resolve_root_symbol(nested, active + (name,)), environment
+        )
+
+    module_parameters = module.get("parameters", {})
+    passed = config.get("params", {})
+    if not isinstance(module_parameters, dict) or not isinstance(passed, dict):
+        result["blockers"].append("module parameter declarations or arguments are malformed")
+        return result
+    for name in sorted(set(passed) - set(module_parameters)):
+        result["blockers"].append("root passes an undeclared module parameter: " + name)
+
+    values = {}
+    resolving = set()
+
+    def resolve_module_symbol(name):
+        if name in values:
+            return values[name]
+        if name in resolving:
+            raise BindingResolutionError("cyclic module parameter/variable reference")
+        if name in module_parameters:
+            resolving.add(name)
+            spec = module_parameters[name]
+            if name in passed:
+                expression = passed[name]
+                resolver = resolve_root_symbol
+            else:
+                expression = spec.get("default")
+                resolver = resolve_module_symbol
+            if expression is None:
+                resolving.remove(name)
+                raise BindingResolutionError("required module parameter is not explicitly bound")
+            value = _resolve_expression(expression, resolver, environment)
+            if not _matches_parameter_type(value, spec.get("type")):
+                resolving.remove(name)
+                raise BindingResolutionError("resolved value does not match the declared module type")
+            values[name] = value
+            resolving.remove(name)
+            return value
+        if name in module.get("variables", {}):
+            resolving.add(name)
+            value = _resolve_expression(
+                module["variables"][name].get("value"), resolve_module_symbol, environment
+            )
+            values[name] = value
+            resolving.remove(name)
+            return value
+        raise BindingResolutionError("module symbol has no explicit literal binding")
+
+    for name in sorted(module_parameters):
+        spec = module_parameters[name]
+        secure = any(
+            decorator.get("type") == "secure"
+            for decorator in spec.get("decorators", [])
+        )
+        item = {"parameter": name, "type": spec.get("type"), "secure": secure}
+        try:
+            value = resolve_module_symbol(name)
+            item["resolved"] = True
+            if not secure:
+                item["value"] = value
+            result["values"][name] = value
+        except BindingResolutionError as error:
+            item["resolved"] = False
+            item["reason"] = str(error)
+            result["blockers"].append("module parameter " + name + ": " + str(error))
+        result["parameters"].append(item)
+    for name in sorted(module.get("variables", {})):
+        try:
+            resolve_module_symbol(name)
+        except BindingResolutionError as error:
+            result["blockers"].append("module variable " + name + ": " + str(error))
+    result["values"] = values
+    return result
 
 
 def _literal_identity(identity):
@@ -139,20 +443,53 @@ def _literal_cosmos(properties):
     return True
 
 
-def inventory(source, environment, instance):
+def inventory(source, environment, instance, resolved_values=None):
     """Derive exact obligations from authored AST before running Checkov."""
     problems = []
     entries = []
-    if environment not in ("dev", "staging", "prod") or instance != "root":
-        problems.append("only an explicit environment and root module instance are qualified")
+    module_instance = instance.startswith("root/") if type(instance) is str else False
+    if (
+        environment not in ("dev", "staging", "prod")
+        or (instance != "root" and (not module_instance or resolved_values is None))
+    ):
+        problems.append("only root sources or explicitly bound local module instances are qualified")
     try:
-        tree = BicepParser().parse(text=source)
+        tree = _parse_source(source)
     except Exception as error:
         return [], 0, ["source parsing failed: " + type(error).__name__]
     if not isinstance(tree, dict):
         return [], 0, ["malformed source AST"]
-    if set(tree) - {"globals", "resources"}:
-        problems.append("parameters, variables, outputs and modules are not qualified")
+    allowed_tree_keys = {"globals", "resources"}
+    if resolved_values is not None:
+        allowed_tree_keys |= {"parameters", "variables"}
+    if set(tree) - allowed_tree_keys:
+        problems.append("outputs and nested modules are outside this qualification")
+    if resolved_values is not None:
+        declared_parameters = tree.get("parameters", {})
+        declared_variables = tree.get("variables", {})
+        if (
+            not isinstance(declared_parameters, dict)
+            or not isinstance(declared_variables, dict)
+            or set(declared_parameters) - set(resolved_values)
+            or set(declared_variables) - set(resolved_values)
+        ):
+            problems.append("module parameter/variable provenance is incomplete")
+
+    def resolve(value, resource_key):
+        if resolved_values is None:
+            return value
+        try:
+            return _resolve_expression(
+                value,
+                lambda name: resolved_values[name]
+                if name in resolved_values
+                else _raise_unresolved_symbol(name),
+                environment,
+            )
+        except (BindingResolutionError, KeyError) as error:
+            problems.append("unresolved module expression in " + resource_key)
+            return None
+
     if tree.get("globals", {}).get("scope", {}).get("value") != "resourceGroup":
         problems.append("only resource-group scope is qualified")
     resources = tree.get("resources", {})
@@ -170,20 +507,35 @@ def inventory(source, environment, instance):
         kind = resource.get("type")
         conf = resource.get("config")
         key = str(kind) + "." + str(symbol)
+        if set(resource) != {"decorators", "type", "api_version", "existing", "config"}:
+            problems.append("conditions and loops are outside the resource contract: " + key)
         if not isinstance(conf, dict) or resource.get("existing") is not False:
             problems.append("unsupported or malformed resource: " + key)
             continue
         if kind == SITE:
             if resource.get("api_version") != API_VERSION:
                 problems.append("unsupported site API version: " + key)
-            name = conf.get("name")
-            properties = conf.get("properties")
-            identity = conf.get("identity")
+            name = resolve(conf.get("name"), key)
+            properties = resolve(conf.get("properties"), key)
+            identity = resolve(conf.get("identity"), key)
+            valid_site_properties = isinstance(properties, dict) and (
+                set(properties) == {"publicNetworkAccess"}
+                or set(properties) == {"publicNetworkAccess", "siteConfig"}
+            )
+            if valid_site_properties and "siteConfig" in properties:
+                site_config = properties["siteConfig"]
+                cors = site_config.get("cors") if isinstance(site_config, dict) else None
+                valid_site_properties = (
+                    set(site_config) == {"cors"}
+                    and isinstance(cors, dict)
+                    and set(cors) == {"allowedOrigins"}
+                    and isinstance(cors["allowedOrigins"], list)
+                    and all(_literal_string(origin) for origin in cors["allowedOrigins"])
+                )
             if (
                 set(conf) != {"name", "properties", "identity"}
                 or type(name) is not str or not name or "${" in name
-                or not isinstance(properties, dict)
-                or set(properties) != {"publicNetworkAccess"}
+                or not valid_site_properties
                 or type(properties.get("publicNetworkAccess")) is not str
                 or properties["publicNetworkAccess"] not in ("Enabled", "Disabled")
                 or not _literal_identity(identity)
@@ -201,9 +553,9 @@ def inventory(source, environment, instance):
         elif kind == CONFIG:
             if resource.get("api_version") != API_VERSION:
                 problems.append("unsupported site config API version: " + key)
-            name = conf.get("name")
+            name = resolve(conf.get("name"), key)
             parent = conf.get("parent")
-            properties = conf.get("properties")
+            properties = resolve(conf.get("properties"), key)
             if (
                 set(conf) != {"name", "parent", "properties"}
                 or type(name) is not str or name not in ("appsettings", "authsettings", "web")
@@ -224,8 +576,8 @@ def inventory(source, environment, instance):
         elif kind == COSMOS:
             if resource.get("api_version") != COSMOS_API_VERSION:
                 problems.append("unsupported Cosmos API version: " + key)
-            name = conf.get("name")
-            properties = conf.get("properties")
+            name = resolve(conf.get("name"), key)
+            properties = resolve(conf.get("properties"), key)
             if (
                 set(conf) != {"name", "properties"}
                 or type(name) is not str or not name or "${" in name
@@ -433,12 +785,92 @@ def qualify(path, environment, instance="root"):
     )
 
 
+def qualify_local_module(path, environment, module_symbol="api"):
+    """Qualify one local module call without flattening or rewriting its source."""
+    _verify_runtime()
+    binding = resolve_local_module_bindings(path, environment, module_symbol)
+    binding_summary = {
+        key: value for key, value in binding.items() if key != "values"
+    }
+    blockers = list(binding["blockers"])
+    module_source = binding.get("module_source")
+    if module_source is None:
+        return {
+            "schema": "certigo.bicep-appservice-qualification/v3",
+            "scope": "one local root-to-module binding and literal resource subset",
+            "production_adoptable": False,
+            "provenance": {
+                "root_source": binding["root_source"],
+                "root_sha256": binding["root_sha256"],
+                "environment": environment,
+                "module_instance": "root/" + module_symbol,
+                "candidate_version": VERSION,
+            },
+            "binding_resolution": binding_summary,
+            "obligations": [],
+            "status": "BLOCKED",
+            "blockers": blockers,
+            "applicability": [],
+            "scanner_report": None,
+        }
+    module_path = Path(module_source)
+    module_bytes = module_path.read_bytes()
+    try:
+        source = module_bytes.decode("utf-8")
+    except UnicodeError as error:
+        blockers.append("module source is not UTF-8: " + type(error).__name__)
+        source = ""
+    entries, resource_count, inventory_problems = inventory(
+        source, environment, "root/" + module_symbol, binding["values"]
+    )
+    blockers.extend(inventory_problems)
+    raw = None
+    qualified = []
+    if not blockers:
+        with tempfile.TemporaryDirectory(prefix="certigo-bicep-module-") as temporary:
+            snapshot = Path(temporary) / module_path.name
+            snapshot.write_bytes(module_bytes)
+            report = Runner().run(
+                root_folder=temporary,
+                files=[str(snapshot)],
+                runner_filter=RunnerFilter(checks=list(CHECKS), show_progress_bar=False),
+            )
+            raw = report.get_dict()
+        qualified, report_problems = reconcile(entries, resource_count, raw)
+        blockers.extend(report_problems)
+    return {
+        "schema": "certigo.bicep-appservice-qualification/v3",
+        "scope": "one local root-to-module binding and literal resource subset; not root-wide",
+        "production_adoptable": False,
+        "provenance": {
+            "root_source": binding["root_source"],
+            "root_sha256": binding["root_sha256"],
+            "module_source": str(module_path),
+            "module_sha256": binding["module_sha256"],
+            "environment": environment,
+            "module_instance": "root/" + module_symbol,
+            "candidate_version": VERSION,
+        },
+        "binding_resolution": binding_summary,
+        "obligations": entries,
+        "status": "BLOCKED" if blockers else "QUALIFIED_SUBSET",
+        "blockers": list(dict.fromkeys(blockers)),
+        "applicability": qualified,
+        "scanner_report": raw,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("--environment", required=True, choices=("dev", "staging", "prod"))
+    parser.add_argument("--module-symbol")
     args = parser.parse_args()
-    result = qualify(args.source, args.environment)
+    result = (
+        qualify_local_module(args.source, args.environment, args.module_symbol)
+        if args.module_symbol
+        else qualify(args.source, args.environment)
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 1 if result["status"] == "BLOCKED" else 0
 
