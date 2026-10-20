@@ -231,14 +231,56 @@ test('new POSIX output stays private during writing and follows non-default umas
         root: process.cwd(), output, publicWebOrigin: 'https://github.com',
         publicDomainVerified: true, appleCiamDomainReconfigured: false,
       };
+      async function assertModeAndChmod(file, expected, mode) {
+        const handle = await fs.open(file, 'r');
+        try {
+          assert.equal((await handle.stat()).mode & 0o777, expected);
+          await handle.chmod(mode);
+        } finally {
+          await handle.close();
+        }
+      }
       process.umask(0o027);
       await buildPublicPages(config);
       const file = join(output, 'index.html');
-      assert.equal((await fs.stat(file)).mode & 0o777, 0o640);
-      await fs.chmod(file, 0o604);
+      await assertModeAndChmod(file, 0o640, 0o604);
       process.umask(0o077);
       await buildPublicPages(config);
       assert.equal((await fs.stat(file)).mode & 0o777, 0o604);
+
+      const originalOpen = fs.open;
+      const original = join(output, 'original-index.html');
+      const victim = join(output, 'victim');
+      await fs.writeFile(victim, 'untouched', { mode: 0o600 });
+      let substituted = false;
+      let closed = false;
+      fs.open = async (...args) => {
+        const handle = await originalOpen(...args);
+        const originalStat = handle.stat.bind(handle);
+        const originalClose = handle.close.bind(handle);
+        handle.stat = async () => {
+          const stats = await originalStat();
+          await fs.rename(file, original);
+          await fs.symlink(victim, file);
+          substituted = true;
+          return stats;
+        };
+        handle.close = async () => {
+          closed = true;
+          return originalClose();
+        };
+        return handle;
+      };
+      try {
+        await assertModeAndChmod(file, 0o604, 0o640);
+      } finally {
+        fs.open = originalOpen;
+      }
+      assert.equal(substituted, true);
+      assert.equal(closed, true);
+      assert.equal((await fs.stat(original)).mode & 0o777, 0o640);
+      assert.equal((await fs.stat(victim)).mode & 0o777, 0o600);
+      assert.equal(await fs.readFile(victim, 'utf8'), 'untouched');
     `, join(output, 'different-umask')], { timeout: 15000, encoding: 'utf8' });
   } finally {
     context.mock.restoreAll();
