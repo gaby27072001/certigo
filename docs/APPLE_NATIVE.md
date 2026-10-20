@@ -174,6 +174,44 @@ availability, completion/cancellation callbacks, pause/resume, unavailable-voice
 errors, VoiceOver coexistence, scene/tab/lesson/account changes and dismissal.
 Also check the controls at accessibility text sizes on iPhone and iPad.
 
+### Native distribution identity preparation
+
+The separate **CertigoNative Distribution** scheme archives the **Distribution**
+configuration for the existing App Store app identity `com.certigo.mobileapp`.
+Debug and Release remain `com.certigo.native.dev`; the development scheme, local
+CIAM callback and opt-in stay unchanged. Distribution has no development callback,
+no `DEBUG` condition, and uses `-O`. This is source configuration preparation, not
+a signed archive, processed TestFlight build or authorization to upload.
+
+Before a future archive, the owner must confirm the marketing version and unused,
+increasing build number in App Store Connect. Pass both as explicit Xcode build
+settings: `CERTIGO_DISTRIBUTION_VERSION` (numeric `major.minor.patch`, each
+component up to four digits) and `CERTIGO_DISTRIBUTION_BUILD` (integer 1-9999).
+There are no default or reserved numbers. `MARKETING_VERSION` and
+`CURRENT_PROJECT_VERSION` must resolve to these values without separate overrides.
+The archive pre-action validates them before the archive build; an always-running
+target phase also fails closed for direct Distribution builds. Local validation
+checks syntax and consistency only, not availability or monotonicity on Apple.
+Missing values are intentional errors, not permission to reuse development `0.1.0 (1)`.
+
+`CODE_SIGNING_ALLOWED=NO` remains explicit. No team, identity, profile or
+entitlement is added. Signing, archive validation and upload require a separate
+authorized Apple step; do not enable automatic provisioning to bypass this gate.
+The current first-party manifest and pinned MSAL dependency are unchanged;
+inspect the final aggregated archive privacy report before distribution.
+
+The app remains a preview with fictional offline demonstration and a separately
+accessible test API/token connector. This identity does not turn that connector
+into production authentication. CIAM opt-in remains Debug-only; Distribution
+must reject it. No production callback or shared Keychain entitlement is added.
+The test connector's device-only vault remains unchanged: no migration or access
+to the legacy Flutter app's credential cache is claimed. A future connected
+production product requires its own authentication/data-flow decision.
+
+The existing Flutter TestFlight build is not this native candidate. Do not claim
+production login, in-app account deletion, validated accessibility, App Review
+acceptance or a privacy label from this configuration alone.
+
 ### Existing portable checks
 
 Use an existing Swift 6.2-compatible toolchain. The package lock pins
