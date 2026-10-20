@@ -16,6 +16,7 @@
 		000000000000000000000007 /* MSAL in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000044 /* MSAL */; };
 		000000000000000000000008 /* Certigo.icon in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000016 /* Certigo.icon */; };
 		000000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000017 /* PrivacyInfo.xcprivacy */; };
+		00000000000000000000000A /* NativeEditorialPilotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000018 /* NativeEditorialPilotView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 		000000000000000000000015 /* MSALAuthenticationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MSALAuthenticationProvider.swift; sourceTree = "<group>"; };
 		000000000000000000000016 /* Certigo.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Certigo.icon; sourceTree = "<group>"; };
 		000000000000000000000017 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		000000000000000000000018 /* NativeEditorialPilotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeEditorialPilotView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +69,7 @@
 				000000000000000000000012 /* NativeModel.swift */,
 				000000000000000000000013 /* CredentialVault.swift */,
 				000000000000000000000015 /* MSALAuthenticationProvider.swift */,
+				000000000000000000000018 /* NativeEditorialPilotView.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -157,6 +160,7 @@
 				000000000000000000000002 /* NativeModel.swift in Sources */,
 				000000000000000000000003 /* CredentialVault.swift in Sources */,
 				000000000000000000000006 /* MSALAuthenticationProvider.swift in Sources */,
+				00000000000000000000000A /* NativeEditorialPilotView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

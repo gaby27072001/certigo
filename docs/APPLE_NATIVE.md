@@ -22,6 +22,21 @@ Actual Apple validation needs Xcode/SDK 26 or newer and a Swift 6.2-compatible
 toolchain. Linux Foundation demo/navigation checks and syntax parsing do not
 typecheck or render the SwiftUI branch.
 
+## Launch profiling
+
+The shared `CertigoNative` scheme's Profile action runs the app target in Release.
+Select the intended device and use Product > Profile; no executable selection
+should be needed in a fresh checkout. Keep signing and local scheme edits intact
+when updating an existing Mac checkout.
+
+Distinguish build duration, debugger overhead, simulator loader time and time to
+first rendered frame. Compare the same Release build outside the debugger before
+attributing startup delays to app code. A trace stopped by the user may contain
+an unfinished loader interval; its total duration is not a launch measurement.
+If a lifecycle export contains no rows, it does not establish time to first
+frame. Do not sum nested loader intervals or overlapping time-profile tables.
+A simulator result does not establish physical-device launch performance.
+
 ## Session and correction authority
 
 The `@MainActor` model receives its client, credential vault and optional
@@ -130,6 +145,13 @@ Parser errors abort preparation of the entire reading and produce a visible erro
 there is no silent paragraph skip or raw-Markdown fallback. CommonMark accepts many
 unmatched delimiters as literal text, so these are not necessarily parser errors.
 
+The French editorial pilot uses the same controls and speech controller. Its
+allowlist is the displayed lesson title, objective, hook, key ideas, worked-example
+situation/numbered steps/decision, and recap, in screen order. These contract
+fields are plain text in the UI and are passed through without Markdown
+interpretation. Practice prompts, success criteria, feedback, sources, progress
+metadata and history are excluded; reading does not mark a lesson as read.
+
 There is no preselected voice or automatic playback. The user chooses a voice
 from the system's available voices; that choice is not a claim about the content's
 language. Voice and speed are in-memory only. No voice download, microphone,
@@ -140,8 +162,9 @@ when the scene becomes inactive. When VoiceOver is active, optional speech stays
 stopped and the UI explains that VoiceOver can read the accessible content.
 Enabling VoiceOver also stops any current optional reading.
 
-Portable Foundation checks cover block selection, title/body ordering, paragraph
-boundaries, empty inputs, original text and propagation of a renderer failure.
+Portable Foundation checks cover block selection, title/body ordering, editorial
+allowlist and ordering, paragraph boundaries, empty inputs, original text and
+propagation of a renderer failure.
 The injected identity/failing renderers in those tests are not Markdown conversion
 evidence. Darwin-conditional checks in `DemoTests/NativeDemoFlowTests.swift` exercise
 the real Apple Markdown conversion and link-label/paragraph behavior, but must be

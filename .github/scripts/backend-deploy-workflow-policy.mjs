@@ -12,7 +12,7 @@ import {
 } from './workflow-semantic-fingerprint.mjs';
 
 // Exact reviewed preparation deltas, not a general privileged-workflow allowlist.
-const reviewedTransitions = Object.freeze({
+export const reviewedWorkflowTransitions = Object.freeze({
   'codeql.yml': [
     '30cb9b1ab2d3a8d440530194b593e34bdc2623ac28b04f3fa46c391a58afa124',
     'dc1fd62b98b5bbe676984059025e99f77aa3bf0bdfc012c69fa2d478bb28dd6e',
@@ -45,6 +45,69 @@ const reviewedTransitions = Object.freeze({
     '8461c70580527fbada9c309fbfe1a0c70c7b7b11f7c3dc98d237e493f436964d',
     'd81e70c123dba3d8e89bf7248090937d940857a6b365e835dd66e8a91e2ac171',
   ],
+  'cd-backend-staging.yml': [
+    null,
+    'a92a7e312eddb4ca43a49597226d1aa7086aeaf8263800f9d6e055cc63060a7b',
+  ],
+});
+export const reviewedWorkflowTransitionExpirations = Object.freeze({
+  'cd-backend-staging.yml': '2026-11-02',
+});
+export const reviewedPrivilegedInputTransitions = Object.freeze({
+  'codeql-race-corrections': Object.freeze({
+    expiresOn: '2026-11-02',
+    files: Object.freeze({
+      '.github/scripts/backend-deployment-state.mjs': Object.freeze({
+        sourceSha256: '97040960b4c788dd500e4b868b3937a3fabf41a162669b4c231d8d3121364e97',
+        targetSha256: '2eb503bbef17e34335407a8b1dca5f325aabd7969bb5e6e102c2aff6bf1f6d4d',
+      }),
+      'infra/governance/evidence-files.mjs': Object.freeze({
+        sourceSha256: '4fb31670a29d03685c05a3df132d11a43ea4ea25de9903dc9c64b7688f1df9d8',
+        targetSha256: 'fca7a230b1ffdbb1e6cfa2cf0a87303dca42d7aef05dde19622b7e13b3336143',
+      }),
+    }),
+  }),
+  'staging-build-identity-preparation': Object.freeze({
+    expiresOn: '2026-11-02',
+    files: Object.freeze({
+      '.github/scripts/deploy-flex-onedeploy.sh': Object.freeze({
+        sourceSha256: '9fef96ccfd9977cd18d1df25b8de29b61275380e652f16ab6ed43f40a27948a6',
+        targetSha256: '9762434aec34edb969c2a9e03237fc5f73f179cd74bdd36763b11ef969d49c5a',
+      }),
+      '.github/scripts/staging-backend-package.sh': Object.freeze({
+        sourceSha256: null,
+        targetSha256: '4ffac6d8555ab48f9f3bf88ac2907ed936a5a07943aa950232debb1e000cf3cd',
+      }),
+      '.github/scripts/staging-backend-package.test.mjs': Object.freeze({
+        sourceSha256: null,
+        targetSha256: 'ea4eadd8b430625b58f9e973a17b79bcf58bab732cdfe0444058c06492519c00',
+      }),
+      '.github/scripts/staging-backend-release.mjs': Object.freeze({
+        sourceSha256: null,
+        targetSha256: '380f89515f7ea568b6305687d2ee5d0702e2d9c58e410f8c498803fcd65aceea',
+      }),
+      '.github/scripts/staging-backend-release.test.mjs': Object.freeze({
+        sourceSha256: null,
+        targetSha256: '204e8fc8ba34c120b99e8be4bf99d411000ddc49b29dfc37f759b426164f2b1e',
+      }),
+      '.github/scripts/verify-backend-build-identity.mjs': Object.freeze({
+        sourceSha256: null,
+        targetSha256: '9fe8fee4141c68ceb3ed8141a6137f50f18506c32ff6de08b0375e4cd74fac99',
+      }),
+      '.github/workflows-disabled/cd-backend-staging.yml': Object.freeze({
+        sourceSha256: null,
+        targetSha256: 'a92a7e312eddb4ca43a49597226d1aa7086aeaf8263800f9d6e055cc63060a7b',
+      }),
+      'docs/deployment-runbook.md': Object.freeze({
+        sourceSha256: '97de776c99e430baf895eec58ed02578742343f2e8ed8d5ea7effc5c7e5ee9e5',
+        targetSha256: '8712d70c1a08723f19500f95a7d61a21f26f3417edc3124b686c7a2884e349c1',
+      }),
+      'docs/runbooks/STAGING_BACKEND_PREPARATION.md': Object.freeze({
+        sourceSha256: null,
+        targetSha256: 'bce4c4fb701ce94308aee412685490476ef73ed0ecf1cb193144d31872fa631a',
+      }),
+    }),
+  }),
 });
 
 export function isReviewedWorkflowTransition(
@@ -67,23 +130,39 @@ export function isReviewedWorkflowTransition(
       'dc1fd62b98b5bbe676984059025e99f77aa3bf0bdfc012c69fa2d478bb28dd6e',
       '5bf6faf8f8c88acaeaf185ddb01128a2c47a29d99328ebd7ba7b7048728dc8ff',
     ]
-    : Object.hasOwn(reviewedTransitions, name) ? reviewedTransitions[name] : null;
+    : Object.hasOwn(reviewedWorkflowTransitions, name)
+      ? reviewedWorkflowTransitions[name]
+      : null;
   if (!transition || sha256(candidateInput) !== transition[1]) {
+    return false;
+  }
+  const expiresOn = reviewedWorkflowTransitionExpirations[name];
+  if (
+    expiresOn
+    && !isPreApprovalActive({ expires: expiresOn }, now)
+  ) {
     return false;
   }
   const workflowPath = `.github/workflows/${name}`;
   const trusted = readRegularRepositoryFile(trustedRoot, workflowPath);
-  if (!trusted.exists || trusted.error) {
+  if (trusted.error) {
     return false;
   }
-  const sourceDigest = sha256(trusted.bytes);
-  if (!transition.includes(sourceDigest)) {
+  const sourceDigest = trusted.exists ? sha256(trusted.bytes) : null;
+  if (sourceDigest !== transition[0] && sourceDigest !== transition[1]) {
     return false;
   }
   const proposal = directory === 'workflows-proposed';
   if (proposal) {
     // Reviewing a proposal grants no authority to execute it. Landing below needs BASE approval.
     return sourceDigest === transition[0];
+  }
+  if (
+    name === 'cd-backend-staging.yml'
+    && sourceDigest !== transition[1]
+    && !hasAdoptedStagingBuildIdentityInputs(trustedRoot)
+  ) {
+    return false;
   }
   const manifestFile = readRegularRepositoryFile(
     trustedRoot,
@@ -166,10 +245,18 @@ const circularCapacityDigest =
 const revisionLocalPrivilegedInputs = Object.freeze([
   '.github/scripts/backend-deployment-state.mjs',
   '.github/scripts/deploy-flex-onedeploy.sh',
+  '.github/scripts/staging-backend-package.sh',
+  '.github/scripts/staging-backend-package.test.mjs',
+  '.github/scripts/staging-backend-release.mjs',
+  '.github/scripts/staging-backend-release.test.mjs',
   '.github/scripts/public-domain-contract.mjs',
   '.github/scripts/update-backend-deployment-state.mjs',
   '.github/scripts/verify-backend-deployment-state.mjs',
+  '.github/scripts/verify-backend-build-identity.mjs',
   '.github/scripts/write-secure-bicep-parameters.mjs',
+  '.github/workflows-disabled/cd-backend-staging.yml',
+  'docs/deployment-runbook.md',
+  'docs/runbooks/STAGING_BACKEND_PREPARATION.md',
 ]);
 const revisionLocalPrivilegedTrees = Object.freeze(['infra']);
 const canonicalCapacityPrecondition = Buffer.from(
@@ -547,6 +634,48 @@ function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
+export function isExactReviewedFileTransition(
+  candidateBytes,
+  trustedBytes,
+  transition,
+  { now = new Date() } = {},
+) {
+  if (
+    !transition
+    || !(Buffer.isBuffer(candidateBytes))
+    || (trustedBytes !== null && !Buffer.isBuffer(trustedBytes))
+    || !isPreApprovalActive({ expires: transition.expiresOn }, now)
+  ) {
+    return false;
+  }
+  const sourceMatches = transition.sourceSha256 === null
+    ? trustedBytes === null
+    : trustedBytes !== null && sha256(trustedBytes) === transition.sourceSha256;
+  return sourceMatches && sha256(candidateBytes) === transition.targetSha256;
+}
+
+function findReviewedPrivilegedInputTransition(relativePath) {
+  for (const [bundle, transition] of Object.entries(reviewedPrivilegedInputTransitions)) {
+    const fileTransition = transition.files[relativePath];
+    if (fileTransition) {
+      return { bundle, ...fileTransition, expiresOn: transition.expiresOn };
+    }
+  }
+  return null;
+}
+
+function hasAdoptedStagingBuildIdentityInputs(trustedRoot) {
+  const transition = reviewedPrivilegedInputTransitions['staging-build-identity-preparation'];
+  return Object.entries(transition.files)
+    .filter(([relativePath]) => relativePath.startsWith('.github/scripts/'))
+    .every(([relativePath, fileTransition]) => {
+      const trusted = readRegularRepositoryFile(trustedRoot, relativePath);
+      return trusted.exists
+        && !trusted.error
+        && sha256(trusted.bytes) === fileTransition.targetSha256;
+    });
+}
+
 function normalized(value) {
   return String(value ?? '').replace(/\s+/gu, ' ').trim();
 }
@@ -614,7 +743,7 @@ function workflowInput(input) {
 }
 
 function exactLegacyLintTransition(candidateBytes, trustedBytes) {
-  const [source, target] = reviewedTransitions['cd-backend.yml'];
+  const [source, target] = reviewedWorkflowTransitions['cd-backend.yml'];
   if (
     candidateBytes.length !== 38056
     || sha256(candidateBytes) !== target
@@ -1382,7 +1511,9 @@ function revisionLocalTree(root, relativeRoot, label, errors) {
         const relativePath = path.relative(root, declared).split(path.sep).join('/');
         const file = readRegularRepositoryFile(root, relativePath);
         if (file.error || !file.exists) {
-          errors.push(`${label}: ${file.error ?? `${relativePath} disappeared while being inspected`}`);
+          errors.push(
+            `${label}: ${file.error ?? `${relativePath} disappeared while being inspected`}`,
+          );
           continue;
         }
         files.set(relativePath, file.bytes);
@@ -1397,28 +1528,68 @@ function revisionLocalTree(root, relativeRoot, label, errors) {
 }
 
 function validateRevisionLocalPrivilegedFiles(
-  candidateRoot, trustedRoot, paths, { allowAbsent = false } = {},
+  candidateRoot,
+  trustedRoot,
+  paths,
+  { allowAbsent = false, now = new Date(), activeBundles } = {},
 ) {
   const errors = [];
   for (const relativePath of paths) {
-    if (
-      allowAbsent
-      && !readRegularRepositoryFile(candidateRoot, relativePath).exists
-      && !readRegularRepositoryFile(trustedRoot, relativePath).exists
-    ) {
-      continue;
-    }
-    const candidate = regularFile(candidateRoot, relativePath, 'candidate privileged input');
-    const trusted = regularFile(trustedRoot, relativePath, 'revision-local privileged input');
+    const transition = findReviewedPrivilegedInputTransition(relativePath);
+    const candidate = readRegularRepositoryFile(candidateRoot, relativePath);
+    const trusted = readRegularRepositoryFile(trustedRoot, relativePath);
     if (candidate.error) {
-      errors.push(candidate.error);
+      errors.push(`candidate privileged input: ${candidate.error}`);
       continue;
     }
     if (trusted.error) {
-      errors.push(trusted.error);
+      errors.push(`revision-local privileged input: ${trusted.error}`);
       continue;
     }
-    if (!fs.readFileSync(candidate.path).equals(fs.readFileSync(trusted.path))) {
+    if (
+      !candidate.exists
+      && !trusted.exists
+      && (
+        allowAbsent
+        || transition?.sourceSha256 === null
+      )
+    ) {
+      continue;
+    }
+    if (!candidate.exists) {
+      errors.push(`candidate privileged input: missing ${relativePath}`);
+      continue;
+    }
+    if (
+      candidate.exists
+      && trusted.exists
+      && candidate.bytes.equals(trusted.bytes)
+    ) {
+      continue;
+    }
+    if (
+      isExactReviewedFileTransition(
+        candidate.bytes,
+        trusted.exists ? trusted.bytes : null,
+        transition,
+        { now },
+      )
+    ) {
+      activeBundles?.add(transition.bundle);
+      continue;
+    }
+    const isExpiredExactTransition = transition
+      && (transition.sourceSha256 === null
+        ? !trusted.exists
+        : trusted.exists && sha256(trusted.bytes) === transition.sourceSha256)
+      && sha256(candidate.bytes) === transition.targetSha256;
+    if (isExpiredExactTransition) {
+      errors.push(
+        `candidate privileged input: exact transition for ${relativePath} expired on ${transition.expiresOn}`,
+      );
+    } else if (!trusted.exists) {
+      errors.push(`revision-local privileged input: missing ${relativePath}`);
+    } else {
       errors.push(
         `candidate privileged input: ${relativePath} must match the immutable base revision`,
       );
@@ -1428,8 +1599,12 @@ function validateRevisionLocalPrivilegedFiles(
 }
 
 function validateRevisionLocalPrivilegedInputs(candidateRoot, trustedRoot) {
+  const activeBundles = new Set();
   const errors = validateRevisionLocalPrivilegedFiles(
-    candidateRoot, trustedRoot, revisionLocalPrivilegedInputs,
+    candidateRoot,
+    trustedRoot,
+    revisionLocalPrivilegedInputs,
+    { activeBundles },
   );
   for (const relativeRoot of revisionLocalPrivilegedTrees) {
     const candidate = revisionLocalTree(
@@ -1449,11 +1624,28 @@ function validateRevisionLocalPrivilegedInputs(candidateRoot, trustedRoot) {
       const candidateBytes = candidate.get(relativePath);
       const trustedBytes = trusted.get(relativePath);
       if (!candidateBytes || !trustedBytes || !candidateBytes.equals(trustedBytes)) {
-        errors.push(
-          `candidate privileged input: ${relativePath} must match the immutable base revision`,
-        );
+        const transition = findReviewedPrivilegedInputTransition(relativePath);
+        if (
+          candidateBytes
+          && isExactReviewedFileTransition(
+            candidateBytes,
+            trustedBytes ?? null,
+            transition,
+          )
+        ) {
+          activeBundles.add(transition.bundle);
+        } else {
+          errors.push(
+            `candidate privileged input: ${relativePath} must match the immutable base revision`,
+          );
+        }
       }
     }
+  }
+  if (activeBundles.size > 1) {
+    errors.push(
+      `candidate privileged input: independent transitions cannot be combined (${[...activeBundles].join(', ')})`,
+    );
   }
   return errors;
 }

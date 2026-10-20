@@ -202,6 +202,56 @@ Tout est exécuté par le code de la **base**, sur l'arbre de la PR, dans `Valid
 dépend de la date. Une approbation expirée n'autorise plus rien ; elle reste inerte tant qu'une PR
 ne la retire pas (`--write` retire les approbations expirées et leurs propositions).
 
+### Transitions temporaires de fichiers privilégiés
+
+Deux préparations locales ont des deltas protégés exacts distincts. La politique exécutée depuis
+la BASE fixe pour chaque chemin l'empreinte SHA-256 des octets source et cible (ou l'absence de
+source), avec une échéance au **2026-11-02 UTC**. Seul le couple exact, tant que la date est
+active, peut remplacer l'égalité binaire ; une autre source, cible, un autre chemin ou une
+transition expirée reste refusé. L'autorité vient exclusivement de cette politique de BASE :
+modifier la politique, le manifeste ou les tests dans la PR candidate ne crée ni ne renouvelle
+une transition. Ces deux lots sont indépendants et ne doivent pas être réunis dans la même PR
+d'adoption.
+
+Les empreintes source sont celles du `main` frais `658a7c4ca5f1b7d734a0d30b9698268b3585127b`
+(tree `b95fdbf66d1e3ecb04d0118748861c0fd209e608`). Les bases d'origine indiquées dans le tableau
+décrivent les révisions préparées, pas la source autorisée après adoption de cette politique.
+
+| Lot local de référence | Chemin | SHA-256 source → cible |
+|---|---|---|
+| CodeQL race corrections — head `4a6158e11dbffd2760d2b4192b18acf2ebb26750`, tree `7007aa3a139f237834f07e1e01b7e5fed1b9d4c1`, base d'origine `6fd060138d97e620a0f818593adb873b5cfeca72` | `.github/scripts/backend-deployment-state.mjs` | `97040960b4c788dd500e4b868b3937a3fabf41a162669b4c231d8d3121364e97` → `2eb503bbef17e34335407a8b1dca5f325aabd7969bb5e6e102c2aff6bf1f6d4d` |
+| idem | `infra/governance/evidence-files.mjs` | `4fb31670a29d03685c05a3df132d11a43ea4ea25de9903dc9c64b7688f1df9d8` → `fca7a230b1ffdbb1e6cfa2cf0a87303dca42d7aef05dde19622b7e13b3336143` |
+| Staging-only CD — head `9dcd63e143436d40ade5c71340577d622beb2279`, tree `6d68a6a6006a6eecef4e7aef0a537fdefdb05a86`, base d'origine `6fd060138d97e620a0f818593adb873b5cfeca72` | `.github/scripts/deploy-flex-onedeploy.sh` | `9fef96ccfd9977cd18d1df25b8de29b61275380e652f16ab6ed43f40a27948a6` → `9762434aec34edb969c2a9e03237fc5f73f179cd74bdd36763b11ef969d49c5a` |
+| idem | `.github/scripts/staging-backend-package.sh` | absent → `4ffac6d8555ab48f9f3bf88ac2907ed936a5a07943aa950232debb1e000cf3cd` |
+| idem | `.github/scripts/staging-backend-package.test.mjs` | absent → `ea4eadd8b430625b58f9e973a17b79bcf58bab732cdfe0444058c06492519c00` |
+| idem | `.github/scripts/staging-backend-release.mjs` | absent → `380f89515f7ea568b6305687d2ee5d0702e2d9c58e410f8c498803fcd65aceea` |
+| idem | `.github/scripts/staging-backend-release.test.mjs` | absent → `204e8fc8ba34c120b99e8be4bf99d411000ddc49b29dfc37f759b426164f2b1e` |
+| idem | `.github/scripts/verify-backend-build-identity.mjs` | absent → `9fe8fee4141c68ceb3ed8141a6137f50f18506c32ff6de08b0375e4cd74fac99` |
+| idem | `.github/workflows-disabled/cd-backend-staging.yml` | absent → `a92a7e312eddb4ca43a49597226d1aa7086aeaf8263800f9d6e055cc63060a7b` |
+| idem | `docs/deployment-runbook.md` | `97de776c99e430baf895eec58ed02578742343f2e8ed8d5ea7effc5c7e5ee9e5` → `8712d70c1a08723f19500f95a7d61a21f26f3417edc3124b686c7a2884e349c1` |
+| idem | `docs/runbooks/STAGING_BACKEND_PREPARATION.md` | absent → `bce4c4fb701ce94308aee412685490476ef73ed0ecf1cb193144d31872fa631a` |
+
+Les empreintes complètes et l'échéance figurent dans
+`reviewedPrivilegedInputTransitions` de `.github/scripts/backend-deploy-workflow-policy.mjs`.
+Les références head/tree identifient les artefacts préparés ; la garde compare les octets des
+fichiers protégés, et tous les autres contrôles de la PR continuent de s'appliquer.
+
+**Adoption à faire séparément.** Soumettre d'abord cette modification de politique seule à la
+revue explicite du mainteneur ; l'ancienne BASE doit valider ce diff de politique/tests sans
+aucune modification des entrées privilégiées. Après son adoption, repartir d'un `main` frais
+pour chacune des deux PR de fichiers. Une cible qui ne correspond plus à l'empreinte listée
+reste refusée et demande un nouvel amendement revu ; ne pas rafraîchir les empreintes pour
+faire passer un rebase. Vérifier l'expiration lors du contrôle : un contrôle vert n'est pas
+relancé automatiquement à l'instant de la fusion.
+
+Le workflow staging reste sous `.github/workflows-disabled/`. Son empreinte cible est aussi
+bornée pour le futur chemin actif `.github/workflows/cd-backend-staging.yml`, sans l'activer :
+une proposition devra encore être pré-approuvée et fusionnée en PR A, puis consommée par une PR B
+avec le manifeste trusted et son expiration normale. Le landing actif est refusé tant que la BASE
+ne contient pas déjà les SHA-256 cibles de tous les scripts staging scellés. Le vérificateur
+d'identité de build fait partie du lot exact ; toute modification ou expiration demande un nouvel
+amendement de gouvernance revu explicitement.
+
 **Limite connue : l'expiration est vérifiée quand le contrôle tourne, pas au moment de la fusion.**
 GitHub ne relance pas un contrôle vert parce que le temps passe : une PR B validée la veille de
 l'expiration reste fusionnable après, tant que `main` n'a pas bougé (avec `strict: true`, tout

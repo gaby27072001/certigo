@@ -97,6 +97,10 @@
         private var pauseGoal = false
         private var goalResponseOwner: String?
         private var profileStatus = 200
+        private var pilotContent: Data?
+        private var pilotLessonID = "verify-claims"
+        private var pausePilotHistory = false
+        private var pilotHistoryStatus = 200
         init(resources: URL) throws {
             catalog = try Data(contentsOf: resources.appendingPathComponent("catalog.json"))
             lesson = try Data(contentsOf: resources.appendingPathComponent("lesson.json"))
@@ -112,6 +116,10 @@
             result = try JSONSerialization.data(withJSONObject: response)
         }
         func setOwner(_ value: String) { owner = value }
+        func enablePilot(_ content: Data) { pilotContent = content }
+        func setPilotLesson(_ value: String) { pilotLessonID = value }
+        func suspendPilotHistory() { pausePilotHistory = true }
+        func failPilotHistory(_ status: Int) { pilotHistoryStatus = status }
         func pathRequestCount() -> Int { pathRequests }
         func addSecondGoal() throws {
             guard var object = try JSONSerialization.jsonObject(with: catalog) as? [String: Any],
@@ -183,6 +191,38 @@
                     """.utf8)
             } else if url.path.hasSuffix("/catalog/tracks") {
                 bytes = catalog
+            } else if url.path.hasSuffix("/pilots/responsible-ai-assistants/content"),
+                let content = pilotContent
+            {
+                bytes = content
+                let digest = "sha256:\(try CanonicalQuestionReader.digest(content).sha256)"
+                headers["X-Certigo-Pilot-Content-Digest"] = digest
+                headers["ETag"] = "\"\(digest)\""
+            } else if url.path.contains("/pilots/responsible-ai-assistants/history/"),
+                let content = pilotContent
+            {
+                let digest = "sha256:\(try CanonicalQuestionReader.digest(content).sha256)"
+                bytes = Data(
+                    """
+                    {"pilotId":"responsible-ai-assistants","contentDigest":"\(digest)",
+                    "lastLessonId":"\(pilotLessonID)","lessons":[
+                    {"lessonId":"\(pilotLessonID)","lastAccessedAt":"2026-10-19T10:01:00Z",
+                    "markedReadAt":null}]}
+                    """.utf8)
+                status = pilotHistoryStatus
+                if pausePilotHistory {
+                    pausePilotHistory = false
+                    await withCheckedContinuation { waiter = $0 }
+                }
+            } else if url.path.contains("/pilots/responsible-ai-assistants/lessons/"),
+                request.httpMethod == "POST", pilotContent != nil
+            {
+                let marked = url.path.contains("/read/") ? "\"2026-10-19T10:02:00Z\"" : "null"
+                bytes = Data(
+                    """
+                    {"lessonId":"\(pilotLessonID)","lastAccessedAt":"2026-10-19T10:01:00Z",
+                    "markedReadAt":\(marked)}
+                    """.utf8)
             } else if url.path.hasSuffix("/me/paths/fixture:foundations") {
                 pathRequests += 1
                 let state = corrected ? "completed" : "available"
@@ -288,13 +328,87 @@
             try await failedAndAmbiguousRecovery(resources)
             try await explicitGoalSelection(resources)
             try await lateGoalResponse(resources)
+            try await pilotHistorySessionIsolation(resources)
             try resumeNavigation(resources)
             print(
-                "NativeModel: 14 coordination/journey scenarios and resume-state checks passed."
+                "NativeModel: 14 coordination/journey scenarios, pilot-history isolation and resume-state checks passed."
             )
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+        @MainActor static func pilotHistorySessionIsolation(_ resources: URL) async throws {
+            let root = (0..<5).reduce(URL(fileURLWithPath: #filePath)) { url, _ in
+                url.deletingLastPathComponent()
+            }
+            let content = try Data(
+                contentsOf: root.appendingPathComponent(
+                    "backend/src/Certigo.Infrastructure/Learning/Fixtures/responsible-ai-assistants.json"))
+            for markRead in [false, true] {
+                for reconnect in [false, true] {
+                    let fixture = try ModelFixture(resources: resources)
+                    defer { fixture.cleanup() }
+                    await fixture.server.enablePilot(content)
+                    let model = fixture.model(authenticated: false)
+                    model.baseURL = "https://example.invalid/api"
+                    model.token = "synthetic-A"
+                    await model.connect()
+                    try await model.loadEditorialPilot()
+                    let original = model.pilotHistory?.lastLessonId
+                    try expect(original == "verify-claims", "Initial pilot history missing")
+                    if markRead {
+                        try await model.markEditorialPilotLessonRead("verify-claims")
+                    } else {
+                        try await model.accessEditorialPilotLesson("verify-claims")
+                    }
+                    try expect(
+                        model.pilotHistory?.lastLessonId == original && !model.busy,
+                        "Current-session activity did not refresh history")
+                    await fixture.server.failPilotHistory(503)
+                    do {
+                        try await model.accessEditorialPilotLesson("verify-claims")
+                        throw ModelTestFailure.assertion("History failure became success")
+                    } catch APIError.http(503) {}
+                    try expect(
+                        model.pilotHistory?.lastLessonId == original && !model.busy,
+                        "Failed history refresh changed existing state or stayed busy")
+                    await fixture.server.failPilotHistory(200)
+                    await fixture.server.suspendPilotHistory()
+                    let pending = Task {
+                        do {
+                            if markRead {
+                                try await model.markEditorialPilotLessonRead("verify-claims")
+                            } else {
+                                try await model.accessEditorialPilotLesson("verify-claims")
+                            }
+                            return false
+                        } catch NativePilotError.ownerChanged {
+                            return true
+                        } catch APIError.staleSession {
+                            return true
+                        }
+                    }
+                    try await wait { await fixture.server.isWaiting() }
+                    await model.disconnect()
+                    if reconnect {
+                        await fixture.server.setOwner("server-owner-B")
+                        await fixture.server.setPilotLesson("retrieval-not-training")
+                        model.token = "synthetic-B"
+                        await model.connect()
+                        try await model.loadEditorialPilot()
+                    }
+                    let expected = model.pilotHistory?.lastLessonId
+                    try expect(
+                        expected == (reconnect ? "retrieval-not-training" : nil),
+                        "Replacement session history not established")
+                    await fixture.server.resume()
+                    let rejected = try await pending.value
+                    try expect(rejected, "Late old-session history did not report owner change")
+                    try expect(
+                        model.pilotHistory?.lastLessonId == expected && !model.busy,
+                        "Late old-session history overwrote disconnected or replacement state")
+                }
+            }
         }
         @MainActor static func explicitGoalSelection(_ resources: URL) async throws {
             let fixture = try ModelFixture(resources: resources)
