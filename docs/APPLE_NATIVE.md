@@ -60,14 +60,46 @@ atomic file replacement. It does **not** inherit `RuntimeDisk` cross-process
 locking, symlink/hard-link hardening or power-loss guarantees. Runtime activation
 process-death tests must not be presented as outbox durability evidence.
 
-## Inactive resume-state contract
+## Activity restoration
 
-`NativeResumeState` is a bounded, closed schema-2 navigation value. It is not wired
-to UI persistence or an automatic restore lifecycle in this layer. A submitting
-marker is not evidence that the outbox committed an attempt or received a server
-ACK. Reconciliation checks owner, API scope, lesson, attempt and original manifest
-pin against the existing outbox. Unknown fields, unsupported schemas, ambiguous
-attempts and mismatched identities fail closed without fabricating a new attempt.
+The connected native model saves one active activity in
+`Application Support/CertigoNative/activity-v1.json`, separately from the submission
+outbox. The bounded, closed schema-1 snapshot contains schema-2 `NativeResumeState`
+navigation, the opened track, and an optional unsent draft: selected option IDs,
+completed answer latencies, attempt UUID and start date. A digest of the exact
+public lesson projection binds even unpinned lessons to their original content.
+No token, private answer key or local grading result is stored there.
+
+Selections and navigation changes replace the file atomically. Write failures are
+visible; a failed pre-submission save prevents sending the request. Like the outbox,
+this Foundation path-based store does not provide cross-process locking,
+`RuntimeDisk` link hardening or power-loss guarantees. Unselected elapsed reading
+time is not reconstructed after termination; already recorded latencies and the
+original attempt start remain intact.
+
+After a successful connection, restoration checks the authenticated `/me` owner
+and normalized API scope, reloads the current catalog/path/lesson, and requires an
+available track, an openable lesson, the original manifest and exact lesson digest
+for a draft. Empty and partially answered lessons can reopen without submitting.
+The UI restores the top-level tab and selected track/lesson, opening the activity
+detail when appropriate. Browsing a path retains the active activity; reopening
+prefers that activity's path over a different last-browsed track. Opening another
+lesson explicitly replaces the single active draft. Demo navigation, editorial
+reading position, social subsection, speech playback and scroll offsets are not
+part of this connected activity snapshot.
+
+A submitting marker is not evidence that the outbox committed an attempt or
+received a server ACK. Reconciliation checks owner, API scope, lesson, attempt and
+original manifest pin against the outbox; pending, corrected and failed attempts
+remain non-editable and are never automatically resent. An unresolved in-flight
+marker is rejected rather than converted into a fresh draft or a success.
+Unknown fields, unsupported schemas, incompatible selections, missing/locked
+content and changed owner/scope/content clear the activity with a visible message,
+without changing submitted responses. Transient verification failures preserve
+the file without displaying it; reconnecting retries verification. Explicit
+sign-out removes the activity, reports removal failure and blocks automatic
+connection restoration. Generation guards discard late restoration responses
+after sign-out or account replacement.
 
 ## Opt-in development authentication and storage adapters
 
@@ -88,8 +120,9 @@ The developer connector defaults to manual test-token sign-in. In Debug, a valid
 local opt-in constructs `MSALAuthenticationProvider`, injects it into `NativeModel`
 and routes callbacks through `.onOpenURL`. Invalid or incomplete opt-in
 configuration fails closed with a setup error instead of falling back to manual
-sign-in; Release rejects the opt-in. There is no automatic account restore on
-startup. See [local CIAM development](../apps/apple/CIAM_LOCAL_DEVELOPMENT.md)
+sign-in; Release rejects the opt-in. Startup restoration uses only an existing
+local connection or silent acquisition; it never starts interactive sign-in.
+See [local CIAM development](../apps/apple/CIAM_LOCAL_DEVELOPMENT.md)
 for the unshared Xcode scheme configuration and its limits.
 `CIAMDevelopmentCandidate` records dated public metadata, not active registration
 or endpoint health. The plist's callback scheme is only a declaration, not
@@ -191,7 +224,15 @@ swift build --package-path apps/apple/CertigoKit --scratch-path <scratch> \
 The Linux harness compiles the actual model with strict concurrency and
 warnings-as-errors, a memory vault, synthetic provider/HTTP responses and a
 throw-only stand-in for the default Security vault. It checks coordination,
-journeys, stale responses, uncertain goal retry and resume-state rejection. It
+journeys, stale responses, uncertain goal retry and resume-state rejection. Its
+activity tests reopen fresh model/client/store instances against an actual
+temporary snapshot file: empty/partial/full drafts, tab/path/lesson selection,
+stable attempt/timing/answer identity, pending/corrected/failed outbox authority,
+account/scope/content invalidation, transient failures, interrupted restoration,
+storage failures and sign-out removal. These deterministic Foundation checks are
+not an Apple process-kill/relaunch or SwiftUI navigation test. On Mac/iPhone,
+separately verify selecting answers, closing/relaunching, re-opening the correct
+detail/tab and submitting only after an explicit action. It
 also rejects a retained track selection if silent authentication refresh changes
 the account: the old selection must not send a path request as the new owner,
 and the model surfaces a stale-session error instead. It does not compile
