@@ -594,3 +594,97 @@ in the pinned runner or a complete production parent/module inventory.
 The active Bicep report gate is unchanged and still treats its raw findings as
 blocking. Runtime/Flex, module/parameter binding, comprehensive source coverage
 and adoption remain separate work; no fixture result authorizes an exemption.
+
+## Function App module qualification (inactive schema v6)
+
+A single `--module-symbol api` call containing an authored App Service plan now
+uses an independent declaration inventory for the Function App module. The
+existing literal and multi-module modes remain bounded as documented above;
+this does not make v4 a root-wide Function App qualifier.
+
+```sh
+PYTHONPATH=/tmp/parser-runtime:/tmp/checkov-adapter \
+  python tools/checkov/bicep_ingress_candidate.py infra/main.bicep \
+  --environment dev --module-symbol api
+PYTHONPATH=/tmp/parser-runtime:/tmp/checkov-adapter \
+  python tools/checkov/bicep_ingress_candidate.py infra/main.bicep \
+  --environment staging --module-symbol api --resolved-function-snapshot
+PYTHONPATH=/tmp/parser-runtime:/tmp/checkov-adapter \
+  python tools/checkov/bicep_ingress_candidate.py infra/main.bicep \
+  --environment prod --module-symbol api --resolved-function-snapshot
+```
+
+All three real root scenarios are expected to exit **1 / BLOCKED**, not pass.
+No deployment parameters, module outputs, subscription IDs, resource IDs,
+DNS suffixes, secrets, public-network defaults or unsupported Flex properties
+are invented to obtain a literal snapshot.
+
+The inventory precedes the first Runner and accounts for every declaration in
+the selected module:
+
+| Authored declaration | Inventory treatment |
+| --- | --- |
+| One `Microsoft.Web/sites@2024-04-01` | All 21 pinned Python resource checks, including CKV_AZURE_16 and CKV_AZURE_222. |
+| Each `Microsoft.Web/sites/config@2024-04-01` | All nine pinned checks; exact subtype and same-module authored site parent required. |
+| One `Microsoft.Web/serverfarms@2024-04-01` | CKV_AZURE_225; FC1 does not receive an exemption or fabricated `zoneRedundant: true`. |
+| UAMI, ARM role assignments and Cosmos SQL role assignments | Explicit `NO_POLICY_IN_PINNED_RUNNER`, never PASSED or a security verdict. Python and nested/wildcard graph dispatch must remain empty. |
+| The four supported `existing` reference types | `EXTERNAL_REFERENCE_NOT_EVALUATED`, not new resources or evidence about their deployed configuration. Only their authored names are in scope. |
+
+Other types/API versions, decorators, resource conditions/loops, unresolved
+structural references, duplicate config subtypes and unknown outputs block
+before the first Runner. The four exact existing Function App output forms
+are recognized as source declarations only; their runtime values are not
+evaluated or propagated as deployment evidence.
+
+The real module has 14 declarations: four existing references, seven no-policy
+resources, and three policy-dispatched resources. Its 38 obligations comprise
+31 resource/check pairs plus seven explicit no-policy entries. Runner resource
+cardinality is three, not 14 or 38. Sources, root/module SHA-256, environment,
+module instance, parameter-resolution metadata and sealed runtime provenance
+are included in the report. Independent full bound resource bodies are compared
+type-strictly to Runner definitions; a raw identity PASSED does not qualify an
+unresolved mixed-identity body.
+
+The six previously qualified config checks still require their existing
+same-site parent/sibling PASSED proofs. A missing, unsafe or unbound proof
+cannot become NOT_APPLICABLE. The additional CKV_AZURE_56/65/70 config checks
+retain ordinary applicable Runner verdicts; this lot introduces no new
+applicability exemption. Raw appsettings failures remain in `authored_report`.
+
+The first Runner may run on structurally inventoried source with unresolved
+deployment inputs to preserve diagnostic evidence, but the qualification
+remains BLOCKED. On the real source, CKV_AZURE_225 and CKV_AZURE_222 remain
+FAILED. CKV_AZURE_81/82/83 return UNKNOWN for absent language properties and
+disappear from the raw JSON. The independent pair inventory catches all three
+missing records. In particular, the pinned Java check inspects the top-level
+`siteConfig/javaVersion`, not `properties/siteConfig/javaVersion`. No language
+property or status is injected into the real source to hide this limitation.
+
+`--resolved-function-snapshot` is an opt-in second pass, not permission to
+resolve unknown values. It requires complete parameter/variable and resource
+bindings, including no-policy resources and existing reference names, and a
+complete first report. Secure declarations remain unresolved even with empty
+defaults. Every declaration is materialized with its original type, API version,
+`existing` marker and explicit structural links, reparsed, and compared to the
+independent AST before the second Runner. The temporary source text, SHA-256
+and full declaration source map are retained separately. Literal authored
+quoted dictionary keys preserve the parser's delimiters during this round trip.
+UNKNOWN/lost/duplicate/unexpected records, parsing/skips or input mismatches
+remain blocking. A raw first-pass policy failure may be resolved only by the
+unchanged pinned Runner on the proven snapshot; it is never overwritten.
+
+The real root cannot reach this second pass: secure parameters, other modules'
+runtime outputs and resource-property expressions remain unresolved, and its
+first report loses the three language records. The tests separately exercise
+the actual root's declaration inventory and these blockers for dev/staging/prod.
+The literal second-pass harness is deliberately **not a deployable Function App**:
+it supplies outdated language values at the pinned checks' inspected paths
+(including the incorrect Java path) so their real FAILED records are observable.
+It proves snapshot determinism/AST round trips, retained FC1 and language
+failures, same-parent evidence and UNKNOWN detection in both Runners; it is not
+a cloud-valid positive deployment or a proposed fix to `functionApp.bicep`.
+
+No infrastructure, rule predicates, parser/wheel pins, CI gates or installation
+policy change. `production_adoptable` remains false. Real Function App
+remediation, language-rule applicability and any production adoption require
+separate review.
