@@ -17,8 +17,9 @@ from checkov.arm.checks.resource.AppServicePublicAccessDisabled import check as 
 from checkov.arm.checks.resource.AppServiceHttpLoggingEnabled import check as logging
 
 from bicep_ingress_candidate import (
-    CONFIG_CHECKS, COSMOS_CHECKS, RULE_SOURCES, UPSTREAM_PARSER_SOURCES,
+    CONFIG_CHECKS, COSMOS_CHECKS, FUNCTION_CHECKS, FUNCTION_RULE_SOURCES, RULE_SOURCES, UPSTREAM_PARSER_SOURCES,
     _verify_cosmos_dispatch, _verify_parser, inventory, qualify, qualify_cosmos_snapshot,
+    _function_inventory, _verify_function_dispatch, qualify_function_snapshot,
     qualify_local_module, qualify_local_modules,
     reconcile, resolve_local_module_bindings,
 )
@@ -1179,6 +1180,228 @@ class CandidateTests(unittest.TestCase):
                 report = json.loads(run.stdout)
                 self.assertFalse(report["production_adoptable"])
                 self.assertEqual(report["schema"], "certigo.bicep-appservice-qualification/v2")
+
+
+FUNCTION_PLAN = """resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
+ name: 'fixture-plan'
+ sku: { name: 'FC1' tier: 'FlexConsumption' }
+ properties: { reserved: true }
+}
+"""
+# Negative Runner-input harness, not a deployable Function App. The pinned Java
+# rule reads the wrong top-level path; explicit outdated versions retain FAILED
+# records instead of its disappearing UNKNOWN. Real source is never rewritten.
+FUNCTION_RUNNER_SOURCE = MODULE_SOURCE.replace(
+    "properties: {\n  publicNetworkAccess",
+    "siteConfig: { javaVersion: 'outdated' }\n properties: {\n  publicNetworkAccess",
+).replace(
+    "siteConfig: { cors:",
+    "siteConfig: { phpVersion: 'outdated' pythonVersion: 'outdated' cors:",
+) + FUNCTION_PLAN
+
+
+class FunctionModuleTests(unittest.TestCase):
+    def test_bound_snapshot_executes_both_runners_without_suppressing_flex_failures(self):
+        import bicep_ingress_candidate as candidate
+
+        events = []
+        original_inventory = candidate._function_inventory
+        original_run = candidate.Runner.run
+
+        def observed_inventory(*args, **kwargs):
+            events.append("inventory")
+            return original_inventory(*args, **kwargs)
+
+        def observed_run(*args, **kwargs):
+            events.append("runner")
+            return original_run(*args, **kwargs)
+
+        with module_fixture(app_source=FUNCTION_RUNNER_SOURCE) as root, patch.object(
+            candidate, "_function_inventory", side_effect=observed_inventory,
+        ), patch.object(candidate.Runner, "run", side_effect=observed_run, autospec=True):
+            before = (root.parent / "modules" / "functionApp.bicep").read_bytes()
+            result = qualify_function_snapshot(root, "staging")
+            self.assertEqual(before, (root.parent / "modules" / "functionApp.bicep").read_bytes())
+        self.assertEqual(events, ["inventory", "runner", "runner"])
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertFalse(result["production_adoptable"])
+        self.assertEqual(len(result["obligations"]), 49)
+        self.assertEqual(len(result["resource_inventory"]), 5)
+        self.assertTrue(all(p["matches_bound_ast"] for p in result["resolved_input_provenance"]))
+        snapshot = result["resolved_snapshot"]
+        self.assertTrue(snapshot["ast_round_trip_verified"])
+        self.assertEqual(snapshot["sha256"], hashlib.sha256(snapshot["source_text"].encode()).hexdigest())
+        self.assertEqual(len(snapshot["source_map"]), 5)
+        self.assertFalse(snapshot["actual_deployment_parameters_verified"])
+        for report in (result["authored_report"], result["resolved_report"]):
+            self.assertEqual(report["summary"]["resource_count"], 5)
+            self.assertEqual(report["summary"]["passed"] + report["summary"]["failed"], 49)
+            self.assertIn("CKV_AZURE_225", {r["check_id"] for r in report["results"]["failed_checks"]})
+        settings = [row for row in result["resolved_applicability"] if row["resource"] == SETTINGS]
+        self.assertEqual({r["check"] for r in settings}, set(FUNCTION_CHECKS["Microsoft.Web/sites/config"]))
+        for row in settings:
+            if row["check"] in CONFIG_CHECKS:
+                self.assertEqual(row["status"], "NOT_APPLICABLE")
+                self.assertTrue(all(p["scanner_status"] == "PASSED" for p in row["applicability_evidence"]))
+
+    def test_real_api_inventory_keeps_all_declarations_and_unresolved_inputs_block(self):
+        root = Path(__file__).resolve().parents[2] / "infra" / "main.bicep"
+        for environment in ("dev", "staging", "prod"):
+            binding = resolve_local_module_bindings(root, environment, "api", _function_module=True)
+            self.assertTrue(binding["blockers"])
+            if version("pycep-parser") != COMPAT_PARSER_VERSION:
+                self.assertTrue(any("root source parsing failed" in p for p in binding["blockers"]))
+                continue
+            entries, count, declared, _, structural, unresolved = _function_inventory(binding)
+            self.assertEqual(structural, [])
+            self.assertTrue(unresolved)
+            self.assertEqual((len(entries), count, len(declared)), (38, 3, 14))
+            self.assertEqual(sum(row["existing"] for row in declared), 4)
+            self.assertEqual(sum(row["expected"] == "NO_POLICY_IN_PINNED_RUNNER" for row in entries), 7)
+            parameters = {p["parameter"]: p for p in binding["parameters"]}
+            self.assertEqual(parameters["allowedCorsOrigins"]["value"], ["*"] if environment == "dev" else [])
+            self.assertFalse(parameters["entraAuthority"]["resolved"])
+            self.assertNotIn("value", parameters["entraAuthority"])
+        result = qualify_function_snapshot(root, "staging")
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIsNone(result["resolved_snapshot"])
+        self.assertIsNone(result["resolved_report"])
+        if version("pycep-parser") == COMPAT_PARSER_VERSION:
+            self.assertIsNotNone(result["authored_report"])
+            failed = {r["check_id"] for r in result["authored_report"]["results"]["failed_checks"]}
+            self.assertTrue({"CKV_AZURE_225", "CKV_AZURE_222"} <= failed)
+            self.assertFalse(any("nested modules and outputs" in p for p in result["blockers"]))
+            missing = {row["check"] for row in result["authored_applicability"]
+                       if row["check"] and row["scanner_status"] is None}
+            self.assertEqual(missing, {"CKV_AZURE_81", "CKV_AZURE_82", "CKV_AZURE_83"})
+
+    def test_unknown_in_either_real_runner_never_disappears_into_qualification(self):
+        from checkov.arm.checks.resource.AppServicePlanZoneRedundant import check
+
+        original = check.scan_resource_conf
+        for unknown_pass in (1, 2):
+            calls = []
+
+            def scan(conf):
+                calls.append(conf)
+                return CheckResult.UNKNOWN if len(calls) == unknown_pass else original(conf)
+
+            with module_fixture(app_source=FUNCTION_RUNNER_SOURCE) as root, patch.object(
+                check, "scan_resource_conf", side_effect=scan,
+            ):
+                result = qualify_function_snapshot(root, "prod")
+            self.assertEqual(result["status"], "BLOCKED")
+            self.assertTrue(any("obligation" in p for p in result["blockers"]))
+            self.assertEqual(len(calls), unknown_pass)
+            self.assertEqual(result["resolved_report"] is None, unknown_pass == 1)
+
+    def test_snapshot_round_trip_cannot_lose_a_declared_child(self):
+        import bicep_ingress_candidate as candidate
+
+        original = candidate._parse_source
+
+        def lose_child(source):
+            tree = original(source)
+            if source.startswith("resource "):
+                tree["resources"].pop("settings", None)
+            return tree
+
+        with module_fixture(app_source=FUNCTION_RUNNER_SOURCE) as root, patch.object(
+            candidate, "_parse_source", side_effect=lose_child,
+        ):
+            result = qualify_function_snapshot(root, "staging")
+        self.assertIsNotNone(result["authored_report"])
+        self.assertIsNone(result["resolved_report"])
+        identity = next(row for row in result["authored_applicability"]
+                        if row["resource"] == PARENT and row["check"] == "CKV_AZURE_16")
+        self.assertEqual(identity["scanner_status"], "PASSED")
+        self.assertEqual(identity["status"], "BLOCKED")
+        self.assertTrue(all(row["status"] != "NOT_APPLICABLE"
+                            for row in result["authored_applicability"] if row["resource"] == SETTINGS))
+        self.assertTrue(any("exactly reproduce" in p for p in result["blockers"]))
+
+    def test_structural_drift_is_blocked_before_authored_runner(self):
+        for damage in ("parent", "unknown", "condition", "api", "existing", "duplicate", "output"):
+            source = MODULE_SOURCE + FUNCTION_PLAN
+            if damage == "parent":
+                source = source.replace("parent: site", "parent: missing")
+            elif damage == "unknown":
+                source += "resource other 'Unknown/type@2024-01-01' = { name: 'other' }\n"
+            elif damage == "condition":
+                source = source.replace("'Microsoft.Web/serverfarms@2024-04-01' = {",
+                                        "'Microsoft.Web/serverfarms@2024-04-01' = if (true) {")
+            elif damage == "api":
+                source = source.replace("serverfarms@2024-04-01", "serverfarms@2023-01-01")
+            elif damage == "existing":
+                source += "resource other 'Microsoft.Storage/storageAccounts@2024-01-01' existing = { name: 'x' properties: {} }\n"
+            elif damage == "duplicate":
+                source += CHILD.replace("resource settings", "resource duplicate")
+            else:
+                source += "output functionAppName string = 'functionApp.name'\n"
+            with self.subTest(damage=damage), module_fixture(app_source=source) as root, patch(
+                "bicep_ingress_candidate.Runner.run",
+            ) as runner:
+                result = qualify_function_snapshot(root, "prod")
+                self.assertEqual(result["status"], "BLOCKED")
+                self.assertIsNone(result["authored_report"])
+                runner.assert_not_called()
+
+    def test_secret_or_dynamic_inputs_do_not_get_materialized_by_opt_in(self):
+        for declaration in ("@secure()\nparam extra string = 'sentinel-not-a-secret'",
+                            "param extra string = uniqueString('unknown')"):
+            source = declaration + "\n" + MODULE_SOURCE + FUNCTION_PLAN
+            with module_fixture(app_source=source) as root:
+                result = qualify_function_snapshot(root, "prod")
+            self.assertEqual(result["status"], "BLOCKED")
+            self.assertIsNotNone(result["authored_report"])
+            self.assertIsNone(result["resolved_snapshot"])
+            self.assertNotIn("sentinel-not-a-secret", json.dumps(result))
+
+    def test_dispatch_and_rule_source_drift_cannot_claim_no_policy_or_complete_coverage(self):
+        from checkov.bicep.checks.resource.registry import registry
+
+        original = registry.get_checks
+        for kind in ("Microsoft.Web/sites", "Microsoft.Authorization/roleAssignments"):
+            fake = type("NewCheck", (), {"id": "UNQUALIFIED"})()
+            with patch.object(registry, "get_checks", side_effect=lambda k: [
+                *original(k), *([fake] if k == kind else []),
+            ]):
+                with self.assertRaisesRegex(ValueError, "unqualified Function App policy dispatch"):
+                    _verify_function_dispatch()
+        with patch.dict(FUNCTION_RULE_SOURCES, {"AppServicePlanZoneRedundant": "0" * 64}):
+            with self.assertRaisesRegex(ValueError, "unexpected installed Function App rule"):
+                _verify_function_dispatch()
+        from types import SimpleNamespace
+
+        wildcard = SimpleNamespace(resource_types=["Microsoft.Web/*"], connected_resources_types=[], sub_checks=[])
+        with patch.object(registry.graph_registry, "checks", [*registry.graph_registry.checks, wildcard]):
+            with self.assertRaisesRegex(ValueError, "unqualified Function App policy dispatch"):
+                _verify_function_dispatch()
+
+    def test_default_api_uses_function_inventory_and_cli_rejects_wrong_snapshot_scope(self):
+        with module_fixture(app_source=MODULE_SOURCE + FUNCTION_PLAN) as root:
+            result = qualify_local_module(root, "dev")
+            self.assertEqual(result["schema"], "certigo.bicep-function-module-qualification/v6")
+            self.assertIsNotNone(result["authored_report"])
+            self.assertIsNone(result["resolved_report"])
+            for flags in (["--module-symbol", "data"], ["--module-symbol", "api", "--resolved-cosmos-snapshot"],
+                          ["--module-symbol", "api", "--cosmos-backup-mode", "Periodic"]):
+                run = subprocess.run(
+                    [sys.executable, str(Path(__file__).with_name("bicep_ingress_candidate.py")),
+                     str(root), "--environment", "dev", "--resolved-function-snapshot", *flags],
+                    text=True, capture_output=True, timeout=90,
+                )
+                self.assertEqual(run.returncode, 2, run.stderr)
+
+    def test_complete_literal_snapshot_is_deterministic_but_never_a_flex_exemption(self):
+        with module_fixture(app_source=FUNCTION_RUNNER_SOURCE) as root:
+            first = qualify_function_snapshot(root, "staging")
+            second = qualify_function_snapshot(root, "prod")
+        self.assertEqual(first["resolved_snapshot"], second["resolved_snapshot"])
+        for result in (first, second):
+            self.assertEqual(result["status"], "BLOCKED")
+            failed = {row["check_id"] for row in result["resolved_report"]["results"]["failed_checks"]}
+            self.assertTrue({"CKV_AZURE_81", "CKV_AZURE_82", "CKV_AZURE_83", "CKV_AZURE_225"} <= failed)
 
 
 if __name__ == "__main__":

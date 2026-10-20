@@ -47,6 +47,58 @@ CONFIG_CHECKS = {
 CHECKS = tuple(sorted({*SITE_CHECKS, *CONFIG_CHECKS, *COSMOS_CHECKS}))
 API_VERSION = "2024-04-01"
 COSMOS_API_VERSION = "2024-11-15"
+PLAN = "Microsoft.Web/serverfarms"
+FUNCTION_CHECKS = {
+    SITE: (
+        "CKV_AZURE_14", "CKV_AZURE_15", "CKV_AZURE_16", "CKV_AZURE_17",
+        "CKV_AZURE_18", "CKV_AZURE_57", "CKV_AZURE_62", "CKV_AZURE_67",
+        "CKV_AZURE_70", "CKV_AZURE_71", "CKV_AZURE_72", "CKV_AZURE_78",
+        "CKV_AZURE_81", "CKV_AZURE_82", "CKV_AZURE_83", "CKV_AZURE_145",
+        "CKV_AZURE_153", "CKV_AZURE_155", "CKV_AZURE_212", "CKV_AZURE_213",
+        "CKV_AZURE_222",
+    ),
+    CONFIG: (
+        "CKV_AZURE_13", "CKV_AZURE_56", "CKV_AZURE_63", "CKV_AZURE_65",
+        "CKV_AZURE_66", "CKV_AZURE_70", "CKV_AZURE_80", "CKV_AZURE_88",
+        "CKV_AZURE_222",
+    ),
+    PLAN: ("CKV_AZURE_225",),
+}
+FUNCTION_NO_POLICY = {
+    "Microsoft.ManagedIdentity/userAssignedIdentities": "2023-01-31",
+    "Microsoft.Authorization/roleAssignments": "2022-04-01",
+    COSMOS + "/sqlRoleAssignments": COSMOS_API_VERSION,
+}
+FUNCTION_REFERENCES = {
+    "Microsoft.Storage/storageAccounts": "2024-01-01",
+    "Microsoft.Insights/components": "2020-02-02",
+    "Microsoft.KeyVault/vaults": "2024-04-01-preview",
+    COSMOS: COSMOS_API_VERSION,
+}
+FUNCTION_RULE_SOURCES = {
+    "AppServicePlanZoneRedundant": "f7913bb20a13fe3baafabba40c6220e15780ffbb673ca65b832884b1be46439c",
+    "FunctionAppDisallowCORS": "f1a1f7ae75ad2396f40dc25fae1ca4b9d8c111b3fad2c7079f9f0107536ab922",
+    "AppServicePythonVersion": "7327d1b494b0cdfb8a881998f6dbe2f432a413e006461cd6a5f1bd0dab85e29e",
+    "AppServiceClientCertificate": "85ece118d1785e6e4348cc1455c6f9c512f238aa4d234c8fbe67774a8a674434",
+    "AppServiceIdentityProviderEnabled": "8b92a8f4ae955ce1e1e47789d6887eabc3104c2adf0726baadffe9820c02b6f9",
+    "AppServiceSlotHTTPSOnly": "dff5c2867b23fab1c9537a6a94d0a4e28673a47c595e4bce68c80e807030dcdb",
+    "AppServiceRemoteDebuggingNotEnabled": "517cd6dfff59429516b1f7967ee8c09eff393763369f393d2c6f56642c9e7057",
+    "FunctionAppsAccessibleOverHttps": "3a233972ac4c3e25efc5c9d8693bf8f12dce41ebd0dd4b1cdb7270595a5289bb",
+    "FunctionAppMinTLSVersion": "fbc4d0b521aec25a5acebfbb4785c34b0d62184ed72e6ad6f3e5b59e7a5b9584",
+    "AppServiceHttps20Enabled": "f9336161d4f351099f0f6d144be32ae8c5b5c7d612aefefcaaa016cf5bfb2b97",
+    "FunctionAppHttpVersionLatest": "e461e475c61e7ff2e2c116817dd9bfdbf2feba4d0051df7139c506448187db99",
+    "AppServiceDisallowCORS": "48cc69112532a387c620d4caad98eb2ac1a59c860ba0a971ef5735764fa1c70d",
+    "AppServiceMinTLSVersion": "aed85c8aac3689b4f7c59f129c8a4d652934a15ba7f10c8431319cd758e71170",
+    "AppServiceJavaVersion": "b84bf51dee8d3718e3cb20603c0aa9cae207676e9abf45f58003bc504e8ae8a1",
+    "AppServicePHPVersion": "e12eca33dedd164d7811d46b5836539ffec156409b91a9f846b57ce54d7f3897",
+    "AppServiceSlotDebugDisabled": "e9763bed70449f7e47e822d5ea570b63784a87479e13e105498ba3f9a168b576",
+    "AppServiceHTTPSOnly": "e576150aa1da2fb1a5fc5f6b1a0a2008b7d814a6f81402b07003e8631ce74188",
+    "AppServiceInstanceMinimum": "2406b19bed287a28d1afb3135969e3dccc7a087bbed51e2e090c184eace019f7",
+    "AppServiceSetHealthCheck": "0bd1556d2ce9c731498428779665e7454b2f36b071b39a08661d4d7fcd858758",
+    "AppServiceFTPSState": "a65f1cd1acd97b52bcb67b723c8aaf4eda5f446f8280f36cc1c683ec780b9118",
+    "AppServiceDetailedErrorMessagesEnabled": "1e8f662a6dcae0150faacd7b5b0c8d8d057122ee51507fb584ff0b0ab44d5dc3",
+    "FunctionAppsEnableAuthentication": "25d69afdf201fbd927bf88a26c502c1f1e9516bfab131d658b0e0ec34435e41e",
+}
 
 RULE_SOURCES = {
     CHECKOV_BASE_SOURCE: PATCHED_SOURCE_SHA256,
@@ -468,7 +520,7 @@ def _symbolic_cosmos_name(root, module, passed, environment, resolve_root, root_
 def resolve_local_module_bindings(
     root_path, environment, module_symbol="api", *, _snapshot=None, _module_snapshots=None,
     _json_snapshots=None,
-    _root_values=None, _symbolic_name=False,
+    _root_values=None, _symbolic_name=False, _function_module=False,
 ):
     """Resolve one local call using bounded literals, expressions and Cosmos JSON."""
     root_path = Path(root_path).resolve(strict=True)
@@ -566,9 +618,15 @@ def resolve_local_module_bindings(
     if not isinstance(module, dict):
         result["blockers"].append("module source AST is malformed")
         return result
+    result["_function_module"] = _function_module and any(
+        isinstance(item, dict) and item.get("type") == PLAN
+        for item in (module.get("resources", {}) or {}).values()
+    )
     if (
         set(module) - {"globals", "parameters", "variables", "resources", "outputs"}
-        or not _bounded_cosmos_outputs(module)
+        or not (
+            _bounded_function_outputs(module) if _function_module else _bounded_cosmos_outputs(module)
+        )
     ):
         result["blockers"].append("nested modules and outputs are outside this module contract")
     if not isinstance(module.get("resources"), dict) or not module["resources"]:
@@ -744,6 +802,7 @@ def resolve_local_module_bindings(
                 item["value"] = value
             result["values"][name] = value
         except BindingResolutionError as error:
+            resolving.clear()
             item["resolved"] = False
             item["reason"] = str(error)
             result["blockers"].append("module parameter " + name + ": " + str(error))
@@ -752,6 +811,7 @@ def resolve_local_module_bindings(
         try:
             resolve_module_symbol(name)
         except BindingResolutionError as error:
+            resolving.clear()
             result["blockers"].append("module variable " + name + ": " + str(error))
     result["values"] = values
     if set(_root_values or {}) != set(result["explicit_root_parameters_used"]):
@@ -1402,7 +1462,11 @@ def qualify(path, environment, instance="root"):
 def qualify_local_module(path, environment, module_symbol="api"):
     """Qualify one local module call without flattening or rewriting its source."""
     _verify_runtime()
-    binding = resolve_local_module_bindings(path, environment, module_symbol)
+    binding = resolve_local_module_bindings(
+        path, environment, module_symbol, _function_module=module_symbol == "api",
+    )
+    if binding.get("_function_module"):
+        return _qualify_function_binding(binding, False)
     return _qualify_bound_module(binding)
 
 
@@ -1596,10 +1660,321 @@ def _render_literal(value, depth=0):
         for key, item in value.items():
             if type(key) is not str:
                 raise BindingResolutionError("snapshot object key is not literal")
-            rendered = key if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) else _render_literal(key)
+            if key.startswith("'") and key.endswith("'"):
+                # pycep retains delimiters on authored quoted object keys.
+                _render_literal(key[1:-1])
+                rendered = key
+            else:
+                rendered = key if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) else _render_literal(key)
             lines.append(indent + "  " + rendered + ": " + _render_literal(item, depth + 1))
         return "{\n" + "\n".join(lines) + "\n" + indent + "}"
     raise BindingResolutionError("snapshot contains an unresolved or unsupported value")
+
+
+def _bounded_function_outputs(tree):
+    expected = {
+        "functionAppName": ("functionApp", "name"),
+        "defaultHostName": ("functionApp", "properties", "defaultHostName"),
+        "principalId": ("functionApp", "identity", "principalId"),
+        "hostStoragePrincipalId": ("hostStorageIdentity", "properties", "principalId"),
+    }
+    outputs = tree.get("outputs", {})
+    if not isinstance(outputs, dict) or set(outputs) - set(expected):
+        return False
+    for name, output in outputs.items():
+        expression = ".".join(expected[name])
+        parsed = _parse_source("output fixture string = " + expression)["outputs"]["fixture"]
+        if not _same_literal(output, parsed, allow_symbols=True):
+            return False
+    return True
+
+
+def _verify_function_dispatch():
+    from checkov.bicep.checks.resource.registry import registry
+
+    def graph_matches(check, kind):
+        return any(
+            fnmatchcase(kind, pattern)
+            for pattern in (*check.resource_types, *check.connected_resources_types)
+        ) or any(graph_matches(child, kind) for child in check.sub_checks)
+
+    for kind, expected in {
+        **FUNCTION_CHECKS, **{kind: () for kind in FUNCTION_NO_POLICY},
+    }.items():
+        actual = [check.id for check in registry.get_checks(kind)]
+        if (
+            len(actual) != len(set(actual)) or set(actual) != set(expected)
+            or any(graph_matches(check, kind) for check in registry.graph_registry.checks)
+        ):
+            raise ValueError("unqualified Function App policy dispatch: " + kind)
+    for name, digest in FUNCTION_RULE_SOURCES.items():
+        source = Path(import_module("checkov.arm.checks.resource." + name).__file__).read_bytes()
+        if hashlib.sha256(source).hexdigest() != digest:
+            raise ValueError("unexpected installed Function App rule: " + name)
+
+
+def _function_inventory(binding):
+    """Inventory every declaration even when its deployment inputs are unresolved."""
+    tree = _parse_source(binding["_module_bytes"].decode("utf-8"))
+    resources = tree.get("resources", {})
+    structural = []
+    unresolved = []
+    entries = []
+    declared = []
+    materialized = []
+    if (
+        set(tree) - {"globals", "parameters", "variables", "resources", "outputs"}
+        or not _bounded_function_outputs(tree)
+        or tree.get("globals", {}).get("scope", {}).get("value") != "resourceGroup"
+        or not resources
+    ):
+        structural.append("unsupported Function App module structure, scope or outputs")
+    if sum(item.get("type") == SITE and not item.get("existing") for item in resources.values()) != 1:
+        structural.append("exactly one authored site is required")
+    if sum(item.get("type") == PLAN and not item.get("existing") for item in resources.values()) != 1:
+        structural.append("exactly one authored plan is required")
+    for symbol, node in resources.items():
+        kind = node.get("type")
+        key = str(kind) + "." + symbol
+        existing = node.get("existing")
+        config = node.get("config")
+        policy_ids = FUNCTION_CHECKS.get(kind, ()) if existing is False else ()
+        row = {
+            "resource": key, "symbol": symbol, "type": kind,
+            "api_version": node.get("api_version"), "existing": existing,
+            "checks": list(policy_ids), "bound": False,
+            "scope": "EXTERNAL_REFERENCE_NOT_EVALUATED" if existing else "AUTHORED_RESOURCE",
+        }
+        declared.append(row)
+        versions = FUNCTION_REFERENCES if existing is True else {
+            **FUNCTION_NO_POLICY, **{kind: API_VERSION for kind in FUNCTION_CHECKS},
+        }
+        if (
+            set(node) != {"decorators", "type", "api_version", "existing", "config"}
+            or node.get("decorators") != [] or type(existing) is not bool
+            or kind not in versions or node.get("api_version") != versions.get(kind)
+            or not isinstance(config, dict)
+        ):
+            structural.append("unsupported resource, API, loop, condition or decorator: " + key)
+            continue
+        allowed_fields = (
+            {"name"} if existing else
+            {"name", "location", "tags", "kind", "identity", "properties", "dependsOn", "siteConfig"}
+            if kind == SITE else
+            {"name", "location", "tags", "sku", "properties"} if kind == PLAN else
+            {"name", "parent", "properties"} if kind in (CONFIG, COSMOS + "/sqlRoleAssignments") else
+            {"name", "scope", "properties"} if kind == "Microsoft.Authorization/roleAssignments" else
+            {"name", "location", "tags"}
+        )
+        if "name" not in config or set(config) - allowed_fields:
+            structural.append("unsupported resource body, condition or loop: " + key)
+        links = {}
+        for field in ("parent", "scope", "dependsOn"):
+            if field not in config:
+                continue
+            links[field] = config[field]
+            symbols = config[field] if field == "dependsOn" else [config[field]]
+            if not isinstance(symbols, list) or any(
+                type(item) is not BicepElement or item not in resources for item in symbols
+            ):
+                structural.append("unresolved structural resource reference: " + key + "/" + field)
+        parent = config.get("parent")
+        if kind == CONFIG and (
+            type(parent) is not BicepElement
+            or resources.get(parent, {}).get("type") != SITE
+            or resources.get(parent, {}).get("existing") is not False
+            or config.get("name") not in ("appsettings", "web", "authsettings")
+        ):
+            structural.append("config requires an explicit same-module authored site parent: " + key)
+        if existing and set(config) != {"name"}:
+            structural.append("existing references may only supply a name: " + key)
+        try:
+            bound = {
+                **_resolve_expression(
+                    {k: v for k, v in config.items() if k not in links},
+                    lambda name: binding["values"][name]
+                    if name in binding["values"] else _raise_unresolved_symbol(name),
+                    binding["environment"],
+                ),
+                **links,
+            }
+            if kind == CONFIG and config["name"] == "appsettings" and (
+                not isinstance(bound.get("properties"), dict)
+                or any(not _literal_string(k) or not _literal_string(v)
+                       for k, v in bound["properties"].items())
+            ):
+                raise BindingResolutionError("appsettings must remain a literal StringDictionary")
+            _render_literal(bound)
+            row["bound"] = True
+            materialized.append({
+                "symbol": symbol, "source_identity": key, "type": kind,
+                "api_version": node["api_version"], "existing": existing, "config": bound,
+            })
+        except BindingResolutionError as error:
+            unresolved.append("unresolved resource " + key + ": " + str(error))
+        if existing:
+            continue
+        if kind in FUNCTION_NO_POLICY:
+            entries.append(dict(
+                resource=key, check=None, expected="NO_POLICY_IN_PINNED_RUNNER", parent=None,
+            ))
+        for check in policy_ids:
+            entry = dict(resource=key, check=check, expected="APPLICABLE", parent=None)
+            if kind == CONFIG:
+                entry.update(parent=SITE + "." + str(parent), subtype=config.get("name"))
+                if check in CONFIG_CHECKS and CONFIG_CHECKS[check] != config.get("name"):
+                    entry["expected"] = "NOT_APPLICABLE"
+            entries.append(entry)
+    child_keys = [(row.get("parent"), row.get("subtype"), row["check"])
+                  for row in entries if row.get("subtype")]
+    if len(child_keys) != len(set(child_keys)):
+        structural.append("duplicate same-site config subtype")
+    count = sum(bool(row["checks"]) for row in declared)
+    return entries, count, declared, materialized, structural, unresolved
+
+
+def _function_input_proofs(entries, materialized, definitions):
+    expected = {item["source_identity"]: item["config"] for item in materialized}
+    actual = {}
+    for source in definitions.values():
+        for symbol, node in source.get("resources", {}).items():
+            key = str(node.get("type")) + "." + symbol
+            actual.setdefault(key, []).append(node.get("config"))
+    return [
+        {
+            "resource": row["resource"], "check": row["check"],
+            "matches_bound_ast": row["resource"] in expected
+            and len(actual.get(row["resource"], [])) == 1
+            and _same_literal(expected[row["resource"]], actual[row["resource"]][0], allow_symbols=True),
+        }
+        for row in entries if row["check"] is not None
+    ]
+
+
+def _qualify_function_binding(binding, resolved_snapshot):
+    _verify_function_dispatch()
+    result = {
+        "schema": "certigo.bicep-function-module-qualification/v6",
+        "scope": "all pinned site/config/plan resource rules; no deployment or global compliance",
+        "production_adoptable": False,
+        "provenance": {
+            "root_source": binding["root_source"], "root_sha256": binding["root_sha256"],
+            "module_source": binding["module_source"], "module_sha256": binding["module_sha256"],
+            "environment": binding["environment"], "module_instance": "root/api",
+            "candidate_version": VERSION, "parser": _verify_parser(),
+        },
+        "binding_resolution": {
+            k: v for k, v in binding.items() if k != "values" and not k.startswith("_")
+        },
+        "resource_inventory": [], "obligations": [], "authored_report": None,
+        "authored_applicability": [], "authored_input_provenance": [],
+        "resolved_snapshot": None, "resolved_report": None, "resolved_applicability": [],
+        "resolved_input_provenance": [], "status": "BLOCKED", "blockers": list(binding["blockers"]),
+    }
+    if "_module_bytes" not in binding:
+        return result
+    try:
+        entries, count, declared, materialized, structural, unresolved = _function_inventory(binding)
+    except (UnicodeError, ValueError, KeyError, TypeError) as error:
+        result["blockers"].append("Function App inventory failed: " + type(error).__name__)
+        return result
+    result["resource_inventory"] = declared
+    result["obligations"] = entries
+    result["blockers"].extend(structural + unresolved)
+    if structural:
+        return result
+
+    def run(contents, prefix):
+        with tempfile.TemporaryDirectory(prefix=prefix) as temporary:
+            snapshot = Path(temporary) / "source.bicep"
+            snapshot.write_bytes(contents)
+            runner = Runner()
+            raw = runner.run(
+                root_folder=temporary, files=[str(snapshot)],
+                runner_filter=RunnerFilter(
+                    checks=sorted({check for checks in FUNCTION_CHECKS.values() for check in checks}),
+                    show_progress_bar=False,
+                ),
+            ).get_dict()
+            return raw, _function_input_proofs(entries, materialized, runner.definitions)
+
+    raw, proofs = run(binding["_module_bytes"], "certigo-function-authored-")
+    result["authored_report"] = raw
+    result["authored_input_provenance"] = proofs
+    result["authored_applicability"], raw_problems = reconcile(entries, count, raw)
+    coverage_errors = [
+        reason for reason in raw_problems
+        if not reason.startswith("applicable check failed: ")
+        and reason != "non-applicable check lacks a passed same-site parent proof"
+    ]
+    result["blockers"].extend(coverage_errors)
+    if resolved_snapshot and not result["blockers"]:
+        try:
+            lines = []
+            source_map = []
+            for item in materialized:
+                rendered = (
+                    "resource " + item["symbol"] + " '" + item["type"] + "@" + item["api_version"]
+                    + "'" + (" existing" if item["existing"] else "") + " = "
+                    + _render_literal(item["config"])
+                ).splitlines()
+                source_map.append({
+                    "source_identity": item["source_identity"], "snapshot_symbol": item["symbol"],
+                    "snapshot_line_range": [len(lines) + 1, len(lines) + len(rendered)],
+                })
+                lines.extend(rendered)
+            contents = ("\n".join(lines) + "\n").encode("utf-8")
+            parsed = _parse_source(contents.decode("utf-8"))
+            expected = {
+                item["symbol"]: {
+                    "decorators": [], "type": item["type"], "api_version": item["api_version"],
+                    "existing": item["existing"], "config": item["config"],
+                } for item in materialized
+            }
+            if set(parsed) - {"globals", "resources"} or not _same_literal(
+                parsed.get("resources"), expected, allow_symbols=True,
+            ):
+                raise BindingResolutionError("snapshot AST does not exactly reproduce all declarations")
+            result["resolved_snapshot"] = {
+                "source_text": contents.decode("utf-8"), "sha256": hashlib.sha256(contents).hexdigest(),
+                "source_map": source_map, "ast_round_trip_verified": True,
+                "actual_deployment_parameters_verified": False,
+            }
+            raw, proofs = run(contents, "certigo-function-resolved-")
+            result["resolved_report"] = raw
+            result["resolved_input_provenance"] = proofs
+            result["resolved_applicability"], raw_problems = reconcile(entries, count, raw)
+        except (BindingResolutionError, ValueError) as error:
+            result["blockers"].append("Function App snapshot blocked: " + str(error))
+    result["blockers"].extend(raw_problems)
+    mismatches = {(proof["resource"], proof["check"]) for proof in proofs if not proof["matches_bound_ast"]}
+    result["blockers"].extend(
+        "Runner inputs differ from bound AST: " + resource + "/" + check
+        for resource, check in sorted(mismatches)
+    )
+    for rows, input_proofs in (
+        (result["authored_applicability"], result["authored_input_provenance"]),
+        (result["resolved_applicability"], result["resolved_input_provenance"]),
+    ):
+        unknown = {proof["resource"] for proof in input_proofs if not proof["matches_bound_ast"]}
+        for row in rows:
+            missing_proof = row["status"] == "NOT_APPLICABLE" and (
+                row.get("parent") in unknown
+                or any(proof["resource"] in unknown for proof in row.get("applicability_evidence", []))
+            )
+            if missing_proof or (row["resource"] in unknown and row["status"] in ("PASSED", "NOT_APPLICABLE")):
+                row.update(status="BLOCKED", reason="raw verdict does not prove the fully bound resource inputs")
+    result["blockers"] = list(dict.fromkeys(result["blockers"]))
+    if not result["blockers"]:
+        result["status"] = "QUALIFIED_SUBSET"
+    return result
+
+
+def qualify_function_snapshot(path, environment):
+    """A Function App snapshot requires complete literal bindings; never invent runtime IDs."""
+    _verify_runtime()
+    binding = resolve_local_module_bindings(path, environment, "api", _function_module=True)
+    return _qualify_function_binding(binding, True)
 
 
 def qualify_cosmos_snapshot(path, environment, backup_mode):
@@ -1742,9 +2117,14 @@ def main():
     parser.add_argument("--environment", required=True, choices=("dev", "staging", "prod"))
     parser.add_argument("--module-symbol", action="append")
     parser.add_argument("--resolved-cosmos-snapshot", action="store_true")
+    parser.add_argument("--resolved-function-snapshot", action="store_true")
     parser.add_argument("--cosmos-backup-mode", choices=("Periodic", "Continuous"))
     args = parser.parse_args()
-    if args.resolved_cosmos_snapshot:
+    if args.resolved_function_snapshot:
+        if args.module_symbol != ["api"] or args.resolved_cosmos_snapshot or args.cosmos_backup_mode is not None:
+            parser.error("resolved Function App mode requires only --module-symbol api")
+        result = qualify_function_snapshot(args.source, args.environment)
+    elif args.resolved_cosmos_snapshot:
         if args.module_symbol != ["data"] or args.cosmos_backup_mode is None:
             parser.error("resolved Cosmos mode requires --module-symbol data and an explicit --cosmos-backup-mode")
         result = qualify_cosmos_snapshot(args.source, args.environment, args.cosmos_backup_mode)
