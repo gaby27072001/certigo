@@ -2,7 +2,8 @@
 
 ## Scope and evidence
 
-Source review on 2026-10-20 at `bc6d058114a608752b4dbcee8aba59f072a30ad5`.
+Source review on 2026-10-20, aligned with
+`3487f6dd0a125ddd1f0efe9ade4c16506b23bcdc` after the history increment merged.
 This document is a release checklist, not an assertion of an uploaded binary,
 an App Store Connect submission, live policy publication, or Apple acceptance.
 Recheck it whenever the candidate, SDK resolution, backend retention settings,
@@ -18,7 +19,7 @@ The Flutter release/crash runbooks do not prove native Apple privacy behavior.
 | Surface | Evidence and disclosure | Acceptance still required |
 | --- | --- | --- |
 | Microsoft authentication | `apps/apple/CertigoNative/Sources/MSALAuthenticationProvider.swift`, `CredentialVault.swift`, `DistributionInfo.plist`; Entra CIAM/MSAL and system Keychain, not a manual production token flow | Check actual resolved MSAL archive and authentication on the signed candidate |
-| Confirmed results and progression | Backend is authoritative; account identity comes from the verified JWT | Integrate and verify `GET /api/me/history` from the history increment; do not label local drafts as multi-device history |
+| Confirmed results and progression | Backend `LearningFunctions.cs` exposes authenticated `GET /api/me/history` with bounded summary pagination; owner comes from the verified JWT, not the client | Integrate and verify the native history client; do not label local drafts as multi-device history |
 | Offline work | `NativeModel.swift` (`NativeActivityStore`), `SubmissionStore.swift` (`OfflineSubmissionOutbox`), `RuntimeContentStore.swift`; voluntary public packs, local drafts and queued submissions scoped by owner/API | Verify owner changes, offline retry and no private correction keys in downloaded packs on device |
 | File protection | `FileProtectionPolicy.swift`, `RuntimeDisk.swift`, `SubmissionStore.swift`, `NativeModel.swift` use `completeUntilFirstUserAuthentication` | Inspect attributes on device; this is **not** `NSFileProtectionComplete`, and allows access after first unlock even when relocked |
 | Preferences and metadata | `apps/apple/CertigoNative/Resources/PrivacyInfo.xcprivacy`: UserDefaults `CA92.1`, file timestamps `C617.1` | Inspect final aggregated privacy report; required-reason APIs are not collection declarations |
