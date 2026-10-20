@@ -1624,6 +1624,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var loadingPathRequestID: UUID?
         @State private var loadingLessonID: String?
         @State private var loadingLessonRequestID: UUID?
+        @State private var downloadTrack: Track?
 
         var body: some View {
             Group {
@@ -1695,7 +1696,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 if owner == nil { savingGoalID = nil }
             }
             .onChange(of: model.restorationRevision) { _, _ in
-                selectedTrack = model.path?.trackId
+                selectedTrack = model.path?.trackId ?? model.offlinePack?.trackId
                 selectedLesson = model.lesson?.id
                 if model.lesson != nil {
                     columns = .detailOnly
@@ -1746,6 +1747,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                             .disabled(model.busy)
                         }
+                        Button("Restore downloaded activity", systemImage: "internaldrive") {
+                            Task { await model.restoreDownloadedActivity() }
+                        }
+                        .disabled(model.busy)
                         if navigation.learn == .myLearning && model.profile?.activeTrackId == nil {
                             Text(
                                 "Choose an active goal in Explore. Browsing never changes your goal."
@@ -1794,11 +1799,16 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .onChange(of: selectedTrack) { _, id in
                 guard let track = model.tracks.first(where: { $0.id == id }) else { return }
                 guard model.path?.trackId != track.id else { return }
+                if model.offlinePack?.trackId == track.id && model.lesson != nil { return }
                 selectedLesson = nil
                 requestPath(track)
             }
             .onChange(of: selectedLesson) { _, id in
                 guard model.lesson?.id != id else { return }
+                if let id, model.offlinePack?.lessons.contains(where: { $0.id == id }) == true {
+                    Task { await model.openCachedLesson(id) }
+                    return
+                }
                 guard
                     let node = model.path?.units.flatMap(\.lessons).first(where: {
                         $0.id == id
@@ -1806,6 +1816,23 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     )
                 else { return }
                 requestLesson(node)
+            }
+            .confirmationDialog(
+                "Download public question packs?",
+                isPresented: Binding(
+                    get: { downloadTrack != nil },
+                    set: { if !$0 { downloadTrack = nil } })
+            ) {
+                if let track = downloadTrack {
+                    Button("Download public content") {
+                        downloadTrack = nil
+                        Task { await model.downloadQuestionPack(track) }
+                    }
+                }
+            } message: {
+                Text(
+                    "This downloads the whole current public release, not just this certification. No solutions are downloaded. Answers stay local until you choose Submit; correction and XP require the server."
+                )
             }
         }
 
@@ -1945,6 +1972,26 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var path: some View {
             List(selection: $selectedLesson) {
+                if let track = model.tracks.first(where: {
+                    $0.id == (selectedTrack ?? model.offlinePack?.trackId ?? model.path?.trackId)
+                }) {
+                    Section("Offline question pack") {
+                        Button("Download public question packs", systemImage: "arrow.down.circle") {
+                            downloadTrack = track
+                        }
+                        .disabled(model.busy)
+                        if let pack = model.offlinePack, pack.trackId == track.id {
+                            Text("Downloaded public content. No local correction or XP.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                            ForEach(pack.lessons, id: \.id) { lesson in
+                                NavigationLink(value: lesson.id) {
+                                    Label(lesson.title, systemImage: "internaldrive")
+                                }
+                                .disabled(model.busy)
+                            }
+                        }
+                    }
+                }
                 if let path = model.path,
                     selectedTrack == nil || selectedTrack == path.trackId
                 {
