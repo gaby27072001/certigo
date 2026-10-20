@@ -226,7 +226,8 @@ public actor LearningClient {
             try assertCurrent(context)
             return .pendingCorrection
         } catch let error as APIError {
-            if error != .unauthorized {
+            // Cancellation does not establish whether the server committed this attempt.
+            if error != .unauthorized && error != .transport(URLError.cancelled.rawValue) {
                 try await store.recordFailure("api:\(error)", entry: entry)
             }
             try assertCurrent(context)

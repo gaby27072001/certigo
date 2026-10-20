@@ -55,6 +55,12 @@ The outbox remains authoritative for persisted attempts, owner/API scope,
 local verdict. Authorized server feedback can include explanations and corrected
 answer IDs; this does not permit shipping a private answer-key bank.
 
+A cancelled submission or retry propagates the cancellation error and leaves its
+outbox entry pending: cancellation is not proof that the server rejected or did
+not receive the request. After reopening, an explicit retry sends the same
+`clientAttemptId` and original payload for server reconciliation. Cancellation
+does not become an automatic retry or a local correction.
+
 `SubmissionStore` uses Foundation path-based access, an actor-local cache and
 atomic file replacement. It does **not** inherit `RuntimeDisk` cross-process
 locking, symlink/hard-link hardening or power-loss guarantees. Runtime activation
