@@ -255,8 +255,8 @@ or gate change is implemented by this fixture-only delivery.
 It parses authored source before scanning to derive independent resource/check
 obligations, and pins the installed rule source digests and the reviewed ARM
 input-extraction base class plus the Bicep
-registry, candidate and parser versions. The Runner consumes the original
-captured module bytes; no source flattening or rewriting is used. Reports keep
+registry, candidate and parser versions. By default the Runner consumes the original
+captured module bytes; no source flattening or rewriting is used in schemas v2-v4. Reports keep
 the independent inventory, unmodified raw scanner report, separate
 applicability records and blockers. Literal single-file inputs use schema v2;
 the optional single local-module path uses schema v3 with both source hashes.
@@ -381,9 +381,9 @@ cannot prove the staging/prod root's `true` argument because the unchanged modul
 Runner has not consumed that binding. Neither failure is removed or relabelled
 as a policy success. A test-only authored-literal positive control executes all
 four checks successfully; it is not an infrastructure change or deployment
-recommendation. Any resolved-snapshot Runner/report contract, external
-deployment inputs or metadata-write policy change needs separate approval;
-this lot implements none of them.
+recommendation. The separately authorized opt-in snapshot below resolves proven
+inputs without modifying this raw report. External deployment identity and any
+metadata-write infrastructure change remain outside this tool.
 No Runner record is invented from an AST-resolved value: when the unchanged
 module scan cannot resolve it, missing/UNKNOWN evidence still blocks.
 The tool does not compile Bicep, validate complete Azure schemas, or establish
@@ -454,6 +454,63 @@ The latter intentionally exits 1 on the current repository because the real
 modules exceed the qualified subset. Schema v4 keeps both module reports and
 all blockers; it is not a root-wide gate. Empty, duplicate or absent module
 selections cannot become a successful partial report.
+
+### Opt-in resolved Cosmos snapshot (inactive schema v5)
+
+The authorized second-pass mode is separate from the unchanged default path:
+
+```sh
+python tools/checkov/bicep_ingress_candidate.py infra/main.bicep \
+  --environment dev --module-symbol data \
+  --resolved-cosmos-snapshot --cosmos-backup-mode Periodic
+python tools/checkov/bicep_ingress_candidate.py infra/main.bicep \
+  --environment staging --module-symbol data \
+  --resolved-cosmos-snapshot --cosmos-backup-mode Continuous
+python tools/checkov/bicep_ingress_candidate.py infra/main.bicep \
+  --environment prod --module-symbol data \
+  --resolved-cosmos-snapshot --cosmos-backup-mode Continuous
+```
+
+These are explicit source qualification scenarios, **not verified deployment
+parameters**. Backup mode is required, validated against the root declaration
+and must actually be consumed by the module; no parameter file or production
+choice is inferred. Only the `data` module is supported in this mode. The
+reviewed root name expression `cosmos-${appName}-${env}-${suffix}`, with
+`suffix = uniqueString(subscription().id, appName, env)`, may remain symbolic.
+Its deterministic snapshot token is explicitly **not an Azure account name**.
+The AST must prove that `accountName` is used only as the account's non-security
+name; any additional/interpolated use, alias, secret dependency or unreviewed
+suffix blocks. No subscription ID is invented or queried.
+
+The original root/module/JSON bytes and independent complete inventory are
+established first. The authored Runner report is preserved in `authored_report`;
+missing/UNKNOWN records, parse errors, skips, duplicates and coverage mismatch
+block before a second scan. Ordinary raw failures are retained separately,
+not deleted to manufacture a green authored scan.
+
+Only proven bindings are rendered into a temporary literal Bicep snapshot,
+including the database and thirteen expanded containers. No policy predicate is
+reimplemented or changed. The snapshot is parsed back and its **entire**
+resource AST must exactly match the independently materialized inventory
+(including negative integer TTL literals and typed parent references).
+Escaped/interpolated strings and unsupported values block. Its source text,
+SHA-256, source-identity/snapshot-symbol/line mapping, symbolic-name proof and
+explicit backup input are kept separately in `resolved_snapshot`.
+The same pinned Bicep Runner then executes it; `resolved_report` remains raw
+and has its own exact coverage and input-equivalence reconciliation.
+
+On the unchanged real source the three scenarios still exit 1: **132 remains a
+real FAILED** because `disableKeyBasedMetadataWriteAccess` is absent. Dev also
+fails 140 because its explicit root value is false. Staging/prod now obtain a
+real second-Runner PASSED for 140 with the proven true root binding, while the
+authored 140 failure remains visible. Database/container no-policy entries do
+not become security passes. A test-only source adding the missing metadata flag
+exercises the positive path, deterministic snapshot hash and raw-report
+separation; this tool does not add the flag to infrastructure.
+
+No gate consumes v5, and `production_adoptable` remains false. Source
+qualification, deployed configuration, policy adoption and remediation are
+distinct; this opt-in operation does not authorize any of the latter three.
 
 Exit 0 means only `QUALIFIED_SUBSET` under that narrow contract; every report
 sets `production_adoptable: false` and names the restricted control scope.

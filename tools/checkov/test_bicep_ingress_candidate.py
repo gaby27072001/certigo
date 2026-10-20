@@ -18,7 +18,8 @@ from checkov.arm.checks.resource.AppServiceHttpLoggingEnabled import check as lo
 
 from bicep_ingress_candidate import (
     CONFIG_CHECKS, COSMOS_CHECKS, RULE_SOURCES, UPSTREAM_PARSER_SOURCES,
-    _verify_cosmos_dispatch, _verify_parser, inventory, qualify, qualify_local_module, qualify_local_modules,
+    _verify_cosmos_dispatch, _verify_parser, inventory, qualify, qualify_cosmos_snapshot,
+    qualify_local_module, qualify_local_modules,
     reconcile, resolve_local_module_bindings,
 )
 from build_parser_wheel import PATCHED_FILES, VERSION as COMPAT_PARSER_VERSION
@@ -152,6 +153,21 @@ def real_cosmos_fixture(environment):
             " databaseName: contract.databaseName\n disableLocalAuth: hardened\n"
             " backupMode: 'Periodic'\n tags: tags\n }\n}\n", encoding="utf-8",
         )
+        yield root
+
+
+@contextmanager
+def snapshot_fixture():
+    with real_cosmos_fixture("staging") as root:
+        text = root.read_text().replace(
+            "var hardened",
+            "@allowed(['Periodic', 'Continuous'])\nparam cosmosBackupMode string\n"
+            "param appName string = 'certigo'\n"
+            "var suffix = uniqueString(subscription().id, appName, env)\nvar hardened",
+        ).replace("accountName: 'fixture-${env}'", "accountName: 'cosmos-${appName}-${env}-${suffix}'").replace(
+            "backupMode: 'Periodic'", "backupMode: cosmosBackupMode",
+        )
+        root.write_text(text)
         yield root
 
 
@@ -570,6 +586,181 @@ class CandidateTests(unittest.TestCase):
             self.assertEqual(params["disableLocalAuth"]["value"], environment != "dev")
             self.assertEqual(params["tags"]["value"]["env"], environment)
             self.assertEqual(len(result["obligations"]), 18)
+
+    def test_resolved_snapshot_keeps_original_failures_and_real_metadata_failure(self):
+        with snapshot_fixture() as root:
+            child = root.parent / "modules" / "cosmos.bicep"
+            before = (root.read_bytes(), child.read_bytes())
+            for env, mode in (("dev", "Periodic"), ("staging", "Continuous"), ("prod", "Continuous")):
+                with self.subTest(environment=env):
+                    result = qualify_cosmos_snapshot(root, env, mode)
+                    self.assert_blocked(result)
+                    if version("pycep-parser") != COMPAT_PARSER_VERSION:
+                        self.assertIsNone(result["resolved_report"])
+                        self.assertIn("module source parsing failed: UnexpectedToken", result["blockers"])
+                        continue
+                    self.assertEqual(result["schema"], "certigo.bicep-cosmos-resolved-qualification/v5")
+                    self.assertEqual(len(result["obligations"]), 18)
+                    self.assertEqual({r["check_id"] for r in result["authored_report"]["results"]["failed_checks"]},
+                                     {"CKV_AZURE_132", "CKV_AZURE_140"})
+                    expected = {"CKV_AZURE_132", "CKV_AZURE_140"} if env == "dev" else {"CKV_AZURE_132"}
+                    self.assertEqual({r["check_id"] for r in result["resolved_report"]["results"]["failed_checks"]},
+                                     expected)
+                    snapshot = result["resolved_snapshot"]
+                    self.assertEqual(len(snapshot["source_map"]), 15)
+                    self.assertEqual(snapshot["sha256"], hashlib.sha256(
+                        snapshot["source_text"].encode("utf-8"),
+                    ).hexdigest())
+                    self.assertTrue(snapshot["ast_round_trip_verified"])
+                    lines = snapshot["source_text"].splitlines()
+                    for entry in snapshot["source_map"]:
+                        start, end = entry["snapshot_line_range"]
+                        self.assertTrue(lines[start - 1].startswith("resource " + entry["snapshot_symbol"] + " "))
+                        self.assertLessEqual(start, end)
+                        self.assertLessEqual(end, len(lines))
+                    self.assertFalse(snapshot["actual_deployment_parameters_verified"])
+                    self.assertFalse(snapshot["symbolic_inputs"][0]["actual_azure_name_known"])
+                    self.assertEqual(snapshot["explicit_root_parameters"], {"cosmosBackupMode": mode})
+                    self.assertTrue(all(p["matches_bound_ast"] for p in result["resolved_input_provenance"]))
+                    self.assertEqual({row["status"] for row in result["resolved_applicability"] if row["check"] is None},
+                                     {"NO_POLICY_IN_PINNED_RUNNER"})
+            self.assertEqual((root.read_bytes(), child.read_bytes()), before)
+
+    def test_resolved_snapshot_positive_and_deterministic_hash_are_separate_from_authored_report(self):
+        with snapshot_fixture() as root:
+            child = root.parent / "modules" / "cosmos.bicep"
+            child.write_text(child.read_text().replace(
+                "minimalTlsVersion: 'Tls12'",
+                "minimalTlsVersion: 'Tls12'\n    disableKeyBasedMetadataWriteAccess: true",
+            ))
+            first = qualify_cosmos_snapshot(root, "staging", "Continuous")
+            if version("pycep-parser") != COMPAT_PARSER_VERSION:
+                self.assert_blocked(first)
+                self.assertIsNone(first["resolved_report"])
+                return
+            self.assertEqual(first["status"], "QUALIFIED_SUBSET", first["blockers"])
+            second = qualify_cosmos_snapshot(root, "staging", "Continuous")
+            self.assertEqual(first["resolved_snapshot"], second["resolved_snapshot"])
+            self.assertEqual(len(first["resolved_report"]["results"]["passed_checks"]), 4)
+            self.assertEqual({r["check_id"] for r in first["authored_report"]["results"]["failed_checks"]},
+                             {"CKV_AZURE_140"})
+            self.assertFalse(first["production_adoptable"])
+
+    def test_resolved_snapshot_rejects_symbolic_network_reuse_secret_or_unreviewed_suffix(self):
+        for damage in ("network-reuse", "suffix", "secret", "dynamic", "unused-backup"):
+            with self.subTest(damage=damage), snapshot_fixture() as root:
+                child = root.parent / "modules" / "cosmos.bicep"
+                if damage == "network-reuse":
+                    child.write_text(child.read_text().replace(
+                        "publicNetworkAccess: 'Disabled'", "publicNetworkAccess: accountName",
+                    ))
+                elif damage == "suffix":
+                    root.write_text(root.read_text().replace("subscription().id", "resourceGroup().id"))
+                elif damage == "secret":
+                    root.write_text(root.read_text().replace("param cosmosBackupMode", "@secure()\nparam cosmosBackupMode"))
+                elif damage == "unused-backup":
+                    root.write_text(root.read_text().replace("backupMode: cosmosBackupMode", "backupMode: 'Periodic'"))
+                else:
+                    child.write_text(child.read_text().replace("publicNetworkAccess: 'Disabled'",
+                                                              "publicNetworkAccess: unknownFunction()"))
+                with patch("bicep_ingress_candidate.Runner.run") as runner:
+                    result = qualify_cosmos_snapshot(root, "prod", "Continuous")
+                self.assert_blocked(result)
+                runner.assert_not_called()
+                self.assertIsNone(result["authored_report"])
+                self.assertIsNone(result["resolved_report"])
+
+    def test_resolved_snapshot_cannot_repair_a_lost_authored_unknown_record(self):
+        from checkov.arm.checks.resource.CosmosDBDisablesPublicNetwork import check
+
+        with snapshot_fixture() as root, patch.object(
+            check, "scan_resource_conf", return_value=CheckResult.UNKNOWN,
+        ):
+            result = qualify_cosmos_snapshot(root, "prod", "Continuous")
+        self.assert_blocked(result)
+        if version("pycep-parser") == COMPAT_PARSER_VERSION:
+            self.assertIsNotNone(result["authored_report"])
+            self.assertIn("missing, duplicate or unexpected resource/check obligation", result["blockers"])
+        self.assertIsNone(result["resolved_report"])
+        original = check.scan_resource_conf
+        calls = []
+
+        def lose_second(conf):
+            calls.append(conf)
+            return CheckResult.UNKNOWN if len(calls) == 2 else original(conf)
+
+        with snapshot_fixture() as root, patch.object(check, "scan_resource_conf", side_effect=lose_second):
+            result = qualify_cosmos_snapshot(root, "prod", "Continuous")
+        self.assert_blocked(result)
+        if version("pycep-parser") == COMPAT_PARSER_VERSION:
+            self.assertEqual(len(calls), 2)
+            self.assertIsNotNone(result["resolved_report"])
+            self.assertIn("missing, duplicate or unexpected resource/check obligation", result["blockers"])
+
+    def test_resolved_snapshot_lost_child_blocks_ast_round_trip_before_second_runner(self):
+        import bicep_ingress_candidate as candidate
+        original = candidate._parse_source
+
+        def lose_child(source):
+            tree = original(source)
+            if source.startswith("resource account "):
+                tree["resources"].pop("containerResources_12")
+            return tree
+
+        with snapshot_fixture() as root, patch.object(candidate, "_parse_source", side_effect=lose_child):
+            result = qualify_cosmos_snapshot(root, "prod", "Continuous")
+        self.assert_blocked(result)
+        self.assertIsNone(result["resolved_report"])
+        if version("pycep-parser") == COMPAT_PARSER_VERSION:
+            self.assertIsNotNone(result["authored_report"])
+            self.assertIn("snapshot AST does not exactly reproduce the independent resource inventory",
+                          result["blockers"])
+
+    def test_resolved_snapshot_preserves_unsafe_network_and_blocks_escaping(self):
+        for damage in ("enabled", "escaping"):
+            with self.subTest(damage=damage), snapshot_fixture() as root:
+                child = root.parent / "modules" / "cosmos.bicep"
+                if damage == "enabled":
+                    child.write_text(child.read_text().replace("publicNetworkAccess: 'Disabled'",
+                                                              "publicNetworkAccess: 'Enabled'"))
+                else:
+                    root.write_text(root.read_text().replace("product: 'Certigo'", "product: 'Certigo\\\\test'"))
+                result = qualify_cosmos_snapshot(root, "prod", "Continuous")
+                self.assert_blocked(result)
+                if version("pycep-parser") != COMPAT_PARSER_VERSION:
+                    self.assertIsNone(result["resolved_report"])
+                elif damage == "enabled":
+                    self.assertEqual({r["check_id"] for r in result["resolved_report"]["results"]["failed_checks"]},
+                                     {"CKV_AZURE_99", "CKV_AZURE_101", "CKV_AZURE_132"})
+                else:
+                    self.assertTrue(any("snapshot rendering blocked" in reason for reason in result["blockers"]))
+                    self.assertIsNone(result["resolved_report"])
+
+    def test_resolved_cli_requires_explicit_mode_and_exact_module_selection(self):
+        script = str(Path(__file__).with_name("bicep_ingress_candidate.py"))
+        with snapshot_fixture() as root:
+            for flags in (
+                ["--resolved-cosmos-snapshot", "--module-symbol", "data"],
+                ["--cosmos-backup-mode", "Periodic"],
+                ["--resolved-cosmos-snapshot", "--module-symbol", "api", "--cosmos-backup-mode", "Periodic"],
+            ):
+                run = subprocess.run([sys.executable, script, str(root), "--environment", "prod", *flags],
+                                     capture_output=True, text=True)
+                self.assertEqual(run.returncode, 2, run.stderr)
+            with self.assertRaisesRegex(ValueError, "explicit Periodic or Continuous"):
+                qualify_cosmos_snapshot(root, "prod", None)
+            run = subprocess.run(
+                [sys.executable, script, str(root), "--environment", "prod",
+                 "--module-symbol", "data", "--resolved-cosmos-snapshot", "--cosmos-backup-mode", "Continuous"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(run.returncode, 1, run.stderr)
+            result = json.loads(run.stdout)
+            self.assertEqual(result["schema"], "certigo.bicep-cosmos-resolved-qualification/v5")
+            self.assert_blocked(result)
+            if version("pycep-parser") == COMPAT_PARSER_VERSION:
+                self.assertEqual({r["check_id"] for r in result["resolved_report"]["results"]["failed_checks"]},
+                                 {"CKV_AZURE_132"})
 
     def test_local_module_resolves_explicit_environment_bindings_before_real_runner(self):
         with tempfile.TemporaryDirectory() as temporary:

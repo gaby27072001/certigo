@@ -230,6 +230,11 @@ def _resolve_expression(expression, resolve_symbol, environment, json_loader=Non
                 or not isinstance(operands, dict)
             ):
                 raise BindingResolutionError("malformed bounded operator")
+            if (
+                kind == "minus" and set(operands) == {"integer_value"}
+                and type(operands["integer_value"]) is int and operands["integer_value"] >= 0
+            ):
+                return -operands["integer_value"]
             if kind == "conditional" and set(operands) == {"condition", "true_value", "false_value"}:
                 condition = resolve(operands["condition"])
                 if type(condition) is not bool:
@@ -410,9 +415,60 @@ def _bounded_cosmos_outputs(tree):
     return True
 
 
+def _symbolic_cosmos_name(root, module, passed, environment, resolve_root, root_sha256):
+    expected_suffix = {"function": {"type": "unique_string", "parameters": {
+        "base_string": {"function": {
+            "type": "subscription", "parameters": {"subscription_id": None}, "property_name": "id",
+        }},
+        "extra_string_1": BicepElement("appName"), "extra_string_2": BicepElement("env"),
+    }}}
+    actual = root.get("variables", {}).get("suffix", {}).get("value")
+    params = actual.get("function", {}).get("parameters", {}) if isinstance(actual, dict) else {}
+    if (
+        passed.get("accountName") != "cosmos-${appName}-${env}-${suffix}"
+        or actual != expected_suffix
+        or type(params.get("extra_string_1")) is not BicepElement
+        or type(params.get("extra_string_2")) is not BicepElement
+    ):
+        raise BindingResolutionError("account name is not the reviewed symbolic subscription expression")
+    usages = []
+
+    def visit(value, path=()):
+        if type(value) is BicepElement and str(value) == "accountName":
+            usages.append(path)
+        elif type(value) is str and "${accountName}" in value:
+            usages.append(path)
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                if isinstance(key, str) and "${accountName}" in key:
+                    usages.append(path + (str(key),))
+                visit(item, path + (str(key),))
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                visit(item, path + (index,))
+
+    visit(module)
+    if usages != [("resources", "account", "config", "name")]:
+        raise BindingResolutionError("symbolic accountName may only populate the account's non-security name")
+    app_name = resolve_root("appName")
+    if not _literal_string(app_name) or not app_name:
+        raise BindingResolutionError("symbolic name appName must be an explicit non-secret literal")
+    token = "symbolic-" + hashlib.sha256(
+        (root_sha256 + ":" + app_name + ":" + environment).encode("utf-8")
+    ).hexdigest()[:24]
+    return token, {
+        "parameter": "accountName", "kind": "symbolic-non-network-name/v1",
+        "authored_expression": passed["accountName"],
+        "dependency": "uniqueString(subscription().id, appName, env)",
+        "snapshot_token": token, "actual_azure_name_known": False,
+        "allowed_usage": "resources.account.config.name",
+    }
+
+
 def resolve_local_module_bindings(
     root_path, environment, module_symbol="api", *, _snapshot=None, _module_snapshots=None,
     _json_snapshots=None,
+    _root_values=None, _symbolic_name=False,
 ):
     """Resolve one local call using bounded literals, expressions and Cosmos JSON."""
     root_path = Path(root_path).resolve(strict=True)
@@ -430,6 +486,9 @@ def resolve_local_module_bindings(
         "parameters": [],
         "values": {},
         "source_inputs": {},
+        "explicit_root_parameters": dict(_root_values or {}),
+        "explicit_root_parameters_used": [],
+        "symbolic_inputs": [],
         "blockers": [],
     }
     if environment not in ("dev", "staging", "prod"):
@@ -534,7 +593,19 @@ def resolve_local_module_bindings(
             spec = root_parameters[name]
             if any(item.get("type") == "secure" for item in spec.get("decorators", [])):
                 raise BindingResolutionError("secure root parameters need external deployment evidence")
-            default = spec.get("default")
+            if name in (_root_values or {}):
+                allowed_values = [
+                    item.get("argument") for item in spec.get("decorators", [])
+                    if item.get("type") == "allowed"
+                ]
+                if (
+                    name != "cosmosBackupMode"
+                    or allowed_values != [["Periodic", "Continuous"]]
+                ):
+                    raise BindingResolutionError("explicit input is outside the bounded Cosmos backup contract")
+                if name not in result["explicit_root_parameters_used"]:
+                    result["explicit_root_parameters_used"].append(name)
+            default = (_root_values or {}).get(name, spec.get("default"))
             if default is None:
                 raise BindingResolutionError("root parameter has no literal deployment value")
             value = default
@@ -630,9 +701,18 @@ def resolve_local_module_bindings(
             if expression is None:
                 resolving.remove(name)
                 raise BindingResolutionError("required module parameter is not explicitly bound")
-            value = _resolve_expression(
-                expression, resolver, environment, root_loader if name in passed else module_loader,
-            )
+            if (
+                _symbolic_name and name == "accountName"
+                and type(expression) is str and "${suffix}" in expression
+            ):
+                value, proof = _symbolic_cosmos_name(
+                    root, module, passed, environment, resolve_root_symbol, result["root_sha256"],
+                )
+                result["symbolic_inputs"].append(proof)
+            else:
+                value = _resolve_expression(
+                    expression, resolver, environment, root_loader if name in passed else module_loader,
+                )
             if not _matches_parameter_type(value, spec.get("type")):
                 resolving.remove(name)
                 raise BindingResolutionError("resolved value does not match the declared module type")
@@ -674,6 +754,8 @@ def resolve_local_module_bindings(
         except BindingResolutionError as error:
             result["blockers"].append("module variable " + name + ": " + str(error))
     result["values"] = values
+    if set(_root_values or {}) != set(result["explicit_root_parameters_used"]):
+        result["blockers"].append("an explicit root input is absent, unresolved or not consumed by this module")
     return result
 
 
@@ -767,7 +849,7 @@ def _literal_cosmos(properties):
     return True
 
 
-def inventory(source, environment, instance, resolved_values=None):
+def inventory(source, environment, instance, resolved_values=None, *, _materialized=None):
     """Derive exact obligations from authored AST before running Checkov."""
     problems = []
     entries = []
@@ -939,6 +1021,16 @@ def inventory(source, environment, instance, resolved_values=None):
                 )
                 for check in COSMOS_CHECKS
             )
+            if _materialized is not None:
+                materialized = {"name": name, "kind": conf.get("kind"), "properties": properties}
+                if "location" in conf:
+                    materialized["location"] = location
+                if "tags" in conf:
+                    materialized["tags"] = tags
+                _materialized.append({
+                    "symbol": symbol, "type": kind, "api_version": resource.get("api_version"),
+                    "config": materialized, "source_identity": key,
+                })
         elif kind in (COSMOS_DATABASE, COSMOS_CONTAINER):
             no_policy_symbols.add(symbol)
             if resource.get("api_version") != COSMOS_API_VERSION:
@@ -1004,6 +1096,15 @@ def inventory(source, environment, instance, resolved_values=None):
                 ):
                     problems.append("Cosmos child is outside the bounded literal contract: " + instance_key)
                 cosmos_children.append((symbol, instance_key, kind, name, parent))
+                if _materialized is not None:
+                    suffix = instance_key.removeprefix(key)
+                    rendered_symbol = symbol + ("_" + suffix[1:-1] if suffix else "")
+                    _materialized.append({
+                        "symbol": rendered_symbol, "type": kind,
+                        "api_version": resource.get("api_version"),
+                        "config": {"parent": parent, "name": name, "properties": properties},
+                        "source_identity": instance_key,
+                    })
         else:
             problems.append("resource type has no qualified mapping: " + key)
 
@@ -1198,17 +1299,25 @@ def _verify_cosmos_dispatch():
             raise ValueError("unqualified Cosmos policy dispatch: " + kind)
 
 
+def _same_literal(left, right, allow_symbols=False):
+    if type(left) is not type(right):
+        return False
+    if type(left) is dict:
+        return set(left) == set(right) and all(
+            _same_literal(left[k], right[k], allow_symbols) for k in left
+        )
+    if type(left) is list:
+        return len(left) == len(right) and all(
+            _same_literal(a, b, allow_symbols) for a, b in zip(left, right)
+        )
+    return (
+        type(left) in (str, bool, int, type(None))
+        or (allow_symbols and type(left) is BicepElement)
+    ) and left == right
+
+
 def _cosmos_runner_inputs(entries, definitions):
     """Compare input provenance, not policy outcomes, with type-strict literals."""
-    def literal_equal(left, right):
-        if type(left) is not type(right):
-            return False
-        if type(left) is dict:
-            return set(left) == set(right) and all(literal_equal(left[k], right[k]) for k in left)
-        if type(left) is list:
-            return len(left) == len(right) and all(literal_equal(a, b) for a, b in zip(left, right))
-        return type(left) in (str, bool, int, type(None)) and left == right
-
     resources = {}
     for source in definitions.values():
         for symbol, node in source.get("resources", {}).items():
@@ -1231,7 +1340,7 @@ def _cosmos_runner_inputs(entries, definitions):
         proofs.append({
             "resource": entry["resource"], "check": entry["check"],
             "matches_bound_ast": len(candidates) == 1 and isinstance(properties, dict)
-            and literal_equal(entry["policy_inputs"], actual),
+            and _same_literal(entry["policy_inputs"], actual),
         })
     return proofs
 
@@ -1462,13 +1571,186 @@ def qualify_local_modules(path, environment, module_symbols):
     return result
 
 
+def _render_literal(value, depth=0):
+    indent = "  " * depth
+    if type(value) is BicepElement:
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value) is None:
+            raise BindingResolutionError("snapshot parent is not a literal symbol")
+        return str(value)
+    if type(value) is str:
+        if "${" in value or any(character in value for character in "\\'\r\n\t"):
+            raise BindingResolutionError("snapshot strings requiring escaping are outside this contract")
+        return "'" + value + "'"
+    if value is None:
+        return "null"
+    if type(value) is bool:
+        return "true" if value else "false"
+    if type(value) is int:
+        return str(value)
+    if type(value) is list:
+        return "[\n" + "\n".join(
+            indent + "  " + _render_literal(item, depth + 1) for item in value
+        ) + "\n" + indent + "]"
+    if type(value) is dict:
+        lines = []
+        for key, item in value.items():
+            if type(key) is not str:
+                raise BindingResolutionError("snapshot object key is not literal")
+            rendered = key if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) else _render_literal(key)
+            lines.append(indent + "  " + rendered + ": " + _render_literal(item, depth + 1))
+        return "{\n" + "\n".join(lines) + "\n" + indent + "}"
+    raise BindingResolutionError("snapshot contains an unresolved or unsupported value")
+
+
+def qualify_cosmos_snapshot(path, environment, backup_mode):
+    """Opt-in, separately reported Runner pass over proven literal Cosmos inputs."""
+    _verify_runtime()
+    if backup_mode not in ("Periodic", "Continuous"):
+        raise ValueError("an explicit Periodic or Continuous Cosmos backup mode is required")
+    binding = resolve_local_module_bindings(
+        path, environment, "data", _root_values={"cosmosBackupMode": backup_mode},
+        _symbolic_name=True,
+    )
+    materialized = []
+    try:
+        source = binding.get("_module_bytes", b"").decode("utf-8")
+    except UnicodeError:
+        source = ""
+        binding["blockers"].append("module source is not UTF-8")
+    binding["_inventory"] = inventory(
+        source, environment, "root/data", binding["values"], _materialized=materialized,
+    )
+    entries, count, problems = binding["_inventory"]
+    if (
+        not materialized
+        or any(item["type"] not in (COSMOS, COSMOS_DATABASE, COSMOS_CONTAINER) for item in materialized)
+        or sum(item["type"] == COSMOS for item in materialized) != 1
+        or len({item["symbol"] for item in materialized}) != len(materialized)
+    ):
+        problems.append("resolved snapshot only supports one account and its explicit Cosmos children")
+    authored = _qualify_bound_module(binding)
+    result = {
+        "schema": "certigo.bicep-cosmos-resolved-qualification/v5",
+        "scope": "explicit Cosmos scenario; symbolic non-network name; not deployment evidence",
+        "production_adoptable": False,
+        "provenance": authored["provenance"],
+        "binding_resolution": authored["binding_resolution"],
+        "obligations": entries,
+        "authored_report": authored["scanner_report"],
+        "authored_applicability": authored["applicability"],
+        "authored_blockers": authored["blockers"],
+        "resolved_snapshot": None,
+        "resolved_report": None,
+        "resolved_applicability": [],
+        "resolved_input_provenance": [],
+        "status": "BLOCKED", "blockers": [],
+    }
+    if binding["blockers"] or problems or authored["scanner_report"] is None:
+        result["blockers"] = list(dict.fromkeys(binding["blockers"] + problems + authored["blockers"]))
+        return result
+    # An approved second pass may resolve a raw failure, never missing/UNKNOWN coverage.
+    _, raw_problems = reconcile(entries, count, authored["scanner_report"])
+    allowed_failures = {"applicable check failed: " + check for check in COSMOS_CHECKS}
+    result["blockers"] = [problem for problem in raw_problems if problem not in allowed_failures]
+    if result["blockers"]:
+        return result
+    lines = []
+    source_map = []
+    try:
+        for item in materialized:
+            rendered = (
+                "resource " + item["symbol"] + " '"
+                + item["type"] + "@" + item["api_version"] + "' = "
+                + _render_literal(item["config"])
+            ).splitlines()
+            source_map.append({
+                "source_identity": item["source_identity"],
+                "snapshot_symbol": item["symbol"],
+                "snapshot_line_range": [len(lines) + 1, len(lines) + len(rendered)],
+            })
+            lines.extend(rendered)
+    except BindingResolutionError as error:
+        result["blockers"].append("snapshot rendering blocked: " + str(error))
+        return result
+    snapshot_bytes = ("\n".join(lines) + "\n").encode("utf-8")
+    try:
+        snapshot_ast = _parse_source(snapshot_bytes.decode("utf-8"))
+        for node in snapshot_ast.get("resources", {}).values():
+            config = node["config"]
+            node["config"] = {
+                **_resolve_expression(
+                    {k: v for k, v in config.items() if k != "parent"},
+                    _raise_unresolved_symbol, environment,
+                ),
+                **({"parent": config["parent"]} if "parent" in config else {}),
+            }
+    except Exception as error:
+        result["blockers"].append("snapshot parsing failed: " + type(error).__name__)
+        return result
+    expected_resources = {
+        item["symbol"]: {
+            "decorators": [], "type": item["type"], "api_version": item["api_version"],
+            "existing": False, "config": item["config"],
+        } for item in materialized
+    }
+    if (
+        set(snapshot_ast) - {"globals", "resources"}
+        or not _same_literal(snapshot_ast.get("resources"), expected_resources, allow_symbols=True)
+    ):
+        result["blockers"].append("snapshot AST does not exactly reproduce the independent resource inventory")
+        return result
+    result["resolved_snapshot"] = {
+        "sha256": hashlib.sha256(snapshot_bytes).hexdigest(),
+        "source_text": snapshot_bytes.decode("utf-8"),
+        "source_map": source_map,
+        "symbolic_inputs": binding["symbolic_inputs"],
+        "explicit_root_parameters": binding["explicit_root_parameters"],
+        "actual_deployment_parameters_verified": False,
+        "ast_round_trip_verified": True,
+    }
+    with tempfile.TemporaryDirectory(prefix="certigo-cosmos-resolved-") as temporary:
+        snapshot = Path(temporary) / "resolved.bicep"
+        snapshot.write_bytes(snapshot_bytes)
+        runner = Runner()
+        raw = runner.run(
+            root_folder=temporary, files=[str(snapshot)],
+            runner_filter=RunnerFilter(checks=list(COSMOS_CHECKS), show_progress_bar=False),
+        ).get_dict()
+        proofs = _cosmos_runner_inputs(entries, runner.definitions)
+    result["resolved_report"] = raw
+    result["resolved_input_provenance"] = proofs
+    result["resolved_applicability"], blockers = reconcile(entries, count, raw)
+    result["blockers"].extend(blockers)
+    for proof in proofs:
+        if not proof["matches_bound_ast"]:
+            result["blockers"].append("resolved Runner inputs differ: " + proof["check"])
+            for row in result["resolved_applicability"]:
+                if (
+                    row["resource"] == proof["resource"] and row["check"] == proof["check"]
+                    and row["status"] == "PASSED"
+                ):
+                    row["status"] = "BLOCKED"
+                    row["reason"] = "raw PASSED does not prove the explicitly bound policy inputs"
+    if not result["blockers"]:
+        result["status"] = "QUALIFIED_SUBSET"
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("--environment", required=True, choices=("dev", "staging", "prod"))
     parser.add_argument("--module-symbol", action="append")
+    parser.add_argument("--resolved-cosmos-snapshot", action="store_true")
+    parser.add_argument("--cosmos-backup-mode", choices=("Periodic", "Continuous"))
     args = parser.parse_args()
-    if args.module_symbol and len(args.module_symbol) > 1:
+    if args.resolved_cosmos_snapshot:
+        if args.module_symbol != ["data"] or args.cosmos_backup_mode is None:
+            parser.error("resolved Cosmos mode requires --module-symbol data and an explicit --cosmos-backup-mode")
+        result = qualify_cosmos_snapshot(args.source, args.environment, args.cosmos_backup_mode)
+    elif args.cosmos_backup_mode is not None:
+        parser.error("--cosmos-backup-mode requires --resolved-cosmos-snapshot")
+    elif args.module_symbol and len(args.module_symbol) > 1:
         result = qualify_local_modules(args.source, args.environment, args.module_symbol)
     elif args.module_symbol:
         result = qualify_local_module(args.source, args.environment, args.module_symbol[0])
