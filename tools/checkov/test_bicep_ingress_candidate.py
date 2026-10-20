@@ -18,8 +18,9 @@ from checkov.arm.checks.resource.AppServiceHttpLoggingEnabled import check as lo
 
 from bicep_ingress_candidate import (
     CONFIG_CHECKS, RULE_SOURCES, UPSTREAM_PARSER_SOURCES,
-    _verify_parser, inventory, qualify, qualify_local_module, qualify_local_modules,
-    reconcile, resolve_local_module_bindings,
+    Runner, _parser_source, _verify_parser, inventory, qualify,
+    qualify_local_module, qualify_local_modules, reconcile,
+    resolve_local_module_bindings,
 )
 from build_parser_wheel import PATCHED_FILES, VERSION as COMPAT_PARSER_VERSION
 
@@ -399,11 +400,9 @@ class CandidateTests(unittest.TestCase):
             self.assertEqual(result["provenance"]["root_sha256"], hashlib.sha256(root.read_bytes()).hexdigest())
 
     def test_all_selected_module_inventories_exist_before_first_runner(self):
-        import bicep_ingress_candidate as candidate
-
         events = []
-        original_inventory = candidate.inventory
-        original_run = candidate.Runner.run
+        original_inventory = inventory
+        original_run = Runner.run
 
         def observed_inventory(*args, **kwargs):
             events.append("inventory")
@@ -413,9 +412,9 @@ class CandidateTests(unittest.TestCase):
             events.append("runner")
             return original_run(*args, **kwargs)
 
-        with module_fixture() as root, patch.object(
-            candidate, "inventory", side_effect=observed_inventory
-        ), patch.object(candidate.Runner, "run", side_effect=observed_run, autospec=True):
+        with module_fixture() as root, patch(
+            "bicep_ingress_candidate.inventory", side_effect=observed_inventory
+        ), patch.object(Runner, "run", side_effect=observed_run, autospec=True):
             result = qualify_local_modules(root, "prod", ["api", "data"])
         self.assertEqual(result["status"], "QUALIFIED_SUBSET", result["blockers"])
         self.assertEqual(events, ["inventory", "inventory", "runner", "runner"])
@@ -516,13 +515,11 @@ class CandidateTests(unittest.TestCase):
                     _verify_parser()
 
     def test_compatibility_parser_consumes_unmodified_authored_source(self):
-        import bicep_ingress_candidate as candidate
-
         source = MODULE_ROOT.replace(" ? [ '*' ] : []", "\n  ? [ '*' ]\n  : []")
         options = (
             {"side_effect": AssertionError("compatibility parser must not normalize source")}
             if version("pycep-parser") == COMPAT_PARSER_VERSION
-            else {"wraps": candidate._parser_source}
+            else {"wraps": _parser_source}
         )
         with module_fixture(root_source=source) as root, patch(
             "bicep_ingress_candidate._parser_source", **options
