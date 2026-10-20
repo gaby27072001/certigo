@@ -39,7 +39,7 @@
             saved = nil
         }
     }
-    @MainActor private final class AuthenticationMock: CIAMAuthenticationProvider {
+    @MainActor private final class AuthenticationMock: CIAMAccountDeletionProvider {
         var token = CIAMAccessToken(
             value: "synthetic-auth-token", expiresAt: Date(timeIntervalSince1970: 2_000))
         var interactiveCalls = 0
@@ -50,6 +50,30 @@
         var failure: CIAMAuthenticationFailure?
         var waiter: CheckedContinuation<Void, Never>?
         private var busy = false
+        var deletionAccountIdentifier: String? = "synthetic-msal-A"
+        var reauthAccount = "synthetic-msal-A"
+        var reauthTime = 1_000
+        var reauthCalls = 0
+        var deletedIdentifiers: [String] = []
+
+        func reauthenticateForAccountDeletion() async throws -> CIAMDeletionProof {
+            reauthCalls += 1
+            let acquired = try await acquire()
+            let claims = Data(
+                """
+                {"aud":"11111111-1111-4111-8111-111111111111","auth_time":\(reauthTime),"exp":2000}
+                """.utf8
+            ).base64EncodedString().replacingOccurrences(of: "=", with: "")
+                .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            return CIAMDeletionProof(
+                accessToken: acquired, idToken: "synthetic.\(claims).signature",
+                accountIdentifier: reauthAccount)
+        }
+
+        func removeAccountForDeletion(identifier: String) async throws {
+            if busy || rejectRemoval { throw CIAMAuthenticationFailure.operationInProgress }
+            deletedIdentifiers.append(identifier)
+        }
 
         func acquireInteractively() async throws -> CIAMAccessToken {
             interactiveCalls += 1
@@ -77,6 +101,14 @@
         }
     }
     private actor ModelTransport: HTTPTransport, BoundedHTTPTransport {
+        private var deletionState = "notRequested"
+        private var deletionHTTP = 200
+        private var deletionPosts = 0
+        private var loseDeletionResponse = false
+        func setDeletion(_ value: String) { deletionState = value }
+        func failDeletion(_ code: Int) { deletionHTTP = code }
+        func loseNextDeletionResponse() { loseDeletionResponse = true }
+        func deletionPostCount() -> Int { deletionPosts }
         private let offlineFixture: OfflinePackFixture
         private var catalog: Data
         private let lesson: Data
@@ -231,7 +263,37 @@
             let bytes: Data
             var status = 200
             var headers = ["Content-Type": "application/json"]
-            if url.path.hasSuffix("/me") {
+            if url.path == "/api/account/deletion" {
+                if request.httpMethod == "POST" {
+                    deletionPosts += 1
+                    guard request.httpBody == nil else { throw APIError.invalidResponse }
+                    if deletionState == "notRequested" {
+                        guard request.value(forHTTPHeaderField: "X-Certigo-Reauthentication") != nil
+                        else {
+                            throw ModelTestFailure.assertion("First deletion POST omitted proof")
+                        }
+                        deletionState = "pending"
+                    }
+                    if loseDeletionResponse {
+                        loseDeletionResponse = false
+                        throw URLError(.networkConnectionLost)
+                    }
+                }
+                status =
+                    deletionHTTP == 200
+                    ? (request.httpMethod == "POST" && deletionState == "pending" ? 202 : 200)
+                    : deletionHTTP
+                let requested =
+                    deletionState == "notRequested" ? "null" : "\"1970-01-01T00:16:40Z\""
+                let completed = deletionState == "completed" ? "\"1970-01-01T00:16:41Z\"" : "null"
+                let steps = deletionState == "completed" ? 6 : deletionState == "pending" ? 2 : 0
+                bytes = Data(
+                    """
+                    {"status":"\(deletionState)","completedSteps":\(steps),"totalSteps":6,
+                    "requestedAt":\(requested),"completedAt":\(completed),"failureCode":null,
+                    "retryAfterSeconds":\(deletionState == "pending" ? "5" : "null")}
+                    """.utf8)
+            } else if url.path.hasSuffix("/me") {
                 profileRequests += 1
                 status = profileStatus
                 let capturedOwner = owner
@@ -417,6 +479,14 @@
     @main private struct NativeModelTests {
         @MainActor static func main() async throws {
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
+            try await deletionProofAndCancellation(resources)
+            try await deletionPendingRecoveryAndCleanup(resources)
+            try await deletionLostResponse(resources)
+            try await deletionMissingRequestRecovery(resources)
+            try await deletionRecoveryWithoutOwner(resources)
+            try await deletionUnavailable(resources)
+            try await deletionReceiptWriteFailure(resources)
+            try await deletionFirstLaunchAndCorruptReceipt(resources)
             try await downloadedDraftRestoresWithoutLessonOrPath(resources)
             try await rejectedRetryRefreshesSavedState(resources)
             try await confirmedProfileAfterCorrection(resources)
@@ -453,6 +523,254 @@
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+        @MainActor static func deletionProofAndCancellation(_ resources: URL) async throws {
+            for failure in ["cancel", "mismatch", "stale", "background", "valid"] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture, authenticated: true)
+                let before = try Data(contentsOf: fixture.activityFile)
+                model.showAccountDeletion()
+                if failure == "cancel" { fixture.provider.failure = .cancelled }
+                if failure == "mismatch" { fixture.provider.reauthAccount = "synthetic-msal-B" }
+                if failure == "stale" { fixture.provider.reauthTime = 1 }
+                if failure == "background" {
+                    fixture.provider.pause = true
+                    let task = Task { await model.verifyDeletionIdentity() }
+                    for _ in 0..<10_000 {
+                        if fixture.provider.waiter != nil { break }
+                        await Task.yield()
+                    }
+                    try expect(
+                        fixture.provider.waiter != nil, "Dedicated reauthentication did not start")
+                    model.discardDeletionProof()
+                    fixture.provider.resume()
+                    await task.value
+                } else {
+                    await model.verifyDeletionIdentity()
+                }
+                try expect(
+                    model.deletionStage == (failure == "valid" ? .confirmation : .explanation),
+                    "Unexpected proof stage for \(failure)")
+                let count = await fixture.server.deletionPostCount()
+                try expect(count == 0, "Reauthentication implicitly submitted deletion")
+                model.discardDeletionProof()
+                await model.confirmAccountDeletion()
+                let after = await fixture.server.deletionPostCount()
+                try expect(after == 0, "Cancelled/stale proof posted deletion")
+                await model.cancelAccountDeletion()
+                try expect(
+                    model.deletionStage == nil && model.canSubmit,
+                    "Cancelled verification failed to resume the learning session")
+                try expect(
+                    try Data(contentsOf: fixture.activityFile) == before,
+                    "Cancellation removed or rewrote the local draft")
+            }
+        }
+
+        @MainActor static func deletionPendingRecoveryAndCleanup(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            let before = try Data(contentsOf: fixture.activityFile)
+            model.showAccountDeletion()
+            await model.verifyDeletionIdentity()
+            try expect(
+                model.deletionStage == .confirmation, "Proof did not require final confirmation")
+            await model.confirmAccountDeletion()
+            let posts = await fixture.server.deletionPostCount()
+            try expect(posts == 1 && model.deletionStage == .pending, "202 was not pending")
+            try expect(
+                !model.canSubmit && !model.canRetryDeletion,
+                "Pending failed to freeze learning/backoff")
+            let frozenCount = await fixture.server.count()
+            if let track = model.tracks.first {
+                await model.chooseActiveTrack(track)
+                await model.loadPath(track)
+                await model.downloadQuestionPack(track)
+            }
+            await model.submit()
+            await model.refreshProgress()
+            let afterFrozen = await fixture.server.count()
+            try expect(frozenCount == afterFrozen, "Pending deletion allowed learning network work")
+            try expect(
+                try Data(contentsOf: fixture.activityFile) == before && fixture.vault.clears == 0,
+                "202 purged local state")
+            await model.retryAccountDeletion()
+            let backedOff = await fixture.server.deletionPostCount()
+            try expect(backedOff == 1, "Backoff did not prevent duplicate deletion POST")
+            await fixture.server.failProfile(423)
+            let profileCount = await fixture.server.profileRequestCount()
+            let reopened = fixture.model()
+            await reopened.restore()
+            let afterProfile = await fixture.server.profileRequestCount()
+            try expect(
+                afterProfile == profileCount && reopened.profile == nil
+                    && reopened.deletionStage == .pending,
+                "Pending restart depended on /me or fabricated a learning session")
+            fixture.provider.deletionAccountIdentifier = "synthetic-msal-B"
+            await reopened.recoverDeletionConnection(interactive: true)
+            try expect(
+                reopened.deletionStage == .unconfirmed,
+                "Different account was accepted for recovery")
+            fixture.provider.deletionAccountIdentifier = "synthetic-msal-A"
+            await reopened.recoverDeletionConnection(interactive: true)
+            fixture.time = fixture.time.addingTimeInterval(6)
+            fixture.vault.rejectClear = true
+            await fixture.server.setDeletion("completed")
+            await reopened.retryAccountDeletion()
+            try expect(
+                reopened.deletionStage == .cleanupFailed && reopened.profile == nil,
+                "Cleanup failure was hidden or profile remained active")
+            try expect(
+                !FileManager.default.fileExists(atPath: fixture.activityFile.path),
+                "Confirmed owner draft was not removed")
+            let completedPosts = await fixture.server.deletionPostCount()
+            let marker = fixture.root.appendingPathComponent("account-deletion-v1.json")
+            let receiptBytes = try Data(contentsOf: marker)
+            let receipt = try CertigoAPI.decoder().decode(
+                NativeDeletionReceipt.self, from: receiptBytes)
+            try expect(
+                receipt.phase == .completed && receipt.remainingCleanup == ["vault", "msal"],
+                "Cleanup receipt did not persist acknowledged local targets")
+            let text = String(decoding: receiptBytes, as: UTF8.self)
+            try expect(
+                !text.contains("synthetic-auth-token") && !text.contains("signature"),
+                "Durable deletion receipt persisted a credential")
+            fixture.vault.rejectClear = false
+            let cleanupRestart = fixture.model()
+            await cleanupRestart.restore()
+            let finalPosts = await fixture.server.deletionPostCount()
+            try expect(
+                cleanupRestart.deletionStage == .completed && finalPosts == completedPosts,
+                "Restarted local cleanup repeated POST or did not finish")
+            try expect(
+                fixture.provider.deletedIdentifiers == ["synthetic-msal-A"],
+                "Cleanup did not target the captured SDK account")
+            cleanupRestart.acknowledgeAccountDeletion()
+            try expect(
+                cleanupRestart.deletionStage == nil
+                    && !FileManager.default.fileExists(atPath: marker.path),
+                "Completion did not wait for acknowledgement")
+        }
+
+        @MainActor static func deletionLostResponse(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            model.showAccountDeletion()
+            await model.verifyDeletionIdentity()
+            await fixture.server.loseNextDeletionResponse()
+            await model.confirmAccountDeletion()
+            try expect(
+                model.deletionStage == .unconfirmed && fixture.vault.clears == 0,
+                "Lost POST response became successful deletion")
+            await model.refreshDeletionStatus()
+            let count = await fixture.server.deletionPostCount()
+            try expect(
+                model.deletionStage == .pending && count == 1,
+                "Lost POST was not reconciled with GET for the same subject")
+        }
+
+        @MainActor static func deletionRecoveryWithoutOwner(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            await fixture.server.failProfile(423)
+            await fixture.server.setDeletion("pending")
+            let model = fixture.model()
+            await model.connect()
+            try expect(
+                model.profile == nil && model.deletionStage == .pending,
+                "/me423 did not expose deletion-only status")
+            await fixture.server.setDeletion("completed")
+            await model.refreshDeletionStatus()
+            try expect(
+                model.deletionStage == .cleanupFailed && fixture.vault.clears == 0,
+                "Unknown owner caused an invented purge or fake completion")
+        }
+
+        @MainActor static func deletionMissingRequestRecovery(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            model.showAccountDeletion()
+            await model.verifyDeletionIdentity()
+            await fixture.server.loseNextDeletionResponse()
+            await model.confirmAccountDeletion()
+            await fixture.server.setDeletion("notRequested")
+            await model.refreshDeletionStatus()
+            try expect(
+                model.deletionStatus?.status == .notRequested
+                    && model.deletionStage == .unconfirmed,
+                "Absent request did not remain explicit")
+            await model.resumeAccountAfterStatusCheck()
+            let posts = await fixture.server.deletionPostCount()
+            try expect(
+                model.deletionStage == nil && model.canSubmit && posts == 1,
+                "Status-checked absent request did not resume without another POST")
+        }
+
+        @MainActor static func deletionUnavailable(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            await fixture.server.failDeletion(503)
+            model.showAccountDeletion()
+            await model.verifyDeletionIdentity()
+            let count = await fixture.server.deletionPostCount()
+            try expect(
+                model.deletionStage == .explanation
+                    && model.deletionMessage?.contains("unavailable") == true && count == 0,
+                "Unavailable backend was represented as deletion success")
+            try expect(
+                fixture.vault.clears == 0
+                    && FileManager.default.fileExists(atPath: fixture.activityFile.path),
+                "Unavailable backend removed local work")
+            await model.cancelAccountDeletion()
+            try expect(model.canSubmit, "Unavailable deletion could not return to learning")
+        }
+        @MainActor static func deletionReceiptWriteFailure(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture, authenticated: true)
+            model.showAccountDeletion()
+            await model.verifyDeletionIdentity()
+            await model.confirmAccountDeletion()
+            await fixture.server.setDeletion("completed")
+            fixture.rejectActivityAccess = true
+            await model.refreshDeletionStatus()
+            try expect(
+                model.deletionStage == .cleanupFailed && model.profile == nil
+                    && model.deletionStatus?.status == .completed && fixture.vault.clears == 0,
+                "Completion receipt write failure became success or lost confirmed server status")
+            fixture.rejectActivityAccess = false
+            let before = await fixture.server.deletionPostCount()
+            await model.retryDeletionCleanup()
+            let after = await fixture.server.deletionPostCount()
+            try expect(
+                model.deletionStage == .completed && before == after,
+                "Cleanup retry after receipt failure repeated server deletion")
+        }
+        @MainActor static func deletionFirstLaunchAndCorruptReceipt(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            let restored = await model.restoreAccountDeletionIfNeeded()
+            try expect(
+                !restored && fixture.provider.silentCalls == 0
+                    && fixture.provider.interactiveCalls == 0
+                    && model.errorMessage == nil,
+                "First launch without a deletion receipt started authentication")
+            try FileManager.default.createDirectory(
+                at: fixture.root, withIntermediateDirectories: true)
+            try Data("{}".utf8).write(
+                to: fixture.root.appendingPathComponent("account-deletion-v1.json"))
+            let corrupt = await model.restoreAccountDeletionIfNeeded()
+            let requests = await fixture.server.count()
+            try expect(
+                corrupt && model.deletionStage == .unconfirmed && model.profile == nil
+                    && requests == 0 && fixture.vault.clears == 0,
+                "Corrupt receipt invented completion, authenticated or purged data")
         }
         @MainActor static func downloadedDraftRestoresWithoutLessonOrPath(_ resources: URL)
             async throws
@@ -697,8 +1015,10 @@
                     "Account switch lost the original owner's ACK")
             }
         }
-        @MainActor static func prepareDraft(_ fixture: ModelFixture) async throws -> NativeModel {
-            let model = fixture.model(authenticated: false)
+        @MainActor static func prepareDraft(_ fixture: ModelFixture, authenticated: Bool = false)
+            async throws -> NativeModel
+        {
+            let model = fixture.model(authenticated: authenticated)
             model.baseURL = "https://example.invalid/api"
             model.token = "synthetic-A"
             await model.connect()
