@@ -1,4 +1,4 @@
-"""Inactive, single-file literal Bicep applicability qualification."""
+"""Inactive Bicep applicability qualification with explicit local-module provenance."""
 
 import argparse
 import hashlib
@@ -17,6 +17,7 @@ from pycep import BicepParser
 from pycep.transformer import BicepElement
 
 from build_checkov_wheel import VERSION
+from build_parser_wheel import PATCHED_FILES, VERSION as COMPAT_PARSER_VERSION
 
 
 SITE = "Microsoft.Web/sites"
@@ -54,6 +55,30 @@ RULE_SOURCES = {
         "2a5d260ab48a02032dfed01f14ba9c4fb4d806f23414f4c12c6d1a031b1c0384",
 }
 REGISTRY_SHA256 = "35a84e2225433f4529efcfdeebc6fe872e8ebca50674ab03717aff3d33d44fd0"
+UPSTREAM_PARSER_SOURCES = {
+    "pycep/__init__.py": "c5ccf5905df50eeaf2b58dc53dc3e693db54ada95c38f7c7cdb63b16a643230d",
+    "pycep/bicep.lark": "e40d0cc7b84e1a324acac120171a475adb9fdcc8770ad0c249e4906caf1277f2",
+    "pycep/main.py": "3de04e7ce87e3ab105f20e829fb17b3394952a76cd4452bc4625c24733e4ae85",
+    "pycep/transformer.py": "c09329a9902e1ca70fa8a9c7ea1112b746ec816b66e22c48f00b0769181b6bbd",
+    "pycep/typing.py": "7602ebb3c2c6fc08da78aec2efea81ed9089c904f59b392e36ca3dba10dfe9ae",
+    "pycep/validator.py": "d5c93e51755c313cd279905ef625b2cbb219fe9a7cab4175d52e90f8a46854c4",
+}
+
+
+def _verify_parser():
+    import pycep
+
+    parser_version = version("pycep-parser")
+    if parser_version not in ("0.5.1", COMPAT_PARSER_VERSION):
+        raise ValueError("requires pinned upstream or reviewed compatibility parser")
+    sources = dict(UPSTREAM_PARSER_SOURCES)
+    if parser_version == COMPAT_PARSER_VERSION:
+        sources.update(PATCHED_FILES)
+    package_root = Path(pycep.__file__).parent.parent
+    for relative, expected in sources.items():
+        if hashlib.sha256((package_root / relative).read_bytes()).hexdigest() != expected:
+            raise ValueError("unexpected installed parser source: " + relative)
+    return {"version": parser_version, "source_sha256": sources}
 
 
 class BindingResolutionError(ValueError):
@@ -103,7 +128,9 @@ def _parser_source(source):
 
 
 def _parse_source(source):
-    return BicepParser().parse(text=_parser_source(source))
+    parser = _verify_parser()
+    text = source if parser["version"] == COMPAT_PARSER_VERSION else _parser_source(source)
+    return BicepParser().parse(text=text)
 
 
 def _resolve_expression(expression, resolve_symbol, environment):
@@ -130,6 +157,8 @@ def _resolve_expression(expression, resolve_symbol, environment):
     if isinstance(expression, list):
         return [_resolve_expression(value, resolve_symbol, environment) for value in expression]
     if isinstance(expression, dict):
+        if "function" in expression:
+            raise BindingResolutionError("function calls are outside the static binding contract")
         operator = expression.get("operator")
         if isinstance(operator, dict):
             operands = operator.get("operands")
@@ -181,10 +210,12 @@ def _raise_unresolved_symbol(name):
     raise BindingResolutionError("module symbol has no explicit binding: " + name)
 
 
-def resolve_local_module_bindings(root_path, environment, module_symbol="api"):
+def resolve_local_module_bindings(
+    root_path, environment, module_symbol="api", *, _snapshot=None, _module_snapshots=None,
+):
     """Resolve one local module call using only literals and bounded env ternaries."""
     root_path = Path(root_path).resolve(strict=True)
-    root_bytes = root_path.read_bytes()
+    root_bytes = root_path.read_bytes() if _snapshot is None else _snapshot[0]
     result = {
         "root_source": str(root_path),
         "root_sha256": hashlib.sha256(root_bytes).hexdigest(),
@@ -192,6 +223,9 @@ def resolve_local_module_bindings(root_path, environment, module_symbol="api"):
         "module_symbol": module_symbol,
         "module_source": None,
         "module_sha256": None,
+        "module_name": None,
+        "module_scope": None,
+        "dependencies": [],
         "parameters": [],
         "values": {},
         "blockers": [],
@@ -200,8 +234,8 @@ def resolve_local_module_bindings(root_path, environment, module_symbol="api"):
         result["blockers"].append("only dev, staging or prod can be resolved")
         return result
     try:
-        root = _parse_source(root_bytes.decode("utf-8"))
-    except (UnicodeError, Exception) as error:
+        root = _parse_source(root_bytes.decode("utf-8")) if _snapshot is None else _snapshot[1]
+    except Exception as error:
         result["blockers"].append("root source parsing failed: " + type(error).__name__)
         return result
     if not isinstance(root, dict):
@@ -237,10 +271,10 @@ def resolve_local_module_bindings(root_path, environment, module_symbol="api"):
     ):
         result["blockers"].append("module call has malformed source or configuration")
         return result
-    unsupported_module_fields = set(config) - {"name", "params"}
+    unsupported_module_fields = set(config) - {"name", "params", "scope", "dependsOn"}
     if unsupported_module_fields:
         result["blockers"].append(
-            "module scope, condition, loop or dependency fields are outside the binding contract"
+            "module condition, loop or unknown fields are outside the binding contract"
         )
     relative_module = Path(detail["path"])
     if relative_module.is_absolute() or ".." in relative_module.parts:
@@ -255,11 +289,17 @@ def resolve_local_module_bindings(root_path, environment, module_symbol="api"):
         result["blockers"].append("local module path escapes the root source directory")
         return result
     result["module_source"] = str(module_path)
-    module_bytes = module_path.read_bytes()
+    if _module_snapshots is None:
+        module_bytes = module_path.read_bytes()
+    else:
+        if module_path not in _module_snapshots:
+            _module_snapshots[module_path] = module_path.read_bytes()
+        module_bytes = _module_snapshots[module_path]
+    result["_module_bytes"] = module_bytes
     result["module_sha256"] = hashlib.sha256(module_bytes).hexdigest()
     try:
         module = _parse_source(module_bytes.decode("utf-8"))
-    except (UnicodeError, Exception) as error:
+    except Exception as error:
         result["blockers"].append("module source parsing failed: " + type(error).__name__)
         return result
     if not isinstance(module, dict):
@@ -278,8 +318,12 @@ def resolve_local_module_bindings(root_path, environment, module_symbol="api"):
             return environment
         if name in active:
             raise BindingResolutionError("cyclic root parameter/variable reference")
+        spec = None
         if name in root_parameters:
-            default = root_parameters[name].get("default")
+            spec = root_parameters[name]
+            if any(item.get("type") == "secure" for item in spec.get("decorators", [])):
+                raise BindingResolutionError("secure root parameters need external deployment evidence")
+            default = spec.get("default")
             if default is None:
                 raise BindingResolutionError("root parameter has no literal deployment value")
             value = default
@@ -287,9 +331,61 @@ def resolve_local_module_bindings(root_path, environment, module_symbol="api"):
             value = root_variables[name].get("value")
         else:
             raise BindingResolutionError("root symbol is not a literal parameter or variable")
-        return _resolve_expression(
+        resolved = _resolve_expression(
             value, lambda nested: resolve_root_symbol(nested, active + (name,)), environment
         )
+        if spec is not None and not _matches_parameter_type(resolved, spec.get("type")):
+            raise BindingResolutionError("root default does not match its declared parameter type")
+        return resolved
+
+    try:
+        name = _resolve_expression(config["name"], resolve_root_symbol, environment)
+        if not _literal_string(name) or not name:
+            raise BindingResolutionError("module deployment name is not a literal")
+        result["module_name"] = name
+    except BindingResolutionError as error:
+        result["blockers"].append("unresolved module deployment name: " + str(error))
+
+    scope = config.get("scope")
+    if scope is None:
+        if root.get("globals", {}).get("scope", {}).get("value") != "resourceGroup":
+            result["blockers"].append("module has no explicit resource-group scope")
+        else:
+            result["module_scope"] = {"kind": "inherited-resource-group"}
+    elif type(scope) is BicepElement:
+        scope_resource = root.get("resources", {}).get(str(scope), {})
+        scope_config = scope_resource.get("config", {})
+        if (
+            scope_resource.get("type") != "Microsoft.Resources/resourceGroups"
+            or scope_resource.get("existing") is not True
+            or scope_resource.get("api_version") != "2024-03-01"
+            or set(scope_resource) != {"decorators", "type", "api_version", "existing", "config"}
+            or set(scope_config) != {"name"}
+            or root.get("globals", {}).get("scope", {}).get("value") not in (
+                "resourceGroup", "subscription",
+            )
+        ):
+            result["blockers"].append("module scope is not a bounded existing resource-group symbol")
+        else:
+            try:
+                name = _resolve_expression(scope_config["name"], resolve_root_symbol, environment)
+                if not _literal_string(name) or not name:
+                    raise BindingResolutionError("resource-group name is not a literal")
+                result["module_scope"] = {
+                    "kind": "existing-resource-group", "symbol": str(scope), "name": name,
+                }
+            except BindingResolutionError as error:
+                result["blockers"].append("unresolved module scope: " + str(error))
+    else:
+        result["blockers"].append("dynamic module scopes are outside the binding contract")
+    dependencies = config.get("dependsOn", [])
+    root_symbols = set(root.get("modules", {})) | set(root.get("resources", {}))
+    if not isinstance(dependencies, list) or any(
+        type(item) is not BicepElement or str(item) not in root_symbols for item in dependencies
+    ):
+        result["blockers"].append("module dependency is not an explicit root symbol")
+    else:
+        result["dependencies"] = [str(item) for item in dependencies]
 
     module_parameters = module.get("parameters", {})
     passed = config.get("params", {})
@@ -310,6 +406,9 @@ def resolve_local_module_bindings(root_path, environment, module_symbol="api"):
         if name in module_parameters:
             resolving.add(name)
             spec = module_parameters[name]
+            if any(item.get("type") == "secure" for item in spec.get("decorators", [])):
+                resolving.remove(name)
+                raise BindingResolutionError("secure module parameters need external deployment evidence")
             if name in passed:
                 expression = passed[name]
                 resolver = resolve_root_symbol
@@ -719,8 +818,9 @@ def reconcile(entries, resource_count, report):
 
 
 def _verify_runtime():
-    if version("checkov") != VERSION or version("pycep-parser") != "0.5.1":
-        raise ValueError("requires existing candidate and pinned upstream parser")
+    if version("checkov") != VERSION:
+        raise ValueError("requires existing pinned Checkov candidate")
+    _verify_parser()
     import checkov.bicep.checks.resource.base_registry as registry
 
     if hashlib.sha256(Path(registry.__file__).read_bytes()).hexdigest() != REGISTRY_SHA256:
@@ -743,6 +843,7 @@ def qualify(path, environment, instance="root"):
         module_instance=instance,
         parameters="none; declarations rejected",
         candidate_version=VERSION,
+        parser=_verify_parser(),
     )
     try:
         source = contents.decode("utf-8")
@@ -789,8 +890,14 @@ def qualify_local_module(path, environment, module_symbol="api"):
     """Qualify one local module call without flattening or rewriting its source."""
     _verify_runtime()
     binding = resolve_local_module_bindings(path, environment, module_symbol)
+    return _qualify_bound_module(binding)
+
+
+def _qualify_bound_module(binding):
+    environment = binding["environment"]
+    module_symbol = binding["module_symbol"]
     binding_summary = {
-        key: value for key, value in binding.items() if key != "values"
+        key: value for key, value in binding.items() if key != "values" and not key.startswith("_")
     }
     blockers = list(binding["blockers"])
     module_source = binding.get("module_source")
@@ -805,6 +912,7 @@ def qualify_local_module(path, environment, module_symbol="api"):
                 "environment": environment,
                 "module_instance": "root/" + module_symbol,
                 "candidate_version": VERSION,
+                "parser": _verify_parser(),
             },
             "binding_resolution": binding_summary,
             "obligations": [],
@@ -814,14 +922,16 @@ def qualify_local_module(path, environment, module_symbol="api"):
             "scanner_report": None,
         }
     module_path = Path(module_source)
-    module_bytes = module_path.read_bytes()
+    module_bytes = binding["_module_bytes"]
     try:
         source = module_bytes.decode("utf-8")
     except UnicodeError as error:
         blockers.append("module source is not UTF-8: " + type(error).__name__)
         source = ""
-    entries, resource_count, inventory_problems = inventory(
-        source, environment, "root/" + module_symbol, binding["values"]
+    entries, resource_count, inventory_problems = (
+        binding["_inventory"] if "_inventory" in binding else inventory(
+            source, environment, "root/" + module_symbol, binding["values"]
+        )
     )
     blockers.extend(inventory_problems)
     raw = None
@@ -850,6 +960,7 @@ def qualify_local_module(path, environment, module_symbol="api"):
             "environment": environment,
             "module_instance": "root/" + module_symbol,
             "candidate_version": VERSION,
+            "parser": _verify_parser(),
         },
         "binding_resolution": binding_summary,
         "obligations": entries,
@@ -860,17 +971,87 @@ def qualify_local_module(path, environment, module_symbol="api"):
     }
 
 
+def qualify_local_modules(path, environment, module_symbols):
+    """Inventory all root calls; bind every selected instance before any Runner."""
+    _verify_runtime()
+    path = Path(path).resolve(strict=True)
+    contents = path.read_bytes()
+    result = {
+        "schema": "certigo.bicep-appservice-qualification/v4",
+        "scope": "explicit selected local module instances; not root-wide or deployment compliance",
+        "production_adoptable": False,
+        "provenance": {
+            "root_source": str(path),
+            "root_sha256": hashlib.sha256(contents).hexdigest(),
+            "environment": environment,
+            "candidate_version": VERSION,
+            "parser": _verify_parser(),
+        },
+        "root_inventory": {"module_calls": [], "resources": []},
+        "modules": [],
+        "status": "BLOCKED",
+        "blockers": [],
+    }
+    if not module_symbols or len(set(module_symbols)) != len(module_symbols):
+        result["blockers"].append("an explicit nonempty unique module selection is required")
+        return result
+    try:
+        root = _parse_source(contents.decode("utf-8"))
+    except Exception as error:
+        result["blockers"].append("root source parsing failed: " + type(error).__name__)
+        return result
+    calls = root.get("modules", {})
+    result["root_inventory"]["module_calls"] = [
+        {
+            "symbol": symbol,
+            "type": node.get("type"),
+            "path": node.get("detail", {}).get("path"),
+            "selected": symbol in module_symbols,
+        }
+        for symbol, node in calls.items()
+    ]
+    result["root_inventory"]["resources"] = [
+        {"symbol": symbol, "type": node.get("type"), "qualified": False}
+        for symbol, node in root.get("resources", {}).items()
+    ]
+    module_snapshots = {}
+    bindings = [
+        resolve_local_module_bindings(
+            path, environment, symbol, _snapshot=(contents, root), _module_snapshots=module_snapshots
+        )
+        for symbol in module_symbols
+    ]
+    for binding in bindings:
+        if "_module_bytes" in binding:
+            try:
+                source = binding["_module_bytes"].decode("utf-8")
+            except UnicodeError:
+                source = ""
+            binding["_inventory"] = inventory(
+                source, environment, "root/" + binding["module_symbol"], binding["values"]
+            )
+    # A selected module cannot disappear behind a different module's passing records.
+    result["modules"] = [_qualify_bound_module(binding) for binding in bindings]
+    for module in result["modules"]:
+        instance = module["provenance"]["module_instance"]
+        result["blockers"].extend(instance + ": " + reason for reason in module["blockers"])
+    if not result["blockers"]:
+        result["status"] = "QUALIFIED_SUBSET"
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("--environment", required=True, choices=("dev", "staging", "prod"))
-    parser.add_argument("--module-symbol")
+    parser.add_argument("--module-symbol", action="append")
     args = parser.parse_args()
-    result = (
-        qualify_local_module(args.source, args.environment, args.module_symbol)
-        if args.module_symbol
-        else qualify(args.source, args.environment)
-    )
+    if args.module_symbol and len(args.module_symbol) > 1:
+        result = qualify_local_modules(args.source, args.environment, args.module_symbol)
+    elif args.module_symbol:
+        result = qualify_local_module(args.source, args.environment, args.module_symbol[0])
+    else:
+        result = qualify(args.source, args.environment)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 1 if result["status"] == "BLOCKED" else 0
 
