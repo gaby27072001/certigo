@@ -1749,14 +1749,15 @@ def main():
         if args.module_symbol != ["data"] or args.cosmos_backup_mode is None:
             parser.error("resolved Cosmos mode requires --module-symbol data and an explicit --cosmos-backup-mode")
         result = qualify_cosmos_snapshot(args.source, args.environment, args.cosmos_backup_mode)
-    elif args.cosmos_backup_mode is not None:
-        parser.error("--cosmos-backup-mode requires --resolved-cosmos-snapshot")
-    elif args.module_symbol and len(args.module_symbol) > 1:
-        result = qualify_local_modules(args.source, args.environment, args.module_symbol)
-    elif args.module_symbol:
-        result = qualify_local_module(args.source, args.environment, args.module_symbol[0])
     else:
-        result = qualify(args.source, args.environment)
+        if args.cosmos_backup_mode is not None:
+            parser.error("--cosmos-backup-mode requires --resolved-cosmos-snapshot")
+        if args.module_symbol and len(args.module_symbol) > 1:
+            result = qualify_local_modules(args.source, args.environment, args.module_symbol)
+        elif args.module_symbol:
+            result = qualify_local_module(args.source, args.environment, args.module_symbol[0])
+        else:
+            result = qualify(args.source, args.environment)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 1 if result["status"] == "BLOCKED" else 0
 

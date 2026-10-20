@@ -18,7 +18,7 @@ from checkov.arm.checks.resource.AppServiceHttpLoggingEnabled import check as lo
 
 from bicep_ingress_candidate import (
     CONFIG_CHECKS, COSMOS_CHECKS, RULE_SOURCES, UPSTREAM_PARSER_SOURCES,
-    Runner, _parser_source, _verify_cosmos_dispatch, _verify_parser, inventory, qualify,
+    Runner, _parse_source, _parser_source, _verify_cosmos_dispatch, _verify_parser, inventory, qualify,
     qualify_cosmos_snapshot, qualify_local_module, qualify_local_modules,
     reconcile, resolve_local_module_bindings,
 )
@@ -698,8 +698,7 @@ class CandidateTests(unittest.TestCase):
             self.assertIn("missing, duplicate or unexpected resource/check obligation", result["blockers"])
 
     def test_resolved_snapshot_lost_child_blocks_ast_round_trip_before_second_runner(self):
-        import bicep_ingress_candidate as candidate
-        original = candidate._parse_source
+        original = _parse_source
 
         def lose_child(source):
             tree = original(source)
@@ -707,7 +706,7 @@ class CandidateTests(unittest.TestCase):
                 tree["resources"].pop("containerResources_12")
             return tree
 
-        with snapshot_fixture() as root, patch.object(candidate, "_parse_source", side_effect=lose_child):
+        with snapshot_fixture() as root, patch("bicep_ingress_candidate._parse_source", side_effect=lose_child):
             result = qualify_cosmos_snapshot(root, "prod", "Continuous")
         self.assert_blocked(result)
         self.assertIsNone(result["resolved_report"])
