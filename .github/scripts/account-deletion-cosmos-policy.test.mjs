@@ -321,6 +321,30 @@ test('accepts migration state A with only the invariant-preserving legacy workfl
   });
 });
 
+test('rejects a reviewed workflow replaced after its descriptor opens', (context) => {
+  withFixture(['activeLegacy'], (root) => {
+    assert.deepEqual(validate(root), []);
+    const file = path.join(root, '.github', 'workflows', 'ci-infra.yml');
+    const open = fs.openSync;
+    let substituted = false;
+    context.mock.method(fs, 'openSync', (target, ...args) => {
+      const descriptor = open(target, ...args);
+      if (target === file && !substituted) {
+        fs.renameSync(file, `${file}.original`);
+        fs.writeFileSync(file, 'name: unreviewed\n');
+        substituted = true;
+      }
+      return descriptor;
+    });
+    try {
+      assert.ok(validate(root).some((error) => error.includes('matching the opened descriptor')));
+      assert.equal(substituted, true);
+    } finally {
+      context.mock.restoreAll();
+    }
+  });
+});
+
 test('accepts migration state B with both controlled archives and no active Cosmos workflow', () => {
   withFixture(['archivedLegacy', 'archivedOneShot'], (root) => {
     assert.deepEqual(validate(root), []);
