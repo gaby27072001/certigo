@@ -25,9 +25,9 @@ enum NativePilotError: Error {
     case lessonUnavailable
 }
 
-// Navigation metadata only; the existing outbox remains the sole persisted submission authority.
+// The outbox remains the sole persisted submission authority.
 struct NativeResumeState: Codable, Equatable, Sendable {
-    enum Tab: String, Codable, Sendable { case learn, coach, social, profile }
+    enum Tab: String, Codable, CaseIterable, Sendable { case learn, coach, social, profile }
     enum Phase: String, Codable, Sendable { case draft, submitting, pending, confirmed, failed }
     struct Session: Codable, Equatable, Sendable {
         let trackId: String
@@ -174,6 +174,115 @@ struct NativeResumeState: Codable, Equatable, Sendable {
     }
 }
 
+struct NativeActivitySnapshot: Codable {
+    struct Draft: Codable {
+        let lessonDigest: String
+        let attemptId: String
+        let startedAt: Date
+        let selections: [String: String]
+        let latencies: [String: Int]
+    }
+
+    let schema: Int
+    let navigation: NativeResumeState
+    let trackId: String?
+    let draft: Draft?
+
+    static func digest(_ lesson: Lesson) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try CanonicalQuestionReader.digest(encoder.encode(lesson)).sha256
+    }
+
+    func encoded() throws -> Data {
+        let bytes = try JSONEncoder().encode(self)
+        _ = try Self.decode(bytes)
+        return bytes
+    }
+
+    static func decode(_ bytes: Data) throws -> Self {
+        do { return try decodeValue(bytes) } catch {
+            throw NativeResumeError.malformed
+        }
+    }
+
+    private static func decodeValue(_ bytes: Data) throws -> Self {
+        guard bytes.count <= 65_536,
+            let object = try JSONSerialization.jsonObject(with: bytes) as? [String: Any],
+            Set(object.keys).isSubset(of: ["schema", "navigation", "trackId", "draft"]),
+            let navigation = object["navigation"] as? [String: Any]
+        else { throw NativeResumeError.malformed }
+        _ = try NativeResumeState.decode(JSONSerialization.data(withJSONObject: navigation))
+        if let draft = object["draft"], !(draft is NSNull) {
+            guard let fields = draft as? [String: Any],
+                Set(fields.keys) == [
+                    "lessonDigest", "attemptId", "startedAt", "selections", "latencies",
+                ]
+            else { throw NativeResumeError.malformed }
+        }
+        let value = try JSONDecoder().decode(Self.self, from: bytes)
+        guard value.schema == 1 else { throw NativeResumeError.malformed }
+        if let track = value.trackId {
+            _ = try NativeResumeState(
+                tab: .learn, ownerId: value.navigation.ownerId,
+                apiScope: value.navigation.apiScope,
+                session: .init(
+                    trackId: track, lessonId: "navigation", publicManifestId: nil,
+                    phase: .draft, attemptId: nil))
+        }
+        if let draft = value.draft {
+            guard value.navigation.session?.phase == .draft,
+                UUID(uuidString: draft.attemptId) != nil,
+                draft.startedAt.timeIntervalSince1970.isFinite,
+                draft.lessonDigest.count == 64,
+                draft.lessonDigest.utf8.allSatisfy({
+                    (48...57).contains($0) || (97...102).contains($0)
+                }),
+                Set(draft.latencies.keys).isSubset(of: Set(draft.selections.keys)),
+                draft.latencies.values.allSatisfy({ $0 >= 0 })
+            else { throw NativeResumeError.malformed }
+        } else if value.navigation.session?.phase == .draft {
+            throw NativeResumeError.malformed
+        }
+        return value
+    }
+}
+
+struct NativeActivityStore {
+    let file: URL
+
+    static func applicationStore() throws -> Self {
+        let directory = try FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: true)
+        return Self(file: directory.appendingPathComponent("CertigoNative/activity-v1.json"))
+    }
+
+    func read() throws -> Data? {
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
+        guard let size = attributes[.size] as? NSNumber, size.intValue <= 65_536 else {
+            throw NativeResumeError.malformed
+        }
+        let bytes = try Data(contentsOf: file)
+        guard bytes.count <= 65_536 else { throw NativeResumeError.malformed }
+        return bytes
+    }
+
+    func save(_ bytes: Data) throws {
+        _ = try NativeActivitySnapshot.decode(bytes)
+        try FileManager.default.createDirectory(
+            at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try bytes.write(to: file, options: .atomic)
+    }
+
+    func clear() throws {
+        if FileManager.default.fileExists(atPath: file.path) {
+            try FileManager.default.removeItem(at: file)
+        }
+    }
+}
+
 @Observable @MainActor
 final class NativeModel {
     var baseURL = ""
@@ -189,6 +298,12 @@ final class NativeModel {
     private(set) var busy = false
     var errorMessage: String?
     var selections: [String: String] = [:]
+    var selectedTab: NativeResumeState.Tab = .learn {
+        didSet { if !busy { persistActivity() } }
+    }
+    private(set) var restorationRevision = 0
+    private var resumeReady = false
+    private var apiScope: String?
     private var latencies: [String: Int] = [:]
     private var questionStarted: [String: ContinuousClock.Instant] = [:]
     private var attemptID = UUID().uuidString
@@ -198,6 +313,7 @@ final class NativeModel {
     private var client: LearningClient?
     private let vault: any DeveloperConnectionVault
     private let defaults: UserDefaults
+    private let activityStore: () throws -> NativeActivityStore
     private let makeClient: (URL) throws -> LearningClient
     private let authentication:
         (provider: any CIAMAuthenticationProvider, configuration: CIAMConfiguration)?
@@ -209,6 +325,8 @@ final class NativeModel {
     init(
         vault: any DeveloperConnectionVault = CredentialVault(),
         defaults: UserDefaults = .standard,
+        activityStore: @escaping () throws -> NativeActivityStore = NativeActivityStore
+            .applicationStore,
         clientFactory: ((URL) throws -> LearningClient)? = nil,
         authentication: (
             provider: any CIAMAuthenticationProvider, configuration: CIAMConfiguration
@@ -217,6 +335,7 @@ final class NativeModel {
     ) {
         self.vault = vault
         self.defaults = defaults
+        self.activityStore = activityStore
         self.authentication = authentication
         self.now = now
         makeClient =
@@ -289,12 +408,15 @@ final class NativeModel {
             let loadedQueue = try await next.savedSubmissions()
             guard generation == marker else { return }
             try vault.save(DeveloperConnection(baseURL: api.scope, accessToken: accessToken))
+            if defaults.bool(forKey: Self.signedOutKey) { try activityStore().clear() }
             defaults.set(false, forKey: Self.signedOutKey)
             client = next
             profile = loadedProfile
             tracks = loadedTracks
             queue = loadedQueue
             token = ""
+            apiScope = api.scope
+            await restoreActivity(marker: marker)
         } catch {
             guard generation == marker else { return }
             report(error)
@@ -309,6 +431,10 @@ final class NativeModel {
         clearSession()
         busy = true
         errorMessage = nil
+        do { try activityStore().clear() } catch {
+            errorMessage =
+                "The local session is closed, but saved activity removal is not confirmed. Retry signing out."
+        }
         defer { if generation == marker { busy = false } }
         await previous?.disconnect()
         guard generation == marker else { return }
@@ -329,6 +455,9 @@ final class NativeModel {
     }
 
     private func clearSession() {
+        resumeReady = false
+        apiScope = nil
+        selectedTab = .learn
         client = nil
         profile = nil
         tracks = []
@@ -400,16 +529,26 @@ final class NativeModel {
                 if generation == marker { throw CIAMAuthenticationFailure.invalidToken }
                 return
             }
+            let loadedScope = try CertigoAPI(baseURL: authentication.configuration.apiBaseURL).scope
+            let needsRestoration =
+                interactive || profile?.id != loadedProfile.id || apiScope != loadedScope
             if profile?.id != loadedProfile.id {
                 clearSession()
                 busy = true
             }
+            if defaults.bool(forKey: Self.signedOutKey) { try activityStore().clear() }
             defaults.set(false, forKey: Self.signedOutKey)
             client = next
             profile = loadedProfile
             tracks = loadedTracks
             queue = loadedQueue
             tokenExpiresAt = acquired.expiresAt
+            apiScope = loadedScope
+            if needsRestoration {
+                await restoreActivity(marker: marker)
+            } else {
+                persistActivity()
+            }
         } catch {
             guard generation == marker else { return }
             clearSession()
@@ -486,13 +625,13 @@ final class NativeModel {
         let marker = generation
         busy = true
         path = nil
-        lesson = nil
         errorMessage = nil
         defer { if generation == marker { busy = false } }
         do {
             let value = try await client.path(trackId: track.id)
             guard generation == marker else { return }
             path = value
+            persistActivity()
         } catch {
             guard generation == marker else { return }
             report(error)
@@ -501,8 +640,13 @@ final class NativeModel {
 
     func loadLesson(_ node: PathLesson) async {
         guard !busy else { return }
+        let owner = profile?.id
         await refreshAuthenticationIfNeeded()
         guard let client, let path, !busy else { return }
+        guard profile?.id == owner else {
+            report(APIError.staleSession)
+            return
+        }
         guard path.units.flatMap(\.lessons).contains(where: { $0.id == node.id && $0.canOpen })
         else {
             report(NativeResumeError.malformed)
@@ -510,6 +654,7 @@ final class NativeModel {
         }
         let marker = generation
         busy = true
+        resumeReady = false
         lesson = nil
         errorMessage = nil
         defer { if generation == marker { busy = false } }
@@ -552,6 +697,8 @@ final class NativeModel {
                 questionStarted = [:]
                 outcome = pending.status == .pendingCorrection ? .pendingCorrection : nil
                 if pending.status == .failed { report(StoreError.invalidRecord) }
+                resumeReady = true
+                persistActivity()
                 return
             }
             lesson = value
@@ -561,7 +708,9 @@ final class NativeModel {
             outcome = nil
             submittedRequest = nil
             attemptID = UUID().uuidString
-            startedAt = Date()
+            startedAt = now()
+            resumeReady = true
+            persistActivity()
         } catch {
             guard generation == marker else { return }
             report(error)
@@ -646,11 +795,17 @@ final class NativeModel {
                 / 1_000_000_000_000_000
             latencies[question.id] = Int(clamping: max(0, milliseconds))
         }
+        persistActivity()
     }
 
     func submit() async {
         guard !busy else { return }
+        let owner = profile?.id
         await refreshAuthenticationIfNeeded()
+        guard profile?.id == owner else {
+            report(APIError.staleSession)
+            return
+        }
         guard let client, let lesson, canSubmit else { return }
         let marker = generation
         busy = true
@@ -670,6 +825,8 @@ final class NativeModel {
                 clientAttemptId: attemptID, trackId: lesson.trackId, startedAt: startedAt,
                 answers: answers, publicManifestId: lesson.publicManifestId
             )
+            // Persist the in-flight fence before the outbox transaction, never infer an ACK from it.
+            try saveActivity(submitting: request)
             let response = try await client.submit(lessonId: lesson.id, submission: request)
             guard generation == marker else { return }
             submittedRequest = request
@@ -677,6 +834,7 @@ final class NativeModel {
             let values = try await client.savedSubmissions()
             guard generation == marker else { return }
             queue = values
+            persistActivity()
         } catch {
             guard generation == marker else { return }
             report(error)
@@ -689,6 +847,7 @@ final class NativeModel {
                     if saved.status == .pendingCorrection { outcome = .pendingCorrection }
                     if let result = saved.result { outcome = .corrected(result) }
                 }
+                persistActivity()
             } catch {
                 guard generation == marker else { return }
                 report(error)
@@ -711,6 +870,7 @@ final class NativeModel {
             let values = try await client.savedSubmissions()
             guard generation == marker else { return }
             queue = values
+            persistActivity()
         } catch {
             guard generation == marker else { return }
             report(error)
@@ -732,6 +892,172 @@ final class NativeModel {
         } catch {
             guard generation == marker else { return }
             report(error)
+        }
+    }
+
+    private func saveActivity(submitting request: QuizSubmission? = nil) throws {
+        guard resumeReady, let profile, let apiScope else { return }
+        var session: NativeResumeState.Session?
+        var draft: NativeActivitySnapshot.Draft?
+        if let lesson {
+            session = .init(
+                trackId: lesson.trackId, lessonId: lesson.id,
+                publicManifestId: lesson.publicManifestId,
+                phase: .draft, attemptId: nil)
+            if submittedRequest != nil {
+                session?.phase = .submitting
+                session?.attemptId = attemptID
+            } else {
+                draft = .init(
+                    lessonDigest: try NativeActivitySnapshot.digest(lesson), attemptId: attemptID,
+                    startedAt: startedAt, selections: selections, latencies: latencies)
+            }
+        }
+        var navigation = try NativeResumeState(
+            tab: selectedTab, ownerId: profile.id, apiScope: apiScope, session: session)
+        if let request {
+            navigation = try navigation.beginningSubmission(request)
+            draft = nil
+        } else if submittedRequest != nil {
+            navigation = try navigation.reconciled(
+                ownerId: profile.id, apiScope: apiScope,
+                currentManifestId: lesson?.publicManifestId, submissions: queue)
+        }
+        let snapshot = NativeActivitySnapshot(
+            schema: 1, navigation: navigation, trackId: path?.trackId, draft: draft)
+        try activityStore().save(snapshot.encoded())
+    }
+
+    private func persistActivity() {
+        do { try saveActivity() } catch {
+            errorMessage =
+                "This activity could not be saved for reopening. Keep the app open and retry your selection."
+        }
+    }
+
+    private func restoreActivity(marker: UUID) async {
+        guard let client, let profile, let apiScope else { return }
+        resumeReady = false
+        do {
+            guard let bytes = try activityStore().read() else {
+                resumeReady = true
+                return
+            }
+            let snapshot = try NativeActivitySnapshot.decode(bytes)
+            let navigation = snapshot.navigation
+            guard navigation.ownerId == profile.id else { throw NativeResumeError.ownerChanged }
+            guard navigation.apiScope == apiScope else { throw NativeResumeError.scopeChanged }
+            let trackID = navigation.session?.trackId ?? snapshot.trackId
+            var loadedPath: LearningPath?
+            var loadedLesson: Lesson?
+            if let trackID {
+                guard tracks.contains(where: { $0.id == trackID && $0.learningAvailable }) else {
+                    throw NativeResumeError.releaseChanged
+                }
+                loadedPath = try await client.path(trackId: trackID)
+                guard generation == marker else { return }
+            }
+            if let session = navigation.session {
+                guard
+                    loadedPath?.units.flatMap(\.lessons).contains(where: {
+                        $0.id == session.lessonId && $0.canOpen
+                    }) == true
+                else { throw NativeResumeError.releaseChanged }
+                loadedLesson = try await client.lesson(
+                    trackId: session.trackId, lessonId: session.lessonId)
+                guard generation == marker else { return }
+            }
+            let reconciled = try navigation.reconciled(
+                ownerId: profile.id, apiScope: apiScope,
+                currentManifestId: loadedLesson?.publicManifestId, submissions: queue)
+            var restoredSelections: [String: String] = [:]
+            var restoredLatencies: [String: Int] = [:]
+            var restoredRequest: QuizSubmission?
+            var restoredOutcome: SubmissionOutcome?
+            var restoredAttempt = UUID().uuidString
+            var restoredStart = now()
+            if let draft = snapshot.draft, let loadedLesson {
+                guard try draft.lessonDigest == NativeActivitySnapshot.digest(loadedLesson),
+                    draft.startedAt <= now(),
+                    draft.selections.allSatisfy({ id, option in
+                        loadedLesson.questions.contains {
+                            $0.id == id && $0.options.contains { $0.id == option }
+                        }
+                    }),
+                    !queue.contains(where: {
+                        $0.id == draft.attemptId
+                            || ($0.lessonId == loadedLesson.id
+                                && $0.submission.trackId == loadedLesson.trackId
+                                && $0.status != .corrected)
+                    })
+                else { throw NativeResumeError.attemptMismatch }
+                restoredSelections = draft.selections
+                restoredLatencies = draft.latencies
+                restoredAttempt = draft.attemptId
+                restoredStart = draft.startedAt
+            } else if let session = reconciled.session, let loadedLesson {
+                guard let saved = queue.first(where: { $0.id == session.attemptId }),
+                    saved.submission.publicManifestId == loadedLesson.publicManifestId,
+                    saved.submission.answers.count == loadedLesson.questions.count,
+                    saved.submission.answers.allSatisfy({ answer in
+                        loadedLesson.questions.contains {
+                            $0.id == answer.itemId && $0.type == answer.itemType
+                                && answer.selected.count == 1
+                                && $0.options.contains { $0.id == answer.selected[0] }
+                        }
+                    })
+                else { throw NativeResumeError.attemptMismatch }
+                restoredRequest = saved.submission
+                restoredAttempt = saved.id
+                restoredStart = saved.submission.startedAt
+                restoredSelections = Dictionary(
+                    uniqueKeysWithValues: saved.submission.answers.map {
+                        ($0.itemId, $0.selected[0])
+                    })
+                restoredLatencies = Dictionary(
+                    uniqueKeysWithValues: saved.submission.answers.map { ($0.itemId, $0.latencyMs) }
+                )
+                if let result = saved.result { restoredOutcome = .corrected(result) }
+                if saved.status == .pendingCorrection { restoredOutcome = .pendingCorrection }
+            }
+            path = loadedPath
+            lesson = loadedLesson
+            selections = restoredSelections
+            latencies = restoredLatencies
+            questionStarted = [:]
+            attemptID = restoredAttempt
+            startedAt = restoredStart
+            submittedRequest = restoredRequest
+            outcome = restoredOutcome
+            selectedTab = navigation.tab
+            resumeReady = true
+            restorationRevision += 1
+            if reconciled.session?.phase == .failed { report(StoreError.invalidRecord) }
+        } catch {
+            guard generation == marker else { return }
+            path = nil
+            lesson = nil
+            selections = [:]
+            latencies = [:]
+            questionStarted = [:]
+            submittedRequest = nil
+            outcome = nil
+            if error is NativeResumeError || error is DecodingError || error is ContractError
+                || (error as? APIError) == .http(404)
+            {
+                do {
+                    try activityStore().clear()
+                    resumeReady = true
+                    errorMessage =
+                        "The saved activity is no longer compatible with this account or content and was cleared. Saved submissions were not changed."
+                } catch {
+                    errorMessage =
+                        "The saved activity is incompatible and could not be removed. It was not reopened. Sign out again to clear it."
+                }
+            } else {
+                errorMessage =
+                    "The saved activity could not be checked. It was kept without reopening or submitting it. Reconnect to retry restoration."
+            }
         }
     }
 
