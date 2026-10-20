@@ -131,11 +131,11 @@ import Foundation
                         "Microsoft sign-in is not configured",
                         systemImage: "person.crop.circle.badge.exclamationmark",
                         description: Text(configurationIssue))
-                } else if model.profile == nil {
-                    NavigationStack {
-                        Form {
-                            Section("Certigo") {
-                                Text("Sign in with your Microsoft account to continue.")
+                    } else if model.profile == nil && model.deletionStage == nil {
+                        NavigationStack {
+                            Form {
+                                Section("Certigo") {
+                                    Text("Sign in with your Microsoft account to continue.")
                                 Button("Sign in with Microsoft", systemImage: "person.crop.circle") {
                                     Task { await model.connect() }
                                 }
@@ -163,11 +163,16 @@ import Foundation
             .onOpenURL { url in
                 _ = provider?.handleCallback(url, sourceApplication: nil)
             }
-        }
+                .task {
+                    if configurationIssue == nil {
+                        _ = await model.restoreAccountDeletionIfNeeded()
+                    }
+                }
+            }
 
-        @MainActor
-        private static func authenticationPresentationController() throws -> UIViewController {
-            let windows = UIApplication.shared.connectedScenes
+            @MainActor
+            private static func authenticationPresentationController() throws -> UIViewController {
+                let windows = UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
                 .flatMap(\.windows)
             guard var controller = windows.first(where: \.isKeyWindow)?.rootViewController else {
@@ -1611,6 +1616,162 @@ struct NativeDemoSnapshot: Codable, Equatable {
 }
 
 #if canImport(SwiftUI)
+    private struct NativeAccountDeletionView: View {
+        @Bindable var model: NativeModel
+        @Environment(\.dismiss) private var dismiss
+        @Environment(\.scenePhase) private var scenePhase
+        private enum Focus: Hashable { case status, error }
+        @AccessibilityFocusState private var focused: Focus?
+
+        var body: some View {
+            Form {
+                Section {
+                    Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($focused, equals: .status)
+                    if model.deletionBusy { ProgressView("Account operation in progress") }
+                    if let message = model.deletionMessage {
+                        Text(message).accessibilityIdentifier("account-deletion-message")
+                            .accessibilityFocused($focused, equals: .error)
+                    }
+                }
+                if [.explanation, .verifying, .confirmation].contains(
+                    model.deletionStage ?? .explanation)
+                {
+                    Section("Before you continue") {
+                        Text(
+                            "Permanently delete your Certigo account, confirmed learning and progression. Local drafts and downloaded account references are removed only after the server confirms completion."
+                        )
+                        Text(
+                            "This is irreversible. There is no cancellation endpoint after submission. Residual production backups may rotate for up to 30 days, a pseudonymous tombstone remains for 30 days and identity-free deletion audit logs for 90 days. These are not an undo period."
+                        )
+                        if model.canReauthenticateForDeletion {
+                            Button(
+                                "Continue to verify identity",
+                                systemImage: "person.badge.shield.checkmark"
+                            ) {
+                                Task { await model.verifyDeletionIdentity() }
+                            }
+                            .disabled(model.deletionBusy)
+                        } else {
+                            Text(
+                                "Remote deletion requires configured Microsoft sign-in. It is unavailable for the demo and manual development connector."
+                            )
+                        }
+                    }
+                } else if model.deletionStage == .pending || model.deletionStage == .unconfirmed
+                    || model.deletionStage == .checking
+                {
+                    Section("Server status") {
+                        if let status = model.deletionStatus, status.status == .pending {
+                            Text(
+                                "\(status.completedSteps) of \(status.totalSteps) server steps confirmed."
+                            )
+                            Text(
+                                "Deletion is pending, not completed. Learning is paused and local data is retained. Status checks do not advance unfinished deletion steps."
+                            )
+                            if status.retryAfterSeconds != nil {
+                                Text(
+                                    "The server requested a retry delay. Refresh status before retrying if the action is not available yet."
+                                )
+                            }
+                        }
+                        Button("Check status", systemImage: "arrow.clockwise") {
+                            Task { await model.refreshDeletionStatus() }
+                        }
+                        .disabled(model.deletionBusy)
+                        Button(
+                            "Sign in to check the same account", systemImage: "person.crop.circle"
+                        ) {
+                            Task { await model.recoverDeletionConnection(interactive: true) }
+                        }
+                        .disabled(model.deletionBusy)
+                        Button("Retry deletion", role: .destructive) {
+                            Task { await model.retryAccountDeletion() }
+                        }
+                        .disabled(!model.canRetryDeletion)
+                        if model.deletionStatus?.status == .notRequested {
+                            Button("Resume account to verify identity") {
+                                Task { await model.resumeAccountAfterStatusCheck() }
+                            }
+                            .disabled(model.deletionBusy)
+                        }
+                    }
+                } else if model.deletionStage == .cleanupFailed {
+                    Section {
+                        Text(
+                            "Account deletion is confirmed. Cleanup on this device is not complete."
+                        )
+                        Button("Retry local cleanup", systemImage: "arrow.clockwise") {
+                            Task { await model.retryDeletionCleanup() }
+                        }
+                        .disabled(model.deletionBusy)
+                    }
+                } else if model.deletionStage == .completed {
+                    Section {
+                        Text(
+                            "The server confirmed account deletion and this device confirmed local cleanup. Residual retention periods still apply."
+                        )
+                        Button("Return to sign-in") { model.acknowledgeAccountDeletion() }
+                    }
+                }
+            }
+            .navigationTitle("Delete account")
+            .navigationBarBackButtonHidden(model.deletionBusy || !model.canCancelDeletion)
+            .toolbar {
+                if model.canCancelDeletion {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            Task {
+                                await model.cancelAccountDeletion()
+                                if model.deletionStage == nil { dismiss() }
+                            }
+                        }
+                    }
+                }
+            }
+            .alert(
+                "Permanently delete this Certigo account?",
+                isPresented: Binding(
+                    get: { model.deletionStage == .confirmation },
+                    set: { _ in })
+            ) {
+                Button("Delete account", role: .destructive) {
+                    Task { await model.confirmAccountDeletion() }
+                }
+                Button("Cancel", role: .cancel) { model.discardDeletionProof() }
+            } message: {
+                Text(
+                    "Microsoft verified the same account. Only Delete account submits the irreversible request. Completion may require retries."
+                )
+            }
+            .onChange(of: model.deletionStage) { _, _ in focused = .status }
+            .onChange(of: model.deletionMessage) { _, message in
+                focused = message == nil ? .status : .error
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { model.discardDeletionProof() }
+            }
+            .onAppear { if model.deletionStage == nil { model.showAccountDeletion() } }
+            .onDisappear {
+                model.discardDeletionProof()
+                if model.canCancelDeletion { Task { await model.cancelAccountDeletion() } }
+            }
+        }
+
+        private var title: String {
+            switch model.deletionStage {
+            case .verifying: "Verify your Microsoft identity"
+            case .confirmation: "Identity verified"
+            case .checking: "Checking account deletion"
+            case .pending: "Deletion pending"
+            case .unconfirmed: "Account status unconfirmed"
+            case .cleanupFailed: "Local cleanup requires attention"
+            case .completed: "Account deleted"
+            default: "Delete your Certigo account"
+            }
+        }
+    }
+
     private struct NativeRoot: View {
         @Bindable var model: NativeModel
         @State private var selectedTrack: String?
@@ -1628,7 +1789,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         var body: some View {
             Group {
-                if model.profile == nil {
+                if model.requiresDeletionSurface {
+                    NavigationStack { NativeAccountDeletionView(model: model) }
+                } else if model.profile == nil {
                     connection
                 } else {
                     TabView(selection: $model.selectedTab) {
@@ -1901,6 +2064,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                     NavigationLink("Settings") {
                         Form {
+                            Section("Account") {
+                                NavigationLink("Delete account") {
+                                    NativeAccountDeletionView(model: model)
+                                }
+                                .disabled(model.busy)
+                            }
                             Section(connectionSectionTitle) {
                                 Text(connectionDescription)
                                 Button("Disconnect", systemImage: "person.crop.circle.badge.xmark")
