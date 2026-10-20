@@ -333,9 +333,55 @@ The provider's account selection is held in memory. After app relaunch, the
 user must explicitly sign in again; silent account restoration is not claimed.
 The test connector's device-only vault remains unchanged, with no migration or
 access to the legacy Flutter app's credential cache. This lot does not implement
-in-app account deletion, offline learning or cross-device attempt history; those
+in-app account deletion or cross-device attempt history; those
 remain separate work dependent on the verified production identity and their
 existing service contracts.
+
+### Downloaded public question packs
+
+In an authenticated session, Learn offers an explicit download confirmation.
+The current download granularity is the **whole public release**, not one
+certification. The dialogue discloses that scope before network access. It
+reuses the bounded manifest/file downloader, digest and public-resource
+validators, and atomic active/previous snapshot activation. No private
+solution, answer key, explanation or correction is part of the downloaded pack.
+The current corpus is bank-first: locally projected practice sessions are
+question packs, not authored courses or certification-readiness evidence.
+
+Downloaded practice is resolved locally from the verified track/domain/question
+graph (or authored unit/lesson blocks when present). Legacy question and concept
+aliases, v3 option IDs and question-bank session IDs match the existing backend
+projection. Cached reading never invents progression, readiness, correction or
+XP; those remain server-confirmed. Unknown resources, unsupported question types,
+incomplete graphs and damaged bytes fail closed with recovery feedback.
+
+Opening cached practice pins its exact manifest for the current owner and API
+scope before saving a local draft. Draft restoration uses that snapshot, not
+the newest release, and checks the original lesson digest and attempt identity.
+It does not require a path/lesson HTTP refetch when the pinned pack is present.
+Learn also has an explicit local restoration action. If a pack is unavailable,
+this action preserves the saved activity and reports the failure rather than
+silently substituting another release. Normal connected restoration may still
+validate an online-only activity against its original digest. Downloaded content
+and drafts are not exposed to another signed-in owner or another API scope.
+
+Selecting answers, downloading, opening and restoring never submit implicitly.
+Submit still writes the existing durable outbox before requesting correction;
+a network failure leaves it pending. Reconnect does not automatically replay it:
+the learner explicitly retries the same attempt and bytes. Only a server ACK
+exposes feedback and rewards, followed by the existing authoritative profile
+refresh. Drafts stay device-local and are not multi-device history.
+The activity directory and atomically written activity file explicitly use the
+same iOS `completeUntilFirstUserAuthentication` policy as the outbox.
+
+This is **not offline identity restoration**: a cold app launch still needs the
+existing verified sign-in/profile and catalog bootstrap. Cached learning works
+without path/lesson HTTP in an already-established account session, including
+restoring its local draft. No cached token/profile is treated as a newly
+authenticated identity. Apple acceptance must separately verify compilation of
+SwiftUI/UIKit/MSAL, effective file protection, airplane-mode reading and explicit
+queue/retry behavior on iPhone/iPad, owner switching, navigation and VoiceOver.
+Linux model/package tests do not establish those Apple runtime properties.
 
 The existing Flutter TestFlight build is not this native candidate. Do not claim
 production login, in-app account deletion, validated accessibility, App Review
