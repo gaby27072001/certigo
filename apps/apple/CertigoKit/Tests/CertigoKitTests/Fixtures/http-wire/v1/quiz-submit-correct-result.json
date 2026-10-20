@@ -1,0 +1,24 @@
+{
+  "attemptId": "demo-correct-attempt",
+  "scorePct": 100,
+  "results": [
+    {
+      "itemId": "demo-item",
+      "correct": true,
+      "conceptId": "demo-concept",
+      "correctAnswer": null,
+      "explanation": "Synthetic feedback returned only after submission.",
+      "masteryDelta": 0.05
+    }
+  ],
+  "rewards": {
+    "xpEarned": 10,
+    "newXp": 110,
+    "levelUp": false,
+    "streakExtended": false,
+    "gemsEarned": 6,
+    "achievementsUnlocked": []
+  },
+  "weakConcepts": [],
+  "nextReviewDueAt": null
+}

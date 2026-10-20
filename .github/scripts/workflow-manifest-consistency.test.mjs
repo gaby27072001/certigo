@@ -22,6 +22,7 @@ import {
   fingerprintWorkflow,
   lifecycleWorkflowNames,
   readRegularRepositoryFile,
+  readVerifiedRegularFileSync,
   renderWorkflowManifest,
   validateWorkflowManifest,
 } from './workflow-semantic-fingerprint.mjs';
@@ -540,6 +541,7 @@ test('repository file reads stay bound to the verified regular-file descriptor',
 
     const filesDirectory = resolveIn(root, 'files');
     const filesBackup = resolveIn(root, 'files.verified');
+    const inspected = fs.lstatSync(regularPath);
     const originalOpen = fs.openSync;
     fs.openSync = (file, ...args) => {
       if (path.resolve(file) === path.resolve(regularPath)) {
@@ -549,8 +551,8 @@ test('repository file reads stay bound to the verified regular-file descriptor',
       return originalOpen.call(fs, file, ...args);
     };
     try {
-      assert.match(
-        readRegularRepositoryFile(root, 'files/regular.txt').error,
+      assert.throws(
+        () => readVerifiedRegularFileSync(regularPath, inspected),
         /file (?:changed|path changed) while opening/u,
       );
     } finally {
@@ -572,8 +574,8 @@ test('repository file reads stay bound to the verified regular-file descriptor',
       return originalOpen.call(fs, file, ...args);
     };
     try {
-      assert.match(
-        readRegularRepositoryFile(root, 'files/regular.txt').error,
+      assert.throws(
+        () => readVerifiedRegularFileSync(regularPath, inspected),
         /file changed while opening/u,
       );
     } finally {

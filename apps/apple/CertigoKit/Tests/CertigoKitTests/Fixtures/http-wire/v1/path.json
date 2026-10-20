@@ -1,0 +1,27 @@
+{
+  "trackId": "demo-track",
+  "trackName": "Synthetic certification",
+  "exam": "CG-DEMO",
+  "readinessScore": 42,
+  "readinessTrend7d": -2,
+  "units": [
+    {
+      "id": "demo-unit",
+      "title": "Demo unit",
+      "domainId": "demo-domain",
+      "status": "active",
+      "lessons": [
+        {
+          "id": "demo-lesson",
+          "title": "Demo lesson",
+          "status": "available",
+          "estMinutes": 5,
+          "masteryPct": 20
+        }
+      ]
+    }
+  ],
+  "domains": [
+    { "id": "demo-domain", "name": "Demo domain", "weight": 1, "score": 42 }
+  ]
+}

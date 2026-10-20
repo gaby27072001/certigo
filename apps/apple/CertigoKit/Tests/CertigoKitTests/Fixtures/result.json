@@ -1,0 +1,23 @@
+{
+  "attemptId": "fixture-server-attempt",
+  "scorePct": 100,
+  "results": [
+    {
+      "itemId": "fixture-question",
+      "conceptId": "fixture-concept",
+      "correct": true,
+      "correctAnswer": ["first"],
+      "explanation": "Synthetic feedback returned after server correction.",
+      "masteryDelta": 0.1
+    }
+  ],
+  "rewards": {
+    "xpEarned": 10,
+    "newXp": 20,
+    "levelUp": false,
+    "streakExtended": false,
+    "gemsEarned": 0,
+    "achievementsUnlocked": []
+  },
+  "weakConcepts": []
+}

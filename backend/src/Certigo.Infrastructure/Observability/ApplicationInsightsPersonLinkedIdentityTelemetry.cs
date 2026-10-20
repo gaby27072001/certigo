@@ -31,12 +31,11 @@ public sealed class ApplicationInsightsPersonLinkedIdentityTelemetry(
         {
             logger.LogWarning(
                 "Person/LinkedIdentity shadow signal: Operation={Operation}, Outcome={Outcome}, "
-                + "Provider={Provider}, IdentityType={IdentityType}, FailureCode={FailureCode}, "
+                + "Provider={Provider}, FailureCode={FailureCode}, "
                 + "ExceptionType={ExceptionType}.",
                 telemetryEvent.Operation,
                 telemetryEvent.Outcome,
                 telemetryEvent.Provider,
-                telemetryEvent.IdentityType,
                 telemetryEvent.FailureCode,
                 telemetryEvent.ExceptionType);
         }

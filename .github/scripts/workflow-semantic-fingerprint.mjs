@@ -409,6 +409,8 @@ export function loadWorkflowManifest(manifestPath) {
   return { manifest, errors: validateWorkflowManifest(manifest) };
 }
 
+// Bind reviewed policy reads to the inspected inode; mutable ancestors still require
+// a stable checkout because O_NOFOLLOW protects only the final component.
 export function readVerifiedRegularFileSync(filePath, expectedStat) {
   const absolutePath = path.resolve(filePath);
   if (!expectedStat.isFile() || expectedStat.isSymbolicLink()) {
@@ -447,34 +449,71 @@ export function readVerifiedRegularFileSync(filePath, expectedStat) {
   }
 }
 
-// Reject pre-existing file/parent symlinks and bind bytes to the verified inode.
-// O_NOFOLLOW protects only the final component; path checks are not atomic against an
-// actor concurrently replacing writable ancestors. Keep the checkout stable during validation.
+// Valide le descripteur avant d'en lire les octets et refuse les liens, parents compris.
+// L'arbre peut venir d'une PR non fiable, mais ses parents doivent rester sans autre écrivain :
+// les API Node utilisées ne résolvent pas atomiquement tous les composants parents.
+// La lecture reste bornée à la taille inspectée (16 MiB maximum), même si le fichier grandit.
 export function readRegularRepositoryFile(root, relativePath) {
   const filePath = path.join(root, ...relativePath.split('/'));
-  let stat;
+  let descriptor;
   try {
-    stat = fs.lstatSync(filePath);
-  } catch (error) {
-    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') {
-      return { exists: false };
+    descriptor = fs.openSync(
+      filePath,
+      fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK,
+    );
+    const opened = fs.fstatSync(descriptor);
+    const current = fs.lstatSync(filePath);
+    if (
+      !opened.isFile()
+      || !current.isFile()
+      || current.isSymbolicLink()
+      || opened.dev !== current.dev || opened.ino !== current.ino
+    ) {
+      throw new Error('must be a real regular non-symlink file matching the opened descriptor');
     }
-    return { exists: true, error: `${relativePath}: ${error.message}` };
-  }
-  if (!stat.isFile() || stat.isSymbolicLink()) {
-    return { exists: true, error: `${relativePath}: must be a real regular non-symlink file` };
-  }
-  try {
     if (fs.realpathSync(filePath) !== path.resolve(filePath)) {
-      return { exists: true, error: `${relativePath}: must resolve to its exact repository path` };
+      throw new Error('must resolve to its exact repository path');
     }
-    const bytes = readVerifiedRegularFileSync(filePath, stat);
+    if (opened.size > 16 * 1024 * 1024) {
+      throw new Error('repository control file exceeds the 16 MiB limit');
+    }
+    const bytes = Buffer.alloc(opened.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = fs.readSync(descriptor, bytes, offset, bytes.length - offset, null);
+      if (count === 0) {
+        throw new Error('file changed while being read');
+      }
+      offset += count;
+    }
+    const after = fs.fstatSync(descriptor);
+    if (
+      after.size !== opened.size
+      || after.mtimeMs !== opened.mtimeMs
+      || after.ctimeMs !== opened.ctimeMs
+    ) {
+      throw new Error('file changed while being read');
+    }
     return { exists: true, bytes, content: bytes.toString('utf8') };
   } catch (error) {
-    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') {
-      return { exists: false };
+    if (descriptor === undefined && (error.code === 'ENOENT' || error.code === 'ENOTDIR')) {
+      try {
+        fs.lstatSync(filePath);
+      } catch (inspectionError) {
+        if (inspectionError.code === 'ENOENT' || inspectionError.code === 'ENOTDIR') {
+          return { exists: false };
+        }
+        return { exists: true, error: `${relativePath}: ${inspectionError.message}` };
+      }
+    }
+    if (['ELOOP', 'EISDIR', 'ENOENT'].includes(error.code)) {
+      return { exists: true, error: `${relativePath}: must be a real regular non-symlink file` };
     }
     return { exists: true, error: `${relativePath}: ${error.message}` };
+  } finally {
+    if (descriptor !== undefined) {
+      fs.closeSync(descriptor);
+    }
   }
 }
 

@@ -1,11 +1,11 @@
 import { parseDocument } from 'yaml';
+import { isPrLinuxCiRunner } from './linux-ci-runner-policy.mjs';
 
 // Invariant de lint-workflows.yml : le job qui exécute les tests .github/scripts DE LA PR sur son
 // propre arbre doit rester en place et mordre. Sans lui, un test cassé apporté par une PR ne
 // s'exécute qu'après la fusion, sur l'arbre de `main`, et bloque alors toutes les PR (#497).
 export const candidateJobId = 'candidate-script-tests';
 export const candidateJobName = 'Candidate workflow security script tests';
-const expectedRunner = ['self-hosted', 'Linux', 'X64', 'certigo-pr'];
 const expectedCondition = "${{ always() && needs.freshness.outputs.current != 'false' "
   + '&& github.event.pull_request.head.repo.full_name == github.repository }}';
 
@@ -60,7 +60,7 @@ export function validateCandidateScriptTestsJob(text, label = 'lint-workflows.ym
   if (job.needs !== 'freshness' || job.if !== expectedCondition) {
     errors.push(problem('must depend on freshness with the standard same-repository condition'));
   }
-  if (!sameJson(job['runs-on'], expectedRunner)) {
+  if (!isPrLinuxCiRunner(label, candidateJobId, job['runs-on'])) {
     errors.push(problem('must run on the untrusted certigo-pr pool'));
   }
   if (!sameJson(job.permissions, { contents: 'read', 'pull-requests': 'read' })) {
