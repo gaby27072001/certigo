@@ -22,6 +22,21 @@ Actual Apple validation needs Xcode/SDK 26 or newer and a Swift 6.2-compatible
 toolchain. Linux Foundation demo/navigation checks and syntax parsing do not
 typecheck or render the SwiftUI branch.
 
+## Launch profiling
+
+The shared `CertigoNative` scheme's Profile action runs the app target in Release.
+Select the intended device and use Product > Profile; no executable selection
+should be needed in a fresh checkout. Keep signing and local scheme edits intact
+when updating an existing Mac checkout.
+
+Distinguish build duration, debugger overhead, simulator loader time and time to
+first rendered frame. Compare the same Release build outside the debugger before
+attributing startup delays to app code. A trace stopped by the user may contain
+an unfinished loader interval; its total duration is not a launch measurement.
+If a lifecycle export contains no rows, it does not establish time to first
+frame. Do not sum nested loader intervals or overlapping time-profile tables.
+A simulator result does not establish physical-device launch performance.
+
 ## Session and correction authority
 
 The `@MainActor` model receives its client, credential vault and optional
