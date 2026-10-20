@@ -14,6 +14,12 @@
 
 ## Preuve et ré-authentification
 
+Le parcours Swift natif est décrit dans
+[`APPLE_NATIVE.md`, « Account deletion and recovery »](./APPLE_NATIVE.md#account-deletion-and-recovery).
+Il distingue vérification Microsoft, confirmation destructive, demande en
+attente et nettoyage local après `completed`. Les preuves portables de source
+ne valent ni activation du service ni validation MSAL/Keychain sur Apple.
+
 La première demande exige un `auth_time` de moins de 10 minutes. Un compte
 e-mail doit ressaisir son mot de passe. Un compte fédéré relance OIDC avec
 `prompt=login`, `max_age=0` et le même `domain_hint` qu’à la connexion

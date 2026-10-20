@@ -412,6 +412,35 @@ final class RuntimeClientTests: XCTestCase {
         XCTAssertNil(try cache.active(ownerId: "owner-A", apiScope: api.scope))
     }
 
+    func testDeletionBarrierPreventsLateDownloadedFilesAndActivation() async throws {
+        let root = temporaryRoot()
+        defer { XCTAssertNoThrow(try FileManager.default.removeItem(at: root)) }
+        let fixture = try RuntimeFixture()
+        let transport = RuntimeTransport(fixture)
+        let api = try CertigoAPI(
+            baseURL: XCTUnwrap(URL(string: fixture.snapshot.apiScope)),
+            transport: RoutingTransport())
+        let cacheRoot = root.appendingPathComponent("cache")
+        let cache = try RuntimeContentStore(root: cacheRoot)
+        let client = LearningClient(
+            api: api, store: SubmissionStore(file: root.appendingPathComponent("outbox.json")),
+            runtimeStore: cache, runtimeTransport: transport)
+        _ = try await client.connect(accessToken: "synthetic-only")
+        await transport.pauseNextFile()
+        let request = Task { try await client.synchronizePublicContent() }
+        try await waitForSuspension(transport)
+        _ = try await client.pauseForAccountDeletion()
+        try await client.purgeDeletedAccount(ownerId: "owner-A")
+        await transport.resume()
+        do {
+            _ = try await request.value
+            XCTFail("Late download activated after account purge")
+        } catch { XCTAssertEqual(error as? APIError, .staleSession) }
+        XCTAssertNil(try cache.active(ownerId: "owner-A", apiScope: api.scope))
+        let remaining = try FileManager.default.contentsOfDirectory(atPath: cacheRoot.path)
+        XCTAssertFalse(remaining.contains { $0.hasPrefix("x-") || $0.hasPrefix("b-") })
+    }
+
     func testNewerSyncWinsAndLateGenerationCannotOverwriteItsActivePointer() async throws {
         let root = temporaryRoot()
         defer { XCTAssertNoThrow(try FileManager.default.removeItem(at: root)) }

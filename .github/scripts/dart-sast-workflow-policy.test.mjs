@@ -238,7 +238,7 @@ test('the reviewed forms directory fails closed', (context) => {
   assert.throws(() => loadDartSastWorkflowForms(directory), /YAML anchors are forbidden/u);
   fs.rmSync(path.join(directory, 'v2.yml'));
   fs.mkdirSync(path.join(directory, 'v3.yml'));
-  assert.throws(() => loadDartSastWorkflowForms(directory), /must be a regular file/u);
+  assert.throws(() => loadDartSastWorkflowForms(directory), /must be a real regular non-symlink file/u);
 });
 
 // A new form is reviewed by humans and by these invariants: they are what the exact contract
