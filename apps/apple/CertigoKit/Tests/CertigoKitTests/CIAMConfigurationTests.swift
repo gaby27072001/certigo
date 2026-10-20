@@ -329,6 +329,164 @@ final class CIAMConfigurationTests: XCTestCase {
         }
     }
 
+    func testProductionProviderRequiresDistributionConfigurationAndNeverUsesDevelopmentValues()
+        async throws
+    {
+        let missingIdentity: [String: Any] = [
+            "CertigoProductionAuthMode": "microsoft",
+            "CFBundleURLTypes": [
+                ["CFBundleURLSchemes": ["msauth.com.certigo.mobileapp"]]
+            ],
+        ]
+        let productionInfo = Self.productionInfoDictionary(
+            tenant: tenant, audience: audience)
+        try await MainActor.run {
+            var providerCalls = 0
+            XCTAssertThrowsError(
+                try CIAMConfigurationEnvironment.configuredProductionProvider(
+                    infoDictionary: missingIdentity,
+                    bundleIdentifier: "com.certigo.mobileapp",
+                    isDevelopmentBuild: false
+                ) { _ in
+                    providerCalls += 1
+                    return "unexpected"
+                }
+            ) {
+                XCTAssertEqual(
+                    $0 as? CIAMConfigurationEnvironmentError,
+                    .missingValue("CertigoProductionCIAMCLIENT_ID"))
+            }
+            XCTAssertEqual(providerCalls, 0)
+        }
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.productionConfiguration(
+                infoDictionary: productionInfo,
+                bundleIdentifier: "com.certigo.mobileapp",
+                isDevelopmentBuild: true
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? CIAMConfigurationEnvironmentError, .productionBuildRequired)
+        }
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.productionConfiguration(
+                infoDictionary: productionInfo,
+                bundleIdentifier: "com.certigo.native.dev",
+                isDevelopmentBuild: false
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? CIAMConfigurationEnvironmentError, .unsupportedProductionBundle)
+        }
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.productionConfiguration(
+                infoDictionary: productionInfo,
+                bundleIdentifier: nil,
+                isDevelopmentBuild: false)
+        ) {
+            XCTAssertEqual(
+                $0 as? CIAMConfigurationEnvironmentError, .missingBundleIdentifier)
+        }
+    }
+
+    func testProductionConfigurationUsesOnlySuppliedDistributionMetadata() throws {
+        let productionInfo = Self.productionInfoDictionary(
+            tenant: tenant, audience: audience)
+        let value = try CIAMConfigurationEnvironment.productionConfiguration(
+            infoDictionary: productionInfo,
+            bundleIdentifier: "com.certigo.mobileapp",
+            isDevelopmentBuild: false)
+        XCTAssertEqual(value.clientID, "33333333-3333-4333-8333-333333333333")
+        XCTAssertEqual(value.apiBaseURL.absoluteString, "https://api.example.invalid/api")
+        XCTAssertEqual(value.apiScope, "api://\(audience)/user_impersonation")
+        XCTAssertEqual(
+            value.redirectURI.absoluteString, "msauth.com.certigo.mobileapp://auth")
+
+        var missingCallback = productionInfo
+        missingCallback["CFBundleURLTypes"] = []
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.productionConfiguration(
+                infoDictionary: missingCallback,
+                bundleIdentifier: "com.certigo.mobileapp",
+                isDevelopmentBuild: false)
+        ) {
+            XCTAssertEqual(
+                $0 as? CIAMConfigurationEnvironmentError, .callbackNotDeclared)
+        }
+        var duplicateCallback = productionInfo
+        duplicateCallback["CFBundleURLTypes"] = [
+            ["CFBundleURLSchemes": ["msauth.com.certigo.mobileapp"]],
+            ["CFBundleURLSchemes": ["MSAUTH.COM.CERTIGO.MOBILEAPP"]],
+        ]
+        XCTAssertThrowsError(
+            try CIAMConfigurationEnvironment.productionConfiguration(
+                infoDictionary: duplicateCallback,
+                bundleIdentifier: "com.certigo.mobileapp",
+                isDevelopmentBuild: false)
+        ) {
+            XCTAssertEqual(
+                $0 as? CIAMConfigurationEnvironmentError, .callbackCollision)
+        }
+    }
+
+    func testUnexpandedDistributionBuildSettingsFailBeforeProviderConstruction() async throws {
+        let settings = [
+            ("CertigoProductionCIAMCLIENT_ID", "CERTIGO_PRODUCTION_CIAM_CLIENT_ID"),
+            ("CertigoProductionCIAMTENANT_ID", "CERTIGO_PRODUCTION_CIAM_TENANT_ID"),
+            ("CertigoProductionCIAMAUTHORITY", "CERTIGO_PRODUCTION_CIAM_AUTHORITY"),
+            ("CertigoProductionCIAMISSUER", "CERTIGO_PRODUCTION_CIAM_ISSUER"),
+            ("CertigoProductionCIAMAUTHORITY_KIND", "CERTIGO_PRODUCTION_CIAM_AUTHORITY_KIND"),
+            ("CertigoProductionCIAMAPI_BASE_URL", "CERTIGO_PRODUCTION_CIAM_API_BASE_URL"),
+            ("CertigoProductionCIAMAPI_SCOPE", "CERTIGO_PRODUCTION_CIAM_API_SCOPE"),
+            ("CertigoProductionCIAMAPI_AUDIENCE", "CERTIGO_PRODUCTION_CIAM_API_AUDIENCE"),
+        ]
+        let tenant = self.tenant
+        let audience = self.audience
+        try await MainActor.run {
+            var providerCalls = 0
+            let baseInfo = Self.productionInfoDictionary(tenant: tenant, audience: audience)
+            for (key, buildSetting) in settings {
+                var info = baseInfo
+                info[key] = "$(\(buildSetting))"
+                XCTAssertThrowsError(
+                    try CIAMConfigurationEnvironment.configuredProductionProvider(
+                        infoDictionary: info,
+                        bundleIdentifier: "com.certigo.mobileapp",
+                        isDevelopmentBuild: false
+                    ) { _ in
+                        providerCalls += 1
+                        return "unexpected"
+                    }
+                ) {
+                    XCTAssertEqual($0 as? CIAMConfigurationEnvironmentError, .missingValue(key))
+                }
+            }
+            XCTAssertEqual(providerCalls, 0)
+        }
+    }
+
+    func testProductionProviderFactoryReceivesValidatedConfiguration() async throws {
+        let tenant = self.tenant
+        let audience = self.audience
+        try await MainActor.run {
+            var providerCalls = 0
+            let info = Self.productionInfoDictionary(tenant: tenant, audience: audience)
+            let configured = try CIAMConfigurationEnvironment.configuredProductionProvider(
+                infoDictionary: info,
+                bundleIdentifier: "com.certigo.mobileapp",
+                isDevelopmentBuild: false
+            ) { configuration in
+                providerCalls += 1
+                return configuration.apiBaseURL.absoluteString
+            }
+            XCTAssertEqual(providerCalls, 1)
+            XCTAssertEqual(configured.provider, "https://api.example.invalid/api")
+            XCTAssertEqual(
+                configured.configuration.redirectURI.absoluteString,
+                "msauth.com.certigo.mobileapp://auth")
+        }
+    }
+
     private var localEnvironment: [String: String] {
         [
             "CERTIGO_CIAM_ENABLED": "true",
@@ -341,6 +499,23 @@ final class CIAMConfigurationTests: XCTestCase {
             "CERTIGO_CIAM_API_SCOPE": "api://\(audience)/user_impersonation",
             "CERTIGO_CIAM_API_AUDIENCE": audience,
             "CERTIGO_CIAM_REDIRECT_URI": callback,
+        ]
+    }
+
+    private static func productionInfoDictionary(tenant: String, audience: String) -> [String: Any] {
+        [
+            "CertigoProductionAuthMode": "microsoft",
+            "CertigoProductionCIAMCLIENT_ID": "33333333-3333-4333-8333-333333333333",
+            "CertigoProductionCIAMTENANT_ID": tenant,
+            "CertigoProductionCIAMAUTHORITY": "https://synthetic.ciamlogin.com",
+            "CertigoProductionCIAMISSUER": "https://synthetic.ciamlogin.com/\(tenant)/v2.0",
+            "CertigoProductionCIAMAUTHORITY_KIND": "standard",
+            "CertigoProductionCIAMAPI_BASE_URL": "https://api.example.invalid/api",
+            "CertigoProductionCIAMAPI_SCOPE": "api://\(audience)/user_impersonation",
+            "CertigoProductionCIAMAPI_AUDIENCE": audience,
+            "CFBundleURLTypes": [
+                ["CFBundleURLSchemes": ["msauth.com.certigo.mobileapp"]]
+            ],
         ]
     }
 

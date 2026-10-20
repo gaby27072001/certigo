@@ -8,6 +8,7 @@
     private enum ModelTestFailure: Error {
         case assertion(String)
         case forbiddenVaultOperation
+        case forbiddenActivityOperation
     }
     struct CredentialVault: DeveloperConnectionVault {
         func read() throws -> DeveloperConnection? {
@@ -88,6 +89,10 @@
         private var offline = false
         private var corrected = false
         private var lessonStatus = 200
+        private var submissionStatus = 200
+        private var pathStatus = 200
+        private var nodeStatus: String?
+        private var replacementLesson: Data?
         private var pauseLesson = false
         private var posts: [Data] = []
         private var replacementManifest: String?
@@ -97,6 +102,8 @@
         private var pauseGoal = false
         private var goalResponseOwner: String?
         private var profileStatus = 200
+        private var profileXP = 0
+        private var profileRequests = 0
         private var pilotContent: Data?
         private var pilotLessonID = "verify-claims"
         private var pausePilotHistory = false
@@ -133,6 +140,9 @@
         func setGoal(_ value: String?) { activeGoal = value }
         func failGoal(_ status: Int) { goalStatus = status }
         func failProfile(_ status: Int) { profileStatus = status }
+        func setProfileXP(_ value: Int) { profileXP = value }
+        func profileRequestCount() -> Int { profileRequests }
+        func allowProfiles() { pause = false }
         func suspendGoal() { pauseGoal = true }
         func respondAsOwner(_ value: String?) { goalResponseOwner = value }
         func goalPayloads() -> [Data] { goalPosts }
@@ -140,6 +150,33 @@
         func suspendLesson() { pauseLesson = true }
         func setOffline(_ value: Bool) { offline = value }
         func failLesson(_ status: Int) { lessonStatus = status }
+        func failSubmission(_ status: Int) { submissionStatus = status }
+        func failPath(_ status: Int) { pathStatus = status }
+        func setNodeStatus(_ value: String) { nodeStatus = value }
+        func removeTracks() throws {
+            guard var object = try JSONSerialization.jsonObject(with: catalog) as? [String: Any]
+            else { throw ModelTestFailure.assertion("Missing catalog") }
+            object["tracks"] = []
+            catalog = try JSONSerialization.data(withJSONObject: object)
+        }
+        func changeLesson() throws {
+            guard var object = try JSONSerialization.jsonObject(with: lesson) as? [String: Any]
+            else { throw ModelTestFailure.assertion("Missing lesson") }
+            object["title"] = "Changed content under the same manifest"
+            replacementLesson = try JSONSerialization.data(withJSONObject: object)
+        }
+        func addQuestion() throws {
+            guard var object = try JSONSerialization.jsonObject(with: lesson) as? [String: Any],
+                var blocks = object["blocks"] as? [[String: Any]],
+                var block = blocks.first(where: { $0["type"] as? String == "check" }),
+                var question = block["check"] as? [String: Any]
+            else { throw ModelTestFailure.assertion("Missing check block") }
+            question["id"] = "second-question"
+            block["check"] = question
+            blocks.append(block)
+            object["blocks"] = blocks
+            replacementLesson = try JSONSerialization.data(withJSONObject: object)
+        }
         func setManifest(_ value: String) { replacementManifest = value }
         func payloads() -> [Data] { posts }
         func isWaiting() -> Bool { waiter != nil }
@@ -158,13 +195,15 @@
             var status = 200
             var headers = ["Content-Type": "application/json"]
             if url.path.hasSuffix("/me") {
+                profileRequests += 1
                 status = profileStatus
                 let capturedOwner = owner
+                let capturedXP = profileXP
                 let goal = activeGoal.map { "\"\($0)\"" } ?? "null"
                 if pause { await withCheckedContinuation { waiter = $0 } }
                 bytes = Data(
                     """
-                    {"id":"\(capturedOwner)","displayName":"Synthetic","xp":0,"activeTrackId":\(goal)}
+                    {"id":"\(capturedOwner)","displayName":"Synthetic","xp":\(capturedXP),"activeTrackId":\(goal)}
                     """.utf8)
             } else if url.path.hasSuffix("/me/active-track"), request.httpMethod == "POST" {
                 guard let payload = request.httpBody,
@@ -225,7 +264,8 @@
                     """.utf8)
             } else if url.path.hasSuffix("/me/paths/fixture:foundations") {
                 pathRequests += 1
-                let state = corrected ? "completed" : "available"
+                let state = nodeStatus ?? (corrected ? "completed" : "available")
+                status = pathStatus
                 bytes = Data(
                     """
                     {"trackId":"fixture:foundations","trackName":"Synthetic","readinessScore":12,
@@ -234,7 +274,7 @@
                     """.utf8)
             } else if url.path.hasSuffix("/tracks/fixture:foundations/lessons/fixture-lesson") {
                 if pauseLesson { await withCheckedContinuation { waiter = $0 } }
-                bytes = lesson
+                bytes = replacementLesson ?? lesson
                 status = lessonStatus
                 let pin = replacementManifest ?? manifestId
                 headers["X-Content-Manifest-Id"] = pin
@@ -245,7 +285,8 @@
                 guard let payload = request.httpBody else { throw APIError.invalidResponse }
                 posts.append(payload)
                 if offline { throw URLError(.notConnectedToInternet) }
-                corrected = true
+                status = submissionStatus
+                corrected = status == 200
                 bytes = result
             } else {
                 throw APIError.invalidResponse
@@ -265,6 +306,8 @@
         let provider = AuthenticationMock()
         let server: ModelTransport
         var time = Date(timeIntervalSince1970: 1_000)
+        var rejectActivityAccess = false
+        var activityFile: URL { root.appendingPathComponent("activity.json") }
         let configuration: CIAMConfiguration
 
         init(resources: URL) throws {
@@ -293,6 +336,12 @@
         func model(authenticated: Bool = true) -> NativeModel {
             NativeModel(
                 vault: vault, defaults: defaults,
+                activityStore: {
+                    if self.rejectActivityAccess {
+                        throw ModelTestFailure.forbiddenActivityOperation
+                    }
+                    return NativeActivityStore(file: self.activityFile)
+                },
                 clientFactory: { [server, root] url in
                     LearningClient(
                         api: try CertigoAPI(baseURL: url, transport: server),
@@ -313,6 +362,11 @@
     @main private struct NativeModelTests {
         @MainActor static func main() async throws {
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
+            try await rejectedRetryRefreshesSavedState(resources)
+            try await confirmedProfileAfterCorrection(resources)
+            try await confirmedProfileAfterPendingRetry(resources)
+            try await confirmedProfileFailurePreservesCorrection(resources)
+            try await lateConfirmedProfileIsNotRepublished(resources)
             try await manualConnection(resources)
             try await authoritativeOwnerAndRefresh(resources)
             try await stalePathSelectionAfterOwnerRefresh(resources)
@@ -330,12 +384,528 @@
             try await lateGoalResponse(resources)
             try await pilotHistorySessionIsolation(resources)
             try resumeNavigation(resources)
+            try await coldActivityRestoration(resources)
+            try await partialDraftRestoration(resources)
+            try await invalidActivityRestoration(resources)
+            try await interruptedActivityRestoration(resources)
+            try await submittedActivityRestoration(resources)
+            try await activityStorageFailure(resources)
+            try await sameOwnerRefreshKeepsDraft(resources)
             print(
-                "NativeModel: 14 coordination/journey scenarios, pilot-history isolation and resume-state checks passed."
+                "NativeModel: coordination/journeys, pilot-history isolation, resume-state and cold activity restoration checks passed."
             )
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+        @MainActor static func rejectedRetryRefreshesSavedState(_ resources: URL) async throws {
+            for status in [403, 422, 401, 503] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture)
+                await fixture.server.setOffline(true)
+                await model.submit()
+                guard let pending = model.queue.first else {
+                    throw ModelTestFailure.assertion("Missing pending recovery fixture")
+                }
+                await fixture.server.setOffline(false)
+                await fixture.server.failSubmission(status)
+                await model.retry(pending)
+                let terminal = status == 403 || status == 422
+                let expectedStatus: SubmissionStatus = terminal ? .failed : .pendingCorrection
+                try expect(
+                    model.queue.first?.status == expectedStatus,
+                    "Rejected retry left a stale pending row instead of durable failed state")
+                try expect(
+                    model.outcome == (terminal ? nil : .pendingCorrection) && !model.canSubmit
+                        && !model.busy && model.queue.first?.result == nil,
+                    "Rejected retry retained a false pending outcome or became editable")
+                if terminal {
+                    try expect(
+                        model.errorMessage?.contains("HTTP \(status)") == true,
+                        "Rejected retry lost its explicit HTTP feedback")
+                }
+                let reopened = fixture.model(authenticated: false)
+                await reopened.restore()
+                try expect(
+                    reopened.queue == model.queue,
+                    "Displayed retry status disagrees with the reopened durable outbox")
+                try expect(
+                    reopened.outcome == model.outcome && !reopened.canSubmit,
+                    "Saved activity restored a rejected retry as pending or editable")
+                if terminal {
+                    await model.retry(pending)
+                    let posts = await fixture.server.payloads()
+                    try expect(
+                        posts.count == 2 && model.queue.first?.status == .failed,
+                        "Terminal retry was posted again or reverted to pending")
+                }
+                let feedback = model.errorMessage ?? ""
+                try expect(
+                    !feedback.contains("synthetic-A")
+                        && !feedback.contains("https://example.invalid")
+                        && !feedback.contains(pending.submission.clientAttemptId)
+                        && !feedback.contains("fixture-question"),
+                    "Recovery feedback exposed connection or answer details")
+            }
+        }
+        @MainActor static func confirmedProfileAfterCorrection(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            try expect(model.profile?.xp == 0, "Unexpected initial synthetic profile")
+            await fixture.server.setProfileXP(963)
+            await model.submit()
+            guard let saved = model.queue.first, case .corrected(let result) = model.outcome else {
+                throw ModelTestFailure.assertion("Missing server correction")
+            }
+            try expect(
+                model.profile?.xp == 963 && result.rewards.xpEarned == 10,
+                "Confirmed profile XP remained stale or was computed from quiz rewards")
+            try expect(
+                saved.status == .corrected && !model.busy && !model.canSubmit,
+                "Profile refresh lost correction state")
+            let profiles = await fixture.server.profileRequestCount()
+            try expect(profiles == 2, "Confirmed correction did not reload /me once")
+            await fixture.server.setProfileXP(1_007)
+            await model.retry(saved)
+            let posts = await fixture.server.payloads()
+            try expect(
+                model.profile?.xp == 1_007 && posts.count == 1,
+                "Rechecking an ACK added local XP or resubmitted the quiz")
+        }
+        @MainActor static func confirmedProfileAfterPendingRetry(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            await fixture.server.setProfileXP(963)
+            await fixture.server.setOffline(true)
+            await model.submit()
+            let profiles = await fixture.server.profileRequestCount()
+            try expect(
+                model.outcome == .pendingCorrection && model.profile?.xp == 0 && profiles == 1,
+                "Pending correction refreshed or awarded unconfirmed XP")
+            guard let saved = model.queue.first else {
+                throw ModelTestFailure.assertion("Missing pending request")
+            }
+            await fixture.server.setOffline(false)
+            await model.retry(saved)
+            let posts = await fixture.server.payloads()
+            try expect(
+                model.profile?.xp == 963 && model.queue.first?.status == .corrected,
+                "Confirmed retry did not reload authoritative profile")
+            try expect(
+                posts.count == 2 && posts[0] == posts[1],
+                "Profile refresh changed the pending attempt or posted twice")
+        }
+        @MainActor static func confirmedProfileFailurePreservesCorrection(_ resources: URL)
+            async throws
+        {
+            for status in [401, 503, 200] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture)
+                await fixture.server.setProfileXP(963)
+                await fixture.server.failProfile(status)
+                if status == 200 { await fixture.server.setOwner("unexpected-owner") }
+                await model.submit()
+                guard let saved = model.queue.first, case .corrected = model.outcome else {
+                    throw ModelTestFailure.assertion("Profile failure rolled back a valid ACK")
+                }
+                try expect(
+                    saved.status == .corrected && saved.result != nil && !model.canSubmit
+                        && !model.busy && model.errorMessage != nil,
+                    "Profile failure hid error or removed durable correction")
+                try expect(
+                    model.profile?.id == "server-owner-A" && model.profile?.xp == 0,
+                    "Failed or foreign profile replaced authoritative account/XP")
+                await fixture.server.failProfile(200)
+                await fixture.server.setOwner("server-owner-A")
+                await model.retry(saved)
+                let posts = await fixture.server.payloads()
+                try expect(
+                    model.profile?.xp == 963 && model.errorMessage == nil && posts.count == 1,
+                    "Profile recovery failed or credited the ACK a second time")
+            }
+        }
+        @MainActor static func lateConfirmedProfileIsNotRepublished(_ resources: URL) async throws {
+            for retrying in [false, true] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture)
+                if retrying {
+                    await fixture.server.setOffline(true)
+                    await model.submit()
+                    await fixture.server.setOffline(false)
+                }
+                let pending = model.queue.first
+                await fixture.server.setProfileXP(963)
+                await fixture.server.pauseProfile()
+                let late = Task {
+                    if let pending {
+                        await model.retry(pending)
+                    } else {
+                        await model.submit()
+                    }
+                }
+                try await wait { await fixture.server.isWaiting() }
+                try expect(
+                    model.queue.first?.status == .corrected && model.busy,
+                    "ACK was not retained while profile refresh was pending")
+                await model.disconnect()
+                await fixture.server.allowProfiles()
+                await fixture.server.setOwner("server-owner-B")
+                await fixture.server.setProfileXP(1_729)
+                model.token = "synthetic-B"
+                await model.connect()
+                await fixture.server.resume()
+                await late.value
+                try expect(
+                    model.profile?.id == "server-owner-B" && model.profile?.xp == 1_729
+                        && model.queue.isEmpty && model.outcome == nil
+                        && model.errorMessage == nil && !model.busy,
+                    "Old correction/profile refresh leaked into the replacement session")
+                let entries = try await SubmissionStore(
+                    file: fixture.root.appendingPathComponent("outbox.json")
+                ).entries(ownerId: "server-owner-A", apiScope: "https://example.invalid/api")
+                try expect(
+                    entries.count == 1 && entries.first?.status == .corrected,
+                    "Account switch lost the original owner's ACK")
+            }
+        }
+        @MainActor static func prepareDraft(_ fixture: ModelFixture) async throws -> NativeModel {
+            let model = fixture.model(authenticated: false)
+            model.baseURL = "https://example.invalid/api"
+            model.token = "synthetic-A"
+            await model.connect()
+            guard let track = model.tracks.first else {
+                throw ModelTestFailure.assertion("Missing draft track")
+            }
+            await model.loadPath(track)
+            guard let node = model.path?.units.first?.lessons.first else {
+                throw ModelTestFailure.assertion("Missing draft node")
+            }
+            await model.loadLesson(node)
+            guard let question = model.lesson?.questions.first, let option = question.options.first
+            else { throw ModelTestFailure.assertion("Missing draft question") }
+            model.select(option, question: question)
+            return model
+        }
+        @MainActor static func coldActivityRestoration(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            model.selectedTab = .profile
+            guard let bytes = try NativeActivityStore(file: fixture.activityFile).read() else {
+                throw ModelTestFailure.assertion("Draft was not persisted")
+            }
+            let snapshot = try NativeActivitySnapshot.decode(bytes)
+            try expect(
+                snapshot.draft?.startedAt == fixture.time && snapshot.draft?.latencies == [:]
+                    && !String(decoding: bytes, as: UTF8.self).contains("synthetic-A"),
+                "Draft lost deterministic timing or persisted a token")
+            let reopened = fixture.model(authenticated: false)
+            await reopened.restore()
+            try expect(
+                reopened.path?.trackId == model.path?.trackId
+                    && reopened.lesson?.id == model.lesson?.id
+                    && reopened.selections == model.selections
+                    && reopened.selectedTab == .profile && reopened.canSubmit
+                    && reopened.queue.isEmpty && reopened.outcome == nil
+                    && reopened.restorationRevision == 1 && reopened.errorMessage == nil,
+                "Cold restore lost route, selections, or draft editability")
+            let noPosts = await fixture.server.payloads()
+            try expect(noPosts.isEmpty, "Restoration automatically submitted a draft")
+            guard let track = reopened.tracks.first else {
+                throw ModelTestFailure.assertion("Missing restored track")
+            }
+            await reopened.loadPath(track)
+            try expect(
+                reopened.lesson?.id == model.lesson?.id && reopened.selections == model.selections,
+                "Browsing discarded the active unsent activity")
+            let again = fixture.model(authenticated: false)
+            await again.restore()
+            await again.submit()
+            let posts = await fixture.server.payloads()
+            guard let payload = posts.first else {
+                throw ModelTestFailure.assertion("Explicit restored submission was not sent")
+            }
+            let request = try CertigoAPI.decoder().decode(QuizSubmission.self, from: payload)
+            try expect(
+                posts.count == 1 && request.clientAttemptId == snapshot.draft?.attemptId
+                    && request.startedAt == fixture.time && request.answers[0].selected == ["first"]
+                    && request.answers[0].latencyMs == 0,
+                "Explicit submission changed the restored attempt or answer")
+            await again.disconnect()
+            try expect(
+                try NativeActivityStore(file: fixture.activityFile).read() == nil,
+                "Logout retained the draft/navigation")
+            let signedOut = fixture.model(authenticated: false)
+            await signedOut.restore()
+            try expect(signedOut.profile == nil && signedOut.lesson == nil, "Logout auto-reopened")
+
+            let pathOnly = fixture.model(authenticated: false)
+            pathOnly.baseURL = "https://example.invalid/api"
+            pathOnly.token = "synthetic-A"
+            await pathOnly.connect()
+            await pathOnly.loadPath(track)
+            pathOnly.selectedTab = .social
+            let pathReopened = fixture.model(authenticated: false)
+            await pathReopened.restore()
+            try expect(
+                pathReopened.path?.trackId == track.id && pathReopened.lesson == nil
+                    && pathReopened.selectedTab == .social,
+                "Path-only navigation was not restored")
+        }
+        @MainActor static func partialDraftRestoration(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            try await fixture.server.addQuestion()
+            let model = try await prepareDraft(fixture)
+            let partial = fixture.model(authenticated: false)
+            await partial.restore()
+            try expect(
+                partial.lesson?.questions.count == 2 && partial.selections == model.selections
+                    && partial.selections.count == 1 && !partial.canSubmit,
+                "Partial draft was discarded or became submittable")
+            guard let node = partial.path?.units.first?.lessons.first else {
+                throw ModelTestFailure.assertion("Missing draft lesson")
+            }
+            await partial.loadLesson(node)
+            let empty = fixture.model(authenticated: false)
+            await empty.restore()
+            try expect(
+                empty.lesson?.id == node.id && empty.selections.isEmpty && !empty.canSubmit,
+                "Reading an unanswered lesson did not survive cold restore")
+            await empty.disconnect()
+            let authenticated = fixture.model()
+            await authenticated.connect()
+            guard let track = authenticated.tracks.first else {
+                throw ModelTestFailure.assertion("Missing authenticated track")
+            }
+            await authenticated.loadPath(track)
+            await authenticated.loadLesson(node)
+            guard let question = authenticated.lesson?.questions.first,
+                let option = question.options.first
+            else { throw ModelTestFailure.assertion("Missing authenticated question") }
+            authenticated.select(option, question: question)
+            fixture.time = Date(timeIntervalSince1970: 1_990)
+            await fixture.server.setOwner("server-owner-B")
+            fixture.provider.token = CIAMAccessToken(
+                value: "synthetic-B", expiresAt: Date(timeIntervalSince1970: 3_000))
+            await authenticated.refreshAuthenticationIfNeeded()
+            try expect(
+                authenticated.profile?.id == "server-owner-B" && authenticated.lesson == nil
+                    && authenticated.selections.isEmpty
+                    && !FileManager.default.fileExists(atPath: fixture.activityFile.path),
+                "Silent account switch retained another owner's draft")
+        }
+        @MainActor static func invalidActivityRestoration(_ resources: URL) async throws {
+            for invalidation in [
+                "owner", "scope", "manifest", "content", "locked", "removed", "deleted",
+                "malformed", "oversize", "future", "selection",
+            ] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                _ = try await prepareDraft(fixture)
+                switch invalidation {
+                case "owner": await fixture.server.setOwner("server-owner-B")
+                case "scope":
+                    fixture.vault.saved = DeveloperConnection(
+                        baseURL: "https://other.invalid/api", accessToken: "synthetic-B")
+                case "manifest":
+                    await fixture.server.setManifest("sha256:" + String(repeating: "b", count: 64))
+                case "content": try await fixture.server.changeLesson()
+                case "locked": await fixture.server.setNodeStatus("locked")
+                case "removed": try await fixture.server.removeTracks()
+                case "deleted": await fixture.server.failLesson(404)
+                case "malformed":
+                    try Data("invalid".utf8).write(to: fixture.activityFile)
+                case "oversize":
+                    try Data(repeating: 0, count: 65_537).write(to: fixture.activityFile)
+                default:
+                    guard let bytes = try NativeActivityStore(file: fixture.activityFile).read(),
+                        var object = try JSONSerialization.jsonObject(with: bytes) as? [String: Any]
+                    else { throw ModelTestFailure.assertion("Missing snapshot object") }
+                    if invalidation == "future" {
+                        object["schema"] = 99
+                    } else {
+                        guard var draft = object["draft"] as? [String: Any] else {
+                            throw ModelTestFailure.assertion("Missing draft object")
+                        }
+                        draft["selections"] = ["fixture-question": "foreign-option"]
+                        object["draft"] = draft
+                    }
+                    try JSONSerialization.data(withJSONObject: object).write(
+                        to: fixture.activityFile)
+                }
+                let reopened = fixture.model(authenticated: false)
+                await reopened.restore()
+                let posts = await fixture.server.payloads()
+                try expect(
+                    reopened.profile != nil && reopened.lesson == nil
+                        && reopened.selections.isEmpty && !reopened.canSubmit && posts.isEmpty
+                        && reopened.errorMessage?.contains("was cleared") == true
+                        && !FileManager.default.fileExists(atPath: fixture.activityFile.path),
+                    "Incompatible \(invalidation) activity was restored or not explicitly purged")
+            }
+        }
+        @MainActor static func interruptedActivityRestoration(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            _ = try await prepareDraft(fixture)
+            let original = try NativeActivityStore(file: fixture.activityFile).read()
+            await fixture.server.failPath(503)
+            let unavailable = fixture.model(authenticated: false)
+            await unavailable.restore()
+            unavailable.selectedTab = .coach
+            try expect(
+                unavailable.lesson == nil && unavailable.errorMessage?.contains("was kept") == true
+                    && (try NativeActivityStore(file: fixture.activityFile).read()) == original,
+                "Transient restore failure overwrote the draft")
+            await fixture.server.failPath(200)
+            guard let track = unavailable.tracks.first else {
+                throw ModelTestFailure.assertion("Missing track after transient failure")
+            }
+            await unavailable.loadPath(track)
+            try expect(
+                try NativeActivityStore(file: fixture.activityFile).read() == original,
+                "Browsing after failed restoration overwrote the retained draft")
+            let reopened = fixture.model(authenticated: false)
+            await reopened.restore()
+            try expect(
+                reopened.canSubmit && reopened.errorMessage == nil, "Restore retry lost draft")
+            await fixture.server.suspendLesson()
+            let late = fixture.model(authenticated: false)
+            let pending = Task { await late.restore() }
+            try await wait { await fixture.server.isWaiting() }
+            await late.disconnect()
+            await fixture.server.resume()
+            await pending.value
+            try expect(
+                late.profile == nil && late.lesson == nil && late.selections.isEmpty
+                    && !FileManager.default.fileExists(atPath: fixture.activityFile.path),
+                "Late restoration resurrected signed-out activity")
+        }
+        @MainActor static func submittedActivityRestoration(_ resources: URL) async throws {
+            for status in ["pending", "corrected", "failed"] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture)
+                await fixture.server.setOffline(status == "pending")
+                if status == "failed" { await fixture.server.failSubmission(400) }
+                await model.submit()
+                let original = await fixture.server.payloads()
+                let reopened = fixture.model(authenticated: false)
+                await reopened.restore()
+                await reopened.submit()
+                let after = await fixture.server.payloads()
+                try expect(
+                    !reopened.canSubmit && reopened.outcome == model.outcome
+                        && reopened.selections == model.selections && after == original
+                        && (status == "failed" || reopened.errorMessage == nil),
+                    "Submitted restoration fabricated a verdict, draft, or duplicate POST")
+            }
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            _ = try await prepareDraft(fixture)
+            guard let bytes = try NativeActivityStore(file: fixture.activityFile).read() else {
+                throw ModelTestFailure.assertion("Missing in-flight fixture")
+            }
+            let snapshot = try NativeActivitySnapshot.decode(bytes)
+            guard let draft = snapshot.draft, let session = snapshot.navigation.session else {
+                throw ModelTestFailure.assertion("Missing in-flight draft/session")
+            }
+            let request = QuizSubmission(
+                clientAttemptId: draft.attemptId,
+                trackId: session.trackId, startedAt: fixture.time,
+                answers: [
+                    QuizAnswer(
+                        itemId: "fixture-question", itemType: "mcq",
+                        selected: ["first"], latencyMs: 0)
+                ], publicManifestId: session.publicManifestId)
+            let fenced = NativeActivitySnapshot(
+                schema: 1, navigation: try snapshot.navigation.beginningSubmission(request),
+                trackId: snapshot.trackId, draft: nil)
+            try NativeActivityStore(file: fixture.activityFile).save(fenced.encoded())
+            let ambiguous = fixture.model(authenticated: false)
+            await ambiguous.restore()
+            let posts = await fixture.server.payloads()
+            try expect(
+                ambiguous.lesson == nil && !ambiguous.canSubmit && posts.isEmpty
+                    && ambiguous.errorMessage != nil,
+                "In-flight marker without outbox was treated as an unsent draft or ACK")
+        }
+        @MainActor static func activityStorageFailure(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            let original = try NativeActivityStore(file: fixture.activityFile).read()
+            fixture.rejectActivityAccess = true
+            guard let question = model.lesson?.questions.first, let option = question.options.last
+            else {
+                throw ModelTestFailure.assertion("Missing alternate selection")
+            }
+            model.select(option, question: question)
+            try expect(
+                model.errorMessage?.contains("could not be saved") == true,
+                "Draft write failure was silent")
+            await model.submit()
+            let posts = await fixture.server.payloads()
+            try expect(posts.isEmpty, "Submission bypassed a failed durable in-flight fence")
+            let unreadable = fixture.model(authenticated: false)
+            await unreadable.restore()
+            try expect(
+                unreadable.lesson == nil && unreadable.errorMessage?.contains("was kept") == true,
+                "Storage read failure became an empty successful restoration")
+            await model.disconnect()
+            try expect(
+                model.profile == nil
+                    && model.errorMessage?.contains("removal is not confirmed") == true
+                    && (try NativeActivityStore(file: fixture.activityFile).read()) == original,
+                "Unconfirmed draft removal was reported as successful")
+            model.token = "synthetic-A"
+            await model.connect()
+            try expect(
+                model.profile == nil && model.lesson == nil && model.errorMessage != nil,
+                "Explicit reconnect bypassed unconfirmed signed-out activity removal")
+            fixture.rejectActivityAccess = false
+            await model.disconnect()
+            try expect(
+                try NativeActivityStore(file: fixture.activityFile).read() == nil,
+                "Explicit sign-out retry did not remove the draft")
+        }
+        @MainActor static func sameOwnerRefreshKeepsDraft(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            await model.connect()
+            guard let track = model.tracks.first else {
+                throw ModelTestFailure.assertion("Missing same-owner track")
+            }
+            await model.loadPath(track)
+            guard let node = model.path?.units.first?.lessons.first else {
+                throw ModelTestFailure.assertion("Missing same-owner node")
+            }
+            await model.loadLesson(node)
+            guard let question = model.lesson?.questions.first, let option = question.options.last
+            else {
+                throw ModelTestFailure.assertion("Missing same-owner option")
+            }
+            fixture.rejectActivityAccess = true
+            model.select(option, question: question)
+            let pathRequests = await fixture.server.pathRequestCount()
+            fixture.time = Date(timeIntervalSince1970: 1_990)
+            fixture.provider.token = CIAMAccessToken(
+                value: "synthetic-renewed", expiresAt: Date(timeIntervalSince1970: 3_000))
+            await model.refreshAuthenticationIfNeeded()
+            let refreshedPathRequests = await fixture.server.pathRequestCount()
+            try expect(
+                model.selections[question.id] == option.id && model.canSubmit
+                    && model.lesson?.id == node.id
+                    && model.errorMessage?.contains("could not be saved") == true
+                    && refreshedPathRequests == pathRequests,
+                "Same-owner renewal reloaded or overwrote the in-memory unsaved draft")
         }
         @MainActor static func pilotHistorySessionIsolation(_ resources: URL) async throws {
             let root = (0..<5).reduce(URL(fileURLWithPath: #filePath)) { url, _ in
@@ -343,7 +913,8 @@
             }
             let content = try Data(
                 contentsOf: root.appendingPathComponent(
-                    "backend/src/Certigo.Infrastructure/Learning/Fixtures/responsible-ai-assistants.json"))
+                    "backend/src/Certigo.Infrastructure/Learning/Fixtures/responsible-ai-assistants.json"
+                ))
             for markRead in [false, true] {
                 for reconnect in [false, true] {
                     let fixture = try ModelFixture(resources: resources)
