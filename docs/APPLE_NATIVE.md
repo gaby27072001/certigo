@@ -13,9 +13,27 @@ these declarations are not Apple build or device evidence.
 `apps/apple/CertigoNative` includes a SwiftUI development UI and a main-only
 Xcode project alongside the model. Its unsigned development bundle is
 `com.certigo.native.dev`, not the installed Flutter identity. No NoAuth test
-target, protection probe, private probe tool or entitlement is included. Importing
-the project does not establish that it loads, builds, links, embeds frameworks or
-runs with an Apple SDK. It does not replace Flutter or an installed app.
+target, protection probe or private probe tool is included. The project now
+declares a source-only Associated Domains entitlement for
+`applinks:www.certigo-app.com`; it is not enabled in the Apple portal, signed,
+or associated by the production AASA. Its App ID prefix is not inferred.
+Importing the project does not establish that it loads, builds, links, embeds
+frameworks or runs with an Apple SDK. It does not replace Flutter or an installed
+app.
+
+The editorial pilot accepts validated lesson links at
+`https://www.certigo-app.com/learn/responsible-ai-assistants/{lessonId}/`.
+The route is retained only in memory and requires explicit user actions to
+continue and open the lesson. Receiving a link does not authenticate or write
+history; after the authenticated lesson view is displayed, the existing V1
+access operation records the consultation. Marking the lesson read remains
+explicit. The public fallback is generated from the same editorial fixture.
+The static site builder emits the AASA for `FFQPC7NC68.com.certigo.mobileapp` only when
+`APPLE_UNIVERSAL_LINKS_COMPATIBLE_BUILD_VERIFIED=true` is explicitly supplied
+after that production bundle has a compatible, verified route implementation.
+The current Flutter production target does not yet have this native pilot route,
+so the gate must remain closed. No deployment, portal capability change, App ID
+creation, signing or profile operation is part of this source change.
 
 The UI source uses SDK 26 glass APIs with availability fallbacks to iOS 17.
 Actual Apple validation needs Xcode/SDK 26 or newer and a Swift 6.2-compatible
