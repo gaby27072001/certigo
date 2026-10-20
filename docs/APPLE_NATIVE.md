@@ -68,10 +68,26 @@ uses the server-authoritative profile and an expected previous goal. An uncertai
 response retains the original decision for retry; a conflict reloads the profile
 rather than silently overwriting a concurrent choice.
 
+After a confirmed correction, initial submission and explicit retry reload the
+authenticated profile from `/me`; displayed XP is the returned server total,
+never the previous total plus a locally applied reward. Pending correction does
+not refresh or award XP. If profile refresh fails, the existing error feedback
+is shown and the last confirmed profile remains unchanged, while the durable
+quiz correction stays available. Retrying an already corrected entry can refresh
+the profile without submitting or crediting the quiz again. Session-generation
+and owner checks prevent a late profile from replacing a signed-out or different
+account.
+
 The outbox remains authoritative for persisted attempts, owner/API scope,
 `clientAttemptId`, original answers and release pin. Pending correction has no
 local verdict. Authorized server feedback can include explanations and corrected
 answer IDs; this does not permit shipping a private answer-key bank.
+
+A cancelled submission or retry propagates the cancellation error and leaves its
+outbox entry pending: cancellation is not proof that the server rejected or did
+not receive the request. After reopening, an explicit retry sends the same
+`clientAttemptId` and original payload for server reconciliation. Cancellation
+does not become an automatic retry or a local correction.
 
 `SubmissionStore` uses Foundation path-based access, an actor-local cache and
 atomic file replacement. It does **not** inherit `RuntimeDisk` cross-process

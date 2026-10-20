@@ -102,6 +102,8 @@
         private var pauseGoal = false
         private var goalResponseOwner: String?
         private var profileStatus = 200
+        private var profileXP = 0
+        private var profileRequests = 0
         private var pilotContent: Data?
         private var pilotLessonID = "verify-claims"
         private var pausePilotHistory = false
@@ -138,6 +140,9 @@
         func setGoal(_ value: String?) { activeGoal = value }
         func failGoal(_ status: Int) { goalStatus = status }
         func failProfile(_ status: Int) { profileStatus = status }
+        func setProfileXP(_ value: Int) { profileXP = value }
+        func profileRequestCount() -> Int { profileRequests }
+        func allowProfiles() { pause = false }
         func suspendGoal() { pauseGoal = true }
         func respondAsOwner(_ value: String?) { goalResponseOwner = value }
         func goalPayloads() -> [Data] { goalPosts }
@@ -190,13 +195,15 @@
             var status = 200
             var headers = ["Content-Type": "application/json"]
             if url.path.hasSuffix("/me") {
+                profileRequests += 1
                 status = profileStatus
                 let capturedOwner = owner
+                let capturedXP = profileXP
                 let goal = activeGoal.map { "\"\($0)\"" } ?? "null"
                 if pause { await withCheckedContinuation { waiter = $0 } }
                 bytes = Data(
                     """
-                    {"id":"\(capturedOwner)","displayName":"Synthetic","xp":0,"activeTrackId":\(goal)}
+                    {"id":"\(capturedOwner)","displayName":"Synthetic","xp":\(capturedXP),"activeTrackId":\(goal)}
                     """.utf8)
             } else if url.path.hasSuffix("/me/active-track"), request.httpMethod == "POST" {
                 guard let payload = request.httpBody,
@@ -355,6 +362,10 @@
     @main private struct NativeModelTests {
         @MainActor static func main() async throws {
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
+            try await confirmedProfileAfterCorrection(resources)
+            try await confirmedProfileAfterPendingRetry(resources)
+            try await confirmedProfileFailurePreservesCorrection(resources)
+            try await lateConfirmedProfileIsNotRepublished(resources)
             try await manualConnection(resources)
             try await authoritativeOwnerAndRefresh(resources)
             try await stalePathSelectionAfterOwnerRefresh(resources)
@@ -385,6 +396,130 @@
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+        @MainActor static func confirmedProfileAfterCorrection(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            try expect(model.profile?.xp == 0, "Unexpected initial synthetic profile")
+            await fixture.server.setProfileXP(963)
+            await model.submit()
+            guard let saved = model.queue.first, case .corrected(let result) = model.outcome else {
+                throw ModelTestFailure.assertion("Missing server correction")
+            }
+            try expect(
+                model.profile?.xp == 963 && result.rewards.xpEarned == 10,
+                "Confirmed profile XP remained stale or was computed from quiz rewards")
+            try expect(
+                saved.status == .corrected && !model.busy && !model.canSubmit,
+                "Profile refresh lost correction state")
+            let profiles = await fixture.server.profileRequestCount()
+            try expect(profiles == 2, "Confirmed correction did not reload /me once")
+            await fixture.server.setProfileXP(1_007)
+            await model.retry(saved)
+            let posts = await fixture.server.payloads()
+            try expect(
+                model.profile?.xp == 1_007 && posts.count == 1,
+                "Rechecking an ACK added local XP or resubmitted the quiz")
+        }
+        @MainActor static func confirmedProfileAfterPendingRetry(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = try await prepareDraft(fixture)
+            await fixture.server.setProfileXP(963)
+            await fixture.server.setOffline(true)
+            await model.submit()
+            let profiles = await fixture.server.profileRequestCount()
+            try expect(
+                model.outcome == .pendingCorrection && model.profile?.xp == 0 && profiles == 1,
+                "Pending correction refreshed or awarded unconfirmed XP")
+            guard let saved = model.queue.first else {
+                throw ModelTestFailure.assertion("Missing pending request")
+            }
+            await fixture.server.setOffline(false)
+            await model.retry(saved)
+            let posts = await fixture.server.payloads()
+            try expect(
+                model.profile?.xp == 963 && model.queue.first?.status == .corrected,
+                "Confirmed retry did not reload authoritative profile")
+            try expect(
+                posts.count == 2 && posts[0] == posts[1],
+                "Profile refresh changed the pending attempt or posted twice")
+        }
+        @MainActor static func confirmedProfileFailurePreservesCorrection(_ resources: URL)
+            async throws
+        {
+            for status in [401, 503, 200] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture)
+                await fixture.server.setProfileXP(963)
+                await fixture.server.failProfile(status)
+                if status == 200 { await fixture.server.setOwner("unexpected-owner") }
+                await model.submit()
+                guard let saved = model.queue.first, case .corrected = model.outcome else {
+                    throw ModelTestFailure.assertion("Profile failure rolled back a valid ACK")
+                }
+                try expect(
+                    saved.status == .corrected && saved.result != nil && !model.canSubmit
+                        && !model.busy && model.errorMessage != nil,
+                    "Profile failure hid error or removed durable correction")
+                try expect(
+                    model.profile?.id == "server-owner-A" && model.profile?.xp == 0,
+                    "Failed or foreign profile replaced authoritative account/XP")
+                await fixture.server.failProfile(200)
+                await fixture.server.setOwner("server-owner-A")
+                await model.retry(saved)
+                let posts = await fixture.server.payloads()
+                try expect(
+                    model.profile?.xp == 963 && model.errorMessage == nil && posts.count == 1,
+                    "Profile recovery failed or credited the ACK a second time")
+            }
+        }
+        @MainActor static func lateConfirmedProfileIsNotRepublished(_ resources: URL) async throws {
+            for retrying in [false, true] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture)
+                if retrying {
+                    await fixture.server.setOffline(true)
+                    await model.submit()
+                    await fixture.server.setOffline(false)
+                }
+                let pending = model.queue.first
+                await fixture.server.setProfileXP(963)
+                await fixture.server.pauseProfile()
+                let late = Task {
+                    if let pending {
+                        await model.retry(pending)
+                    } else {
+                        await model.submit()
+                    }
+                }
+                try await wait { await fixture.server.isWaiting() }
+                try expect(
+                    model.queue.first?.status == .corrected && model.busy,
+                    "ACK was not retained while profile refresh was pending")
+                await model.disconnect()
+                await fixture.server.allowProfiles()
+                await fixture.server.setOwner("server-owner-B")
+                await fixture.server.setProfileXP(1_729)
+                model.token = "synthetic-B"
+                await model.connect()
+                await fixture.server.resume()
+                await late.value
+                try expect(
+                    model.profile?.id == "server-owner-B" && model.profile?.xp == 1_729
+                        && model.queue.isEmpty && model.outcome == nil
+                        && model.errorMessage == nil && !model.busy,
+                    "Old correction/profile refresh leaked into the replacement session")
+                let entries = try await SubmissionStore(
+                    file: fixture.root.appendingPathComponent("outbox.json")
+                ).entries(ownerId: "server-owner-A", apiScope: "https://example.invalid/api")
+                try expect(
+                    entries.count == 1 && entries.first?.status == .corrected,
+                    "Account switch lost the original owner's ACK")
+            }
         }
         @MainActor static func prepareDraft(_ fixture: ModelFixture) async throws -> NativeModel {
             let model = fixture.model(authenticated: false)

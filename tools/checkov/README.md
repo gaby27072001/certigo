@@ -189,6 +189,113 @@ trusted-control manifest, framework, scanner consumption or gate version pin.
 No such protected file is changed here; proposals pinning `certigo.3` must be
 updated and re-reviewed rather than silently consuming this revision.
 
+### Exact fixture coverage is distinct from a successful scan
+
+The inactive composition harness now uses `require_fixture_coverage` for
+explicit `(resource, check)` obligations. This is deliberately a **single-file
+fixture assertion**, not a production inventory, applicability ledger, new
+policy evaluator, or replacement for `.github/scripts/checkov_report_gate.py`.
+It rejects empty/duplicate obligations, missing/extra/duplicate evidence,
+inconsistent statuses, parsing errors, skips and a report without executed
+checks. It returns the retained PASSED/FAILED evidence; a FAILED record is
+coverage, never security success. The fully qualified identity/subnet positive
+controls exercise the assertion directly.
+
+The concrete missing-coverage regression is a real ARM template with a
+`Microsoft.Web/sites` parent whose ingress is Disabled and an embedded short-type
+`config` child named `appsettings`. With only checks 13 and 222 selected, the
+pinned candidate produces **one PASSED parent record, zero failed/skipped/parse
+records and two scanner resources**. No child-13 record survives. The expected
+child obligation makes the fixture assertion fail even though a coarse
+nonempty-resource/nonempty-check test would pass. This is a qualification
+boundary of the runner, not a claim that the active Bicep gate accepts ARM
+reports: that gate explicitly requires the Bicep framework.
+
+A paired control starts from two actual successful site checks, then injects a
+test-only UNKNOWN response for one check. The report loses only that check,
+leaving the other success intact; exact obligations reject the loss. Additional
+controls retain an unsafe parent's ingress failure and all six ordinary
+appsettings failures, and reject damaged report evidence. No UNKNOWN is changed
+to PASSED, no child failure is removed, and installed scanner code is not patched
+by these tests.
+
+Run just the new coverage qualification and its directly affected positive
+control, without rerunning the 18-shape suite or scanning the repository:
+
+```sh
+cd tools/checkov
+python -m unittest -v \
+  test_arm_composition.CompositionTests.test_nested_short_type_child_disappears_despite_success_and_two_resources \
+  test_arm_composition.CompositionTests.test_unknown_check_with_other_success_cannot_meet_exact_obligations \
+  test_arm_composition.CompositionTests.test_failed_parent_and_all_six_child_failures_remain_coverage_not_success \
+  test_arm_composition.CompositionTests.test_exact_fixture_obligations_reject_empty_duplicate_skip_parse_and_foreign \
+  test_arm_composition.CompositionTests.test_literal_qualified_user_and_subnet_positive_controls
+```
+
+Use an isolated environment containing the existing digest-verified
+`3.2.495+certigo.4` wheel and its dependencies. These controls were also run with
+CPython 3.12.15 on Linux aarch64, pycep-parser 0.5.1 and PyYAML 6.0.3. This closes
+the Python-minor qualification gap for these fixtures only; it is not CI x64
+or deployment evidence and does not validate other policies.
+
+Before adopting a production coverage contract, an independently derived
+inventory must bind source revision, environment and module instance to each
+required resource/check pair, retaining explicit non-applicability separately
+from parent security verdicts. An inventory derived only from returned records
+cannot detect omitted checks. Parameter/default evaluation is not evidence of
+the selected environment's module arguments. Unknown subtype, unresolved
+binding, missing parent/module, UNKNOWN response, parse error and zero effective
+coverage must each remain blocking. Neither that architecture nor a runtime
+or gate change is implemented by this fixture-only delivery.
+
+### First inactive Bicep applicability adapter: literal root ingress
+
+`bicep_ingress_candidate.py` implements a deliberately small next step using
+the **existing Bicep Runner and unchanged CKV_AZURE_222 predicate**, not another
+policy engine. It parses authored source before scanning to derive independent
+resource/check obligations, and pins the installed ingress and registry source
+digests as well as candidate and parser versions. Both parser and scanner
+consume the same captured source bytes (the Runner uses a temporary snapshot).
+The versioned JSON includes the original source path/hash, explicit environment,
+root module instance, independent obligations, unmodified raw scanner report,
+separate applicability records and blockers.
+
+Only API `2024-04-01`, resource-group scope, a literal
+`Microsoft.Web/sites` resource containing just `name` and
+`properties.publicNetworkAccess`, and its symbolic-parent-linked literal
+`Microsoft.Web/sites/config` `appsettings` StringDictionary are qualified.
+Site names and per-site appsettings children must be unique. Parameters,
+variables, modules, outputs, conditions, loops, other properties/resources,
+unresolved values and other subtypes fail closed **before** the Runner.
+An environment label does not resolve a parameter: this lot rejects all
+parameter declarations and supports only the root module instance.
+
+For each appsettings child, ingress applicability is explicitly
+`NOT_APPLICABLE` with a typed-contract reason and the separately reconciled site
+obligation. The child's raw CKV_AZURE_222 FAILED record remains in
+`scanner_report`, including its raw summary; it is not deleted, changed to
+PASSED or returned as UNKNOWN. The parent's actual predicate result remains
+independent: an Enabled parent blocks even with a non-applicable child.
+Missing child or parent evidence, duplicate/unexpected obligations, UNKNOWN
+omissions, parsing/skipped records and inconsistent cardinality/status block.
+This custom applicability schema is experimental, **not** an existing Checkov
+result status or an adopted production report contract.
+
+```sh
+python tools/checkov/bicep_ingress_candidate.py /path/literal-fixture.bicep --environment staging
+python tools/checkov/test_bicep_ingress_candidate.py
+```
+
+Exit 0 means only `QUALIFIED_SUBSET` under that narrow contract; every report
+sets `production_adoptable: false` and names the restricted control scope.
+It does not claim every security control on these resources was checked.
+Exit 1 means BLOCKED. The actual `infra/modules/functionApp.bicep` is outside
+this literal-only contract and must remain blocked: parameters, module binding,
+Flex runtime/diagnostics and ingress decisions are not implemented or inferred.
+The other five appsettings checks retain their prior findings; this tool does
+not run, suppress or resolve them. There is no active gate/workflow, dependency
+pin, infrastructure, cloud access or scanner installation change.
+
 All six appsettings-subtype findings remain unchanged and blocking. Returning
 PASSED on an inapplicable appsettings child would misrepresent the parent;
 returning UNKNOWN would silently lose the record in this Checkov version.

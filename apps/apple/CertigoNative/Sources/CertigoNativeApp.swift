@@ -1530,6 +1530,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var compactColumn: NavigationSplitViewColumn = .sidebar
         @State private var showEditorialPilot = false
         @State private var requestedLessonID: String?
+        @State private var loadingTrackID: String?
+        @State private var loadingPathRequestID: UUID?
+        @State private var loadingLessonID: String?
+        @State private var loadingLessonRequestID: UUID?
 
         init(
             model: NativeModel,
@@ -1602,6 +1606,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 selectedLesson = nil
                 columns = .automatic
                 compactColumn = .sidebar
+                loadingTrackID = nil
+                loadingPathRequestID = nil
+                loadingLessonID = nil
+                loadingLessonRequestID = nil
                 if owner == nil { savingGoalID = nil }
             }
             .onChange(of: model.restorationRevision) { _, _ in
@@ -1708,7 +1716,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         Text("No certifications available.")
                     }
                 }
-                .disabled(model.busy)
+                .disabled(
+                    model.busy || loadingTrackID != nil || loadingLessonID != nil
+                )
                 .navigationTitle("Learn")
             } content: {
                 path
@@ -1719,7 +1729,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 guard let track = model.tracks.first(where: { $0.id == id }) else { return }
                 guard model.path?.trackId != track.id else { return }
                 selectedLesson = nil
-                Task { await model.loadPath(track) }
+                requestPath(track)
             }
             .onChange(of: selectedLesson) { _, id in
                 guard model.lesson?.id != id else { return }
@@ -1729,7 +1739,31 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                     )
                 else { return }
-                Task { await model.loadLesson(node) }
+                requestLesson(node)
+            }
+        }
+
+        private func requestPath(_ track: Track) {
+            let requestID = UUID()
+            loadingTrackID = track.id
+            loadingPathRequestID = requestID
+            Task {
+                await model.loadPath(track)
+                guard loadingPathRequestID == requestID else { return }
+                loadingTrackID = nil
+                loadingPathRequestID = nil
+            }
+        }
+
+        private func requestLesson(_ node: PathLesson) {
+            let requestID = UUID()
+            loadingLessonID = node.id
+            loadingLessonRequestID = requestID
+            Task {
+                await model.loadLesson(node)
+                guard loadingLessonRequestID == requestID else { return }
+                loadingLessonID = nil
+                loadingLessonRequestID = nil
             }
         }
 
@@ -1829,7 +1863,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var path: some View {
             List(selection: $selectedLesson) {
-                if let path = model.path {
+                if let path = model.path,
+                    selectedTrack == nil || selectedTrack == path.trackId
+                {
                     if let track = model.tracks.first(where: { $0.id == path.trackId }) {
                         activeGoalSection(track)
                     }
@@ -1854,8 +1890,32 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                         Image(systemName: lesson.canOpen ? "book" : "lock")
                                     }
                                 }
-                                .disabled(!lesson.canOpen || model.busy)
+                                .disabled(
+                                    !lesson.canOpen || model.busy || loadingLessonID != nil)
                             }
+                        }
+                    }
+                } else if let selectedTrack,
+                    let track = model.tracks.first(where: { $0.id == selectedTrack })
+                {
+                    if loadingTrackID == track.id {
+                        Section {
+                            ProgressView("Loading learning path…")
+                                .frame(maxWidth: .infinity, minHeight: 88)
+                        }
+                    } else {
+                        Section {
+                            ContentUnavailableView(
+                                "Learning path unavailable",
+                                systemImage: "wifi.exclamationmark",
+                                description: Text(
+                                    "The selected certification’s learning path could not be loaded."
+                                )
+                            )
+                            Button("Retry loading path", systemImage: "arrow.clockwise") {
+                                requestPath(track)
+                            }
+                            .disabled(model.busy || loadingTrackID != nil)
                         }
                     }
                 } else {
@@ -1936,7 +1996,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var session: some View {
             Group {
-                if let lesson = model.lesson {
+                if let lesson = model.lesson,
+                    selectedTrack == nil || selectedTrack == lesson.trackId,
+                    selectedLesson == nil || selectedLesson == lesson.id
+                {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
                             Text(lesson.title).font(.title).bold()
@@ -2003,6 +2066,31 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         .padding()
                         .frame(maxWidth: 700, alignment: .leading)
                         .frame(maxWidth: .infinity)
+                    }
+                } else if let selectedLesson,
+                    let node = model.path?.units.flatMap(\.lessons).first(where: {
+                        $0.id == selectedLesson
+                    })
+                {
+                    if loadingLessonID == node.id {
+                        ProgressView("Loading lesson…")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        VStack(spacing: 16) {
+                            ContentUnavailableView(
+                                "Lesson unavailable",
+                                systemImage: "wifi.exclamationmark",
+                                description: Text(
+                                    "The selected lesson could not be loaded."
+                                )
+                            )
+                            Button("Retry loading lesson", systemImage: "arrow.clockwise") {
+                                requestLesson(node)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(model.busy || loadingLessonID != nil)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else {
                     ContentUnavailableView(
