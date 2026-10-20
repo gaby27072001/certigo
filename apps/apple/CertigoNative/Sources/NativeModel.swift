@@ -351,7 +351,20 @@ final class NativeModel {
     private(set) var offlinePack: OfflineQuestionPack?
     private(set) var editorialPilot: EditorialPilotSnapshot?
     private(set) var pilotHistory: PilotHistory?
-    private(set) var queue: [SavedSubmission] = []
+    private(set) var queue: [SavedSubmission] = [] {
+        didSet { rebuildHistoryPresentation() }
+    }
+    private(set) var serverHistory: [QuizAttemptHistoryItem] = []
+    private(set) var historyPresentation: LearningHistoryPresentation?
+    private(set) var historyNextCursor: String?
+    private(set) var historyLoading = false
+    private(set) var historyAttempted = false
+    private(set) var historyOffline = false
+    private(set) var historyNeedsSignIn = false
+    private(set) var historyError: String?
+    private(set) var historyRefreshedAt: Date?
+    private var historyGeneration = UUID()
+    private var historyCursors: Set<String> = []
     private(set) var outcome: SubmissionOutcome?
     private(set) var busy = false
     private(set) var deletionStage: NativeDeletionStage?
@@ -931,6 +944,7 @@ final class NativeModel {
     }
 
     private func clearSession() {
+        clearHistory()
         deletionProof = nil
         resumeReady = false
         apiScope = nil
@@ -957,6 +971,7 @@ final class NativeModel {
 
     private func connectUsingAuthentication(interactive: Bool) async {
         guard deletionStage == nil, let authentication, !busy else { return }
+        clearHistory()
         let previous = client
         let marker = UUID()
         generation = marker
@@ -1453,6 +1468,154 @@ final class NativeModel {
         let value = try await client.refreshProfile()
         guard generation == marker else { return }
         profile = value
+    }
+
+    private func clearHistory() {
+        historyGeneration = UUID()
+        serverHistory = []
+        historyPresentation = nil
+        historyNextCursor = nil
+        historyLoading = false
+        historyAttempted = false
+        historyOffline = false
+        historyNeedsSignIn = false
+        historyError = nil
+        historyRefreshedAt = nil
+        historyCursors = []
+    }
+
+    private func rebuildHistoryPresentation() {
+        guard let profile, let apiScope, deletionStage == nil else {
+            historyPresentation = nil
+            return
+        }
+        do {
+            historyPresentation = try LearningHistoryPresentation(
+                server: serverHistory, local: queue, ownerId: profile.id, apiScope: apiScope)
+        } catch {
+            historyPresentation = nil
+            historyError =
+                "History records disagree. Saved answers were preserved. Refresh or contact support."
+        }
+    }
+
+    func refreshHistory() async {
+        await loadHistory(append: false)
+    }
+
+    var canReconnectHistory: Bool { authentication != nil }
+
+    func reconnectHistory() async {
+        guard canReconnectHistory, !busy, deletionStage == nil else { return }
+        await connect()
+        if profile != nil { await refreshHistory() }
+    }
+
+    func localHistorySubmission(for item: QuizAttemptHistoryItem) -> SavedSubmission? {
+        guard let profile, let apiScope, historyPresentation != nil else { return nil }
+        return queue.first {
+            $0.ownerId == profile.id && $0.apiScope == apiScope
+                && QuizAttemptHistoryItem.key($0.id) == item.id
+        }
+    }
+
+    func loadMoreHistory() async {
+        guard !historyLoading, historyNextCursor != nil else { return }
+        await loadHistory(append: true)
+    }
+
+    private func loadHistory(append: Bool) async {
+        guard deletionStage == nil, let client, let profile, let apiScope else { return }
+        if append && historyLoading { return }
+        let marker = generation
+        let requestID = UUID()
+        historyGeneration = requestID
+        let cursor = append ? historyNextCursor : nil
+        historyLoading = true
+        historyAttempted = true
+        historyError = nil
+        historyOffline = false
+        historyNeedsSignIn = false
+        rebuildHistoryPresentation()
+        defer {
+            if historyGeneration == requestID { historyLoading = false }
+        }
+        do {
+            let page = try await client.history(cursor: cursor)
+            try Task.checkCancellation()
+            guard generation == marker, historyGeneration == requestID,
+                self.profile?.id == profile.id, self.apiScope == apiScope,
+                deletionStage == nil
+            else { return }
+            let visited = append ? historyCursors : []
+            if let next = page.nextCursor, next == cursor || visited.contains(next) {
+                throw ContractError.malformed("nonadvancing history cursor")
+            }
+            let combined = try LearningHistoryPresentation.summaries(
+                (append ? serverHistory : []) + page.items)
+            let presentation = try LearningHistoryPresentation(
+                server: combined, local: queue, ownerId: profile.id, apiScope: apiScope)
+            serverHistory = combined
+            historyPresentation = presentation
+            historyNextCursor = page.nextCursor
+            historyCursors = visited
+            if let cursor { historyCursors.insert(cursor) }
+            historyRefreshedAt = now()
+        } catch {
+            guard generation == marker, historyGeneration == requestID,
+                self.profile?.id == profile.id, self.apiScope == apiScope,
+                deletionStage == nil
+            else { return }
+            if error is CancellationError { return }
+            switch error {
+            case APIError.unauthorized:
+                historyNeedsSignIn = true
+                historyError = "Sign in again to load confirmed history. Local work was preserved."
+            case APIError.http(423):
+                historyError =
+                    "Account deletion is in progress. Learning is closed; check deletion status."
+                await recoverDeletionFromHistory(client: client, marker: marker)
+            case APIError.transport:
+                historyOffline = true
+                historyError =
+                    "History is offline. Previously loaded summaries may be stale. Local work remains on this device."
+            case is ContractError, APIError.invalidResponse:
+                historyError =
+                    "History records could not be verified. Saved answers were preserved. Refresh or contact support."
+            default:
+                historyError =
+                    "Confirmed history is unavailable. Previously loaded summaries may be stale. Retry explicitly."
+            }
+        }
+    }
+
+    private func recoverDeletionFromHistory(client: LearningClient, marker: UUID) async {
+        deletionStage = .unconfirmed
+        deletionCanCancel = false
+        clearHistory()
+        self.client = nil
+        deletionClient = client
+        resumeReady = false
+        do {
+            let owner = try await client.pauseForAccountDeletion()
+            guard generation == marker else { return }
+            guard let apiScope,
+                let provider = authentication?.provider as? any CIAMAccountDeletionProvider,
+                let account = provider.deletionAccountIdentifier
+            else {
+                deletionMessage =
+                    "Deletion is in progress. Reconnect with the same Microsoft account to check status. No local data was removed."
+                return
+            }
+            try saveDeletionReceipt(
+                NativeDeletionReceipt(
+                    schema: 1, ownerId: owner, apiScope: apiScope,
+                    accountIdentifier: account, phase: .unconfirmed, remainingCleanup: []))
+            await refreshDeletionStatus()
+        } catch {
+            guard generation == marker else { return }
+            deletionMessage = deletionError(error)
+        }
     }
 
     func refreshProgress() async {

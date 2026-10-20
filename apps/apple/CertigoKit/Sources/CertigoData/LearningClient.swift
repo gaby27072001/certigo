@@ -101,6 +101,14 @@ public actor LearningClient {
         try runtimeStore?.purge(ownerId: ownerId, apiScope: api.scope)
     }
 
+    public func history(limit: Int = 20, cursor: String? = nil) async throws -> LearningHistoryPage
+    {
+        let context = try credentials()
+        let page = try await api.history(credentials: context, limit: limit, cursor: cursor)
+        try assertCurrent(context)
+        return page
+    }
+
     public func catalog() async throws -> [Track] {
         let context = try credentials()
         let value = try await api.catalog(context)

@@ -314,8 +314,8 @@ or permission was changed for this source preparation.
 The provider's account selection is held in memory. After app relaunch, the
 user must explicitly sign in again; silent account restoration is not claimed.
 The test connector's device-only vault remains unchanged, with no migration or
-access to the legacy Flutter app's credential cache. This lot does not implement
-cross-device attempt history. Account deletion uses the separate workflow below;
+access to the legacy Flutter app's credential cache. Read-only quiz history and
+account deletion use the separate workflows below;
 its source implementation does not establish live service availability.
 
 ### Downloaded public question packs
@@ -421,6 +421,59 @@ Apple acceptance must separately verify SwiftUI/UIKit/MSAL typechecking,
 Keychain removal, pending restart and account selection, interrupted cleanup,
 Dynamic Type/VoiceOver focus, and iPhone/iPad confirmation presentation with
 sacrificial accounts. No live destructive request is part of portable tests.
+
+### Confirmed quiz history across devices
+
+Profile > Progress & history reads the paginated `/api/me/history` lesson-quiz
+summary contract. It sends only `limit` (default 20, range 1...50) and an opaque,
+bounded continuation cursor with the existing bearer/correlation headers.
+The response is decoded into dedicated, closed summary/page DTOs, never
+`QuizResult`. Unknown/private fields, invalid identifiers, score/count/reward
+ranges, unsupported kinds, malformed manifests/cursors and inconsistent
+duplicate summaries fail explicitly. The endpoint is `/api`, not `/api/v1`.
+The client does not read or repair economy journals or infer confirmation from
+stored attempt rows; the backend owns those confirmation semantics.
+
+"Confirmed across your devices" uses server submission dates, recorded scores
+and earned XP, not current names from a different content release. Refresh
+starts a replacement traversal; Load more appears for any non-null cursor,
+including an empty continuing page. Identical repeated summaries collapse by
+client attempt identity (canonical UUIDs, opaque IDs otherwise unchanged).
+Track, lesson, manifest when both known, and full local correction identity
+must agree. Conflicts preserve the previous verified page and report an error,
+not last-writer wins. A cursor that does not advance is rejected.
+
+A matching server summary takes presentation precedence over pending/failed
+local state without mutating the outbox, manufacturing correction details,
+unpinning content or awarding XP. Pending attempts can explicitly retrieve
+their full correction using the existing same-ID idempotent retry. A failed
+local record is not silently re-enabled for submission by viewing a summary.
+Local full server ACKs absent from the loaded pages stay visible as
+"Confirmed on this device"; absence from partial pages does not imply deletion.
+Unmatched pending/failed records and the current activity remain explicitly
+device-local. Their dates are local activity starts, not fabricated server
+submission times. Viewing history never uploads drafts or retries submissions.
+Current progress stays a separately labeled last-loaded profile/path reading;
+paginated rewards are never summed into XP balance or readiness.
+
+History is held only in memory, with no new personal-data cache. Account/API
+changes synchronously clear rows and cursors. Independent request generations
+discard old refresh/load-more responses; double load-more is serialized.
+Offline and HTTP errors retain verified rows with an explicit stale/unavailable
+message. A fresh offline session does not claim empty remote history. A 401
+requests explicit sign-in; a 423 freezes learning and enters the existing
+deletion-status recovery without sending a deletion POST. Cancellation does not
+erase previously verified rows.
+
+Portable tests cover the wire allowlist/query, invalid fields, scoped merge,
+pending/server precedence without outbox changes, local ACKs outside loaded
+pages, tied/repeated/conflicting rows, empty continuing pages, cursor loops,
+offline/401/423 errors and late account/refresh/load-more responses. This is
+source integration against the backend contract, not evidence that the history
+endpoint or its Cosmos query/index requirements are deployed. Apple acceptance
+still requires SwiftUI typechecking/build, long identifiers/Dynamic Type,
+VoiceOver, iPhone/iPad navigation, offline presentation and explicit retry.
+Exam and editorial-pilot history remain outside this lesson-quiz summary.
 
 The existing Flutter TestFlight build is not this native candidate. Do not claim
 production login, live account deletion, validated accessibility, App Review
