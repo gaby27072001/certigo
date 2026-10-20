@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import { chmod, link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, link, mkdir, mkdtemp, open, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -328,10 +328,15 @@ test('replacement after descriptor validation cannot redirect truncation, writin
     assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
     assert.equal(await readFile(victim, 'utf8'), 'untouched');
     assert.equal((await stat(victim)).mode & 0o777, 0o600 & ~process.umask());
-    assert.equal((await stat(original)).mode & 0o777, 0o666 & ~process.umask());
-    const generated = JSON.parse(await readFile(original, 'utf8'));
-    assert.deepEqual(generated.mimeTypes, { '.json': 'application/json' });
-    assert.equal(generated.routes[0].route, '/.well-known/apple-app-site-association');
+    const handle = await open(original, 'r');
+    try {
+      assert.equal((await handle.stat()).mode & 0o777, 0o666 & ~process.umask());
+      const generated = JSON.parse(await handle.readFile('utf8'));
+      assert.deepEqual(generated.mimeTypes, { '.json': 'application/json' });
+      assert.equal(generated.routes[0].route, '/.well-known/apple-app-site-association');
+    } finally {
+      await handle.close();
+    }
   } finally {
     context.mock.restoreAll();
     await rm(output, { recursive: true, force: true });
