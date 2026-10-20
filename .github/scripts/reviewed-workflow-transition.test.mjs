@@ -7,8 +7,12 @@ import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 import {
   backendDeployTrustedFiles,
+  isExactReviewedFileTransition,
   isReviewedGenerationJob,
   isReviewedWorkflowTransition,
+  reviewedPrivilegedInputTransitions,
+  reviewedWorkflowTransitionExpirations,
+  reviewedWorkflowTransitions,
   validateBackendDeployWorkflow,
   validateBackendDeployWorkspace,
 } from './backend-deploy-workflow-policy.mjs';
@@ -224,6 +228,90 @@ function approval(directory, spec, expires = '2026-10-16') {
   write(directory, manifestPath, renderWorkflowManifest(manifest));
   write(directory, proposalRelativePath(workflowPath(spec.name)), spec.text);
 }
+
+test('protected-input transitions bind exact source, target, path and expiry in BASE policy', () => {
+  const source = Buffer.from('trusted source');
+  const target = Buffer.from('reviewed target');
+  const transition = {
+    sourceSha256: digest(source),
+    targetSha256: digest(target),
+    expiresOn: '2026-10-16',
+  };
+  assert.equal(isExactReviewedFileTransition(
+    target,
+    source,
+    transition,
+    { now: new Date('2026-10-16T23:59:59Z') },
+  ), true);
+  assert.equal(isExactReviewedFileTransition(
+    Buffer.from('different target'),
+    source,
+    transition,
+    options,
+  ), false);
+  assert.equal(isExactReviewedFileTransition(
+    target,
+    Buffer.from('different source'),
+    transition,
+    options,
+  ), false);
+  assert.equal(isExactReviewedFileTransition(
+    target,
+    source,
+    transition,
+    { now: new Date('2026-10-17T00:00:00Z') },
+  ), false);
+  assert.equal(isExactReviewedFileTransition(
+    target,
+    null,
+    transition,
+    options,
+  ), false);
+
+  const addition = { ...transition, sourceSha256: null };
+  assert.equal(isExactReviewedFileTransition(target, null, addition, options), true);
+  assert.equal(isExactReviewedFileTransition(target, source, addition, options), false);
+});
+
+test('the two reviewed protected-input bundles are separate and pin every staging addition', () => {
+  assert.deepEqual(Object.keys(reviewedPrivilegedInputTransitions).sort(), [
+    'codeql-race-corrections',
+    'staging-build-identity-preparation',
+  ]);
+  assert.equal(reviewedPrivilegedInputTransitions['codeql-race-corrections'].expiresOn, '2026-11-02');
+  assert.deepEqual(
+    reviewedPrivilegedInputTransitions['codeql-race-corrections'].files,
+    {
+      '.github/scripts/backend-deployment-state.mjs': {
+        sourceSha256: '97040960b4c788dd500e4b868b3937a3fabf41a162669b4c231d8d3121364e97',
+        targetSha256: '2eb503bbef17e34335407a8b1dca5f325aabd7969bb5e6e102c2aff6bf1f6d4d',
+      },
+      'infra/governance/evidence-files.mjs': {
+        sourceSha256: '4fb31670a29d03685c05a3df132d11a43ea4ea25de9903dc9c64b7688f1df9d8',
+        targetSha256: 'fca7a230b1ffdbb1e6cfa2cf0a87303dca42d7aef05dde19622b7e13b3336143',
+      },
+    },
+  );
+
+  const staging = reviewedPrivilegedInputTransitions['staging-build-identity-preparation'];
+  assert.equal(staging.expiresOn, '2026-11-02');
+  assert.deepEqual(Object.keys(staging.files).sort(), [
+    '.github/scripts/deploy-flex-onedeploy.sh',
+    '.github/scripts/staging-backend-package.sh',
+    '.github/scripts/staging-backend-package.test.mjs',
+    '.github/scripts/staging-backend-release.mjs',
+    '.github/scripts/staging-backend-release.test.mjs',
+    '.github/scripts/verify-backend-build-identity.mjs',
+    '.github/workflows-disabled/cd-backend-staging.yml',
+    'docs/deployment-runbook.md',
+    'docs/runbooks/STAGING_BACKEND_PREPARATION.md',
+  ]);
+  assert.deepEqual(reviewedWorkflowTransitions['cd-backend-staging.yml'], [
+    null,
+    staging.files['.github/workflows-disabled/cd-backend-staging.yml'].targetSha256,
+  ]);
+  assert.equal(reviewedWorkflowTransitionExpirations['cd-backend-staging.yml'], staging.expiresOn);
+});
 
 test('exact deltas require prior BASE approval; candidate approval cannot grant or renew it', () => {
   for (const spec of specs) {

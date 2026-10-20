@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
 
@@ -47,6 +48,8 @@ class NativeCIAMSchemeTests(unittest.TestCase):
         target = self.create()
         self.assertEqual(self.shared.read_bytes(), before)
         original, local = ET.fromstring(before), ET.fromstring(target.read_bytes())
+        for tag in ("TestAction", "ProfileAction"):
+            original.find(tag).set("shouldUseLaunchSchemeArgsEnv", "NO")
         env = local.find("LaunchAction/EnvironmentVariables")
         self.assertEqual({e.get("key"): e.get("value") for e in env}, self.values)
         self.assertTrue(all(e.get("isEnabled") == "YES" for e in env))
@@ -91,10 +94,10 @@ class NativeCIAMSchemeTests(unittest.TestCase):
             scheme.load_values(self.config)
         self.assertFalse((self.project / "xcuserdata").exists())
 
-    def test_refuses_non_debug_or_ambiguous_shared_action_before_writing(self):
+    def test_refuses_unknown_or_ambiguous_shared_action_before_writing(self):
         original = self.shared.read_bytes()
         for data in (
-            original.replace(b'<LaunchAction\n      buildConfiguration = "Debug"', b'<LaunchAction\n      buildConfiguration = "Release"'),
+            original.replace(b'<LaunchAction\n      buildConfiguration = "Debug"', b'<LaunchAction\n      buildConfiguration = "Unknown"'),
             b"<Scheme><LaunchAction/><LaunchAction/></Scheme>",
             b'<!DOCTYPE Scheme><Scheme/>',
         ):
@@ -179,6 +182,137 @@ class NativeCIAMSchemeTests(unittest.TestCase):
         self.shared.write_bytes(ET.tostring(tree))
         with self.assertRaises(ValueError):
             self.create()
+
+    def test_release_run_and_optional_profile_name_preserve_identity_and_other_settings(self):
+        tree = ET.fromstring(self.shared.read_bytes())
+        launch = tree.find("LaunchAction")
+        launch.set("buildConfiguration", "Release")
+        profile_ref = tree.find("ProfileAction/BuildableProductRunnable/BuildableReference")
+        del profile_ref.attrib["BlueprintName"]
+        profile_attributes = dict(profile_ref.attrib)
+        environment = ET.SubElement(launch, "EnvironmentVariables")
+        ET.SubElement(environment, "EnvironmentVariable", key="EXISTING", value="keep", isEnabled="YES")
+        arguments = ET.SubElement(launch, "CommandLineArguments")
+        ET.SubElement(arguments, "CommandLineArgument", argument="--keep", isEnabled="YES")
+        self.shared.write_bytes(ET.tostring(tree))
+        before = self.shared.read_bytes()
+        project_file = self.project / "project.pbxproj"
+        project_file.write_bytes(b"existing local signing settings")
+        target = self.create()
+        local = ET.fromstring(target.read_bytes())
+        self.assertEqual("Debug", local.find("LaunchAction").get("buildConfiguration"))
+        self.assertEqual(before, self.shared.read_bytes())
+        self.assertEqual(b"existing local signing settings", project_file.read_bytes())
+        self.assertEqual(profile_attributes, local.find(
+            "ProfileAction/BuildableProductRunnable/BuildableReference"
+        ).attrib)
+        self.assertEqual("Release", local.find("ProfileAction").get("buildConfiguration"))
+        for tag in ("TestAction", "ProfileAction"):
+            action = local.find(tag)
+            self.assertEqual("NO", action.get("shouldUseLaunchSchemeArgsEnv"))
+            self.assertEqual(
+                {"EXISTING": "keep"},
+                {node.get("key"): node.get("value") for node in action.findall(
+                    "EnvironmentVariables/EnvironmentVariable"
+                )},
+            )
+            self.assertEqual("--keep", action.find(
+                "CommandLineArguments/CommandLineArgument"
+            ).get("argument"))
+        self.assertEqual(self.values, {
+            node.get("key"): node.get("value")
+            for node in local.findall("LaunchAction/EnvironmentVariables/EnvironmentVariable")
+            if node.get("key", "").startswith("CERTIGO_CIAM_")
+        })
+        with self.assertRaises(FileExistsError):
+            self.create()
+
+    def test_profile_reference_must_match_run_even_when_name_is_absent(self):
+        original = self.shared.read_bytes()
+        for key, value in (
+            ("BlueprintIdentifier", "different-target"),
+            ("BuildableName", "Other.app"),
+            ("ReferencedContainer", "container:Other.xcodeproj"),
+            ("BlueprintName", "Other"),
+        ):
+            with self.subTest(key=key):
+                tree = ET.fromstring(original)
+                ref = tree.find("ProfileAction/BuildableProductRunnable/BuildableReference")
+                del ref.attrib["BlueprintName"]
+                ref.set(key, value)
+                self.shared.write_bytes(ET.tostring(tree))
+                with self.assertRaises(ValueError):
+                    self.create()
+        tree = ET.fromstring(original)
+        runner = tree.find("ProfileAction/BuildableProductRunnable")
+        runner.remove(runner.find("BuildableReference"))
+        self.shared.write_bytes(ET.tostring(tree))
+        with self.assertRaises(ValueError):
+            self.create()
+        self.assertFalse((self.project / "xcuserdata").exists())
+
+    def test_publish_is_complete_and_never_overwrites_a_concurrent_file(self):
+        real_link = os.link
+        def concurrent_link(source, target):
+            self.assertIn(b"CERTIGO_CIAM_ENABLED", Path(source).read_bytes())
+            Path(target).write_bytes(b"CONCURRENT USER EDITS")
+            real_link(source, target)
+        with patch.object(scheme.os, "link", side_effect=concurrent_link):
+            with self.assertRaises(FileExistsError):
+                self.create()
+        destination = self.project / "xcuserdata/fixture.xcuserdatad/xcschemes"
+        self.assertEqual(
+            b"CONCURRENT USER EDITS", (destination / "CertigoNative Local.xcscheme").read_bytes()
+        )
+        self.assertEqual([], list(destination.glob(".certigo-ciam-*.tmp")))
+
+    def test_preserves_explicit_noninherited_profile_settings(self):
+        tree = ET.fromstring(self.shared.read_bytes())
+        profile = tree.find("ProfileAction")
+        profile.set("shouldUseLaunchSchemeArgsEnv", "NO")
+        environment = ET.SubElement(profile, "EnvironmentVariables")
+        ET.SubElement(environment, "EnvironmentVariable", key="PROFILE_ONLY", value="keep")
+        self.shared.write_bytes(ET.tostring(tree))
+        before = self.shared.read_bytes()
+        target = self.create()
+        actual = ET.fromstring(target.read_bytes()).find("ProfileAction")
+        ET.indent(profile, space="   ")
+        ET.indent(actual, space="   ")
+        self.assertEqual(ET.tostring(profile), ET.tostring(actual))
+        self.assertEqual(before, self.shared.read_bytes())
+
+    def test_rejects_ambiguous_inheritance_and_existing_ciam_outside_run(self):
+        original = self.shared.read_bytes()
+        for tag in ("TestAction", "ProfileAction"):
+            for key, inherit in (("UNRELATED", "YES"), ("CERTIGO_CIAM_ENABLED", "NO")):
+                with self.subTest(tag=tag, key=key):
+                    tree = ET.fromstring(original)
+                    action = tree.find(tag)
+                    action.set("shouldUseLaunchSchemeArgsEnv", inherit)
+                    environment = ET.SubElement(action, "EnvironmentVariables")
+                    ET.SubElement(environment, "EnvironmentVariable", key=key, value="true")
+                    self.shared.write_bytes(ET.tostring(tree))
+                    with self.assertRaises(ValueError):
+                        self.create()
+        self.assertFalse((self.project / "xcuserdata").exists())
+
+    def test_io_failure_or_source_change_leaves_no_partial_scheme(self):
+        for change_source in (False, True):
+            with self.subTest(change_source=change_source):
+                before = self.shared.read_bytes()
+                def sync(fd):
+                    if change_source:
+                        self.shared.write_bytes(before + b"\n")
+                    else:
+                        raise OSError("fixture write failure")
+                with patch.object(scheme.os, "fsync", side_effect=sync):
+                    with self.assertRaises(ValueError if change_source else OSError):
+                        self.create()
+                destination = self.project / "xcuserdata/fixture.xcuserdatad/xcschemes"
+                self.assertEqual([], list(destination.iterdir()))
+                self.assertEqual(
+                    before + b"\n" if change_source else before, self.shared.read_bytes()
+                )
 
 
 if __name__ == "__main__":
