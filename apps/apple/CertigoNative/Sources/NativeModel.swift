@@ -876,6 +876,20 @@ final class NativeModel {
         } catch {
             guard generation == marker else { return }
             report(error)
+            do {
+                let values = try await client.savedSubmissions()
+                guard generation == marker else { return }
+                queue = values
+                if saved.id == attemptID,
+                    values.first(where: { $0.id == saved.id })?.status == .failed
+                {
+                    outcome = nil
+                }
+                persistActivity()
+            } catch {
+                guard generation == marker else { return }
+                report(error)
+            }
         }
     }
 
