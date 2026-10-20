@@ -362,6 +362,7 @@
     @main private struct NativeModelTests {
         @MainActor static func main() async throws {
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
+            try await rejectedRetryRefreshesSavedState(resources)
             try await confirmedProfileAfterCorrection(resources)
             try await confirmedProfileAfterPendingRetry(resources)
             try await confirmedProfileFailurePreservesCorrection(resources)
@@ -396,6 +397,57 @@
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+        @MainActor static func rejectedRetryRefreshesSavedState(_ resources: URL) async throws {
+            for status in [403, 422, 401, 503] {
+                let fixture = try ModelFixture(resources: resources)
+                defer { fixture.cleanup() }
+                let model = try await prepareDraft(fixture)
+                await fixture.server.setOffline(true)
+                await model.submit()
+                guard let pending = model.queue.first else {
+                    throw ModelTestFailure.assertion("Missing pending recovery fixture")
+                }
+                await fixture.server.setOffline(false)
+                await fixture.server.failSubmission(status)
+                await model.retry(pending)
+                let terminal = status == 403 || status == 422
+                let expectedStatus: SubmissionStatus = terminal ? .failed : .pendingCorrection
+                try expect(
+                    model.queue.first?.status == expectedStatus,
+                    "Rejected retry left a stale pending row instead of durable failed state")
+                try expect(
+                    model.outcome == (terminal ? nil : .pendingCorrection) && !model.canSubmit
+                        && !model.busy && model.queue.first?.result == nil,
+                    "Rejected retry retained a false pending outcome or became editable")
+                if terminal {
+                    try expect(
+                        model.errorMessage?.contains("HTTP \(status)") == true,
+                        "Rejected retry lost its explicit HTTP feedback")
+                }
+                let reopened = fixture.model(authenticated: false)
+                await reopened.restore()
+                try expect(
+                    reopened.queue == model.queue,
+                    "Displayed retry status disagrees with the reopened durable outbox")
+                try expect(
+                    reopened.outcome == model.outcome && !reopened.canSubmit,
+                    "Saved activity restored a rejected retry as pending or editable")
+                if terminal {
+                    await model.retry(pending)
+                    let posts = await fixture.server.payloads()
+                    try expect(
+                        posts.count == 2 && model.queue.first?.status == .failed,
+                        "Terminal retry was posted again or reverted to pending")
+                }
+                let feedback = model.errorMessage ?? ""
+                try expect(
+                    !feedback.contains("synthetic-A")
+                        && !feedback.contains("https://example.invalid")
+                        && !feedback.contains(pending.submission.clientAttemptId)
+                        && !feedback.contains("fixture-question"),
+                    "Recovery feedback exposed connection or answer details")
+            }
         }
         @MainActor static func confirmedProfileAfterCorrection(_ resources: URL) async throws {
             let fixture = try ModelFixture(resources: resources)
