@@ -450,7 +450,7 @@ test('replacement after descriptor validation cannot redirect truncation, writin
       assert.equal((await handle.stat()).mode & 0o777, 0o666 & ~process.umask());
       const generated = JSON.parse(await handle.readFile('utf8'));
       assert.deepEqual(generated.mimeTypes, { '.json': 'application/json' });
-      assert.equal(generated.routes[0].route, '/.well-known/apple-app-site-association');
+      assert.deepEqual(generated.routes, []);
     } finally {
       await handle.close();
     }
