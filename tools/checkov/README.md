@@ -248,6 +248,54 @@ binding, missing parent/module, UNKNOWN response, parse error and zero effective
 coverage must each remain blocking. Neither that architecture nor a runtime
 or gate change is implemented by this fixture-only delivery.
 
+### First inactive Bicep applicability adapter: literal root ingress
+
+`bicep_ingress_candidate.py` implements a deliberately small next step using
+the **existing Bicep Runner and unchanged CKV_AZURE_222 predicate**, not another
+policy engine. It parses authored source before scanning to derive independent
+resource/check obligations, and pins the installed ingress and registry source
+digests as well as candidate and parser versions. Both parser and scanner
+consume the same captured source bytes (the Runner uses a temporary snapshot).
+The versioned JSON includes the original source path/hash, explicit environment,
+root module instance, independent obligations, unmodified raw scanner report,
+separate applicability records and blockers.
+
+Only API `2024-04-01`, resource-group scope, a literal
+`Microsoft.Web/sites` resource containing just `name` and
+`properties.publicNetworkAccess`, and its symbolic-parent-linked literal
+`Microsoft.Web/sites/config` `appsettings` StringDictionary are qualified.
+Site names and per-site appsettings children must be unique. Parameters,
+variables, modules, outputs, conditions, loops, other properties/resources,
+unresolved values and other subtypes fail closed **before** the Runner.
+An environment label does not resolve a parameter: this lot rejects all
+parameter declarations and supports only the root module instance.
+
+For each appsettings child, ingress applicability is explicitly
+`NOT_APPLICABLE` with a typed-contract reason and the separately reconciled site
+obligation. The child's raw CKV_AZURE_222 FAILED record remains in
+`scanner_report`, including its raw summary; it is not deleted, changed to
+PASSED or returned as UNKNOWN. The parent's actual predicate result remains
+independent: an Enabled parent blocks even with a non-applicable child.
+Missing child or parent evidence, duplicate/unexpected obligations, UNKNOWN
+omissions, parsing/skipped records and inconsistent cardinality/status block.
+This custom applicability schema is experimental, **not** an existing Checkov
+result status or an adopted production report contract.
+
+```sh
+python tools/checkov/bicep_ingress_candidate.py /path/literal-fixture.bicep --environment staging
+python tools/checkov/test_bicep_ingress_candidate.py
+```
+
+Exit 0 means only `QUALIFIED_SUBSET` under that narrow contract; every report
+sets `production_adoptable: false` and names the restricted control scope.
+It does not claim every security control on these resources was checked.
+Exit 1 means BLOCKED. The actual `infra/modules/functionApp.bicep` is outside
+this literal-only contract and must remain blocked: parameters, module binding,
+Flex runtime/diagnostics and ingress decisions are not implemented or inferred.
+The other five appsettings checks retain their prior findings; this tool does
+not run, suppress or resolve them. There is no active gate/workflow, dependency
+pin, infrastructure, cloud access or scanner installation change.
+
 All six appsettings-subtype findings remain unchanged and blocking. Returning
 PASSED on an inapplicable appsettings child would misrepresent the parent;
 returning UNKNOWN would silently lose the record in this Checkov version.
