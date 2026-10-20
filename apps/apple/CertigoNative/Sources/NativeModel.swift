@@ -273,7 +273,17 @@ struct NativeActivityStore {
         _ = try NativeActivitySnapshot.decode(bytes)
         try FileManager.default.createDirectory(
             at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        #if os(iOS)
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: file.deletingLastPathComponent().path)
+        #endif
         try bytes.write(to: file, options: .atomic)
+        #if os(iOS)
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: file.path)
+        #endif
     }
 
     func clear() throws {
@@ -291,6 +301,7 @@ final class NativeModel {
     private(set) var tracks: [Track] = []
     private(set) var path: LearningPath?
     private(set) var lesson: Lesson?
+    private(set) var offlinePack: OfflineQuestionPack?
     private(set) var editorialPilot: EditorialPilotSnapshot?
     private(set) var pilotHistory: PilotHistory?
     private(set) var queue: [SavedSubmission] = []
@@ -347,7 +358,9 @@ final class NativeModel {
                 return LearningClient(
                     api: api,
                     store: SubmissionStore(
-                        file: directory.appendingPathComponent("CertigoNative/submissions-v1.json"))
+                        file: directory.appendingPathComponent("CertigoNative/submissions-v1.json")),
+                    runtimeStore: try RuntimeContentStore(
+                        root: directory.appendingPathComponent("CertigoNative/public-content"))
                 )
             }
     }
@@ -463,6 +476,7 @@ final class NativeModel {
         tracks = []
         path = nil
         lesson = nil
+        offlinePack = nil
         editorialPilot = nil
         pilotHistory = nil
         selections = [:]
@@ -625,9 +639,13 @@ final class NativeModel {
         let marker = generation
         busy = true
         path = nil
+        offlinePack = nil
         errorMessage = nil
         defer { if generation == marker { busy = false } }
         do {
+            let cachedPack = try await client.cachedQuestionPack(trackId: track.id)
+            guard generation == marker else { return }
+            offlinePack = cachedPack
             let value = try await client.path(trackId: track.id)
             guard generation == marker else { return }
             path = value
@@ -638,18 +656,60 @@ final class NativeModel {
         }
     }
 
-    func loadLesson(_ node: PathLesson) async {
-        guard !busy else { return }
-        let owner = profile?.id
-        await refreshAuthenticationIfNeeded()
-        guard let client, let path, !busy else { return }
-        guard profile?.id == owner else {
-            report(APIError.staleSession)
+    func downloadQuestionPack(_ track: Track) async {
+        guard let client, !busy else { return }
+        let marker = generation
+        busy = true
+        errorMessage = nil
+        defer { if generation == marker { busy = false } }
+        do {
+            _ = try await client.synchronizePublicContent()
+            guard generation == marker else { return }
+            guard let pack = try await client.cachedQuestionPack(trackId: track.id) else {
+                throw RuntimeStoreError.missingFile
+            }
+            guard generation == marker else { return }
+            offlinePack = pack
+        } catch {
+            guard generation == marker else { return }
+            report(error)
+        }
+    }
+
+    func openCachedLesson(_ id: String) async {
+        guard let pack = offlinePack, pack.lessons.contains(where: { $0.id == id }) else {
+            report(RuntimeStoreError.missingFile)
             return
         }
-        guard path.units.flatMap(\.lessons).contains(where: { $0.id == node.id && $0.canOpen })
+        await loadLessonValue(id: id, cachedPack: pack)
+    }
+
+    func restoreDownloadedActivity() async {
+        guard !busy, client != nil, profile != nil else { return }
+        let marker = generation
+        busy = true
+        errorMessage = nil
+        defer { if generation == marker { busy = false } }
+        await restoreActivity(marker: marker, requireDownloadedContent: true)
+    }
+
+    func loadLesson(_ node: PathLesson) async {
+        guard let path,
+            path.units.flatMap(\.lessons).contains(where: { $0.id == node.id && $0.canOpen })
         else {
             report(NativeResumeError.malformed)
+            return
+        }
+        await loadLessonValue(id: node.id, cachedPack: nil)
+    }
+
+    private func loadLessonValue(id: String, cachedPack: OfflineQuestionPack?) async {
+        guard !busy else { return }
+        let owner = profile?.id
+        if cachedPack == nil { await refreshAuthenticationIfNeeded() }
+        guard let client, !busy else { return }
+        guard profile?.id == owner else {
+            report(APIError.staleSession)
             return
         }
         let marker = generation
@@ -659,7 +719,14 @@ final class NativeModel {
         errorMessage = nil
         defer { if generation == marker { busy = false } }
         do {
-            let value = try await client.lesson(trackId: path.trackId, lessonId: node.id)
+            let value: Lesson
+            if let cachedPack, let cached = cachedPack.lessons.first(where: { $0.id == id }) {
+                try await client.pinPublicContent(manifestId: cachedPack.manifestId)
+                value = cached
+            } else {
+                guard let path else { throw NativeResumeError.malformed }
+                value = try await client.lesson(trackId: path.trackId, lessonId: id)
+            }
             guard generation == marker else { return }
             let saved = try await client.savedSubmissions()
             guard generation == marker else { return }
@@ -960,7 +1027,7 @@ final class NativeModel {
         }
     }
 
-    private func restoreActivity(marker: UUID) async {
+    private func restoreActivity(marker: UUID, requireDownloadedContent: Bool = false) async {
         guard let client, let profile, let apiScope else { return }
         resumeReady = false
         do {
@@ -975,14 +1042,32 @@ final class NativeModel {
             let trackID = navigation.session?.trackId ?? snapshot.trackId
             var loadedPath: LearningPath?
             var loadedLesson: Lesson?
+            var cachedPack: OfflineQuestionPack?
             if let trackID {
+                do {
+                    cachedPack = try await client.cachedQuestionPack(
+                        trackId: trackID, manifestId: navigation.session?.publicManifestId)
+                } catch RuntimeStoreError.missingFile {
+                    // An online-only activity may never have downloaded its manifest.
+                    cachedPack = nil
+                }
+                guard generation == marker else { return }
+            }
+            if let session = navigation.session, let cachedPack {
+                guard let cached = cachedPack.lessons.first(where: { $0.id == session.lessonId })
+                else { throw NativeResumeError.releaseChanged }
+                try await client.pinPublicContent(manifestId: cachedPack.manifestId)
+                guard generation == marker else { return }
+                loadedLesson = cached
+            } else if let trackID {
+                guard !requireDownloadedContent else { throw RuntimeStoreError.missingFile }
                 guard tracks.contains(where: { $0.id == trackID && $0.learningAvailable }) else {
                     throw NativeResumeError.releaseChanged
                 }
                 loadedPath = try await client.path(trackId: trackID)
                 guard generation == marker else { return }
             }
-            if let session = navigation.session {
+            if let session = navigation.session, loadedLesson == nil {
                 guard
                     loadedPath?.units.flatMap(\.lessons).contains(where: {
                         $0.id == session.lessonId && $0.canOpen
@@ -1046,6 +1131,7 @@ final class NativeModel {
                 if saved.status == .pendingCorrection { restoredOutcome = .pendingCorrection }
             }
             path = loadedPath
+            offlinePack = cachedPack
             lesson = loadedLesson
             selections = restoredSelections
             latencies = restoredLatencies
@@ -1105,6 +1191,15 @@ final class NativeModel {
             errorMessage = "Enter a valid HTTPS API URL without credentials or query parameters."
         case APIError.staleSession:
             errorMessage = "The account changed. This response was not displayed."
+        case RuntimeStoreError.capacity:
+            errorMessage =
+                "The downloaded content storage limit was reached. Saved attempts were preserved; contact support before removing their pinned content."
+        case RuntimeStoreError.busy, RuntimeStoreError.staleActivation:
+            errorMessage =
+                "The downloaded content changed during this operation. Retry explicitly; nothing was submitted."
+        case is RuntimeStoreError, is PublicReleaseError, is CanonicalContentError:
+            errorMessage =
+                "The downloaded question pack is missing, incompatible or damaged. Reconnect and download it again. Saved submissions were not changed."
         case APIError.transport:
             errorMessage = "The server is unreachable. Check the connection and retry."
         case APIError.http(let status):

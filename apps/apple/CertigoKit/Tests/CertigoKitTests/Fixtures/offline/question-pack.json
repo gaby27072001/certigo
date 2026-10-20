@@ -1,0 +1,53 @@
+[
+  {
+    "schema": "certigo.runtime.track/v1",
+    "resourceType": "track",
+    "id": "microsoft.az-900.track.foundations",
+    "legacyId": "fixture-track",
+    "certificationId": "microsoft:az-900",
+    "blueprintVersion": "2026-08-17",
+    "lifecycle": {"status": "active"},
+    "mode": "questionBank",
+    "summary": "Synthetic public question pack",
+    "domainIds": ["microsoft.az-900.domain.cloud-concepts"],
+    "unitIds": []
+  },
+  {
+    "schema": "certigo.runtime.domain/v1",
+    "resourceType": "domain",
+    "id": "microsoft.az-900.domain.cloud-concepts",
+    "certificationId": "microsoft:az-900",
+    "blueprintVersion": "2026-08-17",
+    "lifecycle": {"status": "active"},
+    "objectiveId": "section-1"
+  },
+  {
+    "schema": "certigo.runtime.concept/v1",
+    "resourceType": "concept",
+    "id": "microsoft.az-900.concept.cloud-service-models",
+    "legacyId": "fixture-concept",
+    "certificationId": "microsoft:az-900",
+    "blueprintVersion": "2026-08-17",
+    "lifecycle": {"status": "active"},
+    "domainId": "microsoft.az-900.domain.cloud-concepts",
+    "title": "Synthetic concept"
+  },
+  {
+    "schema": "certigo.certification-catalog/v1",
+    "asOf": "2026-10-20",
+    "freshness": {"maxAgeDays": 30, "reviewDueOn": "2026-11-19"},
+    "providers": [
+      {"id": "aws", "name": "AWS", "namespace": "aws", "officialCatalogUrl": null, "sourceHosts": ["example.invalid"], "checkedOn": null},
+      {"id": "gcp", "name": "GCP", "namespace": "gcp", "officialCatalogUrl": null, "sourceHosts": ["example.invalid"], "checkedOn": null},
+      {"id": "microsoft", "name": "Microsoft", "namespace": "microsoft", "officialCatalogUrl": null, "sourceHosts": ["example.invalid"], "checkedOn": null}
+    ],
+    "certifications": [{
+      "id": "microsoft:az-900", "provider": "microsoft", "slug": "az-900",
+      "officialCode": "AZ-900", "officialSlug": "az-900", "title": "Synthetic certification",
+      "level": "foundational", "status": "active", "officialUrl": "https://example.invalid/certification",
+      "guide": {"url": "https://example.invalid/guide", "version": null, "publishedOn": null, "versionSource": null, "revisionToken": null},
+      "blueprint": {"version": "2026-08-17", "objectives": [{"id": "section-1", "title": "Synthetic cloud models", "weightPercent": 100, "weightType": "exact"}]},
+      "provenance": {"checkedOn": "2026-10-20", "sources": [{"kind": "certification-page", "url": "https://example.invalid/certification"}, {"kind": "exam-guide", "url": "https://example.invalid/guide"}]}
+    }]
+  }
+]

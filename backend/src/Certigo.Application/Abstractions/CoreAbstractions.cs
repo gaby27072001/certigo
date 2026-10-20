@@ -143,12 +143,23 @@ public interface IAttemptRepository
 {
     Task<AttemptRecord?> GetByClientAttemptIdAsync(string userId, string clientAttemptId, CancellationToken cancellationToken = default);
     Task CreateAsync(AttemptRecord attempt, CancellationToken cancellationToken = default);
+    Task<AttemptHistoryWindow> ListHistoryWindowAsync(
+        string userId,
+        AttemptHistoryPosition? after,
+        int maximumRecords,
+        CancellationToken cancellationToken = default);
 
     // Recent-activity aggregate over the attempts container, used to feed the
     // anti-cheat rate-window detectors (XP farming / submission spam) without an
     // external store. Counts every attempt (lesson + exam) submitted since `since`.
     Task<RecentActivity> GetRecentActivityAsync(string userId, DateTimeOffset since, CancellationToken cancellationToken = default);
 }
+
+public sealed record AttemptHistoryPosition(DateTimeOffset SubmittedAt, string Id);
+
+public sealed record AttemptHistoryWindow(
+    IReadOnlyList<AttemptRecord> Records,
+    bool HasMore);
 
 /// Aggregate of a learner's recent attempts (count + XP) over a sliding window.
 public sealed record RecentActivity(int Attempts, int Xp);
