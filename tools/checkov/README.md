@@ -258,7 +258,21 @@ registry, candidate and parser versions. The Runner consumes the original
 captured module bytes; no source flattening or rewriting is used. Reports keep
 the independent inventory, unmodified raw scanner report, separate
 applicability records and blockers. Literal single-file inputs use schema v2;
-the optional local-module path uses schema v3 with both source hashes.
+the optional single local-module path uses schema v3 with both source hashes.
+Selecting multiple module symbols uses schema v4, with a shared root snapshot,
+an independent inventory of every root module call and resource, and a separate
+v3 report per selected instance. Every selected module's bindings and resource
+inventory are established before the first Runner invocation. A missing,
+unsafe, UNKNOWN or unqualified selected module blocks the aggregate even when
+another selected module passes. Unselected siblings and root resources are
+explicitly outside this selected-module subset, never implicitly compliant.
+
+Both `pycep-parser==0.5.1` and the already reviewed
+`0.5.1+certigo.1` from `build_parser_wheel.py` are accepted. All six imported
+parser source files/grammar are SHA-256 checked, not just distribution metadata.
+The compatibility version reuses the builder's reviewed patched-file digests.
+Each report records the parser version and seals. Other versions or changed
+source bytes are rejected; this does not change any CI pin or install a runtime.
 
 The bounded literal resource contracts are:
 
@@ -277,21 +291,40 @@ fail closed **before** the Runner. The optional `--module-symbol` mode accepts
 one explicit local root-to-module call when every target-module parameter and
 variable resolves from a literal/default or a bounded environment ternary.
 It requires a root `env` parameter whose allowed values are exactly
-`dev`, `staging`, and `prod`. Any unresolved, secure-without-a-static-value,
+`dev`, `staging`, and `prod`. Any unresolved, secure,
 unknown, cyclic or type-mismatched binding blocks the whole qualification.
+Secure root/module parameters are not evaluated even when they have defaults:
+they require external deployment evidence. Transitive references cannot expose
+them in non-secure binding evidence. Arbitrary function calls, including
+`uniqueString`, `loadJsonContent` and module output access, remain unresolved.
 Nested modules, dynamic module paths/scopes, loops, module conditions,
 parameters-file inference and resources outside the bounded inventory remain
-unsupported and blocked. Secure values are omitted from the JSON binding
-evidence.
+unsupported and blocked.
 
-The parser-only whitespace normalization for line-wrapped ternary punctuation
-does not alter the captured bytes sent to Checkov. The module report identifies
+The only explicit cross-scope form supported is a symbolic reference to an
+existing `Microsoft.Resources/resourceGroups@2024-03-01` root resource with
+only a deterministically resolved name, under a subscription/resource-group
+root. Its symbol and resolved environment-specific name are recorded; no
+subscription ID or deployed Azure identity is inferred. `dependsOn` accepts
+only declared root symbols and records them as provenance, not as a security
+verdict or proof for the selected module. An inherited scope requires a
+resource-group root.
+
+The upstream parser-only whitespace normalization for line-wrapped ternary
+punctuation is not used with the compatibility parser. Neither path alters
+the captured bytes sent to Checkov. The module report identifies
 the root and child hashes, module instance and per-parameter resolution. This
 is a module-local subset, not qualification of sibling root resources or a
 deployment.
-The current repository `infra/main.bicep` remains `BLOCKED` because the pinned
-upstream parser rejects root syntax before module bindings can be established;
-the adapter does not switch parser runtimes or infer bindings from text.
+With upstream 0.5.1, repository `infra/main.bicep` remains blocked by root syntax.
+With the sealed compatibility parser, the real `data` (Cosmos) and `api`
+(Function App) calls can be inventoried and bound for each explicit environment.
+They still remain **BLOCKED**: unresolved names/module outputs/functions,
+secure parameters and resource types/properties outside this candidate are not
+qualified. Known CORS/auth-mode bindings and source/scope provenance remain
+visible without claiming that those modules or deployments are compliant.
+No Runner record is invented from an AST-resolved value: when the unchanged
+module scan cannot resolve it, missing/UNKNOWN evidence still blocks.
 The tool does not compile Bicep, validate complete Azure schemas, or establish
 cloud runtime capability. In particular the minimal `web` Azure Files control
 is a synthetic predicate fixture, not a proposed valid mount/deployment or a
@@ -348,6 +381,18 @@ To bind one local module call, pass its root source and symbol:
 python tools/checkov/bicep_ingress_candidate.py infra/main.bicep \
   --environment staging --module-symbol api
 ```
+
+For a selected pair of independent instances, repeat the option:
+
+```sh
+python tools/checkov/bicep_ingress_candidate.py infra/main.bicep \
+  --environment prod --module-symbol data --module-symbol api
+```
+
+The latter intentionally exits 1 on the current repository because the real
+modules exceed the qualified subset. Schema v4 keeps both module reports and
+all blockers; it is not a root-wide gate. Empty, duplicate or absent module
+selections cannot become a successful partial report.
 
 Exit 0 means only `QUALIFIED_SUBSET` under that narrow contract; every report
 sets `production_adoptable: false` and names the restricted control scope.

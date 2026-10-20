@@ -1,7 +1,9 @@
 """Real Bicep qualification controls, without scanning infra or adopting a gate."""
 
 from copy import deepcopy
+from contextlib import contextmanager
 import hashlib
+from importlib.metadata import version
 import json
 from pathlib import Path
 import subprocess
@@ -15,9 +17,11 @@ from checkov.arm.checks.resource.AppServicePublicAccessDisabled import check as 
 from checkov.arm.checks.resource.AppServiceHttpLoggingEnabled import check as logging
 
 from bicep_ingress_candidate import (
-    CONFIG_CHECKS, RULE_SOURCES, inventory, qualify, qualify_local_module,
+    CONFIG_CHECKS, RULE_SOURCES, UPSTREAM_PARSER_SOURCES,
+    _verify_parser, inventory, qualify, qualify_local_module, qualify_local_modules,
     reconcile, resolve_local_module_bindings,
 )
+from build_parser_wheel import PATCHED_FILES, VERSION as COMPAT_PARSER_VERSION
 
 
 UAMI = (
@@ -98,6 +102,26 @@ resource site 'Microsoft.Web/sites@2024-04-01' = {
  properties: { AUTH_MODE: authMode }
 }
 """
+
+MULTI_ROOT = MODULE_ROOT + """module data './modules/cosmos.bicep' = {
+ name: 'cosmos-${env}'
+ params: { deploymentLabel: env }
+}
+"""
+
+
+@contextmanager
+def module_fixture(root_source=MULTI_ROOT, app_source=MODULE_SOURCE, cosmos_source=COSMOS):
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary) / "main.bicep"
+        module_dir = root.parent / "modules"
+        module_dir.mkdir()
+        root.write_text(root_source, encoding="utf-8")
+        (module_dir / "functionApp.bicep").write_text(app_source, encoding="utf-8")
+        (module_dir / "cosmos.bicep").write_text(
+            "param deploymentLabel string\n" + cosmos_source, encoding="utf-8"
+        )
+        yield root
 
 
 class CandidateTests(unittest.TestCase):
@@ -325,13 +349,239 @@ class CandidateTests(unittest.TestCase):
             self.assertTrue(any("deploymentSecret" in blocker
                                 for blocker in result["blockers"]))
 
-    def test_repository_function_app_binding_stays_blocked_on_unsupported_root_syntax(self):
+    def test_repository_modules_have_explicit_provenance_but_unqualified_values_stay_blocked(self):
         infra = Path(__file__).resolve().parents[2] / "infra"
-        result = qualify_local_module(infra / "main.bicep", "staging")
-        self.assertEqual(result["status"], "BLOCKED")
-        self.assertIsNone(result["scanner_report"])
-        self.assertTrue(any("root source parsing failed" in blocker
-                            for blocker in result["blockers"]))
+        for environment in ("dev", "staging", "prod"):
+            with self.subTest(environment=environment):
+                result = qualify_local_modules(infra / "main.bicep", environment, ["data", "api"])
+                self.assert_blocked(result)
+                self.assertEqual(result["provenance"]["parser"]["version"], version("pycep-parser"))
+                if version("pycep-parser") == "0.5.1":
+                    self.assertEqual(result["modules"], [])
+                    self.assertTrue(any("root source parsing failed" in blocker
+                                        for blocker in result["blockers"]))
+                    continue
+                self.assertEqual(len(result["modules"]), 2)
+                calls = result["root_inventory"]["module_calls"]
+                self.assertEqual({item["symbol"] for item in calls if item["selected"]}, {"data", "api"})
+                self.assertTrue(any(not item["selected"] for item in calls))
+                for module, symbol, filename in zip(
+                    result["modules"], ("data", "api"), ("cosmos.bicep", "functionApp.bicep")
+                ):
+                    self.assert_blocked(module)
+                    self.assertIsNone(module["scanner_report"])
+                    self.assertEqual(module["provenance"]["module_instance"], "root/" + symbol)
+                    binding = module["binding_resolution"]
+                    self.assertEqual(binding["module_sha256"], hashlib.sha256(
+                        (infra / "modules" / filename).read_bytes()
+                    ).hexdigest())
+                    self.assertEqual(binding["module_scope"]["name"], "rg-certigo-" + environment)
+                    self.assertFalse(any("root source parsing failed" in b for b in module["blockers"]))
+                app = result["modules"][1]
+                params = {item["parameter"]: item for item in app["binding_resolution"]["parameters"]}
+                self.assertEqual(params["allowedCorsOrigins"]["value"], ["*"] if environment == "dev" else [])
+                self.assertEqual(params["authMode"]["value"], "dev" if environment == "dev" else "prod")
+                self.assertFalse(params["functionAppName"]["resolved"])
+                self.assertTrue(any("resource type has no qualified mapping" in b for b in app["blockers"]))
+
+    def test_multiple_modules_keep_independent_reports_and_all_selected_instances(self):
+        with module_fixture() as root:
+            result = qualify_local_modules(root, "staging", ["api", "data"])
+            self.assertEqual(result["status"], "QUALIFIED_SUBSET", result["blockers"])
+            self.assertEqual(result["schema"], "certigo.bicep-appservice-qualification/v4")
+            self.assertFalse(result["production_adoptable"])
+            self.assertEqual([m["provenance"]["module_instance"] for m in result["modules"]],
+                             ["root/api", "root/data"])
+            self.assertEqual([m["scanner_report"]["summary"]["resource_count"] for m in result["modules"]],
+                             [4, 1])
+            self.assertEqual(len(result["modules"][1]["obligations"]), 1)
+            self.assertEqual(result["modules"][1]["binding_resolution"]["module_name"], "cosmos-staging")
+            self.assertEqual(result["provenance"]["root_sha256"], hashlib.sha256(root.read_bytes()).hexdigest())
+
+    def test_all_selected_module_inventories_exist_before_first_runner(self):
+        import bicep_ingress_candidate as candidate
+
+        events = []
+        original_inventory = candidate.inventory
+        original_run = candidate.Runner.run
+
+        def observed_inventory(*args, **kwargs):
+            events.append("inventory")
+            return original_inventory(*args, **kwargs)
+
+        def observed_run(*args, **kwargs):
+            events.append("runner")
+            return original_run(*args, **kwargs)
+
+        with module_fixture() as root, patch.object(
+            candidate, "inventory", side_effect=observed_inventory
+        ), patch.object(candidate.Runner, "run", side_effect=observed_run, autospec=True):
+            result = qualify_local_modules(root, "prod", ["api", "data"])
+        self.assertEqual(result["status"], "QUALIFIED_SUBSET", result["blockers"])
+        self.assertEqual(events, ["inventory", "inventory", "runner", "runner"])
+
+    def test_unsafe_missing_or_unresolved_second_module_never_hides_behind_safe_first(self):
+        for damage in ("unsafe", "missing", "dynamic", "unknown-resource", "parse", "unknown-result"):
+            with self.subTest(damage=damage), module_fixture() as root:
+                child = root.parent / "modules" / "cosmos.bicep"
+                if damage == "unsafe":
+                    child.write_text(child.read_text().replace("'Disabled'", "'Enabled'"), encoding="utf-8")
+                elif damage == "missing":
+                    child.unlink()
+                elif damage == "dynamic":
+                    root.write_text(MULTI_ROOT.replace("deploymentLabel: env", "deploymentLabel: missing"),
+                                    encoding="utf-8")
+                elif damage == "unknown-resource":
+                    child.write_text(child.read_text() + "\nresource other 'Example/unknown@2024-01-01' = { name: 'x' }\n",
+                                     encoding="utf-8")
+                elif damage == "parse":
+                    child.write_text("resource broken", encoding="utf-8")
+                from checkov.arm.checks.resource.CosmosDBAccountsRestrictedAccess import check as cosmos_check
+
+                original = cosmos_check.scan_resource_conf
+                with patch.object(cosmos_check, "scan_resource_conf", side_effect=(
+                    (lambda conf: CheckResult.UNKNOWN) if damage == "unknown-result" else original
+                )):
+                    result = qualify_local_modules(root, "prod", ["api", "data"])
+                self.assert_blocked(result)
+                self.assertEqual(result["modules"][0]["status"], "QUALIFIED_SUBSET")
+                failed = result["modules"][1]
+                self.assert_blocked(failed)
+                if damage == "unsafe":
+                    self.assertEqual(failed["applicability"][0]["status"], "FAILED")
+                    self.assertEqual(len(failed["scanner_report"]["results"]["failed_checks"]), 1)
+                elif damage != "unknown-result":
+                    self.assertIsNone(failed["scanner_report"])
+
+    def test_module_selection_scope_conditions_loops_and_secret_defaults_fail_closed(self):
+        for damage in ("empty", "duplicate", "absent", "scope", "condition", "loop", "secret", "function"):
+            with self.subTest(damage=damage), module_fixture() as root:
+                selected = ["api", "data"]
+                if damage == "empty":
+                    selected = []
+                elif damage == "duplicate":
+                    selected = ["api", "api"]
+                elif damage == "absent":
+                    selected = ["api", "absent"]
+                else:
+                    source = MULTI_ROOT
+                    if damage == "scope":
+                        source = source.replace("name: 'cosmos-${env}'", "scope: resourceGroup('other')\n name: 'cosmos-${env}'")
+                    elif damage == "condition":
+                        source = source.replace("'./modules/cosmos.bicep' = {", "'./modules/cosmos.bicep' = if (true) {")
+                    elif damage == "loop":
+                        source = source.replace("'./modules/cosmos.bicep' = {", "'./modules/cosmos.bicep' = [for x in [1]: {")
+                        source = source.rstrip() + "]\n"
+                    elif damage == "secret":
+                        source = source.replace("param env string", "param env string\n@secure()\nparam hidden string = 'sentinel-not-a-secret'")
+                        source = source.replace("deploymentLabel: env", "deploymentLabel: hidden")
+                    else:
+                        source = source.replace("deploymentLabel: env", "deploymentLabel: uniqueString('seed')")
+                    root.write_text(source, encoding="utf-8")
+                result = qualify_local_modules(root, "staging", selected)
+                self.assert_blocked(result)
+                self.assertNotIn("sentinel-not-a-secret", json.dumps(result))
+
+    def test_symbolic_existing_group_scope_is_bound_to_each_environment(self):
+        scoped = ("targetScope = 'subscription'\n" + MULTI_ROOT).replace(
+            "module api", "resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {\n name: 'rg-${env}'\n}\nmodule api"
+        ).replace("name: 'api'", "scope: rg\n name: 'api'").replace(
+            "name: 'cosmos-${env}'", "scope: rg\n name: 'cosmos-${env}'\n dependsOn: [api]"
+        )
+        with module_fixture(root_source=scoped) as root:
+            for environment in ("dev", "staging", "prod"):
+                bindings = resolve_local_module_bindings(root, environment, "data")
+                self.assertEqual(bindings["blockers"], [])
+                self.assertEqual(bindings["module_scope"], {
+                    "kind": "existing-resource-group", "symbol": "rg", "name": "rg-" + environment,
+                })
+                self.assertEqual(bindings["dependencies"], ["api"])
+            result = qualify_local_modules(root, "prod", ["api", "data"])
+            self.assertEqual(result["status"], "QUALIFIED_SUBSET", result["blockers"])
+            self.assertFalse(result["root_inventory"]["resources"][0]["qualified"])
+
+    def test_parser_version_and_source_seals_reject_unreviewed_runtimes(self):
+        observed = _verify_parser()
+        self.assertIn(observed["version"], ("0.5.1", COMPAT_PARSER_VERSION))
+        self.assertEqual(set(observed["source_sha256"]), set(UPSTREAM_PARSER_SOURCES))
+        with patch("bicep_ingress_candidate.version", return_value="0.5.2"):
+            with self.assertRaisesRegex(ValueError, "pinned upstream or reviewed"):
+                _verify_parser()
+        with patch.dict(UPSTREAM_PARSER_SOURCES, {"pycep/main.py": "0" * 64}):
+            with self.assertRaisesRegex(ValueError, "unexpected installed parser source"):
+                _verify_parser()
+        if observed["version"] == COMPAT_PARSER_VERSION:
+            with patch.dict(PATCHED_FILES, {"pycep/bicep.lark": "0" * 64}):
+                with self.assertRaisesRegex(ValueError, "unexpected installed parser source"):
+                    _verify_parser()
+
+    def test_compatibility_parser_consumes_unmodified_authored_source(self):
+        import bicep_ingress_candidate as candidate
+
+        source = MODULE_ROOT.replace(" ? [ '*' ] : []", "\n  ? [ '*' ]\n  : []")
+        options = (
+            {"side_effect": AssertionError("compatibility parser must not normalize source")}
+            if version("pycep-parser") == COMPAT_PARSER_VERSION
+            else {"wraps": candidate._parser_source}
+        )
+        with module_fixture(root_source=source) as root, patch(
+            "bicep_ingress_candidate._parser_source", **options
+        ) as normalization:
+            result = qualify_local_module(root, "staging")
+            if version("pycep-parser") == "0.5.1":
+                normalization.assert_called()
+        self.assertEqual(result["status"], "QUALIFIED_SUBSET", result["blockers"])
+
+    def test_ast_resolved_security_value_does_not_replace_missing_raw_scanner_evidence(self):
+        parameterized = "param publicAccess string\n" + COSMOS.replace("'Disabled'", "publicAccess")
+        source = MULTI_ROOT.replace("deploymentLabel: env", "deploymentLabel: env\n publicAccess: 'Disabled'")
+        with module_fixture(root_source=source, cosmos_source=parameterized) as root:
+            result = qualify_local_modules(root, "prod", ["api", "data"])
+        self.assert_blocked(result)
+        module = result["modules"][1]
+        parameters = {item["parameter"]: item for item in module["binding_resolution"]["parameters"]}
+        self.assertEqual(parameters["publicAccess"]["value"], "Disabled")
+        self.assertTrue(module["blockers"])
+        self.assertIsNotNone(module["scanner_report"])
+
+    def test_reused_module_source_has_distinct_instance_provenance_not_shared_verdicts(self):
+        source = MULTI_ROOT + """module another './modules/cosmos.bicep' = {
+ name: 'another'
+ params: { deploymentLabel: 'other' }
+}
+"""
+        with module_fixture(root_source=source) as root:
+            source_path = root.parent / "modules" / "cosmos.bicep"
+            original_read = Path.read_bytes
+            reads = []
+
+            def capture_read(path):
+                if path == source_path:
+                    reads.append(path)
+                return original_read(path)
+
+            with patch.object(Path, "read_bytes", autospec=True, side_effect=capture_read):
+                result = qualify_local_modules(root, "prod", ["data", "another"])
+            self.assertEqual(len(reads), 1)
+        self.assertEqual(result["status"], "QUALIFIED_SUBSET", result["blockers"])
+        first, second = result["modules"]
+        self.assertEqual(first["provenance"]["module_sha256"], second["provenance"]["module_sha256"])
+        self.assertNotEqual(first["provenance"]["module_instance"], second["provenance"]["module_instance"])
+        self.assertIsNot(first["scanner_report"], second["scanner_report"])
+
+    def test_cli_multiple_modules_emits_every_instance_and_a_blocking_exit(self):
+        with module_fixture(cosmos_source=COSMOS.replace("'Disabled'", "'Enabled'")) as root:
+            run = subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("bicep_ingress_candidate.py")),
+                 str(root), "--environment", "staging", "--module-symbol", "api",
+                 "--module-symbol", "data"],
+                text=True, capture_output=True, timeout=90,
+            )
+            self.assertEqual(run.returncode, 1, run.stderr)
+            result = json.loads(run.stdout)
+            self.assertEqual(result["schema"], "certigo.bicep-appservice-qualification/v4")
+            self.assertEqual(len(result["modules"]), 2)
+            self.assert_blocked(result)
 
     def test_unknown_bindings_subtypes_or_properties_block_before_runner(self):
         for source in (
