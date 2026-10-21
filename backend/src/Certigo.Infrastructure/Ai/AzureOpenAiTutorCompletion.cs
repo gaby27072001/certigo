@@ -39,6 +39,7 @@ public sealed class AzureOpenAiTutorCompletion(
     TutorLlmOptions options) : ITutorCompletion
 {
     private const string AzureCognitiveServicesScope = "https://cognitiveservices.azure.com/.default";
+    private const string FoundryScope = "https://ai.azure.com/.default";
 
     public async Task<string?> CompleteAsync(
         string systemPrompt,
@@ -124,7 +125,9 @@ public sealed class AzureOpenAiTutorCompletion(
         try
         {
             token = await credential.GetTokenAsync(
-                new TokenRequestContext([AzureCognitiveServicesScope]),
+                new TokenRequestContext([
+                    options.ApiSurface == TutorLlmApiSurface.V1 ? FoundryScope : AzureCognitiveServicesScope
+                ]),
                 cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)

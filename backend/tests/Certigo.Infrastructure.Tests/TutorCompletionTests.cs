@@ -90,6 +90,22 @@ public sealed class AzureOpenAiTutorCompletionTests
         result.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(TutorLlmApiSurface.V1, "https://ai.azure.com/.default")]
+    [InlineData(TutorLlmApiSurface.AzureClassic, "https://cognitiveservices.azure.com/.default")]
+    public async Task CompleteAsync_requests_token_for_the_configured_api_surface(
+        TutorLlmApiSurface surface, string expectedScope)
+    {
+        var credential = new StubTokenCredential();
+        var handler = new StubHttpMessageHandler(_ => JsonResponse(
+            """{"choices":[{"message":{"content":"answer"}}]}"""));
+        var completion = CreateCompletion(handler, apiSurface: surface, credential: credential);
+
+        await completion.CompleteAsync("system", "user");
+
+        credential.RequestedScopes.Should().Equal(expectedScope);
+    }
+
     [Fact]
     public async Task CompleteAsync_throws_controlled_exception_on_service_failure()
     {
@@ -137,10 +153,11 @@ public sealed class AzureOpenAiTutorCompletionTests
     private static AzureOpenAiTutorCompletion CreateCompletion(
         HttpMessageHandler handler,
         string? apiKey = null,
-        TutorLlmApiSurface apiSurface = TutorLlmApiSurface.V1)
+        TutorLlmApiSurface apiSurface = TutorLlmApiSurface.V1,
+        TokenCredential? credential = null)
         => new(
             new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) },
-            new StubTokenCredential(),
+            credential ?? new StubTokenCredential(),
             NullLogger<AzureOpenAiTutorCompletion>.Instance,
             new TutorLlmOptions(
                 apiSurface == TutorLlmApiSurface.AzureClassic
@@ -160,8 +177,13 @@ public sealed class AzureOpenAiTutorCompletionTests
 
     private sealed class StubTokenCredential : TokenCredential
     {
+        public string[] RequestedScopes { get; private set; } = [];
+
         public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
-            => new("token-abc", DateTimeOffset.UtcNow.AddMinutes(5));
+        {
+            RequestedScopes = requestContext.Scopes;
+            return new("token-abc", DateTimeOffset.UtcNow.AddMinutes(5));
+        }
 
         public override ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken)
             => ValueTask.FromResult(GetToken(requestContext, cancellationToken));
