@@ -28,6 +28,30 @@ chat, memory setting, join or share control. Changing a tab does not fabricate d
 
 ## Research coverage, not a claim of 136 shipped screens
 
+### Global Radar display readiness
+
+Explore recognizes namespaces for all 35 provider groups in the Radar registry,
+normalizing case and separator boundaries rather than loosely matching substrings.
+Aliases such as OAI/OPENAI, DBX/DATABRICKS and OCI/ORACLE use one code family.
+The seven code-derived categories have stable Prism accents, while existing
+Microsoft subject accents remain intact. Category filters are populated only by
+recognized loaded codes, combine with code family/search/availability, and do
+not claim authoritative provider metadata. Unrecognized namespaces remain browsable.
+
+A neutral, localized availability badge appears on each catalog entry and its
+overview. An unavailable item keeps its actual title/code/summary accessible,
+with no session/download/goal CTA promising playable questions. An older loaded
+path cannot override an explicit `learningAvailable == false` in the current
+catalog. No pending submission or saved history is removed by this presentation.
+
+This is forward-compatible presentation for entries that a supported catalog may
+eventually supply, not a delivered Radar feed. The Radar discovery registry
+produces non-publishable review drafts; the current native `Track` has no
+announced/planned status. The app therefore says "Practice unavailable", does not
+guess either status, and makes no release-date promise. New providers require no
+UI change only when their codes match these recognized namespaces **and** their
+entries arrive through the existing supported backend/catalog contract.
+
 ### Interface language
 
 The entry screen and connected/demo Profile > Settings expose one shared

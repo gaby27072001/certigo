@@ -19,11 +19,15 @@ class NativePrismPresentationTests(unittest.TestCase):
         flutter = (ROOT / "packages/prism_ui/lib/src/tokens/prism_colors.dart").read_text(
             encoding="utf-8"
         )
-        for native, dart in (("ink", "spectrumInk"), ("glow", "spectrumGlow")):
+        for native, dart, extra in (
+            ("ink", "spectrumInk", "info"),
+            ("glow", "spectrumGlow", "infoGlow"),
+        ):
             expected = re.search(rf"{dart} = <Color>\[(.*?)\];", flutter, re.S)[1]
+            extra_hex = re.search(rf"\b{extra} = Color\(0xFF([A-F0-9]{{6}})\)", flutter)[1]
             actual = re.search(rf"let {native}: \[UInt32\] = \[(.*?)\]", self.app, re.S)[1]
             self.assertEqual(
-                re.findall(r"0xFF([A-F0-9]{6})", expected),
+                re.findall(r"0xFF([A-F0-9]{6})", expected) + [extra_hex],
                 re.findall(r"0x([A-F0-9]{6})", actual),
             )
         self.assertIn("traits.accessibilityContrast == .high", self.app)
@@ -224,6 +228,47 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertNotIn("English interface labels", self.pilot)
         self.assertIn("case .pendingCorrection: copy[.pendingCorrection]", self.app)
         self.assertIn("case .corrected: copy.confirmed", self.app)
+
+    def test_radar_code_hints_never_create_catalog_or_release_metadata(self):
+        for category in (
+            "cloud-hyperscalers", "ai-foundation-models", "apple-mobile",
+            "data-analytics", "devops-cloud-native-dev", "cybersecurity-networking",
+            "enterprise-delivery",
+        ):
+            self.assertIn(category, self.app)
+        self.assertIn('Picker("Code category", selection: $catalogFilter.category)', self.app)
+        self.assertIn("model.tracks.contains", self.app)
+        self.assertIn("display hints derived from recognized codes", self.app)
+        self.assertIn("Announced and planned statuses are not supplied", self.app)
+        self.assertIn("code == $0 || code.hasPrefix($0 + \"-\")", self.app)
+        self.assertNotIn("track.status", self.app)
+        self.assertNotIn("track.provider", self.app)
+
+    def test_summary_only_catalog_entries_keep_details_but_cannot_offer_practice(self):
+        root = self.app.split("private struct NativeRoot:", 1)[1]
+        self.assertIn("NavigationLink(value: track.id)", root)
+        self.assertIn("NativePracticeBadge(available: track.learningAvailable)", root)
+        self.assertIn('accessibilityIdentifier("catalog-practice-availability")', self.app)
+        path = root.split("private var path: some View", 1)[1].split(
+            "private var progressHistory:", 1
+        )[0]
+        self.assertIn("Text(track.summary)", path)
+        self.assertIn("if track.learningAvailable", path)
+        self.assertIn("?.learningAvailable != false", path)
+        self.assertIn("copy[.practiceUnavailableNote]", path)
+        session = root.split("private var session: some View", 1)[1]
+        self.assertLess(
+            session.index("!track.learningAvailable"),
+            session.index("} else if let lesson = model.lesson"),
+        )
+        self.assertIn("copy[.practiceUnavailable]", session)
+        goal = root.split("private var confirmedGoal:", 1)[1].split(
+            "private func resumeCurrentActivity(", 1
+        )[0]
+        self.assertLess(
+            goal.index("if !track.learningAvailable"),
+            goal.index("NativePrimaryButton"),
+        )
 
 
 if __name__ == "__main__":

@@ -104,6 +104,7 @@ public struct AppInterfaceCopy: Sendable, Equatable {
     case progressAndHistory, settings, accountDeletion, pending, confirmed
     case signOut, cancel, done, back, continueLearning, answer, next, previous
     case offline, pendingCorrection, noHistory, deleteAccount, demo, chooseGoal
+    case practiceAvailable, practiceUnavailable, practiceUnavailableNote
   }
 
   public let language: AppLanguage
@@ -158,6 +159,27 @@ public struct AppInterfaceCopy: Sendable, Equatable {
 
   private func translations(for key: Key) -> Translations {
     switch key {
+    case .practiceAvailable:
+      return (
+        "Exercices disponibles", "Practice available", "अभ्यास उपलब्ध", "练习可用", "연습 가능",
+        "Práctica disponible", "Esercizi disponibili", "Übungen verfügbar"
+      )
+    case .practiceUnavailable:
+      return (
+        "Exercices indisponibles", "Practice unavailable", "अभ्यास उपलब्ध नहीं है", "暂无练习", "연습 불가",
+        "Práctica no disponible", "Esercizi non disponibili", "Übungen nicht verfügbar"
+      )
+    case .practiceUnavailableNote:
+      return (
+        "Vous pouvez consulter cette fiche. Aucun pack de questions jouable n’est disponible dans ce catalogue. Aucune date de sortie n’est confirmée.",
+        "You can explore this summary. No playable question pack is available in this catalog. No release date is confirmed.",
+        "आप यह सारांश देख सकते हैं। इस कैटलॉग में कोई प्रश्न पैक अभ्यास के लिए उपलब्ध नहीं है। रिलीज़ की कोई तारीख तय नहीं है।",
+        "你可以查看此简介。本目录中暂无可练习的题包，发布日期尚未确定。",
+        "이 요약은 볼 수 있습니다. 이 카탈로그에는 연습 가능한 문제 팩이 없습니다. 출시일은 확정되지 않았습니다.",
+        "Puedes consultar esta ficha. No hay un paquete de preguntas para practicar en este catálogo. No se ha confirmado una fecha de publicación.",
+        "Puoi consultare questa scheda. In questo catalogo non è disponibile un pacchetto di domande per esercitarti. Non è confermata alcuna data di pubblicazione.",
+        "Du kannst diese Übersicht ansehen. In diesem Katalog ist kein Fragenpaket zum Üben verfügbar. Ein Veröffentlichungstermin ist nicht bestätigt."
+      )
     case .learn:
       return ("Apprendre", "Learn", "सीखें", "学习", "학습", "Aprender", "Impara", "Lernen")
     case .coach:

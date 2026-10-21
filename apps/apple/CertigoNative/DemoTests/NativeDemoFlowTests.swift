@@ -20,6 +20,101 @@ struct NativeDemoFlowTests {
                 NativeTrackAppearance.band(for: code) == band,
                 "stable Prism band for \(code.debugDescription)")
         }
+        let radarGroups: [(NativeRadarCategory, String, [String])] = [
+            (.cloud, "MICROSOFT", ["MICROSOFT", "MSFT"]),
+            (.cloud, "AWS", ["AWS"]),
+            (.cloud, "GCP", ["GCP", "GOOGLE-CLOUD"]),
+            (.cloud, "ORACLE", ["ORACLE", "OCI"]),
+            (.ai, "OPENAI", ["OPENAI", "OAI"]),
+            (.ai, "ANTHROPIC", ["ANTHROPIC", "CLAUDE"]),
+            (.ai, "MISTRAL", ["MISTRAL", "MISTRAL-AI"]),
+            (.ai, "NVIDIA", ["NVIDIA", "NV", "DLI"]),
+            (.ai, "HF", ["HF", "HUGGINGFACE", "HUGGING-FACE"]),
+            (.ai, "COHERE", ["COHERE"]),
+            (.ai, "META", ["META", "META-AI"]),
+            (.apple, "APPLE", ["APPLE"]),
+            (.data, "DATABRICKS", ["DATABRICKS", "DBX"]),
+            (.data, "SNOWFLAKE", ["SNOWFLAKE", "SNOW", "SNOWPRO"]),
+            (.data, "MONGODB", ["MONGODB"]),
+            (.data, "CONFLUENT", ["CONFLUENT"]),
+            (.data, "DBT", ["DBT", "DBT-LABS"]),
+            (.devops, "CNCF", ["CNCF", "LF", "LINUX-FOUNDATION-CNCF", "CKA", "CKAD", "CKS"]),
+            (.devops, "HASHICORP", ["HASHICORP", "TERRAFORM", "VAULT"]),
+            (.devops, "GITHUB", ["GITHUB", "GH"]),
+            (.devops, "REDHAT", ["REDHAT", "RED-HAT", "RH", "RHCSA", "RHCE"]),
+            (.devops, "DOCKER", ["DOCKER"]),
+            (.devops, "GITLAB", ["GITLAB"]),
+            (.security, "CISCO", ["CISCO", "CCNA", "CCNP"]),
+            (.security, "COMPTIA", ["COMPTIA", "SY0", "N10"]),
+            (.security, "ISC2", ["ISC2", "CISSP"]),
+            (.security, "ISACA", ["ISACA", "CISM", "CISA"]),
+            (.security, "OFFSEC", ["OFFSEC", "OSCP"]),
+            (.security, "PALOALTO", ["PALOALTO", "PALO-ALTO-NETWORKS"]),
+            (.security, "CLOUDFLARE", ["CLOUDFLARE"]),
+            (.enterprise, "SALESFORCE", ["SALESFORCE", "SF"]),
+            (.enterprise, "SERVICENOW", ["SERVICENOW", "CSA", "CAD"]),
+            (.enterprise, "SAP", ["SAP"]),
+            (.enterprise, "ATLASSIAN", ["ATLASSIAN"]),
+            (.enterprise, "PMI", ["PMI", "PMP", "PSM", "PMI-SCRUM"]),
+        ]
+        try check(radarGroups.count == 35, "display mapping covers all 35 Radar groups")
+        try check(
+            Set(radarGroups.map { $0.0 }) == Set(NativeRadarCategory.allCases),
+            "all seven Radar categories have namespace coverage")
+        try check(
+            Set(NativeRadarCategory.allCases.map(\.band)).count == 7,
+            "each Radar category owns a distinct Prism display band")
+        for (category, family, prefixes) in radarGroups {
+            for prefix in prefixes {
+                for code in [prefix, " \(prefix.lowercased())_foundation-2026 "] {
+                    try check(
+                        NativeTrackAppearance.group(for: code)?.category == category
+                            && NativeCatalogFilter.family(for: code) == family
+                            && NativeTrackAppearance.band(for: code) == category.band,
+                        "Radar namespace \(code) has stable family category and accent")
+                }
+            }
+        }
+        for prefix in ["AZ", "AI", "PL", "MS", "DP", "SC"] {
+            try check(
+                NativeCatalogFilter.family(for: "\(prefix)-900") == prefix
+                    && NativeTrackAppearance.group(for: "\(prefix)-900")?.category == .cloud,
+                "Microsoft subject family is preserved independently of Radar provider grouping")
+        }
+        for code in ["OPENAIX-100", "GHOST-100", "SFDCUSTOM-1", "CKADDITION", "UNKNOWN-2026", ""] {
+            try check(
+                NativeTrackAppearance.group(for: code) == nil
+                    && NativeTrackAppearance.band(for: code) == 0,
+                "unknown or lookalike namespace is never an inferred provider: \(code)")
+        }
+        var radarFilter = NativeCatalogFilter()
+        radarFilter.category = .ai
+        try check(radarFilter.isActive, "code category alone activates filtering")
+        try check(
+            radarFilter.includes(code: "OAI-101", title: "", summary: "", available: false),
+            "unavailable summary stays discoverable in its code category")
+        try check(
+            !radarFilter.includes(code: "SAP-101", title: "", summary: "", available: true),
+            "category filter excludes a different namespace category")
+        radarFilter.family = "OPENAI"
+        radarFilter.availableOnly = true
+        radarFilter.query = "foundation"
+        try check(
+            radarFilter.includes(
+                code: "OAI-101", title: "Foundation", summary: "", available: true),
+            "alias family category search and availability filters intersect")
+        try check(
+            !radarFilter.includes(
+                code: "OPENAI-101", title: "Foundation", summary: "", available: false),
+            "availability never promotes a summary-only entry to playable practice")
+        try check(
+            !radarFilter.includes(
+                code: "CLAUDE-101", title: "Foundation", summary: "", available: true),
+            "family filter still applies within the same category")
+        radarFilter.clear()
+        try check(
+            !radarFilter.isActive && radarFilter.category == nil && radarFilter.family.isEmpty,
+            "clear filters removes Radar category family query and availability")
         var catalog = NativeCatalogFilter()
         try check(!catalog.isActive, "catalog starts unfiltered")
         try check(
