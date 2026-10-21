@@ -982,7 +982,10 @@ derrière `ITutorCompletion` via les app settings `TUTOR_LLM_*`.
   `https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/`
 - **Auth** : **clé API désactivée** sur la ressource → **Entra ID / identité managée
   obligatoire**. On laisse `TUTOR_LLM_API_KEY` **vide** : le code passe alors par
-  `TokenCredential` (`DefaultAzureCredential`, scope `https://cognitiveservices.azure.com/.default`).
+  `TokenCredential` (`DefaultAzureCredential`, scope `https://ai.azure.com/.default`
+  en surface `v1`; `https://cognitiveservices.azure.com/.default` en surface `classic`).
+  Une audience incorrecte provoque un HTTP 401 du fournisseur et le repli `source=grounded` :
+  un HTTP 200 du tutorat ne prouve donc pas un appel IA réussi ; vérifier `source=ai`.
 
 ### App settings à poser sur la Function App
 
