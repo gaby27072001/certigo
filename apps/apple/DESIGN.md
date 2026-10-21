@@ -82,4 +82,39 @@ The production entry offers Microsoft sign-in and a clearly isolated fictional
 demo, never a manual-token fallback. The developer connector remains DEBUG-only.
 Coach and Social remain explicitly unavailable, not simulated services.
 
+## Research translated to structure
+
+The research's Speak/Babbel separation is visible as one **Next session** action,
+then **Learning plan**, **Review & Practice** and **Goal overview**, not a field
+of equal statistic cards. A loaded active path supplies the next available node;
+otherwise the named goal is opened to load it. Review recommendations are not
+invented. Mimo/Coursera's unit structure uses real node states and remaining
+activity counts; a lock explains that the server has not supplied its reason.
+
+Quizlet/Coursera/Uxcel discovery uses native search, a code-family menu and
+availability filter. Prism code badges are quiet, continuous capsules, with
+readable summaries and explicit counts. An unavailable item can be inspected,
+but cannot start practice. There is no guessed provider, content language, format
+facet, lesson volume or download size. Filters are retained local view state.
+
+Brilliant's selection/action coherence is a value, not a delayed animation:
+named action and lesson identity derive together from the current activity.
+Imprint's reading hierarchy retains the question alongside explanation.
+**Read again** scrolls the existing text; **Practice again** explicitly loads
+the same available activity for fresh selections after server confirmation.
+The editorial pilot separates re-reading from revisiting its ungraded formative
+exercise; neither action submits a quiz or silently marks it read.
+
+Drops/Babbel follow-up distinguishes loaded activity/unit coverage, current-lesson
+local answer selection, paged confirmed sessions and last-loaded readiness.
+Unknown data is not zero; completed activity is not exam competence. Coach and
+Social explain context and future privacy boundaries as prose rather than
+nonfunctional input fields, toggles, chat bubbles or people.
+
+Shared rounded surfaces use continuous Apple corners, hierarchical symbols and
+8/12/16/24-point internal rhythms. Native controls and opaque reading surfaces
+retain precedence over decoration. `NATIVE_UI_BRIEF.md` maps all U01–U12 patterns
+and distinguishes source coverage, deferred service contracts and Apple-only
+acceptance. This is not a claim that every research capability is shipped.
+
 See `NATIVE_UI_BRIEF.md` for the connected acceptance journey and validation limits.
