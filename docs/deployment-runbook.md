@@ -691,14 +691,9 @@ Functions](https://learn.microsoft.com/azure/azure-functions/functions-infrastru
 
 ## T0.5 — Valider l'authentification (Entra External ID)
 
-`Program.cs` enregistre un `CompositeTokenValidator` :
-`LocalJwtTokenValidator` (toujours) → `EntraTokenValidator` (si `ENTRA_AUTHORITY`
-et `ENTRA_AUDIENCE` sont renseignés sans le GUID placeholder nul) →
-`DevTokenValidator` (uniquement si `AUTH_MODE=dev`, toujours en dernier).
-Un jeton Entra valide conserve donc ses claims même sur un hôte de test dev.
-Le fallback dev reste permissif : il accepte aussi les jetons rejetés par les
-validateurs précédents et ne constitue pas un mode sécurisé pour des utilisateurs réels.
-Garde-fou :
+`Program.cs:61` enregistre un `CompositeTokenValidator` :
+`LocalJwtTokenValidator` (toujours) → puis `DevTokenValidator` (si `AUTH_MODE=dev`) **ou**
+`EntraTokenValidator` (si `ENTRA_AUTHORITY` + `ENTRA_AUDIENCE` fournis). Garde-fou :
 `AUTH_MODE=dev` est interdit en Production sauf `AUTH_ALLOW_DEV=true`.
 
 Le middleware `JwtAuthMiddleware` exige `Authorization: Bearer …` **sauf** sur
@@ -982,10 +977,7 @@ derrière `ITutorCompletion` via les app settings `TUTOR_LLM_*`.
   `https://certigo-openai.services.ai.azure.com/api/projects/certigo-dev/openai/v1/`
 - **Auth** : **clé API désactivée** sur la ressource → **Entra ID / identité managée
   obligatoire**. On laisse `TUTOR_LLM_API_KEY` **vide** : le code passe alors par
-  `TokenCredential` (`DefaultAzureCredential`, scope `https://ai.azure.com/.default`
-  en surface `v1`; `https://cognitiveservices.azure.com/.default` en surface `classic`).
-  Une audience incorrecte provoque un HTTP 401 du fournisseur et le repli `source=grounded` :
-  un HTTP 200 du tutorat ne prouve donc pas un appel IA réussi ; vérifier `source=ai`.
+  `TokenCredential` (`DefaultAzureCredential`, scope `https://cognitiveservices.azure.com/.default`).
 
 ### App settings à poser sur la Function App
 
