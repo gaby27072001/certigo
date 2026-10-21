@@ -3,6 +3,7 @@
     import SwiftUI
 
     struct NativeEditorialPilotView: View {
+        @Environment(\.nativeInterfaceCopy) private var copy
         @Environment(\.dismiss) private var dismiss
         @Bindable var model: NativeModel
         let requestedLessonID: String?
@@ -39,19 +40,19 @@
                                 issue ?? "Try again when the network is available.")
                         )
                         .overlay(alignment: .bottom) {
-                            Button("Retry") { Task { await load() } }
+                            Button(copy.retry) { Task { await load() } }
                                 .buttonStyle(.borderedProminent)
                                 .padding()
                         }
                     } else {
-                        ProgressView("Loading editorial pilot…")
+                        ProgressView(copy.loading)
                     }
                 }
                 .navigationTitle("Editorial pilot")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Close") { dismiss() }
+                        Button(copy[.done]) { dismiss() }
                     }
                 }
                 .task { await load() }
@@ -76,6 +77,8 @@
                     title: snapshot.pilot.title,
                     message: "Original French draft · learning, not certification.")
                 NativeReadingSection(title: "Before you start") {
+                    Text(copy.contentLanguageNote)
+                        .font(.subheadline).foregroundStyle(.secondary)
                     Label("Learning, not certification", systemImage: "book")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tint)
@@ -83,10 +86,6 @@
                     LabeledContent(
                         "Estimated duration", value: "\(snapshot.pilot.estimatedMinutes) min")
                     LabeledContent("Sources checked on", value: snapshot.pilot.asOf)
-                    Text(
-                        "Editorial content is shown in its original French. English interface labels do not translate the lessons or their sources."
-                    )
-                    .font(.subheadline).foregroundStyle(.secondary)
                     Text(snapshot.pilot.audience)
                     Text(snapshot.pilot.prerequisites)
                         .foregroundStyle(.secondary)
@@ -96,7 +95,7 @@
                 if let lastLessonId = model.pilotHistory?.lastLessonId,
                     let lastLesson = snapshot.pilot.lessons.first(where: { $0.id == lastLessonId })
                 {
-                    NativeReadingSection(title: "Resume reading") {
+                    NativeReadingSection(title: copy.resume) {
                         NavigationLink(value: lastLesson.id) {
                             Label(lastLesson.title, systemImage: "arrow.counterclockwise")
                                 .frame(minHeight: 44)
@@ -122,8 +121,8 @@
                                     {
                                         Text(
                                             progress.markedReadAt.map {
-                                                "Marked as read · \(date($0))"
-                                            } ?? "Last opened · \(date(progress.lastAccessedAt))"
+                                                "Marked as read · \(date($0, locale: copy.language.locale))"
+                                            } ?? "Last opened · \(date(progress.lastAccessedAt, locale: copy.language.locale))"
                                         )
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -181,6 +180,7 @@
     }
 
     private struct NativeEditorialPilotLessonView: View {
+        @Environment(\.nativeInterfaceCopy) private var copy
         let lesson: EditorialPilotLesson
         let sources: [EditorialPilotSource]
         @Bindable var model: NativeModel
@@ -290,7 +290,7 @@
                     NativeReadingSection(title: "Your reading history") {
                         if let markedReadAt = progress?.markedReadAt {
                             Label(
-                                "You marked this lesson as read on \(date(markedReadAt)).",
+                                "You marked this lesson as read on \(date(markedReadAt, locale: copy.language.locale)).",
                                 systemImage: "checkmark.circle.fill"
                             )
                             .foregroundStyle(.secondary)
@@ -305,7 +305,7 @@
                                 .foregroundStyle(.secondary)
                         }
                         if !accessRecorded {
-                            Button("Retry synchronizing this reading") {
+                            Button(copy.retry) {
                                 Task { await recordAccess() }
                             }
                             .frame(minHeight: 44)
@@ -356,13 +356,13 @@
         }
     }
 
-    private func date(_ value: Date) -> String {
+    private func date(_ value: Date, locale: Locale) -> String {
         value.formatted(
             .dateTime
                 .year()
                 .month(.abbreviated)
                 .day()
-                .locale(Locale(identifier: "en"))
+                .locale(locale)
         )
     }
 #endif

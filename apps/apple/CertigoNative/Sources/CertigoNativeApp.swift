@@ -73,7 +73,7 @@ struct NativeActivityDestination {
     let title: String
 
     var resumeTitle: String { "Resume \(title)" }
-    var practiceTitle: String { "Practice again · \(title)" }
+    func actionTitle(_ action: String) -> String { "\(action) · \(title)" }
 }
 
 #if canImport(SwiftUI)
@@ -91,9 +91,93 @@ struct NativeActivityDestination {
     struct CertigoNativeApp: App {
         var body: some Scene {
             WindowGroup {
-                NativeEntry()
-                    .tint(NativePrism.tint)
-                    .environment(\.locale, Locale(identifier: "en"))
+                NativeLanguageRoot()
+            }
+        }
+    }
+
+    private struct NativeLanguagePreferenceKey: EnvironmentKey {
+        static let defaultValue: Binding<AppLanguagePreference> = .constant(.system)
+    }
+
+    private struct NativeInterfaceCopyKey: EnvironmentKey {
+        static let defaultValue = AppInterfaceCopy(language: .english)
+    }
+
+    extension EnvironmentValues {
+        var nativeLanguagePreference: Binding<AppLanguagePreference> {
+            get { self[NativeLanguagePreferenceKey.self] }
+            set { self[NativeLanguagePreferenceKey.self] = newValue }
+        }
+
+        var nativeInterfaceCopy: AppInterfaceCopy {
+            get { self[NativeInterfaceCopyKey.self] }
+            set { self[NativeInterfaceCopyKey.self] = newValue }
+        }
+    }
+
+    private struct NativeLanguageRoot: View {
+        @Environment(\.scenePhase) private var scenePhase
+        @State private var preference = AppLanguagePreference.load(from: .standard)
+        @State private var preferredLanguages = Locale.preferredLanguages
+
+        private var effectiveLanguage: AppLanguage {
+            preference.effectiveLanguage(fromPreferredLanguages: preferredLanguages)
+        }
+
+        var body: some View {
+            NativeEntry()
+                .tint(NativePrism.tint)
+                .environment(\.locale, effectiveLanguage.locale)
+                .environment(\.nativeInterfaceCopy, AppInterfaceCopy(language: effectiveLanguage))
+                .environment(
+                    \.nativeLanguagePreference,
+                    Binding(
+                        get: { preference },
+                        set: {
+                            $0.save(to: .standard)
+                            preference = $0
+                        })
+                )
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active {
+                        preferredLanguages = Locale.preferredLanguages
+                        preference = AppLanguagePreference.load(from: .standard)
+                    }
+                }
+        }
+    }
+
+    struct NativeAppLanguagePicker: View {
+        @Environment(\.nativeLanguagePreference) private var preference
+        @Environment(\.nativeInterfaceCopy) private var copy
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                Picker(
+                    copy.appLanguage,
+                    selection: Binding(
+                        get: { preference.wrappedValue.rawValue },
+                        set: { raw in
+                            guard let value = AppLanguagePreference(rawValue: raw) else { return }
+                            preference.wrappedValue = value
+                        })
+                ) {
+                    Text(copy.systemDefault).tag(AppLanguagePreference.system.rawValue)
+                    ForEach(AppLanguage.allCases, id: \.rawValue) { language in
+                        Text(
+                            "\(language.nativeDisplayName) · "
+                                + language.localizedDisplayName(in: copy.language)
+                        )
+                            .tag(AppLanguagePreference.explicit(language).rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("app-interface-language")
+                Text(copy.contentLanguageNote)
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("app-content-language-note")
             }
         }
     }
@@ -274,6 +358,7 @@ struct NativeActivityDestination {
     }
 
     private struct NativeEntry: View {
+        @Environment(\.nativeInterfaceCopy) private var copy
         @State private var showDemo = false
         #if DEBUG
             @State private var showDeveloper = false
@@ -295,8 +380,9 @@ struct NativeActivityDestination {
                     NativeEntryHeading(
                         title: "One question. A clearer idea.",
                         message: "Explore Certigo’s native learning preview.", prominent: true)
+                    NativeAppLanguagePicker()
                     NativeReadingSection(title: "Try the learning experience") {
-                        NativePrimaryButton(title: "Explore the demo", symbol: "play.circle") {
+                        NativePrimaryButton(title: copy.exploreDemo, symbol: "play.circle") {
                             showDemo = true
                         }
                         .accessibilityIdentifier("open-native-demo")
@@ -362,6 +448,7 @@ struct NativeActivityDestination {
     #if CERTIGO_PRODUCTION_DISTRIBUTION
         @MainActor
         private struct NativeProductionEntry: View {
+            @Environment(\.nativeInterfaceCopy) private var copy
             @Binding private var pendingLessonLink: EditorialPilotLessonLink?
             @State private var model: NativeModel
             @State private var provider: MSALAuthenticationProvider?
@@ -395,10 +482,13 @@ struct NativeActivityDestination {
             var body: some View {
                 Group {
                     if let configurationIssue {
+                        VStack(spacing: 24) {
+                        NativeAppLanguagePicker().padding(20)
                         ContentUnavailableView(
                             "Microsoft sign-in is not configured",
                             systemImage: "person.crop.circle.badge.exclamationmark",
                             description: Text(configurationIssue))
+                        }
                     } else if model.profile == nil && model.deletionStage == nil {
                         NavigationStack {
                             NativeReadingPage {
@@ -407,10 +497,11 @@ struct NativeActivityDestination {
                                     message:
                                         "Your learning goals, practice and confirmed progress, together in Certigo."
                                 )
+                                NativeAppLanguagePicker()
                                 NativeReadingSection(title: "Continue your learning") {
-                                    Text("Sign in with your Microsoft account to continue.")
+                                    Text(copy.signInWithMicrosoft)
                                     NativePrimaryButton(
-                                        title: "Sign in with Microsoft",
+                                        title: copy.signInWithMicrosoft,
                                         symbol: "person.crop.circle"
                                     ) {
                                         Task { await model.connect() }
@@ -418,15 +509,13 @@ struct NativeActivityDestination {
                                     .disabled(model.busy)
                                     if model.busy { ProgressView() }
                                     Divider()
-                                    Button("Explore the fictional demo", systemImage: "play.circle")
+                                    Button(copy.exploreDemo, systemImage: "play.circle")
                                     {
                                         showDemo = true
                                     }
                                     .frame(minHeight: 44)
                                     .disabled(model.busy)
-                                    Text(
-                                        "An isolated preview. No account, network or real result is used."
-                                    )
+                                    Text(copy.contentLanguageNote)
                                     .font(.subheadline).foregroundStyle(.secondary)
                                 }
                             }
@@ -666,6 +755,8 @@ struct NativeActivityDestination {
     }
 
     private struct NativeDemoRoot: View {
+        @Environment(\.nativeInterfaceCopy) private var copy
+        @Environment(\.nativeInterfaceCopy) private var copy
         @Environment(\.dismiss) private var dismiss
         @AppStorage("certigo.native-design-demo.v1") private var savedState = ""
         @State private var flow = NativeDemoFlow()
@@ -698,29 +789,30 @@ struct NativeActivityDestination {
                         }
                     }
                 }
-                .tabItem { Label("Learn", systemImage: "book") }.tag(NativeDemoDestination.learn)
+                .tabItem { Label(copy.learn, systemImage: "book") }.tag(NativeDemoDestination.learn)
                 NavigationStack {
                     unavailableService(
-                        "Coach", symbol: "bubble.left.and.bubble.right",
+                        copy.coach, symbol: "bubble.left.and.bubble.right",
                         description:
                             "Coach is not connected in this preview. No AI response, conversation history or saved memory is created."
                     )
                 }
-                .tabItem { Label("Coach", systemImage: "bubble.left.and.bubble.right") }
+                .tabItem { Label(copy.coach, systemImage: "bubble.left.and.bubble.right") }
                 .tag(NativeDemoDestination.coach)
                 NavigationStack {
                     social
                 }
-                .tabItem { Label("Social", systemImage: "person.2") }.tag(
+                .tabItem { Label(copy.social, systemImage: "person.2") }.tag(
                     NativeDemoDestination.social)
                 NavigationStack { followUp }
-                    .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+                    .tabItem { Label(copy.profile, systemImage: "person.crop.circle") }
                     .tag(NativeDemoDestination.profile)
             }
             .tint(NativePrism.tint)
             .sheet(isPresented: $showScenarios) {
                 NavigationStack {
                     Form {
+                        Section(copy.appLanguage) { NativeAppLanguagePicker() }
                         Section("Catalog states · simulation") {
                             Picker("Catalog", selection: $scenario) {
                                 ForEach(DemoCatalogScenario.allCases, id: \.self) {
@@ -738,7 +830,7 @@ struct NativeActivityDestination {
                     .navigationTitle("Demo settings")
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { showScenarios = false }
+                            Button(copy[.done]) { showScenarios = false }
                         }
                     }
                 }
@@ -758,7 +850,7 @@ struct NativeActivityDestination {
                 }
             }
             .alert("Demo restoration unavailable", isPresented: issuePresented) {
-                Button("OK", role: .cancel) { issue = nil }
+                Button(copy[.done], role: .cancel) { issue = nil }
             } message: {
                 Text(issue ?? "")
             }
@@ -808,9 +900,9 @@ struct NativeActivityDestination {
         }
 
         private var learnSelector: some View {
-            Picker("Learn section", selection: learnSectionSelection) {
-                Text("My Learning").tag(NativeDemoLearnSection.myLearning)
-                Text("Explore").tag(NativeDemoLearnSection.explore)
+            Picker(copy.learn, selection: learnSectionSelection) {
+                Text(copy.myLearning).tag(NativeDemoLearnSection.myLearning)
+                Text(copy.explore).tag(NativeDemoLearnSection.explore)
             }
             .pickerStyle(.menu)
             .frame(minHeight: 44)
@@ -845,15 +937,15 @@ struct NativeActivityDestination {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     demoNotice
-                    Picker("Social section", selection: $socialSection) {
+                    Picker(copy.social, selection: $socialSection) {
                         ForEach(DemoSocialSection.allCases, id: \.self) { section in
-                            Text(section.rawValue).tag(section)
+                            Text(section == .friends ? copy.friends : copy.teams).tag(section)
                         }
                     }
                     .pickerStyle(.menu)
                     .frame(minHeight: 44)
                     ContentUnavailableView(
-                        "\(socialSection.rawValue) are not connected",
+                        "\(socialSection == .friends ? copy.friends : copy.teams) · not connected",
                         systemImage: socialSection == .friends ? "person.2" : "person.3",
                         description: Text(
                             "Social is unavailable in this navigation preview. No real relationships, invitations, team membership or sharing are loaded."
@@ -865,7 +957,7 @@ struct NativeActivityDestination {
                 .padding(20)
                 .frame(maxWidth: 680).frame(maxWidth: .infinity)
             }
-            .navigationTitle("Social")
+            .navigationTitle(copy.social)
             .toolbar { demoToolbar }
         }
 
@@ -971,7 +1063,7 @@ struct NativeActivityDestination {
                                 "Explore two fictional situations. No account or real result is needed."
                             )
                         )
-                        DemoPrimaryButton(title: "Explore goals", symbol: "arrow.right") {
+                        DemoPrimaryButton(title: copy[.chooseGoal], symbol: "arrow.right") {
                             learnSection = .explore
                             tab = .catalog
                         }
@@ -981,7 +1073,7 @@ struct NativeActivityDestination {
                 .frame(maxWidth: 680, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
-            .navigationTitle("Learn")
+            .navigationTitle(copy.learn)
             .toolbar { demoToolbar }
         }
 
@@ -1036,7 +1128,7 @@ struct NativeActivityDestination {
                             .redacted(reason: .placeholder)
                             .accessibilityHidden(true)
                         }
-                        Label("Simulated loading…", systemImage: "hourglass")
+                        Label("\(copy.loading) · \(copy[.demo])", systemImage: "hourglass")
                             .accessibilityIdentifier("demo-catalog-loading")
                         Button("Finish simulated loading") { scenario = .ready }
                     }
@@ -1055,7 +1147,7 @@ struct NativeActivityDestination {
                             systemImage: "wifi.exclamationmark",
                             description: Text(
                                 "Your demo state is preserved. No server is contacted."))
-                        Button("Retry the simulation", systemImage: "arrow.clockwise") {
+                        Button(copy.retry, systemImage: "arrow.clockwise") {
                             scenario = .ready
                         }
                     }
@@ -1063,7 +1155,7 @@ struct NativeActivityDestination {
             }
             .frame(maxWidth: 680).frame(maxWidth: .infinity)
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Learn")
+            .navigationTitle(copy.learn)
             .toolbar { demoToolbar }
         }
 
@@ -1082,7 +1174,7 @@ struct NativeActivityDestination {
                         title: "The fictional situation", text: goal.practice.situation)
                     Label("Read, choose, understand · no grade", systemImage: "text.bubble")
                     Label("Local demo restoration", systemImage: "clock.arrow.circlepath")
-                    DemoPrimaryButton(title: "Choose this goal", symbol: "scope") {
+                    DemoPrimaryButton(title: copy[.chooseGoal], symbol: "scope") {
                         flow.choose(goal)
                         learnSection = .myLearning
                         catalogPath = []
@@ -1201,7 +1293,7 @@ struct NativeActivityDestination {
                             Text("You can change your choice before the simulated submission.")
                                 .font(.subheadline).foregroundStyle(.secondary)
                             DemoPrimaryButton(
-                                title: "Save the demo answer", symbol: "paperplane"
+                                title: "\(copy.submitAnswer) · \(copy[.demo])", symbol: "paperplane"
                             ) {
                                 flow.submit()
                             }
@@ -1210,7 +1302,7 @@ struct NativeActivityDestination {
                             .accessibilityIdentifier("demo-submit")
                         case .pending:
                             Label {
-                                Text("Demo answer pending")
+                                Text("\(copy.pending) · \(copy[.demo])")
                             } icon: {
                                 Image(systemName: "clock.fill").foregroundStyle(.orange)
                             }
@@ -1224,7 +1316,7 @@ struct NativeActivityDestination {
                                 "No verdict, score or reward is calculated on this device."
                             )
                             if offline {
-                                Label("Offline · simulation", systemImage: "wifi.slash")
+                                Label("\(copy[.offline]) · \(copy[.demo])", systemImage: "wifi.slash")
                                 Text(
                                     "The demo answer remains pending. The offline scenario pauses the next simulation step."
                                 )
@@ -1265,7 +1357,7 @@ struct NativeActivityDestination {
                             )
                             .font(.subheadline).foregroundStyle(.secondary)
                             DemoPrimaryButton(
-                                title: "View demo history",
+                                title: copy.progressAndHistory,
                                 symbol: "arrow.right"
                             ) { tab = .followUp }
                             Button(
@@ -1314,11 +1406,12 @@ struct NativeActivityDestination {
                     NavigationLink {
                         demoHistory
                     } label: {
-                        Label("Progress & history", systemImage: "clock.arrow.circlepath")
+                        Label(copy.progressAndHistory, systemImage: "clock.arrow.circlepath")
                             .frame(minHeight: 44)
                     }
                     NavigationLink {
                         List {
+                            Section(copy.appLanguage) { NativeAppLanguagePicker() }
                             Section("Demonstration controls") {
                                 Button("Preview states & offline simulation") {
                                     showScenarios = true
@@ -1338,16 +1431,16 @@ struct NativeActivityDestination {
                                 )
                             }
                         }
-                        .navigationTitle("Settings")
+                        .navigationTitle(copy.settings)
                     } label: {
-                        Label("Settings", systemImage: "gearshape")
+                        Label(copy.settings, systemImage: "gearshape")
                             .frame(minHeight: 44)
                     }
                 }
             }
             .frame(maxWidth: 680).frame(maxWidth: .infinity)
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Profile")
+            .navigationTitle(copy.profile)
             .toolbar { demoToolbar }
         }
 
@@ -1358,7 +1451,7 @@ struct NativeActivityDestination {
                     if let goal = flow.objective {
                         Text(goal.displayTitle).font(.headline)
                         Button(action: resumeExercise) {
-                            Label(flow.resumeLabel, systemImage: flow.phase.symbol)
+                            Label(copy.resume, systemImage: flow.phase.symbol)
                                 .frame(minHeight: 44)
                         }
                         .accessibilityIdentifier("resume-demo-follow-up")
@@ -1370,9 +1463,9 @@ struct NativeActivityDestination {
                             .foregroundStyle(.secondary)
                     } else {
                         ContentUnavailableView(
-                            "Start with a goal", systemImage: "scope",
-                            description: Text("No demo activity is saved."))
-                        Button("Explore goals") {
+                            copy[.chooseGoal], systemImage: "scope",
+                            description: Text(copy[.noHistory]))
+                        Button(copy[.chooseGoal]) {
                             learnSection = .explore
                             tab = .catalog
                         }
@@ -1382,7 +1475,7 @@ struct NativeActivityDestination {
             }
             .frame(maxWidth: 680).frame(maxWidth: .infinity)
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Progress & history")
+            .navigationTitle(copy.progressAndHistory)
             .toolbar { demoToolbar }
         }
 
@@ -1902,6 +1995,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
 #if canImport(SwiftUI)
     private struct NativeAccountDeletionView: View {
+        @Environment(\.nativeInterfaceCopy) private var copy
         @Bindable var model: NativeModel
         @Environment(\.dismiss) private var dismiss
         @Environment(\.scenePhase) private var scenePhase
@@ -1913,7 +2007,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 Section {
                     Text(title).font(.headline).accessibilityAddTraits(.isHeader)
                         .accessibilityFocused($focused, equals: .status)
-                    if model.deletionBusy { ProgressView("Account operation in progress") }
+                    if model.deletionBusy { ProgressView(copy.loading) }
                     if let message = model.deletionMessage {
                         Text(message).accessibilityIdentifier("account-deletion-message")
                             .accessibilityFocused($focused, equals: .error)
@@ -1970,7 +2064,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             Task { await model.recoverDeletionConnection(interactive: true) }
                         }
                         .disabled(model.deletionBusy)
-                        Button("Retry deletion", role: .destructive) {
+                        Button(copy.retry, role: .destructive) {
                             Task { await model.retryAccountDeletion() }
                         }
                         .disabled(!model.canRetryDeletion)
@@ -1984,9 +2078,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 } else if model.deletionStage == .cleanupFailed {
                     Section {
                         Text(
-                            "Account deletion is confirmed. Cleanup on this device is not complete."
+                            "\(copy.confirmed). Cleanup on this device is not complete."
                         )
-                        Button("Retry local cleanup", systemImage: "arrow.clockwise") {
+                        Button(copy.retry, systemImage: "arrow.clockwise") {
                             Task { await model.retryDeletionCleanup() }
                         }
                         .disabled(model.deletionBusy)
@@ -2000,12 +2094,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 }
             }
-            .navigationTitle("Delete account")
+            .navigationTitle(copy.accountDeletion)
             .navigationBarBackButtonHidden(model.deletionBusy || !model.canCancelDeletion)
             .toolbar {
                 if model.canCancelDeletion {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
+                        Button(copy[.cancel]) {
                             Task {
                                 await model.cancelAccountDeletion()
                                 if model.deletionStage == nil { dismiss() }
@@ -2020,10 +2114,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     get: { model.deletionStage == .confirmation },
                     set: { _ in })
             ) {
-                Button("Delete account", role: .destructive) {
+                Button(copy[.deleteAccount], role: .destructive) {
                     Task { await model.confirmAccountDeletion() }
                 }
-                Button("Cancel", role: .cancel) { model.discardDeletionProof() }
+                Button(copy[.cancel], role: .cancel) { model.discardDeletionProof() }
             } message: {
                 Text(
                     "Microsoft verified the same account. Only Delete account submits the irreversible request. Completion may require retries."
@@ -2058,6 +2152,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
     }
 
     private struct NativeRoot: View {
+        @Environment(\.nativeInterfaceCopy) private var copy
         @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
         @Bindable var model: NativeModel
         @Binding var pendingLessonLink: EditorialPilotLessonLink?
@@ -2094,18 +2189,18 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 } else {
                     TabView(selection: $model.selectedTab) {
                         learning
-                            .tabItem { Label("Learn", systemImage: "book") }
+                            .tabItem { Label(copy.learn, systemImage: "book") }
                             .tag(NativeResumeState.Tab.learn)
                         NavigationStack {
                             coach
                         }
-                        .tabItem { Label("Coach", systemImage: "bubble.left.and.bubble.right") }
+                        .tabItem { Label(copy.coach, systemImage: "bubble.left.and.bubble.right") }
                         .tag(NativeResumeState.Tab.coach)
                         NavigationStack {
                             NativeReadingPage {
-                                Picker("Social section", selection: $navigation.social) {
-                                    Text("Friends").tag(NativeLearningNavigation.Social.friends)
-                                    Text("Teams").tag(NativeLearningNavigation.Social.teams)
+                                Picker(copy.social, selection: $navigation.social) {
+                                    Text(copy.friends).tag(NativeLearningNavigation.Social.friends)
+                                    Text(copy.teams).tag(NativeLearningNavigation.Social.teams)
                                 }
                                 .pickerStyle(.menu)
                                 ContentUnavailableView(
@@ -2144,12 +2239,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 }
                                 .frame(minHeight: 44)
                             }
-                            .navigationTitle("Social")
+                            .navigationTitle(copy.social)
                         }
-                        .tabItem { Label("Social", systemImage: "person.2") }
+                        .tabItem { Label(copy.social, systemImage: "person.2") }
                         .tag(NativeResumeState.Tab.social)
                         NavigationStack { profile }
-                            .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+                            .tabItem { Label(copy.profile, systemImage: "person.crop.circle") }
                             .tag(NativeResumeState.Tab.profile)
                     }
                 }
@@ -2179,7 +2274,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .safeAreaInset(edge: .bottom) {
                 if model.busy {
                     ProgressView(
-                        savingGoalID == nil ? "Operation in progress…" : "Saving active goal…"
+                        savingGoalID == nil ? copy.loading : "Saving active goal…"
                     )
                     .padding()
                     .frame(maxWidth: .infinity)
@@ -2255,13 +2350,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Coach")
+            .navigationTitle(copy.coach)
         }
 
         private var coachPhase: String {
             switch model.outcome {
-            case .pendingCorrection: "Saved on this device · correction pending"
-            case .corrected: "Correction confirmed by the server"
+            case .pendingCorrection: copy[.pendingCorrection]
+            case .corrected: copy.confirmed
             case nil: "Answer selection · no confirmed result shown"
             }
         }
@@ -2287,9 +2382,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
             {
                 List(selection: $selectedTrack) {
                     Section {
-                        Picker("Learn section", selection: $navigation.learn) {
-                            Text("My Learning").tag(NativeLearningNavigation.Learn.myLearning)
-                            Text("Explore").tag(NativeLearningNavigation.Learn.explore)
+                        Picker(copy.learn, selection: $navigation.learn) {
+                            Text(copy.myLearning).tag(NativeLearningNavigation.Learn.myLearning)
+                            Text(copy.explore).tag(NativeLearningNavigation.Learn.explore)
                         }
                         .pickerStyle(.menu)
                     }
@@ -2338,10 +2433,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 || lesson.trackId.lowercased()
                                     != model.profile?.activeTrackId?.lowercased()
                         {
-                            Button("Resume \(lesson.title)", systemImage: "play.circle") {
+                            Button("\(copy.resume) · \(lesson.title)", systemImage: "play.circle") {
                                 resumeCurrentActivity(lesson)
-                                    .disabled(model.busy)
                             }
+                            .disabled(model.busy || loadingLessonID != nil)
                         }
                         Button("Restore downloaded activity", systemImage: "internaldrive") {
                             Task { await model.restoreDownloadedActivity() }
@@ -2351,7 +2446,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             Text(
                                 "Choose an active goal in Explore. Browsing never changes your goal."
                             )
-                            Button("Explore certifications") { navigation.learn = .explore }
+                            Button(copy.explore) { navigation.learn = .explore }
                         }
                     }
                     Section("Guided reading") {
@@ -2423,7 +2518,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
                 .background(NativePrism.canvas)
-                .navigationTitle("Learn")
+                .navigationTitle(copy.learn)
                 .modifier(
                     NativeCatalogSearch(
                         enabled: navigation.learn == .explore, query: $catalogFilter.query))
@@ -2536,7 +2631,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         title: model.tracks.first(where: {
                             $0.id.lowercased() == goalID.lowercased()
                         })?.title ?? goalID,
-                        message: "Your server-confirmed learning goal.")
+                        message: copy.confirmed)
                     Text("Next session").font(.headline)
                     if let track = model.tracks.first(where: {
                         $0.id.lowercased() == goalID.lowercased()
@@ -2547,7 +2642,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             let destination = NativeActivityDestination(
                                 lessonID: lesson.id, title: lesson.title)
                             NativePrimaryButton(
-                                title: destination.resumeTitle, symbol: "play.circle"
+                                title: destination.actionTitle(copy.resume), symbol: "play.circle"
                             ) {
                                 resumeCurrentActivity(lesson)
                             }
@@ -2565,7 +2660,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             let destination = NativeActivityDestination(
                                 lessonID: next.id, title: next.title)
                             NativePrimaryButton(
-                                title: "Practice \(destination.title)", symbol: "play.circle"
+                                title: destination.actionTitle(copy.startSession), symbol: "play.circle"
                             ) {
                                 selectedTrack = path.trackId
                                 selectedLesson = destination.lessonID
@@ -2578,8 +2673,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             )
                             .font(.caption).foregroundStyle(.secondary)
                         } else {
-                            NativePrimaryButton(title: "Open \(track.title)", symbol: "arrow.right")
-                            {
+                            NativePrimaryButton(
+                                title: "\(copy.startSession) · \(track.title)",
+                                symbol: "arrow.right"
+                            ) {
                                 selectedTrack = track.id
                                 columns = .all
                                 compactColumn = .content
@@ -2669,14 +2766,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     NavigationLink {
                         progressHistory
                     } label: {
-                        Label("Progress & history", systemImage: "clock.arrow.circlepath")
+                        Label(copy.progressAndHistory, systemImage: "clock.arrow.circlepath")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }
                     Divider()
                     NavigationLink {
                         Form {
+                            Section(copy.appLanguage) { NativeAppLanguagePicker() }
                             Section("Account") {
-                                NavigationLink("Delete account") {
+                                NavigationLink(copy.accountDeletion) {
                                     NativeAccountDeletionView(model: model)
                                 }
                                 Section("Reading & accessibility") {
@@ -2699,21 +2797,21 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                             Section(connectionSectionTitle) {
                                 Text(connectionDescription)
-                                Button("Disconnect", systemImage: "person.crop.circle.badge.xmark")
+                                Button(copy[.signOut], systemImage: "person.crop.circle.badge.xmark")
                                 {
                                     Task { await model.disconnect() }
                                 }
                                 .disabled(model.busy)
                             }
                         }
-                        .navigationTitle("Settings")
+                        .navigationTitle(copy.settings)
                     } label: {
-                        Label("Settings", systemImage: "gearshape")
+                        Label(copy.settings, systemImage: "gearshape")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }
                 }
             }
-            .navigationTitle("Profile")
+            .navigationTitle(copy.profile)
         }
 
         private var connectionSectionTitle: String {
@@ -2889,7 +2987,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             "Choose an available activity above for practice. A completed result can be read again without starting another attempt."
                         )
                         if let lesson = model.lesson, lesson.trackId == path.trackId {
-                            Button("Resume \(lesson.title)", systemImage: "play.circle") {
+                            Button("\(copy.resume) · \(lesson.title)", systemImage: "play.circle") {
                                 resumeCurrentActivity(lesson)
                             }
                             .disabled(model.busy)
@@ -2906,7 +3004,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         }
                     } else if loadingTrackID == track.id {
                         Section {
-                            ProgressView("Loading learning path…")
+                            ProgressView(copy.loading)
                                 .frame(maxWidth: .infinity, minHeight: 88)
                         }
                     } else {
@@ -2954,7 +3052,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     )
                     .font(.caption).foregroundStyle(.secondary)
                     if model.historyLoading {
-                        ProgressView("Loading confirmed history")
+                        ProgressView(copy.loading)
                     }
                     if let error = model.historyError {
                         Label(
@@ -2972,7 +3070,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         if model.serverHistory.isEmpty && model.historyError == nil {
                             Text(
                                 model.historyNextCursor == nil
-                                    ? "No confirmed quiz attempts."
+                                    ? copy[.noHistory]
                                     : "No confirmed attempts in this page. More history is available."
                             )
                         }
@@ -2982,7 +3080,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     if let presentation = model.historyPresentation {
                         ForEach(presentation.confirmed) { item in
                             NativeReadingCard {
-                                Label("Server confirmed", systemImage: "checkmark.seal")
+                                Label(copy.confirmed, systemImage: "checkmark.seal")
                                     .font(.subheadline).foregroundStyle(NativePrism.confirmed)
                                 Text(lessonTitle(item.lessonId)).font(.headline)
                                 Text(trackTitle(item.trackId)).foregroundStyle(.secondary)
@@ -3036,7 +3134,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     if let presentation = model.historyPresentation {
                         ForEach(presentation.confirmedOnDevice) { saved in
                             NativeReadingCard {
-                                Label("Confirmed on this device", systemImage: "checkmark.circle")
+                                Label(copy.confirmed, systemImage: "checkmark.circle")
                                     .foregroundStyle(NativePrism.confirmed)
                                 Text(lessonTitle(saved.lessonId)).font(.headline)
                                 Text(
@@ -3069,7 +3167,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             model.outcome == nil
                                 ? "Current local activity" : "Current submitted activity",
                             systemImage: "doc.text")
-                        Button("Resume current activity", systemImage: "play.circle") {
+                        Button(copy.resume, systemImage: "play.circle") {
                             model.selectedTab = .learn
                             columns = .detailOnly
                             compactColumn = .detail
@@ -3099,7 +3197,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 }
             }
-            .navigationTitle("Progress & history")
+            .navigationTitle(copy.progressAndHistory)
             .task {
                 if !model.historyAttempted { await model.refreshHistory() }
             }
@@ -3173,7 +3271,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 case .pendingCorrection:
                     Label("Correction pending", systemImage: "clock")
                         .foregroundStyle(NativePrism.pending)
-                    Button("Retry correction") {
+                    Button(copy.retry) {
                         Task { await model.retry(saved) }
                     }
                     .frame(minHeight: 44)
@@ -3297,7 +3395,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 case .pendingCorrection:
                                     NativeReadingCard {
                                         Label(
-                                            "Saved on this device · correction pending",
+                                            copy[.pendingCorrection],
                                             systemImage: "clock"
                                         )
                                         .font(.headline).foregroundStyle(NativePrism.pending)
@@ -3310,7 +3408,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 case .corrected(let result):
                                     NativeReadingSection(title: "Your confirmed result") {
                                         Label(
-                                            "Confirmed by the server", systemImage: "checkmark.seal"
+                                            copy.confirmed, systemImage: "checkmark.seal"
                                         )
                                         .foregroundStyle(NativePrism.confirmed)
                                         LabeledContent("Score", value: "\(result.scorePct) %")
@@ -3336,7 +3434,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                             Text(.init(item.explanation)).textSelection(.enabled)
                                         }
                                     }
-                                    NativeReadingSection(title: "Continue learning") {
+                                    NativeReadingSection(title: copy[.continueLearning]) {
                                         Button("Read again", systemImage: "text.book.closed") {
                                             reader.scrollTo("session-reading-start", anchor: .top)
                                         }
@@ -3350,7 +3448,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                             let destination = NativeActivityDestination(
                                                 lessonID: lesson.id, title: lesson.title)
                                             NativePrimaryButton(
-                                                title: destination.practiceTitle,
+                                                title: destination.actionTitle(copy.practiceAgain),
                                                 symbol: "arrow.clockwise"
                                             ) {
                                                 requestLesson(node)
@@ -3370,7 +3468,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 }
                             } else {
                                 NativePrimaryButton(
-                                    title: "Submit for correction", symbol: "paperplane"
+                                    title: copy.submitAnswer, symbol: "paperplane"
                                 ) {
                                     Task { await model.submit() }
                                 }
@@ -3385,7 +3483,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     })
                 {
                     if loadingLessonID == node.id {
-                        ProgressView("Loading lesson…")
+                        ProgressView(copy.loading)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         VStack(spacing: 16) {
@@ -3396,7 +3494,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                     "The selected lesson could not be loaded."
                                 )
                             )
-                            Button("Retry loading lesson", systemImage: "arrow.clockwise") {
+                            Button(copy.retry, systemImage: "arrow.clockwise") {
                                 requestLesson(node)
                             }
                             .buttonStyle(.borderedProminent)
@@ -3411,7 +3509,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     )
                 }
             }
-            .navigationTitle("Practice")
+            .navigationTitle(copy.startSession)
         }
 
         private func questionView(_ question: QuizItem) -> some View {

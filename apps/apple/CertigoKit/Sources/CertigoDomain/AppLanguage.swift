@@ -99,7 +99,8 @@ public struct AppInterfaceCopy: Sendable, Equatable {
   public enum Key: CaseIterable, Sendable {
     case learn, coach, social, profile, myLearning, explore, friends, teams
     case appLanguage, systemDefault, contentLanguageNote
-    case signInWithMicrosoft, exploreDemo, resume, startSession, submitAnswer, retry, loading
+    case signInWithMicrosoft, exploreDemo, resume, startSession, practiceAgain
+    case submitAnswer, retry, loading
     case progressAndHistory, settings, accountDeletion, pending, confirmed
     case signOut, cancel, done, back, continueLearning, answer, next, previous
     case offline, pendingCorrection, noHistory, deleteAccount, demo, chooseGoal
@@ -126,6 +127,7 @@ public struct AppInterfaceCopy: Sendable, Equatable {
   public var exploreDemo: String { self[.exploreDemo] }
   public var resume: String { self[.resume] }
   public var startSession: String { self[.startSession] }
+  public var practiceAgain: String { self[.practiceAgain] }
   public var submitAnswer: String { self[.submitAnswer] }
   public var retry: String { self[.retry] }
   public var loading: String { self[.loading] }
@@ -215,6 +217,11 @@ public struct AppInterfaceCopy: Sendable, Equatable {
       return (
         "Commencer une session", "Start session", "सत्र शुरू करें", "开始学习", "학습 시작",
         "Iniciar sesión de estudio", "Inizia una sessione", "Lerneinheit starten"
+      )
+    case .practiceAgain:
+      return (
+        "S’entraîner à nouveau", "Practice again", "फिर से अभ्यास करें", "再次练习", "다시 연습하기",
+        "Practicar de nuevo", "Esercitati di nuovo", "Erneut üben"
       )
     case .submitAnswer:
       return (
