@@ -1,7 +1,5 @@
 import CertigoDomain
-
 import Foundation
-
 import XCTest
 
 final class AppLanguageTests: XCTestCase {
@@ -102,6 +100,8 @@ final class AppLanguageTests: XCTestCase {
           "\(language.rawValue): \(key)")
       }
       XCTAssertNotEqual(copy.pending, copy.confirmed)
+      XCTAssertNotEqual(copy[.practiceAvailable], copy[.practiceUnavailable])
+      XCTAssertNotEqual(copy[.practiceUnavailableNote], copy[.practiceUnavailable])
       XCTAssertNotEqual(copy[.pendingCorrection], copy.confirmed)
       XCTAssertEqual(copy.learn, copy[.learn])
       XCTAssertEqual(copy.coach, copy[.coach])

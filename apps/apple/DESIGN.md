@@ -29,10 +29,15 @@ toward black or white. The main objective plane remains solid violet `#3B35F2`
 with white text, including in dark appearance. Brighter foreground colors are
 never used as fills beneath white body text.
 
-The catalog has no visual domain index. Certification-code prefixes select stable
-display bands: AZ/unknown violet, AI magenta, PL rose, MS amber, DP green and SC cyan.
-This is a presentation convention, not invented domain metadata. Track names and
-codes remain visible, so color never carries identity alone.
+The catalog has no visual domain index. Recognized code namespaces use the seven
+Radar display categories: cloud violet, AI magenta, Apple/mobile rose, data green,
+DevOps amber, security cyan and enterprise blue. Blue reuses Prism `info` /
+`infoGlow` (`#1562AA` / `#52A2F8`), not a new vendor-brand palette. Existing
+Microsoft subject accents remain unchanged: AZ violet, AI magenta, PL rose,
+MS amber, DP green and SC cyan. Unknown codes keep violet without acquiring a
+guessed provider or category. These are explicitly code-derived display hints,
+not authoritative server metadata or a claim of a vendor partnership.
+Track names, codes and availability remain visible; color never carries identity alone.
 
 Canvas, reading surfaces, body/secondary text and borders use adaptive UIKit
 semantic roles. Borders use the label role at increased contrast. Success and
@@ -107,11 +112,30 @@ otherwise the named goal is opened to load it. Review recommendations are not
 invented. Mimo/Coursera's unit structure uses real node states and remaining
 activity counts; a lock explains that the server has not supplied its reason.
 
-Quizlet/Coursera/Uxcel discovery uses native search, a code-family menu and
-availability filter. Prism code badges are quiet, continuous capsules, with
+Quizlet/Coursera/Uxcel discovery uses native search, code-family and code-category
+menus and an availability filter. Only categories present in loaded entries are
+offered; alias namespaces share a family while Microsoft subject families remain
+distinct. Filters intersect and clear together. Prism code badges are quiet, continuous capsules, with
 readable summaries and explicit counts. An unavailable item can be inspected,
 but cannot start practice. There is no guessed provider, content language, format
 facet, lesson volume or download size. Filters are retained local view state.
+
+Availability badges use neutral opaque surfaces and a book symbol, not a success
+check or a promise of imminent publication. The same eight-language
+`practiceAvailable` / `practiceUnavailable` copy appears in Explore and the track
+overview; unavailable entries show a source-honest explanatory note. The goal
+plane and session pane never offer playable practice for an explicitly unavailable
+catalog entry, even if an older path remains loaded. Saved work is not deleted.
+
+The Radar registry is an editorial discovery source, not an OTA catalog:
+`gaby27072001/certigo-content` commit
+`e90948c8d47b274bb6a5797b84f77abf48b20e87`,
+`config/content-radar-sources.json` and `docs/CONTENT_RADAR.md`.
+Its `announced` review drafts are not valid catalog/v1 entries. The current app
+contract exposes only `learningAvailable`, not provider/category, announced/planned
+status, or release date. This native presentation does not publish drafts, add
+tracks or connect Radar to the backend. Those require a separately approved
+end-to-end contract and release.
 
 Brilliant's selection/action coherence is a value, not a delayed animation:
 named action and lesson identity derive together from the current activity.

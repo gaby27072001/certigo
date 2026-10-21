@@ -1,17 +1,113 @@
 import Foundation
 
+enum NativeRadarCategory: String, CaseIterable, Sendable {
+    case cloud = "cloud-hyperscalers"
+    case ai = "ai-foundation-models"
+    case apple = "apple-mobile"
+    case data = "data-analytics"
+    case devops = "devops-cloud-native-dev"
+    case security = "cybersecurity-networking"
+    case enterprise = "enterprise-delivery"
+
+    var title: String {
+        switch self {
+        case .cloud: "Cloud platforms"
+        case .ai: "AI & foundation models"
+        case .apple: "Apple & mobile"
+        case .data: "Data & analytics"
+        case .devops: "DevOps & cloud native"
+        case .security: "Security & networking"
+        case .enterprise: "Enterprise & delivery"
+        }
+    }
+
+    var band: Int {
+        switch self {
+        case .cloud: 0
+        case .ai: 1
+        case .apple: 2
+        case .data: 4
+        case .devops: 3
+        case .security: 5
+        case .enterprise: 6
+        }
+    }
+}
+
 enum NativeTrackAppearance {
-    // Catalog contracts have a certification code, not a visual domain index.
+    struct CodeGroup: Sendable {
+        let family: String
+        let category: NativeRadarCategory
+        let prefixes: [String]
+    }
+
+    // Display hints from code namespaces, not authoritative provider/category metadata.
+    private static let groups: [CodeGroup] = [
+        .init(
+            family: "MICROSOFT", category: .cloud,
+            prefixes: ["MICROSOFT", "MSFT", "AZ", "AI", "PL", "MS", "DP", "SC"]),
+        .init(family: "AWS", category: .cloud, prefixes: ["AWS"]),
+        .init(family: "GCP", category: .cloud, prefixes: ["GCP", "GOOGLE-CLOUD"]),
+        .init(family: "ORACLE", category: .cloud, prefixes: ["ORACLE", "OCI"]),
+        .init(family: "OPENAI", category: .ai, prefixes: ["OPENAI", "OAI"]),
+        .init(family: "ANTHROPIC", category: .ai, prefixes: ["ANTHROPIC", "CLAUDE"]),
+        .init(family: "MISTRAL", category: .ai, prefixes: ["MISTRAL"]),
+        .init(family: "NVIDIA", category: .ai, prefixes: ["NVIDIA", "NV", "DLI"]),
+        .init(family: "HF", category: .ai, prefixes: ["HF", "HUGGINGFACE", "HUGGING-FACE"]),
+        .init(family: "COHERE", category: .ai, prefixes: ["COHERE"]),
+        .init(family: "META", category: .ai, prefixes: ["META"]),
+        .init(family: "APPLE", category: .apple, prefixes: ["APPLE"]),
+        .init(family: "DATABRICKS", category: .data, prefixes: ["DATABRICKS", "DBX"]),
+        .init(family: "SNOWFLAKE", category: .data, prefixes: ["SNOWFLAKE", "SNOW", "SNOWPRO"]),
+        .init(family: "MONGODB", category: .data, prefixes: ["MONGODB"]),
+        .init(family: "CONFLUENT", category: .data, prefixes: ["CONFLUENT"]),
+        .init(family: "DBT", category: .data, prefixes: ["DBT"]),
+        .init(
+            family: "CNCF", category: .devops,
+            prefixes: ["CNCF", "LINUX-FOUNDATION", "LF", "CKA", "CKAD", "CKS"]),
+        .init(
+            family: "HASHICORP", category: .devops, prefixes: ["HASHICORP", "TERRAFORM", "VAULT"]),
+        .init(family: "GITHUB", category: .devops, prefixes: ["GITHUB", "GH"]),
+        .init(
+            family: "REDHAT", category: .devops,
+            prefixes: ["REDHAT", "RED-HAT", "RH", "RHCSA", "RHCE"]),
+        .init(family: "DOCKER", category: .devops, prefixes: ["DOCKER"]),
+        .init(family: "GITLAB", category: .devops, prefixes: ["GITLAB"]),
+        .init(family: "CISCO", category: .security, prefixes: ["CISCO", "CCNA", "CCNP"]),
+        .init(family: "COMPTIA", category: .security, prefixes: ["COMPTIA", "SY0", "N10"]),
+        .init(family: "ISC2", category: .security, prefixes: ["ISC2", "CISSP"]),
+        .init(family: "ISACA", category: .security, prefixes: ["ISACA", "CISM", "CISA"]),
+        .init(family: "OFFSEC", category: .security, prefixes: ["OFFSEC", "OSCP"]),
+        .init(family: "PALOALTO", category: .security, prefixes: ["PALOALTO", "PALO-ALTO"]),
+        .init(family: "CLOUDFLARE", category: .security, prefixes: ["CLOUDFLARE"]),
+        .init(family: "SALESFORCE", category: .enterprise, prefixes: ["SALESFORCE", "SF"]),
+        .init(family: "SERVICENOW", category: .enterprise, prefixes: ["SERVICENOW", "CSA", "CAD"]),
+        .init(family: "SAP", category: .enterprise, prefixes: ["SAP"]),
+        .init(family: "ATLASSIAN", category: .enterprise, prefixes: ["ATLASSIAN"]),
+        .init(family: "PMI", category: .enterprise, prefixes: ["PMI", "PMP", "PSM"]),
+    ]
+
+    static func normalized(_ code: String) -> String {
+        code.uppercased().components(separatedBy: .alphanumerics.inverted)
+            .filter { !$0.isEmpty }.joined(separator: "-")
+    }
+
+    static func group(for code: String) -> CodeGroup? {
+        let code = normalized(code)
+        return groups.first { group in
+            group.prefixes.contains { code == $0 || code.hasPrefix($0 + "-") }
+        }
+    }
+
     static func band(for code: String) -> Int {
-        switch code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased().split(
-            separator: "-"
-        ).first {
+        // Preserve the established Microsoft subject accents.
+        switch normalized(code).split(separator: "-").first {
         case "AI": 1
         case "PL": 2
         case "MS": 3
         case "DP": 4
         case "SC": 5
-        default: 0
+        default: group(for: code)?.category.band ?? 0
         }
     }
 }
@@ -19,21 +115,26 @@ enum NativeTrackAppearance {
 struct NativeCatalogFilter {
     var query = ""
     var family = ""
+    var category: NativeRadarCategory?
     var availableOnly = false
 
     var isActive: Bool {
         !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !family.isEmpty || availableOnly
+            || !family.isEmpty || category != nil || availableOnly
     }
 
     static func family(for code: String) -> String {
-        code.trimmingCharacters(in: .whitespacesAndNewlines)
-            .uppercased().split(separator: "-").first.map(String.init) ?? ""
+        let prefix =
+            NativeTrackAppearance.normalized(code).split(separator: "-").first
+            .map(String.init) ?? ""
+        if ["AZ", "AI", "PL", "MS", "DP", "SC"].contains(prefix) { return prefix }
+        return NativeTrackAppearance.group(for: code)?.family ?? prefix
     }
 
     func includes(code: String, title: String, summary: String, available: Bool) -> Bool {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return (family.isEmpty || Self.family(for: code) == family)
+            && (category == nil || NativeTrackAppearance.group(for: code)?.category == category)
             && (!availableOnly || available)
             && (text.isEmpty
                 || [code, title, summary].contains {
@@ -188,12 +289,12 @@ struct NativeActivityDestination {
     // FIRST VIEWPORT: One colored objective plane, one resume action, then quiet supporting rows.
     // FORM: Reviewable extension of approved A, not a new identity; bounded iPad reading width.
     enum NativePrism {
-        // Prism spectrumInk / spectrumGlow; solid fills never use the brighter foreground role.
+        // Prism spectrumInk / spectrumGlow plus info; glow is never a solid reading fill.
         private static let ink: [UInt32] = [
-            0x3B35F2, 0x901BAE, 0xA91A66, 0x924A13, 0x177331, 0x176C7A,
+            0x3B35F2, 0x901BAE, 0xA91A66, 0x924A13, 0x177331, 0x176C7A, 0x1562AA,
         ]
         private static let glow: [UInt32] = [
-            0x8097F8, 0xD764F8, 0xF95DA5, 0xEC7B26, 0x2DBC55, 0x2CB0C7,
+            0x8097F8, 0xD764F8, 0xF95DA5, 0xEC7B26, 0x2DBC55, 0x2CB0C7, 0x52A2F8,
         ]
         static let canvas = Color(uiColor: .systemGroupedBackground)
         static let surface = Color(uiColor: .secondarySystemGroupedBackground)
@@ -234,6 +335,24 @@ struct NativeActivityDestination {
                 red: CGFloat((hex >> 16) & 255) / 255,
                 green: CGFloat((hex >> 8) & 255) / 255,
                 blue: CGFloat(hex & 255) / 255, alpha: 1)
+        }
+    }
+
+    private struct NativePracticeBadge: View {
+        @Environment(\.nativeInterfaceCopy) private var copy
+        let available: Bool
+
+        var body: some View {
+            Label(
+                copy[available ? .practiceAvailable : .practiceUnavailable],
+                systemImage: available ? "book" : "book.closed"
+            )
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(NativePrism.surface, in: Capsule(style: .continuous))
+            .accessibilityIdentifier("catalog-practice-availability")
         }
     }
 
@@ -2377,6 +2496,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 .filter { !$0.isEmpty }.sorted()
         }
 
+        private var catalogCategories: [NativeRadarCategory] {
+            NativeRadarCategory.allCases.filter { category in
+                model.tracks.contains {
+                    NativeTrackAppearance.group(for: $0.code)?.category == category
+                }
+            }
+        }
+
         private var learning: some View {
             NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn)
             {
@@ -2410,12 +2537,18 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             Picker("Code family", selection: $catalogFilter.family) {
                                 Text("All code families").tag("")
                                 ForEach(catalogFamilies, id: \.self) { family in
-                                    Text("\(family) certifications").tag(family)
+                                    Text(family).tag(family)
+                                }
+                            }
+                            Picker("Code category", selection: $catalogFilter.category) {
+                                Text("All code categories").tag(nil as NativeRadarCategory?)
+                                ForEach(catalogCategories, id: \.self) { category in
+                                    Text(category.title).tag(Optional(category))
                                 }
                             }
                             Toggle("Available practice only", isOn: $catalogFilter.availableOnly)
                             Text(
-                                "Searches the loaded catalog on this device. Code families are not provider metadata. Language and format filters are unavailable because the catalog does not declare them."
+                                "Searches the loaded catalog on this device. Code families are not provider metadata. Categories are display hints derived from recognized codes, not server classifications. Language and format filters are unavailable because the catalog does not declare them."
                             )
                             .font(.caption).foregroundStyle(.secondary)
                             Text("\(visibleTracks.count) of \(model.tracks.count) certifications")
@@ -2487,12 +2620,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                             NativePrism.surface,
                                             in: Capsule(style: .continuous))
                                     Text(track.title).font(.title3.weight(.semibold))
+                                    if let group = NativeTrackAppearance.group(for: track.code) {
+                                        Text(
+                                            "\(NativeCatalogFilter.family(for: track.code)) · \(group.category.title)"
+                                        )
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    }
                                     Text(track.summary).font(.subheadline)
                                         .foregroundStyle(.secondary)
-                                    if !track.learningAvailable {
-                                        Text("Practice is not available yet.")
-                                            .font(.caption).foregroundStyle(.secondary)
-                                    }
+                                    NativePracticeBadge(available: track.learningAvailable)
                                 }
                                 .padding(.vertical, 8)
                             }
@@ -2636,7 +2772,11 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     if let track = model.tracks.first(where: {
                         $0.id.lowercased() == goalID.lowercased()
                     }) {
-                        if let lesson = model.lesson,
+                        if !track.learningAvailable {
+                            NativePracticeBadge(available: false)
+                            Text(copy[.practiceUnavailableNote])
+                                .font(.subheadline)
+                        } else if let lesson = model.lesson,
                             lesson.trackId.lowercased() == goalID.lowercased()
                         {
                             let destination = NativeActivityDestination(
@@ -2886,6 +3026,16 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .foregroundStyle(NativePrism.accent(for: track.code))
                         Text(track.title).font(.title2.bold()).accessibilityAddTraits(.isHeader)
                         Text(track.summary)
+                        if let group = NativeTrackAppearance.group(for: track.code) {
+                            LabeledContent(
+                                "Code group", value: NativeCatalogFilter.family(for: track.code))
+                            LabeledContent("Code category", value: group.category.title)
+                        }
+                        NativePracticeBadge(available: track.learningAvailable)
+                        if !track.learningAvailable {
+                            Text(copy[.practiceUnavailableNote])
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
                         Text(
                             "Practice uses the supported question-bank reader when available; this catalog does not declare per-certification formats."
                         )
@@ -2893,7 +3043,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             "Availability: \(track.learningAvailable ? "learning path available" : "practice not available in this catalog")"
                         )
                         Text(
-                            "Language, provider, publication version and prerequisite reasons are not declared by this catalog. The interface language does not translate learning content."
+                            "Language, provider, publication version and prerequisite reasons are not declared by this catalog. Code groups/categories are display hints only. Announced and planned statuses are not supplied; no release date is inferred. The interface language does not translate learning content."
                         )
                         .font(.caption).foregroundStyle(.secondary)
                         if let lesson = model.lesson, lesson.trackId == track.id,
@@ -2924,7 +3074,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 }
                 if let path = model.path,
-                    selectedTrack == nil || selectedTrack == path.trackId
+                    selectedTrack == nil || selectedTrack == path.trackId,
+                    model.tracks.first(where: { $0.id == path.trackId })?.learningAvailable != false
                 {
                     if let track = model.tracks.first(where: { $0.id == path.trackId }) {
                         activeGoalSection(track)
@@ -3000,9 +3151,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 {
                     if !track.learningAvailable {
                         Section {
-                            Text(
-                                "This certification can be explored, but its practice cannot be opened. Choose another certification in Explore."
-                            )
+                            Text(copy[.practiceUnavailableNote])
+                            Button(copy.explore) { navigation.learn = .explore }
                         }
                     } else if loadingTrackID == track.id {
                         Section {
@@ -3344,7 +3494,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var session: some View {
             Group {
-                if let lesson = model.lesson,
+                if let track = model.tracks.first(where: {
+                    $0.id == (selectedTrack ?? model.lesson?.trackId)
+                }), !track.learningAvailable {
+                    ContentUnavailableView(
+                        copy[.practiceUnavailable], systemImage: "book.closed",
+                        description: Text(copy[.practiceUnavailableNote])
+                    )
+                } else if let lesson = model.lesson,
                     selectedTrack == nil || selectedTrack == lesson.trackId,
                     selectedLesson == nil || selectedLesson == lesson.id
                 {
