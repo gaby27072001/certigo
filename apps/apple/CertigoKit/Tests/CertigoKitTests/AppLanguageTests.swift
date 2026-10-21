@@ -3,6 +3,29 @@ import Foundation
 import XCTest
 
 final class AppLanguageTests: XCTestCase {
+  func testSecondaryLearningChromeIsTranslatedInAllEightLanguages() {
+    let keys: [AppInterfaceCopy.Key] = [
+      .categoryAll, .categoryCloud, .categoryAI, .categoryApple, .categoryData, .categoryDevOps,
+      .categoryCyber, .categoryEnterprise, .categoryOther, .contentLanguageFR, .contentLanguageEN,
+      .recommendedReview, .reviewReasonLowScore, .reviewReasonDue, .reviewReasonContinue,
+      .startReview,
+      .explainWithCoach, .coachWorkspaceTitle, .coachExplaining, .coachHeadline, .coachKeyPoints,
+      .coachRecommendation, .coachPersonalization, .coachSourceGrounded, .coachPromptHint,
+      .searchPlaceholder, .noMatchingTracks, .clearFilters, .activeGoalBadge,
+      .masteryNotStarted, .masteryLearning, .masteryPracticing, .masteryMastered, .masteryExamReady,
+      .focusArea, .startFocusSession, .spacedRepetitionReview, .startFinalAssessment, .youreReady,
+      .explainDifferently, .whyWasIWrong, .targetExamDate, .initialLevel, .dailyMinutesGoal,
+      .levelBeginner, .levelIntermediate, .levelAdvanced, .notifications, .notificationsEnabled,
+      .quietHours, .preferredHour, .maxPerDay, .streakAlerts, .questAlerts, .leagueAlerts,
+    ]
+    for key in keys {
+      let translations = AppLanguage.allCases.map { AppInterfaceCopy(language: $0)[key] }
+      XCTAssertTrue(translations.allSatisfy { !$0.isEmpty }, "\(key)")
+      XCTAssertGreaterThan(Set(translations).count, 1, "\(key)")
+      XCTAssertFalse(translations.contains { $0.contains("TODO") || $0.contains("{key}") })
+    }
+  }
+
   func testExactlyEightCanonicalLanguagesAndAutonyms() throws {
     let expected: [(AppLanguage, String, String)] = [
       (.french, "fr", "Français"), (.english, "en", "English"),

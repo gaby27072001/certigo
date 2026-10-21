@@ -9,6 +9,11 @@ public struct Profile: Decodable, Sendable {
     public let displayName: String
     public let xp: Int
     public let activeTrackId: String?
+    public let level: Int?
+    public let streakDays: Int?
+    public let dailyGoalXp: Int?
+    public let dailyXpEarned: Int?
+    public let gems: Int?
 }
 public struct Catalog: Decodable, Sendable {
     public let schema: String
@@ -35,26 +40,38 @@ public struct Track: Decodable, Identifiable, Sendable {
     public let title: String
     public let summary: String
     public let learningAvailable: Bool
+    public let languages: [String]?
 }
 public struct LearningPath: Decodable, Sendable {
     public let trackId: String
     public let trackName: String
     public let readinessScore: Int
     public let units: [PathUnit]
+    public let domains: [DomainProgress]?
+    public let readinessTrend7d: Int?
 }
-public struct PathUnit: Decodable, Identifiable, Sendable {
+public struct DomainProgress: Decodable, Equatable, Sendable {
+    public let id: String
+    public let name: String
+    public let weight: Double
+    public let score: Int
+}
+public struct PathUnit: Decodable, Identifiable, Equatable, Sendable {
     public let id: String
     public let title: String
     public let lessons: [PathLesson]
+    public let domainId: String?
+    public let status: String?
 }
 public enum NodeStatus: String, Decodable, Sendable {
     case locked, available, inProgress, completed, mastered
 }
-public struct PathLesson: Decodable, Identifiable, Sendable {
+public struct PathLesson: Decodable, Identifiable, Equatable, Sendable {
     public let id: String
     public let title: String
     public let status: NodeStatus
     public let estMinutes: Int
+    public let masteryPct: Int?
 
     public var canOpen: Bool { status != .locked }
 }
@@ -85,18 +102,21 @@ public struct EditorialPilot: Decodable, Identifiable, Sendable {
         else { throw ContractError.malformed("editorial pilot identity") }
 
         let sourceIDs = Set(sources.map(\.id))
-        guard sources.allSatisfy({
-            !$0.title.isEmpty && $0.url.hasPrefix("https://")
-                && !$0.checkedOn.isEmpty && !$0.supports.isEmpty && !$0.limits.isEmpty
-        }), lessons.allSatisfy({ lesson in
-            !lesson.title.isEmpty && !lesson.objective.isEmpty && !lesson.hook.isEmpty
-                && !lesson.recap.isEmpty && lesson.estimatedMinutes > 0
-                && !lesson.keyIdeas.isEmpty && !lesson.workedExample.situation.isEmpty
-                && !lesson.workedExample.steps.isEmpty && !lesson.workedExample.decision.isEmpty
-                && !lesson.practice.prompt.isEmpty && !lesson.practice.successCriteria.isEmpty
-                && !lesson.practice.feedback.isEmpty && !lesson.sourceIDs.isEmpty
-                && lesson.sourceIDs.allSatisfy(sourceIDs.contains)
-        }) else {
+        guard
+            sources.allSatisfy({
+                !$0.title.isEmpty && $0.url.hasPrefix("https://")
+                    && !$0.checkedOn.isEmpty && !$0.supports.isEmpty && !$0.limits.isEmpty
+            }),
+            lessons.allSatisfy({ lesson in
+                !lesson.title.isEmpty && !lesson.objective.isEmpty && !lesson.hook.isEmpty
+                    && !lesson.recap.isEmpty && lesson.estimatedMinutes > 0
+                    && !lesson.keyIdeas.isEmpty && !lesson.workedExample.situation.isEmpty
+                    && !lesson.workedExample.steps.isEmpty && !lesson.workedExample.decision.isEmpty
+                    && !lesson.practice.prompt.isEmpty && !lesson.practice.successCriteria.isEmpty
+                    && !lesson.practice.feedback.isEmpty && !lesson.sourceIDs.isEmpty
+                    && lesson.sourceIDs.allSatisfy(sourceIDs.contains)
+            })
+        else {
             throw ContractError.malformed("editorial pilot content")
         }
         return self
@@ -152,10 +172,12 @@ public struct EditorialPilotSnapshot: Sendable {
     }
 
     public func validated() throws -> Self {
-        guard contentDigest.range(
-            of: "^sha256:[0-9a-f]{64}$",
-            options: .regularExpression
-        ) != nil else {
+        guard
+            contentDigest.range(
+                of: "^sha256:[0-9a-f]{64}$",
+                options: .regularExpression
+            ) != nil
+        else {
             throw ContractError.malformed("editorial pilot digest")
         }
         _ = try pilot.validated()
@@ -242,7 +264,7 @@ public struct QuizItem: Codable, Identifiable, Sendable {
         }
     }
 }
-public struct QuizOption: Codable, Identifiable, Sendable {
+public struct QuizOption: Codable, Identifiable, Equatable, Sendable {
     public let id: String
     public let label: String
 }
@@ -298,6 +320,7 @@ public struct QuizResult: Codable, Equatable, Sendable {
     public let results: [ItemResult]
     public let rewards: QuizRewards
     public let weakConcepts: [String]
+    public let nextReviewDueAt: Date?
 
     public func validated(for submission: QuizSubmission) throws -> Self {
         guard !attemptId.isEmpty, (0...100).contains(scorePct),
@@ -328,6 +351,78 @@ public struct QuizRewards: Codable, Equatable, Sendable {
     public let streakExtended: Bool
     public let gemsEarned: Int
     public let achievementsUnlocked: [String]
+}
+
+public struct TutorExplainRequest: Codable, Equatable, Sendable {
+    public let trackId: String
+    public let lessonId: String
+    public let itemId: String
+    public let selected: [String]
+    public let publicManifestId: String?
+
+    public init(
+        trackId: String, lessonId: String, itemId: String, selected: [String],
+        publicManifestId: String? = nil
+    ) {
+        self.trackId = trackId
+        self.lessonId = lessonId
+        self.itemId = itemId
+        self.selected = selected
+        self.publicManifestId = publicManifestId
+    }
+}
+
+public struct TutorPersonalization: Codable, Equatable, Sendable {
+    public let attempts: Int
+    public let errors: Int
+    public let accuracyPct: Int
+    public let recurringStruggle: Bool
+    public let masteredBefore: Bool
+    public let trend: String
+    public let topConfusedOption: String?
+
+    public init(
+        attempts: Int, errors: Int, accuracyPct: Int, recurringStruggle: Bool,
+        masteredBefore: Bool, trend: String, topConfusedOption: String?
+    ) {
+        self.attempts = attempts
+        self.errors = errors
+        self.accuracyPct = accuracyPct
+        self.recurringStruggle = recurringStruggle
+        self.masteredBefore = masteredBefore
+        self.trend = trend
+        self.topConfusedOption = topConfusedOption
+    }
+}
+
+public struct TutorExplanation: Codable, Equatable, Sendable {
+    public let itemId: String
+    public let conceptId: String
+    public let correct: Bool
+    public let headline: String
+    public let points: [String]
+    public let encouragement: String
+    public let recommendation: String
+    public let citedConceptIds: [String]
+    public let source: String
+    public let personalization: TutorPersonalization
+
+    public init(
+        itemId: String, conceptId: String, correct: Bool, headline: String, points: [String],
+        encouragement: String, recommendation: String, citedConceptIds: [String],
+        source: String, personalization: TutorPersonalization
+    ) {
+        self.itemId = itemId
+        self.conceptId = conceptId
+        self.correct = correct
+        self.headline = headline
+        self.points = points
+        self.encouragement = encouragement
+        self.recommendation = recommendation
+        self.citedConceptIds = citedConceptIds
+        self.source = source
+        self.personalization = personalization
+    }
 }
 
 public struct LearningHistoryPage: Decodable, Equatable, Sendable {

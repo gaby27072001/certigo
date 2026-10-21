@@ -123,6 +123,71 @@ public actor LearningClient {
         return value
     }
 
+    public func explainAnswer(_ request: TutorExplainRequest) async throws -> TutorExplanation {
+        let context = try credentials()
+        let value = try await api.explainAnswer(request, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func nextBestRecommendations(trackId: String) async throws -> NextBestRecommendations {
+        let context = try credentials()
+        let value = try await api.nextBestRecommendations(trackId: trackId, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func generateMockExam(_ request: MockExamRequest) async throws -> MockExam {
+        let context = try credentials()
+        let value = try await api.generateMockExam(request, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func submitMockExam(_ request: SubmitMockExamRequest) async throws -> MockExamResult {
+        let context = try credentials()
+        let value = try await api.submitMockExam(request, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func achievements() async throws -> AchievementBoard {
+        let context = try credentials()
+        let value = try await api.achievements(credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func quests() async throws -> QuestBoard {
+        let context = try credentials()
+        let value = try await api.quests(credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func notificationPlan() async throws -> NotificationPlan {
+        let context = try credentials()
+        let value = try await api.notificationPlan(credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func notificationSettings() async throws -> NotificationSettings {
+        let context = try credentials()
+        let value = try await api.notificationSettings(credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func updateNotificationSettings(_ settings: NotificationSettings)
+        async throws -> NotificationSettings
+    {
+        let context = try credentials()
+        let value = try await api.updateNotificationSettings(settings, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
     public func refreshProfile() async throws -> Profile {
         let context = try credentials()
         let value = try await api.profile(accessToken: context.accessToken)
