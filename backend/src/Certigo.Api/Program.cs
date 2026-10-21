@@ -232,16 +232,10 @@ var host = new HostBuilder()
 
         services.AddSingleton<ITokenValidator>(sp =>
         {
-            // The local email/password validator is always first; whichever
-            // environment validator follows is the fallback. The Dev validator
-            // accepts ANY token, so it can only ever be the last link in the chain.
-            var validators = new List<ITokenValidator>
-            {
-                new LocalJwtTokenValidator(
-                    signingSecret, jwtIssuer, jwtAudience,
-                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LocalJwtTokenValidator>>(),
-                    previousSigningSecret)
-            };
+            var local = new LocalJwtTokenValidator(
+                signingSecret, jwtIssuer, jwtAudience,
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LocalJwtTokenValidator>>(),
+                previousSigningSecret);
 
             // Hard production guard: the dev validator accepts any bearer token as a
             // user id, so it can never be wired in production (even if AUTH_MODE=dev
@@ -250,26 +244,14 @@ var host = new HostBuilder()
                 configuration["AUTH_MODE"],
                 context.HostingEnvironment.IsProduction(),
                 configuration["AUTH_ALLOW_DEV"]);
-            if (useDev)
-            {
-                validators.Add(new DevTokenValidator());
-            }
-            else
-            {
-                // Only add Entra when it is actually configured; its ctor throws on
-                // empty authority/audience, which would otherwise break local runs
-                // that rely solely on email/password.
-                var authority = configuration["ENTRA_AUTHORITY"];
-                var audience = configuration["ENTRA_AUDIENCE"];
-                if (!string.IsNullOrWhiteSpace(authority) && !string.IsNullOrWhiteSpace(audience))
-                {
-                    validators.Add(new EntraTokenValidator(
-                        authority, audience,
-                        sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EntraTokenValidator>>()));
-                }
-            }
-
-            return new CompositeTokenValidator(validators);
+            return TokenValidatorConfiguration.Create(
+                local,
+                configuration["ENTRA_AUTHORITY"],
+                configuration["ENTRA_AUDIENCE"],
+                useDev,
+                (authority, audience) => new EntraTokenValidator(
+                    authority, audience,
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EntraTokenValidator>>()));
         });
         services.AddSingleton<IReauthenticationProofValidator>(sp =>
         {

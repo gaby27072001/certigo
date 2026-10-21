@@ -691,9 +691,14 @@ Functions](https://learn.microsoft.com/azure/azure-functions/functions-infrastru
 
 ## T0.5 — Valider l'authentification (Entra External ID)
 
-`Program.cs:61` enregistre un `CompositeTokenValidator` :
-`LocalJwtTokenValidator` (toujours) → puis `DevTokenValidator` (si `AUTH_MODE=dev`) **ou**
-`EntraTokenValidator` (si `ENTRA_AUTHORITY` + `ENTRA_AUDIENCE` fournis). Garde-fou :
+`Program.cs` enregistre un `CompositeTokenValidator` :
+`LocalJwtTokenValidator` (toujours) → `EntraTokenValidator` (si `ENTRA_AUTHORITY`
+et `ENTRA_AUDIENCE` sont renseignés sans le GUID placeholder nul) →
+`DevTokenValidator` (uniquement si `AUTH_MODE=dev`, toujours en dernier).
+Un jeton Entra valide conserve donc ses claims même sur un hôte de test dev.
+Le fallback dev reste permissif : il accepte aussi les jetons rejetés par les
+validateurs précédents et ne constitue pas un mode sécurisé pour des utilisateurs réels.
+Garde-fou :
 `AUTH_MODE=dev` est interdit en Production sauf `AUTH_ALLOW_DEV=true`.
 
 Le middleware `JwtAuthMiddleware` exige `Authorization: Bearer …` **sauf** sur
