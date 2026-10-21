@@ -72,10 +72,16 @@ Authored lesson/question/source text remains in its source language; changing
 the UI locale does not imply content translation. Explore filters, search/reset,
 seven categories, declared FR/EN badges, principal My Learning/Profile sections,
 Coach, study/assessment/notification controls and editorial reading chrome have
-explicit eight-language entries. Legacy detailed history notices, developer/deletion
-flows, audio controls and parts of the fictional demo still contain authored
-English text; this is not full-app localization. Dates follow the
-effective locale. Validate translated string expansion and script rendering on
+explicit eight-language entries. Detailed history, developer/production connection
+diagnostics, irreversible deletion explanations, audio controls and accessibility,
+and fictional demo navigation/status/help also resolve through typed eight-language
+catalogs. Dynamic counts, HTTP status and configuration names use localized
+positional templates; durations use the locale's number format and translated units.
+Model errors and demo/editorial/audio notices retain keys, not already translated
+sentences, so changing language updates an existing notice without repeating a
+request or changing authentication state. The French educational demo fixtures,
+editorial text, server-authored content and technical identifiers remain unchanged.
+Dates follow the effective locale. Validate translated string expansion and script rendering on
 each target device; portable language-catalog tests do not establish linguistic
 quality or layout fit.
 

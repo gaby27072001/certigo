@@ -3,6 +3,21 @@ import CertigoDomain
 import Foundation
 import Observation
 
+enum NativePresentationMessage: Equatable {
+    case copy(AppInterfaceCopy.Key)
+    case http(Int)
+    case configuration(name: String, production: Bool, missing: Bool)
+
+    func resolved(using copy: AppInterfaceCopy) -> String {
+        switch self {
+        case .copy(let key): copy[key]
+        case .http(let status): copy.requestRejected(httpStatus: status)
+        case .configuration(let name, let production, let missing):
+            copy.configurationValue(name, production: production, missing: missing)
+        }
+    }
+}
+
 struct DeveloperConnection: Codable {
     let baseURL: String
     let accessToken: String
@@ -444,14 +459,14 @@ final class NativeModel {
     private(set) var historyAttempted = false
     private(set) var historyOffline = false
     private(set) var historyNeedsSignIn = false
-    private(set) var historyError: String?
+    private(set) var historyError: NativePresentationMessage?
     private(set) var historyRefreshedAt: Date?
     private var historyGeneration = UUID()
     private var historyCursors: Set<String> = []
     private(set) var outcome: SubmissionOutcome?
     private(set) var tutorExplanation: TutorExplanation?
     private(set) var isRequestingTutorExplanation = false
-    private(set) var tutorExplanationError: String?
+    private(set) var tutorExplanationError: NativePresentationMessage?
     private var tutorRequestGeneration = UUID()
     private(set) var recommendations: NextBestRecommendations?
     private(set) var achievementBoard: AchievementBoard?
@@ -471,14 +486,14 @@ final class NativeModel {
     private(set) var busy = false
     private(set) var deletionStage: NativeDeletionStage?
     private(set) var deletionStatus: AccountDeletion?
-    private(set) var deletionMessage: String?
+    private(set) var deletionMessage: NativePresentationMessage?
     private(set) var deletionBusy = false
     private var deletionReceipt: NativeDeletionReceipt?
     private var deletionClient: LearningClient?
     private var deletionProof: CIAMDeletionProof?
     private var deletionVerification = UUID()
     private var deletionCanCancel = false
-    var errorMessage: String?
+    var errorMessage: NativePresentationMessage?
     var selections: [String: String] = [:]
     var selectedTab: NativeResumeState.Tab = .learn {
         didSet { if !busy { persistActivity() } }
@@ -564,7 +579,7 @@ final class NativeModel {
         } catch {
             deletionStage = .unconfirmed
             deletionMessage =
-                "The saved deletion state could not be read. Learning stays closed. Contact support; no completion is assumed."
+                .copy(.errorDeletionStateUnreadable)
             return true
         }
     }
@@ -585,7 +600,7 @@ final class NativeModel {
             await connect()
         } catch {
             errorMessage =
-                "The saved connection could not be restored. Reconnect your account."
+                .copy(.errorConnectionRestore)
         }
     }
 
@@ -645,7 +660,7 @@ final class NativeModel {
         errorMessage = nil
         do { try activityStore().clear() } catch {
             errorMessage =
-                "The local session is closed, but saved activity removal is not confirmed. Retry signing out."
+                .copy(.errorSignOutActivity)
         }
         defer { if generation == marker { busy = false } }
         await previous?.disconnect()
@@ -656,12 +671,12 @@ final class NativeModel {
             } catch {
                 guard generation == marker else { return }
                 errorMessage =
-                    "The local session is closed, but SDK account removal is not confirmed. Retry signing out."
+                    .copy(.errorSignOutSDK)
             }
         } else {
             do { try vault.clear() } catch {
                 errorMessage =
-                    "Secure storage did not confirm sign-out. Retry before closing the app."
+                    .copy(.errorSignOutStorage)
             }
         }
     }
@@ -712,7 +727,7 @@ final class NativeModel {
             let profile, let apiScope
         else {
             deletionMessage =
-                "Remote deletion requires a configured Microsoft sign-in. Demo and manual development tokens cannot verify recent identity."
+                .copy(.errorDeletionRequiresMicrosoft)
             return
         }
         let marker = generation
@@ -764,7 +779,7 @@ final class NativeModel {
         if deletionStage == .confirmation || deletionStage == .verifying {
             deletionStage = .explanation
             deletionMessage =
-                "Identity verification was cancelled. Verify again before confirming deletion."
+                .copy(.errorVerificationCancelled)
         }
     }
 
@@ -787,7 +802,7 @@ final class NativeModel {
             resumeReady = true
         } catch {
             deletionMessage =
-                "Deletion was not submitted, but the local session could not be resumed. Retry cancellation."
+                .copy(.errorDeletionCancelResume)
         }
     }
 
@@ -868,7 +883,7 @@ final class NativeModel {
         case .notRequested:
             deletionStage = .unconfirmed
             deletionMessage =
-                "The server reports no deletion request. Sign in to the same account and verify identity before a new confirmation."
+                .copy(.errorDeletionNotRequested)
         // A deletion-only recovery does not fabricate a learning profile.
         case .pending:
             receipt.phase = .pending
@@ -949,7 +964,7 @@ final class NativeModel {
             await connectUsingAuthentication(interactive: false)
         } catch {
             deletionMessage =
-                "No deletion is recorded, but local recovery could not finish. Retry; no data was removed."
+                .copy(.errorDeletionRecovery)
         }
     }
 
@@ -972,7 +987,7 @@ final class NativeModel {
             try saveDeletionReceipt(receipt)
             guard let owner = receipt.ownerId, let url = URL(string: receipt.apiScope) else {
                 deletionMessage =
-                    "Account deletion is confirmed, but this device has no verified local owner binding. Local cleanup is unconfirmed; contact support."
+                    .copy(.errorDeletionOwnerUnknown)
                 return
             }
             while let target = receipt.remainingCleanup.first {
@@ -1018,7 +1033,7 @@ final class NativeModel {
         } catch {
             deletionStage = .cleanupFailed
             deletionMessage =
-                "Account deleted; some data on this device could not be removed. Retry cleanup. No further server deletion request will be sent."
+                .copy(.errorDeletionCleanup)
         }
     }
 
@@ -1031,31 +1046,31 @@ final class NativeModel {
             deletionStage = nil
             deletionMessage = nil
         } catch {
-            deletionMessage = "The completion receipt could not be cleared. Retry acknowledgement."
+            deletionMessage = .copy(.errorDeletionReceipt)
         }
     }
 
-    private func deletionError(_ error: Error) -> String {
+    private func deletionError(_ error: Error) -> NativePresentationMessage {
         switch error {
         case CIAMAuthenticationFailure.cancelled:
-            return "Microsoft verification was cancelled. Nothing was submitted."
+            return .copy(.errorMicrosoftCancelled)
         case CIAMAuthenticationFailure.accountChanged:
             return
-                "A different Microsoft account was returned. Sign in with the original account; no deletion was submitted for this identity."
+                .copy(.errorDifferentMicrosoftAccount)
         case APIError.unauthorized:
             return
-                "Account status is unconfirmed. Sign in with the same Microsoft account to check it. A rejected token does not prove deletion."
+                .copy(.errorAccountStatusUnknown)
         case APIError.http(403), CIAMAuthenticationFailure.invalidToken:
             return
-                "Recent Microsoft authentication was not accepted. Verify identity again. No deletion is confirmed."
+                .copy(.errorRecentAuthentication)
         case APIError.http(503):
-            return "Account deletion is unavailable on this service. No local data was removed."
+            return .copy(.errorDeletionUnavailable)
         case APIError.configuration:
             return
-                "Account deletion requires the verified /api service configuration. Contact support; no request was sent."
+                .copy(.errorDeletionConfiguration)
         default:
             return
-                "The account operation was not confirmed. Check status before retrying. Local data was preserved."
+                .copy(.errorAccountOperationUnknown)
         }
     }
 
@@ -1214,7 +1229,7 @@ final class NativeModel {
         }
         if let pendingGoal, pendingGoal.trackId != track.id {
             errorMessage =
-                "Your previous goal selection is not confirmed. Retry that same goal before choosing another."
+                .copy(.errorGoalSelectionPending)
             return
         }
         let decision = pendingGoal ?? (trackId: track.id, expectedTrackId: profile.activeTrackId)
@@ -1237,11 +1252,11 @@ final class NativeModel {
                 self.profile = value
                 pendingGoal = nil
                 errorMessage =
-                    "Your active goal changed elsewhere. The current goal was reloaded; choose again to confirm a different goal."
+                    .copy(.errorGoalChanged)
             } catch {
                 guard generation == marker else { return }
                 errorMessage =
-                    "Your goal selection conflicted and the current goal could not be reloaded. Retry the same selection to reconcile; no change is confirmed."
+                    .copy(.errorGoalConflict)
             }
         } catch {
             guard generation == marker else { return }
@@ -1823,7 +1838,7 @@ final class NativeModel {
             let answer = submittedRequest.answers.first(where: { $0.itemId == itemId }),
             lesson.questions.contains(where: { $0.id == itemId })
         else {
-            tutorExplanationError = "A confirmed answer is required before requesting Coach help."
+            tutorExplanationError = .copy(.errorCoachRequiresAnswer)
             return
         }
         await refreshAuthenticationIfNeeded()
@@ -1861,7 +1876,7 @@ final class NativeModel {
                 tutorRequestGeneration == requestID, self.lesson?.id == lesson.id,
                 attemptID == attempt
             else { return }
-            tutorExplanationError = "Coach could not confirm an explanation. Please retry."
+            tutorExplanationError = .copy(.errorCoachUnavailable)
         }
     }
 
@@ -1995,7 +2010,7 @@ final class NativeModel {
         } catch {
             historyPresentation = nil
             historyError =
-                "History records disagree. Saved answers were preserved. Refresh or contact support."
+                .copy(.errorHistoryDisagreement)
         }
     }
 
@@ -2016,7 +2031,7 @@ final class NativeModel {
                 path: path, history: serverHistory, localResults: local)
         } catch {
             smartReviewError = true
-            errorMessage = "Review evidence could not be verified. Refresh confirmed history."
+            errorMessage = .copy(.errorReviewEvidence)
         }
     }
 
@@ -2091,21 +2106,21 @@ final class NativeModel {
             switch error {
             case APIError.unauthorized:
                 historyNeedsSignIn = true
-                historyError = "Sign in again to load confirmed history. Local work was preserved."
+                historyError = .copy(.errorHistorySignIn)
             case APIError.http(423):
                 historyError =
-                    "Account deletion is in progress. Learning is closed; check deletion status."
+                    .copy(.errorHistoryDeletion)
                 await recoverDeletionFromHistory(client: client, marker: marker)
             case APIError.transport:
                 historyOffline = true
                 historyError =
-                    "History is offline. Previously loaded summaries may be stale. Local work remains on this device."
+                    .copy(.errorHistoryOffline)
             case is ContractError, APIError.invalidResponse:
                 historyError =
-                    "History records could not be verified. Saved answers were preserved. Refresh or contact support."
+                    .copy(.errorHistoryInvalid)
             default:
                 historyError =
-                    "Confirmed history is unavailable. Previously loaded summaries may be stale. Retry explicitly."
+                    .copy(.errorHistoryUnavailable)
             }
         }
     }
@@ -2125,7 +2140,7 @@ final class NativeModel {
                 let account = provider.deletionAccountIdentifier
             else {
                 deletionMessage =
-                    "Deletion is in progress. Reconnect with the same Microsoft account to check status. No local data was removed."
+                    .copy(.errorDeletionReconnect)
                 return
             }
             try saveDeletionReceipt(
@@ -2194,7 +2209,7 @@ final class NativeModel {
         guard deletionStage == nil else { return }
         do { try saveActivity() } catch {
             errorMessage =
-                "This activity could not be saved for reopening. Keep the app open and retry your selection."
+                .copy(.errorActivitySave)
         }
     }
 
@@ -2332,14 +2347,14 @@ final class NativeModel {
                     try activityStore().clear()
                     resumeReady = true
                     errorMessage =
-                        "The saved activity is no longer compatible with this account or content and was cleared. Saved submissions were not changed."
+                        .copy(.errorActivityCleared)
                 } catch {
                     errorMessage =
-                        "The saved activity is incompatible and could not be removed. It was not reopened. Sign out again to clear it."
+                        .copy(.errorActivityRemoval)
                 }
             } else {
                 errorMessage =
-                    "The saved activity could not be checked. It was kept without reopening or submitting it. Reconnect to retry restoration."
+                    .copy(.errorActivityRestore)
             }
         }
     }
@@ -2348,50 +2363,50 @@ final class NativeModel {
         switch error {
         case NativeResumeError.releaseChanged:
             errorMessage =
-                "This content version changed. Your saved attempt was preserved; retry its original submission from saved responses."
+                .copy(.errorContentVersionChanged)
         case is NativeResumeError:
             errorMessage =
-                "This activity cannot be safely resumed. Your saved responses were preserved; choose a valid activity or review saved submissions."
+                .copy(.errorActivityUnsafe)
         case CIAMAuthenticationFailure.interactionRequired:
-            errorMessage = "Reconnect your account to continue."
+            errorMessage = .copy(.errorReconnect)
         case is CIAMAuthenticationFailure:
             errorMessage =
-                "The account connection could not be confirmed. No account or access is assumed."
+                .copy(.errorConnectionUnconfirmed)
         case APIError.unauthorized:
-            errorMessage = "Your connection expired. Reconnect your account to continue."
+            errorMessage = .copy(.errorConnectionExpired)
         case APIError.configuration:
-            errorMessage = "Enter a valid HTTPS API URL without credentials or query parameters."
+            errorMessage = .copy(.errorInvalidAPIURL)
         case APIError.staleSession:
-            errorMessage = "The account changed. This response was not displayed."
+            errorMessage = .copy(.errorAccountChanged)
         case RuntimeStoreError.capacity:
             errorMessage =
-                "The downloaded content storage limit was reached. Saved attempts were preserved; contact support before removing their pinned content."
+                .copy(.errorContentStorageFull)
         case RuntimeStoreError.busy, RuntimeStoreError.staleActivation:
             errorMessage =
-                "The downloaded content changed during this operation. Retry explicitly; nothing was submitted."
+                .copy(.errorContentChanged)
         case is RuntimeStoreError, is PublicReleaseError, is CanonicalContentError:
             errorMessage =
-                "The downloaded question pack is missing, incompatible or damaged. Reconnect and download it again. Saved submissions were not changed."
+                .copy(.errorContentPackInvalid)
         case APIError.transport:
-            errorMessage = "The server is unreachable. Check the connection and retry."
+            errorMessage = .copy(.errorServerUnreachable)
         case APIError.http(let status):
             errorMessage =
-                "The server rejected the request (HTTP \(status)). Retry or contact support."
+                .http(status)
         case ContractError.unsupported:
             errorMessage =
-                "This content requires a capability that is unavailable in this native version."
+                .copy(.errorCapabilityUnavailable)
         case StoreError.corruptArchive:
             errorMessage =
-                "Saved responses could not be read. They were preserved and were not resent."
+                .copy(.errorSavedResponsesUnreadable)
         case StoreError.capacity:
             errorMessage =
-                "Response storage is full. Your answers are not confirmed as saved."
+                .copy(.errorResponseStorageFull)
         case StoreError.invalidRecord:
             errorMessage =
-                "This saved submission cannot be retried. Your answers were preserved; review its failure before starting another attempt."
+                .copy(.errorSubmissionRetryUnavailable)
         default:
             errorMessage =
-                "The operation could not be confirmed. No success is assumed. Retry."
+                .copy(.errorOperationUnconfirmed)
         }
     }
 }

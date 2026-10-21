@@ -561,6 +561,30 @@
     }
     @main private struct NativeModelTests {
         @MainActor static func main() async throws {
+            for language in AppLanguage.allCases {
+                let copy = AppInterfaceCopy(language: language)
+                let message = NativePresentationMessage.copy(.errorActivityRestore)
+                try expect(
+                    message.resolved(using: copy) == copy[.errorActivityRestore],
+                    "Stored error did not follow the selected language")
+                try expect(
+                    NativePresentationMessage.http(503).resolved(using: copy)
+                        == copy.requestRejected(httpStatus: 503),
+                    "HTTP status bypassed its localized positional template")
+                try expect(
+                    NativePresentationMessage.configuration(
+                        name: "SYNTHETIC_KEY", production: true, missing: false
+                    ).resolved(using: copy)
+                        == copy.configurationValue(
+                            "SYNTHETIC_KEY", production: true, missing: false),
+                    "Configuration feedback bypassed its localized template")
+                if language != .english {
+                    try expect(
+                        message.resolved(using: copy)
+                            != message.resolved(using: AppInterfaceCopy(language: .english)),
+                        "Changing language left a stored error in English")
+                }
+            }
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
             try await internationalLearningServices(resources)
             try await assessmentPersistenceAndRetry(resources)
@@ -1017,7 +1041,9 @@
                     model.historyError != nil && model.serverHistory == verified,
                     "HTTP failure erased history or became empty")
                 if code == 401 {
-                    try expect(model.historyError?.contains("Sign in") == true, "401 needs sign-in")
+                    try expect(
+                        model.historyError?.resolved(using: AppInterfaceCopy(language: .english))
+                            .contains("Sign in") == true, "401 needs sign-in")
                 }
             }
             await fixture.server.failHistory(200)
@@ -1306,7 +1332,9 @@
             let count = await fixture.server.deletionPostCount()
             try expect(
                 model.deletionStage == .explanation
-                    && model.deletionMessage?.contains("unavailable") == true && count == 0,
+                    && model.deletionMessage?.resolved(using: AppInterfaceCopy(language: .english))
+                        .contains("unavailable") == true
+                    && count == 0,
                 "Unavailable backend was represented as deletion success")
             try expect(
                 fixture.vault.clears == 0
@@ -1450,7 +1478,8 @@
                     "Rejected retry retained a false pending outcome or became editable")
                 if terminal {
                     try expect(
-                        model.errorMessage?.contains("HTTP \(status)") == true,
+                        model.errorMessage?.resolved(using: AppInterfaceCopy(language: .english))
+                            .contains("HTTP \(status)") == true,
                         "Rejected retry lost its explicit HTTP feedback")
                 }
                 let reopened = fixture.model(authenticated: false)
@@ -1468,7 +1497,8 @@
                         posts.count == 2 && model.queue.first?.status == .failed,
                         "Terminal retry was posted again or reverted to pending")
                 }
-                let feedback = model.errorMessage ?? ""
+                let feedback =
+                    model.errorMessage?.resolved(using: AppInterfaceCopy(language: .english)) ?? ""
                 try expect(
                     !feedback.contains("synthetic-A")
                         && !feedback.contains("https://example.invalid")
@@ -1775,7 +1805,9 @@
                 try expect(
                     reopened.profile != nil && reopened.lesson == nil
                         && reopened.selections.isEmpty && !reopened.canSubmit && posts.isEmpty
-                        && reopened.errorMessage?.contains("was cleared") == true
+                        && reopened.errorMessage?.resolved(
+                            using: AppInterfaceCopy(language: .english)
+                        ).contains("was cleared") == true
                         && !FileManager.default.fileExists(atPath: fixture.activityFile.path),
                     "Incompatible \(invalidation) activity was restored or not explicitly purged")
             }
@@ -1790,7 +1822,10 @@
             await unavailable.restore()
             unavailable.selectedTab = .coach
             try expect(
-                unavailable.lesson == nil && unavailable.errorMessage?.contains("was kept") == true
+                unavailable.lesson == nil
+                    && unavailable.errorMessage?.resolved(
+                        using: AppInterfaceCopy(language: .english)
+                    ).contains("was kept") == true
                     && (try NativeActivityStore(file: fixture.activityFile).read()) == original,
                 "Transient restore failure overwrote the draft")
             await fixture.server.failPath(200)
@@ -1878,7 +1913,8 @@
             }
             model.select(option, question: question)
             try expect(
-                model.errorMessage?.contains("could not be saved") == true,
+                model.errorMessage?.resolved(using: AppInterfaceCopy(language: .english)).contains(
+                    "could not be saved") == true,
                 "Draft write failure was silent")
             await model.submit()
             let posts = await fixture.server.payloads()
@@ -1886,12 +1922,16 @@
             let unreadable = fixture.model(authenticated: false)
             await unreadable.restore()
             try expect(
-                unreadable.lesson == nil && unreadable.errorMessage?.contains("was kept") == true,
+                unreadable.lesson == nil
+                    && unreadable.errorMessage?.resolved(
+                        using: AppInterfaceCopy(language: .english)
+                    ).contains("was kept") == true,
                 "Storage read failure became an empty successful restoration")
             await model.disconnect()
             try expect(
                 model.profile == nil
-                    && model.errorMessage?.contains("removal is not confirmed") == true
+                    && model.errorMessage?.resolved(using: AppInterfaceCopy(language: .english))
+                        .contains("removal is not confirmed") == true
                     && (try NativeActivityStore(file: fixture.activityFile).read()) == original,
                 "Unconfirmed draft removal was reported as successful")
             model.token = "synthetic-A"
@@ -1933,7 +1973,8 @@
             try expect(
                 model.selections[question.id] == option.id && model.canSubmit
                     && model.lesson?.id == node.id
-                    && model.errorMessage?.contains("could not be saved") == true
+                    && model.errorMessage?.resolved(using: AppInterfaceCopy(language: .english))
+                        .contains("could not be saved") == true
                     && refreshedPathRequests == pathRequests,
                 "Same-owner renewal reloaded or overwrote the in-memory unsaved draft")
         }
@@ -2060,7 +2101,8 @@
             await model.chooseActiveTrack(track)
             try expect(
                 model.profile?.activeTrackId == "another-goal"
-                    && model.errorMessage?.contains("changed elsewhere") == true,
+                    && model.errorMessage?.resolved(using: AppInterfaceCopy(language: .english))
+                        .contains("changed elsewhere") == true,
                 "Conflict overwrote concurrent goal or failed to reconcile profile")
             let afterConflict = await fixture.server.goalPayloads()
             try expect(afterConflict.count == 3, "Conflict automatically reposted a selection")
@@ -2080,7 +2122,8 @@
             let stillPending = await fixture.server.goalPayloads()
             try expect(
                 stillPending.count == 4
-                    && model.errorMessage?.contains("previous goal selection is not confirmed")
+                    && model.errorMessage?.resolved(using: AppInterfaceCopy(language: .english))
+                        .contains("previous goal selection is not confirmed")
                         == true,
                 "Different goal overwrote the uncertain original decision")
             await fixture.server.setOffline(false)
@@ -2093,7 +2136,8 @@
             await model.chooseActiveTrack(track)
             try expect(
                 model.profile?.activeTrackId == track.id
-                    && model.errorMessage?.contains("HTTP 404") == true,
+                    && model.errorMessage?.resolved(using: AppInterfaceCopy(language: .english))
+                        .contains("HTTP 404") == true,
                 "Missing goal was not an explicit English error")
             await fixture.server.failGoal(200)
             await fixture.server.respondAsOwner("foreign-owner")
@@ -2107,13 +2151,15 @@
             await model.chooseActiveTrack(track)
             try expect(
                 model.profile?.activeTrackId == track.id
-                    && model.errorMessage?.contains("could not be reloaded") == true,
+                    && model.errorMessage?.resolved(using: AppInterfaceCopy(language: .english))
+                        .contains("could not be reloaded") == true,
                 "Failed conflict reload claimed an authoritative goal")
             await fixture.server.failProfile(200)
             await model.chooseActiveTrack(track)
             try expect(
                 model.profile?.activeTrackId == "third-goal"
-                    && model.errorMessage?.contains("changed elsewhere") == true,
+                    && model.errorMessage?.resolved(using: AppInterfaceCopy(language: .english))
+                        .contains("changed elsewhere") == true,
                 "Conflict reload recovery forced a new goal")
         }
         @MainActor static func lateGoalResponse(_ resources: URL) async throws {

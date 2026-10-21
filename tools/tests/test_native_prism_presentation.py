@@ -62,7 +62,7 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertIn("? .isSelected : []", root)
         self.assertIn("case .pendingCorrection:", root)
         self.assertIn("case .corrected(let result):", root)
-        self.assertIn("No score or XP is confirmed yet.", root)
+        self.assertIn("copy.native(.pendingCorrectionHint)", root)
         self.assertIn("confirmedOnDevice", root)
         self.assertIn("NavigationSplitView", root)
         self.assertIn("compactColumn = .detail", root)
@@ -98,17 +98,17 @@ class NativePrismPresentationTests(unittest.TestCase):
             "copy.native(.activityCoverage)", "copy.native(.confirmedSessions)",
             "copy.native(.readiness)", "coverage.totalActivities",
             "coverage.totalUnits", "lesson.questions.count",
-            "not a calibrated probability", "Unknown is not zero",
+            "copy[.historyReadinessNote]", "copy[.historyReadinessUnknown]",
             "copy.native(.lockedHint)",
         ):
             self.assertIn(marker, root)
-        self.assertIn('Button("Read again"', root)
+        self.assertRegex(root, r"Button\(\s*copy\.native\(\.readAgain\)")
         self.assertIn("title: destination.actionTitle(copy.practiceAgain)", root)
         self.assertIn('case .corrected(let result):', root)
         self.assertIn('reader.scrollTo("session-reading-start"', root)
         self.assertIn("copy.native(.coachPrivacy)", root)
         self.assertIn("await model.requestTutorExplanation(itemId: itemID)", root)
-        self.assertIn("No sharing controls are active here", root)
+        self.assertIn("copy.native(.sharingConsent)", root)
         self.assertIn('reader.scrollTo("editorial-practice"', self.pilot)
 
     def test_choice_style_is_shared_not_nested_in_the_primary_button(self):
@@ -259,6 +259,54 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertIn("category.title(copy)", self.app)
         self.assertIn("prompt: copy[.searchPlaceholder]", self.app)
         self.assertIn("track.languages ?? []", self.app)
+
+    def test_secondary_messages_resolve_in_the_current_interface_language(self):
+        model = (SOURCES / "NativeModel.swift").read_text(encoding="utf-8")
+        for name in ("historyError", "tutorExplanationError", "deletionMessage", "errorMessage"):
+            self.assertIn(f"var {name}: NativePresentationMessage?", model)
+        self.assertIn("case http(Int)", model)
+        self.assertIn("copy.requestRejected(httpStatus: status)", model)
+        self.assertNotIn('errorMessage = "', model)
+        self.assertNotIn('deletionMessage = "', model)
+        self.assertIn("message.resolved(using: copy)", self.app)
+        self.assertIn("error.resolved(using: copy)", self.app)
+        self.assertIn("speech.state.label(copy)", self.app)
+        self.assertIn("private(set) var issue: AppInterfaceCopy.Key?", self.app)
+        self.assertIn("Text(copy[issue])", self.app)
+        self.assertNotIn("return error.localizedDescription", self.app)
+        self.assertIn("copy[.deletionCleanupIncomplete]", self.app)
+        self.assertIn("copy.deletionProgress(", self.app)
+        self.assertIn("copy.historyLoaded(", self.app)
+        self.assertIn("copy.historyScore(", self.app)
+        self.assertIn("copy.coverageCount(", self.app)
+        self.assertIn("copy.questionCount(", self.app)
+        self.assertIn("issue: AppInterfaceCopy.NativeLabel?", self.pilot)
+
+    def test_secondary_ui_literals_are_localized_and_source_content_stays_declared(self):
+        ui = self.app.split("#if canImport(SwiftUI)", 1)[1]
+        # Stored fixtures and persistence raw values are source content, not application chrome.
+        before_fixtures, remainder = ui.split("// A demo-only state machine:", 1)
+        after_fixtures = remainder.split("private struct NativeAccountDeletionView:", 1)[1]
+        for source in (before_fixtures, after_fixtures, self.pilot):
+            for literal in re.findall(
+                r'(?:Text|Label|Button|Section|Picker|ContentUnavailableView|'
+                r'NativeReadingSection|NativeEntryHeading)\(\s*(?:title:\s*)?'
+                r'"((?:[^"\\]|\\.)*)"', source
+            ):
+                if "\\(" in literal:
+                    continue
+                self.assertIn(
+                    literal, {"Certigo", "Assistants IA responsables"},
+                    f"Unlocalized application chrome: {literal}",
+                )
+        self.assertIn('NativeContentLanguageBadges(languages: ["fr"])', self.app)
+        self.assertIn("progress.accessibilityLabel(copy)", self.app)
+        self.assertIn("flow.activitySummary(copy)", self.app)
+        self.assertIn("goal.displayTitle(copy)", self.app)
+        self.assertIn("state.status(copy)", self.app)
+        self.assertIn("state.action(copy)", self.app)
+        self.assertIn("copy.minutes(", self.app)
+        self.assertIn("copy.minutes(", self.pilot)
 
     def test_coach_uses_confirmed_answers_and_displays_complete_server_explanations(self):
         model = (SOURCES / "NativeModel.swift").read_text(encoding="utf-8")

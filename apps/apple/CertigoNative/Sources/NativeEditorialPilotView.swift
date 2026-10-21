@@ -7,7 +7,7 @@
         @Environment(\.dismiss) private var dismiss
         @Bindable var model: NativeModel
         let requestedLessonID: String?
-        @State private var issue: String?
+        @State private var issue: AppInterfaceCopy.NativeLabel?
         @State private var navigationPath: [String] = []
         @State private var requestedLessonResolutionAttempted = false
         @State private var requestedLessonUnavailable = false
@@ -37,7 +37,7 @@
                             copy.native(.unavailable),
                             systemImage: "book.closed",
                             description: Text(
-                                issue ?? copy.native(.contentLoadFailure))
+                                copy.native(issue ?? .contentLoadFailure))
                         )
                         .overlay(alignment: .bottom) {
                             Button(copy.retry) { Task { await load() } }
@@ -63,9 +63,9 @@
                         set: { if !$0 { issue = nil } }
                     )
                 ) {
-                    Button("OK", role: .cancel) { issue = nil }
+                    Button(copy.native(.ok), role: .cancel) { issue = nil }
                 } message: {
-                    Text(issue ?? "")
+                    Text(issue.map { copy.native($0) } ?? "")
                 }
             }
         }
@@ -84,7 +84,8 @@
                         .foregroundStyle(.tint)
                     NativeContentLanguageBadges(languages: [snapshot.pilot.locale])
                     LabeledContent(
-                        copy.native(.duration), value: "\(snapshot.pilot.estimatedMinutes) min")
+                        copy.native(.duration),
+                        value: "\(copy.minutes(snapshot.pilot.estimatedMinutes))")
                     LabeledContent(copy.native(.sourcesChecked), value: snapshot.pilot.asOf)
                     Text(snapshot.pilot.audience)
                     Text(snapshot.pilot.prerequisites)
@@ -175,7 +176,7 @@
                 }
                 navigationPath = [requestedLessonID]
             } catch {
-                issue = copy.native(.contentLoadFailure)
+                issue = .contentLoadFailure
             }
         }
     }
@@ -185,7 +186,7 @@
         let lesson: EditorialPilotLesson
         let sources: [EditorialPilotSource]
         @Bindable var model: NativeModel
-        @Binding var issue: String?
+        @Binding var issue: AppInterfaceCopy.NativeLabel?
         @State private var accessRecorded = false
 
         private var progress: PilotLessonProgress? {
@@ -224,7 +225,8 @@
                         Text(lesson.hook)
                             .foregroundStyle(.secondary)
                         LabeledContent(
-                            copy.native(.duration), value: "\(lesson.estimatedMinutes) min")
+                            copy.native(.duration),
+                            value: "\(copy.minutes(lesson.estimatedMinutes))")
                     }
                     .id("editorial-reading-start")
 
@@ -342,7 +344,7 @@
                 try await model.accessEditorialPilotLesson(lesson.id)
                 accessRecorded = true
             } catch {
-                issue = copy.native(.unsynced)
+                issue = .unsynced
             }
         }
 
@@ -351,7 +353,7 @@
             do {
                 try await model.markEditorialPilotLessonRead(lesson.id)
             } catch {
-                issue = copy.native(.readNotConfirmed)
+                issue = .readNotConfirmed
             }
         }
     }
