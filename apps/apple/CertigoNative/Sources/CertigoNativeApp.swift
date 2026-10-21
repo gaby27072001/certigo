@@ -16,6 +16,66 @@ enum NativeTrackAppearance {
     }
 }
 
+struct NativeCatalogFilter {
+    var query = ""
+    var family = ""
+    var availableOnly = false
+
+    var isActive: Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !family.isEmpty || availableOnly
+    }
+
+    static func family(for code: String) -> String {
+        code.trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased().split(separator: "-").first.map(String.init) ?? ""
+    }
+
+    func includes(code: String, title: String, summary: String, available: Bool) -> Bool {
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (family.isEmpty || Self.family(for: code) == family)
+            && (!availableOnly || available)
+            && (text.isEmpty
+                || [code, title, summary].contains {
+                    $0.range(
+                        of: text, options: [.caseInsensitive, .diacriticInsensitive],
+                        locale: Locale(identifier: "en_US_POSIX")) != nil
+                })
+    }
+
+    mutating func clear() { self = Self() }
+}
+
+struct NativePathCoverage {
+    let completedActivities: Int
+    let totalActivities: Int
+    let completedUnits: Int
+    let totalUnits: Int
+    let lockedActivities: Int
+
+    init(units: [[String]]) {
+        func complete(_ status: String) -> Bool {
+            status == "completed" || status == "mastered"
+        }
+        let statuses = units.flatMap { $0 }
+        completedActivities = statuses.filter(complete).count
+        totalActivities = statuses.count
+        completedUnits = units.filter { !$0.isEmpty && $0.allSatisfy(complete) }.count
+        totalUnits = units.count
+        lockedActivities = statuses.filter { $0 == "locked" }.count
+    }
+
+    var remainingActivities: Int { totalActivities - completedActivities }
+}
+
+struct NativeActivityDestination {
+    let lessonID: String
+    let title: String
+
+    var resumeTitle: String { "Resume \(title)" }
+    var practiceTitle: String { "Practice again · \(title)" }
+}
+
 #if canImport(SwiftUI)
     import AVFoundation
 
@@ -98,12 +158,25 @@ enum NativeTrackAppearance {
 
         var body: some View {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) { content }
+                VStack(alignment: .leading, spacing: 24) { content }
                     .padding(20)
                     .frame(maxWidth: 700, alignment: .leading)
                     .frame(maxWidth: .infinity)
             }
             .background(NativePrism.canvas)
+        }
+    }
+
+    private struct NativeCatalogSearch: ViewModifier {
+        let enabled: Bool
+        @Binding var query: String
+
+        @ViewBuilder func body(content: Content) -> some View {
+            if enabled {
+                content.searchable(text: $query, prompt: "Code, title or topic")
+            } else {
+                content
+            }
         }
     }
 
@@ -113,7 +186,7 @@ enum NativeTrackAppearance {
 
         var body: some View {
             VStack(alignment: .leading, spacing: 16) {
-                Text(title).font(.title2.bold()).accessibilityAddTraits(.isHeader)
+                Text(title).font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,9 +200,11 @@ enum NativeTrackAppearance {
             VStack(alignment: .leading, spacing: 12) { content }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(NativePrism.surface, in: RoundedRectangle(cornerRadius: 20))
+                .background(
+                    NativePrism.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                )
                 .overlay {
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .strokeBorder(NativePrism.edge, lineWidth: 1)
                 }
         }
@@ -152,20 +227,6 @@ enum NativeTrackAppearance {
             .tint(NativePrism.objectiveFill)
         }
 
-        struct NativeChoiceButtonStyle: ButtonStyle {
-            @Environment(\.isEnabled) private var isEnabled
-
-            func makeBody(configuration: Configuration) -> some View {
-                configuration.label
-                    .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
-                    .padding(16)
-                    .background(
-                        configuration.isPressed
-                            ? Color(uiColor: .tertiarySystemFill) : NativePrism.surface,
-                        in: RoundedRectangle(cornerRadius: 16))
-            }
-        }
-
         private var button: some View {
             Button(action: action) {
                 Label(title, systemImage: symbol)
@@ -176,21 +237,39 @@ enum NativeTrackAppearance {
         }
     }
 
+    struct NativeChoiceButtonStyle: ButtonStyle {
+        @Environment(\.isEnabled) private var isEnabled
+
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
+                .padding(16)
+                .background(
+                    configuration.isPressed
+                        ? Color(uiColor: .tertiarySystemFill) : NativePrism.surface,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+
     struct NativeEntryHeading: View {
         let title: String
         let message: String
+        var prominent = false
 
         var body: some View {
             VStack(alignment: .leading, spacing: 16) {
                 Image(systemName: "book.pages")
-                    .font(.largeTitle).accessibilityHidden(true)
-                Text(title).font(.largeTitle.bold()).accessibilityAddTraits(.isHeader)
+                    .font(.title2).symbolRenderingMode(.monochrome).accessibilityHidden(true)
+                Text(title).font(prominent ? .largeTitle.bold() : .title2.bold())
+                    .accessibilityAddTraits(.isHeader)
                 Text(message).font(.body)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
             .foregroundStyle(.white)
-            .background(NativePrism.objectiveFill, in: RoundedRectangle(cornerRadius: 24))
+            .background(
+                NativePrism.objectiveFill,
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
     }
 
@@ -215,7 +294,7 @@ enum NativeTrackAppearance {
                 NativeReadingPage {
                     NativeEntryHeading(
                         title: "One question. A clearer idea.",
-                        message: "Explore Certigo’s native learning preview.")
+                        message: "Explore Certigo’s native learning preview.", prominent: true)
                     NativeReadingSection(title: "Try the learning experience") {
                         NativePrimaryButton(title: "Explore the demo", symbol: "play.circle") {
                             showDemo = true
@@ -859,7 +938,8 @@ enum NativeTrackAppearance {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(.white)
                         .background(
-                            NativePrism.objectiveFill, in: RoundedRectangle(cornerRadius: 24))
+                            NativePrism.objectiveFill,
+                            in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                         VStack(alignment: .leading, spacing: 12) {
                             Text("The decision workshop").font(.title2.bold())
                             Text(goal.practice.intent)
@@ -1098,10 +1178,10 @@ enum NativeTrackAppearance {
                                     )
                                     .background(
                                         Color(uiColor: .secondarySystemGroupedBackground),
-                                        in: RoundedRectangle(cornerRadius: 16)
+                                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     )
                                     .overlay {
-                                        RoundedRectangle(cornerRadius: 16)
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                                             .strokeBorder(
                                                 flow.selection == index
                                                     ? NativePrism.tint : Color(uiColor: .separator),
@@ -1978,6 +2058,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
     }
 
     private struct NativeRoot: View {
+        @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
         @Bindable var model: NativeModel
         @Binding var pendingLessonLink: EditorialPilotLessonLink?
         @State private var selectedTrack: String?
@@ -1993,6 +2074,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var loadingLessonID: String?
         @State private var loadingLessonRequestID: UUID?
         @State private var downloadTrack: Track?
+        @State private var catalogFilter = NativeCatalogFilter()
+        @State private var resumeTrackID: String?
 
         init(
             model: NativeModel,
@@ -2014,42 +2097,52 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .tabItem { Label("Learn", systemImage: "book") }
                             .tag(NativeResumeState.Tab.learn)
                         NavigationStack {
-                            ScrollView {
-                                ContentUnavailableView(
-                                    "Coach is not connected",
-                                    systemImage: "bubble.left.and.bubble.right",
-                                    description: Text(
-                                        "Personal assistance and conversation history are not available in this client."
-                                    )
-                                )
-                                .padding(20)
-                                .frame(maxWidth: 680)
-                                .frame(maxWidth: .infinity)
-                            }
-                            .navigationTitle("Coach")
+                            coach
                         }
                         .tabItem { Label("Coach", systemImage: "bubble.left.and.bubble.right") }
                         .tag(NativeResumeState.Tab.coach)
                         NavigationStack {
-                            ScrollView {
-                                VStack {
-                                    Picker("Social section", selection: $navigation.social) {
-                                        Text("Friends").tag(NativeLearningNavigation.Social.friends)
-                                        Text("Teams").tag(NativeLearningNavigation.Social.teams)
-                                    }
-                                    .pickerStyle(.segmented).padding()
-                                    ContentUnavailableView(
-                                        navigation.social == .friends
-                                            ? "Friends are not connected"
-                                            : "Teams are not connected",
-                                        systemImage: "person.2",
-                                        description: Text(
-                                            "Invitations, sharing and group activity are not available. No relationships are created here."
-                                        ))
+                            NativeReadingPage {
+                                Picker("Social section", selection: $navigation.social) {
+                                    Text("Friends").tag(NativeLearningNavigation.Social.friends)
+                                    Text("Teams").tag(NativeLearningNavigation.Social.teams)
                                 }
-                                .padding(20)
-                                .frame(maxWidth: 680)
-                                .frame(maxWidth: .infinity)
+                                .pickerStyle(.menu)
+                                ContentUnavailableView(
+                                    navigation.social == .friends
+                                        ? "Friends are not connected"
+                                        : "Teams are not connected",
+                                    systemImage: "person.2",
+                                    description: Text(
+                                        "Invitations, sharing and group activity are not available. No relationships are created here."
+                                    ))
+                                NativeReadingSection(title: "Private learning comes first") {
+                                    Text(
+                                        "Your Profile is your private learning record, not a friend profile."
+                                    )
+                                    Text(
+                                        "Detailed results, mistakes, readiness and Coach context are not published by visiting Social."
+                                    )
+                                    .foregroundStyle(.secondary)
+                                }
+                                NativeReadingSection(
+                                    title: navigation.social == .friends
+                                        ? "Friends · not active" : "Teams · not active"
+                                ) {
+                                    Text(
+                                        navigation.social == .friends
+                                            ? "Friend discovery, invitations and shared profiles are not enabled. No contacts are uploaded and no invitations are sent."
+                                            : "Team membership, roles, invitations and challenges are not enabled. A shared team would not grant access to private results or readiness."
+                                    )
+                                    Text(
+                                        "Any future sharing needs a separate, explicit opt-in with a preview of the content and audience. No sharing controls are active here."
+                                    )
+                                    .foregroundStyle(.secondary)
+                                }
+                                Button("Return to learning", systemImage: "book") {
+                                    model.selectedTab = .learn
+                                }
+                                .frame(minHeight: 44)
                             }
                             .navigationTitle("Social")
                         }
@@ -2065,6 +2158,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 navigation = NativeLearningNavigation(hasGoal: model.profile?.activeTrackId != nil)
                 selectedTrack = nil
                 selectedLesson = nil
+                catalogFilter.clear()
+                resumeTrackID = nil
                 columns = .automatic
                 compactColumn = .sidebar
                 loadingTrackID = nil
@@ -2088,7 +2183,17 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     )
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(.regularMaterial)
+                    .background {
+                        if reduceTransparency {
+                            NativePrism.surface
+                        } else {
+                            Rectangle().fill(.regularMaterial)
+                        }
+                    }
+                    .overlay(alignment: .top) {
+                        Rectangle().fill(NativePrism.edge).frame(height: 1)
+                            .accessibilityHidden(true)
+                    }
                 }
             }
             .alert(
@@ -2111,6 +2216,72 @@ struct NativeDemoSnapshot: Codable, Equatable {
             }
         }
 
+        private var coach: some View {
+            NativeReadingPage {
+                NativeReadingSection(title: "Help for your learning") {
+                    Label(
+                        "AI assistance is not active", systemImage: "bubble.left.and.bubble.right"
+                    )
+                    .font(.headline)
+                    Text(
+                        "No chat, AI generation, conversation history or saved Coach memory is enabled in this client."
+                    )
+                    .foregroundStyle(.secondary)
+                }
+                NativeReadingSection(title: "Current learning context") {
+                    if let goal = model.profile?.activeTrackId {
+                        LabeledContent("Confirmed goal", value: trackTitle(goal))
+                    } else {
+                        Text("No active goal is confirmed.")
+                    }
+                    if let lesson = model.lesson {
+                        Text(lesson.title).font(.headline)
+                        Text(coachPhase)
+                    }
+                    Text(
+                        "This context is shown on this device, not sent to an AI service. A future assistant must distinguish unanswered questions, pending correction and authorized feedback."
+                    )
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    Button("Choose context in Learn", systemImage: "book") {
+                        model.selectedTab = .learn
+                    }
+                    .frame(minHeight: 44)
+                }
+                NativeReadingSection(title: "What scoped help could support") {
+                    Text("Explain a concept · Help me plan · Review a difficulty")
+                    Text(
+                        "These are intentions, not active prompts. There is no composer, hidden memory or automatic goal change. The server remains authoritative for correction, readiness and XP."
+                    )
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Coach")
+        }
+
+        private var coachPhase: String {
+            switch model.outcome {
+            case .pendingCorrection: "Saved on this device · correction pending"
+            case .corrected: "Correction confirmed by the server"
+            case nil: "Answer selection · no confirmed result shown"
+            }
+        }
+
+        private var visibleTracks: [Track] {
+            model.tracks.filter {
+                navigation.showsTrack(
+                    $0.id, activeID: model.profile?.activeTrackId, openedID: selectedTrack)
+                    && (navigation.learn != .explore
+                        || catalogFilter.includes(
+                            code: $0.code, title: $0.title, summary: $0.summary,
+                            available: $0.learningAvailable))
+            }
+        }
+
+        private var catalogFamilies: [String] {
+            Set(model.tracks.map { NativeCatalogFilter.family(for: $0.code) })
+                .filter { !$0.isEmpty }.sorted()
+        }
+
         private var learning: some View {
             NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn)
             {
@@ -2128,6 +2299,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         }
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        myLearningPlan
                     } else {
                         Section {
                             Text("Find your next learning goal.")
@@ -2139,16 +2311,37 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .foregroundStyle(.secondary)
                         }
                         .listRowBackground(Color.clear)
+                        Section("Find a certification") {
+                            Picker("Code family", selection: $catalogFilter.family) {
+                                Text("All code families").tag("")
+                                ForEach(catalogFamilies, id: \.self) { family in
+                                    Text("\(family) certifications").tag(family)
+                                }
+                            }
+                            Toggle("Available practice only", isOn: $catalogFilter.availableOnly)
+                            Text(
+                                "Searches the loaded catalog on this device. Code families are not provider metadata. Language and format filters are unavailable because the catalog does not declare them."
+                            )
+                            .font(.caption).foregroundStyle(.secondary)
+                            Text("\(visibleTracks.count) of \(model.tracks.count) certifications")
+                                .font(.subheadline)
+                            if catalogFilter.isActive {
+                                Button("Clear filters", systemImage: "xmark.circle") {
+                                    catalogFilter.clear()
+                                }
+                            }
+                        }
                     }
                     Section("Continue on this device") {
-                        if model.lesson != nil {
-                            NativePrimaryButton(
-                                title: "Resume current activity", symbol: "play.circle"
-                            ) {
-                                columns = .detailOnly
-                                compactColumn = .detail
+                        if let lesson = model.lesson,
+                            navigation.learn == .explore
+                                || lesson.trackId.lowercased()
+                                    != model.profile?.activeTrackId?.lowercased()
+                        {
+                            Button("Resume \(lesson.title)", systemImage: "play.circle") {
+                                resumeCurrentActivity(lesson)
+                                    .disabled(model.busy)
                             }
-                            .disabled(model.busy)
                         }
                         Button("Restore downloaded activity", systemImage: "internaldrive") {
                             Task { await model.restoreDownloadedActivity() }
@@ -2161,12 +2354,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             Button("Explore certifications") { navigation.learn = .explore }
                         }
                     }
-                    Section("Lecture guidée") {
+                    Section("Guided reading") {
                         Button("Assistants IA responsables", systemImage: "text.book.closed") {
                             requestedLessonID = nil
                             showEditorialPilot = true
                         }
-                        Text("Pilote éditorial de 18 minutes, distinct des certifications.")
+                        Text("French editorial pilot · estimated 18 minutes · not a certification.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -2182,19 +2375,22 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .accessibilityIdentifier("open-linked-editorial-lesson")
                         }
                     }
-                    Section("Certifications") {
-                        ForEach(
-                            model.tracks.filter {
-                                navigation.showsTrack(
-                                    $0.id, activeID: model.profile?.activeTrackId,
-                                    openedID: selectedTrack)
-                            }
-                        ) { track in
+                    Section(
+                        navigation.learn == .explore
+                            ? "Certification collection" : "Your learning goals"
+                    ) {
+                        ForEach(visibleTracks) { track in
                             NavigationLink(value: track.id) {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Label(track.code, systemImage: "books.vertical")
-                                        .font(.headline)
+                                        .symbolRenderingMode(.hierarchical)
+                                        .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(NativePrism.accent(for: track.code))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            NativePrism.surface,
+                                            in: Capsule(style: .continuous))
                                     Text(track.title).font(.title3.weight(.semibold))
                                     Text(track.summary).font(.subheadline)
                                         .foregroundStyle(.secondary)
@@ -2205,11 +2401,20 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 }
                                 .padding(.vertical, 8)
                             }
-                            .disabled(!track.learningAvailable)
+                            .disabled(model.busy)
                         }
                     }
                     if model.tracks.isEmpty {
-                        Text("No certifications available.")
+                        Text("No catalog entries are loaded. This is not a search result.")
+                    } else if navigation.learn == .explore && visibleTracks.isEmpty {
+                        Section {
+                            ContentUnavailableView(
+                                "No matching certifications", systemImage: "magnifyingglass",
+                                description: Text(
+                                    "Change the query or clear the filters. The loaded catalog is unchanged."
+                                ))
+                            Button("Clear filters") { catalogFilter.clear() }
+                        }
                     }
                 }
                 .disabled(
@@ -2219,13 +2424,22 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 .scrollContentBackground(.hidden)
                 .background(NativePrism.canvas)
                 .navigationTitle("Learn")
+                .modifier(
+                    NativeCatalogSearch(
+                        enabled: navigation.learn == .explore, query: $catalogFilter.query))
             } content: {
                 path
             } detail: {
                 session
             }
             .onChange(of: selectedTrack) { _, id in
-                guard let track = model.tracks.first(where: { $0.id == id }) else { return }
+                if let resumeTrackID, resumeTrackID == id {
+                    self.resumeTrackID = nil
+                    return
+                }
+                guard let track = model.tracks.first(where: { $0.id == id }),
+                    track.learningAvailable
+                else { return }
                 guard model.path?.trackId != track.id else { return }
                 if model.offlinePack?.trackId == track.id && model.lesson != nil { return }
                 selectedLesson = nil
@@ -2264,6 +2478,57 @@ struct NativeDemoSnapshot: Codable, Equatable {
             }
         }
 
+        @ViewBuilder private var myLearningPlan: some View {
+            Section("Learning plan") {
+                if let path = model.path,
+                    path.trackId.lowercased() == model.profile?.activeTrackId?.lowercased()
+                {
+                    let coverage = NativePathCoverage(
+                        units: path.units.map { $0.lessons.map { $0.status.rawValue } })
+                    Text(
+                        "\(coverage.remainingActivities) of \(coverage.totalActivities) activities remain"
+                    )
+                    .font(.headline)
+                    ForEach(path.units) { unit in
+                        LabeledContent(unit.title, value: "\(unit.lessons.count) activities")
+                    }
+                    Text("Open the plan to inspect available activities and server-reported locks.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    Text("Open your confirmed goal to load its units and remaining activities.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Section("Review & Practice") {
+                Text(
+                    "Practice an available activity in your plan. Personalized review scheduling is not connected."
+                )
+                .foregroundStyle(.secondary)
+                Text("Confirmed corrections can be read again without starting a new attempt.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Section("Goal overview") {
+                if let goal = model.profile?.activeTrackId,
+                    let track = model.tracks.first(where: {
+                        $0.id.lowercased() == goal.lowercased()
+                    })
+                {
+                    Button("Open overview · \(track.title)", systemImage: "list.bullet.rectangle") {
+                        selectedTrack = track.id
+                        columns = .all
+                        compactColumn = .content
+                    }
+                    Text(
+                        "Inspect the catalog summary, availability and declared content information. Browsing never changes your goal."
+                    )
+                    .font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    Text("Choose an available certification in Explore to confirm a learning goal.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+
         private var confirmedGoal: some View {
             VStack(alignment: .leading, spacing: 16) {
                 if let goalID = model.profile?.activeTrackId {
@@ -2272,6 +2537,57 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             $0.id.lowercased() == goalID.lowercased()
                         })?.title ?? goalID,
                         message: "Your server-confirmed learning goal.")
+                    Text("Next session").font(.headline)
+                    if let track = model.tracks.first(where: {
+                        $0.id.lowercased() == goalID.lowercased()
+                    }) {
+                        if let lesson = model.lesson,
+                            lesson.trackId.lowercased() == goalID.lowercased()
+                        {
+                            let destination = NativeActivityDestination(
+                                lessonID: lesson.id, title: lesson.title)
+                            NativePrimaryButton(
+                                title: destination.resumeTitle, symbol: "play.circle"
+                            ) {
+                                resumeCurrentActivity(lesson)
+                            }
+                            .disabled(model.busy || loadingTrackID != nil || loadingLessonID != nil)
+                            Text(
+                                "Your current activity is kept on this device; this does not submit it."
+                            )
+                            .font(.caption).foregroundStyle(.secondary)
+                        } else if let path = model.path,
+                            path.trackId.lowercased() == goalID.lowercased(),
+                            let next = path.units.flatMap(\.lessons).first(where: {
+                                $0.status == .inProgress || $0.status == .available
+                            })
+                        {
+                            let destination = NativeActivityDestination(
+                                lessonID: next.id, title: next.title)
+                            NativePrimaryButton(
+                                title: "Practice \(destination.title)", symbol: "play.circle"
+                            ) {
+                                selectedTrack = path.trackId
+                                selectedLesson = destination.lessonID
+                                columns = .detailOnly
+                                compactColumn = .detail
+                            }
+                            .disabled(model.busy || loadingTrackID != nil || loadingLessonID != nil)
+                            Text(
+                                "Next available activity in the loaded plan, not a personalized review recommendation."
+                            )
+                            .font(.caption).foregroundStyle(.secondary)
+                        } else {
+                            NativePrimaryButton(title: "Open \(track.title)", symbol: "arrow.right")
+                            {
+                                selectedTrack = track.id
+                                columns = .all
+                                compactColumn = .content
+                            }
+                            .disabled(
+                                !track.learningAvailable || model.busy || loadingTrackID != nil)
+                        }
+                    }
                     if let path = model.path,
                         path.trackId.lowercased() == goalID.lowercased()
                     {
@@ -2280,19 +2596,11 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             value: "\(path.readinessScore) %"
                         )
                         .font(.subheadline)
+                        Text("A learning indicator, not an exam pass probability.")
+                            .font(.caption).foregroundStyle(.secondary)
                     } else {
                         Text("Open this goal to load its current learning path and readiness.")
                             .font(.subheadline).foregroundStyle(.secondary)
-                    }
-                    if let track = model.tracks.first(where: {
-                        $0.id.lowercased() == goalID.lowercased()
-                    }) {
-                        NativePrimaryButton(title: "Open my learning goal", symbol: "arrow.right") {
-                            selectedTrack = track.id
-                            columns = .all
-                            compactColumn = .content
-                        }
-                        .disabled(!track.learningAvailable)
                     }
                 } else {
                     NativeEntryHeading(
@@ -2304,6 +2612,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
             }
             .accessibilityIdentifier("confirmed-learning-goal")
+        }
+
+        private func resumeCurrentActivity(_ lesson: Lesson) {
+            if selectedTrack != lesson.trackId { resumeTrackID = lesson.trackId }
+            selectedTrack = lesson.trackId
+            selectedLesson = lesson.id
+            columns = .detailOnly
+            compactColumn = .detail
         }
 
         private func requestPath(_ track: Track) {
@@ -2362,6 +2678,22 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             Section("Account") {
                                 NavigationLink("Delete account") {
                                     NativeAccountDeletionView(model: model)
+                                }
+                                Section("Reading & accessibility") {
+                                    Text(
+                                        "Text size, VoiceOver, contrast, motion and transparency follow your iPhone or iPad system settings. Reading voices are selected in the lesson audio controls."
+                                    )
+                                    Text("No separate accessibility preference is stored here.")
+                                        .foregroundStyle(.secondary)
+                                }
+                                Section("Data & privacy") {
+                                    Text(
+                                        "Downloaded public questions, unsent answers and pending submissions are device-local. Confirmed history is synchronized by the server."
+                                    )
+                                    Text(
+                                        "Disconnecting is not account deletion. There is no Coach memory or active social sharing to clear in this client."
+                                    )
+                                    .foregroundStyle(.secondary)
                                 }
                                 .disabled(model.busy)
                             }
@@ -2448,19 +2780,45 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 if let track = model.tracks.first(where: {
                     $0.id == (selectedTrack ?? model.offlinePack?.trackId ?? model.path?.trackId)
                 }) {
-                    Section("Offline question pack") {
-                        Button("Download public question packs", systemImage: "arrow.down.circle") {
-                            downloadTrack = track
+                    Section("Goal overview") {
+                        Label(track.code, systemImage: "books.vertical")
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(NativePrism.accent(for: track.code))
+                        Text(track.title).font(.title2.bold()).accessibilityAddTraits(.isHeader)
+                        Text(track.summary)
+                        Text(
+                            "Practice uses the supported question-bank reader when available; this catalog does not declare per-certification formats."
+                        )
+                        Text(
+                            "Availability: \(track.learningAvailable ? "learning path available" : "practice not available in this catalog")"
+                        )
+                        Text(
+                            "Language, provider, publication version and prerequisite reasons are not declared by this catalog. The interface language does not translate learning content."
+                        )
+                        .font(.caption).foregroundStyle(.secondary)
+                        if let lesson = model.lesson, lesson.trackId == track.id,
+                            let manifest = lesson.publicManifestId
+                        {
+                            LabeledContent("Loaded public content version", value: manifest)
                         }
-                        .disabled(model.busy)
-                        if let pack = model.offlinePack, pack.trackId == track.id {
-                            Text("Downloaded public content. No local correction or XP.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                            ForEach(pack.lessons, id: \.id) { lesson in
-                                NavigationLink(value: lesson.id) {
-                                    Label(lesson.title, systemImage: "internaldrive")
+                    }
+                    if track.learningAvailable {
+                        Section("Offline question pack") {
+                            Button(
+                                "Download public question packs", systemImage: "arrow.down.circle"
+                            ) {
+                                downloadTrack = track
+                            }
+                            .disabled(model.busy)
+                            if let pack = model.offlinePack, pack.trackId == track.id {
+                                Text("Downloaded public content. No local correction or XP.")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                                ForEach(pack.lessons, id: \.id) { lesson in
+                                    NavigationLink(value: lesson.id) {
+                                        Label(lesson.title, systemImage: "internaldrive")
+                                    }
+                                    .disabled(model.busy)
                                 }
-                                .disabled(model.busy)
                             }
                         }
                     }
@@ -2481,8 +2839,23 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         }
                         .disabled(model.busy)
                     }
+                    Section("Learning plan") {
+                        let coverage = NativePathCoverage(
+                            units: path.units.map { $0.lessons.map { $0.status.rawValue } })
+                        Text(
+                            "\(coverage.completedActivities) of \(coverage.totalActivities) activities completed"
+                        )
+                        Text(
+                            "\(coverage.remainingActivities) activities remain in this loaded path, including \(coverage.lockedActivities) locked."
+                        )
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        Text(
+                            "Completed means the server returned completed or mastered. This is activity coverage, not an exam score."
+                        )
+                        .font(.caption).foregroundStyle(.secondary)
+                    }
                     ForEach(path.units) { unit in
-                        Section(unit.title) {
+                        Section("Unit · \(unit.title)") {
                             ForEach(unit.lessons) { lesson in
                                 NavigationLink(value: lesson.id) {
                                     Label {
@@ -2491,6 +2864,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                                 .font(.headline)
                                             Text("\(lesson.estMinutes) min").foregroundStyle(
                                                 .secondary)
+                                            Text(activityStatus(lesson.status))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                            if !lesson.canOpen {
+                                                Text(
+                                                    "Locked by the server. A prerequisite reason is not provided."
+                                                )
+                                                .font(.caption).foregroundStyle(.secondary)
+                                            }
                                         }
                                     } icon: {
                                         Image(systemName: lesson.canOpen ? "book" : "lock")
@@ -2501,10 +2882,29 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                         }
                     }
+                    Section("Review & Practice") {
+                        Text("Scheduled review recommendations are not connected in this client.")
+                            .foregroundStyle(.secondary)
+                        Text(
+                            "Choose an available activity above for practice. A completed result can be read again without starting another attempt."
+                        )
+                        if let lesson = model.lesson, lesson.trackId == path.trackId {
+                            Button("Resume \(lesson.title)", systemImage: "play.circle") {
+                                resumeCurrentActivity(lesson)
+                            }
+                            .disabled(model.busy)
+                        }
+                    }
                 } else if let selectedTrack,
                     let track = model.tracks.first(where: { $0.id == selectedTrack })
                 {
-                    if loadingTrackID == track.id {
+                    if !track.learningAvailable {
+                        Section {
+                            Text(
+                                "This certification can be explored, but its practice cannot be opened. Choose another certification in Explore."
+                            )
+                        }
+                    } else if loadingTrackID == track.id {
                         Section {
                             ProgressView("Loading learning path…")
                                 .frame(maxWidth: .infinity, minHeight: 88)
@@ -2512,13 +2912,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     } else {
                         Section {
                             ContentUnavailableView(
-                                "Learning path unavailable",
+                                "Learning path not loaded",
                                 systemImage: "wifi.exclamationmark",
                                 description: Text(
-                                    "The selected certification’s learning path could not be loaded."
+                                    "Load or retry this certification’s path. This does not change your active goal."
                                 )
                             )
-                            Button("Retry loading path", systemImage: "arrow.clockwise") {
+                            Button("Load or retry path", systemImage: "arrow.clockwise") {
                                 requestPath(track)
                             }
                             .disabled(model.busy || loadingTrackID != nil)
@@ -2537,12 +2937,22 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .background(NativePrism.canvas)
             .frame(maxWidth: 700)
             .frame(maxWidth: .infinity)
-            .navigationTitle(model.path?.trackName ?? "Learning path")
+            .navigationTitle(
+                selectedTrack.map(trackTitle) ?? model.path?.trackName ?? "Learning path")
         }
 
         private var progressHistory: some View {
             NativeReadingPage {
-                NativeReadingSection(title: "Confirmed across your devices") {
+                coverageSummary
+                NativeReadingSection(title: "Confirmed session results") {
+                    Text(
+                        "Across your devices · \(model.serverHistory.count) summaries loaded\(model.historyNextCursor == nil ? "" : " · more pages available")"
+                    )
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    Text(
+                        "These are loaded attempts, not all-time question coverage. Pending answers are not confirmed results; no average or pass probability is inferred."
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
                     if model.historyLoading {
                         ProgressView("Loading confirmed history")
                     }
@@ -2667,7 +3077,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         .frame(minHeight: 44)
                     }
                 }
-                NativeReadingSection(title: "Current progress · last loaded") {
+                NativeReadingSection(title: "Readiness · last loaded from server") {
                     if let profile = model.profile {
                         LabeledContent("Confirmed XP", value: "\(profile.xp)")
                     }
@@ -2678,11 +3088,71 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     Text(
                         "History pages do not update your balance, readiness or active learning goal."
                     )
+                    Text(
+                        "Readiness is a server-returned learning indicator for the named path, not a calibrated probability of passing the exam. Its formula version, evidence window and last calculation time are not supplied by this client contract."
+                    )
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    if model.path == nil {
+                        Text(
+                            "Readiness is unknown until a learning path is loaded. Unknown is not zero."
+                        )
+                    }
                 }
             }
             .navigationTitle("Progress & history")
             .task {
                 if !model.historyAttempted { await model.refreshHistory() }
+            }
+        }
+
+        private var coverageSummary: some View {
+            NativeReadingSection(title: "Activity & coverage") {
+                if let path = model.path {
+                    let coverage = NativePathCoverage(
+                        units: path.units.map { $0.lessons.map { $0.status.rawValue } })
+                    Text(path.trackName).font(.headline)
+                    LabeledContent(
+                        "Completed activities",
+                        value: "\(coverage.completedActivities) of \(coverage.totalActivities)")
+                    LabeledContent(
+                        "Completed units",
+                        value: "\(coverage.completedUnits) of \(coverage.totalUnits)")
+                    Text(
+                        "Snapshot of the currently loaded server path, not a time-period report. Completed or mastered activities count; empty units do not count as complete."
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text(
+                        "Load a learning path to see its activity denominator. Coverage is not known yet."
+                    )
+                }
+                if let lesson = model.lesson {
+                    let selectedCount = lesson.questions.filter {
+                        model.selections[$0.id] != nil
+                    }.count
+                    Text(lesson.title).font(.headline)
+                    LabeledContent(
+                        "Locally selected answers",
+                        value: "\(selectedCount) of \(lesson.questions.count) questions")
+                    Text(
+                        "Selection is not submission or correctness. Total questions covered across the whole path are not provided."
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+                Text(
+                    "Viewing this snapshot never switches your active goal. History is separate and may contain other goals."
+                )
+                .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+
+        private func activityStatus(_ status: NodeStatus) -> String {
+            switch status {
+            case .locked: "Locked"
+            case .available: "Available to practice"
+            case .inProgress: "In progress"
+            case .completed: "Completed · server state"
+            case .mastered: "Mastered · server state"
             }
         }
 
@@ -2778,97 +3248,135 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     selectedTrack == nil || selectedTrack == lesson.trackId,
                     selectedLesson == nil || selectedLesson == lesson.id
                 {
-                    NativeReadingPage {
-                        Text(lesson.title).font(.title).bold()
-                            .accessibilityAddTraits(.isHeader)
-                        Label("Read · Decide · Understand", systemImage: "text.book.closed")
-                            .font(.subheadline).foregroundStyle(NativePrism.tint)
-                        DisclosureGroup("Read lesson aloud") {
-                            NativeLessonAudioControls(
-                                content: NativeLessonReadingContent(
-                                    lessonTitle: lesson.title,
-                                    blocks: lesson.blocks.map {
-                                        (type: $0.type, title: $0.title, body: $0.body)
-                                    }),
-                                ownerID: model.profile?.id
+                    ScrollViewReader { reader in
+                        NativeReadingPage {
+                            Text(lesson.title).font(.title).bold()
+                                .accessibilityAddTraits(.isHeader)
+                                .id("session-reading-start")
+                            Label("Read · Decide · Understand", systemImage: "text.book.closed")
+                                .font(.subheadline).foregroundStyle(NativePrism.tint)
+                            DisclosureGroup("Read lesson aloud") {
+                                NativeLessonAudioControls(
+                                    content: NativeLessonReadingContent(
+                                        lessonTitle: lesson.title,
+                                        blocks: lesson.blocks.map {
+                                            (type: $0.type, title: $0.title, body: $0.body)
+                                        }),
+                                    ownerID: model.profile?.id
+                                )
+                                .id(lesson.id)
+                            }
+                            .frame(minHeight: 44)
+                            Text(
+                                "Answer the questions, then submit your answers for server correction."
                             )
-                            .id(lesson.id)
-                        }
-                        .frame(minHeight: 44)
-                        Text(
-                            "Answer the questions, then submit your answers for server correction."
-                        )
-                        .foregroundStyle(.secondary)
-                        ForEach(Array(lesson.blocks.enumerated()), id: \.offset) { _, block in
-                            if let title = block.title {
-                                Text(title).font(.headline)
-                                    .accessibilityAddTraits(.isHeader)
-                            }
-                            if let body = block.body {
-                                Text(.init(body)).textSelection(.enabled)
-                            }
-                            if let code = block.code {
-                                ScrollView(.horizontal) {
-                                    Text(code).font(.body.monospaced()).textSelection(.enabled)
+                            .foregroundStyle(.secondary)
+                            ForEach(Array(lesson.blocks.enumerated()), id: \.offset) { _, block in
+                                if let title = block.title {
+                                    Text(title).font(.headline)
+                                        .accessibilityAddTraits(.isHeader)
                                 }
-                                .padding(16)
-                                .background(
-                                    NativePrism.surface, in: RoundedRectangle(cornerRadius: 16))
-                            }
-                            if let question = block.check {
-                                questionView(question)
-                            }
-                        }
-                        if let outcome = model.outcome {
-                            switch outcome {
-                            case .pendingCorrection:
-                                NativeReadingCard {
-                                    Label(
-                                        "Saved on this device · correction pending",
-                                        systemImage: "clock"
-                                    )
-                                    .font(.headline).foregroundStyle(NativePrism.pending)
-                                    Text(
-                                        "Correction will be requested after reconnecting. No score or XP is confirmed yet."
-                                    )
-                                    .foregroundStyle(.secondary)
+                                if let body = block.body {
+                                    Text(.init(body)).textSelection(.enabled)
                                 }
-                                .accessibilityIdentifier("pending-correction")
-                            case .corrected(let result):
-                                NativeReadingSection(title: "Your confirmed result") {
-                                    Label("Confirmed by the server", systemImage: "checkmark.seal")
-                                        .foregroundStyle(NativePrism.confirmed)
-                                    LabeledContent("Score", value: "\(result.scorePct) %")
-                                    LabeledContent("XP earned", value: "\(result.rewards.xpEarned)")
+                                if let code = block.code {
+                                    ScrollView(.horizontal) {
+                                        Text(code).font(.body.monospaced()).textSelection(.enabled)
+                                    }
+                                    .padding(16)
+                                    .background(
+                                        NativePrism.surface,
+                                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 }
-                                ForEach(result.results) { item in
+                                if let question = block.check {
+                                    questionView(question)
+                                }
+                            }
+                            if let outcome = model.outcome {
+                                switch outcome {
+                                case .pendingCorrection:
                                     NativeReadingCard {
                                         Label(
-                                            item.correct ? "Correct answer" : "Review needed",
-                                            systemImage: item.correct
-                                                ? "checkmark.circle" : "book"
+                                            "Saved on this device · correction pending",
+                                            systemImage: "clock"
                                         )
-                                        .font(.headline)
-                                        .foregroundStyle(
-                                            item.correct
-                                                ? NativePrism.confirmed : NativePrism.pending)
-                                        if let question = lesson.blocks.compactMap(\.check)
-                                            .first(where: { $0.id == item.itemId })
-                                        {
-                                            Text(.init(question.stem)).font(.headline)
+                                        .font(.headline).foregroundStyle(NativePrism.pending)
+                                        Text(
+                                            "Correction will be requested after reconnecting. No score or XP is confirmed yet."
+                                        )
+                                        .foregroundStyle(.secondary)
+                                    }
+                                    .accessibilityIdentifier("pending-correction")
+                                case .corrected(let result):
+                                    NativeReadingSection(title: "Your confirmed result") {
+                                        Label(
+                                            "Confirmed by the server", systemImage: "checkmark.seal"
+                                        )
+                                        .foregroundStyle(NativePrism.confirmed)
+                                        LabeledContent("Score", value: "\(result.scorePct) %")
+                                        LabeledContent(
+                                            "XP earned", value: "\(result.rewards.xpEarned)")
+                                    }
+                                    ForEach(result.results) { item in
+                                        NativeReadingCard {
+                                            Label(
+                                                item.correct ? "Correct answer" : "Review needed",
+                                                systemImage: item.correct
+                                                    ? "checkmark.circle" : "book"
+                                            )
+                                            .font(.headline)
+                                            .foregroundStyle(
+                                                item.correct
+                                                    ? NativePrism.confirmed : NativePrism.pending)
+                                            if let question = lesson.blocks.compactMap(\.check)
+                                                .first(where: { $0.id == item.itemId })
+                                            {
+                                                Text(.init(question.stem)).font(.headline)
+                                            }
+                                            Text(.init(item.explanation)).textSelection(.enabled)
                                         }
-                                        Text(.init(item.explanation)).textSelection(.enabled)
+                                    }
+                                    NativeReadingSection(title: "Continue learning") {
+                                        Button("Read again", systemImage: "text.book.closed") {
+                                            reader.scrollTo("session-reading-start", anchor: .top)
+                                        }
+                                        .frame(minHeight: 44)
+                                        .accessibilityIdentifier("read-confirmed-lesson-again")
+                                        if let node = model.path?.units.flatMap(\.lessons).first(
+                                            where: {
+                                                $0.id == lesson.id && $0.canOpen
+                                            }), model.path?.trackId == lesson.trackId
+                                        {
+                                            let destination = NativeActivityDestination(
+                                                lessonID: lesson.id, title: lesson.title)
+                                            NativePrimaryButton(
+                                                title: destination.practiceTitle,
+                                                symbol: "arrow.clockwise"
+                                            ) {
+                                                requestLesson(node)
+                                            }
+                                            .disabled(model.busy || loadingLessonID != nil)
+                                            Text(
+                                                "Starts a new answer selection for this activity. Your confirmed attempt stays in history."
+                                            )
+                                            .font(.caption).foregroundStyle(.secondary)
+                                        } else {
+                                            Text(
+                                                "Open an available activity in the learning plan to practice again. Reading does not create another attempt."
+                                            )
+                                            .foregroundStyle(.secondary)
+                                        }
                                     }
                                 }
+                            } else {
+                                NativePrimaryButton(
+                                    title: "Submit for correction", symbol: "paperplane"
+                                ) {
+                                    Task { await model.submit() }
+                                }
+                                .disabled(!model.canSubmit)
+                                .accessibilityIdentifier("submit-for-correction")
                             }
-                        } else {
-                            NativePrimaryButton(
-                                title: "Submit for correction", symbol: "paperplane"
-                            ) {
-                                Task { await model.submit() }
-                            }
-                            .disabled(!model.canSubmit)
-                            .accessibilityIdentifier("submit-for-correction")
                         }
                     }
                 } else if let selectedLesson,
@@ -2924,7 +3432,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                     .buttonStyle(NativeChoiceButtonStyle())
                     .overlay {
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .strokeBorder(
                                 model.selections[question.id] == option.id
                                     ? NativePrism.tint : NativePrism.edge,

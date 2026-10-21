@@ -20,6 +20,83 @@ struct NativeDemoFlowTests {
                 NativeTrackAppearance.band(for: code) == band,
                 "stable Prism band for \(code.debugDescription)")
         }
+        var catalog = NativeCatalogFilter()
+        try check(!catalog.isActive, "catalog starts unfiltered")
+        try check(
+            catalog.includes(code: "AZ-900", title: "Cloud", summary: "Basics", available: false),
+            "unfiltered catalog preserves unavailable entries for discovery")
+        catalog.query = "  SéCURité  "
+        try check(
+            catalog.includes(code: "SC-900", title: "Securite", summary: "", available: true),
+            "catalog search ignores case diacritics and surrounding spaces")
+        try check(
+            !catalog.includes(code: "AZ-900", title: "Cloud", summary: "Basics", available: true),
+            "catalog no-match is not an empty source catalog")
+        catalog.query = "cloud"
+        try check(
+            catalog.includes(
+                code: "AZ-900", title: "Basics", summary: "Cloud concepts", available: true),
+            "catalog searches summary")
+        catalog.query = "sc-9"
+        try check(
+            catalog.includes(code: "SC-900", title: "Security", summary: "", available: true),
+            "catalog searches certification code")
+        catalog.query = ""
+        catalog.family = "SC"
+        catalog.availableOnly = true
+        try check(
+            !catalog.includes(code: "SC-900", title: "", summary: "", available: false),
+            "availability and family filters intersect")
+        try check(
+            !catalog.includes(code: "AZ-900", title: "", summary: "", available: true),
+            "family filter never includes another code family")
+        try check(
+            catalog.includes(code: "sc-900", title: "", summary: "", available: true),
+            "family normalization matches the actual code prefix")
+        try check(
+            NativeCatalogFilter.family(for: " AWS-SAA ") == "AWS",
+            "code family supports catalog prefixes without provider inference")
+        try check(NativeCatalogFilter.family(for: "") == "", "empty family is not invented")
+        let retained = catalog
+        try check(
+            retained.family == "SC" && retained.availableOnly,
+            "filter value survives view reconstruction")
+        catalog.clear()
+        try check(
+            !catalog.isActive && catalog.query.isEmpty && catalog.family.isEmpty
+                && !catalog.availableOnly, "clear resets query and all supported facets together")
+        let emptyCoverage = NativePathCoverage(units: [])
+        try check(
+            emptyCoverage.totalActivities == 0 && emptyCoverage.totalUnits == 0,
+            "empty loaded path has explicit zero denominators")
+        let coverage = NativePathCoverage(units: [
+            ["completed", "mastered"], ["available", "inProgress", "locked"], [],
+        ])
+        try check(
+            coverage.completedActivities == 2 && coverage.totalActivities == 5,
+            "coverage includes only server completed or mastered activities")
+        try check(
+            coverage.completedUnits == 1 && coverage.totalUnits == 3,
+            "empty units do not become completed by vacuous truth")
+        try check(
+            coverage.remainingActivities == 3 && coverage.lockedActivities == 1,
+            "remaining work includes locked activities without fabricated prerequisite")
+        let unknown = NativePathCoverage(units: [["futureStatus"]])
+        try check(
+            unknown.completedActivities == 0 && unknown.remainingActivities == 1,
+            "unknown status never turns into confirmed activity")
+        var destination = NativeActivityDestination(lessonID: "first", title: "First activity")
+        destination = NativeActivityDestination(lessonID: "second", title: "Second activity")
+        try check(
+            destination.lessonID == "second" && destination.resumeTitle == "Resume Second activity",
+            "resume title and target derive from one current activity snapshot")
+        try check(
+            destination.practiceTitle == "Practice again · Second activity",
+            "practice label names its current activity and differs from read again")
+        destination = NativeActivityDestination(lessonID: "first", title: "First activity")
+        try check(
+            destination.lessonID == "first" && !destination.resumeTitle.contains("Second"),
+            "rapid presentation selection has no cached previous title")
         var flow = NativeDemoFlow()
         flow.select(1)
         flow.submit()
