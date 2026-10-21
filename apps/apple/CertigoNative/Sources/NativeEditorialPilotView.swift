@@ -122,7 +122,8 @@
                                         Text(
                                             progress.markedReadAt.map {
                                                 "Marked as read · \(date($0, locale: copy.language.locale))"
-                                            } ?? "Last opened · \(date(progress.lastAccessedAt, locale: copy.language.locale))"
+                                            }
+                                                ?? "Last opened · \(date(progress.lastAccessedAt, locale: copy.language.locale))"
                                         )
                                         .font(.caption)
                                         .foregroundStyle(.secondary)

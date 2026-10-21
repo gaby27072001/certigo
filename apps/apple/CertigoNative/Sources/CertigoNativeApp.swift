@@ -169,7 +169,7 @@ struct NativeActivityDestination {
                             "\(language.nativeDisplayName) · "
                                 + language.localizedDisplayName(in: copy.language)
                         )
-                            .tag(AppLanguagePreference.explicit(language).rawValue)
+                        .tag(AppLanguagePreference.explicit(language).rawValue)
                     }
                 }
                 .pickerStyle(.menu)
@@ -483,11 +483,11 @@ struct NativeActivityDestination {
                 Group {
                     if let configurationIssue {
                         VStack(spacing: 24) {
-                        NativeAppLanguagePicker().padding(20)
-                        ContentUnavailableView(
-                            "Microsoft sign-in is not configured",
-                            systemImage: "person.crop.circle.badge.exclamationmark",
-                            description: Text(configurationIssue))
+                            NativeAppLanguagePicker().padding(20)
+                            ContentUnavailableView(
+                                "Microsoft sign-in is not configured",
+                                systemImage: "person.crop.circle.badge.exclamationmark",
+                                description: Text(configurationIssue))
                         }
                     } else if model.profile == nil && model.deletionStage == nil {
                         NavigationStack {
@@ -509,14 +509,13 @@ struct NativeActivityDestination {
                                     .disabled(model.busy)
                                     if model.busy { ProgressView() }
                                     Divider()
-                                    Button(copy.exploreDemo, systemImage: "play.circle")
-                                    {
+                                    Button(copy.exploreDemo, systemImage: "play.circle") {
                                         showDemo = true
                                     }
                                     .frame(minHeight: 44)
                                     .disabled(model.busy)
                                     Text(copy.contentLanguageNote)
-                                    .font(.subheadline).foregroundStyle(.secondary)
+                                        .font(.subheadline).foregroundStyle(.secondary)
                                 }
                             }
                             .navigationTitle("Certigo")
@@ -1316,7 +1315,8 @@ struct NativeActivityDestination {
                                 "No verdict, score or reward is calculated on this device."
                             )
                             if offline {
-                                Label("\(copy[.offline]) · \(copy[.demo])", systemImage: "wifi.slash")
+                                Label(
+                                    "\(copy[.offline]) · \(copy[.demo])", systemImage: "wifi.slash")
                                 Text(
                                     "The demo answer remains pending. The offline scenario pauses the next simulation step."
                                 )
@@ -2660,7 +2660,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             let destination = NativeActivityDestination(
                                 lessonID: next.id, title: next.title)
                             NativePrimaryButton(
-                                title: destination.actionTitle(copy.startSession), symbol: "play.circle"
+                                title: destination.actionTitle(copy.startSession),
+                                symbol: "play.circle"
                             ) {
                                 selectedTrack = path.trackId
                                 selectedLesson = destination.lessonID
@@ -2797,8 +2798,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                             Section(connectionSectionTitle) {
                                 Text(connectionDescription)
-                                Button(copy[.signOut], systemImage: "person.crop.circle.badge.xmark")
-                                {
+                                Button(
+                                    copy[.signOut], systemImage: "person.crop.circle.badge.xmark"
+                                ) {
                                     Task { await model.disconnect() }
                                 }
                                 .disabled(model.busy)
