@@ -105,10 +105,11 @@ check_tests() {
   python3 - "$result.summary.json" "$minimum" <<'PY'
 import json, sys
 summary = json.load(open(sys.argv[1]))
-if (summary.get("result") != "Passed"
-        or summary.get("passedTests", 0) < int(sys.argv[2])
-        or summary.get("failedTests", 0) != 0
-        or summary.get("skippedTests", 0) != 0):
+counts = [summary.get(key) for key in ("passedTests", "failedTests", "skippedTests")]
+if (not all(type(count) is int and count >= 0 for count in counts)
+        or summary.get("result") != "Passed"
+        or counts[0] < int(sys.argv[2])
+        or counts[1] != 0 or counts[2] != 0):
     raise SystemExit("Require executed passing tests, zero failures and zero skipped; inspect xcresult")
 PY
 }

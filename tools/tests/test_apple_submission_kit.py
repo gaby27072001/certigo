@@ -101,6 +101,10 @@ echo "$action completed by mock"
 if [[ "$1" == simctl ]]; then
   printf '{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-26-0":[{"udid":"%s","isAvailable":true}]}}\\n' "$CERTIGO_SIMULATOR_ID"
 else
+  if [[ "${TEST_INCOMPLETE_SUMMARY:-0}" == 1 ]]; then
+    echo '{"result":"Passed","passedTests":3}'
+    exit 0
+  fi
   printf '{"result":"Passed","passedTests":%s,"failedTests":0,"skippedTests":%s}\\n' "${TEST_PASSED:-3}" "${TEST_SKIPPED:-0}"
 fi
 """)
@@ -150,7 +154,8 @@ fi
         self.assertNotIn("xcodebuild test", self.calls())
 
     def test_zero_or_skipped_tests_are_not_a_pass(self):
-        for values in ({"TEST_PASSED": "0"}, {"TEST_SKIPPED": "1"}):
+        for values in ({"TEST_PASSED": "0"}, {"TEST_SKIPPED": "1"},
+                       {"TEST_INCOMPLETE_SUMMARY": "1"}):
             result = self.run_script(**values)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Require executed passing tests", result.stdout)
