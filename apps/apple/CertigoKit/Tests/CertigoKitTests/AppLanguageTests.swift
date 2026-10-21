@@ -3,6 +3,80 @@ import Foundation
 import XCTest
 
 final class AppLanguageTests: XCTestCase {
+  func testDetailedMessagesAreTranslatedWithoutEnglishFallbackAndPreserveTemplateTokens() throws {
+    let prefixes = ["error", "audio", "deletion", "history", "configuration"]
+    let keys = AppInterfaceCopy.Key.allCases.filter { key in
+      prefixes.contains { String(describing: key).hasPrefix($0) }
+    }
+    XCTAssertEqual(keys.count, 155)
+    let tokens = try NSRegularExpression(pattern: #"\{[a-z]+\}"#)
+    func placeholders(_ value: String) -> [String] {
+      tokens.matches(in: value, range: NSRange(value.startIndex..., in: value)).map {
+        (value as NSString).substring(with: $0.range)
+      }.sorted()
+    }
+    let english = AppInterfaceCopy(language: .english)
+    for key in keys {
+      let expectedTokens = placeholders(english[key])
+      for language in AppLanguage.allCases {
+        let value = AppInterfaceCopy(language: language)[key]
+        XCTAssertFalse(value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        XCTAssertEqual(placeholders(value), expectedTokens, "\(language): \(key)")
+        if language != .english {
+          XCTAssertNotEqual(value, english[key], "\(language): \(key)")
+        }
+      }
+    }
+  }
+
+  func testTypedTemplatesPreserveValuesAndTranslateEntireSentences() {
+    for language in AppLanguage.allCases {
+      let copy = AppInterfaceCopy(language: language)
+      let messages = [
+        copy.requestRejected(httpStatus: 503),
+        copy.deletionProgress(completed: 2, total: 7),
+        copy.historyLoaded(count: 12, hasMore: false),
+        copy.historyLoaded(count: 12, hasMore: true),
+        copy.historyScore(scorePercent: 81, xp: 27, confirmedOnDevice: false),
+        copy.historyScore(scorePercent: 81, xp: 27, confirmedOnDevice: true),
+        copy.confirmedScore(81),
+        copy.coverageCount(completed: 2, total: 7),
+        copy.questionCount(selected: 2, total: 7),
+      ]
+      for message in messages {
+        XCTAssertFalse(message.contains("{"), message)
+        XCTAssertFalse(message.contains("}"), message)
+      }
+      XCTAssertTrue(messages[0].contains("503"))
+      XCTAssertTrue(messages[1].contains("2") && messages[1].contains("7"))
+      XCTAssertTrue(messages[2].contains("12") && messages[3].contains("12"))
+      XCTAssertNotEqual(messages[2], messages[3])
+      XCTAssertTrue(messages[4].contains("81") && messages[4].contains("27"))
+      XCTAssertNotEqual(messages[4], messages[5])
+      for production in [true, false] {
+        for missing in [true, false] {
+          let message = copy.configurationValue(
+            "CERTIGO_CIAM_ISSUER", production: production, missing: missing)
+          XCTAssertTrue(message.contains("CERTIGO_CIAM_ISSUER"))
+          XCTAssertFalse(message.contains("{name}"))
+        }
+      }
+    }
+    let copy = AppInterfaceCopy(language: .english)
+    XCTAssertEqual(
+      copy.requestRejected(httpStatus: 429),
+      "The server rejected the request (HTTP 429). Retry or contact support.")
+    XCTAssertEqual(copy.deletionProgress(completed: 0, total: 7), "0 of 7 server steps confirmed.")
+    XCTAssertEqual(copy.questionCount(selected: 0, total: 1), "0 of 1 questions")
+    XCTAssertEqual(
+      copy.historyLoaded(count: 0, hasMore: false), "Across your devices · 0 summaries loaded")
+    XCTAssertTrue(copy[.errorAccountStatusUnknown].contains("does not prove deletion"))
+    XCTAssertTrue(copy[.deletionRetentionNote].contains("90 days"))
+    XCTAssertTrue(copy[.deletionRetentionNote].contains("not an undo period"))
+    XCTAssertTrue(copy[.historyReadinessUnknown].contains("Unknown is not zero"))
+    XCTAssertTrue(copy[.historyEvidenceNote].contains("no average or pass probability"))
+  }
+
   func testSecondaryLearningChromeIsTranslatedInAllEightLanguages() {
     let keys: [AppInterfaceCopy.Key] = [
       .categoryAll, .categoryCloud, .categoryAI, .categoryApple, .categoryData, .categoryDevOps,

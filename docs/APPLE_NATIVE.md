@@ -308,6 +308,13 @@ when the scene becomes inactive. When VoiceOver is active, optional speech stays
 stopped and the UI explains that VoiceOver can read the accessible content.
 Enabling VoiceOver also stops any current optional reading.
 
+Audio controls, playback status and safe errors resolve through the selected
+eight-language interface catalog; voice names and spoken educational content keep
+their source text. Changing interface language updates stored error keys without
+starting playback. Model, deletion and configuration errors follow the same
+locale-reactive presentation rule, with typed HTTP/configuration templates rather
+than raw SDK errors or English sentence concatenation.
+
 Portable Foundation checks cover block selection, title/body ordering, editorial
 allowlist and ordering, paragraph boundaries, empty inputs, original text and
 propagation of a renderer failure.

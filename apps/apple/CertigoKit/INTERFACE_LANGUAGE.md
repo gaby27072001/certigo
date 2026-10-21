@@ -22,13 +22,49 @@ language naming data; `nativeDisplayName` is the stable autonym.
 
 The SwiftUI app observes the chosen preference at its root, rebuilds copy and
 locale, and exposes the picker on entry and in connected/demo settings. The
-typed catalog covers principal navigation and action/status labels; labels for
-which no catalog key exists remain in their authored language, so this contract
-does not claim exhaustive localization of every sentence. It does not change
+typed catalog covers principal navigation and action/status labels as well as
+detailed account-deletion, audio, history, configuration and model-error copy.
+Adding a key does not itself localize a callsite: the app must resolve it with the
+current environment at display time. This contract does not claim exhaustive
+localization of every rendered sentence. It does not change
 authentication, account identity, scoring, content negotiation or server
 contracts. The eight localized content notes explicitly state that interface
 translation does not automatically translate the official certification
 question text or editorial pilot source text.
+
+## Detailed messages and interpolation
+
+The `error*`, `deletion*`, `audio*`, `history*` and `configuration*` keys cover the
+corresponding native source messages inventoried at revision
+`13c692d522b2213cd48781be6dbd428d5913ad44`. All have explicit translations in all
+eight languages, without a per-key English fallback. Keep stored errors typed
+(key plus associated values), not already resolved strings, so changing the
+interface language also updates an error already on screen.
+
+Use these complete-sentence formatters rather than joining translated fragments:
+
+```swift
+copy.requestRejected(httpStatus: 503)
+copy.deletionProgress(completed: 2, total: 7)
+copy.historyLoaded(count: 12, hasMore: true)
+copy.historyScore(scorePercent: 81, xp: 27, confirmedOnDevice: false)
+copy.confirmedScore(81)
+copy.coverageCount(completed: 2, total: 7)
+copy.questionCount(selected: 2, total: 7)
+copy.configurationValue("CERTIGO_CIAM_ISSUER", production: false, missing: true)
+```
+
+`confirmedOnDevice` selects the confirmed acknowledgement label instead of the
+recorded server-history score label; it does not validate evidence or turn a
+pending submission into a result. Callers remain responsible for ownership,
+scope and acknowledgement checks. Counts are literal cardinal counts, not claims
+about unrequested history pages or all-time coverage. Template placeholders may
+change order by language; tests check exact token preservation in every locale.
+
+Configuration names, HTTP status codes, paths and protocol identifiers are
+preserved verbatim. Configuration messages remain presentation-only: no sign-in
+fallback, validation rule or identity behavior is changed. Source learning text,
+demo question fixtures and server-provided explanations are not catalog entries.
 
 Portable coverage: `swift test --filter AppLanguageTests`. This is not an Apple UI,
 layout, VoiceOver or linguistic review on device.

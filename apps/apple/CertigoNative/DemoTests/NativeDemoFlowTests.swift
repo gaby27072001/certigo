@@ -54,6 +54,47 @@ struct NativeDemoFlowTests {
                         !copy.native(key).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                         "native chrome \(key) exists in \(language.rawValue)")
                 }
+                try check(
+                    copy.minutes(7).contains("7") && !copy.minutes(7).contains("{"),
+                    "duration replaces the localized unit template in \(language.rawValue)")
+                let goal = NativeActiveGoalPresentation(
+                    targetID: "new", confirmedID: "old", savingID: "new", busy: true)
+                try check(
+                    goal.status(copy) == copy.native(.goalPending)
+                        && goal.action(copy) == copy.native(.savingGoal),
+                    "pending goal labels use the current \(language.rawValue) locale")
+                for objective in NativeDemoFlow.Objective.allCases {
+                    var flow = NativeDemoFlow()
+                    flow.choose(objective)
+                    try check(
+                        !objective.displayName(copy).isEmpty
+                            && !objective.displayTitle(copy).isEmpty
+                            && flow.startLabel(copy) == copy.native(.demoExploreSituation)
+                            && flow.activitySummary(copy) == copy.native(.demoSituationNoGrade),
+                        "demo objective and preparation localized in \(language.rawValue)")
+                    flow.select(0)
+                    try check(
+                        flow.resumeLabel(copy) == copy.native(.demoResumeChoice),
+                        "editable demo choice localized in \(language.rawValue)")
+                    flow.submit()
+                    try check(
+                        flow.activitySummary(copy) == copy.native(.demoAnswerPending),
+                        "pending demo answer has localized honest status in \(language.rawValue)")
+                    flow.receiveMockExplanation(offline: false)
+                    try check(
+                        flow.resumeLabel(copy) == copy.native(.demoReadExplanation)
+                            && flow.activitySummary(copy)
+                                == copy.native(.demoExplanationAvailable),
+                        "fictional feedback localized in \(language.rawValue)")
+                }
+                for stage in NativeDemoPracticeStage.allCases {
+                    let label = NativeDemoPracticeProgress(current: stage)
+                        .accessibilityLabel(copy)
+                    try check(
+                        label.contains(stage.label(copy))
+                            && label.contains(copy.native(.demoStageHint)),
+                        "stage accessibility is localized in \(language.rawValue)")
+                }
                 for category in NativeRadarCategory.allCases {
                     try check(
                         !category.title(copy).isEmpty,
@@ -388,9 +429,7 @@ struct NativeDemoFlowTests {
         var workshop = NativeDemoFlow()
         workshop.choose(.fundamentals)
         try check(
-            workshop.startRoute == .preparation
-                && workshop.startLabel == "Explore the situation"
-                && workshop.resumeLabel == "Start a question",
+            workshop.startRoute == .preparation && !workshop.canSubmit,
             "new objective leads to preparation before the question")
         let preparationNavigation = try NativeDemoNavigationState.make(
             selectedTab: .objective, objectivePath: [.preparation], catalogPath: [],
@@ -464,8 +503,8 @@ struct NativeDemoFlowTests {
         }
         try check(rejectedEmptyResume, "follow-up cannot invent an exercise without an objective")
         try check(
-            workshop.activitySummary.contains("no verdict"),
-            "reviewed summary cannot present a grade or certification progress")
+            workshop.phase == .reviewed && !workshop.canSubmit,
+            "reviewed demo cannot submit again without an explicit practice restart")
         for goal in NativeDemoFlow.Objective.allCases {
             for option in NativeDemoFlow.options.indices {
                 var example = NativeDemoFlow()
@@ -537,21 +576,18 @@ struct NativeDemoFlowTests {
         try check(rejectedConflictingSection, "a conflicting Learn tab and section is rejected")
         try check(
             NativeDemoFlow.Objective.fundamentals.rawValue == "Cloud · découverte"
-                && NativeDemoFlow.Objective.operations.rawValue == "Cloud · exploitation"
-                && NativeDemoFlow.Objective.fundamentals.displayName == "Cloud · discovery",
-            "English interface labels do not rewrite persisted goal identifiers")
+                && NativeDemoFlow.Objective.operations.rawValue == "Cloud · exploitation",
+            "interface localization does not rewrite persisted goal identifiers")
         let browsingGoal = NativeActiveGoalPresentation(
             targetID: "new-goal", confirmedID: "old-goal", savingID: nil, busy: false)
         try check(
-            browsingGoal.canChoose && !browsingGoal.isConfirmed
-                && browsingGoal.status == "Viewing a goal · not selected",
+            browsingGoal.canChoose && !browsingGoal.isConfirmed,
             "browsing another goal never presents it as confirmed")
         let savingGoal = NativeActiveGoalPresentation(
             targetID: "new-goal", confirmedID: "old-goal", savingID: "new-goal", busy: true)
         try check(
             !savingGoal.canChoose && !savingGoal.isConfirmed
-                && savingGoal.symbol == "clock"
-                && savingGoal.status.contains("waiting for the server"),
+                && savingGoal.symbol == "clock",
             "saving blocks duplicate action without optimistic goal confirmation")
         let confirmedGoal = NativeActiveGoalPresentation(
             targetID: "new-goal", confirmedID: "new-goal", savingID: nil, busy: false)
@@ -632,10 +668,8 @@ struct NativeDemoFlowTests {
         try check(
             explanationProgress.state(for: .situation) == .completed
                 && explanationProgress.state(for: .decision) == .completed
-                && explanationProgress.state(for: .explanation) == .current
-                && explanationProgress.accessibilityLabel
-                    .contains("not whether an answer is correct"),
-            "explanation stage explicitly separates flow progress from answer correctness")
+                && explanationProgress.state(for: .explanation) == .current,
+            "explanation stage completes the reading flow")
         var persistence = NativeDemoPersistence.awaitingRestoration
         var storedSnapshot = "not yet restored"
         try persistence.save(snapshot, to: &storedSnapshot)

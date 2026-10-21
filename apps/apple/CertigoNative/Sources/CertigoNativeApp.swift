@@ -230,8 +230,65 @@ enum NativeLearningDuration {
         }
     }
 
+    extension NativeDemoFlow.Objective {
+        func displayName(_ copy: AppInterfaceCopy) -> String {
+            copy.native(self == .fundamentals ? .demoCloudDiscovery : .demoCloudOperations)
+        }
+
+        func displayTitle(_ copy: AppInterfaceCopy) -> String {
+            copy.native(self == .fundamentals ? .demoCloudFundamentals : .demoCloudPractice)
+        }
+    }
+
+    extension NativeDemoFlow {
+        func startLabel(_ copy: AppInterfaceCopy) -> String {
+            startRoute == .preparation ? copy.native(.demoExploreSituation) : resumeLabel(copy)
+        }
+
+        func activitySummary(_ copy: AppInterfaceCopy) -> String {
+            switch phase {
+            case .answering:
+                copy.native(selection == nil ? .demoSituationNoGrade : .demoEditableChoice)
+            case .pending: copy.native(.demoAnswerPending)
+            case .reviewed: copy.native(.demoExplanationAvailable)
+            }
+        }
+
+        func resumeLabel(_ copy: AppInterfaceCopy) -> String {
+            switch phase {
+            case .answering:
+                copy.native(selection == nil ? .demoStartQuestion : .demoResumeChoice)
+            case .pending: copy.native(.demoResumePending)
+            case .reviewed: copy.native(.demoReadExplanation)
+            }
+        }
+    }
+
+    extension NativeDemoPracticeStage {
+        func label(_ copy: AppInterfaceCopy) -> String {
+            switch self {
+            case .situation: copy.native(.demoStageSituation)
+            case .decision: copy.native(.demoStageDecision)
+            case .explanation: copy.native(.demoStageExplanation)
+            }
+        }
+    }
+
+    extension NativeDemoPracticeProgress {
+        func accessibilityLabel(_ copy: AppInterfaceCopy) -> String {
+            "\(current.position) / \(NativeDemoPracticeStage.allCases.count) · "
+                + "\(current.label(copy)). \(copy.native(.demoStageHint))"
+        }
+    }
+
     extension AppInterfaceCopy {
+        func minutes(_ value: Int) -> String {
+            native(.minutesTemplate).replacingOccurrences(
+                of: "{minutes}", with: value.formatted(.number.locale(language.locale)))
+        }
+
         enum NativeLabel: CaseIterable {
+            case minutesTemplate, apiEndpoint
             case findGoal, catalogHint, findCertification, codeFamily, allFamilies, codeCategory
             case availableOnly, catalogScope, loadedResults, noCatalog, noMatchesHint
             case continueDevice, restoreActivity, chooseGoalHint, guidedReading, frenchPilot
@@ -262,6 +319,47 @@ enum NativeLearningDuration {
             case emptyExam
             case discardExam, discardExamHint, unsupportedExam, score, correctCount, timeRemaining
             case notificationScope, utcOffset, quietStart, quietEnd, pendingExam
+            case developerConnector, testLearning, ciamTestScope, ciamTestSignIn, ciamSignIn,
+                ciamExplicit, ciamUnavailable, ciamIncomplete, developmentConnection,
+                microsoftAccount, testConnectorHint, microsoftConnected, connectWorkspace,
+                developmentScope, connectorBoundary, testConnection, testToken, connectTest,
+                tokenStorageHint, activeGoal, noActiveGoal, goalChangeHint
+            case welcomeTitle, welcomeHint, tryLearning, fictionalBoundary, sharedLesson,
+                openLinkedLesson, development, openConnector, testOnly, lessonLinkUnavailable,
+                lessonLinkInvalid, signInUnconfigured, productionTitle, productionHint,
+                continueLearning, signInIncomplete, socialUnavailable, socialUnavailableHint,
+                privateLearning, privateProfileHint, privateResultsHint, friendsInactive,
+                teamsInactive, friendsPrivacy, teamsPrivacy, sharingConsent, returnLearning,
+                savingGoal, operationUnconfirmed, downloadQuestionPacks, downloadContent,
+                downloadBoundary, offlinePack, downloadPack, downloadedBoundary, pathUnavailable,
+                pathRetryHint, retryPath, chooseCertification, pathServerHint, learningPath,
+                answerInstruction, pendingCorrectionHint, confirmedResult, answerCorrect,
+                reviewNeeded, newAttemptHint, practiceAgainHint, lessonUnavailable,
+                lessonLoadFailure, oneSession, chooseActivity, goalPending, goalConfirmed,
+                goalViewing, chooseGoal
+            case demoPreviewOnly, demoHistory, demoHistoryHint, demoResponsibilities, demoNotice,
+                demoFrenchExamples, demoOptions, demoExploreSituation, demoSituationNoGrade,
+                demoEditableChoice, demoAnswerPending, demoExplanationAvailable, demoStartQuestion,
+                demoResumeChoice, demoResumePending, demoReadExplanation, demoCloudDiscovery,
+                demoCloudOperations, demoCloudFundamentals, demoCloudPractice, demoStageSituation,
+                demoStageDecision, demoStageExplanation, demoStageHint, demoReady, demoLoading,
+                demoEmpty, demoError, close
+            case demoCoachUnavailable, demoCatalogStates, demoCatalog, demoOfflineToggle,
+                demoSettingsScope, demoSettings, demoResetConfirmation, demoReset,
+                demoRestorationUnavailable, demoRestoreFailure, demoSaveFailure, demoReopenFailure,
+                demoReturnLearn, demoSocialUnavailable, demoWorkshop, demoWorkshopHint,
+                demoFictionalContent, demoSwitchGoal, demoHistoryAction, demoNextGoal,
+                demoExploreHint, demoChooseHint, demoWorkshops, demoVolume, demoSelectedGoal,
+                demoSituationExplore, demoFinishLoading, demoNoGoals, demoEmptyHint, demoShowGoals,
+                demoCatalogUnavailable, demoPreservedHint, demoScenarioHint, demoDecisionExplore,
+                demoFictionalSituation, demoNoGrade, demoLocalRestore, demoSituation, demoTask,
+                demoBeforeChoose, demoBoundaryHint, demoOpenQuestion, demoPreparation,
+                demoChooseAnswer, demoAnswerSelected, selected, notSelected, demoEditableHint,
+                demoChooseBeforeContinue, demoChoiceSaved, demoNoVerdict, demoOfflinePending,
+                demoDisableOffline, demoSimulateHint, demoSimulateExplanation, demoExplanation,
+                demoConstraint, demoUnderstanding, demoFixtureHint, demoPracticeAgain, demoPractice,
+                demoChoice, demoProfile, demoProfileHint, demoControls, demoPreviewStates,
+                demoAppearance, demoAppearanceHint, demoAccountHint
             case savedActivityHint, nextAvailableHint, publicVersion, codeGroup, unit
             case activityCoverageHint, lockedHint, catalogFormats, radarLimits
             case confirmedSessions, activityCoverage, localDevice, completedActivities,
@@ -274,6 +372,1273 @@ enum NativeLearningDuration {
         func native(_ key: NativeLabel) -> String {
             let row: [String]
             switch key {
+            case .minutesTemplate:
+                row = [
+                    "{minutes} min", "{minutes} min", "{minutes} मिनट", "{minutes} 分钟",
+                    "{minutes}분", "{minutes} min", "{minutes} min", "{minutes} Min.",
+                ]
+            case .apiEndpoint:
+                row = [
+                    "URL HTTPS de l’API", "HTTPS API URL", "HTTPS API यूआरएल",
+                    "HTTPS API 地址", "HTTPS API 주소", "URL HTTPS de la API",
+                    "URL HTTPS dell’API", "HTTPS-API-Adresse",
+                ]
+            case .developerConnector:
+                row = [
+                    "Connecteur développeur", "Developer connector", "डेवलपर कनेक्टर", "开发者连接器",
+                    "개발자 커넥터", "Conector de desarrollo", "Connettore sviluppatore",
+                    "Entwicklerverbindung",
+                ]
+            case .testLearning:
+                row = [
+                    "Testez l’apprentissage connecté.", "Test your connected learning.",
+                    "कनेक्टेड सीखने का परीक्षण करें।", "测试联网学习。", "연결된 학습을 테스트하세요.",
+                    "Prueba el aprendizaje conectado.", "Prova l’apprendimento connesso.",
+                    "Teste das verbundene Lernen.",
+                ]
+            case .ciamTestScope:
+                row = [
+                    "Configuration CIAM de développement · comptes de test uniquement.",
+                    "CIAM development configuration · test accounts only.",
+                    "CIAM विकास कॉन्फ़िगरेशन · केवल परीक्षण खाते।", "CIAM 开发配置 · 仅供测试账户。",
+                    "CIAM 개발 구성 · 테스트 계정 전용.",
+                    "Configuración CIAM de desarrollo · solo cuentas de prueba.",
+                    "Configurazione CIAM di sviluppo · solo account di test.",
+                    "CIAM-Entwicklungskonfiguration · nur Testkonten.",
+                ]
+            case .ciamTestSignIn:
+                row = [
+                    "Connexion CIAM de test", "CIAM test sign-in", "CIAM परीक्षण साइन-इन", "CIAM 测试登录",
+                    "CIAM 테스트 로그인", "Inicio de sesión CIAM de prueba", "Accesso CIAM di test",
+                    "CIAM-Testanmeldung",
+                ]
+            case .ciamSignIn:
+                row = [
+                    "Se connecter avec CIAM", "Sign in with CIAM", "CIAM से साइन इन करें", "使用 CIAM 登录",
+                    "CIAM으로 로그인", "Iniciar sesión con CIAM", "Accedi con CIAM", "Mit CIAM anmelden",
+                ]
+            case .ciamExplicit:
+                row = [
+                    "Connectez-vous explicitement avec l’identité de test configurée localement.",
+                    "Sign in explicitly with the locally configured test identity.",
+                    "स्थानीय रूप से कॉन्फ़िगर परीक्षण पहचान से स्पष्ट रूप से साइन इन करें।", "请使用本地配置的测试身份明确登录。",
+                    "로컬에 구성된 테스트 ID로 직접 로그인하세요.",
+                    "Inicia sesión explícitamente con la identidad local de prueba.",
+                    "Accedi esplicitamente con l’identità di test locale.",
+                    "Melde dich ausdrücklich mit der lokal konfigurierten Testidentität an.",
+                ]
+            case .ciamUnavailable:
+                row = [
+                    "Connexion CIAM de test indisponible", "CIAM test sign-in is unavailable",
+                    "CIAM परीक्षण साइन-इन उपलब्ध नहीं", "CIAM 测试登录不可用", "CIAM 테스트 로그인 사용 불가",
+                    "Inicio de sesión CIAM no disponible", "Accesso CIAM di test non disponibile",
+                    "CIAM-Testanmeldung nicht verfügbar",
+                ]
+            case .ciamIncomplete:
+                row = [
+                    "Connexion CIAM non aboutie", "CIAM sign-in did not complete",
+                    "CIAM साइन-इन पूरा नहीं हुआ", "CIAM 登录未完成", "CIAM 로그인 미완료",
+                    "Inicio de sesión CIAM incompleto", "Accesso CIAM non completato",
+                    "CIAM-Anmeldung nicht abgeschlossen",
+                ]
+            case .developmentConnection:
+                row = [
+                    "Connexion de développement", "Development connection", "विकास कनेक्शन", "开发连接",
+                    "개발 연결", "Conexión de desarrollo", "Connessione di sviluppo",
+                    "Entwicklungsverbindung",
+                ]
+            case .microsoftAccount:
+                row = [
+                    "Compte Microsoft", "Microsoft account", "Microsoft खाता", "Microsoft 账户",
+                    "Microsoft 계정", "Cuenta Microsoft", "Account Microsoft", "Microsoft-Konto",
+                ]
+            case .testConnectorHint:
+                row = [
+                    "Connecteur de test uniquement. Connexion de production non activée.",
+                    "Test connector only. Production sign-in is not enabled.",
+                    "केवल परीक्षण कनेक्टर। प्रोडक्शन साइन-इन सक्षम नहीं है।", "仅供测试连接器使用，未启用生产登录。",
+                    "테스트 커넥터 전용. 프로덕션 로그인이 비활성화되어 있습니다.",
+                    "Solo conector de prueba. Sin inicio de sesión de producción.",
+                    "Solo connettore di test. Accesso di produzione non abilitato.",
+                    "Nur Testverbindung. Produktionsanmeldung nicht aktiviert.",
+                ]
+            case .microsoftConnected:
+                row = [
+                    "Connecté avec votre compte Microsoft.",
+                    "Connected with your Microsoft account.", "आपके Microsoft खाते से कनेक्ट है।",
+                    "已使用你的 Microsoft 账户连接。", "Microsoft 계정으로 연결되었습니다.",
+                    "Conectado con tu cuenta Microsoft.", "Connesso con il tuo account Microsoft.",
+                    "Mit deinem Microsoft-Konto verbunden.",
+                ]
+            case .connectWorkspace:
+                row = [
+                    "Connectez un espace de test.", "Connect a test workspace.",
+                    "परीक्षण कार्यक्षेत्र कनेक्ट करें।", "连接测试工作区。", "테스트 작업 영역에 연결하세요.",
+                    "Conecta un espacio de prueba.", "Connetti un’area di test.",
+                    "Verbinde einen Testarbeitsbereich.",
+                ]
+            case .developmentScope:
+                row = [
+                    "Accès de développement uniquement. Votre compte de production utilise Microsoft.",
+                    "Development access only. Your production account uses Microsoft sign-in.",
+                    "केवल विकास पहुँच। प्रोडक्शन खाता Microsoft साइन-इन उपयोग करता है।",
+                    "仅限开发访问，生产账户使用 Microsoft 登录。", "개발 접근 전용. 프로덕션 계정은 Microsoft 로그인을 사용합니다.",
+                    "Solo desarrollo. Tu cuenta de producción usa Microsoft.",
+                    "Solo sviluppo. L’account di produzione usa l’accesso Microsoft.",
+                    "Nur Entwicklungszugriff. Dein Produktionskonto verwendet Microsoft-Anmeldung.",
+                ]
+            case .connectorBoundary:
+                row = [
+                    "Ce connecteur n’est pas une connexion de production. Aucun compte Apple ni nouvelle identité créé.",
+                    "This developer connector is not production sign-in. No Apple account or new identity is created.",
+                    "यह डेवलपर कनेक्टर प्रोडक्शन साइन-इन नहीं है। Apple खाता या नई पहचान नहीं बनती।",
+                    "此开发者连接器不是生产登录，不会创建 Apple 账户或新身份。",
+                    "개발자 커넥터는 프로덕션 로그인이 아닙니다. Apple 계정이나 새 ID를 만들지 않습니다.",
+                    "Este conector no es inicio de sesión de producción. No crea cuenta Apple ni identidad nueva.",
+                    "Questo connettore non è accesso di produzione. Non crea account Apple o nuove identità.",
+                    "Diese Entwicklerverbindung ist keine Produktionsanmeldung. Kein Apple-Konto und keine neue Identität werden erstellt.",
+                ]
+            case .testConnection:
+                row = [
+                    "Connexion de test", "Test connection", "परीक्षण कनेक्शन", "测试连接", "테스트 연결",
+                    "Conexión de prueba", "Connessione di test", "Testverbindung",
+                ]
+            case .testToken:
+                row = [
+                    "Jeton d’accès du compte de test", "Test account access token",
+                    "परीक्षण खाते का एक्सेस टोकन", "测试账户访问令牌", "테스트 계정 액세스 토큰", "Token de acceso de prueba",
+                    "Token di accesso account di test", "Zugriffstoken für Testkonto",
+                ]
+            case .connectTest:
+                row = [
+                    "Connecter le compte de test", "Connect the test account", "परीक्षण खाता कनेक्ट करें",
+                    "连接测试账户", "테스트 계정 연결", "Conectar cuenta de prueba", "Connetti account di test",
+                    "Testkonto verbinden",
+                ]
+            case .tokenStorageHint:
+                row = [
+                    "Le jeton reste dans le coffre sécurisé de cet appareil. Les réponses en attente ne sont jamais corrigées localement.",
+                    "The token stays in this device’s secure vault. Pending answers are never graded locally.",
+                    "टोकन इस डिवाइस के सुरक्षित भंडार में रहता है। लंबित उत्तर स्थानीय रूप से नहीं जाँचे जाते।",
+                    "令牌留在设备安全存储中，待提交答案绝不在本地评分。",
+                    "토큰은 이 기기의 보안 저장소에 보관됩니다. 대기 중인 답변은 기기에서 채점하지 않습니다.",
+                    "El token queda en el almacén seguro del dispositivo. Las respuestas pendientes nunca se corrigen localmente.",
+                    "Il token resta nell’archivio sicuro del dispositivo. Le risposte in attesa non sono mai corrette localmente.",
+                    "Das Token bleibt im sicheren Gerätespeicher. Ausstehende Antworten werden niemals lokal ausgewertet.",
+                ]
+            case .activeGoal:
+                row = [
+                    "Objectif d’apprentissage actif", "Active learning goal", "सक्रिय सीखने का लक्ष्य",
+                    "当前学习目标", "활성 학습 목표", "Objetivo de aprendizaje activo",
+                    "Obiettivo di apprendimento attivo", "Aktives Lernziel",
+                ]
+            case .noActiveGoal:
+                row = [
+                    "Aucun objectif actif confirmé par le serveur.",
+                    "No active goal is confirmed by the server.", "सर्वर ने किसी सक्रिय लक्ष्य की पुष्टि नहीं की है।",
+                    "服务器尚未确认当前目标。", "서버가 확인한 활성 목표가 없습니다.",
+                    "No hay objetivo activo confirmado por el servidor.",
+                    "Nessun obiettivo attivo confermato dal server.",
+                    "Kein aktives Ziel vom Server bestätigt.",
+                ]
+            case .goalChangeHint:
+                row = [
+                    "La consultation ne change pas l’objectif. Cette action demande un changement confirmé par le serveur ; activité et réponses sauvegardées restent disponibles.",
+                    "Browsing does not change your goal. This action requests a server-confirmed change; your current activity and saved submissions stay available.",
+                    "देखने से लक्ष्य नहीं बदलता। यह कार्रवाई सर्वर-पुष्ट परिवर्तन माँगती है; गतिविधि और सहेजे उत्तर उपलब्ध रहते हैं।",
+                    "浏览不会更改目标。此操作请求服务器确认更改，当前活动与已保存作答仍可用。",
+                    "탐색으로 목표는 바뀌지 않습니다. 이 작업은 서버가 확인하는 변경을 요청하며 현재 활동과 저장된 제출은 유지됩니다.",
+                    "Navegar no cambia el objetivo. Esta acción pide un cambio confirmado; actividad y respuestas guardadas siguen disponibles.",
+                    "Esplorare non cambia l’obiettivo. L’azione richiede una modifica confermata dal server; attività e invii restano disponibili.",
+                    "Ansehen ändert das Ziel nicht. Diese Aktion fordert einen serverbestätigten Wechsel an; Aktivität und gespeicherte Antworten bleiben verfügbar.",
+                ]
+            case .welcomeTitle:
+                row = [
+                    "Une question. Une idée plus claire.", "One question. A clearer idea.",
+                    "एक प्रश्न। अधिक स्पष्ट समझ।", "一个问题，更清晰的理解。", "문제 하나로 더 명확하게.",
+                    "Una pregunta. Una idea más clara.", "Una domanda. Un’idea più chiara.",
+                    "Eine Frage. Mehr Klarheit.",
+                ]
+            case .welcomeHint:
+                row = [
+                    "Découvrez l’aperçu natif de Certigo.",
+                    "Explore Certigo’s native learning preview.", "Certigo का नेटिव सीखने का पूर्वावलोकन देखें।",
+                    "探索 Certigo 原生学习预览。", "Certigo 네이티브 학습 미리 보기를 살펴보세요.",
+                    "Explora la vista nativa de aprendizaje de Certigo.",
+                    "Esplora l’anteprima nativa di Certigo.",
+                    "Entdecke Certigos native Lernvorschau.",
+                ]
+            case .tryLearning:
+                row = [
+                    "Essayer l’expérience d’apprentissage", "Try the learning experience",
+                    "सीखने का अनुभव आज़माएँ", "体验学习", "학습 체험하기", "Probar el aprendizaje",
+                    "Prova l’esperienza di apprendimento", "Lernerlebnis ausprobieren",
+                ]
+            case .fictionalBoundary:
+                row = [
+                    "Objectifs, réponses et explications sont fictifs. Aucun compte, réseau ou résultat réel n’est utilisé.",
+                    "Goals, answers and explanations are fictional. No account, network or real result is used.",
+                    "लक्ष्य, उत्तर और व्याख्याएँ काल्पनिक हैं। खाता, नेटवर्क या वास्तविक परिणाम उपयोग नहीं होते।",
+                    "目标、答案和解析均为虚构，不使用账户、网络或真实结果。", "목표, 답변, 설명은 가상입니다. 계정, 네트워크, 실제 결과를 사용하지 않습니다.",
+                    "Los objetivos, respuestas y explicaciones son ficticios. No se usa cuenta, red ni resultado real.",
+                    "Obiettivi, risposte e spiegazioni sono fittizi. Nessun account, rete o risultato reale è utilizzato.",
+                    "Ziele, Antworten und Erklärungen sind fiktiv. Es werden keine Konten, Netzwerke oder echten Ergebnisse verwendet.",
+                ]
+            case .sharedLesson:
+                row = [
+                    "Lien de leçon partagé", "Shared lesson link", "साझा पाठ लिंक", "共享课程链接",
+                    "공유된 학습 링크", "Enlace compartido", "Link lezione condiviso",
+                    "Geteilter Lektionslink",
+                ]
+            case .openLinkedLesson:
+                row = [
+                    "Ouvrir la leçon liée", "Open linked lesson", "लिंक किया पाठ खोलें", "打开链接课程",
+                    "연결된 학습 열기", "Abrir lección enlazada", "Apri lezione collegata",
+                    "Verlinkte Lektion öffnen",
+                ]
+            case .development:
+                row = [
+                    "Développement", "Development", "विकास", "开发", "개발", "Desarrollo", "Sviluppo",
+                    "Entwicklung",
+                ]
+            case .openConnector:
+                row = [
+                    "Ouvrir le connecteur API de test", "Open the test API connector",
+                    "परीक्षण API कनेक्टर खोलें", "打开测试 API 连接器", "테스트 API 커넥터 열기",
+                    "Abrir conector API de prueba", "Apri connettore API di test",
+                    "Test-API-Verbindung öffnen",
+                ]
+            case .testOnly:
+                row = [
+                    "Comptes de test uniquement. Ce n’est pas une connexion de production.",
+                    "For test accounts only. This is not production sign-in.",
+                    "केवल परीक्षण खातों के लिए। यह प्रोडक्शन साइन-इन नहीं है।", "仅供测试账户使用，不是生产登录。",
+                    "테스트 계정 전용입니다. 프로덕션 로그인이 아닙니다.",
+                    "Solo cuentas de prueba. No es inicio de sesión de producción.",
+                    "Solo account di test. Non è accesso di produzione.",
+                    "Nur für Testkonten. Keine Produktionsanmeldung.",
+                ]
+            case .lessonLinkUnavailable:
+                row = [
+                    "Lien de leçon indisponible", "Lesson link unavailable", "पाठ लिंक उपलब्ध नहीं",
+                    "课程链接不可用", "학습 링크 사용 불가", "Enlace no disponible",
+                    "Link lezione non disponibile", "Lektionslink nicht verfügbar",
+                ]
+            case .lessonLinkInvalid:
+                row = [
+                    "Ce lien ne correspond à aucune leçon pilote prise en charge.",
+                    "This link does not identify a supported editorial pilot lesson.",
+                    "यह लिंक समर्थित संपादकीय पायलट पाठ की पहचान नहीं करता।", "此链接未指向受支持的编辑试点课程。",
+                    "지원되는 편집 파일럿 학습 링크가 아닙니다.",
+                    "El enlace no identifica una lección piloto compatible.",
+                    "Il link non identifica una lezione pilota supportata.",
+                    "Dieser Link verweist auf keine unterstützte Pilotlektion.",
+                ]
+            case .signInUnconfigured:
+                row = [
+                    "Connexion Microsoft non configurée", "Microsoft sign-in is not configured",
+                    "Microsoft साइन-इन कॉन्फ़िगर नहीं है", "尚未配置 Microsoft 登录", "Microsoft 로그인 미설정",
+                    "Inicio de sesión Microsoft sin configurar",
+                    "Accesso Microsoft non configurato", "Microsoft-Anmeldung nicht konfiguriert",
+                ]
+            case .productionTitle:
+                row = [
+                    "Éclairez votre prochaine décision.", "Make your next decision clearer.",
+                    "अपना अगला निर्णय स्पष्ट बनाएँ।", "让下一次决策更清晰。", "다음 결정을 더 명확하게.",
+                    "Aclara tu próxima decisión.", "Rendi più chiara la prossima decisione.",
+                    "Triff deine nächste Entscheidung klarer.",
+                ]
+            case .productionHint:
+                row = [
+                    "Vos objectifs, vos exercices et votre progression confirmée, réunis dans Certigo.",
+                    "Your learning goals, practice and confirmed progress, together in Certigo.",
+                    "आपके सीखने के लक्ष्य, अभ्यास और पुष्ट प्रगति, सब Certigo में।", "学习目标、练习与已确认进度，尽在 Certigo。",
+                    "학습 목표, 연습, 확인된 진행 상황을 Certigo에서 함께.",
+                    "Tus objetivos, práctica y progreso confirmado, juntos en Certigo.",
+                    "Obiettivi, pratica e progressi confermati, insieme in Certigo.",
+                    "Lernziele, Übungen und bestätigter Fortschritt – vereint in Certigo.",
+                ]
+            case .continueLearning:
+                row = [
+                    "Poursuivre votre apprentissage", "Continue your learning", "सीखना जारी रखें", "继续学习",
+                    "학습 계속하기", "Continuar aprendiendo", "Continua a imparare", "Weiterlernen",
+                ]
+            case .signInIncomplete:
+                row = [
+                    "Connexion Microsoft non aboutie", "Microsoft sign-in did not complete",
+                    "Microsoft साइन-इन पूरा नहीं हुआ", "Microsoft 登录未完成", "Microsoft 로그인 미완료",
+                    "Inicio de sesión Microsoft incompleto", "Accesso Microsoft non completato",
+                    "Microsoft-Anmeldung nicht abgeschlossen",
+                ]
+            case .socialUnavailable:
+                row = [
+                    "Amis et équipes non connectés", "Friends and teams are not connected",
+                    "मित्र और टीमें कनेक्ट नहीं हैं", "好友与团队尚未连接", "친구 및 팀 미연결", "Amigos y equipos sin conectar",
+                    "Amici e team non connessi", "Freunde und Teams nicht verbunden",
+                ]
+            case .socialUnavailableHint:
+                row = [
+                    "Invitations, partage et activités de groupe indisponibles. Aucun lien n’est créé ici.",
+                    "Invitations, sharing and group activity are not available. No relationships are created here.",
+                    "आमंत्रण, साझाकरण और समूह गतिविधि उपलब्ध नहीं हैं। यहाँ संबंध नहीं बनते।",
+                    "邀请、分享和群组活动暂不可用，这里不会建立社交关系。", "초대, 공유, 그룹 활동은 제공되지 않습니다. 관계가 생성되지 않습니다.",
+                    "Invitaciones, compartir y actividades grupales no disponibles. Aquí no se crean relaciones.",
+                    "Inviti, condivisione e attività di gruppo non disponibili. Qui non si creano relazioni.",
+                    "Einladungen, Teilen und Gruppenaktivitäten sind nicht verfügbar. Hier entstehen keine Kontakte.",
+                ]
+            case .privateLearning:
+                row = [
+                    "L’apprentissage privé avant tout", "Private learning comes first",
+                    "निजी सीखना पहले", "私密学习优先", "비공개 학습 우선", "El aprendizaje privado primero",
+                    "Prima l’apprendimento privato", "Privates Lernen zuerst",
+                ]
+            case .privateProfileHint:
+                row = [
+                    "Votre profil est votre dossier d’apprentissage privé, pas un profil public.",
+                    "Your Profile is your private learning record, not a friend profile.",
+                    "आपकी प्रोफ़ाइल निजी सीखने का रिकॉर्ड है, मित्र प्रोफ़ाइल नहीं।", "个人资料是私密学习记录，并非社交主页。",
+                    "프로필은 비공개 학습 기록이며 친구 프로필이 아닙니다.",
+                    "Tu perfil es tu registro privado de aprendizaje, no un perfil de amigos.",
+                    "Il profilo è un registro privato di apprendimento, non un profilo per amici.",
+                    "Dein Profil ist dein privater Lernnachweis, kein Freundesprofil.",
+                ]
+            case .privateResultsHint:
+                row = [
+                    "Consulter Social ne publie ni résultats détaillés, ni erreurs, ni préparation, ni contexte Coach.",
+                    "Detailed results, mistakes, readiness and Coach context are not published by visiting Social.",
+                    "Social खोलने से परिणाम, गलतियाँ, तैयारी या कोच संदर्भ प्रकाशित नहीं होते।",
+                    "访问社交不会公开详细结果、错误、准备度或教练上下文。", "소셜을 열어도 세부 결과, 실수, 준비도, 코치 맥락은 공개되지 않습니다.",
+                    "Visitar Social no publica resultados, errores, preparación ni contexto del Coach.",
+                    "Visitare Social non pubblica risultati, errori, preparazione o contesto Coach.",
+                    "Der Besuch von Social veröffentlicht weder Ergebnisse noch Fehler, Lernbereitschaft oder Coach-Kontext.",
+                ]
+            case .friendsInactive:
+                row = [
+                    "Amis · inactif", "Friends · not active", "मित्र · निष्क्रिय", "好友 · 未启用", "친구 · 비활성",
+                    "Amigos · inactivo", "Amici · non attivo", "Freunde · nicht aktiv",
+                ]
+            case .teamsInactive:
+                row = [
+                    "Équipes · inactif", "Teams · not active", "टीमें · निष्क्रिय", "团队 · 未启用", "팀 · 비활성",
+                    "Equipos · inactivo", "Team · non attivo", "Teams · nicht aktiv",
+                ]
+            case .friendsPrivacy:
+                row = [
+                    "Recherche d’amis, invitations et profils partagés désactivés. Aucun contact envoyé, aucune invitation expédiée.",
+                    "Friend discovery, invitations and shared profiles are not enabled. No contacts are uploaded and no invitations are sent.",
+                    "मित्र खोज, आमंत्रण और साझा प्रोफ़ाइल सक्षम नहीं हैं। संपर्क अपलोड या आमंत्रण भेजे नहीं जाते।",
+                    "好友发现、邀请与共享资料未启用。不会上传联系人或发送邀请。",
+                    "친구 찾기, 초대, 프로필 공유가 비활성화되어 있습니다. 연락처 업로드나 초대 전송은 없습니다.",
+                    "Descubrimiento de amigos, invitaciones y perfiles compartidos desactivados. No se suben contactos ni se envían invitaciones.",
+                    "Ricerca amici, inviti e profili condivisi non attivi. Nessun contatto caricato o invito inviato.",
+                    "Freundesuche, Einladungen und geteilte Profile sind deaktiviert. Keine Kontakte werden hochgeladen oder Einladungen versendet.",
+                ]
+            case .teamsPrivacy:
+                row = [
+                    "Adhésion, rôles, invitations et défis d’équipe désactivés. Une équipe partagée ne donnerait pas accès aux résultats privés ni à la préparation.",
+                    "Team membership, roles, invitations and challenges are not enabled. A shared team would not grant access to private results or readiness.",
+                    "टीम सदस्यता, भूमिकाएँ, आमंत्रण और चुनौतियाँ सक्षम नहीं हैं। साझा टीम निजी परिणाम या तैयारी तक पहुँच नहीं देगी।",
+                    "团队成员、角色、邀请与挑战未启用。共享团队也不会获得私密结果或准备度。",
+                    "팀 가입, 역할, 초대, 챌린지가 비활성화되어 있습니다. 팀 공유로도 비공개 결과나 준비도에 접근할 수 없습니다.",
+                    "Membresía, roles, invitaciones y retos de equipo desactivados. Un equipo no daría acceso a resultados privados ni preparación.",
+                    "Appartenenza, ruoli, inviti e sfide non attivi. Un team non darebbe accesso a risultati o preparazione privati.",
+                    "Mitgliedschaft, Rollen, Einladungen und Aufgaben sind deaktiviert. Ein Team erhielte keinen Zugriff auf private Ergebnisse oder Lernbereitschaft.",
+                ]
+            case .sharingConsent:
+                row = [
+                    "Tout partage futur nécessitera un accord explicite séparé, avec aperçu du contenu et du public. Aucun partage n’est actif ici.",
+                    "Any future sharing needs a separate, explicit opt-in with a preview of the content and audience. No sharing controls are active here.",
+                    "भविष्य में साझाकरण के लिए सामग्री और दर्शकों के पूर्वावलोकन सहित अलग स्पष्ट सहमति चाहिए। यहाँ साझाकरण सक्रिय नहीं है।",
+                    "未来分享须单独明确授权，并预览内容及受众。此处未启用分享。",
+                    "향후 공유에는 내용과 대상을 미리 확인하는 별도 동의가 필요합니다. 현재 공유 기능은 없습니다.",
+                    "Compartir en el futuro requerirá consentimiento explícito separado y vista del contenido y público. Aquí no hay controles activos.",
+                    "Ogni condivisione futura richiederà consenso esplicito separato e anteprima di contenuto e pubblico. Nessun controllo attivo qui.",
+                    "Künftiges Teilen erfordert eine gesonderte Zustimmung mit Vorschau von Inhalt und Zielgruppe. Hier ist kein Teilen aktiv.",
+                ]
+            case .returnLearning:
+                row = [
+                    "Revenir à l’apprentissage", "Return to learning", "सीखने पर लौटें", "返回学习",
+                    "학습으로 돌아가기", "Volver al aprendizaje", "Torna all’apprendimento",
+                    "Zurück zum Lernen",
+                ]
+            case .savingGoal:
+                row = [
+                    "Enregistrement de l’objectif…", "Saving active goal…", "सक्रिय लक्ष्य सहेजा जा रहा है…",
+                    "正在保存当前目标…", "활성 목표 저장 중…", "Guardando objetivo…", "Salvataggio obiettivo…",
+                    "Aktives Ziel wird gespeichert…",
+                ]
+            case .operationUnconfirmed:
+                row = [
+                    "Opération non confirmée", "Operation not confirmed", "कार्रवाई की पुष्टि नहीं", "操作未确认",
+                    "작업 미확인", "Operación no confirmada", "Operazione non confermata",
+                    "Vorgang nicht bestätigt",
+                ]
+            case .downloadQuestionPacks:
+                row = [
+                    "Télécharger les packs publics de questions ?",
+                    "Download public question packs?", "सार्वजनिक प्रश्न पैक डाउनलोड करें?", "下载公共题库包？",
+                    "공개 문제 팩을 다운로드할까요?", "¿Descargar paquetes públicos?",
+                    "Scaricare i pacchetti pubblici?", "Öffentliche Fragenpakete herunterladen?",
+                ]
+            case .downloadContent:
+                row = [
+                    "Télécharger le contenu public", "Download public content",
+                    "सार्वजनिक सामग्री डाउनलोड करें", "下载公共内容", "공개 콘텐츠 다운로드", "Descargar contenido público",
+                    "Scarica contenuto pubblico", "Öffentliche Inhalte herunterladen",
+                ]
+            case .downloadBoundary:
+                row = [
+                    "Toute la version publique actuelle sera téléchargée, pas seulement cette certification. Aucune solution téléchargée. Réponses locales jusqu’à l’envoi ; correction et XP nécessitent le serveur.",
+                    "This downloads the whole current public release, not just this certification. No solutions are downloaded. Answers stay local until you choose Submit; correction and XP require the server.",
+                    "पूरी वर्तमान सार्वजनिक रिलीज़ डाउनलोड होगी, केवल यह प्रमाणन नहीं। समाधान डाउनलोड नहीं होते। जमा करने तक उत्तर स्थानीय रहते हैं; सुधार और XP के लिए सर्वर चाहिए।",
+                    "将下载整个当前公共版本，而不只是此认证。不下载答案解析。提交前答案留在本地，评分与 XP 需要服务器。",
+                    "이 인증만이 아닌 현재 전체 공개 버전을 다운로드합니다. 정답은 내려받지 않습니다. 제출 전 답변은 기기에만 있으며 채점과 XP는 서버가 필요합니다.",
+                    "Se descarga toda la versión pública, no solo esta certificación. Sin soluciones. Las respuestas son locales hasta Enviar; corrección y XP requieren servidor.",
+                    "Scarica l’intera versione pubblica, non solo questa certificazione. Nessuna soluzione. Risposte locali fino all’invio; correzione e XP richiedono il server.",
+                    "Die gesamte öffentliche Version wird geladen, nicht nur diese Zertifizierung. Keine Lösungen. Antworten bleiben bis zum Absenden lokal; Auswertung und XP benötigen den Server.",
+                ]
+            case .offlinePack:
+                row = [
+                    "Pack de questions hors ligne", "Offline question pack", "ऑफ़लाइन प्रश्न पैक", "离线题库包",
+                    "오프라인 문제 팩", "Paquete de preguntas sin conexión", "Pacchetto domande offline",
+                    "Offline-Fragenpaket",
+                ]
+            case .downloadPack:
+                row = [
+                    "Télécharger les packs publics", "Download public question packs",
+                    "सार्वजनिक प्रश्न पैक डाउनलोड करें", "下载公共题库包", "공개 문제 팩 다운로드",
+                    "Descargar paquetes públicos", "Scarica pacchetti pubblici",
+                    "Öffentliche Fragenpakete laden",
+                ]
+            case .downloadedBoundary:
+                row = [
+                    "Contenu public téléchargé. Ni correction ni XP en local.",
+                    "Downloaded public content. No local correction or XP.",
+                    "सार्वजनिक सामग्री डाउनलोड हुई। स्थानीय सुधार या XP नहीं।", "已下载公共内容。本地不评分、不授予 XP。",
+                    "공개 콘텐츠 다운로드됨. 기기 내 채점이나 XP는 없습니다.",
+                    "Contenido público descargado. Sin corrección ni XP locales.",
+                    "Contenuto pubblico scaricato. Nessuna correzione o XP locali.",
+                    "Öffentliche Inhalte geladen. Keine lokale Auswertung oder XP.",
+                ]
+            case .pathUnavailable:
+                row = [
+                    "Parcours non chargé", "Learning path not loaded", "सीखने का पथ लोड नहीं हुआ",
+                    "学习路径未加载", "학습 경로 미로드", "Ruta no cargada", "Percorso non caricato",
+                    "Lernpfad nicht geladen",
+                ]
+            case .pathRetryHint:
+                row = [
+                    "Charger ou réessayer ce parcours ne modifie pas l’objectif actif.",
+                    "Load or retry this certification’s path. This does not change your active goal.",
+                    "इस प्रमाणन का पथ लोड करें या फिर प्रयास करें। सक्रिय लक्ष्य नहीं बदलेगा।", "加载或重试此认证路径，不会更改当前目标。",
+                    "경로를 불러오거나 재시도하세요. 활성 목표는 바뀌지 않습니다.",
+                    "Carga o reintenta esta ruta. No cambia tu objetivo activo.",
+                    "Carica o riprova il percorso. Non cambia l’obiettivo attivo.",
+                    "Lade diesen Lernpfad oder versuche es erneut. Dein aktives Ziel bleibt unverändert.",
+                ]
+            case .retryPath:
+                row = [
+                    "Charger ou réessayer", "Load or retry path", "पथ लोड करें या फिर प्रयास करें", "加载或重试路径",
+                    "경로 불러오기 또는 재시도", "Cargar o reintentar ruta", "Carica o riprova percorso",
+                    "Lernpfad laden oder erneut versuchen",
+                ]
+            case .chooseCertification:
+                row = [
+                    "Choisir une certification", "Choose a certification", "प्रमाणन चुनें", "选择认证",
+                    "인증 선택", "Elegir certificación", "Scegli certificazione",
+                    "Zertifizierung wählen",
+                ]
+            case .pathServerHint:
+                row = [
+                    "Le parcours sera chargé depuis le serveur.",
+                    "Its learning path will load from the server.", "पथ सर्वर से लोड होगा।",
+                    "将从服务器加载学习路径。", "서버에서 학습 경로를 불러옵니다.", "La ruta se cargará desde el servidor.",
+                    "Il percorso verrà caricato dal server.",
+                    "Der Lernpfad wird vom Server geladen.",
+                ]
+            case .learningPath:
+                row = [
+                    "Parcours d’apprentissage", "Learning path", "सीखने का पथ", "学习路径", "학습 경로",
+                    "Ruta de aprendizaje", "Percorso di apprendimento", "Lernpfad",
+                ]
+            case .answerInstruction:
+                row = [
+                    "Répondez, puis envoyez vos réponses pour correction par le serveur.",
+                    "Answer the questions, then submit your answers for server correction.",
+                    "प्रश्नों के उत्तर दें, फिर सर्वर सुधार के लिए जमा करें।", "回答问题后提交，由服务器评分。",
+                    "문제에 답한 후 서버 채점을 위해 제출하세요.",
+                    "Responde y envía tus respuestas para corrección del servidor.",
+                    "Rispondi, poi invia per la correzione del server.",
+                    "Beantworte die Fragen und sende sie zur Serverauswertung ab.",
+                ]
+            case .pendingCorrectionHint:
+                row = [
+                    "La correction sera demandée à la reconnexion. Aucun score ni XP confirmé.",
+                    "Correction will be requested after reconnecting. No score or XP is confirmed yet.",
+                    "दोबारा कनेक्ट होने पर सुधार माँगा जाएगा। अंक या XP की पुष्टि अभी नहीं है।", "重新连接后将请求评分，目前未确认分数或 XP。",
+                    "재연결 후 채점을 요청합니다. 점수나 XP는 아직 확인되지 않았습니다.",
+                    "Se pedirá corrección al reconectar. Aún no hay puntuación ni XP confirmados.",
+                    "Correzione richiesta alla riconnessione. Nessun punteggio o XP ancora confermato.",
+                    "Nach Wiederverbindung wird die Auswertung angefordert. Noch keine bestätigten Punkte oder XP.",
+                ]
+            case .confirmedResult:
+                row = [
+                    "Votre résultat confirmé", "Your confirmed result", "आपका पुष्ट परिणाम", "已确认的结果",
+                    "확인된 결과", "Tu resultado confirmado", "Il tuo risultato confermato",
+                    "Dein bestätigtes Ergebnis",
+                ]
+            case .answerCorrect:
+                row = [
+                    "Réponse correcte", "Correct answer", "सही उत्तर", "回答正确", "정답",
+                    "Respuesta correcta", "Risposta corretta", "Richtige Antwort",
+                ]
+            case .reviewNeeded:
+                row = [
+                    "À réviser", "Review needed", "समीक्षा आवश्यक", "需要复习", "복습 필요", "Necesita repaso",
+                    "Ripasso necessario", "Wiederholung nötig",
+                ]
+            case .newAttemptHint:
+                row = [
+                    "Commence une nouvelle sélection. La tentative confirmée reste dans l’historique.",
+                    "Starts a new answer selection for this activity. Your confirmed attempt stays in history.",
+                    "इस गतिविधि के लिए नया उत्तर चयन शुरू होगा। पुष्ट प्रयास इतिहास में रहेगा।", "为此活动开始新选择，已确认作答保留在历史中。",
+                    "새 답변 선택을 시작합니다. 확인된 시도는 기록에 남습니다.",
+                    "Inicia una selección nueva. Tu intento confirmado sigue en el historial.",
+                    "Avvia una nuova selezione. Il tentativo confermato resta nella cronologia.",
+                    "Startet eine neue Auswahl. Dein bestätigter Versuch bleibt im Verlauf.",
+                ]
+            case .practiceAgainHint:
+                row = [
+                    "Ouvrez une activité disponible pour vous exercer. Lire ne crée pas de tentative.",
+                    "Open an available activity in the learning plan to practice again. Reading does not create another attempt.",
+                    "फिर अभ्यास के लिए योजना की उपलब्ध गतिविधि खोलें। पढ़ने से नया प्रयास नहीं बनता।",
+                    "打开学习计划中的可用活动再次练习。阅读不会创建新作答。", "다시 연습하려면 학습 계획의 활동을 여세요. 읽기는 시도를 만들지 않습니다.",
+                    "Abre una actividad disponible para practicar. Leer no crea otro intento.",
+                    "Apri un’attività disponibile per esercitarti. Leggere non crea un tentativo.",
+                    "Öffne eine verfügbare Aktivität zum Üben. Lesen erzeugt keinen neuen Versuch.",
+                ]
+            case .lessonUnavailable:
+                row = [
+                    "Leçon indisponible", "Lesson unavailable", "पाठ उपलब्ध नहीं", "课程不可用", "학습 사용 불가",
+                    "Lección no disponible", "Lezione non disponibile", "Lektion nicht verfügbar",
+                ]
+            case .lessonLoadFailure:
+                row = [
+                    "Impossible de charger la leçon choisie.",
+                    "The selected lesson could not be loaded.", "चुना पाठ लोड नहीं हो सका।", "无法加载所选课程。",
+                    "선택한 학습을 불러오지 못했습니다.", "No se pudo cargar la lección elegida.",
+                    "Impossibile caricare la lezione selezionata.",
+                    "Die gewählte Lektion konnte nicht geladen werden.",
+                ]
+            case .oneSession:
+                row = [
+                    "Une session à la fois", "One session at a time", "एक समय में एक सत्र", "一次一个学习单元",
+                    "한 번에 하나의 세션", "Una sesión a la vez", "Una sessione alla volta",
+                    "Eine Sitzung nach der anderen",
+                ]
+            case .chooseActivity:
+                row = [
+                    "Choisissez une activité du parcours.",
+                    "Choose an activity in the learning path.", "सीखने के पथ में गतिविधि चुनें।",
+                    "选择学习路径中的活动。", "학습 경로에서 활동을 선택하세요.", "Elige una actividad de la ruta.",
+                    "Scegli un’attività nel percorso.", "Wähle eine Aktivität im Lernpfad.",
+                ]
+            case .goalPending:
+                row = [
+                    "Changement d’objectif en attente du serveur",
+                    "Goal change pending · waiting for the server", "लक्ष्य परिवर्तन लंबित · सर्वर की प्रतीक्षा",
+                    "目标更改等待中 · 等待服务器", "목표 변경 대기 · 서버 응답 대기",
+                    "Cambio de objetivo pendiente · esperando servidor",
+                    "Cambio obiettivo in attesa del server",
+                    "Zielwechsel ausstehend · warte auf Server",
+                ]
+            case .goalConfirmed:
+                row = [
+                    "C’est votre objectif actif confirmé", "This is your confirmed active goal",
+                    "यह आपका पुष्ट सक्रिय लक्ष्य है", "这是已确认的当前目标", "확인된 활성 목표입니다",
+                    "Este es tu objetivo activo confirmado",
+                    "Questo è l’obiettivo attivo confermato",
+                    "Dies ist dein bestätigtes aktives Ziel",
+                ]
+            case .goalViewing:
+                row = [
+                    "Objectif consulté · non sélectionné", "Viewing a goal · not selected",
+                    "लक्ष्य देख रहे हैं · चुना नहीं", "正在浏览目标 · 未选择", "목표 보기 · 미선택",
+                    "Viendo un objetivo · no seleccionado",
+                    "Obiettivo visualizzato · non selezionato", "Ziel ansehen · nicht ausgewählt",
+                ]
+            case .chooseGoal:
+                row = [
+                    "Choisir comme objectif actif", "Choose as active goal", "सक्रिय लक्ष्य के रूप में चुनें",
+                    "设为当前目标", "활성 목표로 선택", "Elegir como objetivo activo",
+                    "Scegli come obiettivo attivo", "Als aktives Ziel wählen",
+                ]
+            case .demoPreviewOnly:
+                row = [
+                    "Ceci est un aperçu de navigation, pas un service connecté.",
+                    "This is a navigation preview, not a working service.",
+                    "यह नेविगेशन पूर्वावलोकन है, चालू सेवा नहीं।", "这是导航预览，并非已连接服务。",
+                    "이것은 탐색 미리 보기이며 연결된 서비스가 아닙니다.",
+                    "Es una vista de navegación, no un servicio conectado.",
+                    "È un’anteprima di navigazione, non un servizio connesso.",
+                    "Dies ist eine Navigationsvorschau, kein verbundener Dienst.",
+                ]
+            case .demoHistory:
+                row = [
+                    "Historique de la démo", "Demo history", "डेमो इतिहास", "演示历史", "데모 기록",
+                    "Historial de demo", "Cronologia demo", "Demo-Verlauf",
+                ]
+            case .demoHistoryHint:
+                row = [
+                    "Cette démonstration enregistrée ne constitue pas une progression de certification.",
+                    "This saved demonstration is not certification progress.",
+                    "यह सहेजा डेमो प्रमाणन प्रगति नहीं है।", "已保存演示并非认证学习进度。", "이 저장된 데모는 인증 학습 진행 상황이 아닙니다.",
+                    "Esta demo guardada no es progreso de certificación.",
+                    "Questa demo salvata non è progresso di certificazione.",
+                    "Diese gespeicherte Demo ist kein Zertifizierungsfortschritt.",
+                ]
+            case .demoResponsibilities:
+                row = [
+                    "Qui gère quoi ?", "Who manages what?", "कौन क्या संभालता है?", "谁管理什么？",
+                    "누가 무엇을 관리하나요?", "¿Quién gestiona qué?", "Chi gestisce cosa?",
+                    "Wer verwaltet was?",
+                ]
+            case .demoNotice:
+                row = [
+                    "Démo · données et résultats fictifs", "Demo · fictional data and results",
+                    "डेमो · काल्पनिक डेटा और परिणाम", "演示 · 虚构数据与结果", "데모 · 가상 데이터 및 결과",
+                    "Demo · datos y resultados ficticios", "Demo · dati e risultati fittizi",
+                    "Demo · fiktive Daten und Ergebnisse",
+                ]
+            case .demoFrenchExamples:
+                row = [
+                    "Exemples pédagogiques : français", "Learning examples: French",
+                    "सीखने के उदाहरण: फ़्रेंच", "学习示例：法语", "학습 예시: 프랑스어", "Ejemplos de aprendizaje: francés",
+                    "Esempi didattici: francese", "Lernbeispiele: Französisch",
+                ]
+            case .demoOptions:
+                row = [
+                    "Options de la démo", "Demo options", "डेमो विकल्प", "演示选项", "데모 옵션",
+                    "Opciones de demo", "Opzioni demo", "Demo-Optionen",
+                ]
+            case .demoExploreSituation:
+                row = [
+                    "Explorer la situation", "Explore the situation", "स्थिति खोजें", "探索情境", "상황 살펴보기",
+                    "Explorar la situación", "Esplora la situazione", "Situation erkunden",
+                ]
+            case .demoSituationNoGrade:
+                row = [
+                    "Une situation à explorer · sans note", "A situation to explore · no grade",
+                    "समझने की स्थिति · अंक नहीं", "待探索的情境 · 不评分", "살펴볼 상황 · 점수 없음",
+                    "Una situación para explorar · sin nota",
+                    "Una situazione da esplorare · senza voto",
+                    "Situation zum Erkunden · ohne Note",
+                ]
+            case .demoEditableChoice:
+                row = [
+                    "Un choix modifiable · non envoyé", "An editable choice · not submitted",
+                    "बदल सकने वाला विकल्प · जमा नहीं", "可编辑选择 · 尚未提交", "변경 가능한 선택 · 제출 안 됨",
+                    "Elección editable · no enviada", "Scelta modificabile · non inviata",
+                    "Änderbare Auswahl · nicht abgesendet",
+                ]
+            case .demoAnswerPending:
+                row = [
+                    "Réponse de démo en attente · aucun résultat confirmé",
+                    "Demo answer pending · no confirmed result", "डेमो उत्तर लंबित · पुष्ट परिणाम नहीं",
+                    "演示答案等待中 · 无已确认结果", "데모 답변 대기 중 · 확인된 결과 없음",
+                    "Respuesta demo pendiente · sin resultado confirmado",
+                    "Risposta demo in attesa · nessun risultato confermato",
+                    "Demo-Antwort ausstehend · kein bestätigtes Ergebnis",
+                ]
+            case .demoExplanationAvailable:
+                row = [
+                    "Explication fictive disponible · sans verdict",
+                    "Fictional explanation available · no verdict", "काल्पनिक व्याख्या उपलब्ध · निर्णय नहीं",
+                    "虚构解析已可查看 · 不作判定", "가상 설명 사용 가능 · 정답 판정 없음",
+                    "Explicación ficticia disponible · sin veredicto",
+                    "Spiegazione fittizia disponibile · nessun verdetto",
+                    "Fiktive Erklärung verfügbar · kein Urteil",
+                ]
+            case .demoStartQuestion:
+                row = [
+                    "Commencer une question", "Start a question", "प्रश्न शुरू करें", "开始答题", "문제 시작",
+                    "Empezar una pregunta", "Inizia una domanda", "Frage beginnen",
+                ]
+            case .demoResumeChoice:
+                row = [
+                    "Reprendre votre choix", "Resume your choice", "विकल्प पर लौटें", "继续你的选择",
+                    "선택 이어서 하기", "Retomar tu elección", "Riprendi la scelta", "Auswahl fortsetzen",
+                ]
+            case .demoResumePending:
+                row = [
+                    "Reprendre la réponse en attente", "Resume the pending answer", "लंबित उत्तर पर लौटें",
+                    "继续等待中的答案", "대기 중인 답변 이어서 하기", "Retomar respuesta pendiente",
+                    "Riprendi risposta in attesa", "Ausstehende Antwort fortsetzen",
+                ]
+            case .demoReadExplanation:
+                row = [
+                    "Relire l’explication fictive", "Read the fictional explanation again",
+                    "काल्पनिक व्याख्या फिर पढ़ें", "重读虚构解析", "가상 설명 다시 읽기",
+                    "Volver a leer la explicación ficticia", "Rileggi la spiegazione fittizia",
+                    "Fiktive Erklärung erneut lesen",
+                ]
+            case .demoCloudDiscovery:
+                row = [
+                    "Cloud · découverte", "Cloud · discovery", "क्लाउड · परिचय", "云 · 探索",
+                    "클라우드 · 알아보기", "Nube · descubrimiento", "Cloud · scoperta", "Cloud · Einstieg",
+                ]
+            case .demoCloudOperations:
+                row = [
+                    "Cloud · exploitation", "Cloud · operations", "क्लाउड · संचालन", "云 · 运维",
+                    "클라우드 · 운영", "Nube · operaciones", "Cloud · operazioni", "Cloud · Betrieb",
+                ]
+            case .demoCloudFundamentals:
+                row = [
+                    "Les fondamentaux du cloud", "Cloud fundamentals", "क्लाउड की बुनियाद", "云基础知识",
+                    "클라우드 기초", "Fundamentos de la nube", "Fondamenti del cloud", "Cloud-Grundlagen",
+                ]
+            case .demoCloudPractice:
+                row = [
+                    "Les services cloud en pratique", "Cloud services in practice",
+                    "व्यवहार में क्लाउड सेवाएँ", "云服务实践", "클라우드 서비스 실습", "Servicios de nube en la práctica",
+                    "Servizi cloud in pratica", "Cloud-Dienste in der Praxis",
+                ]
+            case .demoStageSituation:
+                row = [
+                    "Situation", "Situation", "स्थिति", "情境", "상황", "Situación", "Situazione",
+                    "Situation",
+                ]
+            case .demoStageDecision:
+                row = [
+                    "Décision", "Decision", "निर्णय", "决策", "결정", "Decisión", "Decisione",
+                    "Entscheidung",
+                ]
+            case .demoStageExplanation:
+                row = [
+                    "Explication", "Explanation", "व्याख्या", "解析", "설명", "Explicación", "Spiegazione",
+                    "Erklärung",
+                ]
+            case .demoStageHint:
+                row = [
+                    "Les étapes décrivent le parcours, pas la justesse d’une réponse.",
+                    "Stages describe the learning flow, not whether an answer is correct.",
+                    "चरण सीखने का क्रम हैं, उत्तर की शुद्धता नहीं।", "步骤表示学习流程，并不表示答案正确与否。",
+                    "단계는 학습 흐름을 나타내며 정답 여부를 뜻하지 않습니다.",
+                    "Las etapas describen el aprendizaje, no si la respuesta es correcta.",
+                    "Le fasi descrivono il percorso, non la correttezza della risposta.",
+                    "Die Schritte beschreiben den Lernablauf, nicht die Richtigkeit einer Antwort.",
+                ]
+            case .demoReady:
+                row = ["Prêt", "Ready", "तैयार", "就绪", "준비됨", "Listo", "Pronto", "Bereit"]
+            case .demoLoading:
+                row = [
+                    "Chargement", "Loading", "लोड हो रहा है", "加载中", "불러오는 중", "Cargando",
+                    "Caricamento", "Laden",
+                ]
+            case .demoEmpty: row = ["Vide", "Empty", "खाली", "空", "비어 있음", "Vacío", "Vuoto", "Leer"]
+            case .demoError:
+                row = ["Erreur", "Error", "त्रुटि", "错误", "오류", "Error", "Errore", "Fehler"]
+            case .close:
+                row = ["Fermer", "Close", "बंद करें", "关闭", "닫기", "Cerrar", "Chiudi", "Schließen"]
+            case .demoCoachUnavailable:
+                row = [
+                    "Le Coach n’est pas connecté dans cet aperçu. Aucune réponse IA, conversation ou mémoire n’est créée.",
+                    "Coach is not connected in this preview. No AI response, conversation history or saved memory is created.",
+                    "इस पूर्वावलोकन में कोच जुड़ा नहीं है। कोई AI जवाब, बातचीत या स्मृति नहीं बनती।",
+                    "此预览未连接教练，不会创建 AI 回复、对话历史或记忆。",
+                    "이 미리 보기에는 코치가 연결되어 있지 않습니다. AI 응답, 대화 기록, 메모리가 생성되지 않습니다.",
+                    "El Coach no está conectado. No se crean respuestas de IA, historial ni memoria.",
+                    "Il Coach non è connesso. Nessuna risposta IA, cronologia o memoria viene creata.",
+                    "Coach ist nicht verbunden. Keine KI-Antworten, Gesprächsverläufe oder Erinnerungen werden erstellt.",
+                ]
+            case .demoCatalogStates:
+                row = [
+                    "États du catalogue · simulation", "Catalog states · simulation",
+                    "कैटलॉग स्थितियाँ · अभ्यास", "目录状态 · 模拟", "카탈로그 상태 · 시뮬레이션",
+                    "Estados del catálogo · simulación", "Stati del catalogo · simulazione",
+                    "Katalogzustände · Simulation",
+                ]
+            case .demoCatalog:
+                row = [
+                    "Catalogue", "Catalog", "कैटलॉग", "目录", "카탈로그", "Catálogo", "Catalogo", "Katalog",
+                ]
+            case .demoOfflineToggle:
+                row = [
+                    "Simuler le mode hors ligne", "Simulate offline mode", "ऑफ़लाइन मोड का अभ्यास",
+                    "模拟离线模式", "오프라인 모드 시뮬레이션", "Simular modo sin conexión",
+                    "Simula modalità offline", "Offline-Modus simulieren",
+                ]
+            case .demoSettingsScope:
+                row = [
+                    "Ces réglages ne modifient ni le réseau de l’appareil ni un serveur.",
+                    "These settings do not change the device network or a server.",
+                    "ये सेटिंग डिवाइस नेटवर्क या सर्वर को नहीं बदलतीं।", "这些设置不会更改设备网络或服务器。",
+                    "이 설정은 기기 네트워크나 서버를 변경하지 않습니다.",
+                    "Estos ajustes no cambian la red del dispositivo ni un servidor.",
+                    "Queste impostazioni non cambiano la rete del dispositivo o un server.",
+                    "Diese Einstellungen ändern weder das Gerätenetzwerk noch einen Server.",
+                ]
+            case .demoSettings:
+                row = [
+                    "Réglages de la démo", "Demo settings", "डेमो सेटिंग", "演示设置", "데모 설정",
+                    "Ajustes de la demo", "Impostazioni demo", "Demo-Einstellungen",
+                ]
+            case .demoResetConfirmation:
+                row = [
+                    "Effacer uniquement la démonstration enregistrée ?",
+                    "Clear only the saved demonstration?", "केवल सहेजा हुआ डेमो मिटाएँ?", "仅清除已保存的演示？",
+                    "저장된 데모만 지울까요?", "¿Borrar solo la demostración guardada?",
+                    "Cancellare solo la demo salvata?", "Nur die gespeicherte Demo löschen?",
+                ]
+            case .demoReset:
+                row = [
+                    "Réinitialiser la démo", "Reset the demo", "डेमो रीसेट करें", "重置演示", "데모 재설정",
+                    "Restablecer la demo", "Reimposta demo", "Demo zurücksetzen",
+                ]
+            case .demoRestorationUnavailable:
+                row = [
+                    "Restauration de la démo indisponible", "Demo restoration unavailable",
+                    "डेमो बहाली उपलब्ध नहीं", "无法恢复演示", "데모 복원 불가", "Restauración de demo no disponible",
+                    "Ripristino demo non disponibile", "Demo-Wiederherstellung nicht verfügbar",
+                ]
+            case .demoRestoreFailure:
+                row = [
+                    "La démo enregistrée est illisible. Réinitialisez uniquement la démo dans ses réglages.",
+                    "The saved demonstration cannot be read. Reset only the demo in its settings.",
+                    "सहेजा डेमो पढ़ा नहीं जा सका। सेटिंग में केवल डेमो रीसेट करें।", "无法读取已保存的演示，请仅在演示设置中重置演示。",
+                    "저장된 데모를 읽을 수 없습니다. 데모 설정에서 데모만 재설정하세요.",
+                    "No se puede leer la demo guardada. Restablece solo la demo en sus ajustes.",
+                    "Impossibile leggere la demo salvata. Reimposta solo la demo nelle sue impostazioni.",
+                    "Die gespeicherte Demo ist nicht lesbar. Setze nur die Demo in ihren Einstellungen zurück.",
+                ]
+            case .demoSaveFailure:
+                row = [
+                    "La démo n’a pas pu être enregistrée. Vous pouvez poursuivre cette session.",
+                    "The demonstration could not be saved. You can continue in the current session.",
+                    "डेमो सहेजा नहीं जा सका। मौजूदा सत्र जारी रख सकते हैं।", "无法保存演示，仍可继续当前会话。",
+                    "데모를 저장할 수 없습니다. 현재 세션은 계속할 수 있습니다.",
+                    "No se pudo guardar la demo. Puedes continuar esta sesión.",
+                    "Impossibile salvare la demo. Puoi continuare la sessione attuale.",
+                    "Die Demo konnte nicht gespeichert werden. Du kannst diese Sitzung fortsetzen.",
+                ]
+            case .demoReopenFailure:
+                row = [
+                    "La question ne peut pas être rouverte. Choisissez un objectif dans Apprendre > Explorer.",
+                    "The question cannot be reopened. Choose a goal in Learn > Explore.",
+                    "प्रश्न फिर नहीं खुल सका। सीखें > खोजें में लक्ष्य चुनें।", "无法重新打开题目，请在学习 > 探索中选择目标。",
+                    "문제를 다시 열 수 없습니다. 학습 > 둘러보기에서 목표를 선택하세요.",
+                    "No se puede reabrir la pregunta. Elige un objetivo en Aprender > Explorar.",
+                    "Impossibile riaprire la domanda. Scegli un obiettivo in Impara > Esplora.",
+                    "Die Frage kann nicht erneut geöffnet werden. Wähle ein Ziel unter Lernen > Entdecken.",
+                ]
+            case .demoReturnLearn:
+                row = [
+                    "Revenir à Apprendre", "Return to Learn", "सीखें पर लौटें", "返回学习", "학습으로 돌아가기",
+                    "Volver a Aprender", "Torna a Impara", "Zurück zu Lernen",
+                ]
+            case .demoSocialUnavailable:
+                row = [
+                    "Social est indisponible dans cet aperçu. Aucune relation, invitation, équipe ou donnée partagée réelle n’est chargée.",
+                    "Social is unavailable in this navigation preview. No real relationships, invitations, team membership or sharing are loaded.",
+                    "इस पूर्वावलोकन में सामाजिक सुविधा उपलब्ध नहीं। कोई असली संबंध, निमंत्रण, टीम सदस्यता या साझा डेटा नहीं है।",
+                    "此导航预览不提供社交功能，不会加载真实关系、邀请、团队成员或共享内容。",
+                    "이 탐색 미리 보기에서는 소셜을 사용할 수 없습니다. 실제 관계, 초대, 팀 소속, 공유 데이터는 불러오지 않습니다.",
+                    "Social no está disponible. No se cargan relaciones, invitaciones, equipos ni datos compartidos reales.",
+                    "Social non è disponibile. Non vengono caricati relazioni, inviti, appartenenze o condivisioni reali.",
+                    "Social ist nicht verfügbar. Keine echten Beziehungen, Einladungen, Teamzugehörigkeiten oder Freigaben werden geladen.",
+                ]
+            case .demoWorkshop:
+                row = [
+                    "L’atelier de décision", "The decision workshop", "निर्णय कार्यशाला", "决策练习坊",
+                    "의사 결정 워크숍", "El taller de decisiones", "Il laboratorio decisionale",
+                    "Die Entscheidungswerkstatt",
+                ]
+            case .demoWorkshopHint:
+                row = [
+                    "Lisez une situation, faites un choix, comprenez l’explication.",
+                    "Read a situation, make a choice, understand the explanation.",
+                    "स्थिति पढ़ें, विकल्प चुनें, व्याख्या समझें।", "阅读情境、作出选择、理解解析。", "상황을 읽고, 선택하고, 설명을 이해하세요.",
+                    "Lee una situación, elige y comprende la explicación.",
+                    "Leggi una situazione, scegli e comprendi la spiegazione.",
+                    "Lies eine Situation, entscheide und verstehe die Erklärung.",
+                ]
+            case .demoFictionalContent:
+                row = [
+                    "Contenu fictif · pas un cours publié",
+                    "Fictional content · not a published course", "काल्पनिक सामग्री · प्रकाशित पाठ्यक्रम नहीं",
+                    "虚构内容 · 非已发布课程", "가상 콘텐츠 · 게시된 강좌 아님",
+                    "Contenido ficticio · no es un curso publicado",
+                    "Contenuto fittizio · non un corso pubblicato",
+                    "Fiktiver Inhalt · kein veröffentlichter Kurs",
+                ]
+            case .demoSwitchGoal:
+                row = [
+                    "Changer d’objectif", "Switch goal", "लक्ष्य बदलें", "切换目标", "목표 변경",
+                    "Cambiar objetivo", "Cambia obiettivo", "Ziel wechseln",
+                ]
+            case .demoHistoryAction:
+                row = [
+                    "Voir l’historique de la démo", "View demo history", "डेमो इतिहास देखें", "查看演示历史",
+                    "데모 기록 보기", "Ver historial de demo", "Vedi cronologia demo",
+                    "Demo-Verlauf ansehen",
+                ]
+            case .demoNextGoal:
+                row = [
+                    "Votre prochain objectif", "Your next learning goal", "आपका अगला सीखने का लक्ष्य",
+                    "你的下一个学习目标", "다음 학습 목표", "Tu próximo objetivo", "Il tuo prossimo obiettivo",
+                    "Dein nächstes Lernziel",
+                ]
+            case .demoExploreHint:
+                row = [
+                    "Explorez deux situations fictives. Aucun compte ni résultat réel n’est nécessaire.",
+                    "Explore two fictional situations. No account or real result is needed.",
+                    "दो काल्पनिक स्थितियाँ खोजें। खाता या असली परिणाम नहीं चाहिए।", "探索两个虚构情境，无需账户或真实结果。",
+                    "두 가지 가상 상황을 살펴보세요. 계정이나 실제 결과는 필요 없습니다.",
+                    "Explora dos situaciones ficticias. No necesitas cuenta ni resultados reales.",
+                    "Esplora due situazioni fittizie. Non servono account o risultati reali.",
+                    "Erkunde zwei fiktive Situationen. Kein Konto oder echtes Ergebnis nötig.",
+                ]
+            case .demoChooseHint:
+                row = [
+                    "Choisissez un objectif de démo. Ces exemples en français sont fictifs, pas des cours publiés.",
+                    "Choose a demo goal to begin. These French examples are fictional, not published courses.",
+                    "डेमो लक्ष्य चुनें। ये फ़्रेंच उदाहरण काल्पनिक हैं, प्रकाशित पाठ्यक्रम नहीं।", "选择演示目标开始。这些法语示例是虚构内容，并非已发布课程。",
+                    "데모 목표를 선택하세요. 이 프랑스어 예시는 가상이며 게시된 강좌가 아닙니다.",
+                    "Elige un objetivo de demo. Los ejemplos en francés son ficticios, no cursos publicados.",
+                    "Scegli un obiettivo demo. Gli esempi francesi sono fittizi, non corsi pubblicati.",
+                    "Wähle ein Demo-Ziel. Die französischen Beispiele sind fiktiv, keine veröffentlichten Kurse.",
+                ]
+            case .demoWorkshops:
+                row = [
+                    "Ateliers de démonstration", "Demonstration workshops", "डेमो कार्यशालाएँ", "演示练习坊",
+                    "데모 워크숍", "Talleres de demostración", "Laboratori dimostrativi",
+                    "Demo-Werkstätten",
+                ]
+            case .demoVolume:
+                row = [
+                    "1 situation fictive · 1 question · français",
+                    "1 fictional situation · 1 question · French", "1 काल्पनिक स्थिति · 1 प्रश्न · फ़्रेंच",
+                    "1 个虚构情境 · 1 道题 · 法语", "가상 상황 1개 · 문제 1개 · 프랑스어",
+                    "1 situación ficticia · 1 pregunta · francés",
+                    "1 situazione fittizia · 1 domanda · francese",
+                    "1 fiktive Situation · 1 Frage · Französisch",
+                ]
+            case .demoSelectedGoal:
+                row = [
+                    "Objectif choisi", "Selected goal", "चुना लक्ष्य", "已选目标", "선택한 목표",
+                    "Objetivo seleccionado", "Obiettivo selezionato", "Ausgewähltes Ziel",
+                ]
+            case .demoSituationExplore:
+                row = [
+                    "Une situation à explorer", "A situation to explore", "खोजने के लिए एक स्थिति",
+                    "待探索的情境", "살펴볼 상황", "Una situación para explorar",
+                    "Una situazione da esplorare", "Eine Situation zum Erkunden",
+                ]
+            case .demoFinishLoading:
+                row = [
+                    "Terminer le chargement simulé", "Finish simulated loading", "अभ्यास लोडिंग पूरी करें",
+                    "完成模拟加载", "시뮬레이션 불러오기 완료", "Finalizar carga simulada",
+                    "Termina caricamento simulato", "Simuliertes Laden beenden",
+                ]
+            case .demoNoGoals:
+                row = [
+                    "Aucun objectif dans cet exemple", "No goals in this example",
+                    "इस उदाहरण में कोई लक्ष्य नहीं", "此示例中没有目标", "이 예시에 목표 없음",
+                    "No hay objetivos en este ejemplo", "Nessun obiettivo in questo esempio",
+                    "Keine Ziele in diesem Beispiel",
+                ]
+            case .demoEmptyHint:
+                row = [
+                    "Le catalogue vide est un scénario de démonstration.",
+                    "The empty catalog is a demonstration scenario.", "खाली कैटलॉग एक डेमो स्थिति है।",
+                    "空目录是演示情境。", "빈 카탈로그는 데모 시나리오입니다.",
+                    "El catálogo vacío es un escenario de demo.",
+                    "Il catalogo vuoto è uno scenario demo.",
+                    "Der leere Katalog ist ein Demo-Szenario.",
+                ]
+            case .demoShowGoals:
+                row = [
+                    "Afficher les objectifs de démo", "Show demo goals", "डेमो लक्ष्य दिखाएँ", "显示演示目标",
+                    "데모 목표 표시", "Mostrar objetivos de demo", "Mostra obiettivi demo",
+                    "Demo-Ziele anzeigen",
+                ]
+            case .demoCatalogUnavailable:
+                row = [
+                    "Catalogue indisponible · simulation", "Catalog unavailable · simulation",
+                    "कैटलॉग अनुपलब्ध · अभ्यास", "目录不可用 · 模拟", "카탈로그 사용 불가 · 시뮬레이션",
+                    "Catálogo no disponible · simulación", "Catalogo non disponibile · simulazione",
+                    "Katalog nicht verfügbar · Simulation",
+                ]
+            case .demoPreservedHint:
+                row = [
+                    "Votre état de démo est conservé. Aucun serveur n’est contacté.",
+                    "Your demo state is preserved. No server is contacted.",
+                    "डेमो स्थिति सुरक्षित है। किसी सर्वर से संपर्क नहीं होता।", "演示状态已保留，不会联系服务器。",
+                    "데모 상태는 유지됩니다. 서버에 연결하지 않습니다.",
+                    "Tu estado de demo se conserva. No se contacta con ningún servidor.",
+                    "Lo stato demo è conservato. Nessun server viene contattato.",
+                    "Dein Demo-Zustand bleibt erhalten. Kein Server wird kontaktiert.",
+                ]
+            case .demoScenarioHint:
+                row = [
+                    "Un scénario court pour explorer l’expérience native. Ce n’est pas un catalogue publié.",
+                    "A short scenario to explore the native experience. This is not a published catalog.",
+                    "मूल ऐप अनुभव खोजने के लिए छोटा परिदृश्य। यह प्रकाशित कैटलॉग नहीं।", "用于体验原生应用的简短情境，并非已发布目录。",
+                    "네이티브 경험을 살펴보는 짧은 시나리오입니다. 게시된 카탈로그가 아닙니다.",
+                    "Un escenario breve para explorar la experiencia nativa. No es un catálogo publicado.",
+                    "Un breve scenario per esplorare l’esperienza nativa. Non è un catalogo pubblicato.",
+                    "Ein kurzes Szenario zum Erkunden der nativen App. Kein veröffentlichter Katalog.",
+                ]
+            case .demoDecisionExplore:
+                row = [
+                    "La décision à explorer", "The decision to explore", "समझने के लिए निर्णय", "待探索的决策",
+                    "살펴볼 결정", "La decisión que explorar", "La decisione da esplorare",
+                    "Die zu erkundende Entscheidung",
+                ]
+            case .demoFictionalSituation:
+                row = [
+                    "La situation fictive", "The fictional situation", "काल्पनिक स्थिति", "虚构情境", "가상 상황",
+                    "La situación ficticia", "La situazione fittizia", "Die fiktive Situation",
+                ]
+            case .demoNoGrade:
+                row = [
+                    "Lire, choisir, comprendre · sans note", "Read, choose, understand · no grade",
+                    "पढ़ें, चुनें, समझें · अंक नहीं", "阅读、选择、理解 · 不评分", "읽고, 선택하고, 이해하기 · 점수 없음",
+                    "Leer, elegir, comprender · sin nota", "Leggi, scegli, comprendi · senza voto",
+                    "Lesen, wählen, verstehen · ohne Note",
+                ]
+            case .demoLocalRestore:
+                row = [
+                    "Restauration locale de la démo", "Local demo restoration", "डिवाइस पर डेमो बहाली",
+                    "本机演示恢复", "기기 내 데모 복원", "Restauración local de demo", "Ripristino locale demo",
+                    "Lokale Demo-Wiederherstellung",
+                ]
+            case .demoSituation:
+                row = [
+                    "La situation", "The situation", "स्थिति", "情境", "상황", "La situación",
+                    "La situazione", "Die Situation",
+                ]
+            case .demoTask:
+                row = [
+                    "Votre mission", "Your task", "आपका कार्य", "你的任务", "과제", "Tu tarea",
+                    "Il tuo compito", "Deine Aufgabe",
+                ]
+            case .demoBeforeChoose:
+                row = [
+                    "Avant de choisir", "Before you choose", "चुनने से पहले", "选择之前", "선택하기 전에",
+                    "Antes de elegir", "Prima di scegliere", "Bevor du wählst",
+                ]
+            case .demoBoundaryHint:
+                row = [
+                    "Identifiez ce que l’équipe veut gérer et déléguer. Concentrez-vous sur cette limite, pas sur le nom du fournisseur.",
+                    "Identify what the team wants to manage and what it wants to delegate. Focus on that boundary, not a provider name.",
+                    "पहचानें कि टीम क्या संभालेगी और क्या सौंपेगी। प्रदाता के नाम नहीं, सीमा पर ध्यान दें।",
+                    "识别团队希望管理和委托的职责，关注责任边界而非提供商名称。",
+                    "팀이 직접 관리할 것과 위임할 것을 구분하세요. 제공자 이름보다 경계에 집중하세요.",
+                    "Identifica qué quiere gestionar y delegar el equipo. Céntrate en ese límite, no en el proveedor.",
+                    "Individua cosa il team vuole gestire o delegare. Concentrati sul confine, non sul fornitore.",
+                    "Erkenne, was das Team verwalten oder delegieren möchte. Achte auf diese Grenze, nicht auf Anbieternamen.",
+                ]
+            case .demoOpenQuestion:
+                row = [
+                    "Ouvrir la question", "Open the question", "प्रश्न खोलें", "打开题目", "문제 열기",
+                    "Abrir la pregunta", "Apri la domanda", "Frage öffnen",
+                ]
+            case .demoPreparation:
+                row = [
+                    "Préparation", "Preparation", "तैयारी", "准备", "준비", "Preparación", "Preparazione",
+                    "Vorbereitung",
+                ]
+            case .demoChooseAnswer:
+                row = [
+                    "Choisissez une réponse", "Choose an answer", "उत्तर चुनें", "选择答案", "답변 선택",
+                    "Elige una respuesta", "Scegli una risposta", "Wähle eine Antwort",
+                ]
+            case .demoAnswerSelected:
+                row = [
+                    "Réponse choisie", "Answer selected", "उत्तर चुना गया", "已选答案", "답변 선택됨",
+                    "Respuesta seleccionada", "Risposta selezionata", "Antwort ausgewählt",
+                ]
+            case .selected:
+                row = [
+                    "Sélectionné", "Selected", "चुना गया", "已选择", "선택됨", "Seleccionado", "Selezionato",
+                    "Ausgewählt",
+                ]
+            case .notSelected:
+                row = [
+                    "Non sélectionné", "Not selected", "नहीं चुना गया", "未选择", "선택 안 됨",
+                    "No seleccionado", "Non selezionato", "Nicht ausgewählt",
+                ]
+            case .demoEditableHint:
+                row = [
+                    "Vous pouvez modifier votre choix avant l’envoi simulé.",
+                    "You can change your choice before the simulated submission.",
+                    "अभ्यास जमा करने से पहले विकल्प बदल सकते हैं।", "模拟提交前可更改选择。",
+                    "시뮬레이션 제출 전에는 선택을 변경할 수 있습니다.",
+                    "Puedes cambiar tu elección antes del envío simulado.",
+                    "Puoi cambiare scelta prima dell’invio simulato.",
+                    "Du kannst deine Auswahl vor dem simulierten Absenden ändern.",
+                ]
+            case .demoChooseBeforeContinue:
+                row = [
+                    "Choisissez une réponse avant de continuer.",
+                    "Choose an answer before continuing.", "जारी रखने से पहले उत्तर चुनें।", "继续前请选择答案。",
+                    "계속하기 전에 답변을 선택하세요.", "Elige una respuesta antes de continuar.",
+                    "Scegli una risposta prima di continuare.",
+                    "Wähle eine Antwort, bevor du fortfährst.",
+                ]
+            case .demoChoiceSaved:
+                row = [
+                    "Votre choix est enregistré dans la démo.", "Your choice is saved in the demo.",
+                    "आपका विकल्प डेमो में सहेजा है।", "你的选择已保存在演示中。", "선택이 데모에 저장되었습니다.",
+                    "Tu elección está guardada en la demo.", "La tua scelta è salvata nella demo.",
+                    "Deine Auswahl ist in der Demo gespeichert.",
+                ]
+            case .demoNoVerdict:
+                row = [
+                    "Aucun verdict, score ou gain n’est calculé sur cet appareil.",
+                    "No verdict, score or reward is calculated on this device.",
+                    "इस डिवाइस पर निर्णय, अंक या पुरस्कार नहीं बनता।", "本机不会计算判定、分数或奖励。",
+                    "이 기기에서는 정답 판정, 점수, 보상을 계산하지 않습니다.",
+                    "No se calcula veredicto, puntuación ni recompensa en este dispositivo.",
+                    "Sul dispositivo non si calcolano verdetti, punteggi o premi.",
+                    "Auf diesem Gerät werden weder Urteil, Punktzahl noch Belohnung berechnet.",
+                ]
+            case .demoOfflinePending:
+                row = [
+                    "La réponse reste en attente. Le scénario hors ligne suspend l’étape suivante.",
+                    "The demo answer remains pending. The offline scenario pauses the next simulation step.",
+                    "डेमो उत्तर लंबित है। ऑफ़लाइन स्थिति अगला चरण रोकती है।", "演示答案仍在等待，离线情境会暂停下一模拟步骤。",
+                    "데모 답변이 대기 중입니다. 오프라인 시나리오가 다음 단계를 멈춥니다.",
+                    "La respuesta sigue pendiente. El escenario sin conexión pausa el siguiente paso.",
+                    "La risposta resta in attesa. Lo scenario offline sospende il passo seguente.",
+                    "Die Demo-Antwort bleibt ausstehend. Das Offline-Szenario pausiert den nächsten Schritt.",
+                ]
+            case .demoDisableOffline:
+                row = [
+                    "Désactiver le scénario hors ligne", "Turn off the offline scenario",
+                    "ऑफ़लाइन स्थिति बंद करें", "关闭离线情境", "오프라인 시나리오 끄기", "Desactivar escenario sin conexión",
+                    "Disattiva scenario offline", "Offline-Szenario ausschalten",
+                ]
+            case .demoSimulateHint:
+                row = [
+                    "L’action suivante simule une réponse serveur sans contacter d’API.",
+                    "The next action simulates a server response. It does not contact an API.",
+                    "अगली क्रिया सर्वर उत्तर का अभ्यास है। API से संपर्क नहीं होता।", "下一操作模拟服务器响应，不会调用 API。",
+                    "다음 동작은 서버 응답을 시뮬레이션하며 API에 연결하지 않습니다.",
+                    "La siguiente acción simula una respuesta sin contactar una API.",
+                    "L’azione seguente simula una risposta senza contattare API.",
+                    "Die nächste Aktion simuliert eine Serverantwort, ohne eine API zu kontaktieren.",
+                ]
+            case .demoSimulateExplanation:
+                row = [
+                    "Simuler l’explication fictive", "Simulate the fictional explanation",
+                    "काल्पनिक व्याख्या दिखाएँ", "模拟虚构解析", "가상 설명 시뮬레이션", "Simular explicación ficticia",
+                    "Simula spiegazione fittizia", "Fiktive Erklärung simulieren",
+                ]
+            case .demoExplanation:
+                row = [
+                    "Explication fictive · sans verdict", "Fictional explanation · no verdict",
+                    "काल्पनिक व्याख्या · निर्णय नहीं", "虚构解析 · 不作判定", "가상 설명 · 정답 판정 없음",
+                    "Explicación ficticia · sin veredicto",
+                    "Spiegazione fittizia · nessun verdetto", "Fiktive Erklärung · kein Urteil",
+                ]
+            case .demoConstraint:
+                row = [
+                    "La contrainte décisive", "The decisive constraint", "निर्णायक शर्त", "决定性条件",
+                    "결정적 제약", "La condición decisiva", "Il vincolo decisivo",
+                    "Die entscheidende Bedingung",
+                ]
+            case .demoUnderstanding:
+                row = [
+                    "Comprendre la décision", "Understanding the decision", "निर्णय समझें", "理解决策",
+                    "결정 이해하기", "Comprender la decisión", "Comprendere la decisione",
+                    "Die Entscheidung verstehen",
+                ]
+            case .demoFixtureHint:
+                row = [
+                    "Cet exemple de conception n’est pas un corrigé publié. Il apparaît pour tous les choix : aucun verdict ni score.",
+                    "This is a design fixture, not the correction of a published question. It appears for every choice: the demo gives no verdict or score.",
+                    "यह डिज़ाइन उदाहरण है, प्रकाशित प्रश्न का सुधार नहीं। हर विकल्प पर यही दिखता है, कोई अंक या निर्णय नहीं।",
+                    "这是设计示例而非已发布题目的解析。任何选择都会显示，不作判定或评分。",
+                    "게시된 문제의 해설이 아닌 디자인 예시입니다. 어떤 선택에도 표시되며 정답 판정이나 점수는 없습니다.",
+                    "Es un ejemplo de diseño, no una corrección publicada. Aparece con cualquier elección, sin veredicto ni nota.",
+                    "È un esempio di design, non una correzione pubblicata. Appare per ogni scelta, senza verdetto o punteggio.",
+                    "Dies ist ein Designbeispiel, keine veröffentlichte Korrektur. Es erscheint bei jeder Auswahl, ohne Urteil oder Punktzahl.",
+                ]
+            case .demoPracticeAgain:
+                row = [
+                    "Reprendre la question de démo", "Practice the demo question again",
+                    "डेमो प्रश्न फिर करें", "再次练习演示题", "데모 문제 다시 연습",
+                    "Practicar de nuevo la pregunta de demo", "Riprova la domanda demo",
+                    "Demo-Frage erneut üben",
+                ]
+            case .demoPractice:
+                row = [
+                    "Exercice · démo", "Practice · demo", "अभ्यास · डेमो", "练习 · 演示", "연습 · 데모",
+                    "Práctica · demo", "Pratica · demo", "Übung · Demo",
+                ]
+            case .demoChoice:
+                row = [
+                    "Votre choix dans la démo", "Your demo choice", "आपका डेमो विकल्प", "你的演示选择",
+                    "데모에서 선택한 답변", "Tu elección en la demo", "La tua scelta demo",
+                    "Deine Demo-Auswahl",
+                ]
+            case .demoProfile:
+                row = [
+                    "Profil de démonstration", "Preview profile", "पूर्वावलोकन प्रोफ़ाइल", "预览个人资料",
+                    "미리 보기 프로필", "Perfil de vista previa", "Profilo di anteprima", "Vorschauprofil",
+                ]
+            case .demoProfileHint:
+                row = [
+                    "Aucun compte connecté. Cet écran montre uniquement la démonstration locale.",
+                    "No account is signed in. This screen shows only the local demonstration.",
+                    "कोई खाता साइन इन नहीं। यह केवल स्थानीय डेमो है।", "未登录账户，此屏幕仅显示本机演示。",
+                    "로그인된 계정이 없습니다. 이 화면은 기기 내 데모만 표시합니다.",
+                    "No hay cuenta conectada. Solo se muestra la demo local.",
+                    "Nessun account connesso. Questa schermata mostra solo la demo locale.",
+                    "Kein Konto ist angemeldet. Diese Ansicht zeigt nur die lokale Demo.",
+                ]
+            case .demoControls:
+                row = [
+                    "Commandes de démonstration", "Demonstration controls", "डेमो नियंत्रण", "演示控制",
+                    "데모 제어", "Controles de demostración", "Controlli demo", "Demo-Steuerung",
+                ]
+            case .demoPreviewStates:
+                row = [
+                    "États et simulation hors ligne", "Preview states & offline simulation",
+                    "स्थितियाँ और ऑफ़लाइन अभ्यास", "状态预览与离线模拟", "상태 미리 보기 및 오프라인 시뮬레이션",
+                    "Estados y simulación sin conexión", "Stati e simulazione offline",
+                    "Zustände und Offline-Simulation",
+                ]
+            case .demoAppearance:
+                row = [
+                    "Apparence et accessibilité", "Appearance & accessibility", "दिखावट और सुलभता",
+                    "外观与辅助功能", "모양 및 손쉬운 사용", "Aspecto y accesibilidad", "Aspetto e accessibilità",
+                    "Darstellung und Barrierefreiheit",
+                ]
+            case .demoAppearanceHint:
+                row = [
+                    "L’aperçu suit l’apparence et le texte du système. Navigation native et réduction de transparence sont respectées.",
+                    "The preview follows system appearance and text size. Navigation uses system transitions and controls respect Reduce Transparency.",
+                    "पूर्वावलोकन सिस्टम रूप और टेक्स्ट आकार अपनाता है। नेविगेशन और पारदर्शिता की सेटिंग का पालन होता है।",
+                    "预览遵循系统外观与文字大小，使用系统导航过渡并尊重降低透明度设置。",
+                    "미리 보기는 시스템 모양과 글자 크기를 따릅니다. 시스템 탐색 전환과 투명도 줄이기를 사용합니다.",
+                    "La vista sigue el aspecto y texto del sistema. Usa transiciones nativas y respeta Reducir transparencia.",
+                    "L’anteprima segue aspetto e testo di sistema. Usa transizioni native e rispetta Riduci trasparenza.",
+                    "Die Vorschau folgt Systemdarstellung und Textgröße. Sie nutzt Systemübergänge und berücksichtigt reduzierte Transparenz.",
+                ]
+            case .demoAccountHint:
+                row = [
+                    "Les réglages de compte, confidentialité et notifications ne sont pas connectés. Aucune préférence de compte ne change.",
+                    "Account, privacy and notification settings are not connected in this preview. No account preferences are changed.",
+                    "खाता, गोपनीयता और सूचना सेटिंग जुड़ी नहीं हैं। खाता प्राथमिकताएँ नहीं बदलतीं।",
+                    "此预览未连接账户、隐私或通知设置，不会更改账户偏好。",
+                    "계정, 개인정보, 알림 설정은 연결되지 않았습니다. 계정 환경설정은 변경되지 않습니다.",
+                    "Los ajustes de cuenta, privacidad y notificaciones no están conectados. No cambian preferencias reales.",
+                    "Le impostazioni di account, privacy e notifiche non sono connesse. Nessuna preferenza reale cambia.",
+                    "Konto-, Datenschutz- und Benachrichtigungseinstellungen sind nicht verbunden. Keine Kontoeinstellung wird geändert.",
+                ]
             case .findGoal:
                 row = [
                     "Trouvez votre prochain objectif.", "Find your next learning goal.",
@@ -1009,7 +2374,8 @@ enum NativeLearningDuration {
                 ]
             case .readAgain:
                 row = [
-                    "Relire", "Read again", "फिर पढ़ें", "再次阅读", "다시 읽기", "Volver a leer", "Rileggi",
+                    "Relire", "Read again", "फिर पढ़ें", "再次阅读", "다시 읽기", "Volver a leer",
+                    "Rileggi",
                     "Erneut lesen",
                 ]
             case .formativePractice:
@@ -1284,7 +2650,10 @@ enum NativeLearningDuration {
                     "Diese Bewertung enthält einen nicht unterstützten Fragetyp. Keine Antwort wurde gesendet.",
                 ]
             case .score:
-                row = ["Score", "Score", "स्कोर", "得分", "점수", "Puntuación", "Punteggio", "Punktzahl"]
+                row = [
+                    "Score", "Score", "स्कोर", "得分", "점수", "Puntuación",
+                    "Punteggio", "Punktzahl",
+                ]
             case .correctCount:
                 row = [
                     "Réponses correctes / total", "Correct answers / total", "सही उत्तर / कुल",
@@ -1410,7 +2779,7 @@ enum NativeLearningDuration {
                                 .tag(CertigoStudyPlanPreference.InitialLevel.advanced)
                         }
                         Stepper(
-                            "\(copy.native(.duration)) · \(minutes) min",
+                            "\(copy.native(.duration)) · \(copy.minutes(minutes))",
                             value: $minutes, in: 1...1440, step: 1)
                         Text(copy.native(.localPlanHint)).foregroundStyle(.secondary)
                     }
@@ -1966,41 +3335,41 @@ enum NativeLearningDuration {
             NavigationStack {
                 NativeReadingPage {
                     NativeEntryHeading(
-                        title: "One question. A clearer idea.",
-                        message: "Explore Certigo’s native learning preview.", prominent: true)
+                        title: copy.native(.welcomeTitle),
+                        message: copy.native(.welcomeHint), prominent: true)
                     NativeAppLanguagePicker()
-                    NativeReadingSection(title: "Try the learning experience") {
+                    NativeReadingSection(title: copy.native(.tryLearning)) {
                         NativePrimaryButton(title: copy.exploreDemo, symbol: "play.circle") {
                             showDemo = true
                         }
                         .accessibilityIdentifier("open-native-demo")
                         Text(
-                            "Goals, answers and explanations are fictional. No account, network or real result is used."
+                            copy.native(.fictionalBoundary)
                         )
                         .foregroundStyle(.secondary)
                     }
                     #if DEBUG
                         if let pendingLessonLink {
-                            NativeReadingSection(title: "Shared lesson link") {
+                            NativeReadingSection(title: copy.native(.sharedLesson)) {
                                 Text(
-                                    "Non-certifying editorial pilot · \(pendingLessonLink.lessonID)"
+                                    "\(copy.native(.editorialPilot)) · \(pendingLessonLink.lessonID)"
                                 )
-                                Button("Continue to linked lesson", systemImage: "book") {
+                                Button(copy.native(.openLinkedLesson), systemImage: "book") {
                                     showDeveloper = true
                                 }
                                 .accessibilityIdentifier("continue-to-linked-lesson")
                             }
                         }
-                        NativeReadingSection(title: "Development") {
+                        NativeReadingSection(title: copy.native(.development)) {
                             Button(
-                                "Open the test API connector",
+                                copy.native(.openConnector),
                                 systemImage: "wrench.and.screwdriver"
                             ) {
                                 showDeveloper = true
                             }
                             .frame(minHeight: 44)
                             Text(
-                                "For test accounts only. This is not production sign-in."
+                                copy.native(.testOnly)
                             )
                             .foregroundStyle(.secondary)
                         }
@@ -2015,10 +3384,10 @@ enum NativeLearningDuration {
                 #endif
             }
             .onOpenURL(perform: handleIncomingURL)
-            .alert("Lesson link unavailable", isPresented: $invalidLessonLink) {
-                Button("OK", role: .cancel) { invalidLessonLink = false }
+            .alert(copy.native(.lessonLinkUnavailable), isPresented: $invalidLessonLink) {
+                Button(copy.native(.ok), role: .cancel) { invalidLessonLink = false }
             } message: {
-                Text("This link does not identify a supported editorial pilot lesson.")
+                Text(copy.native(.lessonLinkInvalid))
             }
         }
 
@@ -2040,7 +3409,7 @@ enum NativeLearningDuration {
             @Binding private var pendingLessonLink: EditorialPilotLessonLink?
             @State private var model: NativeModel
             @State private var provider: MSALAuthenticationProvider?
-            @State private var configurationIssue: String?
+            @State private var configurationIssue: NativePresentationMessage?
             @State private var showDemo = false
 
             init(pendingLessonLink: Binding<EditorialPilotLessonLink?>) {
@@ -2073,20 +3442,20 @@ enum NativeLearningDuration {
                         VStack(spacing: 24) {
                             NativeAppLanguagePicker().padding(20)
                             ContentUnavailableView(
-                                "Microsoft sign-in is not configured",
+                                copy.native(.signInUnconfigured),
                                 systemImage: "person.crop.circle.badge.exclamationmark",
-                                description: Text(configurationIssue))
+                                description: Text(configurationIssue.resolved(using: copy)))
                         }
                     } else if model.profile == nil && model.deletionStage == nil {
                         NavigationStack {
                             NativeReadingPage {
                                 NativeEntryHeading(
-                                    title: "Make your next decision clearer.",
+                                    title: copy.native(.productionTitle),
                                     message:
-                                        "Your learning goals, practice and confirmed progress, together in Certigo."
+                                        copy.native(.productionHint)
                                 )
                                 NativeAppLanguagePicker()
-                                NativeReadingSection(title: "Continue your learning") {
+                                NativeReadingSection(title: copy.native(.continueLearning)) {
                                     Text(copy.signInWithMicrosoft)
                                     NativePrimaryButton(
                                         title: copy.signInWithMicrosoft,
@@ -2109,15 +3478,15 @@ enum NativeLearningDuration {
                             .navigationTitle("Certigo")
                             .fullScreenCover(isPresented: $showDemo) { NativeDemoRoot() }
                             .alert(
-                                "Microsoft sign-in did not complete",
+                                copy.native(.signInIncomplete),
                                 isPresented: Binding(
                                     get: { model.errorMessage != nil },
                                     set: { if !$0 { model.errorMessage = nil } }
                                 )
                             ) {
-                                Button("OK", role: .cancel) { model.errorMessage = nil }
+                                Button(copy.native(.ok), role: .cancel) { model.errorMessage = nil }
                             } message: {
-                                Text(model.errorMessage ?? "")
+                                Text(model.errorMessage?.resolved(using: copy) ?? "")
                             }
                         }
                     } else {
@@ -2149,28 +3518,28 @@ enum NativeLearningDuration {
                 return controller
             }
 
-            private static func safeMessage(for error: Error) -> String {
+            private static func safeMessage(for error: Error) -> NativePresentationMessage {
                 switch error {
                 case CIAMConfigurationEnvironmentError.productionBuildRequired:
-                    "Microsoft sign-in is only enabled for the Distribution build."
+                    .copy(.configurationDistributionOnly)
                 case CIAMConfigurationEnvironmentError.unsupportedProductionBundle:
-                    "Use the existing Certigo App Store bundle identifier."
+                    .copy(.configurationAppStoreBundle)
                 case CIAMConfigurationEnvironmentError.missingValue(let key):
-                    "Distribution is missing \(key). Configure the verified production identity before sign-in."
+                    .configuration(name: key, production: true, missing: true)
                 case CIAMConfigurationEnvironmentError.invalidValue(let key):
-                    "Distribution has an invalid \(key). Correct the verified production configuration."
+                    .configuration(name: key, production: true, missing: false)
                 case CIAMConfigurationEnvironmentError.callbackNotDeclared:
-                    "Declare the app-derived Microsoft callback in the Distribution Info.plist."
+                    .copy(.configurationDeclareProductionCallback)
                 case CIAMConfigurationEnvironmentError.callbackCollision:
-                    "The Microsoft callback is duplicated in the Distribution Info.plist."
+                    .copy(.configurationDuplicateProductionCallback)
                 case CIAMConfigurationEnvironmentError.redirectDoesNotMatchBundle:
-                    "The Microsoft callback must match this app's bundle identifier."
+                    .copy(.configurationCallbackBundle)
                 case is CIAMConfigurationEnvironmentError:
-                    "Correct the Distribution Microsoft sign-in configuration."
+                    .copy(.configurationCorrectProduction)
                 case is CIAMConfigurationError:
-                    "The Distribution Microsoft sign-in configuration failed validation."
+                    .copy(.configurationProductionValidation)
                 default:
-                    "Microsoft sign-in could not be initialized. No manual-token fallback is available."
+                    .copy(.configurationInitializationFailed)
                 }
             }
         }
@@ -2179,12 +3548,13 @@ enum NativeLearningDuration {
     #if DEBUG
         @MainActor
         private struct NativeDeveloperConnector: View {
+            @Environment(\.nativeInterfaceCopy) private var copy
             @Environment(\.dismiss) private var dismiss
             @Binding private var pendingLessonLink: EditorialPilotLessonLink?
             @State private var model: NativeModel
             @State private var usesCIAM: Bool
             @State private var ciamProvider: MSALAuthenticationProvider?
-            @State private var configurationIssue: String?
+            @State private var configurationIssue: NativePresentationMessage?
 
             init(pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil)) {
                 self._pendingLessonLink = pendingLessonLink
@@ -2225,9 +3595,9 @@ enum NativeLearningDuration {
                 Group {
                     if let configurationIssue {
                         ContentUnavailableView(
-                            "CIAM test sign-in is unavailable",
+                            copy.native(.ciamUnavailable),
                             systemImage: "person.crop.circle.badge.exclamationmark",
-                            description: Text(configurationIssue)
+                            description: Text(configurationIssue.resolved(using: copy))
                         )
                         .accessibilityIdentifier("ciam-configuration-error")
                     } else if usesCIAM && model.profile == nil {
@@ -2241,9 +3611,9 @@ enum NativeLearningDuration {
                 }
                 .safeAreaInset(edge: .top) {
                     HStack {
-                        Text("Developer connector").font(.subheadline)
+                        Text(copy.native(.developerConnector)).font(.subheadline)
                         Spacer()
-                        Button("Close") { dismiss() }
+                        Button(copy.native(.close)) { dismiss() }
                     }
                     .padding()
                     .background(.background)
@@ -2254,12 +3624,12 @@ enum NativeLearningDuration {
                 NavigationStack {
                     NativeReadingPage {
                         NativeEntryHeading(
-                            title: "Test your connected learning.",
-                            message: "CIAM development configuration · test accounts only.")
-                        NativeReadingSection(title: "CIAM test sign-in") {
-                            Text("Sign in explicitly with the locally configured test identity.")
+                            title: copy.native(.testLearning),
+                            message: copy.native(.ciamTestScope))
+                        NativeReadingSection(title: copy.native(.ciamTestSignIn)) {
+                            Text(copy.native(.ciamExplicit))
                             NativePrimaryButton(
-                                title: "Sign in with CIAM", symbol: "person.crop.circle"
+                                title: copy.native(.ciamSignIn), symbol: "person.crop.circle"
                             ) {
                                 Task { await model.connect() }
                             }
@@ -2268,15 +3638,15 @@ enum NativeLearningDuration {
                     }
                     .navigationTitle("Certigo")
                     .alert(
-                        "CIAM sign-in did not complete",
+                        copy.native(.ciamIncomplete),
                         isPresented: Binding(
                             get: { model.errorMessage != nil },
                             set: { if !$0 { model.errorMessage = nil } }
                         )
                     ) {
-                        Button("OK", role: .cancel) { model.errorMessage = nil }
+                        Button(copy.native(.ok), role: .cancel) { model.errorMessage = nil }
                     } message: {
-                        Text(model.errorMessage ?? "")
+                        Text(model.errorMessage?.resolved(using: copy) ?? "")
                     }
                 }
             }
@@ -2296,35 +3666,50 @@ enum NativeLearningDuration {
                 return controller
             }
 
-            private static func safeConfigurationMessage(for error: Error) -> String {
+            private static func safeConfigurationMessage(for error: Error)
+                -> NativePresentationMessage
+            {
                 if let error = error as? CIAMConfigurationEnvironmentError {
-                    return error.localizedDescription
+                    switch error {
+                    case .invalidOptIn: return .copy(.configurationOptIn)
+                    case .missingValue(let name):
+                        return .configuration(name: name, production: false, missing: true)
+                    case .invalidValue(let name):
+                        return .configuration(name: name, production: false, missing: false)
+                    case .releaseOptInNotAllowed: return .copy(.configurationDevelopmentOnly)
+                    case .productionBuildRequired: return .copy(.configurationDistributionOnly)
+                    case .unsupportedProductionBundle: return .copy(.configurationAppStoreBundle)
+                    case .missingBundleIdentifier: return .copy(.configurationMissingBundle)
+                    case .callbackNotDeclared: return .copy(.configurationCallbackUnregistered)
+                    case .callbackCollision: return .copy(.configurationCallbackDuplicate)
+                    case .redirectDoesNotMatchBundle: return .copy(.configurationDerivedRedirect)
+                    }
                 }
                 if let error = error as? CIAMConfigurationError {
                     switch error {
                     case .invalidIdentity:
                         return
-                            "Set valid client, tenant, and API audience identifiers in the local Xcode scheme."
+                            .copy(.configurationIdentity)
                     case .invalidAuthority:
-                        return "Correct the CIAM authority in the local Xcode scheme."
+                        return .copy(.configurationAuthority)
                     case .issuerMismatch:
-                        return "Set the issuer matching the configured CIAM tenant and authority."
+                        return .copy(.configurationIssuer)
                     case .invalidAPIScope:
                         return
-                            "Set one API scope for the configured audience in the local Xcode scheme."
+                            .copy(.configurationScope)
                     case .invalidAPIURL:
-                        return "Set the existing API HTTPS base URL, including its /api path."
+                        return .copy(.configurationAPIURL)
                     case .invalidRedirect, .redirectNotRegistered:
-                        return "Set the exact CIAM redirect registered for this app."
+                        return .copy(.configurationRedirect)
                     case .callbackNotDeclared:
                         return
-                            "The callback scheme must already be declared in this app's Info.plist."
+                            .copy(.configurationCallbackDeclaration)
                     case .callbackCollision:
-                        return "The CIAM callback scheme collides with another app callback scheme."
+                        return .copy(.configurationCallbackCollision)
                     }
                 }
                 return
-                    "Review the local Xcode scheme and registered app callback. Manual token sign-in is disabled while CIAM is opted in."
+                    .copy(.configurationReview)
             }
         }
     #endif
@@ -2343,7 +3728,6 @@ enum NativeLearningDuration {
 
     private struct NativeDemoRoot: View {
         @Environment(\.nativeInterfaceCopy) private var copy
-        @Environment(\.nativeInterfaceCopy) private var copy
         @Environment(\.dismiss) private var dismiss
         @AppStorage("certigo.native-design-demo.v1") private var savedState = ""
         @State private var flow = NativeDemoFlow()
@@ -2353,7 +3737,7 @@ enum NativeLearningDuration {
         @State private var catalogPath: [NativeDemoRoute] = []
         @State private var scenario = DemoCatalogScenario.ready
         @State private var offline = false
-        @State private var issue: String?
+        @State private var issue: AppInterfaceCopy.NativeLabel?
         @State private var showScenarios = false
         @State private var showReset = false
         @State private var persistence = NativeDemoPersistence.awaitingRestoration
@@ -2381,7 +3765,7 @@ enum NativeLearningDuration {
                     unavailableService(
                         copy.coach, symbol: "bubble.left.and.bubble.right",
                         description:
-                            "Coach is not connected in this preview. No AI response, conversation history or saved memory is created."
+                            copy.native(.demoCoachUnavailable)
                     )
                 }
                 .tabItem { Label(copy.coach, systemImage: "bubble.left.and.bubble.right") }
@@ -2400,21 +3784,21 @@ enum NativeLearningDuration {
                 NavigationStack {
                     Form {
                         Section(copy.appLanguage) { NativeAppLanguagePicker() }
-                        Section("Catalog states · simulation") {
-                            Picker("Catalog", selection: $scenario) {
+                        Section(copy.native(.demoCatalogStates)) {
+                            Picker(copy.native(.demoCatalog), selection: $scenario) {
                                 ForEach(DemoCatalogScenario.allCases, id: \.self) {
-                                    Text($0.rawValue)
+                                    Text(scenarioTitle($0)).tag($0)
                                 }
                             }
-                            Toggle("Simulate offline mode", isOn: $offline)
+                            Toggle(copy.native(.demoOfflineToggle), isOn: $offline)
                         }
                         Section {
                             Text(
-                                "These settings do not change the device network or a server."
+                                copy.native(.demoSettingsScope)
                             )
                         }
                     }
-                    .navigationTitle("Demo settings")
+                    .navigationTitle(copy.native(.demoSettings))
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button(copy[.done]) { showScenarios = false }
@@ -2423,9 +3807,9 @@ enum NativeLearningDuration {
                 }
             }
             .confirmationDialog(
-                "Clear only the saved demonstration?", isPresented: $showReset
+                copy.native(.demoResetConfirmation), isPresented: $showReset
             ) {
-                Button("Reset the demo", role: .destructive) {
+                Button(copy.native(.demoReset), role: .destructive) {
                     flow = NativeDemoFlow()
                     objectivePath = []
                     catalogPath = []
@@ -2436,10 +3820,10 @@ enum NativeLearningDuration {
                     persistence.reset(&savedState)
                 }
             }
-            .alert("Demo restoration unavailable", isPresented: issuePresented) {
+            .alert(copy.native(.demoRestorationUnavailable), isPresented: issuePresented) {
                 Button(copy[.done], role: .cancel) { issue = nil }
             } message: {
-                Text(issue ?? "")
+                Text(issue.map { copy.native($0) } ?? "")
             }
             .task {
                 guard persistence == .awaitingRestoration else { return }
@@ -2457,7 +3841,7 @@ enum NativeLearningDuration {
                     }
                 } catch {
                     issue =
-                        "The saved demonstration cannot be read. Reset only the demo in its settings."
+                        .demoRestoreFailure
                 }
             }
             .onChange(of: flow) { _, value in
@@ -2503,13 +3887,11 @@ enum NativeLearningDuration {
                 VStack(alignment: .leading, spacing: 24) {
                     demoNotice
                     ContentUnavailableView(
-                        "\(title) is not connected", systemImage: symbol,
+                        copy.native(.unavailable), systemImage: symbol,
                         description: Text(description))
-                    Text(
-                        "This is a navigation preview, not a working \(title.lowercased()) service."
-                    )
-                    .foregroundStyle(.secondary)
-                    DemoPrimaryButton(title: "Return to Learn", symbol: "book") {
+                    Text(copy.native(.demoPreviewOnly))
+                        .foregroundStyle(.secondary)
+                    DemoPrimaryButton(title: copy.native(.demoReturnLearn), symbol: "book") {
                         tab = NativeDemoTab.selecting(.learn, learnSection: learnSection)
                     }
                 }
@@ -2532,12 +3914,12 @@ enum NativeLearningDuration {
                     .pickerStyle(.menu)
                     .frame(minHeight: 44)
                     ContentUnavailableView(
-                        "\(socialSection == .friends ? copy.friends : copy.teams) · not connected",
+                        copy.native(.unavailable),
                         systemImage: socialSection == .friends ? "person.2" : "person.3",
                         description: Text(
-                            "Social is unavailable in this navigation preview. No real relationships, invitations, team membership or sharing are loaded."
+                            copy.native(.demoSocialUnavailable)
                         ))
-                    DemoPrimaryButton(title: "Return to Learn", symbol: "book") {
+                    DemoPrimaryButton(title: copy.native(.demoReturnLearn), symbol: "book") {
                         tab = NativeDemoTab.selecting(.learn, learnSection: learnSection)
                     }
                 }
@@ -2571,7 +3953,7 @@ enum NativeLearningDuration {
                 try persistence.save(snapshot, to: &savedState)
             } catch {
                 issue =
-                    "The demonstration could not be saved. You can continue in the current session."
+                    .demoSaveFailure
             }
         }
 
@@ -2590,7 +3972,7 @@ enum NativeLearningDuration {
                 tab = navigation.selectedTab
             } catch {
                 issue =
-                    "The question cannot be reopened. Choose a goal in Learn > Explore."
+                    .demoReopenFailure
             }
         }
 
@@ -2601,12 +3983,12 @@ enum NativeLearningDuration {
                     learnSelector
                     if let goal = flow.objective {
                         VStack(alignment: .leading, spacing: 16) {
-                            Text(goal.displayName).font(.largeTitle.bold())
-                            Text(goal.displayTitle).font(.title2.weight(.semibold))
-                            Text(flow.activitySummary)
+                            Text(goal.displayName(copy)).font(.largeTitle.bold())
+                            Text(goal.displayTitle(copy)).font(.title2.weight(.semibold))
+                            Text(flow.activitySummary(copy))
                                 .font(.subheadline)
                             NavigationLink(value: flow.startRoute) {
-                                Label(flow.startLabel, systemImage: "arrow.right.circle.fill")
+                                Label(flow.startLabel(copy), systemImage: "arrow.right.circle.fill")
                                     .font(.headline)
                                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             }
@@ -2620,34 +4002,36 @@ enum NativeLearningDuration {
                             NativePrism.objectiveFill,
                             in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("The decision workshop").font(.title2.bold())
+                            Text(copy.native(.demoWorkshop)).font(.title2.bold())
                             Text(goal.practice.intent)
                             Text(
-                                "Read a situation, make a choice, understand the explanation."
+                                copy.native(.demoWorkshopHint)
                             )
                             .foregroundStyle(.secondary)
                             Label(
-                                "Fictional content · not a published course",
+                                copy.native(.demoFictionalContent),
                                 systemImage: "text.book.closed"
                             )
                             .font(.subheadline).foregroundStyle(.secondary)
                         }
                         Divider()
-                        Button("Switch goal", systemImage: "square.grid.2x2") {
+                        Button(copy.native(.demoSwitchGoal), systemImage: "square.grid.2x2") {
                             learnSection = .explore
                             tab = .catalog
                         }
                         .frame(minHeight: 44)
-                        Button("View demo history", systemImage: "clock.arrow.circlepath") {
+                        Button(
+                            copy.native(.demoHistoryAction), systemImage: "clock.arrow.circlepath"
+                        ) {
                             tab = .followUp
                         }
                         .frame(minHeight: 44)
                     } else {
                         ContentUnavailableView(
-                            "Your next learning goal",
+                            copy.native(.demoNextGoal),
                             systemImage: "scope",
                             description: Text(
-                                "Explore two fictional situations. No account or real result is needed."
+                                copy.native(.demoExploreHint)
                             )
                         )
                         DemoPrimaryButton(title: copy[.chooseGoal], symbol: "arrow.right") {
@@ -2675,11 +4059,11 @@ enum NativeLearningDuration {
                     if flow.objective == nil {
                         Section {
                             Text(
-                                "Choose a demo goal to begin. These French examples are fictional, not published courses."
+                                copy.native(.demoChooseHint)
                             )
                         }
                     }
-                    Section("Demonstration workshops") {
+                    Section(copy.native(.demoWorkshops)) {
                         ForEach(NativeDemoFlow.Objective.allCases, id: \.self) { goal in
                             NavigationLink(value: NativeDemoRoute.goalDetail(goal)) {
                                 HStack(spacing: 16) {
@@ -2687,18 +4071,18 @@ enum NativeLearningDuration {
                                         .foregroundStyle(NativePrism.tint)
                                         .accessibilityHidden(true)
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text(goal.displayName).font(.headline)
-                                        Text(goal.displayTitle).foregroundStyle(.secondary)
+                                        Text(goal.displayName(copy)).font(.headline)
+                                        Text(goal.displayTitle(copy)).foregroundStyle(.secondary)
                                         Text(goal.practice.intent).font(.subheadline)
                                             .foregroundStyle(.secondary)
-                                        Text("1 fictional situation · 1 question · French")
+                                        Text(copy.native(.demoVolume))
                                             .font(.subheadline).foregroundStyle(.secondary)
                                     }
                                     Spacer()
                                     if flow.objective == goal {
                                         Image(systemName: "checkmark.circle.fill")
                                             .foregroundStyle(NativePrism.tint)
-                                            .accessibilityLabel("Selected goal")
+                                            .accessibilityLabel(copy.native(.demoSelectedGoal))
                                     }
                                 }
                                 .frame(minHeight: 44)
@@ -2709,31 +4093,31 @@ enum NativeLearningDuration {
                     Section {
                         ForEach(NativeDemoFlow.Objective.allCases, id: \.self) { goal in
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(goal.displayTitle).font(.headline)
-                                Text("A situation to explore").font(.subheadline)
+                                Text(goal.displayTitle(copy)).font(.headline)
+                                Text(copy.native(.demoSituationExplore)).font(.subheadline)
                             }
                             .redacted(reason: .placeholder)
                             .accessibilityHidden(true)
                         }
                         Label("\(copy.loading) · \(copy[.demo])", systemImage: "hourglass")
                             .accessibilityIdentifier("demo-catalog-loading")
-                        Button("Finish simulated loading") { scenario = .ready }
+                        Button(copy.native(.demoFinishLoading)) { scenario = .ready }
                     }
                 case .empty:
                     Section {
                         ContentUnavailableView(
-                            "No goals in this example", systemImage: "books.vertical",
-                            description: Text("The empty catalog is a demonstration scenario.")
+                            copy.native(.demoNoGoals), systemImage: "books.vertical",
+                            description: Text(copy.native(.demoEmptyHint))
                         )
-                        Button("Show demo goals") { scenario = .ready }
+                        Button(copy.native(.demoShowGoals)) { scenario = .ready }
                     }
                 case .error:
                     Section {
                         ContentUnavailableView(
-                            "Catalog unavailable · simulation",
+                            copy.native(.demoCatalogUnavailable),
                             systemImage: "wifi.exclamationmark",
                             description: Text(
-                                "Your demo state is preserved. No server is contacted."))
+                                copy.native(.demoPreservedHint)))
                         Button(copy.retry, systemImage: "arrow.clockwise") {
                             scenario = .ready
                         }
@@ -2750,17 +4134,18 @@ enum NativeLearningDuration {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     demoNotice
-                    Text(goal.displayName).font(.largeTitle.bold()).foregroundStyle(
+                    Text(goal.displayName(copy)).font(.largeTitle.bold()).foregroundStyle(
                         NativePrism.tint)
-                    Text(goal.displayTitle).font(.title2.bold())
+                    Text(goal.displayTitle(copy)).font(.title2.bold())
                     Text(
-                        "A short scenario to explore the native experience. This is not a published catalog."
+                        copy.native(.demoScenarioHint)
                     )
-                    DemoReadingSection(title: "The decision to explore", text: goal.practice.intent)
                     DemoReadingSection(
-                        title: "The fictional situation", text: goal.practice.situation)
-                    Label("Read, choose, understand · no grade", systemImage: "text.bubble")
-                    Label("Local demo restoration", systemImage: "clock.arrow.circlepath")
+                        title: copy.native(.demoDecisionExplore), text: goal.practice.intent)
+                    DemoReadingSection(
+                        title: copy.native(.demoFictionalSituation), text: goal.practice.situation)
+                    Label(copy.native(.demoNoGrade), systemImage: "text.bubble")
+                    Label(copy.native(.demoLocalRestore), systemImage: "clock.arrow.circlepath")
                     DemoPrimaryButton(title: copy[.chooseGoal], symbol: "scope") {
                         flow.choose(goal)
                         learnSection = .myLearning
@@ -2772,7 +4157,7 @@ enum NativeLearningDuration {
                 .padding(20)
                 .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
             }
-            .navigationTitle("Goal overview").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(copy.native(.goalOverview)).navigationBarTitleDisplayMode(.inline)
         }
 
         private var preparation: some View {
@@ -2783,15 +4168,18 @@ enum NativeLearningDuration {
                         DemoPracticeTrail(progress: NativeDemoPracticeProgress(current: .situation))
                         Text(practice.title).font(.title.bold())
                             .accessibilityAddTraits(.isHeader)
-                        DemoReadingSection(title: "The situation", text: practice.situation)
-                        DemoReadingSection(title: "Your task", text: practice.intent)
+                        DemoReadingSection(
+                            title: copy.native(.demoSituation), text: practice.situation)
+                        DemoReadingSection(title: copy.native(.demoTask), text: practice.intent)
                         Divider()
                         DemoReadingSection(
-                            title: "Before you choose",
+                            title: copy.native(.demoBeforeChoose),
                             text:
-                                "Identify what the team wants to manage and what it wants to delegate. Focus on that boundary, not a provider name."
+                                copy.native(.demoBoundaryHint)
                         )
-                        DemoPrimaryButton(title: "Open the question", symbol: "arrow.right") {
+                        DemoPrimaryButton(
+                            title: copy.native(.demoOpenQuestion), symbol: "arrow.right"
+                        ) {
                             objectivePath = [.exercise]
                         }
                         .accessibilityIdentifier("demo-open-question")
@@ -2800,7 +4188,7 @@ enum NativeLearningDuration {
                 .padding(20)
                 .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
             }
-            .navigationTitle("Preparation").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(copy.native(.demoPreparation)).navigationBarTitleDisplayMode(.inline)
             .toolbar { demoToolbar }
         }
 
@@ -2816,7 +4204,8 @@ enum NativeLearningDuration {
                         case .answering:
                             Label(
                                 flow.selection == nil
-                                    ? "Choose an answer" : "Answer selected",
+                                    ? copy.native(.demoChooseAnswer)
+                                    : copy.native(.demoAnswerSelected),
                                 systemImage: flow.selection == nil
                                     ? "circle" : "checkmark.circle.fill"
                             )
@@ -2872,12 +4261,12 @@ enum NativeLearningDuration {
                                     .accessibilityLabel(option)
                                     .accessibilityValue(
                                         flow.selection == index
-                                            ? "Selected" : "Not selected"
+                                            ? copy.native(.selected) : copy.native(.notSelected)
                                     )
                                     .accessibilityIdentifier("demo-option-\(index)")
                                 }
                             }
-                            Text("You can change your choice before the simulated submission.")
+                            Text(copy.native(.demoEditableHint))
                                 .font(.subheadline).foregroundStyle(.secondary)
                             DemoPrimaryButton(
                                 title: "\(copy.submitAnswer) · \(copy[.demo])", symbol: "paperplane"
@@ -2885,7 +4274,7 @@ enum NativeLearningDuration {
                                 flow.submit()
                             }
                             .disabled(!flow.canSubmit)
-                            .accessibilityHint("Choose an answer before continuing.")
+                            .accessibilityHint(copy.native(.demoChooseBeforeContinue))
                             .accessibilityIdentifier("demo-submit")
                         case .pending:
                             Label {
@@ -2896,28 +4285,28 @@ enum NativeLearningDuration {
                             .font(.title2.bold())
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityIdentifier("demo-pending-state")
-                            Text("Your choice is saved in the demo.")
+                            Text(copy.native(.demoChoiceSaved))
                                 .font(.headline)
                             selectedAnswer
                             Text(
-                                "No verdict, score or reward is calculated on this device."
+                                copy.native(.demoNoVerdict)
                             )
                             if offline {
                                 Label(
                                     "\(copy[.offline]) · \(copy[.demo])", systemImage: "wifi.slash")
                                 Text(
-                                    "The demo answer remains pending. The offline scenario pauses the next simulation step."
+                                    copy.native(.demoOfflinePending)
                                 )
                                 DemoPrimaryButton(
-                                    title: "Turn off the offline scenario",
+                                    title: copy.native(.demoDisableOffline),
                                     symbol: "wifi"
                                 ) { offline = false }
                             } else {
                                 Text(
-                                    "The next action simulates a server response. It does not contact an API."
+                                    copy.native(.demoSimulateHint)
                                 )
                                 DemoPrimaryButton(
-                                    title: "Simulate the fictional explanation",
+                                    title: copy.native(.demoSimulateExplanation),
                                     symbol: "text.bubble"
                                 ) {
                                     flow.receiveMockExplanation(offline: offline)
@@ -2926,7 +4315,7 @@ enum NativeLearningDuration {
                             }
                         case .reviewed:
                             Label(
-                                "Fictional explanation · no verdict",
+                                copy.native(.demoExplanation),
                                 systemImage: "text.bubble"
                             )
                             .font(.title2.bold())
@@ -2935,13 +4324,13 @@ enum NativeLearningDuration {
                             .accessibilityIdentifier("demo-explanation-state")
                             selectedAnswer
                             DemoReadingSection(
-                                title: "The decisive constraint", text: practice.constraint)
+                                title: copy.native(.demoConstraint), text: practice.constraint)
                             DemoReadingSection(
-                                title: "Understanding the decision", text: practice.explanation)
+                                title: copy.native(.demoUnderstanding), text: practice.explanation)
                             DemoResponsibilities(rows: practice.responsibilities)
                             DemoTakeaway(text: practice.takeaway)
                             Text(
-                                "This is a design fixture, not the correction of a published question. It appears for every choice: the demo gives no verdict or score."
+                                copy.native(.demoFixtureHint)
                             )
                             .font(.subheadline).foregroundStyle(.secondary)
                             DemoPrimaryButton(
@@ -2949,7 +4338,7 @@ enum NativeLearningDuration {
                                 symbol: "arrow.right"
                             ) { tab = .followUp }
                             Button(
-                                "Practice the demo question again",
+                                copy.native(.demoPracticeAgain),
                                 systemImage: "arrow.counterclockwise"
                             ) {
                                 flow.restartQuestion()
@@ -2962,10 +4351,10 @@ enum NativeLearningDuration {
                 .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Practice · demo").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(copy.native(.demoPractice)).navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Demo settings", systemImage: "slider.horizontal.3") {
+                    Button(copy.native(.demoSettings), systemImage: "slider.horizontal.3") {
                         showScenarios = true
                     }
                 }
@@ -2974,7 +4363,7 @@ enum NativeLearningDuration {
 
         private var selectedAnswer: some View {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Your demo choice").font(.headline)
+                Text(copy.native(.demoChoice)).font(.headline)
                 if let selection = flow.selection {
                     Text(NativeDemoFlow.options[selection])
                 }
@@ -2986,8 +4375,8 @@ enum NativeLearningDuration {
             List {
                 Section {
                     demoNotice
-                    Text("Preview profile").font(.title2.bold())
-                    Text("No account is signed in. This screen shows only the local demonstration.")
+                    Text(copy.native(.demoProfile)).font(.title2.bold())
+                    Text(copy.native(.demoProfileHint))
                         .foregroundStyle(.secondary)
                 }
                 Section {
@@ -3000,22 +4389,24 @@ enum NativeLearningDuration {
                     NavigationLink {
                         List {
                             Section(copy.appLanguage) { NativeAppLanguagePicker() }
-                            Section("Demonstration controls") {
-                                Button("Preview states & offline simulation") {
+                            Section(copy.native(.demoControls)) {
+                                Button(copy.native(.demoPreviewStates)) {
                                     showScenarios = true
                                 }
                                 .frame(minHeight: 44)
-                                Button("Reset the demo", role: .destructive) { showReset = true }
-                                    .frame(minHeight: 44)
+                                Button(copy.native(.demoReset), role: .destructive) {
+                                    showReset = true
+                                }
+                                .frame(minHeight: 44)
                             }
-                            Section("Appearance & accessibility") {
+                            Section(copy.native(.demoAppearance)) {
                                 Text(
-                                    "The preview follows system appearance and text size. Navigation uses system transitions and controls respect Reduce Transparency."
+                                    copy.native(.demoAppearanceHint)
                                 )
                             }
-                            Section("Account") {
+                            Section(copy.native(.account)) {
                                 Text(
-                                    "Account, privacy and notification settings are not connected in this preview. No account preferences are changed."
+                                    copy.native(.demoAccountHint)
                                 )
                             }
                         }
@@ -3035,19 +4426,19 @@ enum NativeLearningDuration {
         private var demoHistory: some View {
             List {
                 Section { demoNotice }
-                Section("Demo history") {
+                Section(copy.native(.demoHistory)) {
                     if let goal = flow.objective {
-                        Text(goal.displayTitle).font(.headline)
+                        Text(goal.displayTitle(copy)).font(.headline)
                         Button(action: resumeExercise) {
                             Label(copy.resume, systemImage: flow.phase.symbol)
                                 .frame(minHeight: 44)
                         }
                         .accessibilityIdentifier("resume-demo-follow-up")
-                        Text(flow.activitySummary)
+                        Text(flow.activitySummary(copy))
                         if flow.phase == .reviewed {
                             Text(goal.practice.takeaway)
                         }
-                        Text("This saved demonstration is not certification progress.")
+                        Text(copy.native(.demoHistoryHint))
                             .foregroundStyle(.secondary)
                     } else {
                         ContentUnavailableView(
@@ -3081,6 +4472,7 @@ enum NativeLearningDuration {
         }
 
         private struct DemoPracticeTrail: View {
+            @Environment(\.nativeInterfaceCopy) private var copy
             let progress: NativeDemoPracticeProgress
 
             var body: some View {
@@ -3090,14 +4482,14 @@ enum NativeLearningDuration {
                 }
                 .font(.subheadline)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(progress.accessibilityLabel)
+                .accessibilityLabel(progress.accessibilityLabel(copy))
             }
 
             @ViewBuilder private var steps: some View {
                 ForEach(NativeDemoPracticeStage.allCases, id: \.self) { step in
                     let state = progress.state(for: step)
                     Label(
-                        step.rawValue,
+                        step.label(copy),
                         systemImage: state.symbol
                     )
                     .foregroundStyle(state == .current ? NativePrism.tint : Color.secondary)
@@ -3108,6 +4500,7 @@ enum NativeLearningDuration {
         }
 
         private struct DemoTakeaway: View {
+            @Environment(\.nativeInterfaceCopy) private var copy
             let text: String
 
             var body: some View {
@@ -3117,7 +4510,7 @@ enum NativeLearningDuration {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                 } label: {
-                    Label("Takeaway", systemImage: "lightbulb")
+                    Label(copy.native(.takeaway), systemImage: "lightbulb")
                         .font(.headline)
                         .accessibilityAddTraits(.isHeader)
                 }
@@ -3125,11 +4518,12 @@ enum NativeLearningDuration {
         }
 
         private struct DemoResponsibilities: View {
+            @Environment(\.nativeInterfaceCopy) private var copy
             let rows: [NativeDemoPractice.Responsibility]
 
             var body: some View {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Who manages what?").font(.headline)
+                    Text(copy.native(.demoResponsibilities)).font(.headline)
                         .accessibilityAddTraits(.isHeader)
                     ForEach(rows, id: \.layer) { row in
                         Divider()
@@ -3145,29 +4539,40 @@ enum NativeLearningDuration {
 
         private var demoNotice: some View {
             VStack(alignment: .leading, spacing: 4) {
-                Label("Demo · fictional data and results", systemImage: "testtube.2")
-                Text("Learning examples: French").font(.caption)
+                Label(copy.native(.demoNotice), systemImage: "testtube.2")
+                Text(copy.native(.demoFrenchExamples)).font(.caption)
+                NativeContentLanguageBadges(languages: ["fr"])
             }
+
             .font(.subheadline).foregroundStyle(.secondary)
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("synthetic-demo-notice")
         }
 
+        private func scenarioTitle(_ scenario: DemoCatalogScenario) -> String {
+            switch scenario {
+            case .ready: copy.native(.demoReady)
+            case .loading: copy.native(.demoLoading)
+            case .empty: copy.native(.demoEmpty)
+            case .error: copy.native(.demoError)
+            }
+        }
+
         @ToolbarContentBuilder private var demoToolbar: some ToolbarContent {
-            ToolbarItem(placement: .topBarLeading) { Button("Close") { dismiss() } }
+            ToolbarItem(placement: .topBarLeading) { Button(copy.native(.close)) { dismiss() } }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button("Demo settings", systemImage: "slider.horizontal.3") {
+                    Button(copy.native(.demoSettings), systemImage: "slider.horizontal.3") {
                         showScenarios = true
                     }
                     Button(
-                        "Reset the demo", systemImage: "arrow.counterclockwise",
+                        copy.native(.demoReset), systemImage: "arrow.counterclockwise",
                         role: .destructive
                     ) {
                         showReset = true
                     }
                 } label: {
-                    Label("Demo options", systemImage: "ellipsis.circle")
+                    Label(copy.native(.demoOptions), systemImage: "ellipsis.circle")
                 }
             }
         }
@@ -3192,18 +4597,6 @@ struct NativeDemoFlow: Codable, Equatable {
         case fundamentals = "Cloud · découverte"
         case operations = "Cloud · exploitation"
 
-        var displayName: String {
-            switch self {
-            case .fundamentals: "Cloud · discovery"
-            case .operations: "Cloud · operations"
-            }
-        }
-        var displayTitle: String {
-            switch self {
-            case .fundamentals: "Cloud fundamentals"
-            case .operations: "Cloud services in practice"
-            }
-        }
         var title: String {
             switch self {
             case .fundamentals: "Les fondamentaux du cloud"
@@ -3247,26 +4640,6 @@ struct NativeDemoFlow: Codable, Equatable {
     var startRoute: NativeDemoRoute {
         phase == .answering && selection == nil ? .preparation : .exercise
     }
-    var startLabel: String {
-        startRoute == .preparation ? "Explore the situation" : resumeLabel
-    }
-    var activitySummary: String {
-        switch phase {
-        case .answering:
-            selection == nil
-                ? "A situation to explore · no grade"
-                : "An editable choice · not submitted"
-        case .pending: "Demo answer pending · no confirmed result"
-        case .reviewed: "Fictional explanation available · no verdict"
-        }
-    }
-    var resumeLabel: String {
-        switch phase {
-        case .answering: selection == nil ? "Start a question" : "Resume your choice"
-        case .pending: "Resume the pending answer"
-        case .reviewed: "Read the fictional explanation again"
-        }
-    }
     mutating func choose(_ objective: Objective) {
         guard self.objective != objective else { return }
         self.objective = objective
@@ -3302,10 +4675,8 @@ struct NativeDemoFlow: Codable, Equatable {
     }
 }
 
-enum NativeDemoPracticeStage: String, CaseIterable {
-    case situation = "Situation"
-    case decision = "Decision"
-    case explanation = "Explanation"
+enum NativeDemoPracticeStage: Hashable, CaseIterable {
+    case situation, decision, explanation
 
     var position: Int {
         switch self {
@@ -3336,11 +4707,6 @@ struct NativeDemoPracticeProgress {
         return stage.position < current.position ? .completed : .upcoming
     }
 
-    var accessibilityLabel: String {
-        let stageCount = NativeDemoPracticeStage.allCases.count
-        return "Stage \(current.position) of \(stageCount): \(current.rawValue). "
-            + "Stages describe the learning flow, not whether an answer is correct."
-    }
 }
 
 struct NativeDemoPractice: Sendable {
@@ -3597,23 +4963,25 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         .accessibilityFocused($focused, equals: .status)
                     if model.deletionBusy { ProgressView(copy.loading) }
                     if let message = model.deletionMessage {
-                        Text(message).accessibilityIdentifier("account-deletion-message")
-                            .accessibilityFocused($focused, equals: .error)
+                        Text(message.resolved(using: copy)).accessibilityIdentifier(
+                            "account-deletion-message"
+                        )
+                        .accessibilityFocused($focused, equals: .error)
                     }
                 }
                 if [.explanation, .verifying, .confirmation].contains(
                     model.deletionStage ?? .explanation)
                 {
-                    Section("Before you continue") {
+                    Section(copy[.deletionBeforeContinuing]) {
                         Text(
-                            "Permanently delete your Certigo account, confirmed learning and progression. Local drafts and downloaded account references are removed only after the server confirms completion."
+                            copy[.deletionScopeNote]
                         )
                         Text(
-                            "This is irreversible. There is no cancellation endpoint after submission. Residual production backups may rotate for up to 30 days, a pseudonymous tombstone remains for 30 days and identity-free deletion audit logs for 90 days. These are not an undo period."
+                            copy[.deletionRetentionNote]
                         )
                         if model.canReauthenticateForDeletion {
                             Button(
-                                "Continue to verify identity",
+                                copy[.deletionVerify],
                                 systemImage: "person.badge.shield.checkmark"
                             ) {
                                 Task { await model.verifyDeletionIdentity() }
@@ -3621,33 +4989,34 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .disabled(model.deletionBusy)
                         } else {
                             Text(
-                                "Remote deletion requires configured Microsoft sign-in. It is unavailable for the demo and manual development connector."
+                                copy[.deletionMicrosoftRequired]
                             )
                         }
                     }
                 } else if model.deletionStage == .pending || model.deletionStage == .unconfirmed
                     || model.deletionStage == .checking
                 {
-                    Section("Server status") {
+                    Section(copy[.deletionServerStatus]) {
                         if let status = model.deletionStatus, status.status == .pending {
                             Text(
-                                "\(status.completedSteps) of \(status.totalSteps) server steps confirmed."
+                                copy.deletionProgress(
+                                    completed: status.completedSteps, total: status.totalSteps)
                             )
                             Text(
-                                "Deletion is pending, not completed. Learning is paused and local data is retained. Status checks do not advance unfinished deletion steps."
+                                copy[.deletionPendingNote]
                             )
                             if status.retryAfterSeconds != nil {
                                 Text(
-                                    "The server requested a retry delay. Refresh status before retrying if the action is not available yet."
+                                    copy[.deletionRetryDelay]
                                 )
                             }
                         }
-                        Button("Check status", systemImage: "arrow.clockwise") {
+                        Button(copy[.deletionCheckStatus], systemImage: "arrow.clockwise") {
                             Task { await model.refreshDeletionStatus() }
                         }
                         .disabled(model.deletionBusy)
                         Button(
-                            "Sign in to check the same account", systemImage: "person.crop.circle"
+                            copy[.deletionSignInSameAccount], systemImage: "person.crop.circle"
                         ) {
                             Task { await model.recoverDeletionConnection(interactive: true) }
                         }
@@ -3657,7 +5026,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         }
                         .disabled(!model.canRetryDeletion)
                         if model.deletionStatus?.status == .notRequested {
-                            Button("Resume account to verify identity") {
+                            Button(copy[.deletionResumeAccount]) {
                                 Task { await model.resumeAccountAfterStatusCheck() }
                             }
                             .disabled(model.deletionBusy)
@@ -3666,7 +5035,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 } else if model.deletionStage == .cleanupFailed {
                     Section {
                         Text(
-                            "\(copy.confirmed). Cleanup on this device is not complete."
+                            copy[.deletionCleanupIncomplete]
                         )
                         Button(copy.retry, systemImage: "arrow.clockwise") {
                             Task { await model.retryDeletionCleanup() }
@@ -3676,9 +5045,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 } else if model.deletionStage == .completed {
                     Section {
                         Text(
-                            "The server confirmed account deletion and this device confirmed local cleanup. Residual retention periods still apply."
+                            copy[.deletionCompletedNote]
                         )
-                        Button("Return to sign-in") { model.acknowledgeAccountDeletion() }
+                        Button(copy[.deletionReturnToSignIn]) { model.acknowledgeAccountDeletion() }
                     }
                 }
             }
@@ -3697,7 +5066,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
             }
             .alert(
-                "Permanently delete this Certigo account?",
+                copy[.deletionConfirmTitle],
                 isPresented: Binding(
                     get: { model.deletionStage == .confirmation },
                     set: { _ in })
@@ -3708,7 +5077,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 Button(copy[.cancel], role: .cancel) { model.discardDeletionProof() }
             } message: {
                 Text(
-                    "Microsoft verified the same account. Only Delete account submits the irreversible request. Completion may require retries."
+                    copy[.deletionConfirmMessage]
                 )
             }
             .onChange(of: model.deletionStage) { _, _ in focused = .status }
@@ -3727,14 +5096,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var title: String {
             switch model.deletionStage {
-            case .verifying: "Verify your Microsoft identity"
-            case .confirmation: "Identity verified"
-            case .checking: "Checking account deletion"
-            case .pending: "Deletion pending"
-            case .unconfirmed: "Account status unconfirmed"
-            case .cleanupFailed: "Local cleanup requires attention"
-            case .completed: "Account deleted"
-            default: "Delete your Certigo account"
+            case .verifying: copy[.deletionVerifying]
+            case .confirmation: copy[.deletionIdentityVerified]
+            case .checking: copy[.deletionChecking]
+            case .pending: copy[.deletionPending]
+            case .unconfirmed: copy[.deletionUnconfirmed]
+            case .cleanupFailed: copy[.deletionCleanupAttention]
+            case .completed: copy[.deletionCompleted]
+            default: copy[.deletionTitle]
             }
         }
     }
@@ -3794,36 +5163,37 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 .pickerStyle(.menu)
                                 ContentUnavailableView(
                                     navigation.social == .friends
-                                        ? "Friends are not connected"
-                                        : "Teams are not connected",
+                                        ? copy.native(.socialUnavailable)
+                                        : copy.native(.socialUnavailable),
                                     systemImage: "person.2",
                                     description: Text(
-                                        "Invitations, sharing and group activity are not available. No relationships are created here."
+                                        copy.native(.socialUnavailableHint)
                                     ))
-                                NativeReadingSection(title: "Private learning comes first") {
+                                NativeReadingSection(title: copy.native(.privateLearning)) {
                                     Text(
-                                        "Your Profile is your private learning record, not a friend profile."
+                                        copy.native(.privateProfileHint)
                                     )
                                     Text(
-                                        "Detailed results, mistakes, readiness and Coach context are not published by visiting Social."
+                                        copy.native(.privateResultsHint)
                                     )
                                     .foregroundStyle(.secondary)
                                 }
                                 NativeReadingSection(
                                     title: navigation.social == .friends
-                                        ? "Friends · not active" : "Teams · not active"
+                                        ? copy.native(.friendsInactive)
+                                        : copy.native(.teamsInactive)
                                 ) {
                                     Text(
                                         navigation.social == .friends
-                                            ? "Friend discovery, invitations and shared profiles are not enabled. No contacts are uploaded and no invitations are sent."
-                                            : "Team membership, roles, invitations and challenges are not enabled. A shared team would not grant access to private results or readiness."
+                                            ? copy.native(.friendsPrivacy)
+                                            : copy.native(.teamsPrivacy)
                                     )
                                     Text(
-                                        "Any future sharing needs a separate, explicit opt-in with a preview of the content and audience. No sharing controls are active here."
+                                        copy.native(.sharingConsent)
                                     )
                                     .foregroundStyle(.secondary)
                                 }
-                                Button("Return to learning", systemImage: "book") {
+                                Button(copy.native(.returnLearning), systemImage: "book") {
                                     model.selectedTab = .learn
                                 }
                                 .frame(minHeight: 44)
@@ -3867,7 +5237,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .safeAreaInset(edge: .bottom) {
                 if model.busy {
                     ProgressView(
-                        savingGoalID == nil ? copy.loading : "Saving active goal…"
+                        savingGoalID == nil ? copy.loading : copy.native(.savingGoal)
                     )
                     .padding()
                     .frame(maxWidth: .infinity)
@@ -3885,15 +5255,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
             }
             .alert(
-                "Operation not confirmed",
+                copy.native(.operationUnconfirmed),
                 isPresented: Binding(
                     get: { model.errorMessage != nil },
                     set: { if !$0 { model.errorMessage = nil } }
                 )
             ) {
-                Button("OK", role: .cancel) { model.errorMessage = nil }
+                Button(copy.native(.ok), role: .cancel) { model.errorMessage = nil }
             } message: {
-                Text(model.errorMessage ?? "")
+                Text(model.errorMessage?.resolved(using: copy) ?? "")
             }
             .task { await model.restore() }
             .sheet(isPresented: $showEditorialPilot) {
@@ -4138,9 +5508,11 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             .foregroundStyle(.secondary)
                     }
                     if let pendingLessonLink {
-                        Section("Shared lesson link") {
-                            Text("Editorial pilot · \(pendingLessonLink.lessonID)")
-                            Button("Open linked lesson", systemImage: "arrow.up.right.square") {
+                        Section(copy.native(.sharedLesson)) {
+                            Text("\(copy.native(.editorialPilot)) · \(pendingLessonLink.lessonID)")
+                            Button(
+                                copy.native(.openLinkedLesson), systemImage: "arrow.up.right.square"
+                            ) {
                                 requestedLessonID = pendingLessonLink.lessonID
                                 self.pendingLessonLink = nil
                                 showEditorialPilot = true
@@ -4236,20 +5608,20 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 requestLesson(node)
             }
             .confirmationDialog(
-                "Download public question packs?",
+                copy.native(.downloadQuestionPacks),
                 isPresented: Binding(
                     get: { downloadTrack != nil },
                     set: { if !$0 { downloadTrack = nil } })
             ) {
                 if let track = downloadTrack {
-                    Button("Download public content") {
+                    Button(copy.native(.downloadContent)) {
                         downloadTrack = nil
                         Task { await model.downloadQuestionPack(track) }
                     }
                 }
             } message: {
                 Text(
-                    "This downloads the whole current public release, not just this certification. No solutions are downloaded. Answers stay local until you choose Submit; correction and XP require the server."
+                    copy.native(.downloadBoundary)
                 )
             }
         }
@@ -4324,7 +5696,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 Text(recommendation.unit.title).font(.title3.weight(.semibold))
                 Text(reviewReason(recommendation.reason)).foregroundStyle(.secondary)
                 Button(
-                    "\(copy[.startReview]) · \(node.title) · \(node.estMinutes) min",
+                    "\(copy[.startReview]) · \(node.title) · \(copy.minutes(node.estMinutes))",
                     systemImage: "arrow.clockwise"
                 ) {
                     selectedTrack = path.trackId
@@ -4365,7 +5737,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         $0.status != .completed && $0.status != .mastered
                     }.map(\.estMinutes))
                 if let remaining {
-                    LabeledContent(copy.native(.remainingLearning), value: "\(remaining) min")
+                    LabeledContent(
+                        copy.native(.remainingLearning), value: "\(copy.minutes(remaining))")
                 } else {
                     Label(copy.native(.dataFailure), systemImage: "exclamationmark.triangle")
                 }
@@ -4454,7 +5827,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
         {
             Text(recommendation.title).font(.headline)
             Text(recommendation.reason).foregroundStyle(.secondary)
-            Text("\(copy.native(.duration)) · \(recommendation.estMinutes) min")
+            Text("\(copy.native(.duration)) · \(copy.minutes(recommendation.estMinutes))")
                 .font(.caption).foregroundStyle(.secondary)
             if let node = recommendationNode(recommendation) {
                 Button("\(copy.startSession) · \(node.title)", systemImage: "play.circle") {
@@ -4484,7 +5857,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 copy.native(.targetDate),
                                 value: target.formatted(date: .abbreviated, time: .omitted))
                         }
-                        Text("\(copy.native(.studyPlan)) · \(plan.dailyMinutesGoal) min")
+                        Text("\(copy.native(.studyPlan)) · \(copy.minutes(plan.dailyMinutesGoal))")
                             .font(.subheadline)
                         switch plan.initialLevel {
                         case .beginner: Text("\(copy[.initialLevel]) · \(copy[.levelBeginner])")
@@ -4518,7 +5891,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         }), let next = recommendationNode(recommendation) {
                             NativePrimaryButton(
                                 title:
-                                    "\(copy.startSession) · \(next.title) · \(next.estMinutes) min",
+                                    "\(copy.startSession) · \(next.title) · \(copy.minutes(next.estMinutes))",
                                 symbol: "play.circle"
                             ) {
                                 selectedTrack = track.id
@@ -4537,7 +5910,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 lessonID: next.id, title: next.title)
                             NativePrimaryButton(
                                 title:
-                                    "\(destination.actionTitle(copy.startSession)) · \(next.estMinutes) min",
+                                    "\(destination.actionTitle(copy.startSession)) · \(copy.minutes(next.estMinutes))",
                                 symbol: "play.circle"
                             ) {
                                 selectedTrack = path.trackId
@@ -4787,17 +6160,17 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var connectionSectionTitle: String {
             #if DEBUG
-                "Development connection"
+                copy.native(.developmentConnection)
             #else
-                "Microsoft account"
+                copy.native(.microsoftAccount)
             #endif
         }
 
         private var connectionDescription: String {
             #if DEBUG
-                "Test connector only. Production sign-in is not enabled."
+                copy.native(.testConnectorHint)
             #else
-                "Connected with your Microsoft account."
+                copy.native(.microsoftConnected)
             #endif
         }
 
@@ -4806,36 +6179,36 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 Form {
                     Section {
                         NativeEntryHeading(
-                            title: "Connect a test workspace.",
+                            title: copy.native(.connectWorkspace),
                             message:
-                                "Development access only. Your production account uses Microsoft sign-in."
+                                copy.native(.developmentScope)
                         )
                         Text(
-                            "This developer connector is not production sign-in. No Apple account or new identity is created."
+                            copy.native(.connectorBoundary)
                         )
                         .foregroundStyle(.secondary)
                     } header: {
-                        Text("Certigo · development")
+                        Text("Certigo · \(copy.native(.development))")
                     }
                     .scrollContentBackground(.hidden)
                     .background(NativePrism.canvas)
-                    Section("Test connection") {
-                        TextField("HTTPS API URL", text: $model.baseURL)
+                    Section(copy.native(.testConnection)) {
+                        TextField(copy.native(.apiEndpoint), text: $model.baseURL)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
                             .accessibilityIdentifier("developer-api-url")
-                        SecureField("Test account access token", text: $model.token)
+                        SecureField(copy.native(.testToken), text: $model.token)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .privacySensitive()
                             .accessibilityIdentifier("developer-access-token")
-                        Button("Connect the test account") { Task { await model.connect() } }
+                        Button(copy.native(.connectTest)) { Task { await model.connect() } }
                             .disabled(model.busy || model.baseURL.isEmpty || model.token.isEmpty)
                     }
                     Section {
                         Text(
-                            "The token stays in this device’s secure vault. Pending answers are never graded locally."
+                            copy.native(.tokenStorageHint)
                         )
                         .foregroundStyle(.secondary)
                     }
@@ -4878,15 +6251,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         }
                     }
                     if track.learningAvailable {
-                        Section("Offline question pack") {
+                        Section(copy.native(.offlinePack)) {
                             Button(
-                                "Download public question packs", systemImage: "arrow.down.circle"
+                                copy.native(.downloadPack), systemImage: "arrow.down.circle"
                             ) {
                                 downloadTrack = track
                             }
                             .disabled(model.busy)
                             if let pack = model.offlinePack, pack.trackId == track.id {
-                                Text("Downloaded public content. No local correction or XP.")
+                                Text(copy.native(.downloadedBoundary))
                                     .font(.footnote).foregroundStyle(.secondary)
                                 ForEach(pack.lessons, id: \.id) { lesson in
                                     NavigationLink(value: lesson.id) {
@@ -4937,8 +6310,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                         VStack(alignment: .leading) {
                                             Text(lesson.title)
                                                 .font(.headline)
-                                            Text("\(lesson.estMinutes) min").foregroundStyle(
-                                                .secondary)
+                                            Text("\(copy.minutes(lesson.estMinutes))")
+                                                .foregroundStyle(
+                                                    .secondary)
                                             Text(activityStatus(lesson.status))
                                                 .font(.caption).foregroundStyle(.secondary)
                                             Text(
@@ -4984,13 +6358,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     } else {
                         Section {
                             ContentUnavailableView(
-                                "Learning path not loaded",
+                                copy.native(.pathUnavailable),
                                 systemImage: "wifi.exclamationmark",
                                 description: Text(
-                                    "Load or retry this certification’s path. This does not change your active goal."
+                                    copy.native(.pathRetryHint)
                                 )
                             )
-                            Button("Load or retry path", systemImage: "arrow.clockwise") {
+                            Button(copy.native(.retryPath), systemImage: "arrow.clockwise") {
                                 requestPath(track)
                             }
                             .disabled(model.busy || loadingTrackID != nil)
@@ -4998,8 +6372,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 } else {
                     ContentUnavailableView(
-                        "Choose a certification", systemImage: "books.vertical",
-                        description: Text("Its learning path will load from the server.")
+                        copy.native(.chooseCertification), systemImage: "books.vertical",
+                        description: Text(copy.native(.pathServerHint))
                     )
                 }
                 savedAnswers
@@ -5010,7 +6384,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .frame(maxWidth: 700)
             .frame(maxWidth: .infinity)
             .navigationTitle(
-                selectedTrack.map(trackTitle) ?? model.path?.trackName ?? "Learning path")
+                selectedTrack.map(trackTitle) ?? model.path?.trackName ?? copy.native(.learningPath)
+            )
         }
 
         private var progressHistory: some View {
@@ -5022,11 +6397,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
                 NativeReadingSection(title: copy.native(.confirmedSessions)) {
                     Text(
-                        "Across your devices · \(model.serverHistory.count) summaries loaded\(model.historyNextCursor == nil ? "" : " · more pages available")"
+                        copy.historyLoaded(
+                            count: model.serverHistory.count,
+                            hasMore: model.historyNextCursor != nil)
                     )
                     .font(.subheadline).foregroundStyle(.secondary)
                     Text(
-                        "These are loaded attempts, not all-time question coverage. Pending answers are not confirmed results; no average or pass probability is inferred."
+                        copy[.historyEvidenceNote]
                     )
                     .font(.caption).foregroundStyle(.secondary)
                     if model.historyLoading {
@@ -5034,7 +6411,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                     if let error = model.historyError {
                         Label(
-                            error,
+                            error.resolved(using: copy),
                             systemImage: model.historyOffline
                                 ? "wifi.slash" : "exclamationmark.triangle"
                         )
@@ -5049,7 +6426,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             Text(
                                 model.historyNextCursor == nil
                                     ? copy[.noHistory]
-                                    : "No confirmed attempts in this page. More history is available."
+                                    : copy[.historyPageEmpty]
                             )
                         }
                     } else if !model.historyLoading && model.historyError == nil {
@@ -5066,10 +6443,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                     item.submittedAt,
                                     format: .dateTime.year().month().day().hour().minute())
                                 Text(
-                                    "Recorded score: \(item.scorePct) % · Earned XP: \(item.xpEarned)"
+                                    copy.historyScore(
+                                        scorePercent: item.scorePct, xp: item.xpEarned,
+                                        confirmedOnDevice: false)
                                 )
                                 Text(
-                                    "Server-confirmed summary · full correction is in saved answers when available."
+                                    copy[.historyCorrectionNote]
                                 )
                                 .font(.caption).foregroundStyle(.secondary)
                                 if let saved = model.localHistorySubmission(for: item),
@@ -5106,7 +6485,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
                 NativeReadingSection(title: copy.native(.localDevice)) {
                     Text(
-                        "Drafts are never uploaded by viewing history. Local dates are activity start dates, not server submission times."
+                        copy[.historyLocalDatesNote]
                     )
                     .font(.caption).foregroundStyle(.secondary)
                     if let presentation = model.historyPresentation {
@@ -5120,11 +6499,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                     format: .dateTime.year().month().day())
                                 if let result = saved.result {
                                     Text(
-                                        "Confirmed score: \(result.scorePct) % · Earned XP: \(result.rewards.xpEarned)"
+                                        copy.historyScore(
+                                            scorePercent: result.scorePct,
+                                            xp: result.rewards.xpEarned, confirmedOnDevice: true)
                                     )
                                 }
                                 Text(
-                                    "Server acknowledgement saved locally; not in the loaded history pages."
+                                    copy[.historyLocalAcknowledgement]
                                 )
                                 .font(.caption).foregroundStyle(.secondary)
                             }
@@ -5133,17 +6514,17 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             savedAnswer(saved)
                         }
                         if presentation.onDevice.isEmpty && presentation.confirmedOnDevice.isEmpty {
-                            Text("No additional saved submissions on this device.")
+                            Text(copy[.historyNoAdditional])
                         }
                     } else if model.historyError != nil {
                         Text(
-                            "The local history presentation could not be verified. Saved answers remain available in Learn."
+                            copy[.historyLocalUnverified]
                         )
                     }
                     if model.lesson != nil {
                         Label(
                             model.outcome == nil
-                                ? "Current local activity" : "Current submitted activity",
+                                ? copy[.historyCurrentLocal] : copy[.historyCurrentSubmitted],
                             systemImage: "doc.text")
                         Button(copy.resume, systemImage: "play.circle") {
                             model.selectedTab = .learn
@@ -5162,15 +6543,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         LabeledContent(copy.native(.readiness), value: "\(path.readinessScore) %")
                     }
                     Text(
-                        "History pages do not update your balance, readiness or active learning goal."
+                        copy[.historyNoBalanceChange]
                     )
                     Text(
-                        "Readiness is a server-returned learning indicator for the named path, not a calibrated probability of passing the exam. Its formula version, evidence window and last calculation time are not supplied by this client contract."
+                        copy[.historyReadinessNote]
                     )
                     .font(.subheadline).foregroundStyle(.secondary)
                     if model.path == nil {
                         Text(
-                            "Readiness is unknown until a learning path is loaded. Unknown is not zero."
+                            copy[.historyReadinessUnknown]
                         )
                     }
                 }
@@ -5189,17 +6570,20 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     Text(path.trackName).font(.headline)
                     LabeledContent(
                         copy.native(.completedActivities),
-                        value: "\(coverage.completedActivities) of \(coverage.totalActivities)")
+                        value: copy.coverageCount(
+                            completed: coverage.completedActivities, total: coverage.totalActivities
+                        ))
                     LabeledContent(
                         copy.native(.completedUnits),
-                        value: "\(coverage.completedUnits) of \(coverage.totalUnits)")
+                        value: copy.coverageCount(
+                            completed: coverage.completedUnits, total: coverage.totalUnits))
                     Text(
-                        "Snapshot of the currently loaded server path, not a time-period report. Completed or mastered activities count; empty units do not count as complete."
+                        copy[.historyCoverageSnapshot]
                     )
                     .font(.caption).foregroundStyle(.secondary)
                 } else {
                     Text(
-                        "Load a learning path to see its activity denominator. Coverage is not known yet."
+                        copy[.historyCoverageUnknown]
                     )
                 }
                 if let lesson = model.lesson {
@@ -5209,14 +6593,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     Text(lesson.title).font(.headline)
                     LabeledContent(
                         copy.native(.localAnswers),
-                        value: "\(selectedCount) of \(lesson.questions.count) questions")
+                        value: copy.questionCount(
+                            selected: selectedCount, total: lesson.questions.count))
                     Text(
-                        "Selection is not submission or correctness. Total questions covered across the whole path are not provided."
+                        copy[.historySelectionNote]
                     )
                     .font(.caption).foregroundStyle(.secondary)
                 }
                 Text(
-                    "Viewing this snapshot never switches your active goal. History is separate and may contain other goals."
+                    copy[.historyGoalUnchanged]
                 )
                 .font(.caption).foregroundStyle(.secondary)
             }
@@ -5234,7 +6619,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         @ViewBuilder private var savedAnswers: some View {
             if !model.queue.isEmpty {
-                Section("Saved answers") {
+                Section(copy[.historySavedAnswers]) {
                     ForEach(model.queue) { saved in
                         savedAnswer(saved)
                     }
@@ -5247,7 +6632,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 Text(lessonTitle(saved.lessonId)).font(.headline)
                 switch saved.status {
                 case .pendingCorrection:
-                    Label("Correction pending", systemImage: "clock")
+                    Label(copy[.pendingCorrection], systemImage: "clock")
                         .foregroundStyle(NativePrism.pending)
                     Button(copy.retry) {
                         Task { await model.retry(saved) }
@@ -5256,17 +6641,17 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     .disabled(model.busy)
                 case .corrected:
                     if let result = saved.result {
-                        Text("Confirmed score: \(result.scorePct) %")
+                        Text(copy.confirmedScore(result.scorePct))
                         ForEach(result.results) { item in
                             Text(item.explanation)
                         }
                     }
                 case .failed:
                     Label(
-                        "Submission rejected · answers preserved",
+                        copy[.historySubmissionRejected],
                         systemImage: "exclamationmark.triangle")
                     Text(
-                        "This is a local status; the server may already have recorded the attempt."
+                        copy[.historyLocalStatusNote]
                     )
                     .font(.caption).foregroundStyle(.secondary)
                 }
@@ -5289,19 +6674,19 @@ struct NativeDemoSnapshot: Codable, Equatable {
             let state = NativeActiveGoalPresentation(
                 targetID: track.id, confirmedID: model.profile?.activeTrackId,
                 savingID: savingGoalID, busy: model.busy)
-            Section("Active learning goal") {
-                Label(state.status, systemImage: state.symbol)
+            Section(copy.native(.activeGoal)) {
+                Label(state.status(copy), systemImage: state.symbol)
                     .accessibilityIdentifier("active-goal-status")
                 if let current = model.profile?.activeTrackId {
                     Text(
-                        "Server-confirmed goal: \(model.tracks.first(where: { $0.id == current })?.title ?? current)"
+                        "\(copy.native(.goalConfirmed)) · \(model.tracks.first(where: { $0.id == current })?.title ?? current)"
                     )
                     .foregroundStyle(.secondary)
                 } else {
-                    Text("No active goal is confirmed by the server.")
+                    Text(copy.native(.noActiveGoal))
                         .foregroundStyle(.secondary)
                 }
-                NativePrimaryButton(title: state.action, symbol: "scope") {
+                NativePrimaryButton(title: state.action(copy), symbol: "scope") {
                     savingGoalID = track.id
                     Task {
                         await model.chooseActiveTrack(track)
@@ -5312,7 +6697,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 .disabled(!state.canChoose)
                 .accessibilityIdentifier("choose-active-goal")
                 Text(
-                    "Browsing does not change your goal. This action requests a server-confirmed change; your current activity and saved submissions stay available."
+                    copy.native(.goalChangeHint)
                 )
                 .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -5341,7 +6726,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 $0.id == lesson.id
                             }) {
                                 LabeledContent(
-                                    copy.native(.duration), value: "\(node.estMinutes) min")
+                                    copy.native(.duration),
+                                    value: "\(copy.minutes(node.estMinutes))")
                             }
                             Label(copy.native(.understandStage), systemImage: "text.book.closed")
                                 .font(.subheadline).foregroundStyle(NativePrism.tint)
@@ -5358,7 +6744,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                             .frame(minHeight: 44)
                             Text(
-                                "Answer the questions, then submit your answers for server correction."
+                                copy.native(.answerInstruction)
                             )
                             .foregroundStyle(.secondary)
                             ForEach(Array(lesson.blocks.enumerated()), id: \.offset) { _, block in
@@ -5392,20 +6778,22 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                         )
                                         .font(.headline).foregroundStyle(NativePrism.pending)
                                         Text(
-                                            "Correction will be requested after reconnecting. No score or XP is confirmed yet."
+                                            copy.native(.pendingCorrectionHint)
                                         )
                                         .foregroundStyle(.secondary)
                                     }
                                     .accessibilityIdentifier("pending-correction")
                                 case .corrected(let result):
-                                    NativeReadingSection(title: "Your confirmed result") {
+                                    NativeReadingSection(title: copy.native(.confirmedResult)) {
                                         Label(
                                             copy.confirmed, systemImage: "checkmark.seal"
                                         )
                                         .foregroundStyle(NativePrism.confirmed)
-                                        LabeledContent("Score", value: "\(result.scorePct) %")
                                         LabeledContent(
-                                            "XP earned", value: "\(result.rewards.xpEarned)")
+                                            copy.native(.score), value: "\(result.scorePct) %")
+                                        LabeledContent(
+                                            copy.native(.earned),
+                                            value: "\(result.rewards.xpEarned)")
                                         if let reviewDate = result.nextReviewDueAt {
                                             LabeledContent(
                                                 copy.native(.nextReview),
@@ -5416,7 +6804,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                     ForEach(result.results) { item in
                                         NativeReadingCard {
                                             Label(
-                                                item.correct ? "Correct answer" : "Review needed",
+                                                item.correct
+                                                    ? copy.native(.answerCorrect)
+                                                    : copy.native(.reviewNeeded),
                                                 systemImage: item.correct
                                                     ? "checkmark.circle" : "book"
                                             )
@@ -5457,7 +6847,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                         }
                                     }
                                     NativeReadingSection(title: copy[.continueLearning]) {
-                                        Button("Read again", systemImage: "text.book.closed") {
+                                        Button(
+                                            copy.native(.readAgain), systemImage: "text.book.closed"
+                                        ) {
                                             reader.scrollTo("session-reading-start", anchor: .top)
                                         }
                                         .frame(minHeight: 44)
@@ -5477,12 +6869,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                             }
                                             .disabled(model.busy || loadingLessonID != nil)
                                             Text(
-                                                "Starts a new answer selection for this activity. Your confirmed attempt stays in history."
+                                                copy.native(.newAttemptHint)
                                             )
                                             .font(.caption).foregroundStyle(.secondary)
                                         } else {
                                             Text(
-                                                "Open an available activity in the learning plan to practice again. Reading does not create another attempt."
+                                                copy.native(.practiceAgainHint)
                                             )
                                             .foregroundStyle(.secondary)
                                         }
@@ -5510,10 +6902,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     } else {
                         VStack(spacing: 16) {
                             ContentUnavailableView(
-                                "Lesson unavailable",
+                                copy.native(.lessonUnavailable),
                                 systemImage: "wifi.exclamationmark",
                                 description: Text(
-                                    "The selected lesson could not be loaded."
+                                    copy.native(.lessonLoadFailure)
                                 )
                             )
                             Button(copy.retry, systemImage: "arrow.clockwise") {
@@ -5526,8 +6918,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 } else {
                     ContentUnavailableView(
-                        "One session at a time", systemImage: "book",
-                        description: Text("Choose an activity in the learning path.")
+                        copy.native(.oneSession), systemImage: "book",
+                        description: Text(copy.native(.chooseActivity))
                     )
                 }
             }
@@ -5583,7 +6975,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         model.selections[question.id] == option.id ? .isSelected : []
                     )
                     .accessibilityValue(
-                        model.selections[question.id] == option.id ? "Selected" : "Not selected")
+                        model.selections[question.id] == option.id
+                            ? copy.native(.selected) : copy.native(.notSelected))
                 }
             }
             .onAppear { model.questionAppeared(question.id) }
@@ -5592,6 +6985,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
     @MainActor
     struct NativeLessonAudioControls: View {
+        @Environment(\.nativeInterfaceCopy) private var copy
         @Environment(\.scenePhase) private var scenePhase
         @State private var speech = NativeLessonSpeech()
         let content: NativeLessonReadingContent
@@ -5599,35 +6993,35 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         var body: some View {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Read lesson aloud").font(.headline)
+                Text(copy[.audioReadAloud]).font(.headline)
                     .accessibilityAddTraits(.isHeader)
                 Text(
-                    "Reads selected learning text only. Code, questions and corrections are not read. Choose a reading voice; the content language is not detected."
+                    copy[.audioScopeNote]
                 )
                 .font(.subheadline).foregroundStyle(.secondary)
-                Picker("Reading voice", selection: $speech.voiceID) {
-                    Text("Choose a voice").tag("")
+                Picker(copy[.audioVoice], selection: $speech.voiceID) {
+                    Text(copy[.audioChooseVoice]).tag("")
                     ForEach(speech.voices, id: \.identifier) { voice in
                         Text("\(voice.name) · \(voice.language)").tag(voice.identifier)
                     }
                 }
                 .disabled(speech.state != .idle)
                 if speech.voices.isEmpty {
-                    Text("No reading voices are available on this device.")
+                    Text(copy[.audioNoVoices])
                 }
-                Picker("Reading speed", selection: $speech.rate) {
-                    Text("Slower").tag(AVSpeechUtteranceDefaultSpeechRate * 0.8)
-                    Text("Standard").tag(AVSpeechUtteranceDefaultSpeechRate)
+                Picker(copy[.audioSpeed], selection: $speech.rate) {
+                    Text(copy[.audioSlower]).tag(AVSpeechUtteranceDefaultSpeechRate * 0.8)
+                    Text(copy[.audioStandard]).tag(AVSpeechUtteranceDefaultSpeechRate)
                 }
                 .disabled(speech.state != .idle)
-                Text(speech.state.label).font(.subheadline)
+                Text(speech.state.label(copy)).font(.subheadline)
                     .accessibilityIdentifier("lesson-audio-state")
                 ViewThatFits(in: .horizontal) {
                     HStack { playbackButtons }
                     VStack(alignment: .leading) { playbackButtons }
                 }
                 if let issue = speech.issue {
-                    Text(issue).foregroundStyle(.primary)
+                    Text(copy[issue]).foregroundStyle(.primary)
                         .accessibilityIdentifier("lesson-audio-error")
                 }
             }
@@ -5648,19 +7042,19 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @ViewBuilder private var playbackButtons: some View {
             switch speech.state {
             case .idle:
-                Button("Read lesson", systemImage: "speaker.wave.2") {
+                Button(copy[.audioRead], systemImage: "speaker.wave.2") {
                     speech.read(content)
                 }
                 .frame(minHeight: 44)
             case .reading:
-                Button("Pause reading", systemImage: "pause") { speech.pause() }
+                Button(copy[.audioPause], systemImage: "pause") { speech.pause() }
                     .frame(minHeight: 44)
             case .paused:
-                Button("Resume reading", systemImage: "play") { speech.resume() }
+                Button(copy[.audioResume], systemImage: "play") { speech.resume() }
                     .frame(minHeight: 44)
             }
             if speech.state != .idle {
-                Button("Stop reading", systemImage: "stop") { speech.stop() }
+                Button(copy[.audioStop], systemImage: "stop") { speech.stop() }
                     .frame(minHeight: 44)
             }
         }
@@ -5672,11 +7066,11 @@ struct NativeDemoSnapshot: Codable, Equatable {
         enum State {
             case idle, reading, paused
 
-            var label: String {
+            func label(_ copy: AppInterfaceCopy) -> String {
                 switch self {
-                case .idle: "Audio stopped"
-                case .reading: "Reading lesson"
-                case .paused: "Audio paused"
+                case .idle: copy[.audioStopped]
+                case .reading: copy[.audioReading]
+                case .paused: copy[.audioPaused]
                 }
             }
         }
@@ -5687,7 +7081,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
         var voiceID = ""
         var rate = AVSpeechUtteranceDefaultSpeechRate
         private(set) var state = State.idle
-        private(set) var issue: String?
+        private(set) var issue: AppInterfaceCopy.Key?
         private let synthesizer = AVSpeechSynthesizer()
         private var utteranceID: ObjectIdentifier?
 
@@ -5701,20 +7095,19 @@ struct NativeDemoSnapshot: Codable, Equatable {
             guard state == .idle else { return }
             issue = nil
             guard !voices.isEmpty else {
-                issue = "No reading voices are available on this device."
+                issue = .audioNoVoices
                 return
             }
             guard !UIAccessibility.isVoiceOverRunning else {
-                issue =
-                    "VoiceOver is active. Use VoiceOver to read this content; optional audio stays stopped to avoid overlapping speech."
+                issue = .audioVoiceOverRead
                 return
             }
             guard !voiceID.isEmpty else {
-                issue = "Choose a reading voice before starting."
+                issue = .audioChooseVoiceFirst
                 return
             }
             guard let voice = AVSpeechSynthesisVoice(identifier: voiceID) else {
-                issue = "That voice is unavailable. Choose an available reading voice."
+                issue = .audioVoiceUnavailable
                 return
             }
             let text: String
@@ -5722,12 +7115,11 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 text = try content.spokenText(
                     renderingMarkdown: NativeLessonReadingContent.plainText)
             } catch {
-                issue =
-                    "The lesson text could not be prepared for reading. No audio was started; you can still read the lesson on screen."
+                issue = .audioPreparationFailed
                 return
             }
             guard !text.isEmpty else {
-                issue = "No lesson text is available to read."
+                issue = .audioNoText
                 return
             }
             let utterance = AVSpeechUtterance(string: text)
@@ -5743,7 +7135,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
             if synthesizer.pauseSpeaking(at: .immediate) {
                 state = .paused
             } else {
-                issue = "Reading could not be paused. Stop reading and try again."
+                issue = .audioPauseFailed
             }
         }
 
@@ -5751,14 +7143,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
             guard state == .paused else { return }
             guard !UIAccessibility.isVoiceOverRunning else {
                 stop()
-                issue =
-                    "VoiceOver is active. Optional audio stays stopped to avoid overlapping speech."
+                issue = .audioVoiceOverResume
                 return
             }
             if synthesizer.continueSpeaking() {
                 state = .reading
             } else {
-                issue = "Reading could not be resumed. Stop reading and try again."
+                issue = .audioResumeFailed
             }
         }
 
@@ -5885,12 +7276,18 @@ struct NativeActiveGoalPresentation {
 
     var isSaving: Bool { savingID == targetID }
     var canChoose: Bool { !busy && savingID == nil && !isConfirmed }
-    var status: String {
-        if isSaving { return "Goal change pending · waiting for the server" }
-        return isConfirmed ? "This is your confirmed active goal" : "Viewing a goal · not selected"
-    }
+    #if canImport(CertigoDomain)
+        func status(_ copy: AppInterfaceCopy) -> String {
+            if isSaving { return copy.native(.goalPending) }
+            return isConfirmed ? copy.native(.goalConfirmed) : copy.native(.goalViewing)
+        }
+    #endif
     var symbol: String { isSaving ? "clock" : isConfirmed ? "checkmark.circle" : "eye" }
-    var action: String { isSaving ? "Saving active goal…" : "Choose as active goal" }
+    #if canImport(CertigoDomain)
+        func action(_ copy: AppInterfaceCopy) -> String {
+            isSaving ? copy.native(.savingGoal) : copy.native(.chooseGoal)
+        }
+    #endif
 }
 
 struct NativeLearningNavigation {

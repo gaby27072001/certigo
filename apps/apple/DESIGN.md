@@ -96,8 +96,11 @@ fictional demo, and the editorial pilot. Both the arrival surface and Settings
 show native autonyms alongside localized language names. This changes interface
 chrome only: certification questions and French editorial source text remain
 unaltered and carry an explicit source-language disclosure. See
-`NATIVE_UI_BRIEF.md` for the exact copy-catalog coverage and remaining English
-explanatory labels; this is not a claim of complete translation of every sentence.
+`NATIVE_UI_BRIEF.md` for the application-chrome catalog coverage and its source-content
+boundary. Secondary history, deletion, audio, configuration and demo messages use
+the same eight-language contract; stored notices resolve in the current language,
+not the language selected when an error occurred. This is source-wiring coverage,
+not a claim of linguist-reviewed translations or verified Apple-device layout.
 
 The production entry offers Microsoft sign-in and a clearly isolated fictional
 demo, never a manual-token fallback. The developer connector remains DEBUG-only.
