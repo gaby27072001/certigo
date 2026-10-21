@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-21T10:04:00+01:00",
+  "title": "Design System: Certigo Apple",
+  "extensions": {
+    "typographyMeta": {
+      "display": {
+        "displayName": "Apple system display",
+        "purpose": "SwiftUI semantic title styles with Dynamic Type."
+      },
+      "body": {
+        "displayName": "Apple system body",
+        "purpose": "Semantic reading text; monospaced only for source code."
+      }
+    },
+    "motion": [],
+    "shadows": [],
+    "breakpoints": []
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "Prism, native to Apple.",
+    "rules": [
+      "Connected learning and the isolated demonstration share the Prism visual direction.",
+      "System controls own glass; questions and explanations remain opaque.",
+      "Ink/glow spectrum roles adapt to appearance and increased contrast.",
+      "Pending local answers never appear to be server-confirmed progress.",
+      "Source implementation is not proof of Apple rendering or accessibility acceptance."
+    ]
+  }
+}

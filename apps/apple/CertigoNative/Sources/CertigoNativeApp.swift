@@ -1,5 +1,21 @@
 import Foundation
 
+enum NativeTrackAppearance {
+    // Catalog contracts have a certification code, not a visual domain index.
+    static func band(for code: String) -> Int {
+        switch code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased().split(
+            separator: "-"
+        ).first {
+        case "AI": 1
+        case "PL": 2
+        case "MS": 3
+        case "DP": 4
+        case "SC": 5
+        default: 0
+        }
+    }
+}
+
 #if canImport(SwiftUI)
     import AVFoundation
 
@@ -27,20 +43,161 @@ import Foundation
     // STORY: Read a situation, decide, wait, understand; every demo result is explicitly synthetic.
     // FIRST VIEWPORT: One colored objective plane, one resume action, then quiet supporting rows.
     // FORM: Reviewable extension of approved A, not a new identity; bounded iPad reading width.
-    private enum NativePrism {
-        static let tint = Color(
+    enum NativePrism {
+        // Prism spectrumInk / spectrumGlow; solid fills never use the brighter foreground role.
+        private static let ink: [UInt32] = [
+            0x3B35F2, 0x901BAE, 0xA91A66, 0x924A13, 0x177331, 0x176C7A,
+        ]
+        private static let glow: [UInt32] = [
+            0x8097F8, 0xD764F8, 0xF95DA5, 0xEC7B26, 0x2DBC55, 0x2CB0C7,
+        ]
+        static let canvas = Color(uiColor: .systemGroupedBackground)
+        static let surface = Color(uiColor: .secondarySystemGroupedBackground)
+        static let edge = Color(
             uiColor: UIColor { traits in
-                traits.userInterfaceStyle == .dark
-                    ? UIColor(red: 128 / 255, green: 151 / 255, blue: 248 / 255, alpha: 1)
-                    : UIColor(red: 59 / 255, green: 53 / 255, blue: 242 / 255, alpha: 1)
+                traits.accessibilityContrast == .high ? .label : .separator
             })
-        static let objectiveFill = Color(red: 59 / 255, green: 53 / 255, blue: 242 / 255)
+        static let tint = accent(band: 0)
+        static let objectiveFill = Color(uiColor: color(ink[0]))
+        static let confirmed = accent(band: 4)
+        static let pending = accent(band: 3)
+
+        static func accent(for code: String) -> Color {
+            accent(band: NativeTrackAppearance.band(for: code))
+        }
+
+        private static func accent(band: Int) -> Color {
+            Color(
+                uiColor: UIColor { traits in
+                    let dark = traits.userInterfaceStyle == .dark
+                    let base = color(dark ? glow[band] : ink[band])
+                    guard traits.accessibilityContrast == .high else { return base }
+                    var red: CGFloat = 0
+                    var green: CGFloat = 0
+                    var blue: CGFloat = 0
+                    var alpha: CGFloat = 0
+                    base.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+                    let target: CGFloat = dark ? 1 : 0
+                    return UIColor(
+                        red: red + (target - red) * 0.25,
+                        green: green + (target - green) * 0.25,
+                        blue: blue + (target - blue) * 0.25, alpha: 1)
+                })
+        }
+
+        private static func color(_ hex: UInt32) -> UIColor {
+            UIColor(
+                red: CGFloat((hex >> 16) & 255) / 255,
+                green: CGFloat((hex >> 8) & 255) / 255,
+                blue: CGFloat(hex & 255) / 255, alpha: 1)
+        }
+    }
+
+    struct NativeReadingPage<Content: View>: View {
+        @ViewBuilder let content: Content
+
+        var body: some View {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) { content }
+                    .padding(20)
+                    .frame(maxWidth: 700, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+            }
+            .background(NativePrism.canvas)
+        }
+    }
+
+    struct NativeReadingSection<Content: View>: View {
+        let title: String
+        @ViewBuilder let content: Content
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(title).font(.title2.bold()).accessibilityAddTraits(.isHeader)
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    struct NativeReadingCard<Content: View>: View {
+        @ViewBuilder let content: Content
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) { content }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(NativePrism.surface, in: RoundedRectangle(cornerRadius: 20))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(NativePrism.edge, lineWidth: 1)
+                }
+        }
+    }
+
+    struct NativePrimaryButton: View {
+        @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+        let title: String
+        let symbol: String
+        let action: () -> Void
+
+        var body: some View {
+            Group {
+                if #available(iOS 26.0, *), !reduceTransparency {
+                    button.buttonStyle(.glassProminent)
+                } else {
+                    button.buttonStyle(.borderedProminent)
+                }
+            }
+            .tint(NativePrism.objectiveFill)
+        }
+
+        struct NativeChoiceButtonStyle: ButtonStyle {
+            @Environment(\.isEnabled) private var isEnabled
+
+            func makeBody(configuration: Configuration) -> some View {
+                configuration.label
+                    .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
+                    .padding(16)
+                    .background(
+                        configuration.isPressed
+                            ? Color(uiColor: .tertiarySystemFill) : NativePrism.surface,
+                        in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+
+        private var button: some View {
+            Button(action: action) {
+                Label(title, systemImage: symbol)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .multilineTextAlignment(.center)
+            }
+            .controlSize(.large)
+        }
+    }
+
+    struct NativeEntryHeading: View {
+        let title: String
+        let message: String
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                Image(systemName: "book.pages")
+                    .font(.largeTitle).accessibilityHidden(true)
+                Text(title).font(.largeTitle.bold()).accessibilityAddTraits(.isHeader)
+                Text(message).font(.body)
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(.white)
+            .background(NativePrism.objectiveFill, in: RoundedRectangle(cornerRadius: 24))
+        }
     }
 
     private struct NativeEntry: View {
         @State private var showDemo = false
         #if DEBUG
-        @State private var showDeveloper = false
+            @State private var showDeveloper = false
         #endif
         @State private var pendingLessonLink: EditorialPilotLessonLink?
         @State private var invalidLessonLink = false
@@ -55,53 +212,53 @@ import Foundation
 
         private var developmentEntry: some View {
             NavigationStack {
-                List {
-                    Section {
-                        Text("One question. A clearer idea.")
-                            .font(.largeTitle.bold())
-                            .padding(.vertical, 16)
-                        Text("Explore Certigo’s native learning preview.")
-                            .foregroundStyle(.secondary)
-                        Button("Explore the demo", systemImage: "play.circle") { showDemo = true }
-                            .frame(minHeight: 44)
-                            .accessibilityIdentifier("open-native-demo")
-                    }
-                    Section("Isolated demonstration") {
+                NativeReadingPage {
+                    NativeEntryHeading(
+                        title: "One question. A clearer idea.",
+                        message: "Explore Certigo’s native learning preview.")
+                    NativeReadingSection(title: "Try the learning experience") {
+                        NativePrimaryButton(title: "Explore the demo", symbol: "play.circle") {
+                            showDemo = true
+                        }
+                        .accessibilityIdentifier("open-native-demo")
                         Text(
                             "Goals, answers and explanations are fictional. No account, network or real result is used."
                         )
-                    }
-                    #if DEBUG
-                    if let pendingLessonLink {
-                        Section("Shared lesson link") {
-                            Text("Non-certifying editorial pilot · \(pendingLessonLink.lessonID)")
-                            Button("Continue to linked lesson", systemImage: "book") {
-                                showDeveloper = true
-                            }
-                            .accessibilityIdentifier("continue-to-linked-lesson")
-                        }
-                    }
-                    Section("Development") {
-                        Button(
-                            "Open the test API connector",
-                            systemImage: "wrench.and.screwdriver"
-                        ) {
-                            showDeveloper = true
-                        }
-                        .frame(minHeight: 44)
-                        Text(
-                            "For test accounts only. This is not production sign-in."
-                        )
                         .foregroundStyle(.secondary)
                     }
+                    #if DEBUG
+                        if let pendingLessonLink {
+                            NativeReadingSection(title: "Shared lesson link") {
+                                Text(
+                                    "Non-certifying editorial pilot · \(pendingLessonLink.lessonID)"
+                                )
+                                Button("Continue to linked lesson", systemImage: "book") {
+                                    showDeveloper = true
+                                }
+                                .accessibilityIdentifier("continue-to-linked-lesson")
+                            }
+                        }
+                        NativeReadingSection(title: "Development") {
+                            Button(
+                                "Open the test API connector",
+                                systemImage: "wrench.and.screwdriver"
+                            ) {
+                                showDeveloper = true
+                            }
+                            .frame(minHeight: 44)
+                            Text(
+                                "For test accounts only. This is not production sign-in."
+                            )
+                            .foregroundStyle(.secondary)
+                        }
                     #endif
                 }
                 .navigationTitle("Certigo")
                 .fullScreenCover(isPresented: $showDemo) { NativeDemoRoot() }
                 #if DEBUG
-                .sheet(isPresented: $showDeveloper) {
-                    NativeDeveloperConnector(pendingLessonLink: $pendingLessonLink)
-                }
+                    .sheet(isPresented: $showDeveloper) {
+                        NativeDeveloperConnector(pendingLessonLink: $pendingLessonLink)
+                    }
                 #endif
             }
             .onOpenURL(perform: handleIncomingURL)
@@ -124,76 +281,97 @@ import Foundation
     }
 
     #if CERTIGO_PRODUCTION_DISTRIBUTION
-    @MainActor
-    private struct NativeProductionEntry: View {
-        @Binding private var pendingLessonLink: EditorialPilotLessonLink?
-        @State private var model: NativeModel
-        @State private var provider: MSALAuthenticationProvider?
-        @State private var configurationIssue: String?
+        @MainActor
+        private struct NativeProductionEntry: View {
+            @Binding private var pendingLessonLink: EditorialPilotLessonLink?
+            @State private var model: NativeModel
+            @State private var provider: MSALAuthenticationProvider?
+            @State private var configurationIssue: String?
+            @State private var showDemo = false
 
-        init(pendingLessonLink: Binding<EditorialPilotLessonLink?>) {
-            self._pendingLessonLink = pendingLessonLink
-            do {
-                let configured = try CIAMConfigurationEnvironment.configuredProductionProvider(
-                    infoDictionary: Bundle.main.infoDictionary ?? [:],
-                    bundleIdentifier: Bundle.main.bundleIdentifier,
-                    isDevelopmentBuild: false
-                ) { configuration in
-                    try MSALAuthenticationProvider(
-                        configuration: configuration,
-                        presentation: Self.authenticationPresentationController)
+            init(pendingLessonLink: Binding<EditorialPilotLessonLink?>) {
+                self._pendingLessonLink = pendingLessonLink
+                do {
+                    let configured = try CIAMConfigurationEnvironment.configuredProductionProvider(
+                        infoDictionary: Bundle.main.infoDictionary ?? [:],
+                        bundleIdentifier: Bundle.main.bundleIdentifier,
+                        isDevelopmentBuild: false
+                    ) { configuration in
+                        try MSALAuthenticationProvider(
+                            configuration: configuration,
+                            presentation: Self.authenticationPresentationController)
+                    }
+                    _model = State(
+                        initialValue: NativeModel(
+                            authentication: (configured.provider, configured.configuration)))
+                    _provider = State(initialValue: configured.provider)
+                    _configurationIssue = State(initialValue: nil)
+                } catch {
+                    _model = State(initialValue: NativeModel())
+                    _provider = State(initialValue: nil)
+                    _configurationIssue = State(initialValue: Self.safeMessage(for: error))
                 }
-                _model = State(
-                    initialValue: NativeModel(
-                        authentication: (configured.provider, configured.configuration)))
-                _provider = State(initialValue: configured.provider)
-                _configurationIssue = State(initialValue: nil)
-            } catch {
-                _model = State(initialValue: NativeModel())
-                _provider = State(initialValue: nil)
-                _configurationIssue = State(initialValue: Self.safeMessage(for: error))
             }
-        }
 
-        var body: some View {
-            Group {
-                if let configurationIssue {
-                    ContentUnavailableView(
-                        "Microsoft sign-in is not configured",
-                        systemImage: "person.crop.circle.badge.exclamationmark",
-                        description: Text(configurationIssue))
+            var body: some View {
+                Group {
+                    if let configurationIssue {
+                        ContentUnavailableView(
+                            "Microsoft sign-in is not configured",
+                            systemImage: "person.crop.circle.badge.exclamationmark",
+                            description: Text(configurationIssue))
                     } else if model.profile == nil && model.deletionStage == nil {
                         NavigationStack {
-                            Form {
-                                Section("Certigo") {
+                            NativeReadingPage {
+                                NativeEntryHeading(
+                                    title: "Make your next decision clearer.",
+                                    message:
+                                        "Your learning goals, practice and confirmed progress, together in Certigo."
+                                )
+                                NativeReadingSection(title: "Continue your learning") {
                                     Text("Sign in with your Microsoft account to continue.")
-                                Button("Sign in with Microsoft", systemImage: "person.crop.circle") {
-                                    Task { await model.connect() }
+                                    NativePrimaryButton(
+                                        title: "Sign in with Microsoft",
+                                        symbol: "person.crop.circle"
+                                    ) {
+                                        Task { await model.connect() }
+                                    }
+                                    .disabled(model.busy)
+                                    if model.busy { ProgressView() }
+                                    Divider()
+                                    Button("Explore the fictional demo", systemImage: "play.circle")
+                                    {
+                                        showDemo = true
+                                    }
+                                    .frame(minHeight: 44)
+                                    .disabled(model.busy)
+                                    Text(
+                                        "An isolated preview. No account, network or real result is used."
+                                    )
+                                    .font(.subheadline).foregroundStyle(.secondary)
                                 }
-                                .disabled(model.busy)
-                                if model.busy { ProgressView() }
+                            }
+                            .navigationTitle("Certigo")
+                            .fullScreenCover(isPresented: $showDemo) { NativeDemoRoot() }
+                            .alert(
+                                "Microsoft sign-in did not complete",
+                                isPresented: Binding(
+                                    get: { model.errorMessage != nil },
+                                    set: { if !$0 { model.errorMessage = nil } }
+                                )
+                            ) {
+                                Button("OK", role: .cancel) { model.errorMessage = nil }
+                            } message: {
+                                Text(model.errorMessage ?? "")
                             }
                         }
-                        .navigationTitle("Certigo")
-                        .alert(
-                            "Microsoft sign-in did not complete",
-                            isPresented: Binding(
-                                get: { model.errorMessage != nil },
-                                set: { if !$0 { model.errorMessage = nil } }
-                            )
-                        ) {
-                            Button("OK", role: .cancel) { model.errorMessage = nil }
-                        } message: {
-                            Text(model.errorMessage ?? "")
-                        }
+                    } else {
+                        NativeRoot(model: model, pendingLessonLink: $pendingLessonLink)
                     }
-                } else {
-                    NativeRoot(model: model, pendingLessonLink: $pendingLessonLink)
                 }
-            }
-            .onOpenURL { url in
-                _ = provider?.handleCallback(url, sourceApplication: nil)
-            }
+                .onOpenURL { url in
+                    _ = provider?.handleCallback(url, sourceApplication: nil)
+                }
                 .task {
                     if configurationIssue == nil {
                         _ = await model.restoreAccountDeletionIfNeeded()
@@ -204,188 +382,196 @@ import Foundation
             @MainActor
             private static func authenticationPresentationController() throws -> UIViewController {
                 let windows = UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap(\.windows)
-            guard var controller = windows.first(where: \.isKeyWindow)?.rootViewController else {
-                throw CIAMAuthenticationFailure.configuration
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap(\.windows)
+                guard var controller = windows.first(where: \.isKeyWindow)?.rootViewController
+                else {
+                    throw CIAMAuthenticationFailure.configuration
+                }
+                while let presented = controller.presentedViewController {
+                    controller = presented
+                }
+                return controller
             }
-            while let presented = controller.presentedViewController {
-                controller = presented
-            }
-            return controller
-        }
 
-        private static func safeMessage(for error: Error) -> String {
-            switch error {
-            case CIAMConfigurationEnvironmentError.productionBuildRequired:
-                "Microsoft sign-in is only enabled for the Distribution build."
-            case CIAMConfigurationEnvironmentError.unsupportedProductionBundle:
-                "Use the existing Certigo App Store bundle identifier."
-            case CIAMConfigurationEnvironmentError.missingValue(let key):
-                "Distribution is missing \(key). Configure the verified production identity before sign-in."
-            case CIAMConfigurationEnvironmentError.invalidValue(let key):
-                "Distribution has an invalid \(key). Correct the verified production configuration."
-            case CIAMConfigurationEnvironmentError.callbackNotDeclared:
-                "Declare the app-derived Microsoft callback in the Distribution Info.plist."
-            case CIAMConfigurationEnvironmentError.callbackCollision:
-                "The Microsoft callback is duplicated in the Distribution Info.plist."
-            case CIAMConfigurationEnvironmentError.redirectDoesNotMatchBundle:
-                "The Microsoft callback must match this app's bundle identifier."
-            case is CIAMConfigurationEnvironmentError:
-                "Correct the Distribution Microsoft sign-in configuration."
-            case is CIAMConfigurationError:
-                "The Distribution Microsoft sign-in configuration failed validation."
-            default:
-                "Microsoft sign-in could not be initialized. No manual-token fallback is available."
+            private static func safeMessage(for error: Error) -> String {
+                switch error {
+                case CIAMConfigurationEnvironmentError.productionBuildRequired:
+                    "Microsoft sign-in is only enabled for the Distribution build."
+                case CIAMConfigurationEnvironmentError.unsupportedProductionBundle:
+                    "Use the existing Certigo App Store bundle identifier."
+                case CIAMConfigurationEnvironmentError.missingValue(let key):
+                    "Distribution is missing \(key). Configure the verified production identity before sign-in."
+                case CIAMConfigurationEnvironmentError.invalidValue(let key):
+                    "Distribution has an invalid \(key). Correct the verified production configuration."
+                case CIAMConfigurationEnvironmentError.callbackNotDeclared:
+                    "Declare the app-derived Microsoft callback in the Distribution Info.plist."
+                case CIAMConfigurationEnvironmentError.callbackCollision:
+                    "The Microsoft callback is duplicated in the Distribution Info.plist."
+                case CIAMConfigurationEnvironmentError.redirectDoesNotMatchBundle:
+                    "The Microsoft callback must match this app's bundle identifier."
+                case is CIAMConfigurationEnvironmentError:
+                    "Correct the Distribution Microsoft sign-in configuration."
+                case is CIAMConfigurationError:
+                    "The Distribution Microsoft sign-in configuration failed validation."
+                default:
+                    "Microsoft sign-in could not be initialized. No manual-token fallback is available."
+                }
             }
         }
-    }
     #endif
 
     #if DEBUG
-    @MainActor
-    private struct NativeDeveloperConnector: View {
-        @Environment(\.dismiss) private var dismiss
-        @Binding private var pendingLessonLink: EditorialPilotLessonLink?
-        @State private var model: NativeModel
-        @State private var usesCIAM: Bool
-        @State private var ciamProvider: MSALAuthenticationProvider?
-        @State private var configurationIssue: String?
+        @MainActor
+        private struct NativeDeveloperConnector: View {
+            @Environment(\.dismiss) private var dismiss
+            @Binding private var pendingLessonLink: EditorialPilotLessonLink?
+            @State private var model: NativeModel
+            @State private var usesCIAM: Bool
+            @State private var ciamProvider: MSALAuthenticationProvider?
+            @State private var configurationIssue: String?
 
-        init(pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil)) {
-            self._pendingLessonLink = pendingLessonLink
-            do {
-                let configured = try CIAMConfigurationEnvironment.configuredProvider(
-                    environment: ProcessInfo.processInfo.environment,
-                    bundleIdentifier: Bundle.main.bundleIdentifier,
-                    infoDictionary: Bundle.main.infoDictionary ?? [:],
-                    isDevelopmentBuild: true
-                ) { configuration in
-                    try MSALAuthenticationProvider(
-                        configuration: configuration,
-                        presentation: Self.authenticationPresentationController
-                    )
-                }
-                if let configured {
-                    _model = State(
-                        initialValue: NativeModel(
-                            authentication: (configured.provider, configured.configuration)))
-                    _usesCIAM = State(initialValue: true)
-                    _ciamProvider = State(initialValue: configured.provider)
-                } else {
+            init(pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil)) {
+                self._pendingLessonLink = pendingLessonLink
+                do {
+                    let configured = try CIAMConfigurationEnvironment.configuredProvider(
+                        environment: ProcessInfo.processInfo.environment,
+                        bundleIdentifier: Bundle.main.bundleIdentifier,
+                        infoDictionary: Bundle.main.infoDictionary ?? [:],
+                        isDevelopmentBuild: true
+                    ) { configuration in
+                        try MSALAuthenticationProvider(
+                            configuration: configuration,
+                            presentation: Self.authenticationPresentationController
+                        )
+                    }
+                    if let configured {
+                        _model = State(
+                            initialValue: NativeModel(
+                                authentication: (configured.provider, configured.configuration)))
+                        _usesCIAM = State(initialValue: true)
+                        _ciamProvider = State(initialValue: configured.provider)
+                    } else {
+                        _model = State(initialValue: NativeModel())
+                        _usesCIAM = State(initialValue: false)
+                        _ciamProvider = State(initialValue: nil)
+                    }
+                    _configurationIssue = State(initialValue: nil)
+                } catch {
                     _model = State(initialValue: NativeModel())
-                    _usesCIAM = State(initialValue: false)
+                    _usesCIAM = State(initialValue: true)
                     _ciamProvider = State(initialValue: nil)
+                    _configurationIssue = State(
+                        initialValue: Self.safeConfigurationMessage(for: error))
                 }
-                _configurationIssue = State(initialValue: nil)
-            } catch {
-                _model = State(initialValue: NativeModel())
-                _usesCIAM = State(initialValue: true)
-                _ciamProvider = State(initialValue: nil)
-                _configurationIssue = State(
-                    initialValue: Self.safeConfigurationMessage(for: error))
             }
-        }
 
-        var body: some View {
-            Group {
-                if let configurationIssue {
-                    ContentUnavailableView(
-                        "CIAM test sign-in is unavailable",
-                        systemImage: "person.crop.circle.badge.exclamationmark",
-                        description: Text(configurationIssue)
-                    )
-                    .accessibilityIdentifier("ciam-configuration-error")
-                } else if usesCIAM && model.profile == nil {
-                    ciamSignIn
-                } else {
-                    NativeRoot(model: model, pendingLessonLink: $pendingLessonLink)
-                }
-            }
-            .onOpenURL { url in
-                _ = ciamProvider?.handleCallback(url, sourceApplication: nil)
-            }
-            .safeAreaInset(edge: .top) {
-                HStack {
-                    Text("Developer connector").font(.subheadline)
-                    Spacer()
-                    Button("Close") { dismiss() }
-                }
-                .padding()
-                .background(.background)
-            }
-        }
-
-        private var ciamSignIn: some View {
-            NavigationStack {
-                Form {
-                    Section("CIAM test sign-in") {
-                        Text("Sign in explicitly with the locally configured test identity.")
-                        Button("Sign in with CIAM", systemImage: "person.crop.circle") {
-                            Task { await model.connect() }
-                        }
-                        .disabled(model.busy)
+            var body: some View {
+                Group {
+                    if let configurationIssue {
+                        ContentUnavailableView(
+                            "CIAM test sign-in is unavailable",
+                            systemImage: "person.crop.circle.badge.exclamationmark",
+                            description: Text(configurationIssue)
+                        )
+                        .accessibilityIdentifier("ciam-configuration-error")
+                    } else if usesCIAM && model.profile == nil {
+                        ciamSignIn
+                    } else {
+                        NativeRoot(model: model, pendingLessonLink: $pendingLessonLink)
                     }
                 }
-                .navigationTitle("Certigo")
-                .alert(
-                    "CIAM sign-in did not complete",
-                    isPresented: Binding(
-                        get: { model.errorMessage != nil },
-                        set: { if !$0 { model.errorMessage = nil } }
-                    )
-                ) {
-                    Button("OK", role: .cancel) { model.errorMessage = nil }
-                } message: {
-                    Text(model.errorMessage ?? "")
+                .onOpenURL { url in
+                    _ = ciamProvider?.handleCallback(url, sourceApplication: nil)
+                }
+                .safeAreaInset(edge: .top) {
+                    HStack {
+                        Text("Developer connector").font(.subheadline)
+                        Spacer()
+                        Button("Close") { dismiss() }
+                    }
+                    .padding()
+                    .background(.background)
                 }
             }
-        }
 
-        @MainActor
-        private static func authenticationPresentationController() throws -> UIViewController {
-            let windows = UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap(\.windows)
-            guard var controller = windows.first(where: \.isKeyWindow)?.rootViewController else {
-                throw CIAMAuthenticationFailure.configuration
-            }
-            while let presented = controller.presentedViewController {
-                controller = presented
-            }
-            return controller
-        }
-
-        private static func safeConfigurationMessage(for error: Error) -> String {
-            if let error = error as? CIAMConfigurationEnvironmentError {
-                return error.localizedDescription
-            }
-            if let error = error as? CIAMConfigurationError {
-                switch error {
-                case .invalidIdentity:
-                    return
-                        "Set valid client, tenant, and API audience identifiers in the local Xcode scheme."
-                case .invalidAuthority:
-                    return "Correct the CIAM authority in the local Xcode scheme."
-                case .issuerMismatch:
-                    return "Set the issuer matching the configured CIAM tenant and authority."
-                case .invalidAPIScope:
-                    return
-                        "Set one API scope for the configured audience in the local Xcode scheme."
-                case .invalidAPIURL:
-                    return "Set the existing API HTTPS base URL, including its /api path."
-                case .invalidRedirect, .redirectNotRegistered:
-                    return "Set the exact CIAM redirect registered for this app."
-                case .callbackNotDeclared:
-                    return "The callback scheme must already be declared in this app's Info.plist."
-                case .callbackCollision:
-                    return "The CIAM callback scheme collides with another app callback scheme."
+            private var ciamSignIn: some View {
+                NavigationStack {
+                    NativeReadingPage {
+                        NativeEntryHeading(
+                            title: "Test your connected learning.",
+                            message: "CIAM development configuration · test accounts only.")
+                        NativeReadingSection(title: "CIAM test sign-in") {
+                            Text("Sign in explicitly with the locally configured test identity.")
+                            NativePrimaryButton(
+                                title: "Sign in with CIAM", symbol: "person.crop.circle"
+                            ) {
+                                Task { await model.connect() }
+                            }
+                            .disabled(model.busy)
+                        }
+                    }
+                    .navigationTitle("Certigo")
+                    .alert(
+                        "CIAM sign-in did not complete",
+                        isPresented: Binding(
+                            get: { model.errorMessage != nil },
+                            set: { if !$0 { model.errorMessage = nil } }
+                        )
+                    ) {
+                        Button("OK", role: .cancel) { model.errorMessage = nil }
+                    } message: {
+                        Text(model.errorMessage ?? "")
+                    }
                 }
             }
-            return
-                "Review the local Xcode scheme and registered app callback. Manual token sign-in is disabled while CIAM is opted in."
+
+            @MainActor
+            private static func authenticationPresentationController() throws -> UIViewController {
+                let windows = UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap(\.windows)
+                guard var controller = windows.first(where: \.isKeyWindow)?.rootViewController
+                else {
+                    throw CIAMAuthenticationFailure.configuration
+                }
+                while let presented = controller.presentedViewController {
+                    controller = presented
+                }
+                return controller
+            }
+
+            private static func safeConfigurationMessage(for error: Error) -> String {
+                if let error = error as? CIAMConfigurationEnvironmentError {
+                    return error.localizedDescription
+                }
+                if let error = error as? CIAMConfigurationError {
+                    switch error {
+                    case .invalidIdentity:
+                        return
+                            "Set valid client, tenant, and API audience identifiers in the local Xcode scheme."
+                    case .invalidAuthority:
+                        return "Correct the CIAM authority in the local Xcode scheme."
+                    case .issuerMismatch:
+                        return "Set the issuer matching the configured CIAM tenant and authority."
+                    case .invalidAPIScope:
+                        return
+                            "Set one API scope for the configured audience in the local Xcode scheme."
+                    case .invalidAPIURL:
+                        return "Set the existing API HTTPS base URL, including its /api path."
+                    case .invalidRedirect, .redirectNotRegistered:
+                        return "Set the exact CIAM redirect registered for this app."
+                    case .callbackNotDeclared:
+                        return
+                            "The callback scheme must already be declared in this app's Info.plist."
+                    case .callbackCollision:
+                        return "The CIAM callback scheme collides with another app callback scheme."
+                    }
+                }
+                return
+                    "Review the local Xcode scheme and registered app callback. Manual token sign-in is disabled while CIAM is opted in."
+            }
         }
-    }
     #endif
 
     private enum DemoCatalogScenario: String, CaseIterable {
@@ -1227,26 +1413,12 @@ import Foundation
     }
 
     private struct DemoPrimaryButton: View {
-        @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
         let title: String
         let symbol: String
         let action: () -> Void
 
         var body: some View {
-            if #available(iOS 26.0, *), !reduceTransparency {
-                button.buttonStyle(.glassProminent)
-            } else {
-                button.buttonStyle(.borderedProminent)
-            }
-        }
-
-        private var button: some View {
-            Button(action: action) {
-                Label(title, systemImage: symbol)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .multilineTextAlignment(.center)
-            }
-            .controlSize(.large)
+            NativePrimaryButton(title: title, symbol: symbol, action: action)
         }
     }
 
@@ -1949,8 +2121,30 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             Text("Explore").tag(NativeLearningNavigation.Learn.explore)
                         }
                         .pickerStyle(.menu)
+                    }
+                    if navigation.learn == .myLearning {
+                        Section {
+                            confirmedGoal
+                        }
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    } else {
+                        Section {
+                            Text("Find your next learning goal.")
+                                .font(.largeTitle.bold())
+                                .accessibilityAddTraits(.isHeader)
+                            Text(
+                                "Explore certifications. Your active goal changes only when you choose it."
+                            )
+                            .foregroundStyle(.secondary)
+                        }
+                        .listRowBackground(Color.clear)
+                    }
+                    Section("Continue on this device") {
                         if model.lesson != nil {
-                            Button("Resume current activity", systemImage: "play.circle") {
+                            NativePrimaryButton(
+                                title: "Resume current activity", symbol: "play.circle"
+                            ) {
                                 columns = .detailOnly
                                 compactColumn = .detail
                             }
@@ -1997,10 +2191,19 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                         ) { track in
                             NavigationLink(value: track.id) {
-                                VStack(alignment: .leading) {
-                                    Text(track.code).font(.headline)
-                                    Text(track.title).foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Label(track.code, systemImage: "books.vertical")
+                                        .font(.headline)
+                                        .foregroundStyle(NativePrism.accent(for: track.code))
+                                    Text(track.title).font(.title3.weight(.semibold))
+                                    Text(track.summary).font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                    if !track.learningAvailable {
+                                        Text("Practice is not available yet.")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
                                 }
+                                .padding(.vertical, 8)
                             }
                             .disabled(!track.learningAvailable)
                         }
@@ -2012,6 +2215,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 .disabled(
                     model.busy || loadingTrackID != nil || loadingLessonID != nil
                 )
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .background(NativePrism.canvas)
                 .navigationTitle("Learn")
             } content: {
                 path
@@ -2058,6 +2264,48 @@ struct NativeDemoSnapshot: Codable, Equatable {
             }
         }
 
+        private var confirmedGoal: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                if let goalID = model.profile?.activeTrackId {
+                    NativeEntryHeading(
+                        title: model.tracks.first(where: {
+                            $0.id.lowercased() == goalID.lowercased()
+                        })?.title ?? goalID,
+                        message: "Your server-confirmed learning goal.")
+                    if let path = model.path,
+                        path.trackId.lowercased() == goalID.lowercased()
+                    {
+                        LabeledContent(
+                            "Readiness · last loaded from server",
+                            value: "\(path.readinessScore) %"
+                        )
+                        .font(.subheadline)
+                    } else {
+                        Text("Open this goal to load its current learning path and readiness.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    if let track = model.tracks.first(where: {
+                        $0.id.lowercased() == goalID.lowercased()
+                    }) {
+                        NativePrimaryButton(title: "Open my learning goal", symbol: "arrow.right") {
+                            selectedTrack = track.id
+                            columns = .all
+                            compactColumn = .content
+                        }
+                        .disabled(!track.learningAvailable)
+                    }
+                } else {
+                    NativeEntryHeading(
+                        title: "A clearer path starts with one goal.",
+                        message: "No active goal has been confirmed by the server.")
+                    NativePrimaryButton(title: "Explore certifications", symbol: "books.vertical") {
+                        navigation.learn = .explore
+                    }
+                }
+            }
+            .accessibilityIdentifier("confirmed-learning-goal")
+        }
+
         private func requestPath(_ track: Track) {
             let requestID = UUID()
             loadingTrackID = track.id
@@ -2083,10 +2331,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
         }
 
         private var profile: some View {
-            List {
+            NativeReadingPage {
                 if let profile = model.profile {
-                    Section("Account") {
-                        Text(profile.displayName).font(.headline)
+                    NativeEntryHeading(
+                        title: profile.displayName,
+                        message: "Your learning, at your pace.")
+                    NativeReadingSection(title: "Confirmed learning") {
                         LabeledContent("Confirmed XP", value: "\(profile.xp)")
                         if let goal = profile.activeTrackId {
                             LabeledContent(
@@ -2099,11 +2349,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         }
                     }
                 }
-                Section {
-                    NavigationLink("Progress & history") {
+                NativeReadingSection(title: "Your account") {
+                    NavigationLink {
                         progressHistory
+                    } label: {
+                        Label("Progress & history", systemImage: "clock.arrow.circlepath")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }
-                    NavigationLink("Settings") {
+                    Divider()
+                    NavigationLink {
                         Form {
                             Section("Account") {
                                 NavigationLink("Delete account") {
@@ -2121,6 +2375,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                         }
                         .navigationTitle("Settings")
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }
                 }
             }
@@ -2147,7 +2404,11 @@ struct NativeDemoSnapshot: Codable, Equatable {
             NavigationStack {
                 Form {
                     Section {
-                        Text("Connect only a test account to the development API.")
+                        NativeEntryHeading(
+                            title: "Connect a test workspace.",
+                            message:
+                                "Development access only. Your production account uses Microsoft sign-in."
+                        )
                         Text(
                             "This developer connector is not production sign-in. No Apple account or new identity is created."
                         )
@@ -2155,6 +2416,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     } header: {
                         Text("Certigo · development")
                     }
+                    .scrollContentBackground(.hidden)
+                    .background(NativePrism.canvas)
                     Section("Test connection") {
                         TextField("HTTPS API URL", text: $model.baseURL)
                             .textInputAutocapitalization(.never)
@@ -2209,7 +2472,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         activeGoalSection(track)
                     }
                     Section {
-                        LabeledContent("Confirmed readiness", value: "\(path.readinessScore) %")
+                        Text(path.trackName).font(.title2.bold())
+                            .accessibilityAddTraits(.isHeader)
+                        LabeledContent(
+                            "Confirmed readiness · last loaded", value: "\(path.readinessScore) %")
                         Button("Refresh progress", systemImage: "arrow.clockwise") {
                             Task { await model.refreshProgress() }
                         }
@@ -2222,6 +2488,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                     Label {
                                         VStack(alignment: .leading) {
                                             Text(lesson.title)
+                                                .font(.headline)
                                             Text("\(lesson.estMinutes) min").foregroundStyle(
                                                 .secondary)
                                         }
@@ -2265,12 +2532,17 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
                 savedAnswers
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(NativePrism.canvas)
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
             .navigationTitle(model.path?.trackName ?? "Learning path")
         }
 
         private var progressHistory: some View {
-            List {
-                Section("Confirmed across your devices") {
+            NativeReadingPage {
+                NativeReadingSection(title: "Confirmed across your devices") {
                     if model.historyLoading {
                         ProgressView("Loading confirmed history")
                     }
@@ -2299,9 +2571,11 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                     if let presentation = model.historyPresentation {
                         ForEach(presentation.confirmed) { item in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(item.lessonId).font(.headline)
-                                Text(item.trackId).foregroundStyle(.secondary)
+                            NativeReadingCard {
+                                Label("Server confirmed", systemImage: "checkmark.seal")
+                                    .font(.subheadline).foregroundStyle(NativePrism.confirmed)
+                                Text(lessonTitle(item.lessonId)).font(.headline)
+                                Text(trackTitle(item.trackId)).foregroundStyle(.secondary)
                                 Text(
                                     item.submittedAt,
                                     format: .dateTime.year().month().day().hour().minute())
@@ -2318,39 +2592,43 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                     Button("Retrieve full correction") {
                                         Task { await model.retry(saved) }
                                     }
+                                    .frame(minHeight: 44)
                                     .disabled(model.busy)
                                 }
                             }
-                            .padding(.vertical, 4)
                         }
                     }
                     Button("Refresh history", systemImage: "arrow.clockwise") {
                         Task { await model.refreshHistory() }
                     }
+                    .frame(minHeight: 44)
                     .disabled(model.historyLoading)
                     if model.historyNeedsSignIn && model.canReconnectHistory {
                         Button("Sign in again", systemImage: "person.crop.circle") {
                             Task { await model.reconnectHistory() }
                         }
+                        .frame(minHeight: 44)
                         .disabled(model.busy || model.historyLoading)
                     }
                     if model.historyNextCursor != nil {
                         Button("Load more", systemImage: "chevron.down") {
                             Task { await model.loadMoreHistory() }
                         }
+                        .frame(minHeight: 44)
                         .disabled(model.historyLoading)
                     }
                 }
-                Section("On this device") {
+                NativeReadingSection(title: "On this device") {
                     Text(
                         "Drafts are never uploaded by viewing history. Local dates are activity start dates, not server submission times."
                     )
                     .font(.caption).foregroundStyle(.secondary)
                     if let presentation = model.historyPresentation {
                         ForEach(presentation.confirmedOnDevice) { saved in
-                            VStack(alignment: .leading, spacing: 6) {
+                            NativeReadingCard {
                                 Label("Confirmed on this device", systemImage: "checkmark.circle")
-                                Text(saved.lessonId).font(.headline)
+                                    .foregroundStyle(NativePrism.confirmed)
+                                Text(lessonTitle(saved.lessonId)).font(.headline)
                                 Text(
                                     saved.submission.startedAt,
                                     format: .dateTime.year().month().day())
@@ -2386,9 +2664,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             columns = .detailOnly
                             compactColumn = .detail
                         }
+                        .frame(minHeight: 44)
                     }
                 }
-                Section("Current progress · last loaded") {
+                NativeReadingSection(title: "Current progress · last loaded") {
                     if let profile = model.profile {
                         LabeledContent("Confirmed XP", value: "\(profile.xp)")
                     }
@@ -2418,33 +2697,46 @@ struct NativeDemoSnapshot: Codable, Equatable {
         }
 
         private func savedAnswer(_ saved: SavedSubmission) -> some View {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(saved.lessonId).font(.headline)
+            NativeReadingCard {
+                Text(lessonTitle(saved.lessonId)).font(.headline)
                 switch saved.status {
                 case .pendingCorrection:
                     Label("Correction pending", systemImage: "clock")
-                                Button("Retry correction") {
-                                    Task { await model.retry(saved) }
-                                }
-                                .disabled(model.busy)
-                            case .corrected:
-                                if let result = saved.result {
-                                    Text("Confirmed score: \(result.scorePct) %")
-                                    ForEach(result.results) { item in
-                                        Text(item.explanation)
-                                    }
-                                }
-                            case .failed:
-                                Label(
-                                    "Submission rejected · answers preserved",
-                                    systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(NativePrism.pending)
+                    Button("Retry correction") {
+                        Task { await model.retry(saved) }
+                    }
+                    .frame(minHeight: 44)
+                    .disabled(model.busy)
+                case .corrected:
+                    if let result = saved.result {
+                        Text("Confirmed score: \(result.scorePct) %")
+                        ForEach(result.results) { item in
+                            Text(item.explanation)
+                        }
+                    }
+                case .failed:
+                    Label(
+                        "Submission rejected · answers preserved",
+                        systemImage: "exclamationmark.triangle")
                     Text(
                         "This is a local status; the server may already have recorded the attempt."
                     )
                     .font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .padding(.vertical, 4)
+        }
+
+        private func trackTitle(_ id: String) -> String {
+            model.tracks.first(where: { $0.id.lowercased() == id.lowercased() })?.title ?? id
+        }
+
+        private func lessonTitle(_ id: String) -> String {
+            if let lesson = model.lesson, lesson.id == id { return lesson.title }
+            if let lesson = model.path?.units.flatMap(\.lessons).first(where: { $0.id == id }) {
+                return lesson.title
+            }
+            return model.offlinePack?.lessons.first(where: { $0.id == id })?.title ?? id
         }
 
         @ViewBuilder private func activeGoalSection(_ track: Track) -> some View {
@@ -2463,7 +2755,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     Text("No active goal is confirmed by the server.")
                         .foregroundStyle(.secondary)
                 }
-                Button(state.action, systemImage: "scope") {
+                NativePrimaryButton(title: state.action, symbol: "scope") {
                     savingGoalID = track.id
                     Task {
                         await model.chooseActiveTrack(track)
@@ -2486,10 +2778,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     selectedTrack == nil || selectedTrack == lesson.trackId,
                     selectedLesson == nil || selectedLesson == lesson.id
                 {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            Text(lesson.title).font(.title).bold()
-                                .accessibilityAddTraits(.isHeader)
+                    NativeReadingPage {
+                        Text(lesson.title).font(.title).bold()
+                            .accessibilityAddTraits(.isHeader)
+                        Label("Read · Decide · Understand", systemImage: "text.book.closed")
+                            .font(.subheadline).foregroundStyle(NativePrism.tint)
+                        DisclosureGroup("Read lesson aloud") {
                             NativeLessonAudioControls(
                                 content: NativeLessonReadingContent(
                                     lessonTitle: lesson.title,
@@ -2499,59 +2793,83 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 ownerID: model.profile?.id
                             )
                             .id(lesson.id)
-                            Text(
-                                "Answer the questions, then submit your answers for server correction."
-                            )
-                            .foregroundStyle(.secondary)
-                            ForEach(Array(lesson.blocks.enumerated()), id: \.offset) { _, block in
-                                if let title = block.title {
-                                    Text(title).font(.headline)
-                                        .accessibilityAddTraits(.isHeader)
-                                }
-                                if let body = block.body {
-                                    Text(.init(body)).textSelection(.enabled)
-                                }
-                                if let code = block.code {
+                        }
+                        .frame(minHeight: 44)
+                        Text(
+                            "Answer the questions, then submit your answers for server correction."
+                        )
+                        .foregroundStyle(.secondary)
+                        ForEach(Array(lesson.blocks.enumerated()), id: \.offset) { _, block in
+                            if let title = block.title {
+                                Text(title).font(.headline)
+                                    .accessibilityAddTraits(.isHeader)
+                            }
+                            if let body = block.body {
+                                Text(.init(body)).textSelection(.enabled)
+                            }
+                            if let code = block.code {
+                                ScrollView(.horizontal) {
                                     Text(code).font(.body.monospaced()).textSelection(.enabled)
                                 }
-                                if let question = block.check {
-                                    questionView(question)
-                                }
+                                .padding(16)
+                                .background(
+                                    NativePrism.surface, in: RoundedRectangle(cornerRadius: 16))
                             }
-                            if let outcome = model.outcome {
-                                switch outcome {
-                                case .pendingCorrection:
-                                    Label(
-                                        "Answers saved. Correction will be requested after reconnecting.",
-                                        systemImage: "clock"
-                                    )
-                                    .accessibilityIdentifier("pending-correction")
-                                case .corrected(let result):
-                                    Text("Confirmed score: \(result.scorePct) %").font(.title2)
-                                        .bold()
-                                    Text("Confirmed XP: \(result.rewards.xpEarned)")
-                                    ForEach(result.results) { item in
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            Label(
-                                                item.correct ? "Correct answer" : "Review needed",
-                                                systemImage: item.correct
-                                                    ? "checkmark.circle" : "book"
-                                            )
-                                            Text(.init(item.explanation)).textSelection(.enabled)
-                                        }
-                                    }
-                                }
-                            } else {
-                                Button("Submit for correction") { Task { await model.submit() } }
-                                    .buttonStyle(.borderedProminent)
-                                    .controlSize(.large)
-                                    .disabled(!model.canSubmit)
-                                    .accessibilityIdentifier("submit-for-correction")
+                            if let question = block.check {
+                                questionView(question)
                             }
                         }
-                        .padding()
-                        .frame(maxWidth: 700, alignment: .leading)
-                        .frame(maxWidth: .infinity)
+                        if let outcome = model.outcome {
+                            switch outcome {
+                            case .pendingCorrection:
+                                NativeReadingCard {
+                                    Label(
+                                        "Saved on this device · correction pending",
+                                        systemImage: "clock"
+                                    )
+                                    .font(.headline).foregroundStyle(NativePrism.pending)
+                                    Text(
+                                        "Correction will be requested after reconnecting. No score or XP is confirmed yet."
+                                    )
+                                    .foregroundStyle(.secondary)
+                                }
+                                .accessibilityIdentifier("pending-correction")
+                            case .corrected(let result):
+                                NativeReadingSection(title: "Your confirmed result") {
+                                    Label("Confirmed by the server", systemImage: "checkmark.seal")
+                                        .foregroundStyle(NativePrism.confirmed)
+                                    LabeledContent("Score", value: "\(result.scorePct) %")
+                                    LabeledContent("XP earned", value: "\(result.rewards.xpEarned)")
+                                }
+                                ForEach(result.results) { item in
+                                    NativeReadingCard {
+                                        Label(
+                                            item.correct ? "Correct answer" : "Review needed",
+                                            systemImage: item.correct
+                                                ? "checkmark.circle" : "book"
+                                        )
+                                        .font(.headline)
+                                        .foregroundStyle(
+                                            item.correct
+                                                ? NativePrism.confirmed : NativePrism.pending)
+                                        if let question = lesson.blocks.compactMap(\.check)
+                                            .first(where: { $0.id == item.itemId })
+                                        {
+                                            Text(.init(question.stem)).font(.headline)
+                                        }
+                                        Text(.init(item.explanation)).textSelection(.enabled)
+                                    }
+                                }
+                            }
+                        } else {
+                            NativePrimaryButton(
+                                title: "Submit for correction", symbol: "paperplane"
+                            ) {
+                                Task { await model.submit() }
+                            }
+                            .disabled(!model.canSubmit)
+                            .accessibilityIdentifier("submit-for-correction")
+                        }
                     }
                 } else if let selectedLesson,
                     let node = model.path?.units.flatMap(\.lessons).first(where: {
@@ -2604,10 +2922,20 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(NativeChoiceButtonStyle())
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(
+                                model.selections[question.id] == option.id
+                                    ? NativePrism.tint : NativePrism.edge,
+                                lineWidth: model.selections[question.id] == option.id ? 2 : 1)
+                    }
                     .disabled(model.outcome != nil || model.busy)
                     .accessibilityAddTraits(
-                        model.selections[question.id] == option.id ? .isSelected : [])
+                        model.selections[question.id] == option.id ? .isSelected : []
+                    )
+                    .accessibilityValue(
+                        model.selections[question.id] == option.id ? "Selected" : "Not selected")
                 }
             }
             .onAppear { model.questionAppeared(question.id) }
@@ -2859,9 +3187,10 @@ struct NativeLessonReadingContent: Equatable {
         parts.append(contentsOf: keyIdeas.map(Part.text))
         parts.append(.title("Exemple résolu"))
         parts.append(.text(exampleSituation))
-        parts.append(contentsOf: exampleSteps.enumerated().map {
-            .text("\($0.offset + 1). \($0.element)")
-        })
+        parts.append(
+            contentsOf: exampleSteps.enumerated().map {
+                .text("\($0.offset + 1). \($0.element)")
+            })
         parts.append(.text(exampleDecision))
         parts.append(.title("À retenir"))
         parts.append(.text(recap))

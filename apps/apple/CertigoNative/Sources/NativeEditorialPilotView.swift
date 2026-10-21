@@ -35,7 +35,8 @@
                         ContentUnavailableView(
                             "Le pilote n’est pas disponible",
                             systemImage: "book.closed",
-                            description: Text(issue ?? "Réessayez lorsque le réseau sera disponible.")
+                            description: Text(
+                                issue ?? "Réessayez lorsque le réseau sera disponible.")
                         )
                         .overlay(alignment: .bottom) {
                             Button("Réessayer") { Task { await load() } }
@@ -70,11 +71,11 @@
 
         @ViewBuilder
         private func pilotContent(_ snapshot: EditorialPilotSnapshot) -> some View {
-            List {
-                Section {
-                    Text(snapshot.pilot.title)
-                        .font(.title2.bold())
-                        .accessibilityAddTraits(.isHeader)
+            NativeReadingPage {
+                NativeEntryHeading(
+                    title: snapshot.pilot.title,
+                    message: "Apprentissage, pas certification · pilote original en brouillon.")
+                NativeReadingSection(title: "Avant de commencer") {
                     Label("Apprentissage, pas certification", systemImage: "book")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tint)
@@ -84,41 +85,49 @@
                     Text(snapshot.pilot.audience)
                     Text(snapshot.pilot.prerequisites)
                         .foregroundStyle(.secondary)
-                } header: {
-                    Text("Pilote original · brouillon éditorial")
-                } footer: {
-                    Text(snapshot.pilot.scope)
+                    Text(snapshot.pilot.scope).font(.footnote).foregroundStyle(.secondary)
                 }
 
                 if let lastLessonId = model.pilotHistory?.lastLessonId,
                     let lastLesson = snapshot.pilot.lessons.first(where: { $0.id == lastLessonId })
                 {
-                    Section("Reprendre") {
+                    NativeReadingSection(title: "Reprendre") {
                         NavigationLink(value: lastLesson.id) {
                             Label(lastLesson.title, systemImage: "arrow.counterclockwise")
+                                .frame(minHeight: 44)
                         }
                     }
                 }
 
-                Section("Trois leçons") {
+                NativeReadingSection(title: "Trois leçons") {
                     ForEach(snapshot.pilot.lessons) { lesson in
                         NavigationLink(value: lesson.id) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(lesson.title).font(.headline)
-                                Text(lesson.objective)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(3)
-                                if let progress = progress(for: lesson, in: model.pilotHistory) {
-                                    Text(progress.markedReadAt.map {
-                                        "Déclarée lue · \(date($0))"
-                                    } ?? "Consultée · \(date(progress.lastAccessedAt))")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                            NativeReadingCard {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                        Text(lesson.title).font(.headline).foregroundStyle(.primary)
+                                        Spacer(minLength: 0)
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(.secondary).accessibilityHidden(true)
+                                    }
+                                    Text(lesson.objective)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                    if let progress = progress(for: lesson, in: model.pilotHistory)
+                                    {
+                                        Text(
+                                            progress.markedReadAt.map {
+                                                "Déclarée lue · \(date($0))"
+                                            } ?? "Consultée · \(date(progress.lastAccessedAt))"
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
                                 }
+                                .padding(.vertical, 4)
                             }
-                            .padding(.vertical, 4)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -151,9 +160,10 @@
                     !requestedLessonResolutionAttempted
                 else { return }
                 requestedLessonResolutionAttempted = true
-                guard model.editorialPilot?.pilot.lessons.contains(where: {
-                    $0.id == requestedLessonID
-                }) == true
+                guard
+                    model.editorialPilot?.pilot.lessons.contains(where: {
+                        $0.id == requestedLessonID
+                    }) == true
                 else {
                     requestedLessonUnavailable = true
                     return
@@ -177,25 +187,28 @@
         }
 
         var body: some View {
-            List {
-                Section {
+            NativeReadingPage {
+                NativeReadingSection(title: "Comprendre la situation") {
                     Text(lesson.title)
                         .font(.title2.bold())
                         .accessibilityAddTraits(.isHeader)
-                    NativeLessonAudioControls(
-                        content: NativeLessonReadingContent(
-                            editorialTitle: lesson.title,
-                            objective: lesson.objective,
-                            hook: lesson.hook,
-                            keyIdeas: lesson.keyIdeas,
-                            exampleSituation: lesson.workedExample.situation,
-                            exampleSteps: lesson.workedExample.steps,
-                            exampleDecision: lesson.workedExample.decision,
-                            recap: lesson.recap
-                        ),
-                        ownerID: model.profile?.id
-                    )
-                    .id(lesson.id)
+                    DisclosureGroup("Écouter la leçon") {
+                        NativeLessonAudioControls(
+                            content: NativeLessonReadingContent(
+                                editorialTitle: lesson.title,
+                                objective: lesson.objective,
+                                hook: lesson.hook,
+                                keyIdeas: lesson.keyIdeas,
+                                exampleSituation: lesson.workedExample.situation,
+                                exampleSteps: lesson.workedExample.steps,
+                                exampleDecision: lesson.workedExample.decision,
+                                recap: lesson.recap
+                            ),
+                            ownerID: model.profile?.id
+                        )
+                        .id(lesson.id)
+                    }
+                    .frame(minHeight: 44)
                     Text(lesson.objective)
                         .font(.headline)
                     Text(lesson.hook)
@@ -203,22 +216,25 @@
                     LabeledContent("Durée estimée", value: "\(lesson.estimatedMinutes) min")
                 }
 
-                Section("Idées clés") {
+                NativeReadingSection(title: "Idées clés") {
                     ForEach(Array(lesson.keyIdeas.enumerated()), id: \.offset) { item in
                         Label(item.element, systemImage: "lightbulb")
                     }
                 }
 
-                Section("Exemple résolu") {
-                    Text(lesson.workedExample.situation)
-                    ForEach(Array(lesson.workedExample.steps.enumerated()), id: \.offset) { item in
-                        LabeledContent("\(item.offset + 1)", value: item.element)
+                NativeReadingSection(title: "Exemple résolu") {
+                    NativeReadingCard {
+                        Text(lesson.workedExample.situation)
+                        ForEach(Array(lesson.workedExample.steps.enumerated()), id: \.offset) {
+                            item in
+                            LabeledContent("\(item.offset + 1)", value: item.element)
+                        }
+                        Text(lesson.workedExample.decision)
+                            .fontWeight(.medium)
                     }
-                    Text(lesson.workedExample.decision)
-                        .fontWeight(.medium)
                 }
 
-                Section("Pratique formative · sans réponse enregistrée") {
+                NativeReadingSection(title: "Pratique formative · sans réponse enregistrée") {
                     Text(lesson.practice.prompt)
                     ForEach(Array(lesson.practice.successCriteria.enumerated()), id: \.offset) {
                         item in
@@ -228,11 +244,12 @@
                         .foregroundStyle(.secondary)
                 }
 
-                Section("À retenir") {
+                NativeReadingSection(title: "À retenir") {
                     Text(lesson.recap)
+                        .font(.headline)
                 }
 
-                Section("Sources et limites") {
+                NativeReadingSection(title: "Sources et limites") {
                     ForEach(sources.filter { lesson.sourceIDs.contains($0.id) }) { source in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(source.title).font(.headline)
@@ -244,13 +261,14 @@
                                 .foregroundStyle(.secondary)
                             if let url = URL(string: source.url) {
                                 Link("Ouvrir la source", destination: url)
+                                    .frame(minHeight: 44)
                             }
                         }
                         .padding(.vertical, 4)
                     }
                 }
 
-                Section {
+                NativeReadingSection(title: "Votre historique") {
                     if let markedReadAt = progress?.markedReadAt {
                         Label(
                             "Vous avez déclaré cette leçon lue le \(date(markedReadAt)).",
@@ -258,7 +276,7 @@
                         )
                         .foregroundStyle(.secondary)
                     } else {
-                        Button("Marquer comme lue") {
+                        NativePrimaryButton(title: "Marquer comme lue", symbol: "checkmark") {
                             Task { await markRead() }
                         }
                         .disabled(model.busy || !accessRecorded)
@@ -271,10 +289,9 @@
                         Button("Réessayer la synchronisation de la consultation") {
                             Task { await recordAccess() }
                         }
+                        .frame(minHeight: 44)
                         .disabled(model.busy)
                     }
-                } header: {
-                    Text("Votre historique")
                 }
             }
             .navigationTitle("Leçon")
@@ -288,7 +305,8 @@
                 try await model.accessEditorialPilotLesson(lesson.id)
                 accessRecorded = true
             } catch {
-                issue = "La consultation n’a pas été synchronisée. Aucune déclaration de lecture n’a été enregistrée."
+                issue =
+                    "La consultation n’a pas été synchronisée. Aucune déclaration de lecture n’a été enregistrée."
             }
         }
 

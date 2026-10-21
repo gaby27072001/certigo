@@ -12,6 +12,14 @@ struct NativeDemoFlowTests {
             count += 1
             print("PASS \(name)")
         }
+        for (code, band) in [
+            ("AZ-900", 0), ("AI-900", 1), ("PL-900", 2), ("MS-900", 3),
+            ("DP-900", 4), ("SC-900", 5), (" ai-102 ", 1), ("", 0), ("UNKNOWN-1", 0),
+        ] {
+            try check(
+                NativeTrackAppearance.band(for: code) == band,
+                "stable Prism band for \(code.debugDescription)")
+        }
         var flow = NativeDemoFlow()
         flow.select(1)
         flow.submit()
