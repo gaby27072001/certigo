@@ -80,32 +80,34 @@ class NativePrismPresentationTests(unittest.TestCase):
         root = self.app.split("private struct NativeRoot:", 1)[1]
         for marker in (
             ".searchable(text: $query", "$catalogFilter.query",
-            'Picker("Code family"', '"Available practice only"',
-            "visibleTracks.count", '"No matching certifications"',
-            '"Clear filters"', "catalogFilter.clear()", "catalogFilter.includes(",
-            "Code families are not provider metadata",
+            'Picker(copy.native(.codeFamily)', "copy.native(.availableOnly)",
+            "visibleTracks.count", "copy[.noMatchingTracks]",
+            "copy[.clearFilters]", "catalogFilter.clear()", "catalogFilter.includes(",
+            "copy.native(.catalogScope)",
         ):
             self.assertIn(marker, self.app)
         self.assertIn("onChange(of: model.profile?.id", root)
-        self.assertIn("Language and format filters are unavailable", root)
+        self.assertIn("Language badges require explicit catalog metadata", self.app)
         self.assertNotIn("Task { await model.search", root)
 
     def test_learning_intentions_and_denominators_stay_distinct(self):
         root = self.app.split("private struct NativeRoot:", 1)[1]
         for marker in (
-            '"Next session"', '"Learning plan"', '"Review & Practice"', '"Goal overview"',
-            '"Activity & coverage"', '"Confirmed session results"',
-            '"Readiness · last loaded from server"', "coverage.totalActivities",
+            "copy.native(.nextSession)", "copy.native(.learningPlan)",
+            "copy.native(.reviewPractice)", "copy.native(.goalOverview)",
+            "copy.native(.activityCoverage)", "copy.native(.confirmedSessions)",
+            "copy.native(.readiness)", "coverage.totalActivities",
             "coverage.totalUnits", "lesson.questions.count",
             "not a calibrated probability", "Unknown is not zero",
-            "Locked by the server", "not connected in this client",
+            "copy.native(.lockedHint)",
         ):
             self.assertIn(marker, root)
         self.assertIn('Button("Read again"', root)
         self.assertIn("title: destination.actionTitle(copy.practiceAgain)", root)
         self.assertIn('case .corrected(let result):', root)
         self.assertIn('reader.scrollTo("session-reading-start"', root)
-        self.assertIn("No chat, AI generation", root)
+        self.assertIn("copy.native(.coachPrivacy)", root)
+        self.assertIn("await model.requestTutorExplanation(itemId: itemID)", root)
         self.assertIn("No sharing controls are active here", root)
         self.assertIn('reader.scrollTo("editorial-practice"', self.pilot)
 
@@ -130,11 +132,12 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertIn("style: .continuous", self.app)
         self.assertIn(".symbolRenderingMode(.hierarchical)", self.app)
 
-    def test_editorial_chrome_is_english_without_translating_content(self):
+    def test_editorial_chrome_is_localized_without_translating_content(self):
         for marker in (
-            '"Content language", value: "French (France)"',
-            '"Read lesson aloud"', '"Mark as read"', '"Sources & limits"',
-            '"Read again"', '"Revisit formative practice"', '"History not confirmed"',
+            "NativeContentLanguageBadges(languages: [snapshot.pilot.locale])",
+            "copy.native(.readAloud)", "copy.native(.markRead)", "copy.native(.sourcesLimits)",
+            "copy.native(.readAgain)", "copy.native(.formativePractice)",
+            "copy.native(.historyUnconfirmed)",
             "Text(lesson.hook)", "Text(lesson.practice.prompt)",
             "Text(lesson.practice.feedback)", "Text(source.supports)",
             "Text(source.limits)",
@@ -142,8 +145,8 @@ class NativePrismPresentationTests(unittest.TestCase):
             self.assertIn(marker, self.pilot)
         for old_label in ('"Marquer comme lue"', '"Écouter la leçon"', '"Fermer"'):
             self.assertNotIn(old_label, self.pilot)
-        criteria = self.pilot.split('title: "Self-check · no answer recorded"', 1)[1].split(
-            'title: "Takeaway"', 1
+        criteria = self.pilot.split('title: copy.native(.selfCheck)', 1)[1].split(
+            'title: copy.native(.takeaway)', 1
         )[0]
         self.assertNotIn("checkmark", criteria)
         self.assertIn("item.offset + 1", criteria)
@@ -220,7 +223,7 @@ class NativePrismPresentationTests(unittest.TestCase):
     def test_editorial_pilot_inherits_locale_and_content_language_disclosure(self):
         self.assertIn("@Environment(\\.nativeInterfaceCopy) private var copy", self.pilot)
         self.assertIn("Text(copy.contentLanguageNote)", self.pilot)
-        self.assertIn("French (France)", self.pilot)
+        self.assertIn('NativeContentLanguageBadges(languages: ["fr-FR"])', self.pilot)
         self.assertIn("Text(lesson.hook)", self.pilot)
         self.assertIn("Text(lesson.practice.prompt)", self.pilot)
         self.assertIn("Text(source.supports)", self.pilot)
@@ -236,13 +239,64 @@ class NativePrismPresentationTests(unittest.TestCase):
             "enterprise-delivery",
         ):
             self.assertIn(category, self.app)
-        self.assertIn('Picker("Code category", selection: $catalogFilter.category)', self.app)
+        self.assertIn('Picker(copy.native(.codeCategory), selection: $catalogFilter.category)', self.app)
         self.assertIn("model.tracks.contains", self.app)
-        self.assertIn("display hints derived from recognized codes", self.app)
+        self.assertIn("Groups come from codes", self.app)
         self.assertIn("Announced and planned statuses are not supplied", self.app)
         self.assertIn("code == $0 || code.hasPrefix($0 + \"-\")", self.app)
         self.assertNotIn("track.status", self.app)
         self.assertNotIn("track.provider", self.app)
+
+    def test_international_copy_has_eight_explicit_translations_per_native_label(self):
+        copy = self.app.split("enum NativeLabel:", 1)[1].split(
+            "struct NativeContentLanguageBadges:", 1
+        )[0]
+        rows = re.findall(r"case \.(\w+):\s*row = \[(.*?)\]", copy, re.S)
+        self.assertGreater(len(rows), 100)
+        for key, row in rows:
+            self.assertEqual(len(re.findall(r'"(?:[^"\\]|\\.)*"', row)), 8, key)
+        self.assertIn("precondition(row.count == 8)", copy)
+        self.assertIn("category.title(copy)", self.app)
+        self.assertIn("prompt: copy[.searchPlaceholder]", self.app)
+        self.assertIn("track.languages ?? []", self.app)
+
+    def test_coach_uses_confirmed_answers_and_displays_complete_server_explanations(self):
+        model = (SOURCES / "NativeModel.swift").read_text(encoding="utf-8")
+        request = model.split("func requestTutorExplanation(", 1)[1].split(
+            "func submit()", 1
+        )[0]
+        for marker in (
+            "case .corrected(let result) = outcome", "submittedRequest.answers.first",
+            "selected: answer.selected", "submittedRequest.publicManifestId",
+            "tutorRequestGeneration == requestID", "profile?.id == owner",
+            "attemptID == attempt", "explanation.itemId == itemId",
+        ):
+            self.assertIn(marker, request, marker)
+        for field in (
+            "explanation.headline", "explanation.points", "explanation.encouragement",
+            "explanation.recommendation", "explanation.source",
+            "explanation.personalization.attempts", "explanation.personalization.accuracyPct",
+            "explanation.personalization.recurringStruggle",
+        ):
+            self.assertIn(field, self.app)
+        self.assertIn("model.isRequestingTutorExplanation", self.app)
+        self.assertNotIn("AI assistance is not active", self.app)
+
+    def test_review_study_plan_and_assessment_remain_source_honest(self):
+        model = (SOURCES / "NativeModel.swift").read_text(encoding="utf-8")
+        for marker in (
+            "SmartReviewAdvisor.recommend(", "historyPresentation?.confirmedOnDevice",
+            "result.validated(for: saved.submission)", "studyPlanPrefix(owner:",
+            "snapshot.submission = request", "try examStore(",
+            "client.submitMockExam(request)", "examGeneration == requestID",
+        ):
+            self.assertIn(marker, model)
+        self.assertIn("Completed does not mean mastered", self.app)
+        self.assertIn("No mastered-domain count is inferred", self.app)
+        self.assertIn("model.restoreMockExam()", self.app)
+        self.assertIn("model.discardMockExam()", self.app)
+        self.assertIn("copy.native(.notificationScope)", self.app)
+        self.assertNotIn("UNUserNotificationCenter", self.app)
 
     def test_summary_only_catalog_entries_keep_details_but_cannot_offer_practice(self):
         root = self.app.split("private struct NativeRoot:", 1)[1]

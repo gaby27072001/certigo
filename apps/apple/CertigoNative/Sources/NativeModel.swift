@@ -25,6 +25,64 @@ enum NativePilotError: Error {
     case lessonUnavailable
 }
 
+struct NativeExamSnapshot: Codable, Sendable {
+    let ownerId: String
+    let apiScope: String
+    let exam: MockExam
+    let startedAt: Date
+    let attemptId: String
+    var selections: [String: String]
+    var submission: SubmitMockExamRequest?
+    var result: MockExamResult?
+
+    func validated(owner: String, scope: String, now: Date) throws -> Self {
+        _ = try exam.validated()
+        guard ownerId == owner, apiScope == scope, UUID(uuidString: attemptId) != nil,
+            startedAt.timeIntervalSince1970.isFinite, startedAt.timeIntervalSince1970 >= 0,
+            startedAt <= now,
+            selections.allSatisfy({ id, option in
+                exam.items.contains {
+                    $0.itemId == id && $0.options.contains { $0.id == option }
+                }
+            })
+        else { throw NativeResumeError.malformed }
+        guard let submission else {
+            guard result == nil else { throw NativeResumeError.malformed }
+            return self
+        }
+        let itemIDs = Set(exam.items.map(\.itemId))
+        guard !exam.items.isEmpty, submission.clientAttemptId == attemptId,
+            submission.examId == exam.examId, submission.trackId == exam.trackId,
+            submission.startedAt == startedAt, submission.answers.count == itemIDs.count,
+            Set(submission.answers.map(\.itemId)) == itemIDs,
+            submission.answers.allSatisfy({ answer in
+                answer.latencyMs >= 0 && answer.selected.count == 1
+                    && exam.items.contains {
+                        $0.itemId == answer.itemId && $0.type == answer.itemType
+                            && answer.selected == [selections[$0.itemId]].compactMap { $0 }
+                    }
+            })
+        else { throw NativeResumeError.malformed }
+        if let result {
+            guard result.examId == exam.examId, !result.attemptId.isEmpty,
+                (0...100).contains(result.pct), (0...1_000).contains(result.scaledScore),
+                result.passingScore == exam.passingScore,
+                result.passed == (result.scaledScore >= result.passingScore),
+                result.total == itemIDs.count, (0...result.total).contains(result.correct),
+                result.results.count == itemIDs.count,
+                Set(result.results.map(\.itemId)) == itemIDs,
+                result.results.filter(\.correct).count == result.correct,
+                result.results.allSatisfy({ $0.masteryDelta.isFinite }),
+                result.domains.allSatisfy({
+                    $0.total >= 0 && (0...$0.total).contains($0.correct)
+                        && (0...100).contains($0.pct) && $0.weight.isFinite && $0.weight >= 0
+                })
+            else { throw NativeResumeError.malformed }
+        }
+        return self
+    }
+}
+
 // The outbox remains the sole persisted submission authority.
 struct NativeResumeState: Codable, Equatable, Sendable {
     enum Tab: String, Codable, CaseIterable, Sendable { case learn, coach, social, profile }
@@ -287,6 +345,20 @@ struct NativeActivityStore {
         return try CertigoAPI.decoder().decode(NativeDeletionReceipt.self, from: bytes).validated()
     }
 
+    func saveExam(_ snapshot: NativeExamSnapshot) throws {
+        let bytes = try CertigoAPI.encoder().encode(snapshot)
+        guard bytes.count <= 1_048_576 else { throw NativeResumeError.malformed }
+        try writeProtected(bytes)
+    }
+
+    func readExam() throws -> NativeExamSnapshot? {
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize
+        guard let size, size <= 1_048_576 else { throw NativeResumeError.malformed }
+        return try CertigoAPI.decoder().decode(
+            NativeExamSnapshot.self, from: Data(contentsOf: file))
+    }
+
     private func writeProtected(_ bytes: Data) throws {
         try FileManager.default.createDirectory(
             at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -344,9 +416,20 @@ struct NativeDeletionReceipt: Codable {
 final class NativeModel {
     var baseURL = ""
     var token = ""
-    private(set) var profile: Profile?
+    private(set) var profile: Profile? {
+        didSet {
+            if oldValue?.id != profile?.id || oldValue?.activeTrackId != profile?.activeTrackId {
+                clearInsights()
+                loadStudyPlan()
+            }
+        }
+    }
     private(set) var tracks: [Track] = []
-    private(set) var path: LearningPath?
+    private(set) var path: LearningPath? {
+        didSet { rebuildSmartReview() }
+    }
+    private(set) var smartReviewRecommendation: SmartReviewRecommendation?
+    private(set) var smartReviewError = false
     private(set) var lesson: Lesson?
     private(set) var offlinePack: OfflineQuestionPack?
     private(set) var editorialPilot: EditorialPilotSnapshot?
@@ -366,6 +449,25 @@ final class NativeModel {
     private var historyGeneration = UUID()
     private var historyCursors: Set<String> = []
     private(set) var outcome: SubmissionOutcome?
+    private(set) var tutorExplanation: TutorExplanation?
+    private(set) var isRequestingTutorExplanation = false
+    private(set) var tutorExplanationError: String?
+    private var tutorRequestGeneration = UUID()
+    private(set) var recommendations: NextBestRecommendations?
+    private(set) var achievementBoard: AchievementBoard?
+    private(set) var questBoard: QuestBoard?
+    private(set) var notificationPlan: NotificationPlan?
+    private(set) var notificationSettings: NotificationSettings?
+    private(set) var insightsLoading = false
+    private(set) var insightFailures: Set<String> = []
+    private var insightsGeneration = UUID()
+    private(set) var studyPlan: CertigoStudyPlanPreference?
+    private(set) var studyPlanError = false
+    private(set) var examSnapshot: NativeExamSnapshot?
+    private(set) var examBusy = false
+    private(set) var examError = false
+    private(set) var examUnsupported = false
+    private var examGeneration = UUID()
     private(set) var busy = false
     private(set) var deletionStage: NativeDeletionStage?
     private(set) var deletionStatus: AccountDeletion?
@@ -383,7 +485,11 @@ final class NativeModel {
     }
     private(set) var restorationRevision = 0
     private var resumeReady = false
-    private var apiScope: String?
+    private var apiScope: String? {
+        didSet {
+            if oldValue != apiScope { loadStudyPlan() }
+        }
+    }
     private var latencies: [String: Int] = [:]
     private var questionStarted: [String: ContinuousClock.Instant] = [:]
     private var attemptID = UUID().uuidString
@@ -578,6 +684,10 @@ final class NativeModel {
 
     func showAccountDeletion() {
         guard !busy, deletionStage == nil else { return }
+        clearTutorExplanation()
+        clearInsights()
+        examGeneration = UUID()
+        examBusy = false
         deletionMessage = nil
         deletionCanCancel = true
         deletionStage = .explanation
@@ -871,6 +981,12 @@ final class NativeModel {
                     let cleaner = try deletionClient ?? makeClient(url)
                     deletionClient = cleaner
                     try await cleaner.purgeDeletedAccount(ownerId: owner)
+                    try examStore(owner: owner, scope: receipt.apiScope).clear()
+                    let prefix = try studyPlanPrefix(owner: owner, scope: receipt.apiScope)
+                    for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(prefix)
+                    {
+                        defaults.removeObject(forKey: key)
+                    }
                 case "activity":
                     let store = try activityStore()
                     if let bytes = try store.read() {
@@ -944,6 +1060,15 @@ final class NativeModel {
     }
 
     private func clearSession() {
+        clearTutorExplanation()
+        clearInsights()
+        studyPlan = nil
+        studyPlanError = false
+        examGeneration = UUID()
+        examSnapshot = nil
+        examBusy = false
+        examError = false
+        examUnsupported = false
         clearHistory()
         deletionProof = nil
         resumeReady = false
@@ -1215,6 +1340,7 @@ final class NativeModel {
         let marker = generation
         busy = true
         resumeReady = false
+        clearTutorExplanation()
         lesson = nil
         errorMessage = nil
         defer { if generation == marker { busy = false } }
@@ -1366,6 +1492,379 @@ final class NativeModel {
         persistActivity()
     }
 
+    private func clearTutorExplanation() {
+        tutorRequestGeneration = UUID()
+        tutorExplanation = nil
+        tutorExplanationError = nil
+        isRequestingTutorExplanation = false
+    }
+
+    private func clearInsights() {
+        insightsGeneration = UUID()
+        insightsLoading = false
+        recommendations = nil
+        achievementBoard = nil
+        questBoard = nil
+        notificationPlan = nil
+        notificationSettings = nil
+        insightFailures = []
+    }
+
+    func refreshLearningInsights() async {
+        guard deletionStage == nil, !busy, !insightsLoading, let owner = profile?.id else { return }
+        await refreshAuthenticationIfNeeded()
+        guard profile?.id == owner, deletionStage == nil, !busy, !insightsLoading,
+            let client
+        else { return }
+        let marker = generation
+        let requestID = UUID()
+        insightsGeneration = requestID
+        insightsLoading = true
+        insightFailures = []
+        let trackID = profile?.activeTrackId
+        defer { if insightsGeneration == requestID { insightsLoading = false } }
+        if let trackID {
+            do {
+                let value = try await client.nextBestRecommendations(trackId: trackID)
+                guard generation == marker, insightsGeneration == requestID,
+                    profile?.activeTrackId == trackID, deletionStage == nil
+                else { return }
+                recommendations = value
+            } catch {
+                guard generation == marker, insightsGeneration == requestID else { return }
+                insightFailures.insert("recommendations")
+            }
+        }
+        do {
+            let value = try await client.achievements()
+            guard generation == marker, insightsGeneration == requestID, deletionStage == nil else {
+                return
+            }
+            achievementBoard = value
+        } catch {
+            guard generation == marker, insightsGeneration == requestID else { return }
+            insightFailures.insert("achievements")
+        }
+        do {
+            let value = try await client.quests()
+            guard generation == marker, insightsGeneration == requestID, deletionStage == nil else {
+                return
+            }
+            questBoard = value
+        } catch {
+            guard generation == marker, insightsGeneration == requestID else { return }
+            insightFailures.insert("quests")
+        }
+        do {
+            let value = try await client.notificationSettings()
+            guard generation == marker, insightsGeneration == requestID, deletionStage == nil else {
+                return
+            }
+            notificationSettings = value
+        } catch {
+            guard generation == marker, insightsGeneration == requestID else { return }
+            insightFailures.insert("notifications")
+        }
+        do {
+            let value = try await client.notificationPlan()
+            guard generation == marker, insightsGeneration == requestID, deletionStage == nil else {
+                return
+            }
+            notificationPlan = value
+        } catch {
+            guard generation == marker, insightsGeneration == requestID else { return }
+            insightFailures.insert("notifications")
+        }
+        loadStudyPlan()
+    }
+
+    func saveNotificationSettings(_ settings: NotificationSettings, ownerID: String) async {
+        guard deletionStage == nil, !busy, !insightsLoading,
+            let owner = profile?.id, owner == ownerID
+        else { return }
+        await refreshAuthenticationIfNeeded()
+        guard profile?.id == owner, deletionStage == nil, !busy, !insightsLoading,
+            let client
+        else { return }
+        let marker = generation
+        let requestID = UUID()
+        insightsGeneration = requestID
+        insightsLoading = true
+        defer { if insightsGeneration == requestID { insightsLoading = false } }
+        do {
+            let confirmed = try await client.updateNotificationSettings(settings)
+            guard generation == marker, insightsGeneration == requestID,
+                profile?.id == owner, deletionStage == nil
+            else { return }
+            notificationSettings = confirmed
+            notificationPlan = nil
+            insightFailures.remove("notifications")
+        } catch {
+            guard generation == marker, insightsGeneration == requestID,
+                profile?.id == owner, deletionStage == nil
+            else { return }
+            insightFailures.insert("notifications")
+        }
+    }
+
+    private func studyPlanKey() throws -> String {
+        guard let profile, let apiScope, let track = profile.activeTrackId else {
+            throw APIError.staleSession
+        }
+        let trackData = try JSONEncoder().encode(track)
+        return try studyPlanPrefix(owner: profile.id, scope: apiScope)
+            + CanonicalQuestionReader.digest(trackData).sha256
+    }
+
+    private func studyPlanPrefix(owner: String, scope: String) throws -> String {
+        let identity = try JSONEncoder().encode([owner, scope])
+        return "certigo.native.study-plan."
+            + (try CanonicalQuestionReader.digest(identity).sha256) + "."
+    }
+
+    func loadStudyPlan() {
+        studyPlan = nil
+        studyPlanError = false
+        guard profile?.activeTrackId != nil, apiScope != nil else { return }
+        do {
+            studyPlan = try CertigoStudyPlanPreference.load(from: defaults, key: studyPlanKey())
+        } catch {
+            studyPlanError = true
+        }
+    }
+
+    func saveStudyPlan(_ plan: CertigoStudyPlanPreference, ownerID: String, trackID: String) {
+        guard deletionStage == nil, !busy, profile?.id == ownerID,
+            profile?.activeTrackId == trackID
+        else {
+            studyPlanError = true
+            return
+        }
+        do {
+            let key = try studyPlanKey()
+            try plan.save(to: defaults, key: key)
+            studyPlan = plan
+            studyPlanError = false
+        } catch {
+            studyPlanError = true
+        }
+    }
+
+    private func examStore(owner: String, scope: String) throws -> NativeActivityStore {
+        let identity = try JSONEncoder().encode([owner, scope])
+        let key = try CanonicalQuestionReader.digest(identity).sha256
+        return NativeActivityStore(
+            file: try activityStore().file.deletingLastPathComponent()
+                .appendingPathComponent("exam-\(key).json"))
+    }
+
+    func restoreMockExam() {
+        guard deletionStage == nil, !examBusy, let owner = profile?.id, let apiScope else { return }
+        examError = false
+        do {
+            guard let saved = try examStore(owner: owner, scope: apiScope).readExam() else {
+                return
+            }
+            examSnapshot = try saved.validated(owner: owner, scope: apiScope, now: now())
+        } catch {
+            examError = true
+        }
+    }
+
+    func generateMockExam() async {
+        guard deletionStage == nil, !busy, !examBusy, let owner = profile?.id,
+            let trackID = profile?.activeTrackId,
+            tracks.first(where: { $0.id == trackID })?.learningAvailable == true
+        else { return }
+        restoreMockExam()
+        guard examSnapshot == nil, !examError else { return }
+        await refreshAuthenticationIfNeeded()
+        guard deletionStage == nil, profile?.id == owner, profile?.activeTrackId == trackID,
+            let client, let apiScope, !busy, !examBusy, examSnapshot == nil
+        else { return }
+        let marker = generation
+        let requestID = UUID()
+        examGeneration = requestID
+        examBusy = true
+        examError = false
+        examUnsupported = false
+        defer { if examGeneration == requestID { examBusy = false } }
+        do {
+            let exam = try await client.generateMockExam(
+                MockExamRequest(trackId: trackID))
+            guard generation == marker, examGeneration == requestID, profile?.id == owner,
+                profile?.activeTrackId == trackID, deletionStage == nil
+            else { return }
+            guard exam.trackId == trackID else { throw APIError.invalidResponse }
+            let snapshot = NativeExamSnapshot(
+                ownerId: owner, apiScope: apiScope, exam: exam,
+                startedAt: Date(
+                    timeIntervalSince1970: (now().timeIntervalSince1970 * 1_000)
+                        .rounded(.down) / 1_000),
+                attemptId: UUID().uuidString, selections: [:])
+            try examStore(owner: owner, scope: apiScope).saveExam(snapshot)
+            examSnapshot = snapshot
+        } catch {
+            guard generation == marker, examGeneration == requestID, deletionStage == nil else {
+                return
+            }
+            if case ContractError.unsupported = error { examUnsupported = true }
+            examError = true
+        }
+    }
+
+    func selectExamOption(itemID: String, optionID: String) {
+        guard deletionStage == nil, !busy, !examBusy, var snapshot = examSnapshot,
+            snapshot.submission == nil, snapshot.ownerId == profile?.id,
+            snapshot.apiScope == apiScope,
+            snapshot.exam.items.contains(where: {
+                $0.itemId == itemID && $0.options.contains { $0.id == optionID }
+            })
+        else { return }
+        do {
+            snapshot.selections[itemID] = optionID
+            try examStore(owner: snapshot.ownerId, scope: snapshot.apiScope).saveExam(snapshot)
+            examSnapshot = snapshot
+            examError = false
+        } catch { examError = true }
+    }
+
+    var canSubmitMockExam: Bool {
+        guard deletionStage == nil, !busy, !examBusy, let snapshot = examSnapshot,
+            !snapshot.exam.items.isEmpty, snapshot.result == nil, snapshot.ownerId == profile?.id,
+            snapshot.apiScope == apiScope
+        else { return false }
+        return snapshot.exam.items.allSatisfy { item in
+            item.options.contains { $0.id == snapshot.selections[item.itemId] }
+        }
+    }
+
+    func submitMockExam() async {
+        guard canSubmitMockExam, let owner = profile?.id else { return }
+        await refreshAuthenticationIfNeeded()
+        guard profile?.id == owner, canSubmitMockExam, let client,
+            var snapshot = examSnapshot
+        else { return }
+        let marker = generation
+        let requestID = UUID()
+        examGeneration = requestID
+        examBusy = true
+        examError = false
+        defer { if examGeneration == requestID { examBusy = false } }
+        do {
+            let request: SubmitMockExamRequest
+            if let existing = snapshot.submission {
+                request = existing
+            } else {
+                request = SubmitMockExamRequest(
+                    clientAttemptId: snapshot.attemptId, trackId: snapshot.exam.trackId,
+                    examId: snapshot.exam.examId, startedAt: snapshot.startedAt,
+                    answers: try snapshot.exam.items.map { item in
+                        guard let option = snapshot.selections[item.itemId] else {
+                            throw NativeResumeError.malformed
+                        }
+                        return QuizAnswer(
+                            itemId: item.itemId, itemType: item.type, selected: [option],
+                            latencyMs: 0)
+                    })
+                snapshot.submission = request
+                try examStore(owner: owner, scope: snapshot.apiScope).saveExam(snapshot)
+                examSnapshot = snapshot
+            }
+            let result = try await client.submitMockExam(request)
+            guard generation == marker, examGeneration == requestID, deletionStage == nil,
+                profile?.id == owner
+            else { return }
+            guard result.examId == snapshot.exam.examId else { throw APIError.invalidResponse }
+            snapshot.result = result
+            _ = try snapshot.validated(owner: owner, scope: snapshot.apiScope, now: now())
+            try examStore(owner: owner, scope: snapshot.apiScope).saveExam(snapshot)
+            examSnapshot = snapshot
+            do {
+                let value = try await client.refreshProfile()
+                guard generation == marker, examGeneration == requestID,
+                    profile?.id == owner, deletionStage == nil
+                else { return }
+                profile = value
+            } catch {
+                guard generation == marker, examGeneration == requestID,
+                    deletionStage == nil
+                else { return }
+                report(error)
+            }
+        } catch {
+            guard generation == marker, examGeneration == requestID, deletionStage == nil else {
+                return
+            }
+            examError = true
+        }
+    }
+
+    func discardMockExam() {
+        guard deletionStage == nil, !busy, !examBusy,
+            let owner = profile?.id, let apiScope
+        else { return }
+        do {
+            try examStore(owner: owner, scope: apiScope).clear()
+            examGeneration = UUID()
+            examSnapshot = nil
+            examError = false
+            examUnsupported = false
+        } catch { examError = true }
+    }
+
+    func requestTutorExplanation(itemId: String) async {
+        guard !isRequestingTutorExplanation else { return }
+        guard deletionStage == nil, !busy,
+            let owner = profile?.id, let lesson,
+            case .corrected(let result) = outcome,
+            result.results.contains(where: { $0.itemId == itemId }),
+            let submittedRequest,
+            let answer = submittedRequest.answers.first(where: { $0.itemId == itemId }),
+            lesson.questions.contains(where: { $0.id == itemId })
+        else {
+            tutorExplanationError = "A confirmed answer is required before requesting Coach help."
+            return
+        }
+        await refreshAuthenticationIfNeeded()
+        guard profile?.id == owner, deletionStage == nil, !busy,
+            self.lesson?.id == lesson.id, !isRequestingTutorExplanation,
+            self.submittedRequest?.clientAttemptId == submittedRequest.clientAttemptId
+        else { return }
+        let marker = generation
+        let requestID = UUID()
+        let attempt = attemptID
+        tutorRequestGeneration = requestID
+        isRequestingTutorExplanation = true
+        tutorExplanation = nil
+        tutorExplanationError = nil
+        defer {
+            if tutorRequestGeneration == requestID { isRequestingTutorExplanation = false }
+        }
+        do {
+            guard generation == marker, profile?.id == owner, deletionStage == nil,
+                tutorRequestGeneration == requestID, self.lesson?.id == lesson.id,
+                attemptID == attempt, let client
+            else { return }
+            let explanation = try await client.explainAnswer(
+                TutorExplainRequest(
+                    trackId: lesson.trackId, lessonId: lesson.id, itemId: itemId,
+                    selected: answer.selected, publicManifestId: submittedRequest.publicManifestId))
+            guard generation == marker, profile?.id == owner, deletionStage == nil,
+                tutorRequestGeneration == requestID, self.lesson?.id == lesson.id,
+                attemptID == attempt
+            else { return }
+            guard explanation.itemId == itemId else { throw APIError.invalidResponse }
+            tutorExplanation = explanation
+        } catch {
+            guard generation == marker, profile?.id == owner, deletionStage == nil,
+                tutorRequestGeneration == requestID, self.lesson?.id == lesson.id,
+                attemptID == attempt
+            else { return }
+            tutorExplanationError = "Coach could not confirm an explanation. Please retry."
+        }
+    }
+
     func submit() async {
         guard deletionStage == nil, !busy else { return }
         let owner = profile?.id
@@ -1485,6 +1984,7 @@ final class NativeModel {
     }
 
     private func rebuildHistoryPresentation() {
+        defer { rebuildSmartReview() }
         guard let profile, let apiScope, deletionStage == nil else {
             historyPresentation = nil
             return
@@ -1496,6 +1996,27 @@ final class NativeModel {
             historyPresentation = nil
             historyError =
                 "History records disagree. Saved answers were preserved. Refresh or contact support."
+        }
+    }
+
+    private func rebuildSmartReview() {
+        smartReviewRecommendation = nil
+        smartReviewError = false
+        guard deletionStage == nil, let path, let profile, let apiScope else { return }
+        do {
+            let local = try (historyPresentation?.confirmedOnDevice ?? []).compactMap { saved in
+                guard saved.ownerId == profile.id, saved.apiScope == apiScope,
+                    saved.submission.trackId == path.trackId, let result = saved.result
+                else { return nil as SmartReviewLocalResult? }
+                _ = try result.validated(for: saved.submission)
+                return try SmartReviewLocalResult(
+                    lessonId: saved.lessonId, scorePercent: result.scorePct)
+            }
+            smartReviewRecommendation = SmartReviewAdvisor.recommend(
+                path: path, history: serverHistory, localResults: local)
+        } catch {
+            smartReviewError = true
+            errorMessage = "Review evidence could not be verified. Refresh confirmed history."
         }
     }
 
@@ -1782,6 +2303,7 @@ final class NativeModel {
             }
             path = loadedPath
             offlinePack = cachedPack
+            clearTutorExplanation()
             lesson = loadedLesson
             selections = restoredSelections
             latencies = restoredLatencies

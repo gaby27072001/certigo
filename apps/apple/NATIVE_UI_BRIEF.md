@@ -21,8 +21,9 @@ reference; `DESIGN.md` in this directory records its native translation.
 
 Learn keeps its `NavigationSplitView`; the goal action reveals its content column
 on compact devices and selection still flows through the existing bindings.
-Resume reveals the existing activity without a second request. Coach shows current
-learning context and possible help intentions without sending it to AI. Friends
+Resume reveals the existing activity without a second request. Coach sends a
+confirmed submitted answer only after an explicit explanation request. It shows
+the response's grounded/AI source and personalization without claiming chat memory. Friends
 and Teams describe separate future opt-in audiences without a fake directory,
 chat, memory setting, join or share control. Changing a tab does not fabricate data.
 
@@ -68,9 +69,12 @@ selectors, sign-in/demo/resume/session/practice-again/submit/retry/loading
 actions, history and settings destinations, deletion label, and pending/confirmed states. The
 eight-language `contentLanguageNote` appears in the picker and editorial pilot.
 Authored lesson/question/source text remains in its source language; changing
-the UI locale does not imply content translation. Not every explanatory sentence
-or catalog filter label has a localized catalog entry yet; those remain authored
-English text rather than falsely claimed full-app localization. Dates follow the
+the UI locale does not imply content translation. Explore filters, search/reset,
+seven categories, declared FR/EN badges, principal My Learning/Profile sections,
+Coach, study/assessment/notification controls and editorial reading chrome have
+explicit eight-language entries. Legacy detailed history notices, developer/deletion
+flows, audio controls and parts of the fictional demo still contain authored
+English text; this is not full-app localization. Dates follow the
 effective locale. Validate translated string expansion and script rendering on
 each target device; portable language-catalog tests do not establish linguistic
 quality or layout fit.
@@ -90,12 +94,12 @@ evidence, not assets to copy or proof of running features.
 | U03 | Goal/Next session before metrics; named resume or next available activity; unit plan, remaining/locked activities, distinct review and overview. No invented scheduler recommendation. |
 | U04 | Local case/diacritic-insensitive search over code/title/summary; actual code-prefix family and availability facets; count, reset and distinct no-match/source-empty states. Provider, language and format facets are unavailable without metadata. |
 | U05 | CTA title and target use the same current activity value; prompt remains with confirmed feedback; read-only scroll versus explicit new practice through the existing loader. Editorial formative practice is not a scored quiz. |
-| U06 | Coach displays confirmed goal, current activity phase and help intentions. No model, composer, streaming or history service is enabled. |
+| U06 | Coach requests a confirmed answer's explanation explicitly and displays source/personalization. No composer, streaming or conversation history is enabled. |
 | U07 | Explicit no-memory disclosure; no nonfunctional Off/clear/edit toggles or implied remote deletion. |
 | U08 | Friends clearly separate private learning records from future opt-in sharing. Discovery, invitations, contacts and sharing are inactive. |
 | U09 | Teams distinguish future membership/role/audience rules from private evidence. No fake joins, rankings or challenges. |
 | U10 | Loaded-path completed/mastered activities and nonempty completed units over actual totals; current-lesson selections over actual question count; paged confirmed attempts and readiness separate. No unprovided global question coverage, period report or pass probability. |
-| U11 | Existing connection and deletion actions retained; grouped system accessibility and data/privacy explanations, without new persisted settings or cache deletion controls. |
+| U11 | Existing connection/deletion retained; scoped local Study Plan and real server notification preferences added. No OS push permission, fake memory or broad cache deletion control. |
 | U12 | Semantic text, bounded reading, nontruncated objectives, 44-point action targets, selected icon/trait and textual locks. Actual VoiceOver/large-text/keyboard acceptance is still required. |
 
 The source-empty catalog does not claim to distinguish a failed load from a
@@ -111,7 +115,7 @@ M08 pending, M09 confirmed correction, M10 error/retry, M18 explicit data refres
 M20 system layout and M22 existing authorized restoration/account boundaries.
 These mechanisms still require interaction, focus and performance acceptance on
 Apple; native defaults are not proof of every motion contract. M11–M17 actual
-AI/memory/social operations, M19 achievement motion and M21 sharing/permission
+memory/social operations, streaming, M19 achievement motion and M21 sharing/permission
 transitions are not added: their relevant contracts or visual evidence are absent.
 No authored timing
 claims, streaming simulation, celebratory reward or decorative loop is introduced.
@@ -154,4 +158,32 @@ without opening practice. Read a confirmed lesson again without a network reques
 then explicitly practice again and verify the old result persists in history.
 Check a selected activity change never leaves the previous activity's CTA label.
 Explain each coverage denominator, zero/unknown state and paged-history count.
-Inspect Coach/Friends/Teams to ensure no input or apparent service is activated.
+In Coach, request an explanation only after confirmed grading, inspect every
+response field and grounded/AI source, then change lesson/account during a request
+to verify the old response is not published. Friends/Teams must remain inactive.
+
+## International learning services
+
+My Learning keeps one resume action first, then an open server recommendation
+matched by actual lesson/unit IDs, otherwise the next available path node. Smart
+Review uses confirmed paged history plus acknowledged local results, never pending
+answers. It does not claim to implement a new FSRS clock.
+
+Study Plan stores an optional target date, initial level and daily minutes under
+an owner/API/track-scoped key. Remaining minutes sum unfinished loaded activities,
+not an exam-preparation prediction. Real path readiness is a learning indicator;
+domain scores are not converted into coverage/mastery, mastered-domain counts or
+an invented readiness endpoint. The weakest loaded domain can link to a focus
+activity only when a server recommendation supplies matching IDs.
+
+Final Assessment is MCQ-only and fail-closed for other server item types. Its
+owner/API-scoped protected draft persists selections and the exact submission
+before sending. Explicit retry reuses that attempt and payload after a lost
+response. Empty assessments are nonplayable; server-confirmed success is not
+official exam readiness. The timer is informational, not a claim of native
+proctoring or a new server timeout rule.
+
+Profile progress displays real XP, optional streak/level/daily XP, quests and
+achievements without substituting missing values with zero. Notification settings
+edit the existing server contract; a displayed plan is a server schedule, not
+evidence that iOS push notifications are installed or delivered.

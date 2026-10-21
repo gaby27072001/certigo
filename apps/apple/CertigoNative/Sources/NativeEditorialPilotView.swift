@@ -23,10 +23,10 @@
                     if let snapshot = model.editorialPilot {
                         if requestedLessonUnavailable {
                             ContentUnavailableView(
-                                "Linked lesson unavailable",
+                                copy.native(.unavailable),
                                 systemImage: "book.closed",
                                 description: Text(
-                                    "This lesson is not present in the current pilot version."
+                                    copy.native(.contentLoadFailure)
                                 )
                             )
                         } else {
@@ -34,10 +34,10 @@
                         }
                     } else if issue != nil {
                         ContentUnavailableView(
-                            "Editorial pilot unavailable",
+                            copy.native(.unavailable),
                             systemImage: "book.closed",
                             description: Text(
-                                issue ?? "Try again when the network is available.")
+                                issue ?? copy.native(.contentLoadFailure))
                         )
                         .overlay(alignment: .bottom) {
                             Button(copy.retry) { Task { await load() } }
@@ -48,7 +48,7 @@
                         ProgressView(copy.loading)
                     }
                 }
-                .navigationTitle("Editorial pilot")
+                .navigationTitle(copy.native(.editorialPilot))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
@@ -57,7 +57,7 @@
                 }
                 .task { await load() }
                 .alert(
-                    "History not confirmed",
+                    copy.native(.historyUnconfirmed),
                     isPresented: Binding(
                         get: { issue != nil && model.editorialPilot != nil },
                         set: { if !$0 { issue = nil } }
@@ -75,17 +75,17 @@
             NativeReadingPage {
                 NativeEntryHeading(
                     title: snapshot.pilot.title,
-                    message: "Original French draft · learning, not certification.")
-                NativeReadingSection(title: "Before you start") {
+                    message: copy.native(.originalFrench))
+                NativeReadingSection(title: copy.native(.beforeStart)) {
                     Text(copy.contentLanguageNote)
                         .font(.subheadline).foregroundStyle(.secondary)
-                    Label("Learning, not certification", systemImage: "book")
+                    Label(copy.native(.learningNotCertification), systemImage: "book")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tint)
-                    LabeledContent("Content language", value: "French (France)")
+                    NativeContentLanguageBadges(languages: [snapshot.pilot.locale])
                     LabeledContent(
-                        "Estimated duration", value: "\(snapshot.pilot.estimatedMinutes) min")
-                    LabeledContent("Sources checked on", value: snapshot.pilot.asOf)
+                        copy.native(.duration), value: "\(snapshot.pilot.estimatedMinutes) min")
+                    LabeledContent(copy.native(.sourcesChecked), value: snapshot.pilot.asOf)
                     Text(snapshot.pilot.audience)
                     Text(snapshot.pilot.prerequisites)
                         .foregroundStyle(.secondary)
@@ -103,7 +103,7 @@
                     }
                 }
 
-                NativeReadingSection(title: "Lessons") {
+                NativeReadingSection(title: copy.native(.lessons)) {
                     ForEach(snapshot.pilot.lessons) { lesson in
                         NavigationLink(value: lesson.id) {
                             NativeReadingCard {
@@ -121,9 +121,9 @@
                                     {
                                         Text(
                                             progress.markedReadAt.map {
-                                                "Marked as read · \(date($0, locale: copy.language.locale))"
+                                                "\(copy.native(.markedRead)) · \(date($0, locale: copy.language.locale))"
                                             }
-                                                ?? "Last opened · \(date(progress.lastAccessedAt, locale: copy.language.locale))"
+                                                ?? "\(copy.native(.lastOpened)) · \(date(progress.lastAccessedAt, locale: copy.language.locale))"
                                         )
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -145,7 +145,7 @@
                         issue: $issue
                     )
                 } else {
-                    ContentUnavailableView("Lesson unavailable", systemImage: "book.closed")
+                    ContentUnavailableView(copy.native(.unavailable), systemImage: "book.closed")
                 }
             }
         }
@@ -175,7 +175,7 @@
                 }
                 navigationPath = [requestedLessonID]
             } catch {
-                issue = "Content loading or verification failed. Please retry."
+                issue = copy.native(.contentLoadFailure)
             }
         }
     }
@@ -195,13 +195,14 @@
         var body: some View {
             ScrollViewReader { reader in
                 NativeReadingPage {
-                    NativeReadingSection(title: "Understand the situation") {
+                    NativeReadingSection(title: copy.native(.understandSituation)) {
                         Text(lesson.title)
                             .font(.title2.bold())
                             .accessibilityAddTraits(.isHeader)
-                        Text("French editorial content · original source language")
+                        Text(copy.native(.originalFrench))
                             .font(.caption).foregroundStyle(.secondary)
-                        DisclosureGroup("Read lesson aloud") {
+                        NativeContentLanguageBadges(languages: ["fr-FR"])
+                        DisclosureGroup(copy.native(.readAloud)) {
                             NativeLessonAudioControls(
                                 content: NativeLessonReadingContent(
                                     editorialTitle: lesson.title,
@@ -223,17 +224,17 @@
                         Text(lesson.hook)
                             .foregroundStyle(.secondary)
                         LabeledContent(
-                            "Estimated duration", value: "\(lesson.estimatedMinutes) min")
+                            copy.native(.duration), value: "\(lesson.estimatedMinutes) min")
                     }
                     .id("editorial-reading-start")
 
-                    NativeReadingSection(title: "Key ideas") {
+                    NativeReadingSection(title: copy.native(.keyIdeas)) {
                         ForEach(Array(lesson.keyIdeas.enumerated()), id: \.offset) { item in
                             Label(item.element, systemImage: "lightbulb")
                         }
                     }
 
-                    NativeReadingSection(title: "Worked example") {
+                    NativeReadingSection(title: copy.native(.workedExample)) {
                         NativeReadingCard {
                             Text(lesson.workedExample.situation)
                             ForEach(Array(lesson.workedExample.steps.enumerated()), id: \.offset) {
@@ -249,7 +250,7 @@
                         }
                     }
 
-                    NativeReadingSection(title: "Self-check · no answer recorded") {
+                    NativeReadingSection(title: copy.native(.selfCheck)) {
                         Text(lesson.practice.prompt)
                         ForEach(Array(lesson.practice.successCriteria.enumerated()), id: \.offset) {
                             item in
@@ -264,23 +265,23 @@
                     }
                     .id("editorial-practice")
 
-                    NativeReadingSection(title: "Takeaway") {
+                    NativeReadingSection(title: copy.native(.takeaway)) {
                         Text(lesson.recap)
                             .font(.headline)
                     }
 
-                    NativeReadingSection(title: "Sources & limits") {
+                    NativeReadingSection(title: copy.native(.sourcesLimits)) {
                         ForEach(sources.filter { lesson.sourceIDs.contains($0.id) }) { source in
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(source.title).font(.headline)
-                                Text("Checked on \(source.checkedOn)")
+                                Text("\(copy.native(.sourcesChecked)) · \(source.checkedOn)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Text(source.supports)
                                 Text(source.limits)
                                     .foregroundStyle(.secondary)
                                 if let url = URL(string: source.url) {
-                                    Link("Open source", destination: url)
+                                    Link(copy.native(.openSource), destination: url)
                                         .frame(minHeight: 44)
                                 }
                             }
@@ -288,20 +289,21 @@
                         }
                     }
 
-                    NativeReadingSection(title: "Your reading history") {
+                    NativeReadingSection(title: copy.native(.readingHistory)) {
                         if let markedReadAt = progress?.markedReadAt {
                             Label(
-                                "You marked this lesson as read on \(date(markedReadAt, locale: copy.language.locale)).",
+                                "\(copy.native(.markedRead)) · \(date(markedReadAt, locale: copy.language.locale))",
                                 systemImage: "checkmark.circle.fill"
                             )
                             .foregroundStyle(.secondary)
                         } else {
-                            NativePrimaryButton(title: "Mark as read", symbol: "checkmark") {
+                            NativePrimaryButton(title: copy.native(.markRead), symbol: "checkmark")
+                            {
                                 Task { await markRead() }
                             }
                             .disabled(model.busy || !accessRecorded)
                             .accessibilityIdentifier("mark-editorial-pilot-lesson-read")
-                            Text("This declaration does not measure mastery or performance.")
+                            Text(copy.native(.declarationHint))
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -313,24 +315,22 @@
                             .disabled(model.busy)
                         }
                     }
-                    NativeReadingSection(title: "Revisit the lesson") {
-                        Button("Read again", systemImage: "text.book.closed") {
+                    NativeReadingSection(title: copy.native(.revisit)) {
+                        Button(copy.native(.readAgain), systemImage: "text.book.closed") {
                             reader.scrollTo("editorial-reading-start", anchor: .top)
                         }
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("read-editorial-lesson-again")
-                        Button("Revisit formative practice", systemImage: "pencil") {
+                        Button(copy.native(.formativePractice), systemImage: "pencil") {
                             reader.scrollTo("editorial-practice", anchor: .top)
                         }
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("review-editorial-practice")
-                        Text(
-                            "Re-reading does not change your history. This exercise submits no answer and awards no score or XP."
-                        )
-                        .font(.footnote).foregroundStyle(.secondary)
+                        Text(copy.native(.noScoreHint))
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
-                .navigationTitle("Lesson")
+                .navigationTitle(copy.native(.lessons))
                 .navigationBarTitleDisplayMode(.inline)
                 .task { await recordAccess() }
             }
@@ -342,8 +342,7 @@
                 try await model.accessEditorialPilotLesson(lesson.id)
                 accessRecorded = true
             } catch {
-                issue =
-                    "This reading was not synchronized. No mark-as-read declaration was recorded."
+                issue = copy.native(.unsynced)
             }
         }
 
@@ -352,7 +351,7 @@
             do {
                 try await model.markEditorialPilotLessonRead(lesson.id)
             } catch {
-                issue = "The server did not confirm your declaration. Please retry."
+                issue = copy.native(.readNotConfirmed)
             }
         }
     }

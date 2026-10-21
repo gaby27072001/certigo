@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(CertigoDomain)
+    import CertigoDomain
+#endif
+
 private enum DemoTestFailure: Error {
     case assertion(String)
 }
@@ -12,6 +16,51 @@ struct NativeDemoFlowTests {
             count += 1
             print("PASS \(name)")
         }
+        try check(
+            NativeLearningDuration.total([3, 7, 10]) == 20, "loaded activity minutes add exactly")
+        try check(NativeLearningDuration.total([]) == 0, "empty loaded duration is zero")
+        try check(NativeLearningDuration.total([-1]) == nil, "negative duration is unavailable")
+        try check(
+            NativeLearningDuration.total([Int.max, 1]) == nil, "duration overflow is unavailable")
+        try check(
+            NativeDeclaredContentLanguage.badges([]).isEmpty,
+            "missing content language is never guessed")
+        try check(
+            NativeDeclaredContentLanguage.badges(["fr-FR", "en_US", "fr", "EN"]) == ["EN", "FR"],
+            "declared regional languages produce unique FR and EN badges")
+        try check(
+            NativeDeclaredContentLanguage.badges(["french", "frenchish", "english", "de"]).isEmpty,
+            "content language badges do not use title or substring guesses")
+        #if canImport(CertigoDomain)
+            for (status, stage) in [
+                ("locked", MasteryStage.notStarted), ("available", .notStarted),
+                ("inProgress", .learning), ("completed", .practicing), ("mastered", .mastered),
+            ] {
+                let lesson = try JSONDecoder().decode(
+                    PathLesson.self,
+                    from: Data(
+                        """
+                        {"id":"synthetic","title":"Synthetic","status":"\(status)",
+                        "estMinutes":5,"masteryPct":100}
+                        """.utf8))
+                try check(
+                    lesson.nativeMasteryStage == stage,
+                    "server \(status) maps conservatively, without an exam-ready inference")
+            }
+            for language in AppLanguage.allCases {
+                let copy = AppInterfaceCopy(language: language)
+                for key in AppInterfaceCopy.NativeLabel.allCases {
+                    try check(
+                        !copy.native(key).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                        "native chrome \(key) exists in \(language.rawValue)")
+                }
+                for category in NativeRadarCategory.allCases {
+                    try check(
+                        !category.title(copy).isEmpty,
+                        "Radar category \(category.rawValue) localized in \(language.rawValue)")
+                }
+            }
+        #endif
         for (code, band) in [
             ("AZ-900", 0), ("AI-900", 1), ("PL-900", 2), ("MS-900", 3),
             ("DP-900", 4), ("SC-900", 5), (" ai-102 ", 1), ("", 0), ("UNKNOWN-1", 0),

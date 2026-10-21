@@ -56,8 +56,8 @@ are centered and bounded at 700 points; answer choices have 16-point corners.
 Use opaque cards for a correction, a saved attempt or a worked example, not a card
 for every paragraph. Code can scroll horizontally without widening the reading
 column. The editorial catalog does not truncate lesson objectives.
-Authored interface labels are English, including the editorial pilot's controls,
-reading status, errors and section headings. Editorial lesson text and source
+Principal interface labels, discovery filters, learning/Coach/account sections
+and editorial controls use typed eight-language copy. Editorial lesson text and source
 descriptions retain their original French with an explicit language/provenance
 notice; interface language is not a content translation claim.
 
@@ -101,7 +101,8 @@ explanatory labels; this is not a claim of complete translation of every sentenc
 
 The production entry offers Microsoft sign-in and a clearly isolated fictional
 demo, never a manual-token fallback. The developer connector remains DEBUG-only.
-Coach and Social remain explicitly unavailable, not simulated services.
+Coach accepts explicit requests about a confirmed answer; Social remains
+unavailable, not a simulated service. Coach has no free-text composer or chat memory.
 
 ## Research translated to structure
 
@@ -147,9 +148,19 @@ exercise; neither action submits a quiz or silently marks it read.
 
 Drops/Babbel follow-up distinguishes loaded activity/unit coverage, current-lesson
 local answer selection, paged confirmed sessions and last-loaded readiness.
-Unknown data is not zero; completed activity is not exam competence. Coach and
-Social explain context and future privacy boundaries as prose rather than
+Unknown data is not zero; completed activity is not exam competence. Coach presents
+the server's explanation and evidence only after an explicit request. Social
+explains future privacy boundaries as prose rather than
 nonfunctional input fields, toggles, chat bubbles or people.
+
+Study Plan is a short native sheet with optional target date, initial level and
+daily minutes, stored separately for each account/API/goal. The learning dashboard
+uses real domain scores and server recommendations without inventing domain
+coverage or a mastered-domain count. Five mastery symbols are a reference:
+server lesson states assign only supported stages; no exam-ready stage is inferred.
+The assessment page is a resumable server-graded MCQ simulation, not an official
+exam or pass guarantee. Notification settings are server preferences, not an iOS
+push authorization. Rewards remain confirmed, read-only server values.
 
 Shared rounded surfaces use continuous Apple corners and 8/12/16/24-point internal
 rhythms. Hierarchical symbols are limited to category labels on semantic surfaces;

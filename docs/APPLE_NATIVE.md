@@ -232,6 +232,48 @@ or call a live `/me` endpoint. Linux Swift validation covers Foundation code
 only; it does not typecheck or render the SwiftUI screen on Apple platforms or
 prove a staging deployment.
 
+## Native learning services
+
+See [CertigoKit learning contracts](../apps/apple/CertigoKit/LEARNING_SERVICES.md)
+for the existing backend routes and evidence limits. NativeModel coordinates the
+Coach, recommendations, assessment, reward boards and notification preferences
+without changing authentication, scoring or release/signing configuration.
+
+Coach requests require a confirmed result and its original submitted selection
+and manifest pin. Requests are explicit: the tutor POST changes server learner
+signals and must never be automatically replayed. Duplicate in-flight requests
+are blocked; responses/errors are discarded after owner, connection, lesson,
+attempt or deletion context changes. Changing tabs does not submit a question.
+The returned source distinguishes grounded fallback from AI output. There is no
+conversation memory or alternate-style request parameter.
+
+Smart Review combines server history with locally stored server acknowledgements
+for the same owner/API/track. Pending answers never become recommendation scores.
+Study Plan injects a hashed owner/API/track preferences key instead of the Kit's
+device-wide default; invalid stored data is a visible failure. Account deletion
+removes only that owner's matching preference prefix and assessment snapshot.
+Signing out preserves protected drafts for explicit same-owner recovery.
+
+Assessment generation and submission use the real server APIs. The protected
+owner/API-scoped JSON snapshot is bounded to 1 MiB and stores the generated exam,
+selections, start time and client attempt ID. Before POST, it also stores the
+immutable request. Restart and explicit retry reuse that request; they do not
+mint another attempt after an ambiguous response. Draft/result identity and
+response shape are validated on restoration. Other item types fail closed,
+and an empty generated exam is not submittable. Discard requires a native
+confirmation and removes only the local snapshot, not a remote result.
+
+Server notification preferences and plan are distinct from OS push permissions.
+Saving is explicit and owner-guarded; canonical server settings replace the form
+and invalidate the older plan. No APNs registration, system permission request,
+notification delivery or background scheduling is implemented here.
+
+The path contract supplies domain scores, not full domain coverage/mastery.
+Consequently no mastered-domain count, remaining exam-preparation prediction or
+probabilistic "you're ready" promise is synthesized. Only loaded activity minutes,
+server readiness/recommendations and confirmed simulation outcomes are presented.
+Apple SDK compilation and device behavior still require the acceptance below.
+
 ## Local validation and its limits
 
 ### Optional lesson reading
