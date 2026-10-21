@@ -117,6 +117,7 @@ final class AppLanguageTests: XCTestCase {
       XCTAssertEqual(copy.exploreDemo, copy[.exploreDemo])
       XCTAssertEqual(copy.resume, copy[.resume])
       XCTAssertEqual(copy.startSession, copy[.startSession])
+      XCTAssertEqual(copy.practiceAgain, copy[.practiceAgain])
       XCTAssertEqual(copy.submitAnswer, copy[.submitAnswer])
       XCTAssertEqual(copy.retry, copy[.retry])
       XCTAssertEqual(copy.loading, copy[.loading])

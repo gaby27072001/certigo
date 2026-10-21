@@ -28,6 +28,29 @@ chat, memory setting, join or share control. Changing a tab does not fabricate d
 
 ## Research coverage, not a claim of 136 shipped screens
 
+### Interface language
+
+The entry screen and connected/demo Profile > Settings expose one shared
+accessible language menu: System default plus the eight `AppLanguage` values,
+each shown as its native name and the name localized in the current interface
+language. `AppLanguagePreference` writes immediately to its versioned UserDefaults
+key; System default resolves the preferred-language list on launch and when the
+app becomes active. The root applies the effective Foundation `Locale` and
+`AppInterfaceCopy` to connected, demo and editorial surfaces without restarting
+or reconstructing the authenticated model.
+
+The typed copy catalog localizes the principal navigation labels, Learn/Social
+selectors, sign-in/demo/resume/session/practice-again/submit/retry/loading
+actions, history and settings destinations, deletion label, and pending/confirmed states. The
+eight-language `contentLanguageNote` appears in the picker and editorial pilot.
+Authored lesson/question/source text remains in its source language; changing
+the UI locale does not imply content translation. Not every explanatory sentence
+or catalog filter label has a localized catalog entry yet; those remain authored
+English text rather than falsely claimed full-app localization. Dates follow the
+effective locale. Validate translated string expansion and script rendering on
+each target device; portable language-catalog tests do not establish linguistic
+quality or layout fit.
+
 The implementation maps the complete three-report research dossier:
 `certigo-education-mobbin-research-2026-10-15.md`,
 `certigo-four-tab-coverage-2026-10-17.md` and

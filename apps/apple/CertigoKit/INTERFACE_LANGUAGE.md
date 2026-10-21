@@ -20,12 +20,15 @@ and an exhaustive `Key` subscript for all catalog entries. No external resource
 or platform UI framework is required. `localizedDisplayName(in:)` uses Foundation's
 language naming data; `nativeDisplayName` is the stable autonym.
 
-The SwiftUI app must observe the chosen preference, rebuild its copy and locale,
-and wire the picker and individual labels. This package alone does not change
-the displayed UI. It does not change authentication, account identity, scoring,
-content negotiation or server contracts. The eight localized content notes
-explicitly state that interface translation does not automatically translate the
-official certification question text or editorial pilot source text.
+The SwiftUI app observes the chosen preference at its root, rebuilds copy and
+locale, and exposes the picker on entry and in connected/demo settings. The
+typed catalog covers principal navigation and action/status labels; labels for
+which no catalog key exists remain in their authored language, so this contract
+does not claim exhaustive localization of every sentence. It does not change
+authentication, account identity, scoring, content negotiation or server
+contracts. The eight localized content notes explicitly state that interface
+translation does not automatically translate the official certification
+question text or editorial pilot source text.
 
 Portable coverage: `swift test --filter AppLanguageTests`. This is not an Apple UI,
 layout, VoiceOver or linguistic review on device.

@@ -82,6 +82,18 @@ resolved from already loaded catalog/path/offline data; unknown IDs remain visib
 rather than being replaced by guessed titles. Audio is available through an
 expandable control group. Account deletion remains a separate destructive flow.
 
+## Interface language
+
+The app resolves a system preference or an explicit eight-language choice once
+at its shared SwiftUI root, persists user selection immediately, and supplies
+Foundation locale and typed `AppInterfaceCopy` to connected learning, the
+fictional demo, and the editorial pilot. Both the arrival surface and Settings
+show native autonyms alongside localized language names. This changes interface
+chrome only: certification questions and French editorial source text remain
+unaltered and carry an explicit source-language disclosure. See
+`NATIVE_UI_BRIEF.md` for the exact copy-catalog coverage and remaining English
+explanatory labels; this is not a claim of complete translation of every sentence.
+
 The production entry offers Microsoft sign-in and a clearly isolated fictional
 demo, never a manual-token fallback. The developer connector remains DEBUG-only.
 Coach and Social remain explicitly unavailable, not simulated services.

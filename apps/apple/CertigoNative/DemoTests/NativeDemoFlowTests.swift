@@ -91,8 +91,11 @@ struct NativeDemoFlowTests {
             destination.lessonID == "second" && destination.resumeTitle == "Resume Second activity",
             "resume title and target derive from one current activity snapshot")
         try check(
-            destination.practiceTitle == "Practice again · Second activity",
+            destination.actionTitle("Practice again") == "Practice again · Second activity",
             "practice label names its current activity and differs from read again")
+        try check(
+            destination.actionTitle("Reprendre") == "Reprendre · Second activity",
+            "localized action preserves the current source-language activity title")
         destination = NativeActivityDestination(lessonID: "first", title: "First activity")
         try check(
             destination.lessonID == "first" && !destination.resumeTitle.contains("Second"),

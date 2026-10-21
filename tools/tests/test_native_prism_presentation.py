@@ -98,7 +98,7 @@ class NativePrismPresentationTests(unittest.TestCase):
         ):
             self.assertIn(marker, root)
         self.assertIn('Button("Read again"', root)
-        self.assertIn("title: destination.practiceTitle", root)
+        self.assertIn("title: destination.actionTitle(copy.practiceAgain)", root)
         self.assertIn('case .corrected(let result):', root)
         self.assertIn('reader.scrollTo("session-reading-start"', root)
         self.assertIn("No chat, AI generation", root)
@@ -166,6 +166,64 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertIn("resumeTrackID = lesson.trackId", resume)
         self.assertIn("selectedLesson = lesson.id", resume)
         self.assertIn("self.resumeTrackID = nil", self.app)
+
+    def test_app_language_preference_is_persisted_and_applied_at_the_root(self):
+        for marker in (
+            "AppLanguagePreference.load(from: .standard)",
+            "$0.save(to: .standard)",
+            ".environment(\\.locale, effectiveLanguage.locale)",
+            "AppInterfaceCopy(language: effectiveLanguage)",
+            "preference.effectiveLanguage(fromPreferredLanguages: preferredLanguages)",
+            "preferredLanguages = Locale.preferredLanguages",
+            "copy.appLanguage,\n                    selection:",
+            "ForEach(AppLanguage.allCases, id: \\.rawValue)",
+            "language.nativeDisplayName",
+            "language.localizedDisplayName(in: copy.language)",
+            "AppLanguagePreference.system.rawValue",
+            'accessibilityIdentifier("app-interface-language")',
+            "copy.contentLanguageNote",
+        ):
+            self.assertIn(marker, self.app)
+        self.assertIn("NativeAppLanguagePicker()", self.app.split("private struct NativeEntry:", 1)[1].split("#if canImport(UIKit)", 1)[0])
+        self.assertIn("Section(copy.appLanguage) { NativeAppLanguagePicker() }", self.app)
+        self.assertNotIn('Locale(identifier: "en")', self.app)
+
+    def test_interface_copy_reaches_real_and_demo_navigation_and_actions(self):
+        root = self.app.split("private struct NativeRoot:", 1)[1].split(
+            "struct NativeLessonAudioControls:", 1
+        )[0]
+        demo = self.app.split("private struct NativeDemoRoot:", 1)[1].split(
+            "private struct NativeDemoSnapshot:", 1
+        )[0]
+        for value in (
+            "copy.learn", "copy.coach", "copy.social", "copy.profile",
+            "copy.myLearning", "copy.explore", "copy.friends", "copy.teams",
+            "copy.progressAndHistory", "copy.settings", "copy.accountDeletion",
+            "copy.resume", "copy.startSession", "copy.practiceAgain", "copy.submitAnswer",
+            "copy.retry", "copy.loading", "copy[.pendingCorrection]", "copy.confirmed",
+        ):
+            self.assertIn(value, root, value)
+        for value in (
+            "copy.learn", "copy.coach", "copy.social", "copy.profile",
+            "copy.myLearning", "copy.explore", "copy.friends", "copy.teams",
+            "copy.progressAndHistory", "copy.settings", "copy.resume",
+            "copy.submitAnswer", "copy.retry", "copy.pending", "copy.confirmed",
+        ):
+            self.assertIn(value, demo, value)
+        self.assertIn("NativeAppLanguagePicker()", root)
+        self.assertIn("NativeAppLanguagePicker()", demo)
+
+    def test_editorial_pilot_inherits_locale_and_content_language_disclosure(self):
+        self.assertIn("@Environment(\\.nativeInterfaceCopy) private var copy", self.pilot)
+        self.assertIn("Text(copy.contentLanguageNote)", self.pilot)
+        self.assertIn("French (France)", self.pilot)
+        self.assertIn("Text(lesson.hook)", self.pilot)
+        self.assertIn("Text(lesson.practice.prompt)", self.pilot)
+        self.assertIn("Text(source.supports)", self.pilot)
+        self.assertIn("date(markedReadAt, locale: copy.language.locale)", self.pilot)
+        self.assertNotIn("English interface labels", self.pilot)
+        self.assertIn("case .pendingCorrection: copy[.pendingCorrection]", self.app)
+        self.assertIn("case .corrected: copy.confirmed", self.app)
 
 
 if __name__ == "__main__":
