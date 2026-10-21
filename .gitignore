@@ -54,7 +54,10 @@ coverage/
 **/ios/Flutter/flutter_export_environment.sh
 **/ios/Runner.app.dSYM.zip
 *.ipa
-apps/apple/CertigoNative/CertigoNative.xcodeproj/xcuserdata/*/xcschemes/CertigoNative Local.xcscheme
+# Xcode user state and SwiftPM workspace state at any project/package depth.
+# Already tracked Package.resolved files remain versioned and checked for changes.
+**/xcuserdata/
+**/.swiftpm/
 
 # Android
 **/android/.gradle/

@@ -13,6 +13,55 @@ KIT = ROOT / "apps/apple/CertigoNative/Docs/APP_STORE_TESTFLIGHT_KIT.md"
 SCRIPT = ROOT / "tools/validate_apple_mac_one_shot.sh"
 
 
+@unittest.skipUnless(shutil.which("git"), "Git is required for real ignore/status checks")
+class AppleWorkspaceIgnoreTests(unittest.TestCase):
+    def test_xcode_ephemera_are_ignored_but_source_and_tracked_locks_stay_dirty(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            shutil.copyfile(ROOT / ".gitignore", repo / ".gitignore")
+
+            def git(*args):
+                return subprocess.run(
+                    ["git", "-C", str(repo), *args], check=True,
+                    text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                ).stdout
+
+            git("init", "--quiet")
+            lock = repo / "apps/apple/CertigoKit/.swiftpm/Package.resolved"
+            lock.parent.mkdir(parents=True)
+            lock.write_text('{"version": 3}\n')
+            git("add", ".gitignore")
+            git("add", "--force", str(lock))
+            git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture")
+            ephemeral = [
+                "xcuserdata/developer.xcuserdatad/UserInterfaceState.xcuserstate",
+                ".swiftpm/workspace-state.json",
+                ".DS_Store",
+                "apps/apple/CertigoNative/CertigoNative.xcodeproj/xcuserdata/user/state",
+                "apps/apple/CertigoNative/CertigoNative.xcodeproj/project.xcworkspace/"
+                "xcuserdata/user/state",
+                "apps/apple/CertigoKit/.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata",
+                "apps/apple/CertigoNative/.DS_Store",
+            ]
+            for relative in ephemeral:
+                path = repo / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("local state\n")
+                git("check-ignore", relative)
+            # Same cleanliness command used before pull and after every validation.
+            self.assertEqual(git("status", "--porcelain", "--untracked-files=all"), "")
+            lock.write_text('{"version": 4}\n')
+            source = repo / "apps/apple/CertigoNative/Sources/NewView.swift"
+            source.parent.mkdir(parents=True)
+            source.write_text("import SwiftUI\n")
+            status = git("status", "--porcelain", "--untracked-files=all")
+            self.assertIn(" M apps/apple/CertigoKit/.swiftpm/Package.resolved", status)
+            self.assertIn("?? apps/apple/CertigoNative/Sources/NewView.swift", status)
+            for relative in ephemeral:
+                self.assertNotIn(relative, status)
+
+
 class SubmissionMetadataTests(unittest.TestCase):
     def test_all_eight_locales_have_complete_fields_within_apple_limits(self):
         text = KIT.read_text(encoding="utf-8")
