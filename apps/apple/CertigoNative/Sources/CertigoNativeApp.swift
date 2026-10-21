@@ -164,7 +164,6 @@ struct NativeActivityDestination {
                     .frame(maxWidth: .infinity)
             }
             .background(NativePrism.canvas)
-            .symbolRenderingMode(.hierarchical)
         }
     }
 
@@ -187,7 +186,7 @@ struct NativeActivityDestination {
 
         var body: some View {
             VStack(alignment: .leading, spacing: 16) {
-                Text(title).font(.title2.bold()).accessibilityAddTraits(.isHeader)
+                Text(title).font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -255,12 +254,14 @@ struct NativeActivityDestination {
     struct NativeEntryHeading: View {
         let title: String
         let message: String
+        var prominent = false
 
         var body: some View {
             VStack(alignment: .leading, spacing: 16) {
                 Image(systemName: "book.pages")
-                    .font(.largeTitle).accessibilityHidden(true)
-                Text(title).font(.largeTitle.bold()).accessibilityAddTraits(.isHeader)
+                    .font(.title2).symbolRenderingMode(.monochrome).accessibilityHidden(true)
+                Text(title).font(prominent ? .largeTitle.bold() : .title2.bold())
+                    .accessibilityAddTraits(.isHeader)
                 Text(message).font(.body)
             }
             .padding(24)
@@ -293,7 +294,7 @@ struct NativeActivityDestination {
                 NativeReadingPage {
                     NativeEntryHeading(
                         title: "One question. A clearer idea.",
-                        message: "Explore Certigo’s native learning preview.")
+                        message: "Explore Certigo’s native learning preview.", prominent: true)
                     NativeReadingSection(title: "Try the learning experience") {
                         NativePrimaryButton(title: "Explore the demo", symbol: "play.circle") {
                             showDemo = true
@@ -937,7 +938,8 @@ struct NativeActivityDestination {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(.white)
                         .background(
-                            NativePrism.objectiveFill, in: RoundedRectangle(cornerRadius: 24))
+                            NativePrism.objectiveFill,
+                            in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                         VStack(alignment: .leading, spacing: 12) {
                             Text("The decision workshop").font(.title2.bold())
                             Text(goal.practice.intent)
@@ -1176,10 +1178,10 @@ struct NativeActivityDestination {
                                     )
                                     .background(
                                         Color(uiColor: .secondarySystemGroupedBackground),
-                                        in: RoundedRectangle(cornerRadius: 16)
+                                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     )
                                     .overlay {
-                                        RoundedRectangle(cornerRadius: 16)
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                                             .strokeBorder(
                                                 flow.selection == index
                                                     ? NativePrism.tint : Color(uiColor: .separator),
@@ -2056,6 +2058,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
     }
 
     private struct NativeRoot: View {
+        @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
         @Bindable var model: NativeModel
         @Binding var pendingLessonLink: EditorialPilotLessonLink?
         @State private var selectedTrack: String?
@@ -2180,7 +2183,17 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     )
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(.regularMaterial)
+                    .background {
+                        if reduceTransparency {
+                            NativePrism.surface
+                        } else {
+                            Rectangle().fill(.regularMaterial)
+                        }
+                    }
+                    .overlay(alignment: .top) {
+                        Rectangle().fill(NativePrism.edge).frame(height: 1)
+                            .accessibilityHidden(true)
+                    }
                 }
             }
             .alert(
@@ -2370,6 +2383,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             NavigationLink(value: track.id) {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Label(track.code, systemImage: "books.vertical")
+                                        .symbolRenderingMode(.hierarchical)
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(NativePrism.accent(for: track.code))
                                         .padding(.horizontal, 12)
@@ -2409,7 +2423,6 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
                 .background(NativePrism.canvas)
-                .symbolRenderingMode(.hierarchical)
                 .navigationTitle("Learn")
                 .modifier(
                     NativeCatalogSearch(
@@ -2472,8 +2485,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 {
                     let coverage = NativePathCoverage(
                         units: path.units.map { $0.lessons.map { $0.status.rawValue } })
-                    Text("\(coverage.remainingActivities) of \(coverage.totalActivities) activities remain")
-                        .font(.headline)
+                    Text(
+                        "\(coverage.remainingActivities) of \(coverage.totalActivities) activities remain"
+                    )
+                    .font(.headline)
                     ForEach(path.units) { unit in
                         LabeledContent(unit.title, value: "\(unit.lessons.count) activities")
                     }
@@ -2485,8 +2500,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
             }
             Section("Review & Practice") {
-                Text("Practice an available activity in your plan. Personalized review scheduling is not connected.")
-                    .foregroundStyle(.secondary)
+                Text(
+                    "Practice an available activity in your plan. Personalized review scheduling is not connected."
+                )
+                .foregroundStyle(.secondary)
                 Text("Confirmed corrections can be read again without starting a new attempt.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -2501,8 +2518,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         columns = .all
                         compactColumn = .content
                     }
-                    Text("Inspect the catalog summary, availability and declared content information. Browsing never changes your goal.")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                    Text(
+                        "Inspect the catalog summary, availability and declared content information. Browsing never changes your goal."
+                    )
+                    .font(.subheadline).foregroundStyle(.secondary)
                 } else {
                     Text("Choose an available certification in Explore to confirm a learning goal.")
                         .foregroundStyle(.secondary)
@@ -2731,7 +2750,6 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                     .scrollContentBackground(.hidden)
                     .background(NativePrism.canvas)
-                    .symbolRenderingMode(.hierarchical)
                     Section("Test connection") {
                         TextField("HTTPS API URL", text: $model.baseURL)
                             .textInputAutocapitalization(.never)
@@ -2764,6 +2782,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }) {
                     Section("Goal overview") {
                         Label(track.code, systemImage: "books.vertical")
+                            .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(NativePrism.accent(for: track.code))
                         Text(track.title).font(.title2.bold()).accessibilityAddTraits(.isHeader)
                         Text(track.summary)

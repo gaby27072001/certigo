@@ -237,18 +237,26 @@
                             Text(lesson.workedExample.situation)
                             ForEach(Array(lesson.workedExample.steps.enumerated()), id: \.offset) {
                                 item in
-                                LabeledContent("\(item.offset + 1)", value: item.element)
+                                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                    Text("\(item.offset + 1).").monospacedDigit()
+                                    Text(item.element)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
                             }
                             Text(lesson.workedExample.decision)
                                 .fontWeight(.medium)
                         }
                     }
 
-                    NativeReadingSection(title: "Formative practice · no answer recorded") {
+                    NativeReadingSection(title: "Self-check · no answer recorded") {
                         Text(lesson.practice.prompt)
                         ForEach(Array(lesson.practice.successCriteria.enumerated()), id: \.offset) {
                             item in
-                            Label(item.element, systemImage: "checkmark.circle")
+                            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                Text("\(item.offset + 1).").monospacedDigit()
+                                Text(item.element)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                         Text(lesson.practice.feedback)
                             .foregroundStyle(.secondary)

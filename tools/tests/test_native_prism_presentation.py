@@ -138,6 +138,24 @@ class NativePrismPresentationTests(unittest.TestCase):
             self.assertIn(marker, self.pilot)
         for old_label in ('"Marquer comme lue"', '"Écouter la leçon"', '"Fermer"'):
             self.assertNotIn(old_label, self.pilot)
+        criteria = self.pilot.split('title: "Self-check · no answer recorded"', 1)[1].split(
+            'title: "Takeaway"', 1
+        )[0]
+        self.assertNotIn("checkmark", criteria)
+        self.assertIn("item.offset + 1", criteria)
+
+    def test_busy_material_and_symbol_layers_respect_readability(self):
+        root = self.app.split("private struct NativeRoot:", 1)[1]
+        busy = root.split(".safeAreaInset(edge: .bottom)", 1)[1].split(
+            ".alert(", 1
+        )[0]
+        self.assertIn("if reduceTransparency", busy)
+        self.assertIn("NativePrism.surface", busy)
+        page = self.app.split("struct NativeReadingPage<", 1)[1].split(
+            "private struct NativeCatalogSearch:", 1
+        )[0]
+        self.assertNotIn(".symbolRenderingMode(.hierarchical)", page)
+        self.assertIn(".symbolRenderingMode(.monochrome)", self.app)
 
     def test_resuming_an_activity_never_reloads_it(self):
         resume = self.app.split("private func resumeCurrentActivity(", 1)[1].split(

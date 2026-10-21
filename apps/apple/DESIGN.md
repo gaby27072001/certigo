@@ -51,6 +51,10 @@ are centered and bounded at 700 points; answer choices have 16-point corners.
 Use opaque cards for a correction, a saved attempt or a worked example, not a card
 for every paragraph. Code can scroll horizontally without widening the reading
 column. The editorial catalog does not truncate lesson objectives.
+Authored interface labels are English, including the editorial pilot's controls,
+reading status, errors and section headings. Editorial lesson text and source
+descriptions retain their original French with an explicit language/provenance
+notice; interface language is not a content translation claim.
 
 `NavigationSplitView` and its selected-track/lesson bindings remain authoritative
 for connected learning, including compact-column resume. Its native selectable
@@ -111,10 +115,17 @@ Unknown data is not zero; completed activity is not exam competence. Coach and
 Social explain context and future privacy boundaries as prose rather than
 nonfunctional input fields, toggles, chat bubbles or people.
 
-Shared rounded surfaces use continuous Apple corners, hierarchical symbols and
-8/12/16/24-point internal rhythms. Native controls and opaque reading surfaces
+Shared rounded surfaces use continuous Apple corners and 8/12/16/24-point internal
+rhythms. Hierarchical symbols are limited to category labels on semantic surfaces;
+white-on-violet hero symbols remain opaque monochrome. The busy inset has a solid
+semantic fallback under Reduce Transparency. Self-check criteria are numbered
+neutrally, never shown as earned success checks. The objective action sits adjacent
+to the violet identity plane, not violet-on-violet inside it.
+Native controls and opaque reading surfaces
 retain precedence over decoration. `NATIVE_UI_BRIEF.md` maps all U01–U12 patterns
 and distinguishes source coverage, deferred service contracts and Apple-only
 acceptance. This is not a claim that every research capability is shipped.
+The follow-on `certigo-apple-ui-excellence-pass-2026-10-21.md` is applied
+semantically, not copied as a file replacement or treated as native render proof.
 
 See `NATIVE_UI_BRIEF.md` for the connected acceptance journey and validation limits.

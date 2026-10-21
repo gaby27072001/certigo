@@ -58,7 +58,7 @@ not profile settings; owner reset clears them. Navigation back does not clear
 them. No query is transmitted to a server.
 
 For motion M01–M22, source mechanisms cover M01 press, M02 selection, M03 native
-navigation, M04 goal/download confirmation, M05 synchronous local search,
+navigation, M04 existing download confirmation (not a new goal draft sheet), M05 synchronous local search,
 M06 explicit session loading, M07 static progress with real denominators,
 M08 pending, M09 confirmed correction, M10 error/retry, M18 explicit data refresh,
 M20 system layout and M22 existing authorized restoration/account boundaries.
