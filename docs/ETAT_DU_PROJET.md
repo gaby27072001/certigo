@@ -38,7 +38,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Fait observable | Valeur générée |
 |---|---|
 | Date de référence analysée | **2026-10-21** |
-| Commit de référence analysé | `bcf4762a7ee4270ed56cd0f4a83b111ee84b90e2` |
+| Commit de référence analysé | `6b08462dea0e0efbff5d6be023f0b6010fad2e2f` |
 | Flutter | **3.44.4** — aligné entre `ci-mobile` (app et goldens), Android et les deux workflows iOS Codemagic |
 | .NET CI | **8.0.x** |
 | Node.js outillage | **>=20** (`package.json#engines`) |
@@ -46,7 +46,7 @@ Les statuts fonctionnels ci-dessous sont narratifs et doivent être lus avec leu
 | Package public actif | **1622 fichiers** — `sha256:11b297c76d95fedf1e83284acbcb3398333761fe23cad14520b4f8eada9393bb` |
 | Package privé actif (`answerKey`) | **714 fichiers** — `sha256:7781a6d36add31223ea234c60808ded367d283c0d1f4a9a042cb1cdad71f9055` |
 | Workflows GitHub Actions | **31** fichiers : `cd-backend.yml`, `ci-backend.yml`, `ci-content-drift.yml`, `ci-content.yml`, `ci-cortex-parity.yml`, `ci-infra.yml`, `ci-migration-registry.yml`, `ci-mobile.yml`, `ci-preflight.yml`, `ci-project-state.yml`, `ciam-posture-monitor.yml`, `codeql.yml`, `content-infra-apply.yml`, `content-infra-what-if.yml`, `dependency-vuln-scan.yml`, `deploy-privacy-policy.yml`, `fork-pr-policy.yml`, `governance-bootstrap-phase-a-what-if.yml`, `governance-bootstrap-phase-b-what-if.yml`, `lint-workflows.yml`, `post-merge-cosmos-account-deletion.yml`, `pr-head-freshness.yml`, `promote-backend-staging-prod.yml`, `publish-verified-public-pages.yml`, `release-android.yml`, `release-ios.yml`, `runner-health.yml`, `runner-resilience-drill.yml`, `security-gate.yml`, `security-scan.yml`, `sync-ios-certs.yml` |
-| Tests découverts | **330 fichiers** — .NET : 4 projets / 132 fichiers ; Flutter/Dart : 6 racines / 180 fichiers ; Python : 1 racine / 18 fichier |
+| Tests découverts | **331 fichiers** — .NET : 4 projets / 132 fichiers ; Flutter/Dart : 6 racines / 180 fichiers ; Python : 1 racine / 19 fichier |
 | Corpus **historique** local | **91 pistes**, **147 leçons** sous `content/` — instantané de compatibilité, non actif |
 | Types pédagogiques canoniques | **8** : `mcq`, `multi`, `scenario`, `cloze`, `ordering`, `matchPairs`, `spotTheIssue`, `applied` (schéma JSON et `ItemType` C# alignés) |
 
