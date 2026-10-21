@@ -104,6 +104,17 @@ public struct AppInterfaceCopy: Sendable, Equatable {
     case progressAndHistory, settings, accountDeletion, pending, confirmed
     case signOut, cancel, done, back, continueLearning, answer, next, previous
     case offline, pendingCorrection, noHistory, deleteAccount, demo, chooseGoal
+    case categoryAll, categoryCloud, categoryAI, categoryApple, categoryData, categoryDevOps
+    case categoryCyber, categoryEnterprise, categoryOther, contentLanguageFR, contentLanguageEN
+    case recommendedReview, reviewReasonLowScore, reviewReasonDue, reviewReasonContinue, startReview
+    case explainWithCoach, coachWorkspaceTitle, coachExplaining, coachHeadline, coachKeyPoints
+    case coachRecommendation, coachPersonalization, coachSourceGrounded, coachPromptHint
+    case searchPlaceholder, noMatchingTracks, clearFilters, activeGoalBadge
+    case masteryNotStarted, masteryLearning, masteryPracticing, masteryMastered, masteryExamReady
+    case focusArea, startFocusSession, spacedRepetitionReview, startFinalAssessment, youreReady
+    case explainDifferently, whyWasIWrong, targetExamDate, initialLevel, dailyMinutesGoal
+    case levelBeginner, levelIntermediate, levelAdvanced, notifications, notificationsEnabled
+    case quietHours, preferredHour, maxPerDay, streakAlerts, questAlerts, leagueAlerts
     case practiceAvailable, practiceUnavailable, practiceUnavailableNote
   }
 
@@ -324,6 +335,274 @@ public struct AppInterfaceCopy: Sendable, Equatable {
       return (
         "Choisir un objectif", "Choose a goal", "लक्ष्य चुनें", "选择目标", "목표 선택", "Elegir un objetivo",
         "Scegli un obiettivo", "Ziel auswählen"
+      )
+    case .categoryAll:
+      return ("Toutes", "All", "सभी", "全部", "전체", "Todas", "Tutte", "Alle")
+    case .categoryCloud:
+      return ("Cloud", "Cloud", "क्लाउड", "云计算", "클라우드", "Nube", "Cloud", "Cloud")
+    case .categoryAI:
+      return (
+        "Intelligence artificielle", "Artificial intelligence", "कृत्रिम बुद्धिमत्ता", "人工智能", "인공지능",
+        "Inteligencia artificial", "Intelligenza artificiale", "Künstliche Intelligenz"
+      )
+    case .categoryApple:
+      return (
+        "Écosystème Apple", "Apple ecosystem", "Apple इकोसिस्टम", "Apple 生态系统", "Apple 생태계",
+        "Ecosistema Apple", "Ecosistema Apple", "Apple-Ökosystem"
+      )
+    case .categoryData:
+      return ("Données", "Data", "डेटा", "数据", "데이터", "Datos", "Dati", "Daten")
+    case .categoryDevOps:
+      return (
+        "Développement et opérations", "Development & operations", "विकास और संचालन", "开发与运维",
+        "개발 및 운영", "Desarrollo y operaciones", "Sviluppo e operazioni", "Entwicklung und Betrieb"
+      )
+    case .categoryCyber:
+      return (
+        "Cybersécurité", "Cybersecurity", "साइबर सुरक्षा", "网络安全", "사이버 보안", "Ciberseguridad",
+        "Sicurezza informatica", "Cybersicherheit"
+      )
+    case .categoryEnterprise:
+      return ("Entreprise", "Enterprise", "उद्यम", "企业", "기업", "Empresa", "Impresa", "Unternehmen")
+    case .categoryOther:
+      return ("Autres", "Other", "अन्य", "其他", "기타", "Otras", "Altre", "Sonstige")
+    case .contentLanguageFR:
+      return (
+        "Contenu en français", "Content in French", "फ़्रेंच में सामग्री", "法语内容", "프랑스어 콘텐츠",
+        "Contenido en francés", "Contenuti in francese", "Inhalte auf Französisch"
+      )
+    case .contentLanguageEN:
+      return (
+        "Contenu en anglais", "Content in English", "अंग्रेज़ी में सामग्री", "英语内容", "영어 콘텐츠",
+        "Contenido en inglés", "Contenuti in inglese", "Inhalte auf Englisch"
+      )
+    case .recommendedReview:
+      return (
+        "Révision recommandée", "Recommended review", "सुझाया गया पुनराभ्यास", "推荐复习", "추천 복습",
+        "Repaso recomendado", "Ripasso consigliato", "Empfohlene Wiederholung"
+      )
+    case .reviewReasonLowScore:
+      return (
+        "Renforcer un résultat plus faible", "Improve a lower score", "कम अंक वाले विषय को मज़बूत करें",
+        "巩固得分较低的内容", "낮은 점수 보완하기", "Mejorar una puntuación baja", "Migliora un risultato più basso",
+        "Ein schwächeres Ergebnis verbessern"
+      )
+    case .reviewReasonDue:
+      return (
+        "Révision à reprendre", "Review to revisit", "फिर से अभ्यास करने का विषय", "待复习内容", "다시 복습할 내용",
+        "Repaso pendiente", "Ripasso da riprendere", "Anstehende Wiederholung"
+      )
+    case .reviewReasonContinue:
+      return (
+        "Poursuivre l’apprentissage", "Continue learning", "सीखना जारी रखें", "继续学习", "계속 학습하기",
+        "Seguir aprendiendo", "Continua a imparare", "Weiterlernen"
+      )
+    case .startReview:
+      return (
+        "Commencer la révision", "Start review", "पुनराभ्यास शुरू करें", "开始复习", "복습 시작", "Empezar repaso",
+        "Inizia il ripasso", "Wiederholung starten"
+      )
+    case .explainWithCoach:
+      return (
+        "Expliquer avec le coach", "Explain with Coach", "मार्गदर्शक से समझें", "请教学习教练", "코치에게 설명 요청",
+        "Explicar con el entrenador", "Chiedi una spiegazione al coach", "Vom Coach erklären lassen"
+      )
+    case .coachWorkspaceTitle:
+      return (
+        "Coach pédagogique", "Learning coach", "अध्ययन मार्गदर्शक", "学习教练", "학습 코치",
+        "Entrenador de aprendizaje", "Coach di apprendimento", "Lerncoach"
+      )
+    case .coachExplaining:
+      return (
+        "Préparation de l’explication…", "Preparing an explanation…", "समझाया जा रहा है…", "正在准备讲解…",
+        "설명 준비 중…", "Preparando una explicación…", "Preparazione della spiegazione…",
+        "Erklärung wird vorbereitet…"
+      )
+    case .coachHeadline:
+      return (
+        "Comprendre la réponse", "Understand the answer", "उत्तर को समझें", "理解答案", "답안 이해하기",
+        "Entender la respuesta", "Comprendi la risposta", "Die Antwort verstehen"
+      )
+    case .coachKeyPoints:
+      return (
+        "Points clés", "Key points", "मुख्य बातें", "要点", "핵심 내용", "Puntos clave", "Punti chiave",
+        "Kernpunkte"
+      )
+    case .coachRecommendation:
+      return (
+        "Prochaine étape conseillée", "Recommended next step", "सुझाया गया अगला कदम", "建议下一步",
+        "추천 다음 단계", "Siguiente paso recomendado", "Prossimo passo consigliato",
+        "Empfohlener nächster Schritt"
+      )
+    case .coachPersonalization:
+      return (
+        "Selon votre historique", "Based on your history", "आपके इतिहास के आधार पर", "根据你的学习记录",
+        "내 학습 기록 기반", "Según tu historial", "In base alla tua cronologia",
+        "Basierend auf deinem Verlauf"
+      )
+    case .coachSourceGrounded:
+      return (
+        "Explication fondée sur le contenu", "Content-grounded explanation", "सामग्री पर आधारित स्पष्टीकरण",
+        "基于学习内容的讲解", "학습 콘텐츠에 근거한 설명", "Explicación basada en el contenido",
+        "Spiegazione basata sui contenuti", "Auf Lerninhalten basierende Erklärung"
+      )
+    case .coachPromptHint:
+      return (
+        "Répondez à une question pour demander une explication.",
+        "Answer a question to request an explanation.", "स्पष्टीकरण माँगने के लिए किसी प्रश्न का उत्तर दें।",
+        "回答一道题目后即可请求讲解。", "문제에 답한 뒤 설명을 요청하세요.",
+        "Responde una pregunta para pedir una explicación.",
+        "Rispondi a una domanda per richiedere una spiegazione.",
+        "Beantworte eine Frage, um eine Erklärung anzufordern."
+      )
+    case .searchPlaceholder:
+      return (
+        "Rechercher une certification", "Search certifications", "प्रमाणन खोजें", "搜索认证", "인증 검색",
+        "Buscar certificaciones", "Cerca certificazioni", "Zertifizierungen suchen"
+      )
+    case .noMatchingTracks:
+      return (
+        "Aucun parcours correspondant", "No matching tracks", "कोई मिलता-जुलता पाठ्यक्रम नहीं", "没有匹配的学习路径",
+        "일치하는 학습 경로 없음", "No hay itinerarios coincidentes", "Nessun percorso corrispondente",
+        "Keine passenden Lernpfade"
+      )
+    case .clearFilters:
+      return (
+        "Effacer les filtres", "Clear filters", "फ़िल्टर हटाएँ", "清除筛选", "필터 지우기", "Borrar filtros",
+        "Rimuovi filtri", "Filter zurücksetzen"
+      )
+    case .activeGoalBadge:
+      return (
+        "Objectif actif", "Active goal", "सक्रिय लक्ष्य", "当前目标", "현재 목표", "Objetivo activo",
+        "Obiettivo attivo", "Aktuelles Ziel"
+      )
+    case .masteryNotStarted:
+      return (
+        "Non commencé", "Not started", "अभी शुरू नहीं किया", "未开始", "시작 전", "Sin empezar", "Non iniziato",
+        "Noch nicht begonnen"
+      )
+    case .masteryLearning:
+      return (
+        "En apprentissage", "Learning", "सीख रहे हैं", "学习中", "학습 중", "Aprendiendo", "In apprendimento",
+        "Im Lernen"
+      )
+    case .masteryPracticing:
+      return (
+        "En pratique", "Practicing", "अभ्यास कर रहे हैं", "练习中", "연습 중", "Practicando",
+        "In esercitazione", "Im Üben"
+      )
+    case .masteryMastered:
+      return (
+        "Maîtrisé", "Mastered", "महारत हासिल", "已掌握", "숙달", "Dominado", "Padroneggiato", "Beherrscht"
+      )
+    case .masteryExamReady:
+      return (
+        "Préparation consolidée", "Exam ready", "परीक्षा की तैयारी पूरी", "考试准备就绪", "시험 준비 완료",
+        "Preparación consolidada", "Pronto per l’esame", "Prüfungsbereit"
+      )
+    case .focusArea:
+      return (
+        "Domaine à renforcer", "Focus area", "ध्यान देने का क्षेत्र", "重点提升领域", "집중 학습 영역", "Área de enfoque",
+        "Area su cui concentrarsi", "Schwerpunktbereich"
+      )
+    case .startFocusSession:
+      return (
+        "Renforcer ce domaine", "Start focus session", "केंद्रित सत्र शुरू करें", "开始专项学习", "집중 학습 시작",
+        "Iniciar sesión de refuerzo", "Inizia una sessione mirata",
+        "Schwerpunkt-Lerneinheit starten"
+      )
+    case .spacedRepetitionReview:
+      return (
+        "Révision espacée", "Spaced repetition review", "अंतराल पर पुनराभ्यास", "间隔复习", "간격 반복 복습",
+        "Repaso espaciado", "Ripasso a intervalli", "Verteilte Wiederholung"
+      )
+    case .startFinalAssessment:
+      return (
+        "Commencer l’évaluation finale", "Start final assessment", "अंतिम मूल्यांकन शुरू करें", "开始最终测评",
+        "최종 평가 시작", "Iniciar evaluación final", "Inizia la valutazione finale",
+        "Abschlussbewertung starten"
+      )
+    case .youreReady:
+      return (
+        "Vous êtes prêt", "You’re ready", "आप तैयार हैं", "你已准备就绪", "준비가 되었습니다", "Estás listo",
+        "Sei pronto", "Du bist bereit"
+      )
+    case .explainDifferently:
+      return (
+        "Expliquer autrement", "Explain differently", "अलग तरह से समझाएँ", "换个方式解释", "다른 방식으로 설명",
+        "Explicar de otra forma", "Spiega diversamente", "Anders erklären"
+      )
+    case .whyWasIWrong:
+      return (
+        "Pourquoi cette erreur ?", "Why was I wrong?", "मेरा उत्तर गलत क्यों था?", "我为什么答错了？", "왜 틀렸나요?",
+        "¿Por qué me equivoqué?", "Perché ho sbagliato?", "Warum war meine Antwort falsch?"
+      )
+    case .targetExamDate:
+      return (
+        "Date cible d’examen", "Target exam date", "परीक्षा की लक्ष्य तिथि", "目标考试日期", "목표 시험 날짜",
+        "Fecha objetivo del examen", "Data prevista dell’esame", "Angestrebter Prüfungstermin"
+      )
+    case .initialLevel:
+      return (
+        "Niveau initial", "Initial level", "शुरुआती स्तर", "初始水平", "시작 수준", "Nivel inicial",
+        "Livello iniziale", "Ausgangsniveau"
+      )
+    case .dailyMinutesGoal:
+      return (
+        "Objectif quotidien en minutes", "Daily minutes goal", "दैनिक मिनटों का लक्ष्य", "每日学习分钟目标",
+        "일일 학습 시간 목표(분)", "Objetivo diario en minutos", "Obiettivo giornaliero in minuti",
+        "Tägliches Lernziel in Minuten"
+      )
+    case .levelBeginner:
+      return (
+        "Débutant", "Beginner", "शुरुआती", "初学者", "초급", "Principiante", "Principiante", "Anfänger"
+      )
+    case .levelIntermediate:
+      return (
+        "Intermédiaire", "Intermediate", "मध्यम", "中级", "중급", "Intermedio", "Intermedio",
+        "Fortgeschritten"
+      )
+    case .levelAdvanced:
+      return ("Avancé", "Advanced", "उन्नत", "高级", "고급", "Avanzado", "Avanzato", "Erfahren")
+    case .notifications:
+      return (
+        "Notifications", "Notifications", "सूचनाएँ", "通知", "알림", "Notificaciones", "Notifiche",
+        "Benachrichtigungen"
+      )
+    case .notificationsEnabled:
+      return (
+        "Activer les notifications", "Enable notifications", "सूचनाएँ चालू करें", "启用通知", "알림 사용",
+        "Activar notificaciones", "Attiva notifiche", "Benachrichtigungen aktivieren"
+      )
+    case .quietHours:
+      return (
+        "Heures de silence", "Quiet hours", "शांत समय", "免打扰时段", "방해 금지 시간", "Horas de silencio",
+        "Orario silenzioso", "Ruhezeiten"
+      )
+    case .preferredHour:
+      return (
+        "Heure préférée", "Preferred hour", "पसंदीदा समय", "首选时间", "선호 시간", "Hora preferida",
+        "Orario preferito", "Bevorzugte Uhrzeit"
+      )
+    case .maxPerDay:
+      return (
+        "Maximum par jour", "Maximum per day", "प्रति दिन अधिकतम", "每日上限", "일일 최대 횟수", "Máximo por día",
+        "Massimo al giorno", "Höchstens pro Tag"
+      )
+    case .streakAlerts:
+      return (
+        "Rappels de série", "Streak reminders", "लगातार अभ्यास के अनुस्मारक", "连续学习提醒", "연속 학습 알림",
+        "Recordatorios de racha", "Promemoria serie", "Serienerinnerungen"
+      )
+    case .questAlerts:
+      return (
+        "Rappels de quêtes", "Quest reminders", "मिशन अनुस्मारक", "任务提醒", "퀘스트 알림",
+        "Recordatorios de misiones", "Promemoria missioni", "Aufgabenerinnerungen"
+      )
+    case .leagueAlerts:
+      return (
+        "Rappels de ligue", "League reminders", "लीग अनुस्मारक", "联赛提醒", "리그 알림",
+        "Recordatorios de liga", "Promemoria lega", "Ligaerinnerungen"
       )
     }
   }
