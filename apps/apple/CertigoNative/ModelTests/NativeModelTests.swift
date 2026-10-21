@@ -101,11 +101,39 @@
         }
     }
     private actor ModelTransport: HTTPTransport, BoundedHTTPTransport {
+        private var services: [String: Data] = [:]
+        private var servicePosts: [String: [Data]] = [:]
+        private var lostServiceResponse: String?
+        private var pausedService: String?
+        private var serviceWaiter: CheckedContinuation<Void, Never>?
+        func service(_ path: String, json: String) { services[path] = Data(json.utf8) }
+        func servicePayloads(_ path: String) -> [Data] { servicePosts[path] ?? [] }
+        func loseServiceResponse(_ path: String) { lostServiceResponse = path }
+        func suspendService(_ path: String) { pausedService = path }
+        func serviceWaiting() -> Bool { serviceWaiter != nil }
+        func resumeService() {
+            pausedService = nil
+            serviceWaiter?.resume()
+            serviceWaiter = nil
+        }
         private var historyPages: [String: Data] = [:]
         private var historyStatus = 200
         private var historyRequests = 0
         private var pauseHistory = false
         private var historyWaiters: [CheckedContinuation<Void, Never>] = []
+        private var tutorPosts: [Data] = []
+        private var tutorStatus = 200
+        private var pauseTutor = false
+        private var tutorWaiter: CheckedContinuation<Void, Never>?
+        func tutorPayloads() -> [Data] { tutorPosts }
+        func failTutor(_ status: Int) { tutorStatus = status }
+        func suspendTutor() { pauseTutor = true }
+        func tutorWaiting() -> Bool { tutorWaiter != nil }
+        func resumeTutor() {
+            pauseTutor = false
+            tutorWaiter?.resume()
+            tutorWaiter = nil
+        }
         func setHistory(_ data: Data, cursor: String = "") { historyPages[cursor] = data }
         func failHistory(_ status: Int) { historyStatus = status }
         func suspendHistory(_ value: Bool) { pauseHistory = value }
@@ -274,7 +302,40 @@
             let bytes: Data
             var status = 200
             var headers = ["Content-Type": "application/json"]
-            if url.path.hasSuffix("/me/history") {
+            if let response = services[url.path] {
+                if let payload = request.httpBody {
+                    servicePosts[url.path, default: []].append(payload)
+                }
+                if pausedService == url.path {
+                    await withCheckedContinuation { serviceWaiter = $0 }
+                }
+                if lostServiceResponse == url.path {
+                    lostServiceResponse = nil
+                    throw URLError(.networkConnectionLost)
+                }
+                if offline { throw URLError(.notConnectedToInternet) }
+                bytes = response
+            } else if url.path.hasSuffix("/tutor/explain") {
+                guard request.httpMethod == "POST", let payload = request.httpBody,
+                    let object = try JSONSerialization.jsonObject(with: payload) as? [String: Any],
+                    let itemID = object["itemId"] as? String
+                else { throw APIError.invalidResponse }
+                tutorPosts.append(payload)
+                let capturedStatus = tutorStatus
+                if pauseTutor { await withCheckedContinuation { tutorWaiter = $0 } }
+                if offline { throw URLError(.notConnectedToInternet) }
+                status = capturedStatus
+                bytes = Data(
+                    """
+                    {"itemId":"\(itemID)","conceptId":"fixture-concept","correct":false,
+                    "headline":"Synthetic explanation","points":["A grounded point"],
+                    "encouragement":"Keep practising","recommendation":"Review the concept",
+                    "citedConceptIds":["fixture-concept"],"source":"grounded",
+                    "personalization":{"attempts":2,"errors":1,"accuracyPct":50,
+                    "recurringStruggle":false,"masteredBefore":false,"trend":"stable",
+                    "topConfusedOption":null}}
+                    """.utf8)
+            } else if url.path.hasSuffix("/me/history") {
                 historyRequests += 1
                 let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
                 let cursor = query?.first(where: { $0.name == "cursor" })?.value ?? ""
@@ -501,6 +562,9 @@
     @main private struct NativeModelTests {
         @MainActor static func main() async throws {
             let resources = URL(fileURLWithPath: CommandLine.arguments[1])
+            try await internationalLearningServices(resources)
+            try await assessmentPersistenceAndRetry(resources)
+            try await tutorRequiresConfirmationAndRejectsStaleResponses(resources)
             try await historyPaginationAndLocalWork(resources)
             try await historyErrorsAndDeletion(resources)
             try await historyRefreshAndOwnerRaces(resources)
@@ -548,6 +612,290 @@
         }
         static func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw ModelTestFailure.assertion(message) }
+        }
+
+        @MainActor static func internationalLearningServices(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            await fixture.server.setGoal("track")
+            let model = try await prepareDraft(fixture)
+            let plan = try CertigoStudyPlanPreference(
+                initialLevel: .intermediate, dailyMinutesGoal: 17)
+            model.saveStudyPlan(plan, ownerID: "wrong-owner", trackID: "track")
+            try expect(model.studyPlan == nil && model.studyPlanError, "Stale plan write accepted")
+            model.saveStudyPlan(plan, ownerID: "server-owner-A", trackID: "track")
+            try expect(model.studyPlan == plan && !model.studyPlanError, "Study plan did not save")
+            let reopened = fixture.model(authenticated: false)
+            reopened.baseURL = "https://example.invalid/api"
+            reopened.token = "synthetic-A"
+            await reopened.connect()
+            try expect(reopened.studyPlan == plan, "Scoped study plan did not restore")
+            await fixture.server.setOwner("server-owner-B")
+            await reopened.disconnect()
+            reopened.token = "synthetic-B"
+            await reopened.connect()
+            try expect(reopened.studyPlan == nil, "Study plan crossed accounts")
+            guard
+                let key = fixture.defaults.dictionaryRepresentation().keys.first(where: {
+                    $0.hasPrefix("certigo.native.study-plan.")
+                })
+            else { throw ModelTestFailure.assertion("Scoped study-plan key absent") }
+            fixture.defaults.set(Data("malformed".utf8), forKey: key)
+            model.loadStudyPlan()
+            try expect(
+                model.studyPlanError && model.studyPlan == nil,
+                "Corrupt study plan looked like a valid default")
+
+            await fixture.server.service(
+                "/api/me/recommendations/track",
+                json:
+                    #"{"trackId":"track","generatedAt":"2026-10-20T00:00:00Z","items":[]}"#)
+            await fixture.server.service(
+                "/api/achievements",
+                json:
+                    #"{"unlocked":0,"total":0,"achievements":[]}"#)
+            await fixture.server.service(
+                "/api/quests",
+                json:
+                    #"{"date":"2026-10-20","gems":0,"quests":[]}"#)
+            let settingsJSON = """
+                {"enabled":false,"utcOffsetMinutes":0,"quietHoursStart":22,"quietHoursEnd":7,
+                "preferredHour":18,"maxPerDay":2,"streakAlerts":true,"questAlerts":true,
+                "leagueAlerts":false}
+                """
+            await fixture.server.service("/api/me/notifications/settings", json: settingsJSON)
+            await fixture.server.service(
+                "/api/me/notifications/plan",
+                json:
+                    #"{"localDate":"2026-10-20","notifications":[]}"#)
+            await reopened.refreshLearningInsights()
+            try expect(
+                reopened.recommendations?.items.isEmpty == true
+                    && reopened.achievementBoard?.total == 0 && reopened.questBoard != nil
+                    && reopened.notificationSettings?.enabled == false
+                    && reopened.notificationPlan != nil && reopened.insightFailures.isEmpty,
+                "Confirmed services were not published")
+            guard let settings = reopened.notificationSettings else {
+                throw ModelTestFailure.assertion("Notification settings absent")
+            }
+            await reopened.saveNotificationSettings(settings, ownerID: "server-owner-A")
+            try expect(
+                await fixture.server.servicePayloads("/api/me/notifications/settings").isEmpty,
+                "Stale owner replaced notification preferences")
+            await reopened.saveNotificationSettings(settings, ownerID: "server-owner-B")
+            try expect(
+                await fixture.server.servicePayloads("/api/me/notifications/settings").count == 1,
+                "Explicit notification save was not sent")
+            await fixture.server.suspendService("/api/achievements")
+            let loading = Task { await reopened.refreshLearningInsights() }
+            for _ in 0..<10_000 {
+                if await fixture.server.serviceWaiting() { break }
+                await Task.yield()
+            }
+            try expect(await fixture.server.serviceWaiting(), "Insights did not suspend")
+            await reopened.disconnect()
+            await fixture.server.resumeService()
+            await loading.value
+            try expect(
+                reopened.profile == nil && reopened.recommendations == nil
+                    && reopened.achievementBoard == nil && reopened.notificationSettings == nil
+                    && !reopened.insightsLoading,
+                "Late insights crossed sign-out")
+        }
+
+        @MainActor static func assessmentPersistenceAndRetry(_ resources: URL) async throws {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            await fixture.server.setGoal("fixture:foundations")
+            let model = try await prepareDraft(fixture)
+            let examJSON = """
+                {"examId":"synthetic-exam","trackId":"fixture:foundations","trackCode":"AZ-SYNTHETIC",
+                "trackTitle":"Synthetic","timeLimitSeconds":600,"passingScore":700,
+                "blueprint":[],"items":[{"itemId":"exam-item","lessonId":"lesson",
+                "domainId":"synthetic-domain","type":"mcq","stem":"Synthetic assessment?",
+                "options":[{"id":"yes","label":"Yes"},{"id":"no","label":"No"}]}],
+                "publicManifestId":null}
+                """
+            let resultJSON = """
+                {"attemptId":"server-exam-attempt","examId":"synthetic-exam",
+                "scaledScore":1000,"pct":100,"passed":true,"passingScore":700,
+                "correct":1,"total":1,"domains":[],"results":[
+                {"itemId":"exam-item","conceptId":"synthetic-concept","correct":true,
+                "correctAnswer":["yes"],"explanation":"Synthetic feedback","masteryDelta":0.1}],
+                "rewards":{"xpEarned":20,"newXp":20,"levelUp":false,
+                "streakExtended":false,"gemsEarned":0,"achievementsUnlocked":[]},
+                "weakConcepts":[]}
+                """
+            await fixture.server.service("/api/exam/generate", json: examJSON)
+            await fixture.server.service("/api/exam/submit", json: resultJSON)
+            await model.generateMockExam()
+            try expect(
+                model.examSnapshot != nil && !model.canSubmitMockExam,
+                "Unanswered assessment became submittable")
+            model.selectExamOption(itemID: "exam-item", optionID: "unknown")
+            try expect(
+                model.examSnapshot?.selections.isEmpty == true, "Unknown exam option accepted")
+            model.selectExamOption(itemID: "exam-item", optionID: "yes")
+            try expect(model.canSubmitMockExam, "Answered assessment stayed blocked")
+            await fixture.server.loseServiceResponse("/api/exam/submit")
+            await model.submitMockExam()
+            try expect(
+                model.examSnapshot?.submission != nil && model.examSnapshot?.result == nil
+                    && model.examError, "Lost response did not retain submission fence")
+            let attempt = model.examSnapshot?.attemptId
+            let reopened = fixture.model(authenticated: false)
+            reopened.baseURL = "https://example.invalid/api"
+            reopened.token = "synthetic-A"
+            await reopened.connect()
+            reopened.restoreMockExam()
+            try expect(
+                reopened.examSnapshot?.attemptId == attempt, "Assessment attempt changed on restart"
+            )
+            reopened.selectExamOption(itemID: "exam-item", optionID: "no")
+            try expect(
+                reopened.examSnapshot?.selections["exam-item"] == "yes",
+                "Unresolved assessment answers were editable")
+            await reopened.submitMockExam()
+            let payloads = await fixture.server.servicePayloads("/api/exam/submit")
+            try expect(payloads.count == 2, "Assessment was not explicitly retried")
+            let first = try CertigoAPI.decoder().decode(
+                SubmitMockExamRequest.self, from: payloads[0])
+            let second = try CertigoAPI.decoder().decode(
+                SubmitMockExamRequest.self, from: payloads[1])
+            try expect(
+                first == second && reopened.examSnapshot?.result?.pct == 100,
+                "Assessment retry changed request or failed to confirm")
+            guard var snapshot = reopened.examSnapshot else {
+                throw ModelTestFailure.assertion("Confirmed assessment absent")
+            }
+            _ = try snapshot.validated(
+                owner: "server-owner-A", scope: snapshot.apiScope, now: fixture.time)
+            snapshot.selections["exam-item"] = "unknown"
+            do {
+                _ = try snapshot.validated(
+                    owner: "server-owner-A", scope: snapshot.apiScope, now: fixture.time)
+                throw ModelTestFailure.assertion("Corrupt assessment restored")
+            } catch NativeResumeError.malformed {}
+            reopened.discardMockExam()
+            reopened.restoreMockExam()
+            try expect(reopened.examSnapshot == nil, "Discarded assessment restored")
+            await fixture.server.service(
+                "/api/exam/generate",
+                json: """
+                    {"examId":"empty","trackId":"fixture:foundations","trackCode":"EMPTY","trackTitle":"Empty",
+                    "timeLimitSeconds":0,"passingScore":700,"blueprint":[],"items":[]}
+                    """)
+            await reopened.generateMockExam()
+            try expect(
+                reopened.examSnapshot?.exam.items.isEmpty == true
+                    && !reopened.canSubmitMockExam, "Empty assessment became playable")
+            reopened.discardMockExam()
+            await fixture.server.service(
+                "/api/exam/generate",
+                json:
+                    examJSON.replacingOccurrences(of: #""type":"mcq""#, with: #""type":"ordering""#)
+            )
+            await reopened.generateMockExam()
+            try expect(
+                reopened.examUnsupported && reopened.examSnapshot == nil,
+                "Unsupported assessment silently rendered as MCQ")
+            reopened.discardMockExam()
+            await fixture.server.service("/api/exam/generate", json: examJSON)
+            await fixture.server.suspendService("/api/exam/generate")
+            let loading = Task { await reopened.generateMockExam() }
+            for _ in 0..<10_000 {
+                if await fixture.server.serviceWaiting() { break }
+                await Task.yield()
+            }
+            try expect(await fixture.server.serviceWaiting(), "Assessment did not suspend")
+            await reopened.disconnect()
+            await fixture.server.resumeService()
+            await loading.value
+            try expect(
+                reopened.examSnapshot == nil && !reopened.examBusy,
+                "Assessment response survived sign-out")
+        }
+
+        @MainActor static func tutorRequiresConfirmationAndRejectsStaleResponses(_ resources: URL)
+            async throws
+        {
+            let fixture = try ModelFixture(resources: resources)
+            defer { fixture.cleanup() }
+            let model = fixture.model(authenticated: false)
+            model.baseURL = "https://example.invalid/api"
+            model.token = "synthetic-token"
+            await model.connect()
+            guard let track = model.tracks.first else {
+                throw ModelTestFailure.assertion("Tutor fixture catalog missing")
+            }
+            await model.loadPath(track)
+            guard let node = model.path?.units.first?.lessons.first else {
+                throw ModelTestFailure.assertion("Tutor fixture path missing")
+            }
+            await model.loadLesson(node)
+            guard let question = model.lesson?.questions.first, let option = question.options.first
+            else { throw ModelTestFailure.assertion("Tutor fixture question missing") }
+            await model.requestTutorExplanation(itemId: question.id)
+            try expect(
+                await fixture.server.tutorPayloads().isEmpty, "Unconfirmed answer sent to Coach")
+            model.select(option, question: question)
+            await model.submit()
+            guard case .corrected = model.outcome else {
+                throw ModelTestFailure.assertion("Tutor fixture correction missing")
+            }
+            await model.requestTutorExplanation(itemId: "unrelated-item")
+            try expect(await fixture.server.tutorPayloads().isEmpty, "Unrelated item sent to Coach")
+            await model.requestTutorExplanation(itemId: question.id)
+            try expect(
+                model.tutorExplanation?.itemId == question.id, "Confirmed Coach explanation missing"
+            )
+            let payloads = await fixture.server.tutorPayloads()
+            let payload = try JSONSerialization.jsonObject(with: payloads[0]) as? [String: Any]
+            try expect(
+                payload?["selected"] as? [String] == [option.id]
+                    && payload?["publicManifestId"] as? String == model.lesson?.publicManifestId
+                    && payload?["userId"] == nil,
+                "Coach changed submitted answer, pin or identity boundary")
+            await fixture.server.failTutor(503)
+            await model.requestTutorExplanation(itemId: question.id)
+            try expect(
+                model.tutorExplanation == nil && model.tutorExplanationError != nil
+                    && !model.isRequestingTutorExplanation,
+                "Coach failure looked successful or blocked retries")
+            await fixture.server.failTutor(200)
+            await fixture.server.suspendTutor()
+            let pending = Task { await model.requestTutorExplanation(itemId: question.id) }
+            for _ in 0..<10_000 {
+                if await fixture.server.tutorWaiting() { break }
+                await Task.yield()
+            }
+            try expect(await fixture.server.tutorWaiting(), "Coach did not reach suspension")
+            let count = await fixture.server.tutorPayloads().count
+            await model.requestTutorExplanation(itemId: question.id)
+            try expect(
+                await fixture.server.tutorPayloads().count == count, "Duplicate Coach request")
+            await model.loadLesson(node)
+            await fixture.server.resumeTutor()
+            await pending.value
+            try expect(
+                model.tutorExplanation == nil && !model.isRequestingTutorExplanation,
+                "Old lesson Coach response was republished")
+            model.select(option, question: question)
+            await model.submit()
+            await fixture.server.suspendTutor()
+            let signingOut = Task { await model.requestTutorExplanation(itemId: question.id) }
+            for _ in 0..<10_000 {
+                if await fixture.server.tutorWaiting() { break }
+                await Task.yield()
+            }
+            try expect(await fixture.server.tutorWaiting(), "Second Coach request did not suspend")
+            await model.disconnect()
+            await fixture.server.resumeTutor()
+            await signingOut.value
+            try expect(
+                model.profile == nil && model.tutorExplanation == nil
+                    && !model.isRequestingTutorExplanation,
+                "Signed-out Coach response leaked into the session")
         }
 
         static func historyPage(
