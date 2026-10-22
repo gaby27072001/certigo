@@ -4146,16 +4146,21 @@ enum NativeLearningDuration {
                         title: copy.native(.demoFictionalSituation), text: goal.practice.situation)
                     Label(copy.native(.demoNoGrade), systemImage: "text.bubble")
                     Label(copy.native(.demoLocalRestore), systemImage: "clock.arrow.circlepath")
-                    DemoPrimaryButton(title: copy[.chooseGoal], symbol: "scope") {
-                        flow.choose(goal)
-                        learnSection = .myLearning
-                        catalogPath = []
-                        objectivePath = []
-                        tab = .objective
-                    }
                 }
                 .padding(20)
                 .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
+            }
+            .safeAreaInset(edge: .bottom) {
+                DemoPrimaryButton(title: copy[.chooseGoal], symbol: "scope") {
+                    flow.choose(goal)
+                    learnSection = .myLearning
+                    catalogPath = []
+                    objectivePath = []
+                    tab = .objective
+                }
+                .padding(.horizontal, 20).padding(.vertical, 12)
+                .frame(maxWidth: 680).frame(maxWidth: .infinity)
+                .background(Color(uiColor: .systemGroupedBackground))
             }
             .navigationTitle(copy.native(.goalOverview)).navigationBarTitleDisplayMode(.inline)
         }
@@ -4268,14 +4273,6 @@ enum NativeLearningDuration {
                             }
                             Text(copy.native(.demoEditableHint))
                                 .font(.subheadline).foregroundStyle(.secondary)
-                            DemoPrimaryButton(
-                                title: "\(copy.submitAnswer) · \(copy[.demo])", symbol: "paperplane"
-                            ) {
-                                flow.submit()
-                            }
-                            .disabled(!flow.canSubmit)
-                            .accessibilityHint(copy.native(.demoChooseBeforeContinue))
-                            .accessibilityIdentifier("demo-submit")
                         case .pending:
                             Label {
                                 Text("\(copy.pending) · \(copy[.demo])")
@@ -4351,6 +4348,21 @@ enum NativeLearningDuration {
                 .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
             }
             .background(Color(uiColor: .systemGroupedBackground))
+            .safeAreaInset(edge: .bottom) {
+                if flow.practice != nil, flow.phase == .answering {
+                    DemoPrimaryButton(
+                        title: "\(copy.submitAnswer) · \(copy[.demo])", symbol: "paperplane"
+                    ) {
+                        flow.submit()
+                    }
+                    .disabled(!flow.canSubmit)
+                    .accessibilityHint(copy.native(.demoChooseBeforeContinue))
+                    .accessibilityIdentifier("demo-submit")
+                    .padding(.horizontal, 20).padding(.vertical, 12)
+                    .frame(maxWidth: 680).frame(maxWidth: .infinity)
+                    .background(Color(uiColor: .systemGroupedBackground))
+                }
+            }
             .navigationTitle(copy.native(.demoPractice)).navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -4454,7 +4466,7 @@ enum NativeLearningDuration {
             }
             .frame(maxWidth: 680).frame(maxWidth: .infinity)
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle(copy.progressAndHistory)
+            .navigationTitle(copy.native(.demoHistory))
             .toolbar { demoToolbar }
         }
 
