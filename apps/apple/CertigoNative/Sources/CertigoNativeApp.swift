@@ -5990,11 +5990,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
     private struct NativeRoot: View {
         @Environment(\.nativeInterfaceCopy) private var copy
         @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+        @Environment(\.scenePhase) private var scenePhase
         @Bindable var model: NativeModel
         @Binding var pendingLessonLink: EditorialPilotLessonLink?
         @Binding var pendingWidgetRoute: CertigoWidgetRoute?
         let closeDeveloper: (() -> Void)?
         @State private var widgetController = NativeWidgetSnapshotController()
+        @State private var appIconController = NativeAppIconController()
         @State private var selectedTrack: String?
         @State private var selectedLesson: String?
         @State private var savingGoalID: String?
@@ -6103,7 +6105,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 }
             }
-            .onChange(of: model.profile?.id, initial: true) { _, owner in
+            .onChange(of: model.profile?.id, initial: true) { previousOwner, owner in
+                if owner == nil || (previousOwner != nil && previousOwner != owner) {
+                    appIconController.resetForSignedOut()
+                }
                 navigation = NativeLearningNavigation(hasGoal: model.profile?.activeTrackId != nil)
                 selectedTrack = nil
                 selectedLesson = nil
@@ -6132,6 +6137,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
             }
             .onChange(of: widgetSnapshotKey, initial: true) { _, _ in
                 refreshWidgetSnapshot()
+            }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                if phase == .active {
+                    refreshWidgetSnapshot()
+                    appIconController.applicationBecameActive()
+                }
             }
             .onDisappear {
                 if model.profile == nil { widgetController.clear() }
@@ -6192,7 +6203,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     liveSnapshot: widgetController.snapshot,
                     storeLocation: widgetController.store.location,
                     storeError: widgetController.error,
-                    language: copy.language
+                    language: copy.language,
+                    appIconController: appIconController
                 )
             }
         }
@@ -6217,6 +6229,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 studyPlan: model.studyPlan,
                 language: copy.language,
                 now: .now
+            )
+            appIconController.synchronize(
+                phase: widgetController.snapshot?.phase(at: .now),
+                streakDays: model.profile?.streakDays
             )
         }
 
