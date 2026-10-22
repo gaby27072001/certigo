@@ -3680,7 +3680,7 @@ enum NativeLearningDuration {
 
     struct NativeCertificationCrest: View {
         @Environment(\.nativeInterfaceCopy) private var copy
-        @Environment(\.accessibilityContrast) private var contrast
+        @Environment(\.colorSchemeContrast) private var contrast
         @ScaledMetric(relativeTo: .headline) private var emblemSize = 70.0
         let code: String
         var compact = false
