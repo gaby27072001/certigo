@@ -33,6 +33,17 @@ in. No environment variable is treated as proof of that external registration.
 Never add a client secret, access token, or credential to the scheme, source,
 logs, or a shared scheme file.
 
+For a standard `*.ciamlogin.com` authority, supply either the HTTPS origin or
+that origin followed by `/<tenant GUID>` matching `CERTIGO_CIAM_TENANT_ID`.
+The MSAL adapter appends the explicit tenant GUID when the configured path is
+empty or `/`; existing explicit tenant paths and custom domains are preserved.
+This prevents MSAL 2.16.0 from interpreting a GUID host prefix as an
+`<GUID>.onmicrosoft.com` tenant during discovery. The issuer remains the separate,
+exact tenant-bound `/<tenant GUID>/v2.0` URL. Scope, host and returned tenant
+validation are unchanged; no registration or Keychain entitlement change is needed.
+See the SDK's
+[CIAM authority normalization pinned by MSAL 2.16.0](https://github.com/AzureAD/microsoft-authentication-library-common-for-objc/blob/24941c2102fb2e61734ecf3e0675a5a6f81bf047/IdentityCore/src/validation/MSIDCIAMAuthority.m).
+
 The configured connector signs in explicitly with MSAL and uses the configured
 API scope and HTTPS base URL. This development connector does not restore an
 account automatically on startup: MSAL account selection is held in memory, so

@@ -32,7 +32,13 @@ final class MSALAuthenticationProvider: CIAMAccountDeletionProvider {
         else { throw CIAMAuthenticationFailure.configuration }
         let authority: MSALCIAMAuthority
         do {
-            authority = try MSALCIAMAuthority(url: configuration.authority)
+            // MSAL 2.16 synthesizes <host-prefix>.onmicrosoft.com for pathless CIAM URLs.
+            let authorityURL =
+                configuration.authority.path.isEmpty || configuration.authority.path == "/"
+                ? configuration.authority.appendingPathComponent(
+                    configuration.tenantID.lowercased())
+                : configuration.authority
+            authority = try MSALCIAMAuthority(url: authorityURL)
         } catch {
             throw Self.failure(error)
         }
