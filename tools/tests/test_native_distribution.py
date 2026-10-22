@@ -19,6 +19,15 @@ GUARD = ROOT / "tools/validate_native_distribution.sh"
 
 
 class NativeDistributionTests(unittest.TestCase):
+    def test_all_native_configurations_target_ios_26_and_package_preserves_linux(self):
+        text = (PROJECT / "project.pbxproj").read_text()
+        targets = re.findall(r"IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);", text)
+        self.assertGreaterEqual(len(targets), 2)
+        self.assertEqual(set(targets), {"26.0"})
+        package = (ROOT / "apps/apple/CertigoKit/Package.swift").read_text()
+        self.assertIn(".iOS(.v26)", package)
+        self.assertIn(".when(platforms: [.linux])", package)
+
     def test_openstep_graph_references_and_configuration_lists(self):
         text = (PROJECT / "project.pbxproj").read_text()
         definitions = re.findall(r"(?m)^\s*([A-F0-9]{24})(?: /\*.*?\*/)? = \{", text)
