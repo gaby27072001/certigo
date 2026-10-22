@@ -263,3 +263,87 @@ User-facing status copy names the learner's task and next safe action, not the i
 - Retained Certigo research and evidence dossiers named above; use `certigo-four-tab-sources-2026-10-17.md` for the source register and `certigo-education-mobbin-research-2026-10-15.md` / `certigo-motion-interaction-research-2026-10-15.md` for the specific visual and motion evidence. Mobbin media are analytical references only; do not reuse its app assets.
 - Apple Human Interface Guidelines: [Color](https://developer.apple.com/design/human-interface-guidelines/color), [Motion](https://developer.apple.com/design/human-interface-guidelines/motion), [Progress indicators](https://developer.apple.com/design/human-interface-guidelines/progress-indicators), [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility). Use current guidance alongside the app’s iOS 17 minimum; do not assume iOS 26-only glass exists on older devices.
 - This blueprint contains **recommendations and proposed values**, not a native render, implementation, accessibility audit, build, or usability result. Current service/data contracts remain the gate for all conditional surfaces.
+
+## 8. Official provider marks and certification badges (research addendum, 22 October 2026)
+
+This addendum answers the request for recognizable provider imagery while correcting a key design/legal distinction: **a provider logo identifies the source of a learning resource; a certification badge is evidence of a credential earned by a person.** The latter must never be used as decoration on a course card or as a proxy for course level.
+
+### Verified brand and badge rules
+
+| Ecosystem | Officially verified evidence | Certigo rule |
+|---|---|---|
+| Microsoft / Azure / Fabric / Security | Microsoft states its logos, product icons and designs are proprietary, and many uses require a license. The public trademark page does not establish that bundling Microsoft/Azure/Fabric product marks in a third-party education app is automatically licensed. Microsoft Learn says certificates/badges are proof of accomplishments and are retrieved/shared from the learner's credential dashboard. | Use plain text provider naming by default. Use a product logo only after confirming the exact asset and product-UI permission; don't trace Azure, Fabric, Security or Microsoft marks from screenshots. Display an issued Microsoft credential badge only for a verified earned credential, unchanged. |
+| GitHub / Copilot | GitHub's current Brand Toolkit says the Invertocat and wordmark are available only in specified contexts, prohibits altering marks, and states no adaptation/use of its registered marks or site contents without express written permission. Its current Copilot guidance says the standalone Copilot-icon logo was deprecated in 2025; current product lockups should be used instead. The current Copilot palette includes Purple `#8534F3`, Purple 1 `#C898FD`, Purple 2 `#B870FF`, Purple 4 `#43179E`, Purple 5 `#26115F`, Purple 6 `#160048`, and Orange 1–6 `#F4A876`, `#F08A3A`, `#FE4C25`, `#C53211`, `#801E0F`, `#500A00`. | Do not draw the Octocat/Invertocat, Copilot visor or branch glyph with `Path`; do not recolor a mark with Primer tokens or use a made-up GitHub certification octagon. Use the current official lockup only after written-permission/product-use review. Identify a course with text (`GitHub`, exact exam code) meanwhile. A GitHub credential badge belongs only to its verified earner. |
+| AWS | AWS's official trademark terms grant a narrow “Powered by AWS” mark license to eligible current customers to identify qualifying content/services, and impose limitations on modifying/composing marks and implying endorsement. AWS Certification describes its digital badges as a way to showcase certification achievement and links to its digital-badge program. The public pages consulted do **not** publish an authorization for an unrelated learning app to redraw an AWS Certified badge or use it as an exam decoration. | Do not draw the Smile, AWS mark or AWS Certified hex badge. The supplied `#232F3E`, `#FF9900`, `#0073BB` are not verified here as an official complete app/icon palette; don't apply them to the mark. Use the exact authorized artwork only if permission covers this product surface; show an earned badge only for a verified credential. |
+| Google Cloud | The official Google Cloud product-icon library supplies current SVG/PNG assets and says the library is for diagrams and technical documentation. The page notes a product-icon system update in early 2025. It does not by itself grant use in an unrelated commercial application UI. | Do not reconstruct the four-color cloud/hexagon. Use the current official product icon only if the applicable brand permission covers in-app course identification; otherwise show `Google Cloud` as text and an original Certigo motif. Treat `#4285F4`, `#EA4335`, `#FBBC04`, `#34A853` as values to verify against the exact authorized asset, not as permission to recolor it. |
+| Kubernetes / CNCF | CNCF publishes project artwork in official SVG/PNG variants and requires marks to remain unchanged, with clear space and no misleading implication of sponsorship. Its brand guide says product/website/commercial logo use should be checked with CNCF; it lists CNCF blue `#0086FF` for the CNCF brand, not as a universal Kubernetes logo recolor. | Fetch the official Kubernetes project asset only after the use case is checked against CNCF/Linux Foundation policy. Do not draw the 7-spoke helm symbol or recolor it `#326CE5` from memory. Use a text label if permission is unclear. |
+| HashiCorp | The official brand site returned HTTP 429 in this bounded review, so asset-specific permission, palette, current Terraform/Vault marks and usage constraints were not verified. | No logo or hand-traced mark in this tranche. Use factual provider text until the official current guide and product-app permission are reviewed. |
+| CompTIA | The candidate official logo-usage URL returned 404 and no current official policy was verified in the bounded review. | No logo or certification badge until an accessible official policy/asset is confirmed; use plain text. |
+| ISC2 | ISC2's official copyright page says marks and website contents may not be copied/reproduced without permission, and says its named certification marks/logos are authorized for certified individuals only, subject to its Logo Usage Guidelines. Its digital-badges page describes the badge program. | Do not use ISC2/CISSP or other certification-logo/badge art as course decoration. Use text for the catalog; display a learner's actual badge only after credential ownership and the official asset are verified. |
+
+**Important palette correction:** the colors listed in the earlier visual-system tables are Certigo **proposed UI accent values**, not licenses or official logo palettes. In particular, the earlier `#4C3FB4` / `#7047EB` values are not the current GitHub Copilot palette published in its Brand Toolkit. Never apply Certigo gradients, shadow, tint, hierarchical symbol treatment or dark-mode recoloring to a third-party mark.
+
+### SwiftUI vector pipeline: use official assets, do not trace logos
+
+The request asked for exact `Path` coordinates for Microsoft four-square/Azure prism/Fabric ribbon/Security shield, GitHub/Copilot/branch marks, AWS smile/badge, Google Cloud, Kubernetes, HashiCorp, CompTIA and ISC2. **No vendor logo path coordinates are specified here on purpose.** The current authoritative sources supply (or direct to) official logo/icon assets and usage rules, not a reusable third-party SwiftUI-path license. Redrawing a path from a screenshot or approximating its silhouette would risk a visually inaccurate, unauthorized derivative and may suggest endorsement. The right way to be pixel-faithful is to use the exact authorized vector asset unchanged, not to invent coordinates.
+
+Implementation handoff for each proposed asset:
+
+1. Record the official asset's canonical URL, retrieval date, asset/version name, checksum, licensing/permission basis, allowed context, required attribution and clear-space rule in an asset manifest. A publicly downloadable SVG is **not automatically approved for third-party product UI**.
+2. Use a provider-supplied SVG/approved vector variant, retaining its exact `viewBox`, geometry, brand colors and clear space. Add it as a non-template vector asset to the iOS asset catalog only after permission is confirmed. In SwiftUI render it with `Image("ProviderAssetName").resizable().scaledToFit()`; do not set `.template`, `foregroundStyle`, `.symbolRenderingMode`, opacity, blend modes, gradients, masks or shadows on the official artwork. If the provider only gives a specific PNG or badge image, display that supplied version unchanged at a legible size.
+3. Keep the mark separate from Certigo branding: provider mark identifies a content issuer; Certigo remains the app/product identity. Do not create lockups by placing the two logos together unless an applicable co-branding guideline explicitly permits it.
+4. If the exact asset, permission, clear-space, or appearance constraints cannot be documented, render the provider's **plain text name** and a Certigo-owned generic category shape. Do not substitute a traced logo or an SF Symbol that imitates it.
+
+### Original Certigo learning token: normalized geometry, not an issuer mark
+
+For the catalog, create a clearly Certigo-owned topic marker instead of fake vendor emblems or certification badges. This is the only vector geometry in this addendum. It is a generic six-sided learning tile with an open Prism diamond; it must be labelled by nearby provider/course text, must not contain “Certified”, an issuer logo, a star/rank, or an exam code on a medal/ribbon, and must not be presented as a credential.
+
+Normalized source coordinates are in a `100 × 100` design box; map them proportionally into the destination rect. Outer polygon: `(50,4) → (90,27) → (90,72) → (50,96) → (10,72) → (10,27) → close`. Inner diamond: `(50,28) → (66,50) → (50,72) → (34,50) → close`; leave it unfilled/outlined so the motif reads as Certigo's own learning token, not a vendor icon. Keep the exam code in an independent text pill below/alongside the tile.
+
+```swift
+struct CertigoLearningToken: Shape {
+    func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height)
+        let origin = CGPoint(x: rect.midX - side / 2, y: rect.midY - side / 2)
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: origin.x + side * x / 100,
+                    y: origin.y + side * y / 100)
+        }
+
+        return Path { path in
+            path.move(to: point(50, 4))
+            path.addLines([
+                point(90, 27), point(90, 72), point(50, 96),
+                point(10, 72), point(10, 27)
+            ])
+            path.closeSubpath()
+
+            path.move(to: point(50, 28))
+            path.addLines([point(66, 50), point(50, 72), point(34, 50)])
+            path.closeSubpath()
+        }
+    }
+}
+```
+
+Use the outer outline as a single small taxonomy accent, not as an earned award. For this original Certigo shape, provider tones can fill the background while the inner diamond stays a contrast-checked stroke; that coloration is an app-created category cue and is **not** to be called an official provider icon. Accessibility label/value comes from the adjacent actual content, e.g. “Azure AI Fundamentals, AI-901”; the shape itself is decorative (`accessibilityHidden(true)`).
+
+### Credential, level, exam code: three separate semantics
+
+- **Provider mark:** identifies who authored/offers the content. It is not an award and is not proof of affiliation. Gate any actual mark on permission; text name is the safe fallback.
+- **Exam code pill:** plain typography (e.g. `AZ-900`, `AI-103`, `DP-600`, `GH-300`, `CLF-C02`, `SAA-C03`, `AIF-C01`) in a neutral pill. Render only codes present in the actual catalog; code examples do not establish that a track is available or that Certigo is endorsed by the issuer.
+- **Learning level:** use a factual text value such as `Fundamentals`, `Associate`, `Expert` or `Specialty` only when that exact level is provider-authored catalog metadata. Do not infer three star tiers (`★`/`★★`/`★★★`) or a hierarchy shared across vendors: the credential systems are not semantically equivalent.
+- **Certigo practice milestone:** if real mastery/achievement criteria are later implemented, create a distinct Certigo-owned progress mark. Label its state (`En cours`, `Terminé`, etc.) and define the criteria. Never call it an official certification, use an issuer badge silhouette, or imply the learner passed an external exam.
+- **Official earned credential:** only display the original badge/artwork actually issued for the signed-in learner, after verifying the credential record and any current validity/expiry. Do not recolor, crop, add a Certigo ribbon, add stars, replace its link or regenerate its artwork. If the service cannot prove ownership, omit it. Link to the issuer/badge verification page when the credential provides one.
+
+### References verified on 22 October 2026
+
+- Microsoft [Trademark and Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks); Microsoft Learn [Access certificates, badges and transcript](https://learn.microsoft.com/en-us/credentials/certifications/access-certificates-badges-transcript).
+- GitHub [Brand Toolkit: Logo](https://brand.github.com/foundations/logo); [GitHub Copilot brand guidance and palette](https://brand.github.com/brand-identity/copilot); [About GitHub Certifications](https://docs.github.com/en/get-started/showcase-your-expertise-with-github-certifications/about-github-certifications).
+- AWS [Trademark Guidelines](https://aws.amazon.com/trademark-guidelines/); [AWS Certification Benefits and Digital Badges](https://aws.amazon.com/certification/benefits/).
+- Google Cloud [official product icon library](https://cloud.google.com/icons) (official assets are for the documented purposes on that page; it is not a product-UI license).
+- CNCF [Brand Guidelines](https://www.cncf.io/brand-guidelines/) and [official project artwork repository](https://github.com/cncf/artwork).
+- ISC2 [Copyright Information and mark permissions](https://www.isc2.org/Policies-Procedures/Copyright-Information); [Digital Badges](https://www.isc2.org/certifications/digital-badges).
+- HashiCorp and CompTIA official-logo permission details were **not verified** in this bounded pass (429/404 responses respectively); no asset is recommended for either until official guidance is accessible.
+
+This is a bounded visual/permission review, not legal advice or a permission grant. Before shipping third-party marks inside Certigo, obtain and retain the applicable written permission/license or documented guideline allowing that exact use in a third-party mobile learning product.
