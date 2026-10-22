@@ -73,10 +73,12 @@
         @ViewBuilder
         private func pilotContent(_ snapshot: EditorialPilotSnapshot) -> some View {
             NativeReadingPage {
-                NativeEntryHeading(
+                NativeGoalHero(
                     title: snapshot.pilot.title,
-                    message: copy.native(.originalFrench))
-                NativeReadingSection(title: copy.native(.beforeStart)) {
+                    subtitle: copy.native(.originalFrench),
+                    theme: NativeTrackTheme(band: 0, symbol: "brain"),
+                    readinessTitle: copy.native(.readiness))
+                DisclosureGroup(copy.native(.beforeStart)) {
                     Label(copy.native(.learningNotCertification), systemImage: "book")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tint)
@@ -107,6 +109,11 @@
                         NavigationLink(value: lesson.id) {
                             NativeReadingCard {
                                 VStack(alignment: .leading, spacing: 8) {
+                                    NativeSymbolMedallion(
+                                        symbol: progress(for: lesson, in: model.pilotHistory)?
+                                            .markedReadAt != nil
+                                            ? "bookmark.fill" : "text.book.closed.fill",
+                                        accent: NativePrism.tint)
                                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                                         Text(lesson.title).font(.headline).foregroundStyle(.primary)
                                         Spacer(minLength: 0)

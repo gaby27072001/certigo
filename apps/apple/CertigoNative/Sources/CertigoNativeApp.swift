@@ -2839,6 +2839,9 @@ enum NativeLearningDuration {
                             title: result.passed
                                 ? copy.native(.assessmentPassed) : copy.native(.assessmentReview)
                         ) {
+                            NativeReadinessRing(
+                                percent: result.pct, title: copy.native(.score),
+                                accent: result.passed ? NativePrism.confirmed : NativePrism.pending)
                             Label(
                                 snapshot.exam.trackCode,
                                 systemImage: result.passed ? "trophy" : "book")
@@ -2876,6 +2879,15 @@ enum NativeLearningDuration {
                             }
                         }
                     } else {
+                        NativeQuestionProgress(
+                            selected: snapshot.exam.items.filter {
+                                snapshot.selections[$0.itemId] != nil
+                            }.count,
+                            total: snapshot.exam.items.count,
+                            title: copy.questionCount(
+                                selected: snapshot.exam.items.filter {
+                                    snapshot.selections[$0.itemId] != nil
+                                }.count, total: snapshot.exam.items.count))
                         TimelineView(.periodic(from: .now, by: 1)) { context in
                             let remaining = max(
                                 0,
@@ -2892,21 +2904,21 @@ enum NativeLearningDuration {
                         ForEach(snapshot.exam.items, id: \.itemId) { item in
                             NativeReadingSection(title: copy.native(.multipleChoice)) {
                                 Text(.init(item.stem)).font(.headline)
-                                ForEach(item.options) { option in
+                                ForEach(Array(item.options.enumerated()), id: \.element.id) {
+                                    index, option in
                                     Button {
                                         model.selectExamOption(
                                             itemID: item.itemId, optionID: option.id)
                                     } label: {
-                                        Label(
-                                            option.label,
-                                            systemImage: snapshot.selections[item.itemId]
-                                                == option.id
-                                                ? "checkmark.circle.fill" : "circle"
-                                        )
-                                        .frame(
-                                            maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                        NativeAnswerLabel(
+                                            text: option.label, index: index,
+                                            selected: snapshot.selections[item.itemId] == option.id)
                                     }
-                                    .buttonStyle(NativeChoiceButtonStyle())
+                                    .buttonStyle(
+                                        NativeChoiceButtonStyle(
+                                            isSelected: snapshot.selections[item.itemId]
+                                                == option.id)
+                                    )
                                     .disabled(snapshot.submission != nil || model.examBusy)
                                     .accessibilityAddTraits(
                                         snapshot.selections[item.itemId] == option.id
@@ -3120,11 +3132,11 @@ enum NativeLearningDuration {
         }
     }
 
-    // THESIS: A decision workshop extends the objective-first demo; no invented course or metrics.
-    // OWN-WORLD: Prism violet, semantic surfaces, SF text, native navigation and glass controls.
-    // STORY: Read a situation, decide, wait, understand; every demo result is explicitly synthetic.
-    // FIRST VIEWPORT: One colored objective plane, one resume action, then quiet supporting rows.
-    // FORM: Reviewable extension of approved A, not a new identity; bounded iPad reading width.
+    // THESIS: A vibrant learning studio; evidence becomes visible progress, never invented success.
+    // OWN-WORLD: Ocean, indigo, emerald, amber and plum; SF medallions, rings and opaque reading.
+    // STORY: See today's confirmed state, take one lesson, understand the answer, return tomorrow.
+    // FIRST VIEWPORT: Compact activity tiles, a spectrum goal with readiness ring, one next action.
+    // FORM: User-selected Brilliant / Duolingo + Apple Fitness+; native navigation stays authoritative.
     enum NativePrism {
         // Prism spectrumInk / spectrumGlow plus info; glow is never a solid reading fill.
         private static let ink: [UInt32] = [
@@ -3143,12 +3155,16 @@ enum NativeLearningDuration {
         static let objectiveFill = Color(uiColor: color(ink[0]))
         static let confirmed = accent(band: 4)
         static let pending = accent(band: 3)
+        // PrismMotion.base and standard, shared with the Flutter design system.
+        static let feedback = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.24)
 
         static func accent(for code: String) -> Color {
-            accent(band: NativeTrackAppearance.band(for: code))
+            NativeTrackTheme(code: code).accent
         }
 
-        private static func accent(band: Int) -> Color {
+        static func solid(band: Int) -> Color { Color(uiColor: color(ink[band])) }
+
+        static func accent(band: Int) -> Color {
             Color(
                 uiColor: UIColor { traits in
                     let dark = traits.userInterfaceStyle == .dark
@@ -3172,6 +3188,273 @@ enum NativeLearningDuration {
                 red: CGFloat((hex >> 16) & 255) / 255,
                 green: CGFloat((hex >> 8) & 255) / 255,
                 blue: CGFloat(hex & 255) / 255, alpha: 1)
+        }
+    }
+
+    struct NativeTrackTheme {
+        let band: Int
+        let symbol: String
+
+        init(band: Int, symbol: String) {
+            self.band = band
+            self.symbol = symbol
+        }
+
+        init(code: String) {
+            let value = code.uppercased()
+            if value.hasPrefix("GH-") || value.contains(":GH-") || value.hasPrefix("GITHUB") {
+                band = 0
+                symbol = "sparkles"
+            } else if value.hasPrefix("AWS") || value.contains("AWS:") {
+                band = 3
+                symbol = "cloud.sun.fill"
+            } else if value.hasPrefix("DP-") || value.contains(":DP-")
+                || value.contains("FABRIC")
+            {
+                band = 4
+                symbol = "square.stack.3d.up.fill"
+            } else if value.hasPrefix("SC-") || value.contains(":SC-")
+                || value.contains("SECURITY")
+            {
+                band = 1
+                symbol = "checkmark.shield.fill"
+            } else if value.hasPrefix("AZ-") || value.contains(":AZ-") {
+                band = 6
+                symbol = "cloud.fill"
+            } else if value.hasPrefix("AI-") || value.contains(":AI-") {
+                band = 0
+                symbol = "brain"
+            } else {
+                band = NativeTrackAppearance.band(for: code)
+                symbol = "books.vertical.fill"
+            }
+        }
+
+        var accent: Color { NativePrism.accent(band: band) }
+        var gradient: LinearGradient {
+            LinearGradient(
+                colors: [
+                    NativePrism.solid(band: band),
+                    NativePrism.solid(band: band == 3 ? 2 : (band + 1) % 7),
+                ],
+                startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
+    }
+
+    struct NativeSymbolMedallion: View {
+        let symbol: String
+        var accent: Color = NativePrism.tint
+
+        var body: some View {
+            Image(systemName: symbol)
+                .font(.title2.weight(.semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(accent)
+                .frame(width: 52, height: 52)
+                .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))
+                .accessibilityHidden(true)
+        }
+    }
+
+    struct NativeReadinessRing: View {
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        @ScaledMetric(relativeTo: .title2) private var diameter = 88.0
+        let percent: Int
+        let title: String
+        var accent: Color = NativePrism.tint
+
+        var body: some View {
+            VStack(spacing: 8) {
+                ZStack {
+                    Circle().stroke(accent.opacity(0.16), lineWidth: 9)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(min(100, max(0, percent))) / 100)
+                        .stroke(accent, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Text("\(percent) %").font(.system(.title2, design: .rounded, weight: .bold))
+                        .monospacedDigit()
+                }
+                .frame(width: diameter, height: diameter)
+                Text(title).font(.caption.weight(.semibold)).multilineTextAlignment(.center)
+            }
+            .animation(reduceMotion ? nil : NativePrism.feedback, value: percent)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityValue("\(percent) %")
+        }
+    }
+
+    struct NativeMetricTile: View {
+        let title: String
+        let value: String
+        let symbol: String
+        var accent: Color = NativePrism.tint
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                NativeSymbolMedallion(symbol: symbol, accent: accent)
+                Text(value).font(.system(.title2, design: .rounded, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+                Text(title).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(20)
+            .background(NativePrism.surface, in: RoundedRectangle(cornerRadius: 24))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24)
+                    .strokeBorder(accent.opacity(0.18), lineWidth: 1)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    struct NativeMetricGrid<Content: View>: View {
+        @Environment(\.dynamicTypeSize) private var typeSize
+        @ViewBuilder let content: Content
+
+        var body: some View {
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: 12),
+                    count: typeSize.isAccessibilitySize ? 1 : 2),
+                alignment: .leading, spacing: 12
+            ) { content }
+        }
+    }
+
+    struct NativeGoalHero: View {
+        let title: String
+        let subtitle: String
+        let theme: NativeTrackTheme
+        var readiness: Int?
+        let readinessTitle: String
+
+        var body: some View {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 24) {
+                    heading
+                    if let readiness, (0...100).contains(readiness) {
+                        NativeReadinessRing(
+                            percent: readiness, title: readinessTitle, accent: .white)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 24) {
+                    heading
+                    if let readiness, (0...100).contains(readiness) {
+                        NativeReadinessRing(
+                            percent: readiness, title: readinessTitle, accent: .white)
+                    }
+                }
+            }
+            .padding(24).foregroundStyle(.white)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(theme.gradient, in: RoundedRectangle(cornerRadius: 28))
+        }
+
+        private var heading: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                Image(systemName: theme.symbol)
+                    .font(.largeTitle).symbolRenderingMode(.hierarchical)
+                    .accessibilityHidden(true)
+                Text(title).font(.system(.title2, design: .rounded, weight: .bold)).fixedSize(
+                    horizontal: false, vertical: true
+                )
+                .accessibilityAddTraits(.isHeader)
+                Text(subtitle).font(.subheadline.weight(.medium))
+            }
+        }
+    }
+
+    struct NativeCertificationCard: View {
+        @Environment(\.nativeInterfaceCopy) private var copy
+        let track: Track
+
+        var body: some View {
+            let theme = NativeTrackTheme(code: track.code)
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    NativeSymbolMedallion(symbol: theme.symbol, accent: theme.accent)
+                    Spacer()
+                    Text(track.code).font(.system(.subheadline, design: .rounded, weight: .bold))
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .foregroundStyle(theme.accent)
+                        .background(theme.accent.opacity(0.12), in: Capsule())
+                }
+                Text(track.title).font(.system(.title3, design: .rounded, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                NativeContentLanguageBadges(languages: track.languages ?? [])
+                Text(track.summary).font(.subheadline).foregroundStyle(.secondary)
+                HStack {
+                    NativePracticeBadge(available: track.learningAvailable)
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right").foregroundStyle(theme.accent)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(20)
+            .background(NativePrism.surface, in: RoundedRectangle(cornerRadius: 26))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26)
+                    .strokeBorder(theme.accent.opacity(0.24), lineWidth: 1)
+            }
+        }
+    }
+
+    struct NativeAnswerLabel: View {
+        let text: String
+        let index: Int
+        let selected: Bool
+
+        var body: some View {
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                Text(
+                    index < 26
+                        ? String("ABCDEFGHIJKLMNOPQRSTUVWXYZ".dropFirst(index).prefix(1))
+                        : "\(index + 1)"
+                )
+                .font(.system(.headline, design: .rounded)).monospacedDigit()
+                .frame(width: 36, height: 36)
+                .foregroundStyle(selected ? Color.white : NativePrism.tint)
+                .background(
+                    selected ? NativePrism.objectiveFill : NativePrism.tint.opacity(0.1),
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
+                .accessibilityHidden(true)
+                Text(text).multilineTextAlignment(.leading).foregroundStyle(.primary)
+                Spacer(minLength: 0)
+                if selected {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(NativePrism.tint)
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        }
+    }
+
+    struct NativeQuestionProgress: View {
+        let selected: Int
+        let total: Int
+        let title: String
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title).font(.subheadline.weight(.semibold))
+                HStack(spacing: 4) {
+                    ForEach(0..<min(max(total, 0), 30), id: \.self) { index in
+                        Capsule()
+                            .fill(
+                                Double(index) / Double(min(total, 30))
+                                    < Double(selected) / Double(max(1, total))
+                                    ? NativePrism.tint : NativePrism.tint.opacity(0.15)
+                            )
+                            .frame(height: 6)
+                    }
+                }
+                .accessibilityHidden(true)
+            }
+            .accessibilityElement(children: .combine)
         }
     }
 
@@ -3279,6 +3562,8 @@ enum NativeLearningDuration {
     }
 
     struct NativeChoiceButtonStyle: ButtonStyle {
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        var isSelected = false
         @Environment(\.isEnabled) private var isEnabled
 
         func makeBody(configuration: Configuration) -> some View {
@@ -3286,9 +3571,19 @@ enum NativeLearningDuration {
                 .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
                 .padding(16)
                 .background(
-                    configuration.isPressed
-                        ? Color(uiColor: .tertiarySystemFill) : NativePrism.surface,
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    isSelected
+                        ? NativePrism.tint.opacity(0.1)
+                        : configuration.isPressed
+                            ? Color(uiColor: .tertiarySystemFill) : NativePrism.surface,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(
+                            isSelected ? NativePrism.tint : NativePrism.edge,
+                            lineWidth: isSelected ? 2 : 1)
+                }
+                .animation(reduceMotion ? nil : NativePrism.feedback, value: isSelected)
         }
     }
 
@@ -3309,7 +3604,7 @@ enum NativeLearningDuration {
             .frame(maxWidth: .infinity, alignment: .leading)
             .foregroundStyle(.white)
             .background(
-                NativePrism.objectiveFill,
+                NativeTrackTheme(code: "").gradient,
                 in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
     }
@@ -5174,14 +5469,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                     Text(copy.teams).tag(NativeLearningNavigation.Social.teams)
                                 }
                                 .pickerStyle(.menu)
-                                ContentUnavailableView(
-                                    navigation.social == .friends
-                                        ? copy.native(.socialUnavailable)
-                                        : copy.native(.socialUnavailable),
-                                    systemImage: "person.2",
-                                    description: Text(
-                                        copy.native(.socialUnavailableHint)
-                                    ))
+                                NativeGoalHero(
+                                    title: copy.social,
+                                    subtitle: copy.native(.socialUnavailableHint),
+                                    theme: NativeTrackTheme(band: 4, symbol: "person.2.fill"),
+                                    readinessTitle: copy.native(.readiness))
+                                Label(
+                                    copy.native(.socialUnavailable), systemImage: "person.2"
+                                )
+                                .font(.headline).foregroundStyle(.secondary)
                                 NativeReadingSection(title: copy.native(.privateLearning)) {
                                     Text(
                                         copy.native(.privateProfileHint)
@@ -5294,8 +5590,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var coach: some View {
             NativeReadingPage {
-                NativeEntryHeading(
-                    title: copy[.coachWorkspaceTitle], message: copy[.coachPromptHint])
+                NativeGoalHero(
+                    title: copy[.coachWorkspaceTitle], subtitle: copy[.coachPromptHint],
+                    theme: NativeTrackTheme(band: 0, symbol: "sparkles"),
+                    readinessTitle: copy.native(.readiness))
                 Text(copy.native(.coachDisclosure))
                     .font(.subheadline).foregroundStyle(.secondary)
                 if case .corrected(let result) = model.outcome, let lesson = model.lesson {
@@ -5400,6 +5698,8 @@ struct NativeDemoSnapshot: Codable, Equatable {
             }
             .frame(minHeight: 44)
             .disabled(model.busy || model.isRequestingTutorExplanation)
+            .buttonStyle(.borderedProminent)
+            .tint(NativePrism.tint)
             .accessibilityIdentifier("request-tutor-explanation-\(itemID)")
         }
 
@@ -5444,6 +5744,35 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         }
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        Section {
+                            NativeMetricGrid {
+                                NavigationLink {
+                                    NativeReadingPage { smartReview }
+                                        .navigationTitle(copy.native(.reviewPractice))
+                                } label: {
+                                    NativeMetricTile(
+                                        title: copy.native(.reviewPractice),
+                                        value: copy.native(.continueReview),
+                                        symbol: "arrow.triangle.2.circlepath",
+                                        accent: NativePrism.confirmed)
+                                }
+                                .buttonStyle(.plain)
+                                NavigationLink {
+                                    NativeReadingPage { learningInsights }
+                                        .navigationTitle(copy.native(.focusArea))
+                                } label: {
+                                    NativeMetricTile(
+                                        title: copy.native(.focusArea), value: copy.native(.skills),
+                                        symbol: "scope", accent: NativePrism.pending)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            if let board = model.questBoard {
+                                Text(copy.native(.quests)).font(.headline)
+                                questCards(board)
+                            }
+                        }
+                        .listRowBackground(Color.clear)
                         myLearningPlan
                         Section(copy.native(.readiness)) {
                             learningInsights
@@ -5471,12 +5800,35 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                     Text(family).tag(family)
                                 }
                             }
-                            Picker(copy.native(.codeCategory), selection: $catalogFilter.category) {
-                                Text(copy[.categoryAll]).tag(nil as NativeRadarCategory?)
-                                ForEach(catalogCategories, id: \.self) { category in
-                                    Text(category.title(copy)).tag(Optional(category))
+                            ScrollView(.horizontal) {
+                                HStack(spacing: 8) {
+                                    Button(copy[.categoryAll]) { catalogFilter.category = nil }
+                                        .buttonStyle(.bordered)
+                                        .tint(
+                                            catalogFilter.category == nil
+                                                ? NativePrism.tint : .secondary
+                                        )
+                                        .accessibilityAddTraits(
+                                            catalogFilter.category == nil ? .isSelected : [])
+                                    ForEach(catalogCategories, id: \.self) { category in
+                                        Button(category.title(copy)) {
+                                            catalogFilter.category = category
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .tint(
+                                            catalogFilter.category == category
+                                                ? NativePrism.tint : .secondary
+                                        )
+                                        .accessibilityAddTraits(
+                                            catalogFilter.category == category ? .isSelected : [])
+                                    }
                                 }
+                                .frame(minHeight: 44)
+                                .controlSize(.large)
+                                .buttonBorderShape(.capsule)
                             }
+                            .scrollIndicators(.hidden)
+                            .accessibilityLabel(copy.native(.codeCategory))
                             Toggle(copy.native(.availableOnly), isOn: $catalogFilter.availableOnly)
                             Text(copy.native(.catalogScope))
                                 .font(.caption).foregroundStyle(.secondary)
@@ -5491,6 +5843,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                         }
                     }
+                    certificationCollection
                     Section(copy.native(.continueDevice)) {
                         if let lesson = model.lesson,
                             navigation.learn == .explore
@@ -5532,49 +5885,6 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             }
                             .disabled(model.busy)
                             .accessibilityIdentifier("open-linked-editorial-lesson")
-                        }
-                    }
-                    Section(
-                        navigation.learn == .explore
-                            ? copy.native(.collection) : copy.native(.yourGoals)
-                    ) {
-                        ForEach(visibleTracks) { track in
-                            NavigationLink(value: track.id) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Label(track.code, systemImage: "books.vertical")
-                                        .symbolRenderingMode(.hierarchical)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(NativePrism.accent(for: track.code))
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            NativePrism.surface,
-                                            in: Capsule(style: .continuous))
-                                    Text(track.title).font(.title3.weight(.semibold))
-                                    NativeContentLanguageBadges(languages: track.languages ?? [])
-                                    if let group = NativeTrackAppearance.group(for: track.code) {
-                                        Text(
-                                            "\(NativeCatalogFilter.family(for: track.code)) · \(group.category.title(copy))"
-                                        )
-                                        .font(.caption).foregroundStyle(.secondary)
-                                    }
-                                    Text(track.summary).font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                    NativePracticeBadge(available: track.learningAvailable)
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .disabled(model.busy)
-                        }
-                    }
-                    if model.tracks.isEmpty {
-                        Text(copy.native(.noCatalog))
-                    } else if navigation.learn == .explore && visibleTracks.isEmpty {
-                        Section {
-                            ContentUnavailableView(
-                                copy[.noMatchingTracks], systemImage: "magnifyingglass",
-                                description: Text(copy.native(.noMatchesHint)))
-                            Button(copy[.clearFilters]) { catalogFilter.clear() }
                         }
                     }
                 }
@@ -5639,6 +5949,31 @@ struct NativeDemoSnapshot: Codable, Equatable {
             }
         }
 
+        @ViewBuilder private var certificationCollection: some View {
+            Section(
+                navigation.learn == .explore ? copy.native(.collection) : copy.native(.yourGoals)
+            ) {
+                ForEach(visibleTracks) { track in
+                    NavigationLink(value: track.id) {
+                        NativeCertificationCard(track: track).padding(.vertical, 8)
+                    }
+                    .disabled(model.busy)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+            }
+            if model.tracks.isEmpty {
+                Text(copy.native(.noCatalog))
+            } else if navigation.learn == .explore && visibleTracks.isEmpty {
+                Section {
+                    ContentUnavailableView(
+                        copy[.noMatchingTracks], systemImage: "magnifyingglass",
+                        description: Text(copy.native(.noMatchesHint)))
+                    Button(copy[.clearFilters]) { catalogFilter.clear() }
+                }
+            }
+        }
+
         @ViewBuilder private var myLearningPlan: some View {
             Section(copy.native(.learningPlan)) {
                 if let path = model.path,
@@ -5651,16 +5986,18 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     )
                     .font(.headline)
                     ForEach(path.units) { unit in
-                        LabeledContent(
-                            unit.title, value: "\(unit.lessons.count) · \(copy.native(.activities))"
-                        )
+                        unitProgress(title: unit.title, lessons: unit.lessons, code: path.trackId)
                         ForEach(unit.lessons) { lesson in
-                            LabeledContent(
-                                lesson.title,
-                                value:
-                                    "\(lesson.nativeMasteryStage.symbol) \(copy[lesson.nativeMasteryStage.copyKey])"
-                            )
-                            .font(.subheadline)
+                            Button {
+                                selectedTrack = path.trackId
+                                selectedLesson = lesson.id
+                                columns = .detailOnly
+                                compactColumn = .detail
+                            } label: {
+                                lessonLabel(lesson, code: path.trackId)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!lesson.canOpen || model.busy || loadingLessonID != nil)
                         }
                     }
                     Text(copy.native(.openPlanHint))
@@ -5696,6 +6033,57 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         .foregroundStyle(.secondary)
                 }
             }
+        }
+
+        private func unitProgress(title: String, lessons: [PathLesson], code: String) -> some View {
+            let completed = lessons.filter { $0.status == .completed || $0.status == .mastered }
+                .count
+            return VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    NativeSymbolMedallion(
+                        symbol: "square.stack.3d.up.fill", accent: NativePrism.accent(for: code))
+                    Text(title).font(.title3.weight(.bold))
+                }
+                Text(copy.coverageCount(completed: completed, total: lessons.count))
+                    .font(.caption).foregroundStyle(.secondary)
+                if !lessons.isEmpty {
+                    ProgressView(value: Double(completed), total: Double(lessons.count))
+                        .tint(NativePrism.accent(for: code))
+                }
+            }
+            .padding(.vertical, 12)
+        }
+
+        private func lessonLabel(_ lesson: PathLesson, code: String) -> some View {
+            HStack(alignment: .center, spacing: 16) {
+                ZStack {
+                    Circle().stroke(NativePrism.accent(for: code).opacity(0.15), lineWidth: 4)
+                    if let mastery = lesson.masteryPct {
+                        Circle().trim(from: 0, to: CGFloat(min(100, max(0, mastery))) / 100)
+                            .stroke(
+                                NativePrism.accent(for: code),
+                                style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                            )
+                            .rotationEffect(.degrees(-90))
+                    }
+                    Text(lesson.nativeMasteryStage.symbol).font(.title2)
+                        .foregroundStyle(NativePrism.accent(for: code))
+                }
+                .frame(width: 44, height: 44).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(lesson.title).font(.headline).foregroundStyle(.primary)
+                    Text("\(copy.minutes(lesson.estMinutes)) · \(activityStatus(lesson.status))")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text(copy[lesson.nativeMasteryStage.copyKey])
+                        .font(.caption).foregroundStyle(NativePrism.accent(for: code))
+                    if !lesson.canOpen {
+                        Text(copy.native(.lockedHint)).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+            .padding(.vertical, 8)
+            .accessibilityElement(children: .combine)
         }
 
         @ViewBuilder private var smartReview: some View {
@@ -5857,12 +6245,22 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var confirmedGoal: some View {
             VStack(alignment: .leading, spacing: 16) {
+                activityStrip
                 if let goalID = model.profile?.activeTrackId {
-                    NativeEntryHeading(
+                    NativeGoalHero(
                         title: model.tracks.first(where: {
                             $0.id.lowercased() == goalID.lowercased()
                         })?.title ?? goalID,
-                        message: copy.confirmed)
+                        subtitle: copy.confirmed,
+                        theme: NativeTrackTheme(
+                            code: model.tracks.first(where: {
+                                $0.id.lowercased() == goalID.lowercased()
+                            })?.code ?? ""),
+                        readiness: model.path.flatMap {
+                            $0.trackId.lowercased() == goalID.lowercased()
+                                ? $0.readinessScore : nil
+                        },
+                        readinessTitle: copy.native(.readiness))
                     Text(copy.native(.nextSession)).font(.headline)
                     if let plan = model.studyPlan {
                         if let target = plan.targetExamDate {
@@ -6024,7 +6422,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         title: profile.displayName,
                         message: copy.myLearning)
                     NativeReadingSection(title: copy.native(.confirmedLearning)) {
-                        LabeledContent(copy.native(.confirmedXP), value: "\(profile.xp)")
+                        activityMetrics
                         if let goal = profile.activeTrackId {
                             LabeledContent(
                                 copy.native(.confirmedGoal),
@@ -6137,45 +6535,121 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         @ViewBuilder private var rewards: some View {
             Text(copy.native(.rewards)).font(.title2.bold())
-            if let profile = model.profile {
-                LabeledContent(copy.native(.confirmedXP), value: "\(profile.xp)")
-                if let level = profile.level {
-                    LabeledContent(copy.native(.level), value: "\(level)")
-                }
-                if let streak = profile.streakDays {
-                    LabeledContent(copy.native(.streak), value: "\(streak)")
-                }
-                if let target = profile.dailyGoalXp, let earned = profile.dailyXpEarned {
-                    LabeledContent(copy.native(.dailyGoal), value: "\(earned) / \(target)")
-                }
-            }
+            activityMetrics
             if let board = model.questBoard {
                 Text(copy.native(.quests)).font(.headline)
                 Text(board.date).font(.caption).foregroundStyle(.secondary)
-                ForEach(board.quests, id: \.id) { quest in
-                    LabeledContent(quest.title, value: "\(quest.current) / \(quest.target)")
-                    if quest.completed {
-                        Label(copy.confirmed, systemImage: "checkmark.circle")
-                    }
-                }
+                questCards(board)
             }
             if let board = model.achievementBoard {
                 Text(copy.native(.achievements)).font(.headline)
                 LabeledContent(copy.confirmed, value: "\(board.unlocked) / \(board.total)")
-                ForEach(board.achievements, id: \.id) { achievement in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label(
-                            achievement.name,
-                            systemImage: achievement.unlocked ? "checkmark.seal" : "seal"
-                        )
-                        .font(.headline)
-                        Text(achievement.description)
-                        Text("\(achievement.progress) / \(achievement.threshold)")
-                            .font(.caption).foregroundStyle(.secondary)
+                NativeMetricGrid {
+                    ForEach(board.achievements, id: \.id) { achievement in
+                        NativeReadingCard {
+                            if achievement.threshold > 0 {
+                                NativeReadinessRing(
+                                    percent: Int(
+                                        min(
+                                            1,
+                                            max(
+                                                0,
+                                                Double(achievement.progress)
+                                                    / Double(achievement.threshold))) * 100),
+                                    title: achievement.name, accent: NativePrism.confirmed)
+                            } else {
+                                NativeSymbolMedallion(
+                                    symbol: achievement.unlocked ? "medal.fill" : "seal",
+                                    accent: NativePrism.confirmed)
+                                Text(achievement.name).font(.headline)
+                            }
+                            Text(achievement.description).font(.subheadline)
+                            Text("\(achievement.progress) / \(achievement.threshold)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
-            Text(copy.native(.sourceServer)).font(.caption).foregroundStyle(.secondary)
+        }
+
+        private func questCards(_ board: QuestBoard) -> some View {
+            NativeMetricGrid {
+                ForEach(board.quests, id: \.id) { quest in
+                    NativeReadingCard {
+                        NativeSymbolMedallion(
+                            symbol: quest.completed ? "checkmark.seal.fill" : "flag.fill",
+                            accent: NativePrism.pending)
+                        Text(quest.title).font(.headline)
+                        Text("\(quest.current) / \(quest.target)").monospacedDigit()
+                        if quest.target > 0 {
+                            ProgressView(
+                                value: Double(min(quest.current, quest.target)),
+                                total: Double(quest.target)
+                            ).tint(NativePrism.pending)
+                        }
+                        if quest.completed {
+                            Label(copy.confirmed, systemImage: "checkmark.circle")
+                        }
+                    }
+                }
+            }
+        }
+
+        @ViewBuilder private var activityMetrics: some View {
+            if let profile = model.profile {
+                NativeMetricGrid {
+                    NativeMetricTile(
+                        title: copy.native(.confirmedXP), value: "\(profile.xp)",
+                        symbol: "bolt.fill", accent: NativePrism.pending)
+                    if let streak = profile.streakDays {
+                        NativeMetricTile(
+                            title: copy.native(.streak), value: "\(streak)",
+                            symbol: "flame.fill", accent: NativePrism.accent(band: 2))
+                    }
+
+                    if let level = profile.level {
+                        NativeMetricTile(
+                            title: copy.native(.level), value: "\(level)",
+                            symbol: "mountain.2.fill")
+                    }
+                    if let target = profile.dailyGoalXp, let earned = profile.dailyXpEarned,
+                        target > 0
+                    {
+                        NativeReadingCard {
+                            NativeReadinessRing(
+                                percent: Int(min(1, max(0, Double(earned) / Double(target))) * 100),
+                                title: copy.native(.dailyGoal), accent: NativePrism.confirmed)
+                            Text("\(earned) / \(target)").font(.subheadline).monospacedDigit()
+                        }
+                    }
+                }
+                .accessibilityIdentifier("confirmed-activity-bento")
+            }
+        }
+
+        @ViewBuilder private var activityStrip: some View {
+            if let profile = model.profile {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 20) {
+                        Label("\(profile.xp)", systemImage: "bolt.fill")
+                            .accessibilityLabel("\(copy.native(.confirmedXP)) · \(profile.xp)")
+                        if let streak = profile.streakDays {
+                            Label("\(streak)", systemImage: "flame.fill")
+                                .accessibilityLabel("\(copy.native(.streak)) · \(streak)")
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label(
+                            "\(copy.native(.confirmedXP)) · \(profile.xp)", systemImage: "bolt.fill"
+                        )
+                        if let streak = profile.streakDays {
+                            Label("\(copy.native(.streak)) · \(streak)", systemImage: "flame.fill")
+                        }
+                    }
+                }
+                .font(.headline).foregroundStyle(NativePrism.pending)
+                .symbolRenderingMode(.hierarchical)
+            }
         }
 
         private var connectionSectionTitle: String {
@@ -6319,29 +6793,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
             {
                 ForEach(path.units) { unit in
                     Section("\(copy.native(.unit)) · \(unit.title)") {
+                        unitProgress(title: unit.title, lessons: unit.lessons, code: path.trackId)
                         ForEach(unit.lessons) { lesson in
                             NavigationLink(value: lesson.id) {
-                                Label {
-                                    VStack(alignment: .leading) {
-                                        Text(lesson.title)
-                                            .font(.headline)
-                                        Text("\(copy.minutes(lesson.estMinutes))")
-                                            .foregroundStyle(
-                                                .secondary)
-                                        Text(activityStatus(lesson.status))
-                                            .font(.caption).foregroundStyle(.secondary)
-                                        Text(
-                                            "\(lesson.nativeMasteryStage.symbol) \(copy[lesson.nativeMasteryStage.copyKey])"
-                                        )
-                                        .font(.caption)
-                                        if !lesson.canOpen {
-                                            Text(copy.native(.lockedHint))
-                                                .font(.caption).foregroundStyle(.secondary)
-                                        }
-                                    }
-                                } icon: {
-                                    Image(systemName: lesson.canOpen ? "book" : "lock")
-                                }
+                                lessonLabel(lesson, code: path.trackId)
                             }
                             .disabled(
                                 !lesson.canOpen || model.busy || loadingLessonID != nil)
@@ -6759,6 +7214,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 .accessibilityAddTraits(.isHeader)
                                 .id("session-reading-start")
                             learningCycle
+                            NativeQuestionProgress(
+                                selected: lesson.questions.filter { model.selections[$0.id] != nil }
+                                    .count,
+                                total: lesson.questions.count,
+                                title: copy.questionCount(
+                                    selected: lesson.questions.filter {
+                                        model.selections[$0.id] != nil
+                                    }.count,
+                                    total: lesson.questions.count))
                             if let node = model.path?.units.flatMap(\.lessons).first(where: {
                                 $0.id == lesson.id
                             }) {
@@ -6822,6 +7286,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                     .accessibilityIdentifier("pending-correction")
                                 case .corrected(let result):
                                     NativeReadingSection(title: copy.native(.confirmedResult)) {
+                                        NativeReadinessRing(
+                                            percent: result.scorePct, title: copy.native(.score),
+                                            accent: NativePrism.confirmed)
                                         Label(
                                             copy.confirmed, systemImage: "checkmark.seal"
                                         )
@@ -6917,7 +7384,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                         }
                                     }
                                 }
-                            } else {
+                            }
+                        }
+                        .safeAreaInset(edge: .bottom) {
+                            if model.outcome == nil {
                                 NativePrimaryButton(
                                     title: copy.submitAnswer, symbol: "paperplane"
                                 ) {
@@ -6925,6 +7395,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 }
                                 .disabled(!model.canSubmit)
                                 .accessibilityIdentifier("submit-for-correction")
+                                .padding(16)
+                                .frame(maxWidth: 700)
+                                .frame(maxWidth: .infinity)
+                                .background(NativePrism.surface)
                             }
                         }
                     }
@@ -6987,26 +7461,20 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     .font(.caption).foregroundStyle(.secondary)
                 Text(.init(question.stem)).font(.headline)
                     .accessibilityAddTraits(.isHeader)
-                ForEach(question.options) { option in
+                ForEach(Array(question.options.enumerated()), id: \.element.id) { index, option in
                     Button {
                         model.select(option, question: question)
                     } label: {
-                        Label(
-                            option.label,
-                            systemImage: model.selections[question.id] == option.id
-                                ? "checkmark.circle.fill" : "circle"
+                        NativeAnswerLabel(
+                            text: option.label, index: index,
+                            selected: model.selections[question.id] == option.id
                         )
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(NativeChoiceButtonStyle())
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(
-                                model.selections[question.id] == option.id
-                                    ? NativePrism.tint : NativePrism.edge,
-                                lineWidth: model.selections[question.id] == option.id ? 2 : 1)
-                    }
+                    .buttonStyle(
+                        NativeChoiceButtonStyle(
+                            isSelected: model.selections[question.id] == option.id)
+                    )
                     .disabled(model.outcome != nil || model.busy)
                     .accessibilityAddTraits(
                         model.selections[question.id] == option.id ? .isSelected : []

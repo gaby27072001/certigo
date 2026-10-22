@@ -120,7 +120,7 @@ class NativePrismPresentationTests(unittest.TestCase):
         root = self.app.split("private struct NativeRoot:", 1)[1].split(
             "struct NativeLessonAudioControls:", 1
         )[0]
-        styles = set(re.findall(r"\.buttonStyle\((\w+Style)\(", root))
+        styles = set(re.findall(r"\.buttonStyle\(\s*(\w+Style)\(", root))
         self.assertIn("NativeChoiceButtonStyle", styles)
         for style in styles:
             declaration = re.search(
@@ -239,13 +239,106 @@ class NativePrismPresentationTests(unittest.TestCase):
             "enterprise-delivery",
         ):
             self.assertIn(category, self.app)
-        self.assertIn('Picker(copy.native(.codeCategory), selection: $catalogFilter.category)', self.app)
+        self.assertRegex(
+            self.app, r"Button\(category\.title\(copy\)\)\s*\{\s*catalogFilter\.category = category\s*\}"
+        )
+        self.assertIn(".accessibilityLabel(copy.native(.codeCategory))", self.app)
         self.assertIn("model.tracks.contains", self.app)
         self.assertIn("Groups come from codes", self.app)
         self.assertIn("Announced and planned statuses are not supplied", self.app)
         self.assertIn("code == $0 || code.hasPrefix($0 + \"-\")", self.app)
         self.assertNotIn("track.status", self.app)
         self.assertNotIn("track.provider", self.app)
+
+    def test_signature_components_are_file_level_not_hidden_in_another_view(self):
+        for name in (
+            "NativeTrackTheme", "NativeReadinessRing", "NativeMetricGrid",
+            "NativeMetricTile", "NativeGoalHero", "NativeCertificationCard",
+            "NativeAnswerLabel", "NativeQuestionProgress",
+        ):
+            self.assertRegex(self.app, rf"(?m)^    struct {name}\b")
+        prism = self.app.split("enum NativePrism {", 1)[1].split(
+            "struct NativeTrackTheme", 1
+        )[0]
+        self.assertEqual(prism.count("{") + 1, prism.count("}"))
+
+    def test_metrics_never_synthesize_unknown_server_values(self):
+        metrics = self.app.split("private var activityMetrics:", 1)[1].split(
+            "private var activityStrip:", 1
+        )[0]
+        for field in ("profile.streakDays", "profile.level", "profile.dailyGoalXp", "profile.dailyXpEarned"):
+            self.assertIn(field, metrics)
+        self.assertNotRegex(metrics, r"\?\?\s*0")
+        goal = self.app.split("private var confirmedGoal:", 1)[1].split(
+            "private func resumeCurrentActivity", 1
+        )[0]
+        self.assertIn("$0.trackId.lowercased() == goalID.lowercased()", goal)
+        self.assertIn("? $0.readinessScore : nil", goal)
+        self.assertIn("activityStrip", goal)
+        self.assertNotIn("activityMetrics", goal)  # Do not bury the next action below a full dashboard.
+        self.assertIn("questCards(board)", self.app)
+        self.assertIn("quest.target > 0", self.app)
+        self.assertNotIn('Text("+XP")', self.app)  # The quest contract supplies gems, not XP.
+
+    def test_quiz_selection_and_progress_are_not_correctness(self):
+        root = self.app.split("private struct NativeRoot:", 1)[1]
+        self.assertIn("NativeAnswerLabel(", root)
+        self.assertIn("isSelected: model.selections[question.id] == option.id", root)
+        self.assertIn("lesson.questions.filter { model.selections[$0.id] != nil }", root)
+        self.assertIn("NativeQuestionProgress(", root)
+        style = self.app.split("struct NativeChoiceButtonStyle:", 1)[1].split(
+            "struct NativeEntryHeading:", 1
+        )[0]
+        self.assertIn("accessibilityReduceMotion", style)
+        self.assertIn("reduceMotion ? nil : NativePrism.feedback", style)
+        self.assertNotIn("confirmed", style)
+        self.assertIn("copy.native(.pendingCorrectionHint)", root)
+        self.assertIn("case .corrected(let result):", root)
+
+    def test_bento_and_rings_adapt_without_changing_reading_material(self):
+        self.assertIn("typeSize.isAccessibilitySize ? 1 : 2", self.app)
+        self.assertIn("@ScaledMetric(relativeTo: .title2)", self.app)
+        self.assertIn('accessibilityValue("\\(percent) %")', self.app)
+        self.assertIn("if let readiness, (0...100).contains(readiness)", self.app)
+        self.assertIn(".accessibilityHidden(true)", self.app)
+        self.assertIn("DisclosureGroup(copy.native(.beforeStart))", self.pilot)
+        self.assertIn("NativeGoalHero(", self.pilot)
+        self.assertIn("markedReadAt != nil", self.pilot)
+
+    def test_learning_actions_stay_ahead_of_utilities_and_quiz_action_is_pinned(self):
+        learning = self.app.split("private var learning: some View", 1)[1].split(
+            "private var certificationCollection:", 1
+        )[0]
+        self.assertLess(
+            learning.index("certificationCollection"),
+            learning.index("Section(copy.native(.continueDevice))"),
+        )
+        session = self.app.split("private var session: some View", 1)[1].split(
+            "private var learningCycle:", 1
+        )[0]
+        action = session.split(".safeAreaInset(edge: .bottom)", 1)[1]
+        self.assertIn("if model.outcome == nil", action)
+        self.assertIn(".disabled(!model.canSubmit)", action)
+        self.assertIn('accessibilityIdentifier("submit-for-correction")', action)
+        plan = self.app.split("private var myLearningPlan:", 1)[1].split(
+            "private func unitProgress", 1
+        )[0]
+        self.assertIn("selectedLesson = lesson.id", plan)
+        self.assertIn("!lesson.canOpen || model.busy || loadingLessonID != nil", plan)
+
+    def test_hero_gradient_white_text_contrast_at_interpolated_stops(self):
+        ink = re.search(r"let ink: \[UInt32\] = \[(.*?)\]", self.app, re.S)[1]
+        colors = [int(value, 16) for value in re.findall(r"0x([A-F0-9]{6})", ink)]
+        def luminance(rgb):
+            linear = [v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in rgb]
+            return sum(a * b for a, b in zip(linear, (0.2126, 0.7152, 0.0722)))
+        for band, value in enumerate(colors):
+            other = colors[2 if band == 3 else (band + 1) % len(colors)]
+            start = [(value >> shift & 255) / 255 for shift in (16, 8, 0)]
+            end = [(other >> shift & 255) / 255 for shift in (16, 8, 0)]
+            for step in range(21):
+                rgb = [a + (b - a) * step / 20 for a, b in zip(start, end)]
+                self.assertGreaterEqual(1.05 / (luminance(rgb) + 0.05), 4.5, (band, step))
 
     def test_international_copy_has_eight_explicit_translations_per_native_label(self):
         copy = self.app.split("enum NativeLabel:", 1)[1].split(
