@@ -289,6 +289,30 @@ class NativePrismPresentationTests(unittest.TestCase):
                 for match in re.finditer(pattern, source):
                     self.assertIn(match[1], declared, f"{path.name}: {match[0]}")
 
+    def test_demo_primary_decisions_reserve_space_above_the_native_tab_bar(self):
+        goal = self.app.split("private func goalDetail(", 1)[1].split(
+            "private var preparation:", 1
+        )[0]
+        exercise = self.app.split("private var exercise:", 1)[1].split(
+            "private var selectedAnswer:", 1
+        )[0]
+        for source, action in ((goal, "flow.choose(goal)"), (exercise, "flow.submit()")):
+            before, inset = source.split(".safeAreaInset(edge: .bottom)", 1)
+            self.assertNotIn(action, before)
+            self.assertIn(action, inset)
+            self.assertNotIn(".ignoresSafeArea", source)
+            self.assertIn(".frame(maxWidth: 680)", inset)
+        self.assertIn("flow.phase == .answering", exercise)
+        self.assertIn(".disabled(!flow.canSubmit)", exercise)
+        self.assertIn('.accessibilityIdentifier("demo-submit")', exercise)
+
+    def test_demo_history_uses_a_compact_localized_navigation_title(self):
+        history = self.app.split("private var demoHistory:", 1)[1].split(
+            "private struct DemoReadingSection:", 1
+        )[0]
+        self.assertIn(".navigationTitle(copy.native(.demoHistory))", history)
+        self.assertNotIn(".navigationTitle(copy.progressAndHistory)", history)
+
     def test_secondary_messages_resolve_in_the_current_interface_language(self):
         model = (SOURCES / "NativeModel.swift").read_text(encoding="utf-8")
         for name in ("historyError", "tutorExplanationError", "deletionMessage", "errorMessage"):
