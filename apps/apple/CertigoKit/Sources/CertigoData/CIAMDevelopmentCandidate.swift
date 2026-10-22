@@ -1,6 +1,6 @@
 import Foundation
 
-/// Cloud's public 2026-10-13 snapshot; not active configuration or registration permission.
+/// Public development metadata; not active configuration or registration permission.
 public enum CIAMDevelopmentCandidate {
     public static let observedAt = "2026-10-13"
     public static let bundleIdentifier = "com.certigo.native.dev"
@@ -27,8 +27,8 @@ public enum CIAMDevelopmentCandidate {
             authority: url("https://\(tenantID).ciamlogin.com"),
             issuer: url("https://\(tenantID).ciamlogin.com/\(tenantID)/v2.0"),
             authorityKind: .standard,
-            // ARM host plus the source API route prefix is a candidate, not a health proof.
-            apiBaseURL: url("https://func-certigo-staging-hwbsyiwa7tqnw.azurewebsites.net/api"),
+            // Development host selected on 2026-10-22; not a backend health proof.
+            apiBaseURL: url("https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net/api"),
             apiScope: "api://\(apiAudience)/user_impersonation", apiAudience: apiAudience,
             redirectURI: url(redirect), registeredRedirects: registeredRedirects,
             declaredCallbackSchemes: declaredSchemes, otherAppCallbackSchemes: otherAppSchemes

@@ -8,6 +8,18 @@ final class CIAMConfigurationTests: XCTestCase {
     private let callback = "msauth.example.native.dev://auth"
     private let bundleIdentifier = "example.native.dev"
 
+    func testDevelopmentCandidateUsesTheSelectedDevelopmentAPIWithRoutePrefix() throws {
+        let value = try CIAMDevelopmentCandidate.validatedMetadata(
+            registeredRedirects: [CIAMDevelopmentCandidate.redirect],
+            declaredSchemes: ["msauth.\(CIAMDevelopmentCandidate.bundleIdentifier)"],
+            otherAppSchemes: [])
+        XCTAssertEqual(
+            value.apiBaseURL.absoluteString,
+            "https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net/api")
+        XCTAssertEqual(value.tenantID, CIAMDevelopmentCandidate.tenantID)
+        XCTAssertEqual(value.redirectURI.absoluteString, CIAMDevelopmentCandidate.redirect)
+    }
+
     func testSuppliedStandardPublicConfigurationDoesNotNormalizeTheIssuerIntoTheSDKAuthority()
         throws
     {
