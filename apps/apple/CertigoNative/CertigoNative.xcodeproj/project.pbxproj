@@ -24,6 +24,7 @@
 		0000000000000000000000A5 /* CertigoWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000B5 /* CertigoWidgetExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		0000000000000000000000A6 /* CertigoData in Frameworks */ = {isa = PBXBuildFile; productRef = 0000000000000000000000B6 /* CertigoData */; };
 		0000000000000000000000A7 /* CertigoDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 0000000000000000000000B7 /* CertigoDomain */; };
+		0000000000000000000000D1 /* CertigoAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000D2 /* CertigoAssets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		0000000000000000000000B3 /* CertigoWidgetExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertigoWidgetExtension.swift; sourceTree = "<group>"; };
 		0000000000000000000000B4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0000000000000000000000B5 /* CertigoWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = CertigoWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		0000000000000000000000D2 /* CertigoAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = CertigoAssets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +73,7 @@
 			children = (
 				000000000000000000000016 /* Certigo.icon */,
 				000000000000000000000017 /* PrivacyInfo.xcprivacy */,
+				0000000000000000000000D2 /* CertigoAssets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -208,6 +211,7 @@
 			files = (
 				000000000000000000000008 /* Certigo.icon in Resources */,
 				000000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */,
+				0000000000000000000000D1 /* CertigoAssets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -301,6 +305,11 @@
 		000000000000000000000085 /* Distribution */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
+					CertigoIconStreakFire,
+					CertigoIconStreakAtRisk,
+					CertigoIconMasteryGold,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = Certigo;
 				CODE_SIGNING_ALLOWED = NO;
 				CURRENT_PROJECT_VERSION = "$(CERTIGO_DISTRIBUTION_BUILD)";
@@ -352,6 +361,11 @@
 		000000000000000000000082 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
+					CertigoIconStreakFire,
+					CertigoIconStreakAtRisk,
+					CertigoIconMasteryGold,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = Certigo;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGN_ENTITLEMENTS = CertigoNative.entitlements;
@@ -379,6 +393,11 @@
 		000000000000000000000083 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
+					CertigoIconStreakFire,
+					CertigoIconStreakAtRisk,
+					CertigoIconMasteryGold,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = Certigo;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGN_ENTITLEMENTS = CertigoNative.entitlements;

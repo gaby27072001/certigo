@@ -1,13 +1,15 @@
+import json
 import os
 from pathlib import Path
 import plistlib
 import re
 import shutil
+import struct
 import subprocess
 import unittest
 import xml.etree.ElementTree as ET
 
-from test_native_source_membership import objects_of_type
+from test_native_source_membership import objects_of_type, references
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -89,6 +91,69 @@ class NativeDistributionTests(unittest.TestCase):
         original = ET.parse(PROJECT / "xcshareddata/xcschemes/CertigoNative.xcscheme")
         self.assertEqual(original.find("LaunchAction").get("buildConfiguration"), "Debug")
         self.assertEqual(original.find("ArchiveAction").get("buildConfiguration"), "Release")
+
+    def test_alternate_app_icons_are_registered_and_have_complete_asset_sets(self):
+        text = (PROJECT / "project.pbxproj").read_text()
+        configs = objects_of_type(text, "XCBuildConfiguration")
+        names = (
+            "CertigoIconStreakFire",
+            "CertigoIconStreakAtRisk",
+            "CertigoIconMasteryGold",
+        )
+        for identifier in (
+            "000000000000000000000082",
+            "000000000000000000000083",
+            "000000000000000000000085",
+        ):
+            match = re.search(
+                r"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = \((.*?)\);",
+                configs[identifier],
+                re.DOTALL,
+            )
+            self.assertIsNotNone(match, identifier)
+            self.assertEqual(tuple(re.findall(r"\bCertigoIcon\w+\b", match[1])), names)
+
+        resources = objects_of_type(text, "PBXResourcesBuildPhase")[
+            "000000000000000000000032"
+        ]
+        build_files = objects_of_type(text, "PBXBuildFile")
+        self.assertIn(
+            "0000000000000000000000D1",
+            references(resources, "files"),
+        )
+        self.assertIn(
+            "fileRef = 0000000000000000000000D2",
+            build_files["0000000000000000000000D1"],
+        )
+        catalog = APP / "Resources/CertigoAssets.xcassets"
+        for name in names:
+            app_icon_set = catalog / f"{name}.appiconset"
+            with (app_icon_set / "Contents.json").open(encoding="utf-8") as file:
+                contents = json.load(file)
+            self.assertEqual(
+                contents["images"],
+                [{
+                    "filename": f"{name}.png",
+                    "idiom": "universal",
+                    "platform": "ios",
+                    "size": "1024x1024",
+                }],
+            )
+            image_data = (app_icon_set / contents["images"][0]["filename"]).read_bytes()
+            self.assertEqual(image_data[:8], b"\x89PNG\r\n\x1a\n")
+            self.assertEqual(struct.unpack(">II", image_data[16:24]), (1024, 1024))
+            self.assertEqual(image_data[25], 2)
+
+            preview_name = f"{name}Preview"
+            preview_set = catalog / f"{preview_name}.imageset"
+            with (preview_set / "Contents.json").open(encoding="utf-8") as file:
+                preview = json.load(file)
+            self.assertTrue((preview_set / preview["images"][0]["filename"]).is_file())
+
+        standard = catalog / "CertigoIconStandardPreview.imageset"
+        with (standard / "Contents.json").open(encoding="utf-8") as file:
+            preview = json.load(file)
+        self.assertTrue((standard / preview["images"][0]["filename"]).is_file())
 
     def test_archive_and_direct_build_both_validate_before_compilation(self):
         tree = ET.parse(PROJECT / "xcshareddata/xcschemes/CertigoNative Distribution.xcscheme")

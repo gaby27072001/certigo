@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "CertigoIconStandardPreview.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
