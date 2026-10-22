@@ -359,10 +359,11 @@ class NativePrismPresentationTests(unittest.TestCase):
             "paintMicrosoftTiles(in: &context",
             "NativeMicrosoftVendorBadge",
             "context.fill(", "context.stroke(", "path.closeSubpath()",
-            "NativePrism.surface", "contrast == .increased", "@ScaledMetric",
-            "certigo-preparation-crest", "copy.native(.learningPath)",
+            "NativePrism.surface", "@Environment(\\.colorSchemeContrast)", "contrast == .increased",
+            "@ScaledMetric", "certigo-preparation-crest", "copy.native(.learningPath)",
         ):
             self.assertIn(marker, art)
+        self.assertNotIn("@Environment(\\.accessibilityContrast)", self.app)
         for claim in ("Certified", "official", "earned", "fundamentals", "associate", "expert"):
             self.assertNotRegex(art, rf'"[^"\n]*\b{claim}\b[^"\n]*"')
         for unsafe in ("★", "octocat", "visor", "smile", "reward", "level", "AsyncImage"):
