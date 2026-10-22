@@ -4146,11 +4146,14 @@ enum NativeLearningDuration {
             @State private var showDeveloper = false
         #endif
         @State private var pendingLessonLink: EditorialPilotLessonLink?
+        @State private var pendingWidgetRoute: CertigoWidgetRoute?
         @State private var invalidLessonLink = false
 
         var body: some View {
             #if CERTIGO_PRODUCTION_DISTRIBUTION
-                NativeProductionEntry(pendingLessonLink: $pendingLessonLink)
+                NativeProductionEntry(
+                    pendingLessonLink: $pendingLessonLink,
+                    pendingWidgetRoute: $pendingWidgetRoute)
             #else
                 developmentEntry
             #endif
@@ -4215,7 +4218,10 @@ enum NativeLearningDuration {
                 .fullScreenCover(isPresented: $showDemo) { NativeDemoRoot() }
                 #if DEBUG
                     .sheet(isPresented: $showDeveloper) {
-                        NativeDeveloperConnector(pendingLessonLink: $pendingLessonLink)
+                        NativeDeveloperConnector(
+                            pendingLessonLink: $pendingLessonLink,
+                            pendingWidgetRoute: $pendingWidgetRoute
+                        )
                         .interactiveDismissDisabled()
                     }
                 #endif
@@ -4229,6 +4235,13 @@ enum NativeLearningDuration {
         }
 
         private func handleIncomingURL(_ url: URL) {
+            if let route = CertigoWidgetRoute(url: url) {
+                pendingWidgetRoute = route
+                #if DEBUG
+                    showDeveloper = true
+                #endif
+                return
+            }
             guard url.scheme == "https", url.host == EditorialPilotLessonLink.host else { return }
             guard let link = EditorialPilotLessonLink(url: url) else {
                 pendingLessonLink = nil
@@ -4244,13 +4257,18 @@ enum NativeLearningDuration {
         private struct NativeProductionEntry: View {
             @Environment(\.nativeInterfaceCopy) private var copy
             @Binding private var pendingLessonLink: EditorialPilotLessonLink?
+            @Binding private var pendingWidgetRoute: CertigoWidgetRoute?
             @State private var model: NativeModel
             @State private var provider: MSALAuthenticationProvider?
             @State private var configurationIssue: NativePresentationMessage?
             @State private var showDemo = false
 
-            init(pendingLessonLink: Binding<EditorialPilotLessonLink?>) {
+            init(
+                pendingLessonLink: Binding<EditorialPilotLessonLink?>,
+                pendingWidgetRoute: Binding<CertigoWidgetRoute?>
+            ) {
                 self._pendingLessonLink = pendingLessonLink
+                self._pendingWidgetRoute = pendingWidgetRoute
                 do {
                     let configured = try CIAMConfigurationEnvironment.configuredProductionProvider(
                         infoDictionary: Bundle.main.infoDictionary ?? [:],
@@ -4327,10 +4345,16 @@ enum NativeLearningDuration {
                             }
                         }
                     } else {
-                        NativeRoot(model: model, pendingLessonLink: $pendingLessonLink)
+                        NativeRoot(
+                            model: model, pendingLessonLink: $pendingLessonLink,
+                            pendingWidgetRoute: $pendingWidgetRoute)
                     }
                 }
                 .onOpenURL { url in
+                    if let route = CertigoWidgetRoute(url: url) {
+                        pendingWidgetRoute = route
+                        return
+                    }
                     _ = provider?.handleCallback(url, sourceApplication: nil)
                 }
                 .task {
@@ -4388,13 +4412,18 @@ enum NativeLearningDuration {
             @Environment(\.nativeInterfaceCopy) private var copy
             @Environment(\.dismiss) private var dismiss
             @Binding private var pendingLessonLink: EditorialPilotLessonLink?
+            @Binding private var pendingWidgetRoute: CertigoWidgetRoute?
             @State private var model: NativeModel
             @State private var usesCIAM: Bool
             @State private var ciamProvider: MSALAuthenticationProvider?
             @State private var configurationIssue: NativePresentationMessage?
 
-            init(pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil)) {
+            init(
+                pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil),
+                pendingWidgetRoute: Binding<CertigoWidgetRoute?> = .constant(nil)
+            ) {
                 self._pendingLessonLink = pendingLessonLink
+                self._pendingWidgetRoute = pendingWidgetRoute
                 do {
                     let configured = try CIAMConfigurationEnvironment.configuredProvider(
                         environment: ProcessInfo.processInfo.environment,
@@ -4442,6 +4471,7 @@ enum NativeLearningDuration {
                     } else {
                         NativeRoot(
                             model: model, pendingLessonLink: $pendingLessonLink,
+                            pendingWidgetRoute: $pendingWidgetRoute,
                             closeDeveloper: { dismiss() })
                     }
                 }
@@ -5962,7 +5992,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
         @Bindable var model: NativeModel
         @Binding var pendingLessonLink: EditorialPilotLessonLink?
+        @Binding var pendingWidgetRoute: CertigoWidgetRoute?
         let closeDeveloper: (() -> Void)?
+        @State private var widgetController = NativeWidgetSnapshotController()
         @State private var selectedTrack: String?
         @State private var selectedLesson: String?
         @State private var savingGoalID: String?
@@ -5980,14 +6012,17 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var showcaseUniverse: NativeShowcaseUniverse?
         @State private var resumeTrackID: String?
         @State private var showingStudyPlan = false
+        @State private var showingWidgetGallery = false
 
         init(
             model: NativeModel,
             pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil),
+            pendingWidgetRoute: Binding<CertigoWidgetRoute?> = .constant(nil),
             closeDeveloper: (() -> Void)? = nil
         ) {
             self.model = model
             self._pendingLessonLink = pendingLessonLink
+            self._pendingWidgetRoute = pendingWidgetRoute
             self.closeDeveloper = closeDeveloper
         }
 
@@ -6087,6 +6122,20 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .onChange(of: model.profile?.activeTrackId) { _, _ in
                 showingStudyPlan = false
             }
+            .onChange(of: pendingWidgetRoute, initial: true) { _, route in
+                guard route != nil else { return }
+                navigation.learn = .myLearning
+                model.selectedTab = .learn
+                columns = .all
+                compactColumn = .sidebar
+                pendingWidgetRoute = nil
+            }
+            .onChange(of: widgetSnapshotKey, initial: true) { _, _ in
+                refreshWidgetSnapshot()
+            }
+            .onDisappear {
+                if model.profile == nil { widgetController.clear() }
+            }
             .onChange(of: model.restorationRevision) { _, _ in
                 selectedTrack = model.path?.trackId ?? model.offlinePack?.trackId
                 selectedLesson = model.lesson?.id
@@ -6138,6 +6187,37 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     NativeStudyPlanView(model: model, ownerID: ownerID, trackID: trackID)
                 }
             }
+            .sheet(isPresented: $showingWidgetGallery) {
+                NativeWidgetGalleryView(
+                    liveSnapshot: widgetController.snapshot,
+                    storeLocation: widgetController.store.location,
+                    storeError: widgetController.error,
+                    language: copy.language
+                )
+            }
+        }
+
+        private var widgetSnapshotKey: NativeWidgetSnapshotKey {
+            NativeWidgetSnapshotKey(
+                profile: model.profile,
+                tracks: model.tracks,
+                notificationPlan: model.notificationPlan,
+                notificationSettings: model.notificationSettings,
+                studyPlan: model.studyPlan,
+                language: copy.language
+            )
+        }
+
+        private func refreshWidgetSnapshot() {
+            widgetController.refresh(
+                profile: model.profile,
+                tracks: model.tracks,
+                notificationPlan: model.notificationPlan,
+                notificationSettings: model.notificationSettings,
+                studyPlan: model.studyPlan,
+                language: copy.language,
+                now: .now
+            )
         }
 
         private var coach: some View {
@@ -7073,6 +7153,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 }
                 NativeReadingSection(title: copy.native(.yourAccount)) {
+                    Button {
+                        showingWidgetGallery = true
+                    } label: {
+                        Label(
+                            CertigoWidgetCopy(language: copy.language).galleryTitle,
+                            systemImage: "square.grid.2x2"
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }
                     NavigationLink {
                         NativeReadingPage {
                             learningInsights

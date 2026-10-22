@@ -12,6 +12,14 @@
 				<string>msauth.com.certigo.mobileapp</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.certigo.mobileapp.widget</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>certigo</string>
+			</array>
+		</dict>
 	</array>
 	<key>CertigoProductionAuthMode</key>
 	<string>microsoft</string>
