@@ -77,8 +77,6 @@
                     title: snapshot.pilot.title,
                     message: copy.native(.originalFrench))
                 NativeReadingSection(title: copy.native(.beforeStart)) {
-                    Text(copy.contentLanguageNote)
-                        .font(.subheadline).foregroundStyle(.secondary)
                     Label(copy.native(.learningNotCertification), systemImage: "book")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tint)
