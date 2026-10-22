@@ -239,6 +239,39 @@ for the existing backend routes and evidence limits. NativeModel coordinates the
 Coach, recommendations, assessment, reward boards and notification preferences
 without changing authentication, scoring or release/signing configuration.
 
+## WidgetKit learning snapshot
+
+`CertigoKit` defines a bounded, account-identity-free widget snapshot from the
+confirmed profile, active catalog track, current-day server notification plan,
+study-plan preference and app language. Its phase is derived only from confirmed
+daily XP, the configured XP goal and a current-day server `StreakDanger`
+notification; it does not infer a streak risk from the clock. Snapshots expire
+at the end of their recorded study day. No review count or weekly activity
+history is available in this contract.
+
+The native app writes the snapshot to `group.com.certigo.native` when that
+container is provisioned, otherwise to its private Application Support fallback.
+The WidgetKit extension is deliberately shared-container-only and shows an
+unavailable state until the App Group exists; it never reads the private
+fallback. The repository does not configure the App Group entitlement or Apple
+Developer signing capability. Provisioning and signing must be completed and
+verified separately before installed widgets can show live account data.
+
+The in-app widget gallery previews small, medium, circular Lock Screen and
+rectangular Lock Screen layouts. Its four sample phases are explicitly labeled
+as simulated and are never written to the live store. The app declares the
+`certigo://widget/learn` and `certigo://widget/review` routes; both currently
+land on the Learn tab because no distinct review destination is wired. The
+snapshot is cleared when the connected model's profile becomes nil (including
+sign-out and confirmed deletion), then WidgetKit timelines are reloaded. iOS
+controls timeline refresh timing and may continue displaying an already-rendered
+entry until it processes the reload.
+
+Portable `CertigoKit` tests and Swift syntax parsing do not build the SwiftUI or
+WidgetKit targets. An Apple SDK build, signed installation, App Group
+entitlement, and on-device widget/deep-link validation remain separate
+acceptance gates.
+
 Coach requests require a confirmed result and its original submitted selection
 and manifest pin. Requests are explicit: the tutor POST changes server learner
 signals and must never be automatically replayed. Duplicate in-flight requests

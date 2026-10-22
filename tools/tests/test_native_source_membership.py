@@ -9,16 +9,15 @@ PROJECT = APP / "CertigoNative.xcodeproj" / "project.pbxproj"
 
 
 def objects_of_type(project, kind):
-    section = project.split(f"/* Begin {kind} section */", 1)[1].split(
-        f"/* End {kind} section */", 1
-    )[0]
-    return dict(
-        re.findall(
+    return {
+        identifier: body
+        for identifier, body in re.findall(
             r"^\t\t([A-F0-9]{24})(?: /\*.*?\*/)? = \{(.*?)\};",
-            section,
+            project,
             re.MULTILINE | re.DOTALL,
         )
-    )
+        if re.search(rf"\bisa = {re.escape(kind)};", body)
+    }
 
 
 def references(body, field):
@@ -64,8 +63,12 @@ class NativeSourceMembershipTests(unittest.TestCase):
         build_files = objects_of_type(project, "PBXBuildFile")
         file_refs = objects_of_type(project, "PBXFileReference")
 
-        self.assertEqual(len(targets), 1)
-        target = next(iter(targets.values()))
+        app_targets = [
+            body for body in targets.values()
+            if 'productType = "com.apple.product-type.application";' in body
+        ]
+        self.assertEqual(len(app_targets), 1)
+        target = app_targets[0]
         target_sources = set(references(target, "buildPhases")) & sources_phases.keys()
         self.assertEqual(len(target_sources), 1)
         phase = sources_phases[target_sources.pop()]
@@ -105,6 +108,51 @@ class NativeSourceMembershipTests(unittest.TestCase):
                 for path in (APP / "Sources").rglob("*.swift")
             },
         )
+
+    def test_widget_extension_compiles_shared_presentation_and_is_embedded_in_app(self):
+        project = PROJECT.read_text(encoding="utf-8")
+        targets = objects_of_type(project, "PBXNativeTarget")
+        self.assertEqual(len(targets), 2)
+        app = targets["000000000000000000000050"]
+        widget_id = "0000000000000000000000BC"
+        widget = targets[widget_id]
+        self.assertIn('productType = "com.apple.product-type.app-extension";', widget)
+        phases = objects_of_type(project, "PBXSourcesBuildPhase")
+        source_ids = set(references(widget, "buildPhases")) & phases.keys()
+        self.assertEqual(len(source_ids), 1)
+        build_files = objects_of_type(project, "PBXBuildFile")
+        file_refs = objects_of_type(project, "PBXFileReference")
+        compiled_refs = []
+        for identifier in references(phases[source_ids.pop()], "files"):
+            reference = re.search(r"\bfileRef = ([A-F0-9]{24})\b", build_files[identifier])
+            self.assertIsNotNone(reference)
+            compiled_refs.append(reference[1])
+        self.assertEqual(len(compiled_refs), len(set(compiled_refs)))
+        self.assertEqual(
+            {re.search(r'\bpath = "?([^";]+)"?;', file_refs[ref])[1]
+             for ref in compiled_refs},
+            {"CertigoWidgetPresentation.swift", "CertigoWidgetExtension.swift"},
+        )
+        groups = objects_of_type(project, "PBXGroup")
+        widget_groups = [
+            body for body in groups.values() if re.search(r"\bpath = WidgetExtension;", body)
+        ]
+        self.assertEqual(len(widget_groups), 1)
+        self.assertIn("0000000000000000000000B3", references(widget_groups[0], "children"))
+        dependencies = objects_of_type(project, "PBXTargetDependency")
+        self.assertTrue(any(
+            f"target = {widget_id}" in dependencies[identifier]
+            for identifier in references(app, "dependencies")
+        ))
+        copies = objects_of_type(project, "PBXCopyFilesBuildPhase")
+        embed_phases = set(references(app, "buildPhases")) & copies.keys()
+        self.assertEqual(len(embed_phases), 1)
+        embed = copies[embed_phases.pop()]
+        self.assertIn("dstSubfolderSpec = 13;", embed)
+        self.assertTrue(any(
+            "fileRef = 0000000000000000000000B5" in build_files[identifier]
+            for identifier in references(embed, "files")
+        ))
 
 
 if __name__ == "__main__":

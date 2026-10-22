@@ -12,6 +12,14 @@
 				<string>msauth.com.certigo.native.dev</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.certigo.native.widget</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>certigo</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>
