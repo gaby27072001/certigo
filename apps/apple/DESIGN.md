@@ -1,6 +1,6 @@
 ---
 name: Certigo Apple
-description: Prism identity shared by connected learning and the isolated demonstration
+description: Expressive Prism learning studio with native Apple interaction
 colors:
   prism-violet: "#3B35F2"
   prism-dark-tint: "#8097F8"
@@ -15,28 +15,32 @@ typography:
 
 ## Direction
 
-**Prism, native to Apple.** This is a native translation of the root `DESIGN.md`,
-not a pixel copy of Flutter. The connected experience and isolated demonstration
-share the same identity. This document describes source implementation, not a
-validated Apple render.
+**Prism learning studio: Brilliant / Duolingo + Apple Fitness+.** This is the
+user-selected replacement for the former restrained, text-row-led presentation.
+Vibrant goal planes, code-colored certification identities, tactile answer options
+and evidence-backed activity tiles express the learning loop. System navigation,
+opaque reading surfaces and product truth remain authoritative. This document
+describes source implementation, not a validated Apple render or an award claim.
 
 ## Color and contrast
 
 `NativePrism` takes its six ink/glow bands directly from
 `packages/prism_ui/lib/src/tokens/prism_colors.dart`. Foregrounds use ink in light
 appearance and glow in dark appearance; Increase Contrast moves these foregrounds
-toward black or white. The main objective plane remains solid violet `#3B35F2`
-with white text, including in dark appearance. Brighter foreground colors are
-never used as fills beneath white body text.
+toward black or white. Goal planes use adjacent dark Prism ink stops with white text, including in dark
+appearance. AWS's amber plane ends in rose rather than success green. Brighter
+foreground colors are never used as fills beneath white body text. Presentation
+tests sample every hero gradient against white text at the normal-text 4.5:1 floor;
+these calculations do not replace inspection of composited Apple rendering.
 
-The catalog has no visual domain index. Recognized code namespaces use the seven
-Radar display categories: cloud violet, AI magenta, Apple/mobile rose, data green,
-DevOps amber, security cyan and enterprise blue. Blue reuses Prism `info` /
-`infoGlow` (`#1562AA` / `#52A2F8`), not a new vendor-brand palette. Existing
-Microsoft subject accents remain unchanged: AZ violet, AI magenta, PL rose,
-MS amber, DP green and SC cyan. Unknown codes keep violet without acquiring a
-guessed provider or category. These are explicitly code-derived display hints,
-not authoritative server metadata or a claim of a vendor partnership.
+`NativeTrackTheme` is a code-derived display hint, not a provider field. AZ codes
+use ocean blue, GH and AI indigo/violet, DP/Fabric emerald, AWS amber/rose, and
+SC/security plum. Remaining recognized namespaces reuse the existing Radar
+category spectrum. Blue reuses Prism `info` / `infoGlow`
+(`#1562AA` / `#52A2F8`), not an official vendor palette. Unknown codes retain the
+neutral Prism identity without acquiring guessed provider metadata, a logo,
+availability, or a claim of partnership. Existing catalog families and filter
+semantics are unchanged.
 Track names, codes and availability remain visible; color never carries identity alone.
 
 Canvas, reading surfaces, body/secondary text and borders use adaptive UIKit
@@ -50,11 +54,14 @@ Use SF through SwiftUI semantic styles and Dynamic Type, not custom font files,
 fixed-point text or tracked labels. This intentionally translates the Archivo
 hierarchy rather than reproducing its glyphs.
 
-The main learning goal is one violet 24-point rounded plane, followed by the real
-next action. Supporting content stays quieter. Reading and account/history pages
+The learning goal is a vibrant 28-point rounded plane with a readiness ring only
+when the loaded path belongs to the confirmed goal and provides a valid percentage.
+A compact XP/streak strip precedes it; the full profile Bento never precedes the
+next learning action. Rounded SF appears in short headings and numeric values,
+not long reading text. Supporting content stays quieter. Reading and account/history pages
 are centered and bounded at 700 points; answer choices have 16-point corners.
-Use opaque cards for a correction, a saved attempt or a worked example, not a card
-for every paragraph. Code can scroll horizontally without widening the reading
+Use opaque cards for a correction, a saved attempt, a metric or a worked example,
+not a card for every paragraph. Code can scroll horizontally without widening the reading
 column. The editorial catalog does not truncate lesson objectives.
 Principal interface labels, discovery filters, learning/Coach/account sections
 and editorial controls use typed eight-language copy. Editorial lesson text and source
@@ -63,8 +70,9 @@ notice; interface language is not a content translation claim.
 
 `NavigationSplitView` and its selected-track/lesson bindings remain authoritative
 for connected learning, including compact-column resume. Its native selectable
-lists retain system selection and back behavior; the sidebar now includes the
-objective-first composition and track accents. It is not replaced by a custom
+lists retain system selection and back behavior. Course rows use symbol medallions,
+readable code capsules and complete titles. Category chips mutate the same local
+filter state, and cards precede device-restore and editorial utilities. It is not replaced by a custom
 navigation shell. iPhone, iPad and multitasking must still be checked on Apple.
 
 ## Controls and material
@@ -75,8 +83,9 @@ Questions, explanations and text-heavy reading never use glass. Answer choices
 combine a rounded border, check icon, selected accessibility trait and readable
 state value. Pressed choices receive a semantic system fill.
 
-No custom animation, blur or decorative haptics is added. System navigation and
-controls own transitions, depth and motion preferences. Native signing, launch,
+Answer selection and changed readiness use the shared Prism 240 ms standard
+feedback curve; Reduce Motion removes that interpolation. No blur, confetti,
+decorative haptics or custom navigation transition is added. Native signing, launch,
 archive and MSAL configuration gates are unchanged.
 
 ## Product truth
@@ -110,14 +119,14 @@ unavailable, not a simulated service. Coach has no free-text composer or chat me
 ## Research translated to structure
 
 The research's Speak/Babbel separation is visible as one **Next session** action,
-then **Learning plan**, **Review & Practice** and **Goal overview**, not a field
-of equal statistic cards. A loaded active path supplies the next available node;
+then compact review/focus shortcuts, **Learning plan** and **Goal overview**.
+A loaded active path supplies the next available node;
 otherwise the named goal is opened to load it. Review recommendations are not
 invented. Mimo/Coursera's unit structure uses real node states and remaining
 activity counts; a lock explains that the server has not supplied its reason.
 
-Quizlet/Coursera/Uxcel discovery uses native search, code-family and code-category
-menus and an availability filter. Only categories present in loaded entries are
+Quizlet/Coursera/Uxcel discovery uses native search, a code-family menu, category
+chips and an availability filter. Only categories present in loaded entries are
 offered; alias namespaces share a family while Microsoft subject families remain
 distinct. Filters intersect and clear together. Prism code badges are quiet, continuous capsules, with
 readable summaries and explicit counts. An unavailable item can be inspected,
@@ -155,6 +164,16 @@ Unknown data is not zero; completed activity is not exam competence. Coach prese
 the server's explanation and evidence only after an explicit request. Social
 explains future privacy boundaries as prose rather than
 nonfunctional input fields, toggles, chat bubbles or people.
+
+Profile metrics and quest/achievement boards use an adaptive two-column grid,
+falling back to one column at accessibility sizes. Missing streak, level, daily
+goal or board fields do not become zeros, fake earned badges, or synthetic quests.
+Quest progress uses its supplied current/target, not an invented XP reward (the
+contract supplies gems). Unit bars count completed/mastered activities; lesson
+rings use only supplied mastery percentages. Readiness remains preparation,
+not mastery or a pass probability. The quiz rail counts selected answers, not
+correct answers; only confirmed results acquire score rings. The submit action
+is in the native bottom safe-area inset; pending answers never receive success styling.
 
 Study Plan is a short native sheet with optional target date, initial level and
 daily minutes, stored separately for each account/API/goal. The learning dashboard
