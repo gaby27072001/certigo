@@ -43,22 +43,23 @@ availability, or a claim of partnership. Existing catalog families and filter
 semantics are unchanged.
 Track names, codes and availability remain visible; color never carries identity alone.
 
-### Original preparation emblems
+### Vector vendor emblems and preparation crests
 
-`NativeEcosystemEmblem` draws original Certigo facets, curved ribbons or a five-node
-constellation with SwiftUI Canvas. `NativeCertificationCrest` frames that artwork
-with a two-line pennant, hexagon or octagon and the exact loaded exam code. They
-are preparation identifiers, **not official vendor logos, official certification
-badges or evidence of an earned qualification**. The accessible label uses the
-localized learning-path label and exact code, never a claimed level or award.
+`NativeEcosystemEmblem` ports the stylised vector `Canvas` primitives from
+`packages/prism_ui/lib/src/components/vendor_brand.dart` into SwiftUI `Canvas`:
+Microsoft tracks (`az-*`, `ai-*`, `dp-*`, `sc-*`, `ms-*`, `pl-*`) display the
+four-colour 2×2 Microsoft vendor badge (`#F25022`, `#7FBA00`, `#00A4EF`, `#FFB900`)
+alongside an Azure prism, Fabric diamond or Security shield; GitHub tracks (`gh-*`)
+pair the stylised mascot silhouette (`#24292F`) with a Copilot halo (`#8534F3`,
+`#BF3989`, `#2DA44E`); AWS tracks (`aws:*`) draw the `#FF9900` upward arrow arc on a
+Squid Ink (`#232F3E`) ground; and Google Cloud tracks (`gcp:*` / `google`) draw the
+four-colour ring and horizontal crossbar (`#4285F4`, `#EA4335`, `#FBBC05`, `#34A853`).
+Other ecosystems fall back to Certigo facets, curved ribbons or a five-node
+constellation. `NativeCertificationCrest` frames that artwork with a two-line
+pennant, hexagon or octagon and the exact loaded exam code. They remain preparation
+identifiers, **not evidence of an earned qualification**. The accessible label uses
+the localized learning-path label and exact code, never a claimed level or award.
 Numeric code suffixes do not assign Fundamentals/Associate/Expert or stars.
-
-Color references give each code universe a distinct visual rhythm; they do not
-grant a right to copy a brand mark. No four-square Microsoft logo, Azure A,
-Fabric mark, Copilot visor, Octocat, AWS smile, Google G/cloud or Kubernetes wheel
-is traced or approximated. A visible Certigo label accompanies the exam code.
-Existing Flutter hand-drawn vendor artwork is not
-ported: its "trademark-safe" comment is not a license or legal evidence.
 
 The same source component appears on catalog cards, the confirmed learning goal,
 track detail, quiz, mock exam, contextual Coach and profile. Only a loaded Track
@@ -71,19 +72,6 @@ path headers use a compact horizontal version; no new full-height badge is place
 above the primary learning action.
 Artwork is bundled as Swift source, has no network request, binary asset,
 added dependency or project-file change.
-
-Brand-source review (2026-10-22; recheck before introducing official assets):
-
-- [Microsoft trademark guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks)
-  identify brand assets as proprietary and require a license for many logo/icon uses.
-- [GitHub logo guidance](https://brand.github.com/foundations/logo) prohibits
-  modifications, gradients on logos and combination with other design elements;
-  it also states that Copilot's standalone visor logo was deprecated in 2025.
-  Permitted uses are scoped, not a blanket license to redraw marks.
-
-Future official assets require an approved unchanged source, documented permission
-covering Certigo's use and placement, and separate treatment from preparation
-artwork. These notes are implementation constraints, not a legal opinion.
 
 Canvas, reading surfaces, body/secondary text and borders use adaptive UIKit
 semantic roles. Borders use the label role at increased contrast. Success and

@@ -3280,12 +3280,20 @@ enum NativeLearningDuration {
         }
     }
 
-    // Original Certigo preparation artwork, not vendor logos or earned certification badges.
+    // Original Certigo preparation artwork, not official certification badges.
     struct NativeEcosystemArtwork {
         enum Silhouette: Sendable { case pennant, hexagon, octagon }
-        enum Motif: Sendable { case facets, constellation, ribbons }
+        enum Motif: Sendable {
+            case microsoftAzure, microsoftFabric, microsoftSecurity
+            case github, aws, google
+            case facets, constellation, ribbons
+        }
+        static let microsoftTileColors = Self.colors([
+            0xF25022, 0x7FBA00, 0x00A4EF, 0xFFB900,
+        ])
         let silhouette: Silhouette
         let motif: Motif
+        let isMicrosoft: Bool
         let colors: [Color]
 
         init(code: String) {
@@ -3294,47 +3302,83 @@ enum NativeLearningDuration {
             let family = NativeCatalogFilter.family(for: code)
             if components.contains("GH") || family == "GITHUB" {
                 silhouette = .octagon
-                motif = .constellation
-                colors = Self.colors([0x8250DF, 0xBF3989, 0x2DA44E])
+                motif = .github
+                isMicrosoft = false
+                colors = Self.colors([0x24292F, 0x8534F3, 0xBF3989, 0x2DA44E])
             } else if family == "AWS"
                 || components.contains(where: {
-                    ["CLF", "AIF", "SAA", "DVA", "SOA", "SAP", "DOP"].contains($0)
+                    ["AWS", "CLF", "AIF", "SAA", "DVA", "SOA", "SAP", "DOP"].contains($0)
                 })
             {
                 silhouette = .hexagon
-                motif = .facets
-                colors = Self.colors([0xFF9900, 0x0073BB, 0xFFE2AF])
-            } else if family == "GCP" {
+                motif = .aws
+                isMicrosoft = false
+                colors = Self.colors([0x232F3E, 0xFF9900])
+            } else if family == "GCP" || components.contains("GOOGLE") {
                 silhouette = .hexagon
-                motif = .ribbons
-                colors = Self.colors([0x4285F4, 0xEA4335, 0xFBBC04, 0x34A853])
+                motif = .google
+                isMicrosoft = false
+                colors = Self.colors([0x4285F4, 0xEA4335, 0xFBBC05, 0x34A853])
             } else if components.contains("DP") || normalized.contains("FABRIC") {
                 silhouette = .pennant
-                motif = .ribbons
+                motif = .microsoftFabric
+                isMicrosoft = true
                 colors = Self.colors([0x00B7C3, 0x117865, 0x79E7C5])
-            } else if components.contains("SC") || family == "ISC2" {
+            } else if components.contains("SC") || normalized.contains("SECURITY") {
+                silhouette = .pennant
+                motif = .microsoftSecurity
+                isMicrosoft = true
+                colors = Self.colors([0x008559, 0x0078D4, 0xA5E8D1])
+            } else if family == "MICROSOFT"
+                || components.contains(where: {
+                    ["MICROSOFT", "MSFT", "AZ", "AI", "MS", "PL"].contains($0)
+                })
+            {
+                silhouette = .pennant
+                motif = .microsoftAzure
+                isMicrosoft = true
+                colors = Self.colors([0x0078D4, 0x50E6FF, 0x00A4EF])
+            } else if family == "ISC2" {
                 silhouette = .pennant
                 motif = .constellation
+                isMicrosoft = false
                 colors = Self.colors([0x008559, 0x0078D4, 0xA5E8D1])
             } else if family == "COMPTIA" {
                 silhouette = .octagon
                 motif = .ribbons
+                isMicrosoft = false
                 colors = Self.colors([0xC8102E, 0xF58CA1, 0x54253F])
             } else if family == "CNCF" || components.contains("KUBERNETES") {
                 silhouette = .hexagon
                 motif = .constellation
+                isMicrosoft = false
                 colors = Self.colors([0x326CE5, 0x8DD9FF, 0x5962B8])
-            } else if components.contains("AZ") {
-                silhouette = .pennant
-                motif = .facets
-                colors = Self.colors([0x0078D4, 0x50E6FF, 0xA6C8FF])
             } else {
                 silhouette = .pennant
                 motif = .facets
+                isMicrosoft = false
                 colors = [
                     NativePrism.accent(for: code), NativePrism.accent(band: 1),
                     NativePrism.accent(band: 6),
                 ]
+            }
+        }
+
+        static func paintMicrosoftTiles(in context: inout GraphicsContext, rect: CGRect) {
+            let gutter = rect.width * 0.08
+            let tile = (rect.width - gutter) / 2
+            let radius = tile * 0.08
+            let origins = [
+                CGPoint(x: rect.minX, y: rect.minY),
+                CGPoint(x: rect.minX + tile + gutter, y: rect.minY),
+                CGPoint(x: rect.minX, y: rect.minY + tile + gutter),
+                CGPoint(x: rect.minX + tile + gutter, y: rect.minY + tile + gutter),
+            ]
+            for (index, origin) in origins.enumerated() {
+                let tileRect = CGRect(x: origin.x, y: origin.y, width: tile, height: tile)
+                context.fill(
+                    Path(roundedRect: tileRect, cornerRadius: radius),
+                    with: .color(microsoftTileColors[index]))
             }
         }
 
@@ -3385,6 +3429,23 @@ enum NativeLearningDuration {
         }
     }
 
+    struct NativeMicrosoftVendorBadge: View {
+        var size: CGFloat = 14
+
+        var body: some View {
+            Canvas { context, canvasSize in
+                let edge = min(canvasSize.width, canvasSize.height)
+                let rect = CGRect(
+                    x: (canvasSize.width - edge) / 2,
+                    y: (canvasSize.height - edge) / 2,
+                    width: edge, height: edge)
+                NativeEcosystemArtwork.paintMicrosoftTiles(in: &context, rect: rect)
+            }
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+        }
+    }
+
     struct NativeEcosystemEmblem: View {
         let code: String
 
@@ -3397,6 +3458,170 @@ enum NativeLearningDuration {
                     CGPoint(x: origin.x + x * scale, y: origin.y + y * scale)
                 }
                 switch artwork.motif {
+                case .microsoftAzure:
+                    var leftWing = Path()
+                    leftWing.addLines([point(0.46, 0.10), point(0.14, 0.78), point(0.42, 0.68)])
+                    leftWing.closeSubpath()
+                    context.fill(leftWing, with: .color(artwork.colors[0]))
+                    var rightWing = Path()
+                    rightWing.addLines([
+                        point(0.50, 0.16), point(0.86, 0.84), point(0.32, 0.84), point(0.56, 0.58),
+                    ])
+                    rightWing.closeSubpath()
+                    context.fill(
+                        rightWing,
+                        with: .linearGradient(
+                            Gradient(colors: [artwork.colors[1], artwork.colors[2]]),
+                            startPoint: point(0.45, 0.16), endPoint: point(0.86, 0.84)))
+                    let badgeRect = CGRect(
+                        x: origin.x + scale * 0.08, y: origin.y + scale * 0.08,
+                        width: scale * 0.26, height: scale * 0.26)
+                    NativeEcosystemArtwork.paintMicrosoftTiles(in: &context, rect: badgeRect)
+                case .microsoftFabric:
+                    let layers: [([CGPoint], Color)] = [
+                        (
+                            [
+                                point(0.52, 0.10), point(0.88, 0.36), point(0.52, 0.62),
+                                point(0.16, 0.36),
+                            ],
+                            artwork.colors[0]
+                        ),
+                        (
+                            [
+                                point(0.52, 0.38), point(0.88, 0.62), point(0.52, 0.88),
+                                point(0.16, 0.62),
+                            ],
+                            artwork.colors[1]
+                        ),
+                        (
+                            [
+                                point(0.52, 0.26), point(0.76, 0.48), point(0.52, 0.70),
+                                point(0.28, 0.48),
+                            ],
+                            artwork.colors[2]
+                        ),
+                    ]
+                    for (vertices, color) in layers {
+                        var diamond = Path()
+                        diamond.addLines(vertices)
+                        diamond.closeSubpath()
+                        context.fill(diamond, with: .color(color))
+                    }
+                    let badgeRect = CGRect(
+                        x: origin.x + scale * 0.08, y: origin.y + scale * 0.08,
+                        width: scale * 0.26, height: scale * 0.26)
+                    NativeEcosystemArtwork.paintMicrosoftTiles(in: &context, rect: badgeRect)
+                case .microsoftSecurity:
+                    var outerShield = Path()
+                    outerShield.addLines([
+                        point(0.52, 0.10), point(0.86, 0.24), point(0.80, 0.64),
+                        point(0.52, 0.90), point(0.24, 0.64), point(0.18, 0.24),
+                    ])
+                    outerShield.closeSubpath()
+                    context.fill(
+                        outerShield,
+                        with: .linearGradient(
+                            Gradient(colors: [artwork.colors[0], artwork.colors[1]]),
+                            startPoint: point(0.18, 0.10), endPoint: point(0.86, 0.90)))
+                    var innerCrest = Path()
+                    innerCrest.addLines([
+                        point(0.52, 0.24), point(0.72, 0.34), point(0.68, 0.60),
+                        point(0.52, 0.76), point(0.36, 0.60), point(0.32, 0.34),
+                    ])
+                    innerCrest.closeSubpath()
+                    context.fill(innerCrest, with: .color(artwork.colors[2]))
+                    let badgeRect = CGRect(
+                        x: origin.x + scale * 0.08, y: origin.y + scale * 0.08,
+                        width: scale * 0.26, height: scale * 0.26)
+                    NativeEcosystemArtwork.paintMicrosoftTiles(in: &context, rect: badgeRect)
+                case .github:
+                    let haloCenter = point(0.50, 0.50)
+                    let haloRadius = scale * 0.44
+                    var halo = Path()
+                    halo.addArc(
+                        center: haloCenter, radius: haloRadius,
+                        startAngle: .radians(0), endAngle: .radians(2 * Double.pi),
+                        clockwise: false)
+                    context.stroke(
+                        halo,
+                        with: .linearGradient(
+                            Gradient(colors: Array(artwork.colors.dropFirst())),
+                            startPoint: point(0.06, 0.06), endPoint: point(0.94, 0.94)),
+                        style: StrokeStyle(lineWidth: scale * 0.08, lineCap: .round))
+                    var ears = Path()
+                    ears.move(to: point(0.24, 0.30))
+                    ears.addLine(to: point(0.36, 0.14))
+                    ears.addLine(to: point(0.44, 0.34))
+                    ears.closeSubpath()
+                    ears.move(to: point(0.76, 0.30))
+                    ears.addLine(to: point(0.64, 0.14))
+                    ears.addLine(to: point(0.56, 0.34))
+                    ears.closeSubpath()
+                    context.fill(ears, with: .color(artwork.colors[0]))
+                    let headR = scale * 0.34
+                    let headCenter = point(0.50, 0.52)
+                    let head = Path(
+                        ellipseIn: CGRect(
+                            x: headCenter.x - headR, y: headCenter.y - headR,
+                            width: headR * 2, height: headR * 2))
+                    context.fill(head, with: .color(artwork.colors[0]))
+                    let body = Path(
+                        roundedRect: CGRect(
+                            x: origin.x + scale * 0.20, y: origin.y + scale * 0.52,
+                            width: scale * 0.60, height: scale * 0.34),
+                        cornerRadius: scale * 0.20)
+                    context.fill(body, with: .color(artwork.colors[0]))
+                    let eyeR = scale * 0.055
+                    for eyeX in [0.40, 0.60] {
+                        let eyeCenter = point(eyeX, 0.50)
+                        let eye = Path(
+                            ellipseIn: CGRect(
+                                x: eyeCenter.x - eyeR, y: eyeCenter.y - eyeR,
+                                width: eyeR * 2, height: eyeR * 2))
+                        context.fill(eye, with: .color(.white))
+                    }
+                case .aws:
+                    let backdrop = Path(
+                        roundedRect: CGRect(
+                            x: origin.x + scale * 0.06, y: origin.y + scale * 0.06,
+                            width: scale * 0.88, height: scale * 0.88),
+                        cornerRadius: scale * 0.22)
+                    context.fill(backdrop, with: .color(artwork.colors[0]))
+                    var arc = Path()
+                    arc.move(to: point(0.16, 0.56))
+                    arc.addQuadCurve(to: point(0.84, 0.56), control: point(0.50, 0.86))
+                    context.stroke(
+                        arc, with: .color(artwork.colors[1]),
+                        style: StrokeStyle(lineWidth: scale * 0.11, lineCap: .round))
+                    var arrow = Path()
+                    arrow.move(to: point(0.84, 0.56))
+                    arrow.addLine(to: point(0.72, 0.52))
+                    arrow.addLine(to: point(0.80, 0.66))
+                    arrow.closeSubpath()
+                    context.fill(arrow, with: .color(artwork.colors[1]))
+                case .google:
+                    let center = point(0.50, 0.50)
+                    let radius = scale * 0.36
+                    let stroke = scale * 0.18
+                    let start = -Double.pi / 4
+                    let sweep = (2 * Double.pi - Double.pi / 3) / 4
+                    for index in 0..<4 {
+                        var segment = Path()
+                        segment.addArc(
+                            center: center, radius: radius,
+                            startAngle: .radians(start + Double(index) * sweep),
+                            endAngle: .radians(start + Double(index + 1) * sweep),
+                            clockwise: false)
+                        context.stroke(
+                            segment, with: .color(artwork.colors[index]),
+                            style: StrokeStyle(lineWidth: stroke, lineCap: .butt))
+                    }
+                    var bar = Path()
+                    bar.move(to: CGPoint(x: center.x + radius * 0.1, y: center.y))
+                    bar.addLine(to: CGPoint(x: center.x + radius + stroke * 0.2, y: center.y))
+                    context.stroke(
+                        bar, with: .color(artwork.colors[0]),
+                        style: StrokeStyle(lineWidth: stroke, lineCap: .round))
                 case .facets:
                     let panels: [[CGPoint]] = [
                         [point(0.12, 0.28), point(0.51, 0.08), point(0.48, 0.54)],
@@ -3483,7 +3708,12 @@ enum NativeLearningDuration {
                     width: min(112, emblemSize) * (compact ? 0.65 : 1),
                     height: min(112, emblemSize) * (compact ? 0.65 : 1))
                 VStack(spacing: 2) {
-                    Text("Certigo").font(.caption2.weight(.medium))
+                    HStack(spacing: 4) {
+                        if artwork.isMicrosoft {
+                            NativeMicrosoftVendorBadge(size: 11)
+                        }
+                        Text("Certigo").font(.caption2.weight(.medium))
+                    }
                     Text(code).font(.system(.caption, design: .rounded, weight: .bold))
                 }
                 .fixedSize(horizontal: false, vertical: true)

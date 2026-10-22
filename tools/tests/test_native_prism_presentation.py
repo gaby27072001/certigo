@@ -349,7 +349,15 @@ class NativePrismPresentationTests(unittest.TestCase):
         )[0]
         for marker in (
             "enum Silhouette: Sendable", "case pennant, hexagon, octagon",
+            "case microsoftAzure, microsoftFabric, microsoftSecurity",
+            "case github, aws, google",
             "case facets, constellation, ribbons", "Canvas { context, size in",
+            "0xF25022, 0x7FBA00, 0x00A4EF, 0xFFB900",
+            "0x24292F, 0x8534F3, 0xBF3989, 0x2DA44E",
+            "0x232F3E, 0xFF9900",
+            "0x4285F4, 0xEA4335, 0xFBBC05, 0x34A853",
+            "paintMicrosoftTiles(in: &context",
+            "NativeMicrosoftVendorBadge",
             "context.fill(", "context.stroke(", "path.closeSubpath()",
             "NativePrism.surface", "contrast == .increased", "@ScaledMetric",
             "certigo-preparation-crest", "copy.native(.learningPath)",
