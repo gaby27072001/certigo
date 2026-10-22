@@ -375,10 +375,13 @@ clone per validation, reset local changes, delete old logs/results or alter
 signing. Save/commit deliberate local changes first. The script refuses any dirty
 checkout and a branch/upstream other than `main`/`origin/main`.
 
-Git ignores untracked `xcuserdata/`, `.swiftpm/` and `.DS_Store` state at any
-depth, so opening Xcode does not alone make the checkout dirty. Already tracked
-files, including dependency locks inside `.swiftpm/`, remain checked for changes.
-Do not delete local Xcode state or weaken the cleanliness guard to update.
+Only the validation command exempts untracked `xcuserdata/`, `.swiftpm/` and
+`.DS_Store` state at any depth, so opening Xcode does not alone block validation.
+Ordinary Git still shows that state, except for the specifically ignored local
+CIAM scheme and `.DS_Store`. Already tracked files, including dependency locks
+inside `.swiftpm/`, remain checked for changes, staging and deletion. Untracked
+source outside those exact state directories also blocks validation. Do not
+delete local Xcode state or bypass the guard to update.
 
 After this kit is integrated, run from that checkout using an **existing**
 Simulator UUID listed by `xcrun simctl list devices available`. First verify an

@@ -20,6 +20,35 @@ EOF
 }
 
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+checkout_is_clean() {
+  python3 - <<'PY'
+import subprocess
+import sys
+
+records = subprocess.check_output(
+    ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"]
+).split(b"\0")
+index = 0
+while index < len(records):
+    record = records[index]
+    index += 1
+    if not record:
+        continue
+    status, path = record[:2], record[3:]
+    if b"R" in status or b"C" in status:
+        index += 1
+    # Only untracked workspace state is exempt; tracked changes always block.
+    if status == b"??":
+        parts = path.split(b"/")
+        if b"xcuserdata" in parts[:-1] or b".swiftpm" in parts[:-1]:
+            continue
+        if parts[-1] == b".DS_Store":
+            continue
+    sys.exit(1)
+PY
+}
+
 archive=false
 case "${1-}" in
   --help|-h) usage; exit 0 ;;
@@ -34,7 +63,7 @@ for tool in git swift xcodebuild xcrun python3 plutil; do
 done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
-[[ -z $(git status --porcelain --untracked-files=all) ]] \
+checkout_is_clean \
   || fail 'Checkout has local changes. Preserve them before updating; nothing was pulled.'
 [[ $(git branch --show-current) == main ]] || fail 'Use the permanent main checkout.'
 [[ $(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}') == origin/main ]] \
@@ -66,7 +95,7 @@ exec > >(tee "$run/run.log") 2>&1
 printf 'Evidence directory: %s\n' "$run"
 git rev-parse HEAD > "$run/base-commit.txt"
 git pull --ff-only
-[[ -z $(git status --porcelain --untracked-files=all) ]] || fail 'Checkout changed during update.'
+checkout_is_clean || fail 'Checkout changed during update.'
 git rev-parse HEAD > "$run/tested-commit.txt"
 xcodebuild -version > "$run/xcode-version.txt"
 swift --version > "$run/swift-version.txt"
@@ -163,7 +192,7 @@ if $archive; then
 fi
 [[ $(git rev-parse HEAD) == "$(cat "$run/tested-commit.txt")" ]] \
   || fail 'HEAD changed during validation; results do not describe the current checkout.'
-[[ -z $(git status --porcelain --untracked-files=all) ]] \
+checkout_is_clean \
   || fail 'Checkout changed during validation; preserve and inspect changes.'
 printf '%s\n' "$ui_status" \
   'Package tests, Simulator build and protection tests completed.' \
