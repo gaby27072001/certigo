@@ -409,6 +409,46 @@ export function loadWorkflowManifest(manifestPath) {
   return { manifest, errors: validateWorkflowManifest(manifest) };
 }
 
+// Bind reviewed policy reads to the inspected inode; mutable ancestors still require
+// a stable checkout because O_NOFOLLOW protects only the final component.
+export function readVerifiedRegularFileSync(filePath, expectedStat) {
+  const absolutePath = path.resolve(filePath);
+  if (!expectedStat.isFile() || expectedStat.isSymbolicLink()) {
+    throw new Error('must be a real regular non-symlink file');
+  }
+  if (fs.realpathSync(absolutePath) !== absolutePath) {
+    throw new Error('must resolve to its exact repository path');
+  }
+
+  const flags = fs.constants.O_RDONLY
+    | (fs.constants.O_NOFOLLOW ?? 0)
+    | (fs.constants.O_NONBLOCK ?? 0);
+  const descriptor = fs.openSync(absolutePath, flags);
+  try {
+    const openedStat = fs.fstatSync(descriptor);
+    if (
+      !openedStat.isFile()
+      || openedStat.dev !== expectedStat.dev
+      || openedStat.ino !== expectedStat.ino
+    ) {
+      throw new Error('file changed while opening');
+    }
+    const currentStat = fs.lstatSync(absolutePath);
+    if (
+      fs.realpathSync(absolutePath) !== absolutePath
+      || !currentStat.isFile()
+      || currentStat.isSymbolicLink()
+      || currentStat.dev !== expectedStat.dev
+      || currentStat.ino !== expectedStat.ino
+    ) {
+      throw new Error('file path changed while opening');
+    }
+    return fs.readFileSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
 // Valide le descripteur avant d'en lire les octets et refuse les liens, parents compris.
 // L'arbre peut venir d'une PR non fiable, mais ses parents doivent rester sans autre écrivain :
 // les API Node utilisées ne résolvent pas atomiquement tous les composants parents.
@@ -477,8 +517,7 @@ export function readRegularRepositoryFile(root, relativePath) {
   }
 }
 
-// Calcule, à partir d'un arbre, les états A/B/C exactement comme le générateur les écrit.
-// Ne suit aucun lien symbolique : l'arbre peut être celui d'une PR non fiable.
+// Calcule les états A/B/C d'un arbre stable, en refusant les liens symboliques présents.
 export function computeWorkflowStates(root) {
   const errors = [];
   const workflowsRelative = '.github/workflows';
