@@ -1,0 +1,527 @@
+fichier,ligne,categorie,valeur,extrait
+apps/apple/CertigoKit/Sources/CertigoData/CIAMConfigurationEnvironment.swift,18,unlocalized_string,"""CERTIGO_CIAM_ENABLED must be exactly true or false.""","""CERTIGO_CIAM_ENABLED must be exactly true or false."""
+apps/apple/CertigoKit/Sources/CertigoData/CIAMConfigurationEnvironment.swift,20,unlocalized_string,"""Set the missing local Xcode scheme value \(name).""","""Set the missing local Xcode scheme value \(name)."""
+apps/apple/CertigoKit/Sources/CertigoData/CIAMConfigurationEnvironment.swift,22,unlocalized_string,"""Correct the local Xcode scheme value \(name).""","""Correct the local Xcode scheme value \(name)."""
+apps/apple/CertigoKit/Sources/CertigoData/CIAMConfigurationEnvironment.swift,24,unlocalized_string,"""CIAM test sign-in can only be enabled in a development build.""","""CIAM test sign-in can only be enabled in a development build."""
+apps/apple/CertigoKit/Sources/CertigoData/CIAMConfigurationEnvironment.swift,26,unlocalized_string,"""Microsoft production sign-in is available only in the Distribution build.""","""Microsoft production sign-in is available only in the Distribution build."""
+apps/apple/CertigoKit/Sources/CertigoData/CIAMConfigurationEnvironment.swift,28,unlocalized_string,"""Microsoft production sign-in requires the Certigo App Store bundle identifier.""","""Microsoft production sign-in requires the Certigo App Store bundle identifier."""
+apps/apple/CertigoKit/Sources/CertigoData/CIAMConfigurationEnvironment.swift,30,unlocalized_string,"""The app bundle identifier is unavailable; CIAM sign-in cannot be initialized.""","""The app bundle identifier is unavailable; CIAM sign-in cannot be initialized."""
+apps/apple/CertigoKit/Sources/CertigoData/CIAMConfigurationEnvironment.swift,32,unlocalized_string,"""The CIAM callback scheme is not registered by this app's Info.plist.""","""The CIAM callback scheme is not registered by this app's Info.plist."""
+apps/apple/CertigoKit/Sources/CertigoData/CIAMConfigurationEnvironment.swift,34,unlocalized_string,"""The CIAM callback scheme is duplicated in this app's Info.plist.""","""The CIAM callback scheme is duplicated in this app's Info.plist."""
+apps/apple/CertigoKit/Sources/CertigoData/CIAMConfigurationEnvironment.swift,36,unlocalized_string,"""Use the msauth.<bundle-id>://auth redirect for this app.""","""Use the msauth.<bundle-id>://auth redirect for this app."""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,14,unlocalized_string,"""Cloud platforms""","case .cloud: ""Cloud platforms"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,15,unlocalized_string,"""AI & foundation models""","case .ai: ""AI & foundation models"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,16,unlocalized_string,"""Apple & mobile""","case .apple: ""Apple & mobile"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,17,unlocalized_string,"""Data & analytics""","case .data: ""Data & analytics"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,18,unlocalized_string,"""DevOps & cloud native""","case .devops: ""DevOps & cloud native"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,19,unlocalized_string,"""Security & networking""","case .security: ""Security & networking"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,20,unlocalized_string,"""Enterprise & delivery""","case .enterprise: ""Enterprise & delivery"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,199,unlocalized_string,"""Resume \(title)""","var resumeTitle: String { ""Resume \(title)"" }"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,2766,raw_typography,.font(.caption.weight(.medium)),.font(.caption.weight(.medium))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,2767,raw_spacing_size_radius,".padding(.horizontal, 12)",".padding(.horizontal, 12).padding(.vertical, 8)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,2767,raw_spacing_size_radius,".padding(.vertical, 8)",".padding(.horizontal, 12).padding(.vertical, 8)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,2858,raw_typography,.font(.title2.bold()),Text(snapshot.exam.trackTitle).font(.title2.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,2876,unlocalized_string,"Text(""\(result.scaledScore) / 1000 · \(result.passingScore)""","Text(""\(result.scaledScore) / 1000 · \(result.passingScore)"")"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,2979,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3046,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3130,raw_spacing_size_radius,spacing: 12,"VStack(alignment: .leading, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3150,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3167,raw_color,0x3B35F2,"0x3B35F2, 0x901BAE, 0xA91A66, 0x924A13, 0x177331, 0x176C7A, 0x1562AA,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3167,raw_color,0x901BAE,"0x3B35F2, 0x901BAE, 0xA91A66, 0x924A13, 0x177331, 0x176C7A, 0x1562AA,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3167,raw_color,0xA91A66,"0x3B35F2, 0x901BAE, 0xA91A66, 0x924A13, 0x177331, 0x176C7A, 0x1562AA,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3167,raw_color,0x924A13,"0x3B35F2, 0x901BAE, 0xA91A66, 0x924A13, 0x177331, 0x176C7A, 0x1562AA,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3167,raw_color,0x177331,"0x3B35F2, 0x901BAE, 0xA91A66, 0x924A13, 0x177331, 0x176C7A, 0x1562AA,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3167,raw_color,0x176C7A,"0x3B35F2, 0x901BAE, 0xA91A66, 0x924A13, 0x177331, 0x176C7A, 0x1562AA,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3167,raw_color,0x1562AA,"0x3B35F2, 0x901BAE, 0xA91A66, 0x924A13, 0x177331, 0x176C7A, 0x1562AA,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3170,raw_color,0x8097F8,"0x8097F8, 0xD764F8, 0xF95DA5, 0xEC7B26, 0x2DBC55, 0x2CB0C7, 0x52A2F8,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3170,raw_color,0xD764F8,"0x8097F8, 0xD764F8, 0xF95DA5, 0xEC7B26, 0x2DBC55, 0x2CB0C7, 0x52A2F8,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3170,raw_color,0xF95DA5,"0x8097F8, 0xD764F8, 0xF95DA5, 0xEC7B26, 0x2DBC55, 0x2CB0C7, 0x52A2F8,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3170,raw_color,0xEC7B26,"0x8097F8, 0xD764F8, 0xF95DA5, 0xEC7B26, 0x2DBC55, 0x2CB0C7, 0x52A2F8,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3170,raw_color,0x2DBC55,"0x8097F8, 0xD764F8, 0xF95DA5, 0xEC7B26, 0x2DBC55, 0x2CB0C7, 0x52A2F8,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3170,raw_color,0x2CB0C7,"0x8097F8, 0xD764F8, 0xF95DA5, 0xEC7B26, 0x2DBC55, 0x2CB0C7, 0x52A2F8,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3170,raw_color,0x52A2F8,"0x8097F8, 0xD764F8, 0xF95DA5, 0xEC7B26, 0x2DBC55, 0x2CB0C7, 0x52A2F8,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3183,raw_animation,"Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.24)","static let feedback = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.24)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3203,raw_color,"return UIColor( red: red + (target - red) * 0.25,","return UIColor( red: red + (target - red) * 0.25,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3211,raw_color,"UIColor( red: CGFloat((hex >> 16) & 255) / 255,","UIColor( red: CGFloat((hex >> 16) & 255) / 255,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3274,raw_typography,.font(.title2.weight(.semibold)),.font(.title2.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3277,raw_spacing_size_radius,width: 52,".frame(width: 52, height: 52)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3277,raw_spacing_size_radius,height: 52,".frame(width: 52, height: 52)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3278,raw_color,.opacity(0.12),".background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3278,raw_spacing_size_radius,RoundedRectangle(cornerRadius: 18),".background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3292,raw_color,0xF25022,"0xF25022, 0x7FBA00, 0x00A4EF, 0xFFB900,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3292,raw_color,0x7FBA00,"0xF25022, 0x7FBA00, 0x00A4EF, 0xFFB900,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3292,raw_color,0x00A4EF,"0xF25022, 0x7FBA00, 0x00A4EF, 0xFFB900,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3292,raw_color,0xFFB900,"0xF25022, 0x7FBA00, 0x00A4EF, 0xFFB900,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3307,raw_color,0x24292F,"colors = Self.colors([0x24292F, 0x8534F3, 0xBF3989, 0x2DA44E])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3307,raw_color,0x8534F3,"colors = Self.colors([0x24292F, 0x8534F3, 0xBF3989, 0x2DA44E])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3307,raw_color,0xBF3989,"colors = Self.colors([0x24292F, 0x8534F3, 0xBF3989, 0x2DA44E])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3307,raw_color,0x2DA44E,"colors = Self.colors([0x24292F, 0x8534F3, 0xBF3989, 0x2DA44E])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3316,raw_color,0x232F3E,"colors = Self.colors([0x232F3E, 0xFF9900])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3316,raw_color,0xFF9900,"colors = Self.colors([0x232F3E, 0xFF9900])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3321,raw_color,0x4285F4,"colors = Self.colors([0x4285F4, 0xEA4335, 0xFBBC05, 0x34A853])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3321,raw_color,0xEA4335,"colors = Self.colors([0x4285F4, 0xEA4335, 0xFBBC05, 0x34A853])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3321,raw_color,0xFBBC05,"colors = Self.colors([0x4285F4, 0xEA4335, 0xFBBC05, 0x34A853])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3321,raw_color,0x34A853,"colors = Self.colors([0x4285F4, 0xEA4335, 0xFBBC05, 0x34A853])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3326,raw_color,0x00B7C3,"colors = Self.colors([0x00B7C3, 0x117865, 0x79E7C5])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3326,raw_color,0x117865,"colors = Self.colors([0x00B7C3, 0x117865, 0x79E7C5])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3326,raw_color,0x79E7C5,"colors = Self.colors([0x00B7C3, 0x117865, 0x79E7C5])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3331,raw_color,0x008559,"colors = Self.colors([0x008559, 0x0078D4, 0xA5E8D1])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3331,raw_color,0x0078D4,"colors = Self.colors([0x008559, 0x0078D4, 0xA5E8D1])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3331,raw_color,0xA5E8D1,"colors = Self.colors([0x008559, 0x0078D4, 0xA5E8D1])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3340,raw_color,0x0078D4,"colors = Self.colors([0x0078D4, 0x50E6FF, 0x00A4EF])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3340,raw_color,0x50E6FF,"colors = Self.colors([0x0078D4, 0x50E6FF, 0x00A4EF])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3340,raw_color,0x00A4EF,"colors = Self.colors([0x0078D4, 0x50E6FF, 0x00A4EF])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3345,raw_color,0x008559,"colors = Self.colors([0x008559, 0x0078D4, 0xA5E8D1])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3345,raw_color,0x0078D4,"colors = Self.colors([0x008559, 0x0078D4, 0xA5E8D1])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3345,raw_color,0xA5E8D1,"colors = Self.colors([0x008559, 0x0078D4, 0xA5E8D1])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3350,raw_color,0xC8102E,"colors = Self.colors([0xC8102E, 0xF58CA1, 0x54253F])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3350,raw_color,0xF58CA1,"colors = Self.colors([0xC8102E, 0xF58CA1, 0x54253F])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3350,raw_color,0x54253F,"colors = Self.colors([0xC8102E, 0xF58CA1, 0x54253F])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3355,raw_color,0x326CE5,"colors = Self.colors([0x326CE5, 0x8DD9FF, 0x5962B8])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3355,raw_color,0x8DD9FF,"colors = Self.colors([0x326CE5, 0x8DD9FF, 0x5962B8])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3355,raw_color,0x5962B8,"colors = Self.colors([0x326CE5, 0x8DD9FF, 0x5962B8])"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3387,raw_color,"Color( .sRGB, red: Double(($0 >> 16) & 255) / 255,","Color( .sRGB, red: Double(($0 >> 16) & 255) / 255,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3581,raw_color,.white,"context.fill(eye, with: .color(.white))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3684,raw_typography,@ScaledMetric(relativeTo: .headline) private var emblemSize = 70.0,@ScaledMetric(relativeTo: .headline) private var emblemSize = 70.0
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3692,raw_spacing_size_radius,spacing: 12,? AnyLayout(HStackLayout(spacing: 12)) : AnyLayout(VStackLayout(spacing: 8))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3692,raw_spacing_size_radius,spacing: 8,? AnyLayout(HStackLayout(spacing: 12)) : AnyLayout(VStackLayout(spacing: 8))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3703,raw_color,.opacity(0.5),".stroke(NativePrism.accent(for: code).opacity(0.5), lineWidth: 1)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3704,raw_spacing_size_radius,.padding(6),.padding(6)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3710,raw_spacing_size_radius,spacing: 2,VStack(spacing: 2) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3711,raw_spacing_size_radius,spacing: 4,HStack(spacing: 4) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3715,raw_typography,.font(.caption2.weight(.medium)),"Text(""Certigo"").font(.caption2.weight(.medium))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3715,unlocalized_string,"Text(""Certigo""","Text(""Certigo"").font(.caption2.weight(.medium))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3717,raw_typography,".font(.system(.caption, design: .rounded, weight: .bold))","Text(code).font(.system(.caption, design: .rounded, weight: .bold))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3721,raw_spacing_size_radius,".padding(.horizontal, 12)",".padding(.horizontal, 12).padding(.vertical, 6)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3721,raw_spacing_size_radius,".padding(.vertical, 6)",".padding(.horizontal, 12).padding(.vertical, 6)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3738,raw_spacing_size_radius,spacing: 12,"VStack(alignment: .leading, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3740,raw_spacing_size_radius,width: 56,".frame(width: 56, height: 56)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3740,raw_spacing_size_radius,height: 56,".frame(width: 56, height: 56)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3741,raw_spacing_size_radius,.padding(8),.padding(8)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3742,raw_spacing_size_radius,RoundedRectangle(cornerRadius: 20),".background(NativePrism.surface, in: RoundedRectangle(cornerRadius: 20))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3743,raw_color,.white,Text(title).font(.headline).foregroundStyle(.white)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3746,raw_color,.white,Text(detail).font(.caption.weight(.medium)).foregroundStyle(.white)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3746,raw_typography,.font(.caption.weight(.medium)),Text(detail).font(.caption.weight(.medium)).foregroundStyle(.white)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3749,raw_color,.white,"Image(systemName: ""checkmark.circle.fill"").foregroundStyle(.white)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3753,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3754,raw_spacing_size_radius,width: 200,".frame(width: 200, alignment: .leading)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3756,raw_spacing_size_radius,RoundedRectangle(cornerRadius: 26),"NativeTrackTheme(code: code).gradient, in: RoundedRectangle(cornerRadius: 26)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3771,raw_typography,.font(.caption.weight(.semibold)),"Image(systemName: ""xmark"").font(.caption.weight(.semibold))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3772,raw_spacing_size_radius,minWidth: 44,".frame(minWidth: 44, minHeight: 44)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3772,raw_spacing_size_radius,minHeight: 44,".frame(minWidth: 44, minHeight: 44)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3786,raw_typography,@ScaledMetric(relativeTo: .title2) private var diameter = 88.0,@ScaledMetric(relativeTo: .title2) private var diameter = 88.0
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3792,raw_spacing_size_radius,spacing: 8,VStack(spacing: 8) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3794,raw_color,.opacity(0.16),"Circle().stroke(accent.opacity(0.16), lineWidth: 9)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3799,raw_typography,".font(.system(.title2, design: .rounded, weight: .bold))","Text(""\(percent) %"").font(.system(.title2, design: .rounded, weight: .bold))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3799,unlocalized_string,"Text(""\(percent) %""","Text(""\(percent) %"").font(.system(.title2, design: .rounded, weight: .bold))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3803,raw_typography,.font(.caption.weight(.semibold)),Text(title).font(.caption.weight(.semibold)).multilineTextAlignment(.center)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3819,raw_spacing_size_radius,spacing: 12,"VStack(alignment: .leading, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3821,raw_typography,".font(.system(.title2, design: .rounded, weight: .bold))","Text(value).font(.system(.title2, design: .rounded, weight: .bold))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3824,raw_typography,.font(.subheadline.weight(.medium)),Text(title).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3827,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3828,raw_spacing_size_radius,RoundedRectangle(cornerRadius: 24),".background(NativePrism.surface, in: RoundedRectangle(cornerRadius: 24))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3830,raw_spacing_size_radius,RoundedRectangle(cornerRadius: 24),RoundedRectangle(cornerRadius: 24)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3831,raw_color,.opacity(0.18),".strokeBorder(accent.opacity(0.18), lineWidth: 1)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3844,raw_spacing_size_radius,spacing: 12,"repeating: GridItem(.flexible(), spacing: 12),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3846,raw_spacing_size_radius,spacing: 12,"alignment: .leading, spacing: 12"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3861,raw_spacing_size_radius,spacing: 24,"HStack(alignment: .center, spacing: 24) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3865,raw_color,.white,"percent: readiness, title: readinessTitle, accent: .white)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3868,raw_spacing_size_radius,spacing: 24,"VStack(alignment: .leading, spacing: 24) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3872,raw_color,.white,"percent: readiness, title: readinessTitle, accent: .white)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3876,raw_color,.white,.padding(24).foregroundStyle(.white)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3876,raw_spacing_size_radius,.padding(24),.padding(24).foregroundStyle(.white)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3878,raw_spacing_size_radius,RoundedRectangle(cornerRadius: 28),".background(theme.gradient, in: RoundedRectangle(cornerRadius: 28))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3882,raw_spacing_size_radius,spacing: 12,"VStack(alignment: .leading, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3887,raw_spacing_size_radius,width: 56,".frame(width: 56, height: 56)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3887,raw_spacing_size_radius,height: 56,".frame(width: 56, height: 56)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3889,raw_typography,".font(.system(.title2, design: .rounded, weight: .bold))","Text(title).font(.system(.title2, design: .rounded, weight: .bold)).fixedSize("
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3893,raw_typography,.font(.subheadline.weight(.medium)),Text(subtitle).font(.subheadline.weight(.medium))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3904,raw_spacing_size_radius,spacing: 16,"VStack(alignment: .leading, spacing: 16) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3909,raw_typography,".font(.system(.caption, design: .rounded, weight: .bold))",".font(.system(.caption, design: .rounded, weight: .bold))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3910,raw_spacing_size_radius,".padding(.horizontal, 12)",".padding(.horizontal, 12).padding(.vertical, 8)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3910,raw_spacing_size_radius,".padding(.vertical, 8)",".padding(.horizontal, 12).padding(.vertical, 8)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3912,raw_color,.opacity(0.12),".background(theme.accent.opacity(0.12), in: Capsule())"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3914,raw_typography,".font(.system(.title3, design: .rounded, weight: .bold))","Text(track.title).font(.system(.title3, design: .rounded, weight: .bold))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3926,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3927,raw_spacing_size_radius,RoundedRectangle(cornerRadius: 26),".background(NativePrism.surface, in: RoundedRectangle(cornerRadius: 26))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3929,raw_spacing_size_radius,RoundedRectangle(cornerRadius: 26),RoundedRectangle(cornerRadius: 26)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3930,raw_color,.opacity(0.24),".strokeBorder(theme.accent.opacity(0.24), lineWidth: 1)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3941,raw_spacing_size_radius,spacing: 16,"HStack(alignment: .firstTextBaseline, spacing: 16) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3947,raw_typography,".font(.system(.headline, design: .rounded))",".font(.system(.headline, design: .rounded)).monospacedDigit()"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3948,raw_spacing_size_radius,width: 36,".frame(width: 36, height: 36)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3948,raw_spacing_size_radius,height: 36,".frame(width: 36, height: 36)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3949,raw_color,Color.white,.foregroundStyle(selected ? Color.white : NativePrism.tint)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3951,raw_color,.opacity(0.1),"selected ? NativePrism.objectiveFill : NativePrism.tint.opacity(0.1),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3952,raw_spacing_size_radius,RoundedRectangle(cornerRadius: 12),in: RoundedRectangle(cornerRadius: 12)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3962,raw_spacing_size_radius,minHeight: 44,".frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3972,raw_spacing_size_radius,spacing: 12,"VStack(alignment: .leading, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3973,raw_typography,.font(.subheadline.weight(.semibold)),Text(title).font(.subheadline.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3974,raw_spacing_size_radius,spacing: 4,HStack(spacing: 4) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3980,raw_color,.opacity(0.15),? NativePrism.tint : NativePrism.tint.opacity(0.15)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,3982,raw_spacing_size_radius,height: 6,.frame(height: 6)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4000,raw_typography,.font(.caption.weight(.semibold)),.font(.caption.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4002,raw_spacing_size_radius,".padding(.horizontal, 12)",".padding(.horizontal, 12)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4003,raw_spacing_size_radius,".padding(.vertical, 8)",".padding(.vertical, 8)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4014,raw_spacing_size_radius,spacing: 24,"VStack(alignment: .leading, spacing: 24) { content }"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4015,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4016,raw_spacing_size_radius,maxWidth: 700,".frame(maxWidth: 700, alignment: .leading)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4042,raw_spacing_size_radius,spacing: 16,"VStack(alignment: .leading, spacing: 16) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4043,raw_typography,.font(.title3.weight(.semibold)),Text(title).font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4054,raw_spacing_size_radius,spacing: 12,"VStack(alignment: .leading, spacing: 12) { content }"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4055,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4058,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 20, style: .continuous)","NativePrism.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4061,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 20, style: .continuous)","RoundedRectangle(cornerRadius: 20, style: .continuous)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4087,raw_spacing_size_radius,minHeight: 44,".frame(maxWidth: .infinity, minHeight: 44)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4102,raw_spacing_size_radius,.padding(16),.padding(16)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4105,raw_color,.opacity(0.1),? NativePrism.tint.opacity(0.1)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4107,raw_color,Color(uiColor: .tertiarySystemFill),"? Color(uiColor: .tertiarySystemFill) : NativePrism.surface,"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4108,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 16, style: .continuous)","in: RoundedRectangle(cornerRadius: 16, style: .continuous)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4111,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 16, style: .continuous)","RoundedRectangle(cornerRadius: 16, style: .continuous)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4126,raw_spacing_size_radius,spacing: 16,"VStack(alignment: .leading, spacing: 16) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4133,raw_spacing_size_radius,.padding(24),.padding(24)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4135,raw_color,.white,.foregroundStyle(.white)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4138,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 24, style: .continuous)","in: RoundedRectangle(cornerRadius: 24, style: .continuous))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4179,raw_spacing_size_radius,spacing: 12,"HStack(alignment: .top, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4180,unlocalized_string,"""Microsoft Azure""","NativeShowcaseTile(code: ""AZ"", title: ""Microsoft Azure"")"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4181,unlocalized_string,"""GitHub & Copilot""","NativeShowcaseTile(code: ""GH"", title: ""GitHub & Copilot"")"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4182,unlocalized_string,"""Microsoft Fabric""","NativeShowcaseTile(code: ""DP"", title: ""Microsoft Fabric"")"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4185,raw_spacing_size_radius,".padding(.vertical, 4)",".padding(.vertical, 4)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4209,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4217,unlocalized_string,".navigationTitle(""Certigo"")",".navigationTitle(""Certigo"")"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4297,raw_spacing_size_radius,spacing: 24,VStack(spacing: 24) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4298,raw_spacing_size_radius,.padding(20),NativeAppLanguagePicker().padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4327,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4333,unlocalized_string,".navigationTitle(""Certigo"")",".navigationTitle(""Certigo"")"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4506,unlocalized_string,".navigationTitle(""Certigo"")",".navigationTitle(""Certigo"")"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4585,unlocalized_string,"""Available""","case ready = ""Available"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4586,unlocalized_string,"""Loading""","case loading = ""Loading"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4587,unlocalized_string,"""Empty""","case empty = ""Empty"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4588,unlocalized_string,"""Error""","case error = ""Error"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4592,unlocalized_string,"""Friends""","case friends = ""Friends"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4593,unlocalized_string,"""Teams""","case teams = ""Teams"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4746,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4754,raw_spacing_size_radius,spacing: 24,"VStack(alignment: .leading, spacing: 24) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4765,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4766,raw_spacing_size_radius,maxWidth: 680,.frame(maxWidth: 680).frame(maxWidth: .infinity)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4774,raw_spacing_size_radius,spacing: 24,"VStack(alignment: .leading, spacing: 24) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4782,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4793,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4794,raw_spacing_size_radius,maxWidth: 680,.frame(maxWidth: 680).frame(maxWidth: .infinity)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4848,raw_spacing_size_radius,spacing: 24,"VStack(alignment: .leading, spacing: 24) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4852,raw_spacing_size_radius,spacing: 16,"VStack(alignment: .leading, spacing: 16) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4853,raw_typography,.font(.largeTitle.bold()),Text(goal.displayName(copy)).font(.largeTitle.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4854,raw_typography,.font(.title2.weight(.semibold)),Text(goal.displayTitle(copy)).font(.title2.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4860,raw_spacing_size_radius,minHeight: 44,".frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4862,raw_color,.white,.tint(.white)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4865,raw_spacing_size_radius,.padding(24),.padding(24)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4867,raw_color,.white,.foregroundStyle(.white)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4870,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 24, style: .continuous)","in: RoundedRectangle(cornerRadius: 24, style: .continuous))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4871,raw_spacing_size_radius,spacing: 12,"VStack(alignment: .leading, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4872,raw_typography,.font(.title2.bold()),Text(copy.native(.demoWorkshop)).font(.title2.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4889,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4895,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4910,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4911,raw_spacing_size_radius,maxWidth: 680,".frame(maxWidth: 680, alignment: .leading)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4936,raw_spacing_size_radius,spacing: 16,HStack(spacing: 16) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4940,raw_spacing_size_radius,spacing: 4,"VStack(alignment: .leading, spacing: 4) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4955,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4962,raw_spacing_size_radius,spacing: 8,"VStack(alignment: .leading, spacing: 8) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4994,raw_spacing_size_radius,maxWidth: 680,.frame(maxWidth: 680).frame(maxWidth: .infinity)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,4995,raw_color,Color(uiColor: .systemGroupedBackground),.background(Color(uiColor: .systemGroupedBackground))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5002,raw_spacing_size_radius,spacing: 24,"VStack(alignment: .leading, spacing: 24) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5004,raw_typography,.font(.largeTitle.bold()),Text(goal.displayName(copy)).font(.largeTitle.bold()).foregroundStyle(
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5006,raw_typography,.font(.title2.bold()),Text(goal.displayTitle(copy)).font(.title2.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5017,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5018,raw_spacing_size_radius,maxWidth: 680,".frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5028,raw_spacing_size_radius,".padding(.horizontal, 20)",".padding(.horizontal, 20).padding(.vertical, 12)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5028,raw_spacing_size_radius,".padding(.vertical, 12)",".padding(.horizontal, 20).padding(.vertical, 12)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5029,raw_spacing_size_radius,maxWidth: 680,.frame(maxWidth: 680).frame(maxWidth: .infinity)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5030,raw_color,Color(uiColor: .systemGroupedBackground),.background(Color(uiColor: .systemGroupedBackground))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5037,raw_spacing_size_radius,spacing: 24,"VStack(alignment: .leading, spacing: 24) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5041,raw_typography,.font(.title.bold()),Text(practice.title).font(.title.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5060,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5061,raw_spacing_size_radius,maxWidth: 680,".frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5069,raw_spacing_size_radius,spacing: 24,"VStack(alignment: .leading, spacing: 24) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5084,raw_typography,.font(.subheadline.weight(.medium)),.font(.subheadline.weight(.medium))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5090,raw_typography,.font(.title2.bold()),Text(practice.title).font(.title2.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5094,raw_typography,.font(.title3.weight(.semibold)),.font(.title3.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5096,raw_spacing_size_radius,spacing: 12,VStack(spacing: 12) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5102,raw_spacing_size_radius,spacing: 12,"HStack(alignment: .firstTextBaseline, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5110,raw_spacing_size_radius,minHeight: 44,"maxWidth: .infinity, minHeight: 44, alignment: .leading"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5112,raw_spacing_size_radius,.padding(12),.padding(12)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5120,raw_color,Color(uiColor: .secondarySystemGroupedBackground),"Color(uiColor: .secondarySystemGroupedBackground),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5121,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 16, style: .continuous)","in: RoundedRectangle(cornerRadius: 16, style: .continuous)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5124,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 16, style: .continuous)","RoundedRectangle(cornerRadius: 16, style: .continuous)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5127,raw_color,Color(uiColor: .separator),"? NativePrism.tint : Color(uiColor: .separator),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5147,raw_color,.orange,"Image(systemName: ""clock.fill"").foregroundStyle(.orange)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5149,raw_typography,.font(.title2.bold()),.font(.title2.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5185,raw_typography,.font(.title2.bold()),.font(.title2.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5210,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5214,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5215,raw_spacing_size_radius,maxWidth: 680,".frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5217,raw_color,Color(uiColor: .systemGroupedBackground),.background(Color(uiColor: .systemGroupedBackground))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5228,raw_spacing_size_radius,".padding(.horizontal, 20)",".padding(.horizontal, 20).padding(.vertical, 12)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5228,raw_spacing_size_radius,".padding(.vertical, 12)",".padding(.horizontal, 20).padding(.vertical, 12)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5229,raw_spacing_size_radius,maxWidth: 680,.frame(maxWidth: 680).frame(maxWidth: .infinity)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5230,raw_color,Color(uiColor: .systemGroupedBackground),.background(Color(uiColor: .systemGroupedBackground))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5244,raw_spacing_size_radius,spacing: 8,"VStack(alignment: .leading, spacing: 8) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5257,raw_typography,.font(.title2.bold()),Text(copy.native(.demoProfile)).font(.title2.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5266,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5275,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5279,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5295,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5299,raw_spacing_size_radius,maxWidth: 680,.frame(maxWidth: 680).frame(maxWidth: .infinity)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5300,raw_color,Color(uiColor: .systemGroupedBackground),.background(Color(uiColor: .systemGroupedBackground))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5313,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5330,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5334,raw_spacing_size_radius,maxWidth: 680,.frame(maxWidth: 680).frame(maxWidth: .infinity)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5335,raw_color,Color(uiColor: .systemGroupedBackground),.background(Color(uiColor: .systemGroupedBackground))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5345,raw_spacing_size_radius,spacing: 10,"VStack(alignment: .leading, spacing: 10) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5359,raw_spacing_size_radius,spacing: 16,HStack(spacing: 16) { steps }
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5360,raw_spacing_size_radius,spacing: 8,"VStack(alignment: .leading, spacing: 8) { steps }"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5375,raw_typography,.fontWeight(state == .current ? .semibold : .regular),.fontWeight(state == .current ? .semibold : .regular)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5388,raw_typography,.font(.body.weight(.medium)),.font(.body.weight(.medium))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5404,raw_spacing_size_radius,spacing: 16,"VStack(alignment: .leading, spacing: 16) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5409,raw_spacing_size_radius,spacing: 4,"VStack(alignment: .leading, spacing: 4) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5410,raw_typography,.font(.subheadline.weight(.semibold)),Text(row.layer).font(.subheadline.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5420,raw_spacing_size_radius,spacing: 4,"VStack(alignment: .leading, spacing: 4) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5476,unlocalized_string,"""Cloud · découverte""","case fundamentals = ""Cloud · découverte"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5477,unlocalized_string,"""Cloud · exploitation""","case operations = ""Cloud · exploitation"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5481,unlocalized_string,"""Les fondamentaux du cloud""","case .fundamentals: ""Les fondamentaux du cloud"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5482,unlocalized_string,"""Les services cloud au quotidien""","case .operations: ""Les services cloud au quotidien"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5510,unlocalized_string,"""Une infrastructure à administrer (IaaS)""","""Une infrastructure à administrer (IaaS)"","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5511,unlocalized_string,"""Une plateforme gérée (PaaS)""","""Une plateforme gérée (PaaS)"", ""Un logiciel prêt à l’emploi (SaaS)"","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5511,unlocalized_string,"""Un logiciel prêt à l’emploi (SaaS)""","""Une plateforme gérée (PaaS)"", ""Un logiciel prêt à l’emploi (SaaS)"","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5606,unlocalized_string,"""Déployer sans gérer les serveurs""","title: ""Déployer sans gérer les serveurs"","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5607,unlocalized_string,"""Distinguer une plateforme gérée d’une infrastructure à administrer.""","intent: ""Distinguer une plateforme gérée d’une infrastructure à administrer."","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5609,unlocalized_string,"""L’équipe Exemple veut déployer son application sans administrer le système d’exploitation des serveurs. Elle souhaite garder la responsabilité de son code et de ses données.""","""L’équipe Exemple veut déployer son application sans administrer le système d’exploitation des serveurs. Elle souhaite garder la responsabilité de son code et de ses données."","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5610,unlocalized_string,"""Quel modèle de service correspond à cette situation fictive ?""","question: ""Quel modèle de service correspond à cette situation fictive ?"","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5612,unlocalized_string,"""L’équipe veut déléguer l’administration du système d’exploitation, pas son application.""","""L’équipe veut déléguer l’administration du système d’exploitation, pas son application."","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5614,unlocalized_string,"""Dans cet exemple inventé, une plateforme gérée (PaaS) correspond à cette limite : le fournisseur prend en charge la plateforme et son système. L’équipe déploie son code. Une infrastructure (IaaS) lui laisserait la gestion du système ; un logiciel prêt à l’emploi (SaaS) ne lui fournit pas le même cadre pour déployer son application.""","""Dans cet exemple inventé, une plateforme gérée (PaaS) correspond à cette limite : le fournisseur prend en charge la plateforme et son système. L’équipe déploie son code. Une infrastructure (IaaS) lui laisserait la gestion du système ; un logiciel prêt à l’emploi (SaaS) ne lui fournit pas le même cadre pour déployer son application."","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5616,unlocalized_string,"""Le critère utile est la responsabilité conservée par l’équipe, pas seulement la présence de serveurs dans le cloud.""","""Le critère utile est la responsabilité conservée par l’équipe, pas seulement la présence de serveurs dans le cloud."","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5618,unlocalized_string,"""Application et données""",".init(layer: ""Application et données"", owner: ""L’équipe Exemple""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5618,unlocalized_string,"""L’équipe Exemple""",".init(layer: ""Application et données"", owner: ""L’équipe Exemple""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5620,unlocalized_string,"""Plateforme et système d’exploitation""","layer: ""Plateforme et système d’exploitation"","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5621,unlocalized_string,"""Le fournisseur, dans cet exemple PaaS""","owner: ""Le fournisseur, dans cet exemple PaaS""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5622,unlocalized_string,"""Infrastructure physique""",".init(layer: ""Infrastructure physique"", owner: ""Le fournisseur""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5622,unlocalized_string,"""Le fournisseur""",".init(layer: ""Infrastructure physique"", owner: ""Le fournisseur""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5626,unlocalized_string,"""Garder la main sur le système""","title: ""Garder la main sur le système"","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5627,unlocalized_string,"""Identifier ce qui reste à administrer dans une infrastructure cloud.""","intent: ""Identifier ce qui reste à administrer dans une infrastructure cloud."","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5629,unlocalized_string,"""L’équipe Atelier exploite une application qui exige une configuration particulière du système d’exploitation. Elle veut installer ses composants système et gérer elle-même les mises à jour, sans entretenir de serveurs physiques.""","""L’équipe Atelier exploite une application qui exige une configuration particulière du système d’exploitation. Elle veut installer ses composants système et gérer elle-même les mises à jour, sans entretenir de serveurs physiques."","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5631,unlocalized_string,"""Quel modèle de service lui laisse cette responsabilité dans ce scénario fictif ?""","""Quel modèle de service lui laisse cette responsabilité dans ce scénario fictif ?"","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5633,unlocalized_string,"""L’équipe veut conserver le contrôle du système d’exploitation tout en déléguant le matériel.""","""L’équipe veut conserver le contrôle du système d’exploitation tout en déléguant le matériel."","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5635,unlocalized_string,"""Dans cet exemple inventé, une infrastructure à administrer (IaaS) laisse à l’équipe le choix et la gestion du système d’exploitation. Le fournisseur prend en charge le matériel. Une plateforme gérée (PaaS) ou un logiciel prêt à l’emploi (SaaS) ne lui donnent pas cette même responsabilité système.""","""Dans cet exemple inventé, une infrastructure à administrer (IaaS) laisse à l’équipe le choix et la gestion du système d’exploitation. Le fournisseur prend en charge le matériel. Une plateforme gérée (PaaS) ou un logiciel prêt à l’emploi (SaaS) ne lui donnent pas cette même responsabilité système."","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5637,unlocalized_string,"""Déléguer le matériel ne signifie pas déléguer les mises à jour du système : la frontière dépend du modèle choisi.""","""Déléguer le matériel ne signifie pas déléguer les mises à jour du système : la frontière dépend du modèle choisi."","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5639,unlocalized_string,"""Application et données""",".init(layer: ""Application et données"", owner: ""L’équipe Atelier""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5639,unlocalized_string,"""L’équipe Atelier""",".init(layer: ""Application et données"", owner: ""L’équipe Atelier""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5641,unlocalized_string,"""Système d’exploitation et mises à jour""","layer: ""Système d’exploitation et mises à jour"","
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5642,unlocalized_string,"""L’équipe Atelier, dans cet exemple IaaS""","owner: ""L’équipe Atelier, dans cet exemple IaaS""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5643,unlocalized_string,"""Infrastructure physique""",".init(layer: ""Infrastructure physique"", owner: ""Le fournisseur""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,5643,unlocalized_string,"""Le fournisseur""",".init(layer: ""Infrastructure physique"", owner: ""Le fournisseur""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6093,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6173,raw_spacing_size_radius,height: 1,Rectangle().fill(NativePrism.edge).frame(height: 1)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6280,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6300,raw_typography,.font(.subheadline.weight(.semibold)),Text(copy[.coachKeyPoints]).font(.subheadline.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6305,raw_typography,.font(.subheadline.weight(.semibold)),Text(copy[.coachRecommendation]).font(.subheadline.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6308,raw_typography,.font(.subheadline.weight(.semibold)),Text(copy[.coachPersonalization]).font(.subheadline.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6351,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6385,unlocalized_string,"""Microsoft Azure""","case .azure: ""Microsoft Azure"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6386,unlocalized_string,"""GitHub & Copilot""","case .github: ""GitHub & Copilot"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6387,unlocalized_string,"""Data & Fabric""","case .data: ""Data & Fabric"""
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6396,raw_spacing_size_radius,spacing: 12,"HStack(alignment: .top, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6416,raw_spacing_size_radius,".padding(.vertical, 4)",".padding(.vertical, 4)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6482,raw_typography,.font(.largeTitle.bold()),.font(.largeTitle.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6499,raw_spacing_size_radius,spacing: 8,HStack(spacing: 8) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6521,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6564,unlocalized_string,"Button(""Assistants IA responsables""","Button(""Assistants IA responsables"", systemImage: ""text.book.closed"") {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6655,raw_spacing_size_radius,".padding(.vertical, 8)","NativeCertificationCard(track: track).padding(.vertical, 8)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6745,raw_spacing_size_radius,spacing: 12,"return VStack(alignment: .leading, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6749,raw_typography,.font(.title3.weight(.bold)),Text(title).font(.title3.weight(.bold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6758,raw_spacing_size_radius,".padding(.vertical, 12)",".padding(.vertical, 12)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6764,raw_spacing_size_radius,spacing: 16,"HStack(alignment: .center, spacing: 16) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6767,raw_color,.opacity(0.15),"Circle().stroke(NativePrism.accent(for: code).opacity(0.15), lineWidth: 4)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6779,raw_spacing_size_radius,width: 44,".frame(width: 44, height: 44).accessibilityHidden(true)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6779,raw_spacing_size_radius,height: 44,".frame(width: 44, height: 44).accessibilityHidden(true)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6780,raw_spacing_size_radius,spacing: 6,"VStack(alignment: .leading, spacing: 6) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6787,raw_typography,.font(.caption.weight(.semibold)),.font(.caption.weight(.semibold)).foregroundStyle(NativePrism.accent(for: code))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6788,raw_spacing_size_radius,".padding(.horizontal, 10)",".padding(.horizontal, 10).padding(.vertical, 5)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6788,raw_spacing_size_radius,".padding(.vertical, 5)",".padding(.horizontal, 10).padding(.vertical, 5)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6789,raw_color,.opacity(0.1),".background(NativePrism.accent(for: code).opacity(0.1), in: Capsule())"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6797,raw_spacing_size_radius,minWidth: 44,".frame(minWidth: 44, minHeight: 44).accessibilityHidden(true)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6797,raw_spacing_size_radius,minHeight: 44,".frame(minWidth: 44, minHeight: 44).accessibilityHidden(true)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6799,raw_spacing_size_radius,minHeight: 60,".frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6800,raw_spacing_size_radius,".padding(.vertical, 8)",".padding(.vertical, 8)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6805,raw_color,.opacity(0.25),.fill(NativePrism.accent(for: code).opacity(0.25))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6806,raw_spacing_size_radius,width: 3,".frame(width: 3, height: geometry.size.height / 2 + 20)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6823,raw_typography,.font(.title3.weight(.semibold)),Text(recommendation.unit.title).font(.title3.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6835,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6901,raw_spacing_size_radius,spacing: 16,HStack(spacing: 16) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6925,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6933,raw_color,Color(uiColor: .systemRed),case .weak: Color(uiColor: .systemRed)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6967,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,6973,raw_spacing_size_radius,spacing: 16,"VStack(alignment: .leading, spacing: 16) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7080,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7179,raw_spacing_size_radius,minHeight: 44,".frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7189,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7195,raw_spacing_size_radius,minHeight: 44,".frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7225,raw_spacing_size_radius,spacing: 8,"VStack(alignment: .leading, spacing: 8) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7272,raw_spacing_size_radius,minHeight: 44,".frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7280,raw_typography,.font(.title2.bold()),Text(copy.native(.rewards)).font(.title2.bold())
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7376,raw_spacing_size_radius,spacing: 20,HStack(spacing: 20) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7384,raw_spacing_size_radius,spacing: 12,"VStack(alignment: .leading, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7428,unlocalized_string,"Text(""Certigo · \(copy.native(.development))""","Text(""Certigo · \(copy.native(.development))"")"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7453,unlocalized_string,".navigationTitle(""Certigo"")",".navigationTitle(""Certigo"")"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7468,raw_typography,.font(.title2.bold()),Text(track.title).font(.title2.bold()).accessibilityAddTraits(.isHeader)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7518,raw_spacing_size_radius,maxWidth: 700,.frame(maxWidth: 700)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7603,raw_spacing_size_radius,minHeight: 88,".frame(maxWidth: .infinity, minHeight: 88)"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7697,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7706,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7712,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7719,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7771,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7877,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7940,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,7998,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8015,raw_spacing_size_radius,.padding(16),.padding(16)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8018,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 16, style: .continuous)","in: RoundedRectangle(cornerRadius: 16, style: .continuous))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8111,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8150,raw_spacing_size_radius,.padding(16),.padding(16)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8151,raw_spacing_size_radius,maxWidth: 700,.frame(maxWidth: 700)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8166,raw_spacing_size_radius,spacing: 16,VStack(spacing: 16) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8198,raw_spacing_size_radius,spacing: 12,HStack(spacing: 12) {
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8201,raw_typography,.font(.subheadline.weight(index == active ? .semibold : .regular)),.font(.subheadline.weight(index == active ? .semibold : .regular))
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8211,raw_spacing_size_radius,spacing: 12,"VStack(alignment: .leading, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8252,raw_spacing_size_radius,spacing: 12,"VStack(alignment: .leading, spacing: 12) {"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8305,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8308,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8311,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8315,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8481,unlocalized_string,"""Idées clés""",".title(""Idées clés""),"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8484,unlocalized_string,"""Exemple résolu""","parts.append(.title(""Exemple résolu""))"
+apps/apple/CertigoNative/Sources/CertigoNativeApp.swift,8491,unlocalized_string,"""À retenir""","parts.append(.title(""À retenir""))"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,43,raw_color,"Color(red: 0.12, green: 0.48, blue: 0.91)","case .readyToStart: Color(red: 0.12, green: 0.48, blue: 0.91)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,44,raw_color,"Color(red: 0.19, green: 0.57, blue: 0.87)","case .inProgress: Color(red: 0.19, green: 0.57, blue: 0.87)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,45,raw_color,"Color(red: 0.91, green: 0.36, blue: 0.20)","case .streakAtRisk: Color(red: 0.91, green: 0.36, blue: 0.20)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,46,raw_color,"Color(red: 0.16, green: 0.62, blue: 0.42)","case .goalCompleted: Color(red: 0.16, green: 0.62, blue: 0.42)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,85,raw_spacing_size_radius,spacing: 10,"VStack(alignment: .leading, spacing: 10) {"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,86,raw_spacing_size_radius,spacing: 6,HStack(spacing: 6) {
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,91,raw_typography,.font(.headline.weight(.bold).monospacedDigit()),.font(.headline.weight(.bold).monospacedDigit())
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,95,raw_spacing_size_radius,width: 22,".frame(width: 22, height: 22)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,95,raw_spacing_size_radius,height: 22,".frame(width: 22, height: 22)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,98,raw_typography,.font(.headline.weight(.semibold)),.font(.headline.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,99,raw_typography,.lineLimit(2),.lineLimit(2)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,100,raw_typography,.minimumScaleFactor(0.8),.minimumScaleFactor(0.8)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,102,raw_spacing_size_radius,spacing: 9,HStack(spacing: 9) {
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,108,raw_spacing_size_radius,width: 38,".frame(width: 38, height: 38)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,108,raw_spacing_size_radius,height: 38,".frame(width: 38, height: 38)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,109,raw_spacing_size_radius,spacing: 2,"VStack(alignment: .leading, spacing: 2) {"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,111,raw_typography,.font(.caption.weight(.bold)),.font(.caption.weight(.bold))
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,112,raw_typography,.lineLimit(1),.lineLimit(1)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,114,raw_typography,.font(.caption2.weight(.medium)),.font(.caption2.weight(.medium))
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,120,raw_spacing_size_radius,.padding(14),.padding(14)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,124,raw_spacing_size_radius,spacing: 18,HStack(spacing: 18) {
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,125,raw_spacing_size_radius,spacing: 9,"VStack(alignment: .leading, spacing: 9) {"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,126,raw_spacing_size_radius,spacing: 6,HStack(spacing: 6) {
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,130,raw_typography,.font(.subheadline.weight(.semibold).monospacedDigit()),.font(.subheadline.weight(.semibold).monospacedDigit())
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,134,raw_typography,.font(.title3.weight(.bold)),.font(.title3.weight(.bold))
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,135,raw_typography,.lineLimit(2),.lineLimit(2)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,136,raw_typography,.minimumScaleFactor(0.8),.minimumScaleFactor(0.8)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,137,raw_spacing_size_radius,spacing: 6,HStack(spacing: 6) {
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,138,raw_spacing_size_radius,width: 20,"CertigoWidgetMark().frame(width: 20, height: 20)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,138,raw_spacing_size_radius,height: 20,"CertigoWidgetMark().frame(width: 20, height: 20)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,140,raw_typography,.font(.caption.weight(.semibold)),.font(.caption.weight(.semibold))
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,141,raw_typography,.lineLimit(1),.lineLimit(1)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,143,unlocalized_string,"Text(""\(snapshot.totalXP) XP""","Text(""\(snapshot.totalXP) XP"")"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,144,raw_typography,.font(.caption.weight(.semibold).monospacedDigit()),.font(.caption.weight(.semibold).monospacedDigit())
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,148,raw_typography,.font(.caption.weight(.bold)),.font(.caption.weight(.bold))
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,152,raw_spacing_size_radius,spacing: 6,VStack(spacing: 6) {
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,158,raw_spacing_size_radius,width: 72,".frame(width: 72, height: 72)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,158,raw_spacing_size_radius,height: 72,".frame(width: 72, height: 72)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,160,unlocalized_string,"Text(""\(earned) / \(goal) XP""","Text(""\(earned) / \(goal) XP"")"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,161,raw_typography,.font(.caption2.weight(.semibold).monospacedDigit()),.font(.caption2.weight(.semibold).monospacedDigit())
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,162,raw_typography,.lineLimit(1),.lineLimit(1)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,166,raw_spacing_size_radius,.padding(16),.padding(16)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,177,raw_spacing_size_radius,.padding(2),.padding(2)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,179,raw_spacing_size_radius,spacing: 0,VStack(spacing: 0) {
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,181,raw_typography,".font(.system(size: 14, weight: .bold))",".font(.system(size: 14, weight: .bold))"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,184,raw_typography,".font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())",".font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,195,raw_spacing_size_radius,spacing: 3,"VStack(alignment: .leading, spacing: 3) {"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,196,raw_spacing_size_radius,spacing: 5,HStack(spacing: 5) {
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,201,raw_typography,.fontWeight(.semibold),.fontWeight(.semibold)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,206,raw_typography,.lineLimit(1),.lineLimit(1)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,209,raw_typography,.font(.caption2.weight(.bold)),.font(.caption2.weight(.bold))
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,216,raw_spacing_size_radius,spacing: 8,"VStack(alignment: .leading, spacing: 8) {"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,217,raw_spacing_size_radius,width: 26,"CertigoWidgetMark().frame(width: 26, height: 26)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,217,raw_spacing_size_radius,height: 26,"CertigoWidgetMark().frame(width: 26, height: 26)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,220,raw_typography,.lineLimit(3),.lineLimit(3)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,222,raw_spacing_size_radius,.padding(14),.padding(14)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,228,raw_color,.opacity(phase == .goalCompleted ? 0.13 : 0.10),"accent.opacity(phase == .goalCompleted ? 0.13 : 0.10),"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,229,raw_color,Color(uiColor: .secondarySystemGroupedBackground),"Color(uiColor: .secondarySystemGroupedBackground),"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,245,raw_color,.opacity(0.16),".stroke(accent.opacity(0.16), lineWidth: 5)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,256,raw_typography,".font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())",".font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,257,raw_typography,.minimumScaleFactor(0.75),.minimumScaleFactor(0.75)
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,266,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 7, style: .continuous)","RoundedRectangle(cornerRadius: 7, style: .continuous)"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,270,raw_color,"Color(red: 0.12, green: 0.48, blue: 0.91)","Color(red: 0.12, green: 0.48, blue: 0.91),"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,271,raw_color,"Color(red: 0.31, green: 0.39, blue: 0.87)","Color(red: 0.31, green: 0.39, blue: 0.87),"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,278,raw_typography,".font(.system(size: 11, weight: .bold))",".font(.system(size: 11, weight: .bold))"
+apps/apple/CertigoNative/Sources/CertigoWidgetPresentation.swift,279,raw_color,.white,.foregroundStyle(.white)
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,83,raw_typography,.font(.subheadline.weight(.semibold)),.font(.subheadline.weight(.semibold))
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,102,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,111,raw_spacing_size_radius,spacing: 8,"VStack(alignment: .leading, spacing: 8) {"
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,117,raw_spacing_size_radius,spacing: 12,"HStack(alignment: .firstTextBaseline, spacing: 12) {"
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,138,raw_spacing_size_radius,".padding(.vertical, 4)",".padding(.vertical, 4)"
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,206,raw_typography,.font(.title2.bold()),.font(.title2.bold())
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,227,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,249,raw_spacing_size_radius,spacing: 12,"HStack(alignment: .firstTextBaseline, spacing: 12) {"
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,256,raw_typography,.fontWeight(.medium),.fontWeight(.medium)
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,264,raw_spacing_size_radius,spacing: 12,"HStack(alignment: .firstTextBaseline, spacing: 12) {"
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,282,raw_spacing_size_radius,spacing: 8,"VStack(alignment: .leading, spacing: 8) {"
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,292,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,295,raw_spacing_size_radius,".padding(.vertical, 4)",".padding(.vertical, 4)"
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,321,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,329,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift,334,raw_spacing_size_radius,minHeight: 44,.frame(minHeight: 44)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,38,raw_spacing_size_radius,spacing: 20,"VStack(alignment: .leading, spacing: 20) {"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,51,raw_typography,.font(.caption.weight(.semibold)),.font(.caption.weight(.semibold))
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,59,raw_spacing_size_radius,spacing: 10,"LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,64,raw_spacing_size_radius,spacing: 7,HStack(spacing: 7) {
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,67,raw_spacing_size_radius,width: 9,".frame(width: 9, height: 9)"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,67,raw_spacing_size_radius,height: 9,".frame(width: 9, height: 9)"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,68,raw_color,.opacity(0.5),".overlay(Circle().stroke(.secondary.opacity(0.5), lineWidth: 1))"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,70,raw_typography,.font(.subheadline.weight(.medium)),.font(.subheadline.weight(.medium))
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,71,raw_typography,.lineLimit(2),.lineLimit(2)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,74,raw_spacing_size_radius,.padding(10),.padding(10)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,77,raw_color,.opacity(0.12),? NativeWidgetGalleryPalette.accent.opacity(0.12)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,78,raw_color,.opacity(0.07),": Color.secondary.opacity(0.07),"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,79,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 13, style: .continuous)","in: RoundedRectangle(cornerRadius: 13, style: .continuous)"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,88,raw_spacing_size_radius,spacing: 8,HStack(spacing: 8) {
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,100,raw_spacing_size_radius,height: selectedFamily == .systemSmall ? 170 : 112,height: selectedFamily == .systemSmall ? 170 : 112
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,102,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 22, style: .continuous)",".clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,109,raw_color,.orange,.foregroundStyle(.orange)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,116,raw_spacing_size_radius,.padding(20),.padding(20)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,124,raw_spacing_size_radius,spacing: 14,"VStack(alignment: .leading, spacing: 14) {"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,140,raw_spacing_size_radius,spacing: 10,"LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,153,raw_color,.orange,.foregroundStyle(.orange)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,166,raw_spacing_size_radius,spacing: 9,HStack(spacing: 9) {
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,170,raw_spacing_size_radius,width: 52,".frame(width: 52, height: 52)"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,170,raw_spacing_size_radius,height: 52,".frame(width: 52, height: 52)"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,171,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 12, style: .continuous)",".clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,173,raw_spacing_size_radius,spacing: 4,"VStack(alignment: .leading, spacing: 4) {"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,175,raw_typography,.font(.subheadline.weight(.semibold)),.font(.subheadline.weight(.semibold))
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,177,raw_typography,.lineLimit(2),.lineLimit(2)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,196,raw_spacing_size_radius,.padding(9),.padding(9)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,197,raw_spacing_size_radius,minHeight: 70,".frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,200,raw_color,.opacity(0.12),? NativeWidgetGalleryPalette.accent.opacity(0.12)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,201,raw_color,.opacity(0.07),": Color.secondary.opacity(0.07),"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,202,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 15, style: .continuous)","in: RoundedRectangle(cornerRadius: 15, style: .continuous)"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,204,raw_spacing_size_radius,"RoundedRectangle(cornerRadius: 15, style: .continuous)",".contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,231,raw_typography,.font(.subheadline.weight(.semibold)),.font(.subheadline.weight(.semibold))
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,232,raw_spacing_size_radius,".padding(.horizontal, 13)",".padding(.horizontal, 13)"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,233,raw_spacing_size_radius,".padding(.vertical, 9)",".padding(.vertical, 9)"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,236,raw_color,.opacity(0.15),? NativeWidgetGalleryPalette.accent.opacity(0.15)
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,237,raw_color,.opacity(0.08),": Color.secondary.opacity(0.08),"
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,287,unlocalized_string,"""DEMO""","activeTrackCode: ""DEMO"","
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,288,unlocalized_string,"""Certigo preview""","activeTrackTitle: ""Certigo preview"","
+apps/apple/CertigoNative/Sources/NativeWidgetGalleryView.swift,301,raw_color,"Color(red: 0.12, green: 0.48, blue: 0.91)","static let accent = Color(red: 0.12, green: 0.48, blue: 0.91)"
+apps/apple/CertigoNative/WidgetExtension/CertigoWidgetExtension.swift,62,unlocalized_string,".configurationDisplayName(""Certigo"")",".configurationDisplayName(""Certigo"")"
+apps/apple/CertigoNative/WidgetExtension/CertigoWidgetExtension.swift,63,unlocalized_string,".description(""A gentle reminder of your learning progress."")",".description(""A gentle reminder of your learning progress."")"
