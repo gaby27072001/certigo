@@ -63,7 +63,7 @@
                         set: { if !$0 { issue = nil } }
                     )
                 ) {
-                    Button(copy.native(.ok), role: .cancel) { issue = nil }
+                    Button(copy[.done], role: .cancel) { issue = nil }
                 } message: {
                     Text(issue.map { copy.native($0) } ?? "")
                 }

@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -15,7 +16,7 @@ SCRIPT = ROOT / "tools/validate_apple_mac_one_shot.sh"
 
 @unittest.skipUnless(shutil.which("git"), "Git is required for real ignore/status checks")
 class AppleWorkspaceIgnoreTests(unittest.TestCase):
-    def test_xcode_ephemera_are_ignored_but_source_and_tracked_locks_stay_dirty(self):
+    def test_workspace_exemption_is_command_local_and_tracked_changes_still_block(self):
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
             shutil.copyfile(ROOT / ".gitignore", repo / ".gitignore")
@@ -34,6 +35,15 @@ class AppleWorkspaceIgnoreTests(unittest.TestCase):
             git("add", "--force", str(lock))
             git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
                 "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture")
+            guard = SCRIPT.read_text(encoding="utf-8").split(
+                "checkout_is_clean() {\n  python3 - <<'PY'\n", 1)[1].split("\nPY\n}", 1)[0]
+
+            def clean():
+                return subprocess.run(
+                    [sys.executable, "-c", guard], cwd=repo,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                ).returncode
+
             ephemeral = [
                 "xcuserdata/developer.xcuserdatad/UserInterfaceState.xcuserstate",
                 ".swiftpm/workspace-state.json",
@@ -48,18 +58,52 @@ class AppleWorkspaceIgnoreTests(unittest.TestCase):
                 path = repo / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("local state\n")
-                git("check-ignore", relative)
-            # Same cleanliness command used before pull and after every validation.
-            self.assertEqual(git("status", "--porcelain", "--untracked-files=all"), "")
+            # Ephemera stay visible to ordinary Git; only the validation exempts them.
+            status = git("status", "--porcelain", "--untracked-files=all")
+            self.assertIn("xcuserdata", status)
+            self.assertIn(".swiftpm", status)
+            self.assertEqual(clean(), 0)
             lock.write_text('{"version": 4}\n')
+            self.assertNotEqual(clean(), 0, "Modified tracked workspace lock must block")
+            git("add", str(lock))
+            self.assertNotEqual(clean(), 0, "Staged tracked workspace lock must block")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "lock update")
+            self.assertEqual(clean(), 0)
             source = repo / "apps/apple/CertigoNative/Sources/NewView.swift"
             source.parent.mkdir(parents=True)
             source.write_text("import SwiftUI\n")
             status = git("status", "--porcelain", "--untracked-files=all")
-            self.assertIn(" M apps/apple/CertigoKit/.swiftpm/Package.resolved", status)
             self.assertIn("?? apps/apple/CertigoNative/Sources/NewView.swift", status)
-            for relative in ephemeral:
-                self.assertNotIn(relative, status)
+            self.assertNotEqual(clean(), 0, "Untracked application source must block")
+            source.unlink()
+            similar = repo / "apps/apple/.swiftpm-not-state/notes"
+            similar.parent.mkdir(parents=True)
+            similar.write_text("not workspace state")
+            self.assertNotEqual(clean(), 0, "Directory names must match exactly")
+            similar.unlink()
+            self.assertEqual(clean(), 0)
+            renamed = lock.with_name("Renamed.resolved")
+            git("mv", str(lock), str(renamed))
+            self.assertNotEqual(clean(), 0, "Renamed tracked workspace lock must block")
+            git("mv", str(renamed), str(lock))
+            self.assertEqual(clean(), 0)
+            git("rm", str(lock))
+            self.assertNotEqual(clean(), 0, "Deleted tracked workspace lock must block")
+
+    @unittest.skipIf(os.name == "nt", "Newline filenames require POSIX")
+    def test_untracked_newline_name_cannot_hide_source_behind_workspace_record(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            subprocess.run(["git", "init", "--quiet", str(repo)], check=True)
+            guard = SCRIPT.read_text(encoding="utf-8").split(
+                "checkout_is_clean() {\n  python3 - <<'PY'\n", 1)[1].split("\nPY\n}", 1)[0]
+            workspace = repo / "xcuserdata/user/state\n?? source.swift"
+            workspace.parent.mkdir(parents=True)
+            workspace.write_text("ephemeral")
+            self.assertEqual(subprocess.run([sys.executable, "-c", guard], cwd=repo).returncode, 0)
+            (repo / "real\n?? xcuserdata").write_text("source")
+            self.assertNotEqual(subprocess.run([sys.executable, "-c", guard], cwd=repo).returncode, 0)
 
 
 class SubmissionMetadataTests(unittest.TestCase):
@@ -121,7 +165,9 @@ class MacOneShotOrchestrationTests(unittest.TestCase):
         self.stub("plutil", 'cp "${@: -1}" "$4"\n')
         self.stub("git", """printf 'git %s\\n' "$*" >> "$TRACE"
 case "$1" in
-status) printf '%s' "${TEST_DIRTY-}" ;;
+status)
+  [[ "${TEST_STATUS_FAILURE:-0}" == 0 ]] || exit "$TEST_STATUS_FAILURE"
+  [[ -z "${TEST_DIRTY-}" ]] || printf '%s\\0' "$TEST_DIRTY" ;;
 branch) printf '%s\\n' "${TEST_BRANCH:-main}" ;;
 rev-parse)
   case "$*" in *upstream*) echo origin/main ;; *) echo 1234abcd ;; esac ;;
@@ -186,6 +232,18 @@ fi
             with self.subTest(values=values):
                 self.assertNotEqual(self.run_script(**values).returncode, 0)
                 self.assertNotIn("git pull", self.calls())
+
+    def test_git_status_failure_never_allows_update(self):
+        result = self.run_script(TEST_STATUS_FAILURE="23")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("returned non-zero exit status 23", result.stdout)
+        self.assertNotIn("git pull", self.calls())
+
+    def test_untracked_workspace_state_is_tolerated_at_all_three_checks(self):
+        result = self.run_script(TEST_DIRTY="?? project with spaces/.swiftpm/state")
+        self.assertEqual(result.returncode, 3, result.stdout)
+        self.assertIn("git pull --ff-only", self.calls())
+        self.assertEqual(self.calls().count("git status --porcelain=v1 -z"), 3)
 
     def test_missing_distribution_parameters_refuses_update(self):
         result = self.run_script("--prepare-archive")

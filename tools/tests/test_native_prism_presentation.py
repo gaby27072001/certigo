@@ -260,6 +260,35 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertIn("prompt: copy[.searchPlaceholder]", self.app)
         self.assertIn("track.languages ?? []", self.app)
 
+    def test_native_copy_call_sites_reference_declared_keys_in_all_build_modes(self):
+        native_enum = self.app.split("enum NativeLabel:", 1)[1].split("func native(", 1)[0]
+        shared_copy = (
+            ROOT / "apps/apple/CertigoKit/Sources/CertigoDomain/AppLanguage.swift"
+        ).read_text(encoding="utf-8")
+        shared_enum = shared_copy.split("public enum Key:", 1)[1].split("}", 1)[0]
+
+        def cases(declaration):
+            return {
+                name.strip()
+                for group in re.findall(r"\bcase\s+(.*?)(?=\bcase\b|}|\Z)", declaration, re.S)
+                for name in group.split(",")
+                if name.strip()
+            }
+
+        native_keys = cases(native_enum)
+        shared_keys = cases(shared_enum)
+        self.assertGreater(len(native_keys), 100)
+        self.assertIn("done", shared_keys)
+        # Inspect source, including SwiftUI/DEBUG/Distribution branches excluded on Linux.
+        for path in sorted(SOURCES.glob("*.swift")):
+            source = path.read_text(encoding="utf-8")
+            for pattern, declared in (
+                (r"\bcopy\.native\(\s*\.(\w+)\s*\)", native_keys),
+                (r"\bcopy\[\s*\.(\w+)\s*\]", shared_keys),
+            ):
+                for match in re.finditer(pattern, source):
+                    self.assertIn(match[1], declared, f"{path.name}: {match[0]}")
+
     def test_secondary_messages_resolve_in_the_current_interface_language(self):
         model = (SOURCES / "NativeModel.swift").read_text(encoding="utf-8")
         for name in ("historyError", "tutorExplanationError", "deletionMessage", "errorMessage"):
