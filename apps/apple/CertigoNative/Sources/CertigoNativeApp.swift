@@ -5310,7 +5310,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 } else {
                     ContentUnavailableView(
                         copy[.coachPromptHint], systemImage: "bubble.left.and.bubble.right",
-                        description: Text(coachPhase))
+                        description: model.outcome == nil ? nil : Text(coachPhase))
                 }
                 NativeReadingSection(title: copy.native(.currentContext)) {
                     if let goal = model.profile?.activeTrackId {
@@ -5325,7 +5325,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     Text(copy.native(.coachPrivacy))
                         .font(.subheadline).foregroundStyle(.secondary)
                     Button(copy.native(.chooseContext), systemImage: "book") {
-                        model.selectedTab = .learn
+                        showMyLearning()
                     }
                     .frame(minHeight: 44)
                 }
@@ -5985,6 +5985,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
             compactColumn = .detail
         }
 
+        private func showMyLearning() {
+            navigation.learn = .myLearning
+            model.selectedTab = .learn
+            columns = .all
+            compactColumn = .sidebar
+        }
+
         private func requestPath(_ track: Track) {
             let requestID = UUID()
             loadingTrackID = track.id
@@ -6396,8 +6403,11 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .frame(maxWidth: 700)
             .frame(maxWidth: .infinity)
             .navigationTitle(
-                selectedTrack.map(trackTitle) ?? model.path?.trackName ?? copy.native(.learningPath)
+                model.tracks.first(where: {
+                    $0.id == (selectedTrack ?? model.offlinePack?.trackId ?? model.path?.trackId)
+                })?.code ?? copy.native(.learningPath)
             )
+            .navigationBarTitleDisplayMode(.inline)
         }
 
         private var progressHistory: some View {
@@ -6698,16 +6708,24 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     Text(copy.native(.noActiveGoal))
                         .foregroundStyle(.secondary)
                 }
-                NativePrimaryButton(title: state.action(copy), symbol: "scope") {
-                    savingGoalID = track.id
-                    Task {
-                        await model.chooseActiveTrack(track)
-                        savingGoalID = nil
+                if model.profile?.activeTrackId?.lowercased() == track.id.lowercased() {
+                    NativePrimaryButton(title: copy.myLearning, symbol: "book") {
+                        showMyLearning()
                     }
+                    .disabled(model.busy)
+                    .accessibilityIdentifier("open-confirmed-learning-goal")
+                } else {
+                    NativePrimaryButton(title: state.action(copy), symbol: "scope") {
+                        savingGoalID = track.id
+                        Task {
+                            await model.chooseActiveTrack(track)
+                            savingGoalID = nil
+                        }
+                    }
+                    .frame(minHeight: 44)
+                    .disabled(!state.canChoose)
+                    .accessibilityIdentifier("choose-active-goal")
                 }
-                .frame(minHeight: 44)
-                .disabled(!state.canChoose)
-                .accessibilityIdentifier("choose-active-goal")
                 Text(
                     copy.native(.goalChangeHint)
                 )

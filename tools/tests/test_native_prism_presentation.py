@@ -313,6 +313,38 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertIn(".navigationTitle(copy.native(.demoHistory))", history)
         self.assertNotIn(".navigationTitle(copy.progressAndHistory)", history)
 
+    def test_connected_goal_and_coach_actions_open_my_learning_not_stale_explore(self):
+        helper = self.app.split("private func showMyLearning()", 1)[1].split(
+            "private func requestPath(", 1
+        )[0]
+        for marker in (
+            "navigation.learn = .myLearning", "model.selectedTab = .learn",
+            "columns = .all", "compactColumn = .sidebar",
+        ):
+            self.assertIn(marker, helper)
+        coach = self.app.split("private var coach: some View", 1)[1].split(
+            "private var coachPhase:", 1
+        )[0]
+        self.assertIn("showMyLearning()", coach)
+        self.assertIn("model.outcome == nil ? nil : Text(coachPhase)", coach)
+        goal = self.app.split("private func activeGoalSection(", 1)[1].split(
+            "private var session:", 1
+        )[0]
+        self.assertIn("model.profile?.activeTrackId?.lowercased() == track.id.lowercased()", goal)
+        self.assertIn("showMyLearning()", goal)
+        self.assertIn('.accessibilityIdentifier("open-confirmed-learning-goal")', goal)
+        self.assertIn("await model.chooseActiveTrack(track)", goal)
+        self.assertIn(".disabled(!state.canChoose)", goal)
+
+    def test_connected_track_uses_code_in_bar_and_full_title_in_reading_content(self):
+        path = self.app.split("private var path: some View", 1)[1].split(
+            "private var progressHistory:", 1
+        )[0]
+        self.assertIn("Text(track.title).font(.title2.bold())", path)
+        self.assertIn("})?.code ?? copy.native(.learningPath)", path)
+        self.assertIn(".navigationBarTitleDisplayMode(.inline)", path)
+        self.assertNotIn("selectedTrack.map(trackTitle)", path)
+
     def test_secondary_messages_resolve_in_the_current_interface_language(self):
         model = (SOURCES / "NativeModel.swift").read_text(encoding="utf-8")
         for name in ("historyError", "tutorExplanationError", "deletionMessage", "errorMessage"):
