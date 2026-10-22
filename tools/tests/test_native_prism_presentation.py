@@ -340,6 +340,53 @@ class NativePrismPresentationTests(unittest.TestCase):
                 rgb = [a + (b - a) * step / 20 for a, b in zip(start, end)]
                 self.assertGreaterEqual(1.05 / (luminance(rgb) + 0.05), 4.5, (band, step))
 
+    def test_preparation_artwork_is_original_vector_art_not_an_earned_badge(self):
+        art = self.app.split("struct NativeEcosystemArtwork {", 1)[1].split(
+            "struct NativeReadinessRing:", 1
+        )[0]
+        for marker in (
+            "enum Silhouette: Sendable", "case pennant, hexagon, octagon",
+            "case facets, constellation, ribbons", "Canvas { context, size in",
+            "context.fill(", "context.stroke(", "path.closeSubpath()",
+            "NativePrism.surface", "contrast == .increased", "@ScaledMetric",
+            "certigo-preparation-crest", "copy.native(.learningPath)",
+        ):
+            self.assertIn(marker, art)
+        for claim in ("Certified", "official", "earned", "fundamentals", "associate", "expert"):
+            self.assertNotRegex(art, rf'"[^"\n]*\b{claim}\b[^"\n]*"')
+        for unsafe in ("★", "octocat", "visor", "smile", "reward", "level", "AsyncImage"):
+            self.assertNotIn(unsafe, art)
+        self.assertNotIn("Image(", art)
+        self.assertNotIn("URL(", art)
+        self.assertIn(".accessibilityHidden(true)", art)
+        self.assertIn('Text(code)', art)
+        self.assertIn("NativeCatalogFilter.family(for: code)", art)
+        self.assertIn('components.contains("GH")', art)
+
+    def test_crests_bind_exact_loaded_codes_across_real_surfaces(self):
+        catalog = self.app.split("struct NativeCertificationCard:", 1)[1].split(
+            "struct NativeAnswerLabel:", 1
+        )[0]
+        self.assertIn("NativeCertificationCrest(code: track.code)", catalog)
+        hero = self.app.split("struct NativeGoalHero:", 1)[1].split(
+            "struct NativeCertificationCard:", 1
+        )[0]
+        self.assertIn("if let code", hero)
+        self.assertIn("NativeCertificationCrest(code: code, compact: true)", hero)
+        self.assertIn('Text("Certigo")', self.app)
+        root = self.app.split("private struct NativeRoot:", 1)[1]
+        for section in ("private var profile:", "private var path:", "private var session:"):
+            surface = root.split(section, 1)[1]
+            self.assertIn("NativeCertificationCrest(code: track.code", surface)
+        coach = root.split("private var coach:", 1)[1].split("private var coachPhase:", 1)[0]
+        self.assertIn("model.profile?.activeTrackId?.lowercased()", coach)
+        self.assertIn("})?.code", coach)
+        exam = self.app.split("private struct NativeMockExamView:", 1)[1].split(
+            "private struct NativeNotificationPreferencesView:", 1
+        )[0]
+        self.assertIn("NativeCertificationCrest(code: snapshot.exam.trackCode, compact: true)", exam)
+        self.assertNotIn('NativeCertificationCrest(code: "AZ-', self.app)
+
     def test_international_copy_has_eight_explicit_translations_per_native_label(self):
         copy = self.app.split("enum NativeLabel:", 1)[1].split(
             "struct NativeContentLanguageBadges:", 1

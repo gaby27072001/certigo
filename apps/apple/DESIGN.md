@@ -43,6 +43,48 @@ availability, or a claim of partnership. Existing catalog families and filter
 semantics are unchanged.
 Track names, codes and availability remain visible; color never carries identity alone.
 
+### Original preparation emblems
+
+`NativeEcosystemEmblem` draws original Certigo facets, curved ribbons or a five-node
+constellation with SwiftUI Canvas. `NativeCertificationCrest` frames that artwork
+with a two-line pennant, hexagon or octagon and the exact loaded exam code. They
+are preparation identifiers, **not official vendor logos, official certification
+badges or evidence of an earned qualification**. The accessible label uses the
+localized learning-path label and exact code, never a claimed level or award.
+Numeric code suffixes do not assign Fundamentals/Associate/Expert or stars.
+
+Color references give each code universe a distinct visual rhythm; they do not
+grant a right to copy a brand mark. No four-square Microsoft logo, Azure A,
+Fabric mark, Copilot visor, Octocat, AWS smile, Google G/cloud or Kubernetes wheel
+is traced or approximated. A visible Certigo label accompanies the exam code.
+Existing Flutter hand-drawn vendor artwork is not
+ported: its "trademark-safe" comment is not a license or legal evidence.
+
+The same source component appears on catalog cards, the confirmed learning goal,
+track detail, quiz, mock exam, contextual Coach and profile. Only a loaded Track
+or exam contract supplies a certification code. A missing code uses abstract
+Certigo artwork, not a guessed vendor. Colored motifs are decorative; labels use
+adaptive high-contrast Prism ink on opaque semantic surfaces. Crest geometry
+scales with Dynamic Type (decorative mark capped at 112 points to preserve reading
+width) and the code wraps instead of being truncated. Goal, quiz, exam and active
+path headers use a compact horizontal version; no new full-height badge is placed
+above the primary learning action.
+Artwork is bundled as Swift source, has no network request, binary asset,
+added dependency or project-file change.
+
+Brand-source review (2026-10-22; recheck before introducing official assets):
+
+- [Microsoft trademark guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks)
+  identify brand assets as proprietary and require a license for many logo/icon uses.
+- [GitHub logo guidance](https://brand.github.com/foundations/logo) prohibits
+  modifications, gradients on logos and combination with other design elements;
+  it also states that Copilot's standalone visor logo was deprecated in 2025.
+  Permitted uses are scoped, not a blanket license to redraw marks.
+
+Future official assets require an approved unchanged source, documented permission
+covering Certigo's use and placement, and separate treatment from preparation
+artwork. These notes are implementation constraints, not a legal opinion.
+
 Canvas, reading surfaces, body/secondary text and borders use adaptive UIKit
 semantic roles. Borders use the label role at increased contrast. Success and
 pending use green and amber foreground roles with an accompanying symbol and text.
