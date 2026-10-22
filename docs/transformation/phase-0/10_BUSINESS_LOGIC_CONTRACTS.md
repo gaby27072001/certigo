@@ -246,7 +246,7 @@ Ces endpoints existent dans `backend/src/Certigo.Api/Functions/` et **ne doivent
   - `apps/apple/CertigoKit/Sources/CertigoDomain/AppLanguage.swift:3-97` :
     - 8 langues canoniques exactes (`:3-12`) : `.french = "fr"`, `.english = "en"`, `.hindi = "hi"`, `.chineseSimplified = "zh-Hans"`, `.korean = "ko"`, `.spanish = "es"`, `.italian = "it"`, `.german = "de"`.
     - `AppLanguage.resolved(fromPreferredLanguages:)` (`:32-54`) : refuse explicitement d'assimiler `zh-Hant` ou les régions `TW`, `HK`, `MO` à `zh-Hans` (`:39-48`), et replie par défaut sur `.english` (`:53`).
-    - `AppLanguagePreference` (`:56-97`) : `.system` ou `.explicit(AppLanguage)`, persisté dans `UserDefaults.standard` sous la clé `"certigo.app.interface-language.v1"` (`:61`).
+    - `AppLanguagePreference` (`:56-97`) : `.system` ou `.explicit(AppLanguage)`, persisté dans `UserDefaults.standard` sous la clé définie à `AppLanguage.swift:61`.
     - `AppInterfaceCopy` (`:98-2147`) et `AppInterfaceCopy.NativeLabel` (`apps/apple/CertigoNative/Sources/CertigoNativeApp.swift:313-2750`) : dictionnaires exhaustifs vérifiés par précondition (8 traductions par clé, aucun repli silencieux vers l'anglais).
   - `apps/apple/CertigoNative/Sources/CertigoNativeApp.swift:203-214,2756-2772,3093-3157` :
     - `NativeLanguageRoot` (`:3093-3123`) injecte `.environment(\.locale, effectiveLanguage.locale)` et `.environment(\.nativeInterfaceCopy, AppInterfaceCopy(language: effectiveLanguage))` à la racine de l'app et rafraîchit au retour au premier plan (`scenePhase == .active`).
