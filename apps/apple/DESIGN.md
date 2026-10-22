@@ -240,3 +240,18 @@ The follow-on `certigo-apple-ui-excellence-pass-2026-10-21.md` is applied
 semantically, not copied as a file replacement or treated as native render proof.
 
 See `NATIVE_UI_BRIEF.md` for the connected acceptance journey and validation limits.
+
+Explorer opens with a horizontal ecosystem showcase. Counts are calculated from
+the loaded catalog, with practice availability separate from the collection count.
+Tapping a universe replaces local filters; tapping it again or clearing filters
+restores the collection. Account changes clear this selection too. These are
+code-family display groupings, not additional issuer metadata.
+
+Unit lessons form numbered stepping stones with colored connectors and explicit
+mastery-stage pills. Only supplied mastery percentages fill the node rings;
+sequence numbers never imply completion. Each row retains its single real
+navigation action and availability guard. The development welcome uses original
+ecosystem artwork without catalog counts or achievement claims. Its demo remains
+explicitly fictional. Developer dismissal now lives in native navigation toolbars
+instead of reserving another top banner; swipe dismissal stays disabled.
+Apple compilation and device rendering remain separate acceptance gates.

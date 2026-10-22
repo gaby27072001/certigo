@@ -147,6 +147,29 @@ struct NativeCatalogFilter {
     mutating func clear() { self = Self() }
 }
 
+enum NativeShowcaseUniverse: String, CaseIterable, Sendable {
+    case azure, github, data, aws, security
+
+    func includes(code: String) -> Bool {
+        let parts = NativeTrackAppearance.normalized(code).split(separator: "-")
+        let family = NativeCatalogFilter.family(for: code)
+        switch self {
+        case .azure: return parts.contains("AZ") || parts.contains("AI")
+        case .github: return parts.contains("GH") || family == "GITHUB"
+        case .data: return parts.contains("DP") || parts.contains("FABRIC")
+        case .aws: return family == "AWS"
+        case .security:
+            return NativeTrackAppearance.group(for: code)?.category == .security
+                || parts.contains("SC")
+                || (NativeTrackAppearance.group(for: code)?.category == .cloud
+                    && !Self.azure.includes(code: code)
+                    && !Self.github.includes(code: code)
+                    && !Self.data.includes(code: code)
+                    && !Self.aws.includes(code: code))
+        }
+    }
+}
+
 struct NativePathCoverage {
     let completedActivities: Int
     let totalActivities: Int
@@ -3475,6 +3498,59 @@ enum NativeLearningDuration {
         }
     }
 
+    private struct NativeShowcaseTile: View {
+        let code: String
+        let title: String
+        var detail: String?
+        var selected = false
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                NativeEcosystemEmblem(code: code)
+                    .frame(width: 56, height: 56)
+                    .padding(8)
+                    .background(NativePrism.surface, in: RoundedRectangle(cornerRadius: 20))
+                Text(title).font(.headline).foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail {
+                    Text(detail).font(.caption.weight(.medium)).foregroundStyle(.white)
+                }
+                if selected {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.white)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(20)
+            .frame(width: 200, alignment: .leading)
+            .background(
+                NativeTrackTheme(code: code).gradient, in: RoundedRectangle(cornerRadius: 26)
+            )
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private struct NativeDeveloperToolbar: ViewModifier {
+        @Environment(\.nativeInterfaceCopy) private var copy
+        let close: (() -> Void)?
+
+        func body(content: Content) -> some View {
+            content.toolbar {
+                if let close {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(action: close) {
+                            Image(systemName: "xmark").font(.caption.weight(.semibold))
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                        .accessibilityLabel(
+                            "\(copy.native(.close)) · \(copy.native(.developerConnector))"
+                        )
+                        .accessibilityIdentifier("close-developer-connector")
+                    }
+                }
+            }
+        }
+    }
+
     struct NativeReadinessRing: View {
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @ScaledMetric(relativeTo: .title2) private var diameter = 88.0
@@ -3856,7 +3932,6 @@ enum NativeLearningDuration {
                     NativeEntryHeading(
                         title: copy.native(.welcomeTitle),
                         message: copy.native(.welcomeHint), prominent: true)
-                    NativeAppLanguagePicker()
                     NativeReadingSection(title: copy.native(.tryLearning)) {
                         NativePrimaryButton(title: copy.exploreDemo, symbol: "play.circle") {
                             showDemo = true
@@ -3867,6 +3942,18 @@ enum NativeLearningDuration {
                         )
                         .foregroundStyle(.secondary)
                     }
+                    ScrollView(.horizontal) {
+                        HStack(alignment: .top, spacing: 12) {
+                            NativeShowcaseTile(code: "AZ", title: "Microsoft Azure")
+                            NativeShowcaseTile(code: "GH", title: "GitHub & Copilot")
+                            NativeShowcaseTile(code: "DP", title: "Microsoft Fabric")
+                            NativeShowcaseTile(code: "AWS", title: "AWS")
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .scrollIndicators(.hidden)
+                    .accessibilityIdentifier("entry-ecosystem-artwork")
+                    DisclosureGroup(copy.appLanguage) { NativeAppLanguagePicker() }
                     #if DEBUG
                         if let pendingLessonLink {
                             NativeReadingSection(title: copy.native(.sharedLesson)) {
@@ -4123,20 +4210,19 @@ enum NativeLearningDuration {
                     } else if usesCIAM && model.profile == nil {
                         ciamSignIn
                     } else {
-                        NativeRoot(model: model, pendingLessonLink: $pendingLessonLink)
+                        NativeRoot(
+                            model: model, pendingLessonLink: $pendingLessonLink,
+                            closeDeveloper: { dismiss() })
                     }
                 }
                 .onOpenURL { url in
                     _ = ciamProvider?.handleCallback(url, sourceApplication: nil)
                 }
-                .safeAreaInset(edge: .top) {
-                    HStack {
-                        Text(copy.native(.developerConnector)).font(.subheadline)
-                        Spacer()
+                .overlay(alignment: .topTrailing) {
+                    if configurationIssue != nil {
                         Button(copy.native(.close)) { dismiss() }
+                            .buttonStyle(.bordered).padding()
                     }
-                    .padding()
-                    .background(.background)
                 }
             }
 
@@ -4156,6 +4242,7 @@ enum NativeLearningDuration {
                             .disabled(model.busy)
                         }
                     }
+                    .modifier(NativeDeveloperToolbar(close: { dismiss() }))
                     .navigationTitle("Certigo")
                     .alert(
                         copy.native(.ciamIncomplete),
@@ -5645,6 +5732,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
         @Bindable var model: NativeModel
         @Binding var pendingLessonLink: EditorialPilotLessonLink?
+        let closeDeveloper: (() -> Void)?
         @State private var selectedTrack: String?
         @State private var selectedLesson: String?
         @State private var savingGoalID: String?
@@ -5659,21 +5747,27 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var loadingLessonRequestID: UUID?
         @State private var downloadTrack: Track?
         @State private var catalogFilter = NativeCatalogFilter()
+        @State private var showcaseUniverse: NativeShowcaseUniverse?
         @State private var resumeTrackID: String?
         @State private var showingStudyPlan = false
 
         init(
             model: NativeModel,
-            pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil)
+            pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil),
+            closeDeveloper: (() -> Void)? = nil
         ) {
             self.model = model
             self._pendingLessonLink = pendingLessonLink
+            self.closeDeveloper = closeDeveloper
         }
 
         var body: some View {
             Group {
                 if model.requiresDeletionSurface {
-                    NavigationStack { NativeAccountDeletionView(model: model) }
+                    NavigationStack {
+                        NativeAccountDeletionView(model: model)
+                            .modifier(NativeDeveloperToolbar(close: closeDeveloper))
+                    }
                 } else if model.profile == nil {
                     connection
                 } else {
@@ -5732,12 +5826,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 .frame(minHeight: 44)
                             }
                             .navigationTitle(copy.social)
+                            .modifier(NativeDeveloperToolbar(close: closeDeveloper))
                         }
                         .tabItem { Label(copy.social, systemImage: "person.2") }
                         .tag(NativeResumeState.Tab.social)
-                        NavigationStack { profile }
-                            .tabItem { Label(copy.profile, systemImage: "person.crop.circle") }
-                            .tag(NativeResumeState.Tab.profile)
+                        NavigationStack {
+                            profile.modifier(NativeDeveloperToolbar(close: closeDeveloper))
+                        }
+                        .tabItem { Label(copy.profile, systemImage: "person.crop.circle") }
+                        .tag(NativeResumeState.Tab.profile)
                     }
                 }
             }
@@ -5746,6 +5843,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 selectedTrack = nil
                 selectedLesson = nil
                 catalogFilter.clear()
+                showcaseUniverse = nil
                 showingStudyPlan = false
                 resumeTrackID = nil
                 columns = .automatic
@@ -5857,6 +5955,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
             }
             .navigationTitle(copy.coach)
+            .modifier(NativeDeveloperToolbar(close: closeDeveloper))
         }
 
         private var coachPhase: String {
@@ -5935,9 +6034,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 navigation.showsTrack(
                     $0.id, activeID: model.profile?.activeTrackId, openedID: selectedTrack)
                     && (navigation.learn != .explore
-                        || catalogFilter.includes(
-                            code: $0.code, title: $0.title, summary: $0.summary,
-                            available: $0.learningAvailable))
+                        || ((showcaseUniverse?.includes(code: $0.code) ?? true)
+                            && catalogFilter.includes(
+                                code: $0.code, title: $0.title, summary: $0.summary,
+                                available: $0.learningAvailable)))
             }
         }
 
@@ -5952,6 +6052,45 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     NativeTrackAppearance.group(for: $0.code)?.category == category
                 }
             }
+        }
+
+        private func universeTitle(_ universe: NativeShowcaseUniverse) -> String {
+            switch universe {
+            case .azure: "Microsoft Azure"
+            case .github: "GitHub & Copilot"
+            case .data: "Data & Fabric"
+            case .aws: "AWS"
+            case .security:
+                "\(NativeRadarCategory.cloud.title(copy)) · \(NativeRadarCategory.security.title(copy))"
+            }
+        }
+
+        private var ecosystemShowcase: some View {
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(NativeShowcaseUniverse.allCases, id: \.self) { universe in
+                        let tracks = model.tracks.filter { universe.includes(code: $0.code) }
+                        if let first = tracks.first {
+                            let available = tracks.filter(\.learningAvailable).count
+                            Button {
+                                catalogFilter.clear()
+                                showcaseUniverse = showcaseUniverse == universe ? nil : universe
+                            } label: {
+                                NativeShowcaseTile(
+                                    code: first.code, title: universeTitle(universe),
+                                    detail:
+                                        "\(tracks.count) · \(copy.native(.collection))\n\(available) · \(copy[.practiceAvailable])",
+                                    selected: showcaseUniverse == universe)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(showcaseUniverse == universe ? .isSelected : [])
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .scrollIndicators(.hidden)
+            .accessibilityIdentifier("catalog-ecosystem-showcase")
         }
 
         private var learning: some View {
@@ -6020,6 +6159,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 .foregroundStyle(.secondary)
                         }
                         .listRowBackground(Color.clear)
+                        Section { ecosystemShowcase }
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                         Section(copy.native(.findCertification)) {
                             Picker(copy.native(.codeFamily), selection: $catalogFilter.family) {
                                 Text(copy.native(.allFamilies)).tag("")
@@ -6063,9 +6205,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 "\(copy.native(.loadedResults)) · \(visibleTracks.count) / \(model.tracks.count)"
                             )
                             .font(.subheadline)
-                            if catalogFilter.isActive {
+                            if catalogFilter.isActive || showcaseUniverse != nil {
                                 Button(copy[.clearFilters], systemImage: "xmark.circle") {
                                     catalogFilter.clear()
+                                    showcaseUniverse = nil
                                 }
                             }
                         }
@@ -6122,13 +6265,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 .scrollContentBackground(.hidden)
                 .background(NativePrism.canvas)
                 .navigationTitle(copy.learn)
+                .modifier(NativeDeveloperToolbar(close: closeDeveloper))
                 .modifier(
                     NativeCatalogSearch(
                         enabled: navigation.learn == .explore, query: $catalogFilter.query))
             } content: {
-                path
+                path.modifier(NativeDeveloperToolbar(close: closeDeveloper))
             } detail: {
-                session
+                session.modifier(NativeDeveloperToolbar(close: closeDeveloper))
             }
             .onChange(of: selectedTrack) { _, id in
                 if let resumeTrackID, resumeTrackID == id {
@@ -6196,7 +6340,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     ContentUnavailableView(
                         copy[.noMatchingTracks], systemImage: "magnifyingglass",
                         description: Text(copy.native(.noMatchesHint)))
-                    Button(copy[.clearFilters]) { catalogFilter.clear() }
+                    Button(copy[.clearFilters]) {
+                        catalogFilter.clear()
+                        showcaseUniverse = nil
+                    }
                 }
             }
         }
@@ -6214,16 +6361,20 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     .font(.headline)
                     ForEach(path.units) { unit in
                         unitProgress(title: unit.title, lessons: unit.lessons, code: path.trackId)
-                        ForEach(unit.lessons) { lesson in
+                        ForEach(Array(unit.lessons.enumerated()), id: \.element.id) {
+                            index, lesson in
                             Button {
                                 selectedTrack = path.trackId
                                 selectedLesson = lesson.id
                                 columns = .detailOnly
                                 compactColumn = .detail
                             } label: {
-                                lessonLabel(lesson, code: path.trackId)
+                                lessonLabel(
+                                    lesson, code: path.trackId, number: index + 1,
+                                    isLast: index == unit.lessons.count - 1)
                             }
                             .buttonStyle(.plain)
+                            .listRowSeparator(.hidden)
                             .disabled(!lesson.canOpen || model.busy || loadingLessonID != nil)
                         }
                     }
@@ -6281,9 +6432,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .padding(.vertical, 12)
         }
 
-        private func lessonLabel(_ lesson: PathLesson, code: String) -> some View {
+        private func lessonLabel(
+            _ lesson: PathLesson, code: String, number: Int, isLast: Bool
+        ) -> some View {
             HStack(alignment: .center, spacing: 16) {
                 ZStack {
+                    Circle().fill(NativePrism.surface)
                     Circle().stroke(NativePrism.accent(for: code).opacity(0.15), lineWidth: 4)
                     if let mastery = lesson.masteryPct {
                         Circle().trim(from: 0, to: CGFloat(min(100, max(0, mastery))) / 100)
@@ -6293,7 +6447,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             )
                             .rotationEffect(.degrees(-90))
                     }
-                    Text(lesson.nativeMasteryStage.symbol).font(.title2)
+                    Text(number, format: .number).font(.headline.monospacedDigit())
                         .foregroundStyle(NativePrism.accent(for: code))
                 }
                 .frame(width: 44, height: 44).accessibilityHidden(true)
@@ -6301,15 +6455,34 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     Text(lesson.title).font(.headline).foregroundStyle(.primary)
                     Text("\(copy.minutes(lesson.estMinutes)) · \(activityStatus(lesson.status))")
                         .font(.caption).foregroundStyle(.secondary)
-                    Text(copy[lesson.nativeMasteryStage.copyKey])
-                        .font(.caption).foregroundStyle(NativePrism.accent(for: code))
+                    Text(
+                        "\(lesson.nativeMasteryStage.symbol) \(copy[lesson.nativeMasteryStage.copyKey])"
+                    )
+                    .font(.caption.weight(.semibold)).foregroundStyle(NativePrism.accent(for: code))
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(NativePrism.accent(for: code).opacity(0.1), in: Capsule())
                     if !lesson.canOpen {
                         Text(copy.native(.lockedHint)).font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                Spacer(minLength: 0)
+                Image(systemName: lesson.canOpen ? "play.circle.fill" : "lock.circle")
+                    .font(.title2).foregroundStyle(NativePrism.accent(for: code))
+                    .frame(minWidth: 44, minHeight: 44).accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
             .padding(.vertical, 8)
+            .background(alignment: .leading) {
+                if !isLast {
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(NativePrism.accent(for: code).opacity(0.25))
+                            .frame(width: 3, height: geometry.size.height / 2 + 20)
+                            .offset(x: 20.5, y: geometry.size.height / 2)
+                    }
+                    .accessibilityHidden(true)
+                }
+            }
             .accessibilityElement(children: .combine)
         }
 
@@ -6943,6 +7116,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 }
                 .navigationTitle("Certigo")
+                .modifier(NativeDeveloperToolbar(close: closeDeveloper))
             }
         }
 
@@ -7029,10 +7203,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 ForEach(path.units) { unit in
                     Section("\(copy.native(.unit)) · \(unit.title)") {
                         unitProgress(title: unit.title, lessons: unit.lessons, code: path.trackId)
-                        ForEach(unit.lessons) { lesson in
+                        ForEach(Array(unit.lessons.enumerated()), id: \.element.id) {
+                            index, lesson in
                             NavigationLink(value: lesson.id) {
-                                lessonLabel(lesson, code: path.trackId)
+                                lessonLabel(
+                                    lesson, code: path.trackId, number: index + 1,
+                                    isLast: index == unit.lessons.count - 1)
                             }
+                            .listRowSeparator(.hidden)
                             .disabled(
                                 !lesson.canOpen || model.busy || loadingLessonID != nil)
                         }
