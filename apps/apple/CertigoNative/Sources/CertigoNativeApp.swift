@@ -3385,7 +3385,7 @@ enum NativeLearningDuration {
             }
             .onOpenURL(perform: handleIncomingURL)
             .alert(copy.native(.lessonLinkUnavailable), isPresented: $invalidLessonLink) {
-                Button(copy.native(.ok), role: .cancel) { invalidLessonLink = false }
+                Button(copy[.done], role: .cancel) { invalidLessonLink = false }
             } message: {
                 Text(copy.native(.lessonLinkInvalid))
             }
@@ -3484,7 +3484,7 @@ enum NativeLearningDuration {
                                     set: { if !$0 { model.errorMessage = nil } }
                                 )
                             ) {
-                                Button(copy.native(.ok), role: .cancel) { model.errorMessage = nil }
+                                Button(copy[.done], role: .cancel) { model.errorMessage = nil }
                             } message: {
                                 Text(model.errorMessage?.resolved(using: copy) ?? "")
                             }
@@ -3644,7 +3644,7 @@ enum NativeLearningDuration {
                             set: { if !$0 { model.errorMessage = nil } }
                         )
                     ) {
-                        Button(copy.native(.ok), role: .cancel) { model.errorMessage = nil }
+                        Button(copy[.done], role: .cancel) { model.errorMessage = nil }
                     } message: {
                         Text(model.errorMessage?.resolved(using: copy) ?? "")
                     }
@@ -5261,7 +5261,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     set: { if !$0 { model.errorMessage = nil } }
                 )
             ) {
-                Button(copy.native(.ok), role: .cancel) { model.errorMessage = nil }
+                Button(copy[.done], role: .cancel) { model.errorMessage = nil }
             } message: {
                 Text(model.errorMessage?.resolved(using: copy) ?? "")
             }
