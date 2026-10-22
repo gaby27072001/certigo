@@ -222,7 +222,7 @@ class NativePrismPresentationTests(unittest.TestCase):
 
     def test_editorial_pilot_inherits_locale_and_content_language_disclosure(self):
         self.assertIn("@Environment(\\.nativeInterfaceCopy) private var copy", self.pilot)
-        self.assertIn("Text(copy.contentLanguageNote)", self.pilot)
+        self.assertNotIn("Text(copy.contentLanguageNote)", self.pilot)
         self.assertIn('NativeContentLanguageBadges(languages: ["fr-FR"])', self.pilot)
         self.assertIn("Text(lesson.hook)", self.pilot)
         self.assertIn("Text(lesson.practice.prompt)", self.pilot)
@@ -344,6 +344,31 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertIn("})?.code ?? copy.native(.learningPath)", path)
         self.assertIn(".navigationBarTitleDisplayMode(.inline)", path)
         self.assertNotIn("selectedTrack.map(trackTitle)", path)
+
+    def test_connected_learning_precedes_metadata_and_keeps_explicit_exit(self):
+        sheet = self.app.split(".sheet(isPresented: $showDeveloper)", 1)[1].split("#endif", 1)[0]
+        self.assertIn(".interactiveDismissDisabled()", sheet)
+        self.assertIn("Button(copy.native(.close)) { dismiss() }", self.app)
+        path = self.app.split("private var path: some View", 1)[1].split(
+            "private var progressHistory:", 1
+        )[0]
+        self.assertLess(path.index("pathLearningSections"), path.index("Section(copy.native(.goalOverview))"))
+        learning = path.split("@ViewBuilder private var pathLearningSections:", 1)[1]
+        self.assertLess(learning.index("activeGoalSection(track)"), learning.index("ForEach(path.units)"))
+        self.assertLess(learning.index("ForEach(path.units)"), learning.index("Section(copy.native(.learningPlan))"))
+        def brace_depth_before(marker):
+            source = learning[:learning.index(marker)]
+            source = re.sub(r'"(?:[^"\\]|\\.)*"', '""', source)
+            return source.count("{") - source.count("}")
+        self.assertEqual(
+            brace_depth_before("ForEach(path.units)"),
+            brace_depth_before("Section(copy.native(.learningPlan))"),
+        )
+        self.assertIn("NativeMockExamView(model: model)", learning)
+        self.assertIn("!lesson.canOpen || model.busy || loadingLessonID != nil", learning)
+        goal = self.app.split("private func activeGoalSection(", 1)[1].split("private var session:", 1)[0]
+        self.assertIn("current.lowercased() != track.id.lowercased()", goal)
+        self.assertNotIn("copy.native(.goalChangeHint)", goal)
 
     def test_secondary_messages_resolve_in_the_current_interface_language(self):
         model = (SOURCES / "NativeModel.swift").read_text(encoding="utf-8")

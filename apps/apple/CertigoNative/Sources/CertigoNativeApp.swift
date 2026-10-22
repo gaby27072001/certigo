@@ -3380,6 +3380,7 @@ enum NativeLearningDuration {
                 #if DEBUG
                     .sheet(isPresented: $showDeveloper) {
                         NativeDeveloperConnector(pendingLessonLink: $pendingLessonLink)
+                        .interactiveDismissDisabled()
                     }
                 #endif
             }
@@ -6238,6 +6239,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
 
         private var path: some View {
             List(selection: $selectedLesson) {
+                pathLearningSections
                 if let track = model.tracks.first(where: {
                     $0.id == (selectedTrack ?? model.offlinePack?.trackId ?? model.path?.trackId)
                 }) {
@@ -6290,111 +6292,6 @@ struct NativeDemoSnapshot: Codable, Equatable {
                         }
                     }
                 }
-                if let path = model.path,
-                    selectedTrack == nil || selectedTrack == path.trackId,
-                    model.tracks.first(where: { $0.id == path.trackId })?.learningAvailable != false
-                {
-                    if let track = model.tracks.first(where: { $0.id == path.trackId }) {
-                        activeGoalSection(track)
-                    }
-                    Section {
-                        Text(path.trackName).font(.title2.bold())
-                            .accessibilityAddTraits(.isHeader)
-                        LabeledContent(
-                            copy.native(.readiness), value: "\(path.readinessScore) %")
-                        Button(copy.native(.refreshData), systemImage: "arrow.clockwise") {
-                            Task { await model.refreshProgress() }
-                        }
-                        .disabled(model.busy)
-                    }
-                    Section(copy.native(.learningPlan)) {
-                        let coverage = NativePathCoverage(
-                            units: path.units.map { $0.lessons.map { $0.status.rawValue } })
-                        LabeledContent(
-                            copy.native(.activities),
-                            value: "\(coverage.completedActivities) / \(coverage.totalActivities)")
-                        LabeledContent(
-                            copy.native(.remainingActivities),
-                            value: "\(coverage.remainingActivities)"
-                        )
-                        .font(.subheadline).foregroundStyle(.secondary)
-                        Text(copy.native(.activityCoverageHint))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    ForEach(path.units) { unit in
-                        Section("\(copy.native(.unit)) · \(unit.title)") {
-                            ForEach(unit.lessons) { lesson in
-                                NavigationLink(value: lesson.id) {
-                                    Label {
-                                        VStack(alignment: .leading) {
-                                            Text(lesson.title)
-                                                .font(.headline)
-                                            Text("\(copy.minutes(lesson.estMinutes))")
-                                                .foregroundStyle(
-                                                    .secondary)
-                                            Text(activityStatus(lesson.status))
-                                                .font(.caption).foregroundStyle(.secondary)
-                                            Text(
-                                                "\(lesson.nativeMasteryStage.symbol) \(copy[lesson.nativeMasteryStage.copyKey])"
-                                            )
-                                            .font(.caption)
-                                            if !lesson.canOpen {
-                                                Text(copy.native(.lockedHint))
-                                                    .font(.caption).foregroundStyle(.secondary)
-                                            }
-                                        }
-                                    } icon: {
-                                        Image(systemName: lesson.canOpen ? "book" : "lock")
-                                    }
-                                }
-                                .disabled(
-                                    !lesson.canOpen || model.busy || loadingLessonID != nil)
-                            }
-                        }
-                    }
-                    Section(copy.native(.reviewPractice)) {
-                        smartReview
-                        if let lesson = model.lesson, lesson.trackId == path.trackId {
-                            Button("\(copy.resume) · \(lesson.title)", systemImage: "play.circle") {
-                                resumeCurrentActivity(lesson)
-                            }
-                            .disabled(model.busy)
-                        }
-                    }
-                } else if let selectedTrack,
-                    let track = model.tracks.first(where: { $0.id == selectedTrack })
-                {
-                    if !track.learningAvailable {
-                        Section {
-                            Text(copy[.practiceUnavailableNote])
-                            Button(copy.explore) { navigation.learn = .explore }
-                        }
-                    } else if loadingTrackID == track.id {
-                        Section {
-                            ProgressView(copy.loading)
-                                .frame(maxWidth: .infinity, minHeight: 88)
-                        }
-                    } else {
-                        Section {
-                            ContentUnavailableView(
-                                copy.native(.pathUnavailable),
-                                systemImage: "wifi.exclamationmark",
-                                description: Text(
-                                    copy.native(.pathRetryHint)
-                                )
-                            )
-                            Button(copy.native(.retryPath), systemImage: "arrow.clockwise") {
-                                requestPath(track)
-                            }
-                            .disabled(model.busy || loadingTrackID != nil)
-                        }
-                    }
-                } else {
-                    ContentUnavailableView(
-                        copy.native(.chooseCertification), systemImage: "books.vertical",
-                        description: Text(copy.native(.pathServerHint))
-                    )
-                }
                 savedAnswers
             }
             .listStyle(.insetGrouped)
@@ -6408,6 +6305,121 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 })?.code ?? copy.native(.learningPath)
             )
             .navigationBarTitleDisplayMode(.inline)
+        }
+
+        @ViewBuilder private var pathLearningSections: some View {
+            if let track = model.tracks.first(where: {
+                $0.id == (selectedTrack ?? model.offlinePack?.trackId ?? model.path?.trackId)
+            }), track.learningAvailable {
+                activeGoalSection(track)
+            }
+            if let path = model.path,
+                selectedTrack == nil || selectedTrack == path.trackId,
+                model.tracks.first(where: { $0.id == path.trackId })?.learningAvailable != false
+            {
+                ForEach(path.units) { unit in
+                    Section("\(copy.native(.unit)) · \(unit.title)") {
+                        ForEach(unit.lessons) { lesson in
+                            NavigationLink(value: lesson.id) {
+                                Label {
+                                    VStack(alignment: .leading) {
+                                        Text(lesson.title)
+                                            .font(.headline)
+                                        Text("\(copy.minutes(lesson.estMinutes))")
+                                            .foregroundStyle(
+                                                .secondary)
+                                        Text(activityStatus(lesson.status))
+                                            .font(.caption).foregroundStyle(.secondary)
+                                        Text(
+                                            "\(lesson.nativeMasteryStage.symbol) \(copy[lesson.nativeMasteryStage.copyKey])"
+                                        )
+                                        .font(.caption)
+                                        if !lesson.canOpen {
+                                            Text(copy.native(.lockedHint))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                } icon: {
+                                    Image(systemName: lesson.canOpen ? "book" : "lock")
+                                }
+                            }
+                            .disabled(
+                                !lesson.canOpen || model.busy || loadingLessonID != nil)
+                        }
+                    }
+                }
+                Section(copy.native(.learningPlan)) {
+                    let coverage = NativePathCoverage(
+                        units: path.units.map { $0.lessons.map { $0.status.rawValue } })
+                    LabeledContent(
+                        copy.native(.activities),
+                        value: "\(coverage.completedActivities) / \(coverage.totalActivities)")
+                    LabeledContent(
+                        copy.native(.remainingActivities),
+                        value: "\(coverage.remainingActivities)"
+                    )
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    Text(copy.native(.activityCoverageHint))
+                        .font(.caption).foregroundStyle(.secondary)
+                    LabeledContent(
+                        copy.native(.readiness), value: "\(path.readinessScore) %")
+                    Button(copy.native(.refreshData), systemImage: "arrow.clockwise") {
+                        Task { await model.refreshProgress() }
+                    }
+                    .disabled(model.busy)
+                }
+                if model.profile?.activeTrackId?.lowercased() == path.trackId.lowercased() {
+                    Section(copy.native(.finalAssessment)) {
+                        NavigationLink {
+                            NativeMockExamView(model: model)
+                        } label: {
+                            Label(copy[.startFinalAssessment], systemImage: "checkmark.seal")
+                        }
+                    }
+                }
+                Section(copy.native(.reviewPractice)) {
+                    smartReview
+                    if let lesson = model.lesson, lesson.trackId == path.trackId {
+                        Button("\(copy.resume) · \(lesson.title)", systemImage: "play.circle") {
+                            resumeCurrentActivity(lesson)
+                        }
+                        .disabled(model.busy)
+                    }
+                }
+            } else if let selectedTrack,
+                let track = model.tracks.first(where: { $0.id == selectedTrack })
+            {
+                if !track.learningAvailable {
+                    Section {
+                        Text(copy[.practiceUnavailableNote])
+                        Button(copy.explore) { navigation.learn = .explore }
+                    }
+                } else if loadingTrackID == track.id {
+                    Section {
+                        ProgressView(copy.loading)
+                            .frame(maxWidth: .infinity, minHeight: 88)
+                    }
+                } else {
+                    Section {
+                        ContentUnavailableView(
+                            copy.native(.pathUnavailable),
+                            systemImage: "wifi.exclamationmark",
+                            description: Text(
+                                copy.native(.pathRetryHint)
+                            )
+                        )
+                        Button(copy.native(.retryPath), systemImage: "arrow.clockwise") {
+                            requestPath(track)
+                        }
+                        .disabled(model.busy || loadingTrackID != nil)
+                    }
+                }
+            } else {
+                ContentUnavailableView(
+                    copy.native(.chooseCertification), systemImage: "books.vertical",
+                    description: Text(copy.native(.pathServerHint))
+                )
+            }
         }
 
         private var progressHistory: some View {
@@ -6699,14 +6711,13 @@ struct NativeDemoSnapshot: Codable, Equatable {
             Section(copy.native(.activeGoal)) {
                 Label(state.status(copy), systemImage: state.symbol)
                     .accessibilityIdentifier("active-goal-status")
-                if let current = model.profile?.activeTrackId {
+                if let current = model.profile?.activeTrackId,
+                    current.lowercased() != track.id.lowercased()
+                {
                     Text(
                         "\(copy.native(.goalConfirmed)) · \(model.tracks.first(where: { $0.id == current })?.title ?? current)"
                     )
                     .foregroundStyle(.secondary)
-                } else {
-                    Text(copy.native(.noActiveGoal))
-                        .foregroundStyle(.secondary)
                 }
                 if model.profile?.activeTrackId?.lowercased() == track.id.lowercased() {
                     NativePrimaryButton(title: copy.myLearning, symbol: "book") {
@@ -6726,10 +6737,6 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     .disabled(!state.canChoose)
                     .accessibilityIdentifier("choose-active-goal")
                 }
-                Text(
-                    copy.native(.goalChangeHint)
-                )
-                .font(.subheadline).foregroundStyle(.secondary)
             }
         }
 
