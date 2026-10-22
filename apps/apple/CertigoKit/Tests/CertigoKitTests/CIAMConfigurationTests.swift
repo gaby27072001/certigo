@@ -25,6 +25,19 @@ final class CIAMConfigurationTests: XCTestCase {
         rejects(.invalidAuthority, authority: "https://synthetic.ciamlogin.com.evil.invalid")
     }
 
+    func testStandardAuthorityAcceptsOnlyItsExplicitTenantPathOrAnOrigin() throws {
+        let host = "https://\(tenant).ciamlogin.com"
+        let issuer = "\(host)/\(tenant)/v2.0"
+        for authority in [host, "\(host)/", "\(host)/\(tenant)"] {
+            let value = try config(authority: authority, issuer: issuer)
+            XCTAssertEqual(value.authority.absoluteString, authority)
+            XCTAssertEqual(value.issuer.absoluteString, issuer)
+        }
+        for path in ["/\(audience)", "/common", "/\(tenant)/v2.0", "/\(tenant)/extra"] {
+            rejects(.invalidAuthority, authority: "\(host)\(path)", issuer: issuer)
+        }
+    }
+
     func testCustomDomainRequiresAnExplicitKindAndTheMatchingSuppliedIssuer() throws {
         let host = "https://login.example.invalid"
         let authority = "\(host)/\(tenant)"
@@ -502,7 +515,8 @@ final class CIAMConfigurationTests: XCTestCase {
         ]
     }
 
-    private static func productionInfoDictionary(tenant: String, audience: String) -> [String: Any] {
+    private static func productionInfoDictionary(tenant: String, audience: String) -> [String: Any]
+    {
         [
             "CertigoProductionAuthMode": "microsoft",
             "CertigoProductionCIAMCLIENT_ID": "33333333-3333-4333-8333-333333333333",
