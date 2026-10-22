@@ -43,6 +43,36 @@ availability, or a claim of partnership. Existing catalog families and filter
 semantics are unchanged.
 Track names, codes and availability remain visible; color never carries identity alone.
 
+### Vector vendor emblems and preparation crests
+
+`NativeEcosystemEmblem` ports the stylised vector `Canvas` primitives from
+`packages/prism_ui/lib/src/components/vendor_brand.dart` into SwiftUI `Canvas`:
+Microsoft tracks (`az-*`, `ai-*`, `dp-*`, `sc-*`, `ms-*`, `pl-*`) display the
+four-colour 2×2 Microsoft vendor badge (`#F25022`, `#7FBA00`, `#00A4EF`, `#FFB900`)
+alongside an Azure prism, Fabric diamond or Security shield; GitHub tracks (`gh-*`)
+pair the stylised mascot silhouette (`#24292F`) with a Copilot halo (`#8534F3`,
+`#BF3989`, `#2DA44E`); AWS tracks (`aws:*`) draw the `#FF9900` upward arrow arc on a
+Squid Ink (`#232F3E`) ground; and Google Cloud tracks (`gcp:*` / `google`) draw the
+four-colour ring and horizontal crossbar (`#4285F4`, `#EA4335`, `#FBBC05`, `#34A853`).
+Other ecosystems fall back to Certigo facets, curved ribbons or a five-node
+constellation. `NativeCertificationCrest` frames that artwork with a two-line
+pennant, hexagon or octagon and the exact loaded exam code. They remain preparation
+identifiers, **not evidence of an earned qualification**. The accessible label uses
+the localized learning-path label and exact code, never a claimed level or award.
+Numeric code suffixes do not assign Fundamentals/Associate/Expert or stars.
+
+The same source component appears on catalog cards, the confirmed learning goal,
+track detail, quiz, mock exam, contextual Coach and profile. Only a loaded Track
+or exam contract supplies a certification code. A missing code uses abstract
+Certigo artwork, not a guessed vendor. Colored motifs are decorative; labels use
+adaptive high-contrast Prism ink on opaque semantic surfaces. Crest geometry
+scales with Dynamic Type (decorative mark capped at 112 points to preserve reading
+width) and the code wraps instead of being truncated. Goal, quiz, exam and active
+path headers use a compact horizontal version; no new full-height badge is placed
+above the primary learning action.
+Artwork is bundled as Swift source, has no network request, binary asset,
+added dependency or project-file change.
+
 Canvas, reading surfaces, body/secondary text and borders use adaptive UIKit
 semantic roles. Borders use the label role at increased contrast. Success and
 pending use green and amber foreground roles with an accompanying symbol and text.
@@ -198,3 +228,18 @@ The follow-on `certigo-apple-ui-excellence-pass-2026-10-21.md` is applied
 semantically, not copied as a file replacement or treated as native render proof.
 
 See `NATIVE_UI_BRIEF.md` for the connected acceptance journey and validation limits.
+
+Explorer opens with a horizontal ecosystem showcase. Counts are calculated from
+the loaded catalog, with practice availability separate from the collection count.
+Tapping a universe replaces local filters; tapping it again or clearing filters
+restores the collection. Account changes clear this selection too. These are
+code-family display groupings, not additional issuer metadata.
+
+Unit lessons form numbered stepping stones with colored connectors and explicit
+mastery-stage pills. Only supplied mastery percentages fill the node rings;
+sequence numbers never imply completion. Each row retains its single real
+navigation action and availability guard. The development welcome uses original
+ecosystem artwork without catalog counts or achievement claims. Its demo remains
+explicitly fictional. Developer dismissal now lives in native navigation toolbars
+instead of reserving another top banner; swipe dismissal stays disabled.
+Apple compilation and device rendering remain separate acceptance gates.

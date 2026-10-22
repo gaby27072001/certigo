@@ -2,6 +2,9 @@
 
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 
@@ -339,6 +342,140 @@ class NativePrismPresentationTests(unittest.TestCase):
             for step in range(21):
                 rgb = [a + (b - a) * step / 20 for a, b in zip(start, end)]
                 self.assertGreaterEqual(1.05 / (luminance(rgb) + 0.05), 4.5, (band, step))
+
+    def test_preparation_artwork_is_original_vector_art_not_an_earned_badge(self):
+        art = self.app.split("struct NativeEcosystemArtwork {", 1)[1].split(
+            "private struct NativeShowcaseTile:", 1
+        )[0]
+        for marker in (
+            "enum Silhouette: Sendable", "case pennant, hexagon, octagon",
+            "case microsoftAzure, microsoftFabric, microsoftSecurity",
+            "case github, aws, google",
+            "case facets, constellation, ribbons", "Canvas { context, size in",
+            "0xF25022, 0x7FBA00, 0x00A4EF, 0xFFB900",
+            "0x24292F, 0x8534F3, 0xBF3989, 0x2DA44E",
+            "0x232F3E, 0xFF9900",
+            "0x4285F4, 0xEA4335, 0xFBBC05, 0x34A853",
+            "paintMicrosoftTiles(in: &context",
+            "NativeMicrosoftVendorBadge",
+            "context.fill(", "context.stroke(", "path.closeSubpath()",
+            "NativePrism.surface", "contrast == .increased", "@ScaledMetric",
+            "certigo-preparation-crest", "copy.native(.learningPath)",
+        ):
+            self.assertIn(marker, art)
+        for claim in ("Certified", "official", "earned", "fundamentals", "associate", "expert"):
+            self.assertNotRegex(art, rf'"[^"\n]*\b{claim}\b[^"\n]*"')
+        for unsafe in ("★", "octocat", "visor", "smile", "reward", "level", "AsyncImage"):
+            self.assertNotIn(unsafe, art)
+        self.assertNotIn("Image(", art)
+        self.assertNotIn("URL(", art)
+        self.assertIn(".accessibilityHidden(true)", art)
+        self.assertIn('Text(code)', art)
+        self.assertIn("NativeCatalogFilter.family(for: code)", art)
+        self.assertIn('components.contains("GH")', art)
+
+    def test_showcase_counts_loaded_tracks_and_clears_its_filter(self):
+        root = self.app.split("private struct NativeRoot:", 1)[1]
+        showcase = root.split("private var ecosystemShowcase:", 1)[1].split(
+            "private var learning:", 1
+        )[0]
+        self.assertIn("model.tracks.filter { universe.includes(code: $0.code) }", showcase)
+        self.assertIn(r"tracks.filter(\.learningAvailable).count", showcase)
+        self.assertIn("tracks.count", showcase)
+        self.assertNotIn("39", showcase)
+        self.assertIn("showcaseUniverse == universe ? nil : universe", showcase)
+        self.assertIn("showcaseUniverse?.includes(code: $0.code) ?? true", root)
+        self.assertEqual(root.count("catalogFilter.clear()"), root.count("showcaseUniverse = nil") + 1)
+        self.assertLess(root.index("Section { ecosystemShowcase }"), root.index("certificationCollection"))
+
+    @unittest.skipUnless(shutil.which("swift"), "Swift is required for portable helper execution")
+    def test_showcase_universes_are_exclusive_for_loaded_code_namespaces(self):
+        portable = self.app.split("#if canImport(SwiftUI)", 1)[0]
+        checks = r'''
+let examples: [(String, NativeShowcaseUniverse)] = [
+    ("AZ-900", .azure), ("microsoft:ai-103", .azure),
+    ("GH-300", .github), ("microsoft:gh-900", .github),
+    ("DP-600", .data), ("microsoft:dp-700", .data),
+    ("aws:clf-c02", .aws), ("SC-900", .security),
+    ("gcp:associate-cloud-engineer", .security), ("ISC2-CISSP", .security),
+]
+for (code, expected) in examples {
+    precondition(expected.includes(code: code), code)
+    precondition(NativeShowcaseUniverse.allCases.filter { $0.includes(code: code) }.count == 1, code)
+}
+precondition(!NativeShowcaseUniverse.allCases.contains { $0.includes(code: "UNKNOWN") })
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "showcase.swift"
+            source.write_text(portable + checks, encoding="utf-8")
+            result = subprocess.run(
+                ["swift", "-warnings-as-errors", str(source)],
+                capture_output=True, text=True, timeout=90, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_numbered_path_preserves_optional_mastery_and_one_navigation_action(self):
+        root = self.app.split("private struct NativeRoot:", 1)[1]
+        label = root.split("private func lessonLabel(", 1)[1].split(
+            "@ViewBuilder private var smartReview:", 1
+        )[0]
+        for marker in (
+            "Text(number, format: .number)", "if let mastery = lesson.masteryPct",
+            "if !isLast", "GeometryReader", "copy[lesson.nativeMasteryStage.copyKey]",
+            '"play.circle.fill" : "lock.circle"', "copy.native(.lockedHint)",
+        ):
+            self.assertIn(marker, label)
+        self.assertNotIn("Button(", label)
+        self.assertNotIn("NavigationLink", label)
+        self.assertEqual(root.count("isLast: index == unit.lessons.count - 1"), 2)
+        portable = self.app.split("#if canImport(SwiftUI)", 1)[0]
+        self.assertNotIn("Spacer(", portable)
+        self.assertNotIn("Image(", portable)
+
+    def test_developer_close_uses_navigation_toolbar_not_a_top_banner(self):
+        connector = self.app.split("private struct NativeDeveloperConnector:", 1)[1].split(
+            "private struct NativeDemo", 1
+        )[0]
+        self.assertNotIn(".safeAreaInset(edge: .top)", connector)
+        self.assertIn("closeDeveloper: { dismiss() }", connector)
+        self.assertIn("NativeDeveloperToolbar(close: { dismiss() })", connector)
+        self.assertIn(".interactiveDismissDisabled()", self.app)
+        toolbar = self.app.split("private struct NativeDeveloperToolbar:", 1)[1].split(
+            "struct NativeReadinessRing:", 1
+        )[0]
+        self.assertIn(".topBarTrailing", toolbar)
+        self.assertIn("minWidth: 44, minHeight: 44", toolbar)
+        self.assertIn("copy.native(.developerConnector)", toolbar)
+        entry = self.app.split("private var developmentEntry:", 1)[1].split(
+            "private var", 1
+        )[0]
+        self.assertIn("entry-ecosystem-artwork", entry)
+        self.assertIn("copy.native(.fictionalBoundary)", entry)
+        self.assertIn("open-native-demo", entry)
+
+    def test_crests_bind_exact_loaded_codes_across_real_surfaces(self):
+        catalog = self.app.split("struct NativeCertificationCard:", 1)[1].split(
+            "struct NativeAnswerLabel:", 1
+        )[0]
+        self.assertIn("NativeCertificationCrest(code: track.code)", catalog)
+        hero = self.app.split("struct NativeGoalHero:", 1)[1].split(
+            "struct NativeCertificationCard:", 1
+        )[0]
+        self.assertIn("if let code", hero)
+        self.assertIn("NativeCertificationCrest(code: code, compact: true)", hero)
+        self.assertIn('Text("Certigo")', self.app)
+        root = self.app.split("private struct NativeRoot:", 1)[1]
+        for section in ("private var profile:", "private var path:", "private var session:"):
+            surface = root.split(section, 1)[1]
+            self.assertIn("NativeCertificationCrest(code: track.code", surface)
+        coach = root.split("private var coach:", 1)[1].split("private var coachPhase:", 1)[0]
+        self.assertIn("model.profile?.activeTrackId?.lowercased()", coach)
+        self.assertIn("})?.code", coach)
+        exam = self.app.split("private struct NativeMockExamView:", 1)[1].split(
+            "private struct NativeNotificationPreferencesView:", 1
+        )[0]
+        self.assertIn("NativeCertificationCrest(code: snapshot.exam.trackCode, compact: true)", exam)
+        self.assertNotIn('NativeCertificationCrest(code: "AZ-', self.app)
 
     def test_international_copy_has_eight_explicit_translations_per_native_label(self):
         copy = self.app.split("enum NativeLabel:", 1)[1].split(

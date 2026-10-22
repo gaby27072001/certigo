@@ -147,6 +147,29 @@ struct NativeCatalogFilter {
     mutating func clear() { self = Self() }
 }
 
+enum NativeShowcaseUniverse: String, CaseIterable, Sendable {
+    case azure, github, data, aws, security
+
+    func includes(code: String) -> Bool {
+        let parts = NativeTrackAppearance.normalized(code).split(separator: "-")
+        let family = NativeCatalogFilter.family(for: code)
+        switch self {
+        case .azure: return parts.contains("AZ") || parts.contains("AI")
+        case .github: return parts.contains("GH") || family == "GITHUB"
+        case .data: return parts.contains("DP") || parts.contains("FABRIC")
+        case .aws: return family == "AWS"
+        case .security:
+            return NativeTrackAppearance.group(for: code)?.category == .security
+                || parts.contains("SC")
+                || (NativeTrackAppearance.group(for: code)?.category == .cloud
+                    && !Self.azure.includes(code: code)
+                    && !Self.github.includes(code: code)
+                    && !Self.data.includes(code: code)
+                    && !Self.aws.includes(code: code))
+        }
+    }
+}
+
 struct NativePathCoverage {
     let completedActivities: Int
     let totalActivities: Int
@@ -2831,6 +2854,7 @@ enum NativeLearningDuration {
                     title: copy.native(.finalAssessment),
                     message: copy.native(.assessmentDisclaimer))
                 if let snapshot = model.examSnapshot {
+                    NativeCertificationCrest(code: snapshot.exam.trackCode, compact: true)
                     Text(snapshot.exam.trackTitle).font(.title2.bold())
                     if snapshot.exam.items.isEmpty {
                         Text(copy.native(.emptyExam))
@@ -3256,6 +3280,507 @@ enum NativeLearningDuration {
         }
     }
 
+    // Original Certigo preparation artwork, not official certification badges.
+    struct NativeEcosystemArtwork {
+        enum Silhouette: Sendable { case pennant, hexagon, octagon }
+        enum Motif: Sendable {
+            case microsoftAzure, microsoftFabric, microsoftSecurity
+            case github, aws, google
+            case facets, constellation, ribbons
+        }
+        static let microsoftTileColors = Self.colors([
+            0xF25022, 0x7FBA00, 0x00A4EF, 0xFFB900,
+        ])
+        let silhouette: Silhouette
+        let motif: Motif
+        let isMicrosoft: Bool
+        let colors: [Color]
+
+        init(code: String) {
+            let normalized = NativeTrackAppearance.normalized(code)
+            let components = normalized.split(separator: "-").map(String.init)
+            let family = NativeCatalogFilter.family(for: code)
+            if components.contains("GH") || family == "GITHUB" {
+                silhouette = .octagon
+                motif = .github
+                isMicrosoft = false
+                colors = Self.colors([0x24292F, 0x8534F3, 0xBF3989, 0x2DA44E])
+            } else if family == "AWS"
+                || components.contains(where: {
+                    ["AWS", "CLF", "AIF", "SAA", "DVA", "SOA", "SAP", "DOP"].contains($0)
+                })
+            {
+                silhouette = .hexagon
+                motif = .aws
+                isMicrosoft = false
+                colors = Self.colors([0x232F3E, 0xFF9900])
+            } else if family == "GCP" || components.contains("GOOGLE") {
+                silhouette = .hexagon
+                motif = .google
+                isMicrosoft = false
+                colors = Self.colors([0x4285F4, 0xEA4335, 0xFBBC05, 0x34A853])
+            } else if components.contains("DP") || normalized.contains("FABRIC") {
+                silhouette = .pennant
+                motif = .microsoftFabric
+                isMicrosoft = true
+                colors = Self.colors([0x00B7C3, 0x117865, 0x79E7C5])
+            } else if components.contains("SC") || normalized.contains("SECURITY") {
+                silhouette = .pennant
+                motif = .microsoftSecurity
+                isMicrosoft = true
+                colors = Self.colors([0x008559, 0x0078D4, 0xA5E8D1])
+            } else if family == "MICROSOFT"
+                || components.contains(where: {
+                    ["MICROSOFT", "MSFT", "AZ", "AI", "MS", "PL"].contains($0)
+                })
+            {
+                silhouette = .pennant
+                motif = .microsoftAzure
+                isMicrosoft = true
+                colors = Self.colors([0x0078D4, 0x50E6FF, 0x00A4EF])
+            } else if family == "ISC2" {
+                silhouette = .pennant
+                motif = .constellation
+                isMicrosoft = false
+                colors = Self.colors([0x008559, 0x0078D4, 0xA5E8D1])
+            } else if family == "COMPTIA" {
+                silhouette = .octagon
+                motif = .ribbons
+                isMicrosoft = false
+                colors = Self.colors([0xC8102E, 0xF58CA1, 0x54253F])
+            } else if family == "CNCF" || components.contains("KUBERNETES") {
+                silhouette = .hexagon
+                motif = .constellation
+                isMicrosoft = false
+                colors = Self.colors([0x326CE5, 0x8DD9FF, 0x5962B8])
+            } else {
+                silhouette = .pennant
+                motif = .facets
+                isMicrosoft = false
+                colors = [
+                    NativePrism.accent(for: code), NativePrism.accent(band: 1),
+                    NativePrism.accent(band: 6),
+                ]
+            }
+        }
+
+        static func paintMicrosoftTiles(in context: inout GraphicsContext, rect: CGRect) {
+            let gutter = rect.width * 0.08
+            let tile = (rect.width - gutter) / 2
+            let radius = tile * 0.08
+            let origins = [
+                CGPoint(x: rect.minX, y: rect.minY),
+                CGPoint(x: rect.minX + tile + gutter, y: rect.minY),
+                CGPoint(x: rect.minX, y: rect.minY + tile + gutter),
+                CGPoint(x: rect.minX + tile + gutter, y: rect.minY + tile + gutter),
+            ]
+            for (index, origin) in origins.enumerated() {
+                let tileRect = CGRect(x: origin.x, y: origin.y, width: tile, height: tile)
+                context.fill(
+                    Path(roundedRect: tileRect, cornerRadius: radius),
+                    with: .color(microsoftTileColors[index]))
+            }
+        }
+
+        private static func colors(_ hexes: [UInt32]) -> [Color] {
+            hexes.map {
+                Color(
+                    .sRGB, red: Double(($0 >> 16) & 255) / 255,
+                    green: Double(($0 >> 8) & 255) / 255, blue: Double($0 & 255) / 255,
+                    opacity: 1)
+            }
+        }
+    }
+
+    private struct NativeCrestOutline: Shape {
+        let silhouette: NativeEcosystemArtwork.Silhouette
+
+        func path(in rect: CGRect) -> Path {
+            let vertices: [CGPoint]
+            switch silhouette {
+            case .pennant:
+                vertices = [
+                    .init(x: 0.16, y: 0.04), .init(x: 0.84, y: 0.04),
+                    .init(x: 0.96, y: 0.20), .init(x: 0.86, y: 0.76),
+                    .init(x: 0.50, y: 0.98), .init(x: 0.14, y: 0.76),
+                    .init(x: 0.04, y: 0.20),
+                ]
+            case .hexagon:
+                vertices = [
+                    .init(x: 0.50, y: 0.02), .init(x: 0.94, y: 0.25),
+                    .init(x: 0.94, y: 0.75), .init(x: 0.50, y: 0.98),
+                    .init(x: 0.06, y: 0.75), .init(x: 0.06, y: 0.25),
+                ]
+            case .octagon:
+                vertices = [
+                    .init(x: 0.30, y: 0.04), .init(x: 0.70, y: 0.04),
+                    .init(x: 0.96, y: 0.30), .init(x: 0.96, y: 0.70),
+                    .init(x: 0.70, y: 0.96), .init(x: 0.30, y: 0.96),
+                    .init(x: 0.04, y: 0.70), .init(x: 0.04, y: 0.30),
+                ]
+            }
+            var path = Path()
+            path.addLines(
+                vertices.map {
+                    CGPoint(x: rect.minX + $0.x * rect.width, y: rect.minY + $0.y * rect.height)
+                })
+            path.closeSubpath()
+            return path
+        }
+    }
+
+    struct NativeMicrosoftVendorBadge: View {
+        var size: CGFloat = 14
+
+        var body: some View {
+            Canvas { context, canvasSize in
+                let edge = min(canvasSize.width, canvasSize.height)
+                let rect = CGRect(
+                    x: (canvasSize.width - edge) / 2,
+                    y: (canvasSize.height - edge) / 2,
+                    width: edge, height: edge)
+                NativeEcosystemArtwork.paintMicrosoftTiles(in: &context, rect: rect)
+            }
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+        }
+    }
+
+    struct NativeEcosystemEmblem: View {
+        let code: String
+
+        var body: some View {
+            let artwork = NativeEcosystemArtwork(code: code)
+            Canvas { context, size in
+                let scale = min(size.width, size.height)
+                let origin = CGPoint(x: (size.width - scale) / 2, y: (size.height - scale) / 2)
+                func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                    CGPoint(x: origin.x + x * scale, y: origin.y + y * scale)
+                }
+                switch artwork.motif {
+                case .microsoftAzure:
+                    var leftWing = Path()
+                    leftWing.addLines([point(0.46, 0.10), point(0.14, 0.78), point(0.42, 0.68)])
+                    leftWing.closeSubpath()
+                    context.fill(leftWing, with: .color(artwork.colors[0]))
+                    var rightWing = Path()
+                    rightWing.addLines([
+                        point(0.50, 0.16), point(0.86, 0.84), point(0.32, 0.84), point(0.56, 0.58),
+                    ])
+                    rightWing.closeSubpath()
+                    context.fill(
+                        rightWing,
+                        with: .linearGradient(
+                            Gradient(colors: [artwork.colors[1], artwork.colors[2]]),
+                            startPoint: point(0.45, 0.16), endPoint: point(0.86, 0.84)))
+                    let badgeRect = CGRect(
+                        x: origin.x + scale * 0.08, y: origin.y + scale * 0.08,
+                        width: scale * 0.26, height: scale * 0.26)
+                    NativeEcosystemArtwork.paintMicrosoftTiles(in: &context, rect: badgeRect)
+                case .microsoftFabric:
+                    let layers: [([CGPoint], Color)] = [
+                        (
+                            [
+                                point(0.52, 0.10), point(0.88, 0.36), point(0.52, 0.62),
+                                point(0.16, 0.36),
+                            ],
+                            artwork.colors[0]
+                        ),
+                        (
+                            [
+                                point(0.52, 0.38), point(0.88, 0.62), point(0.52, 0.88),
+                                point(0.16, 0.62),
+                            ],
+                            artwork.colors[1]
+                        ),
+                        (
+                            [
+                                point(0.52, 0.26), point(0.76, 0.48), point(0.52, 0.70),
+                                point(0.28, 0.48),
+                            ],
+                            artwork.colors[2]
+                        ),
+                    ]
+                    for (vertices, color) in layers {
+                        var diamond = Path()
+                        diamond.addLines(vertices)
+                        diamond.closeSubpath()
+                        context.fill(diamond, with: .color(color))
+                    }
+                    let badgeRect = CGRect(
+                        x: origin.x + scale * 0.08, y: origin.y + scale * 0.08,
+                        width: scale * 0.26, height: scale * 0.26)
+                    NativeEcosystemArtwork.paintMicrosoftTiles(in: &context, rect: badgeRect)
+                case .microsoftSecurity:
+                    var outerShield = Path()
+                    outerShield.addLines([
+                        point(0.52, 0.10), point(0.86, 0.24), point(0.80, 0.64),
+                        point(0.52, 0.90), point(0.24, 0.64), point(0.18, 0.24),
+                    ])
+                    outerShield.closeSubpath()
+                    context.fill(
+                        outerShield,
+                        with: .linearGradient(
+                            Gradient(colors: [artwork.colors[0], artwork.colors[1]]),
+                            startPoint: point(0.18, 0.10), endPoint: point(0.86, 0.90)))
+                    var innerCrest = Path()
+                    innerCrest.addLines([
+                        point(0.52, 0.24), point(0.72, 0.34), point(0.68, 0.60),
+                        point(0.52, 0.76), point(0.36, 0.60), point(0.32, 0.34),
+                    ])
+                    innerCrest.closeSubpath()
+                    context.fill(innerCrest, with: .color(artwork.colors[2]))
+                    let badgeRect = CGRect(
+                        x: origin.x + scale * 0.08, y: origin.y + scale * 0.08,
+                        width: scale * 0.26, height: scale * 0.26)
+                    NativeEcosystemArtwork.paintMicrosoftTiles(in: &context, rect: badgeRect)
+                case .github:
+                    let haloCenter = point(0.50, 0.50)
+                    let haloRadius = scale * 0.44
+                    var halo = Path()
+                    halo.addArc(
+                        center: haloCenter, radius: haloRadius,
+                        startAngle: .radians(0), endAngle: .radians(2 * Double.pi),
+                        clockwise: false)
+                    context.stroke(
+                        halo,
+                        with: .linearGradient(
+                            Gradient(colors: Array(artwork.colors.dropFirst())),
+                            startPoint: point(0.06, 0.06), endPoint: point(0.94, 0.94)),
+                        style: StrokeStyle(lineWidth: scale * 0.08, lineCap: .round))
+                    var ears = Path()
+                    ears.move(to: point(0.24, 0.30))
+                    ears.addLine(to: point(0.36, 0.14))
+                    ears.addLine(to: point(0.44, 0.34))
+                    ears.closeSubpath()
+                    ears.move(to: point(0.76, 0.30))
+                    ears.addLine(to: point(0.64, 0.14))
+                    ears.addLine(to: point(0.56, 0.34))
+                    ears.closeSubpath()
+                    context.fill(ears, with: .color(artwork.colors[0]))
+                    let headR = scale * 0.34
+                    let headCenter = point(0.50, 0.52)
+                    let head = Path(
+                        ellipseIn: CGRect(
+                            x: headCenter.x - headR, y: headCenter.y - headR,
+                            width: headR * 2, height: headR * 2))
+                    context.fill(head, with: .color(artwork.colors[0]))
+                    let body = Path(
+                        roundedRect: CGRect(
+                            x: origin.x + scale * 0.20, y: origin.y + scale * 0.52,
+                            width: scale * 0.60, height: scale * 0.34),
+                        cornerRadius: scale * 0.20)
+                    context.fill(body, with: .color(artwork.colors[0]))
+                    let eyeR = scale * 0.055
+                    for eyeX in [0.40, 0.60] {
+                        let eyeCenter = point(eyeX, 0.50)
+                        let eye = Path(
+                            ellipseIn: CGRect(
+                                x: eyeCenter.x - eyeR, y: eyeCenter.y - eyeR,
+                                width: eyeR * 2, height: eyeR * 2))
+                        context.fill(eye, with: .color(.white))
+                    }
+                case .aws:
+                    let backdrop = Path(
+                        roundedRect: CGRect(
+                            x: origin.x + scale * 0.06, y: origin.y + scale * 0.06,
+                            width: scale * 0.88, height: scale * 0.88),
+                        cornerRadius: scale * 0.22)
+                    context.fill(backdrop, with: .color(artwork.colors[0]))
+                    var arc = Path()
+                    arc.move(to: point(0.16, 0.56))
+                    arc.addQuadCurve(to: point(0.84, 0.56), control: point(0.50, 0.86))
+                    context.stroke(
+                        arc, with: .color(artwork.colors[1]),
+                        style: StrokeStyle(lineWidth: scale * 0.11, lineCap: .round))
+                    var arrow = Path()
+                    arrow.move(to: point(0.84, 0.56))
+                    arrow.addLine(to: point(0.72, 0.52))
+                    arrow.addLine(to: point(0.80, 0.66))
+                    arrow.closeSubpath()
+                    context.fill(arrow, with: .color(artwork.colors[1]))
+                case .google:
+                    let center = point(0.50, 0.50)
+                    let radius = scale * 0.36
+                    let stroke = scale * 0.18
+                    let start = -Double.pi / 4
+                    let sweep = (2 * Double.pi - Double.pi / 3) / 4
+                    for index in 0..<4 {
+                        var segment = Path()
+                        segment.addArc(
+                            center: center, radius: radius,
+                            startAngle: .radians(start + Double(index) * sweep),
+                            endAngle: .radians(start + Double(index + 1) * sweep),
+                            clockwise: false)
+                        context.stroke(
+                            segment, with: .color(artwork.colors[index]),
+                            style: StrokeStyle(lineWidth: stroke, lineCap: .butt))
+                    }
+                    var bar = Path()
+                    bar.move(to: CGPoint(x: center.x + radius * 0.1, y: center.y))
+                    bar.addLine(to: CGPoint(x: center.x + radius + stroke * 0.2, y: center.y))
+                    context.stroke(
+                        bar, with: .color(artwork.colors[0]),
+                        style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+                case .facets:
+                    let panels: [[CGPoint]] = [
+                        [point(0.12, 0.28), point(0.51, 0.08), point(0.48, 0.54)],
+                        [point(0.58, 0.14), point(0.91, 0.46), point(0.56, 0.58)],
+                        [point(0.17, 0.39), point(0.47, 0.65), point(0.40, 0.92)],
+                        [point(0.55, 0.69), point(0.87, 0.57), point(0.70, 0.88)],
+                    ]
+                    for (index, panel) in panels.enumerated() {
+                        var facet = Path()
+                        facet.addLines(panel)
+                        facet.closeSubpath()
+                        context.fill(
+                            facet,
+                            with: .linearGradient(
+                                Gradient(colors: [
+                                    artwork.colors[index % artwork.colors.count],
+                                    artwork.colors[(index + 1) % artwork.colors.count],
+                                ]),
+                                startPoint: point(0, 0), endPoint: point(1, 1)))
+                    }
+                case .constellation:
+                    let nodes = [
+                        point(0.18, 0.40), point(0.48, 0.14), point(0.81, 0.32),
+                        point(0.69, 0.78), point(0.27, 0.86),
+                    ]
+                    var links = Path()
+                    links.addLines(nodes)
+                    links.closeSubpath()
+                    context.stroke(links, with: .color(artwork.colors[0]), lineWidth: scale * 0.045)
+                    for (index, node) in nodes.enumerated() {
+                        let radius = scale * (index == 1 ? 0.12 : 0.075)
+                        let circle = Path(
+                            ellipseIn: CGRect(
+                                x: node.x - radius, y: node.y - radius,
+                                width: radius * 2, height: radius * 2))
+                        context.fill(
+                            circle, with: .color(artwork.colors[index % artwork.colors.count]))
+                    }
+                case .ribbons:
+                    for index in 0..<artwork.colors.count {
+                        let y = CGFloat(index) * 0.17 + 0.12
+                        var ribbon = Path()
+                        ribbon.move(to: point(0.12, y + 0.18))
+                        ribbon.addCurve(
+                            to: point(0.88, y + 0.04),
+                            control1: point(0.36, y - 0.16), control2: point(0.62, y + 0.42))
+                        context.stroke(
+                            ribbon, with: .color(artwork.colors[index]),
+                            style: StrokeStyle(lineWidth: scale * 0.10, lineCap: .round))
+                    }
+                }
+            }
+            .accessibilityHidden(true)
+        }
+    }
+
+    struct NativeCertificationCrest: View {
+        @Environment(\.nativeInterfaceCopy) private var copy
+        @Environment(\.accessibilityContrast) private var contrast
+        @ScaledMetric(relativeTo: .headline) private var emblemSize = 70.0
+        let code: String
+        var compact = false
+
+        var body: some View {
+            let artwork = NativeEcosystemArtwork(code: code)
+            let layout =
+                compact
+                ? AnyLayout(HStackLayout(spacing: 12)) : AnyLayout(VStackLayout(spacing: 8))
+            layout {
+                ZStack {
+                    NativeCrestOutline(silhouette: artwork.silhouette)
+                        .fill(NativePrism.surface)
+                    NativeCrestOutline(silhouette: artwork.silhouette)
+                        .stroke(
+                            contrast == .increased
+                                ? NativePrism.edge : NativePrism.accent(for: code),
+                            lineWidth: 2)
+                    NativeCrestOutline(silhouette: artwork.silhouette)
+                        .stroke(NativePrism.accent(for: code).opacity(0.5), lineWidth: 1)
+                        .padding(6)
+                    NativeEcosystemEmblem(code: code).padding(compact ? 10 : 16)
+                }
+                .frame(
+                    width: min(112, emblemSize) * (compact ? 0.65 : 1),
+                    height: min(112, emblemSize) * (compact ? 0.65 : 1))
+                VStack(spacing: 2) {
+                    HStack(spacing: 4) {
+                        if artwork.isMicrosoft {
+                            NativeMicrosoftVendorBadge(size: 11)
+                        }
+                        Text("Certigo").font(.caption2.weight(.medium))
+                    }
+                    Text(code).font(.system(.caption, design: .rounded, weight: .bold))
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .foregroundStyle(NativePrism.accent(for: code))
+                .background(NativePrism.surface, in: Capsule())
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(copy.native(.learningPath)) · \(code)")
+            .accessibilityIdentifier("certigo-preparation-crest")
+        }
+    }
+
+    private struct NativeShowcaseTile: View {
+        let code: String
+        let title: String
+        var detail: String?
+        var selected = false
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                NativeEcosystemEmblem(code: code)
+                    .frame(width: 56, height: 56)
+                    .padding(8)
+                    .background(NativePrism.surface, in: RoundedRectangle(cornerRadius: 20))
+                Text(title).font(.headline).foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail {
+                    Text(detail).font(.caption.weight(.medium)).foregroundStyle(.white)
+                }
+                if selected {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.white)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(20)
+            .frame(width: 200, alignment: .leading)
+            .background(
+                NativeTrackTheme(code: code).gradient, in: RoundedRectangle(cornerRadius: 26)
+            )
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private struct NativeDeveloperToolbar: ViewModifier {
+        @Environment(\.nativeInterfaceCopy) private var copy
+        let close: (() -> Void)?
+
+        func body(content: Content) -> some View {
+            content.toolbar {
+                if let close {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(action: close) {
+                            Image(systemName: "xmark").font(.caption.weight(.semibold))
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                        .accessibilityLabel(
+                            "\(copy.native(.close)) · \(copy.native(.developerConnector))"
+                        )
+                        .accessibilityIdentifier("close-developer-connector")
+                    }
+                }
+            }
+        }
+    }
+
     struct NativeReadinessRing: View {
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @ScaledMetric(relativeTo: .title2) private var diameter = 88.0
@@ -3329,6 +3854,7 @@ enum NativeLearningDuration {
         let theme: NativeTrackTheme
         var readiness: Int?
         let readinessTitle: String
+        var code: String?
 
         var body: some View {
             ViewThatFits(in: .horizontal) {
@@ -3354,9 +3880,12 @@ enum NativeLearningDuration {
 
         private var heading: some View {
             VStack(alignment: .leading, spacing: 12) {
-                Image(systemName: theme.symbol)
-                    .font(.largeTitle).symbolRenderingMode(.hierarchical)
-                    .accessibilityHidden(true)
+                if let code {
+                    NativeCertificationCrest(code: code, compact: true)
+                } else {
+                    NativeEcosystemEmblem(code: "")
+                        .frame(width: 56, height: 56)
+                }
                 Text(title).font(.system(.title2, design: .rounded, weight: .bold)).fixedSize(
                     horizontal: false, vertical: true
                 )
@@ -3374,9 +3903,10 @@ enum NativeLearningDuration {
             let theme = NativeTrackTheme(code: track.code)
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    NativeSymbolMedallion(symbol: theme.symbol, accent: theme.accent)
+                    NativeCertificationCrest(code: track.code)
                     Spacer()
-                    Text(track.code).font(.system(.subheadline, design: .rounded, weight: .bold))
+                    Text(NativeCatalogFilter.family(for: track.code))
+                        .font(.system(.caption, design: .rounded, weight: .bold))
                         .padding(.horizontal, 12).padding(.vertical, 8)
                         .foregroundStyle(theme.accent)
                         .background(theme.accent.opacity(0.12), in: Capsule())
@@ -3632,7 +4162,6 @@ enum NativeLearningDuration {
                     NativeEntryHeading(
                         title: copy.native(.welcomeTitle),
                         message: copy.native(.welcomeHint), prominent: true)
-                    NativeAppLanguagePicker()
                     NativeReadingSection(title: copy.native(.tryLearning)) {
                         NativePrimaryButton(title: copy.exploreDemo, symbol: "play.circle") {
                             showDemo = true
@@ -3643,6 +4172,18 @@ enum NativeLearningDuration {
                         )
                         .foregroundStyle(.secondary)
                     }
+                    ScrollView(.horizontal) {
+                        HStack(alignment: .top, spacing: 12) {
+                            NativeShowcaseTile(code: "AZ", title: "Microsoft Azure")
+                            NativeShowcaseTile(code: "GH", title: "GitHub & Copilot")
+                            NativeShowcaseTile(code: "DP", title: "Microsoft Fabric")
+                            NativeShowcaseTile(code: "AWS", title: "AWS")
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .scrollIndicators(.hidden)
+                    .accessibilityIdentifier("entry-ecosystem-artwork")
+                    DisclosureGroup(copy.appLanguage) { NativeAppLanguagePicker() }
                     #if DEBUG
                         if let pendingLessonLink {
                             NativeReadingSection(title: copy.native(.sharedLesson)) {
@@ -3899,20 +4440,19 @@ enum NativeLearningDuration {
                     } else if usesCIAM && model.profile == nil {
                         ciamSignIn
                     } else {
-                        NativeRoot(model: model, pendingLessonLink: $pendingLessonLink)
+                        NativeRoot(
+                            model: model, pendingLessonLink: $pendingLessonLink,
+                            closeDeveloper: { dismiss() })
                     }
                 }
                 .onOpenURL { url in
                     _ = ciamProvider?.handleCallback(url, sourceApplication: nil)
                 }
-                .safeAreaInset(edge: .top) {
-                    HStack {
-                        Text(copy.native(.developerConnector)).font(.subheadline)
-                        Spacer()
+                .overlay(alignment: .topTrailing) {
+                    if configurationIssue != nil {
                         Button(copy.native(.close)) { dismiss() }
+                            .buttonStyle(.bordered).padding()
                     }
-                    .padding()
-                    .background(.background)
                 }
             }
 
@@ -3932,6 +4472,7 @@ enum NativeLearningDuration {
                             .disabled(model.busy)
                         }
                     }
+                    .modifier(NativeDeveloperToolbar(close: { dismiss() }))
                     .navigationTitle("Certigo")
                     .alert(
                         copy.native(.ciamIncomplete),
@@ -5421,6 +5962,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
         @Bindable var model: NativeModel
         @Binding var pendingLessonLink: EditorialPilotLessonLink?
+        let closeDeveloper: (() -> Void)?
         @State private var selectedTrack: String?
         @State private var selectedLesson: String?
         @State private var savingGoalID: String?
@@ -5435,21 +5977,27 @@ struct NativeDemoSnapshot: Codable, Equatable {
         @State private var loadingLessonRequestID: UUID?
         @State private var downloadTrack: Track?
         @State private var catalogFilter = NativeCatalogFilter()
+        @State private var showcaseUniverse: NativeShowcaseUniverse?
         @State private var resumeTrackID: String?
         @State private var showingStudyPlan = false
 
         init(
             model: NativeModel,
-            pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil)
+            pendingLessonLink: Binding<EditorialPilotLessonLink?> = .constant(nil),
+            closeDeveloper: (() -> Void)? = nil
         ) {
             self.model = model
             self._pendingLessonLink = pendingLessonLink
+            self.closeDeveloper = closeDeveloper
         }
 
         var body: some View {
             Group {
                 if model.requiresDeletionSurface {
-                    NavigationStack { NativeAccountDeletionView(model: model) }
+                    NavigationStack {
+                        NativeAccountDeletionView(model: model)
+                            .modifier(NativeDeveloperToolbar(close: closeDeveloper))
+                    }
                 } else if model.profile == nil {
                     connection
                 } else {
@@ -5508,12 +6056,15 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 .frame(minHeight: 44)
                             }
                             .navigationTitle(copy.social)
+                            .modifier(NativeDeveloperToolbar(close: closeDeveloper))
                         }
                         .tabItem { Label(copy.social, systemImage: "person.2") }
                         .tag(NativeResumeState.Tab.social)
-                        NavigationStack { profile }
-                            .tabItem { Label(copy.profile, systemImage: "person.crop.circle") }
-                            .tag(NativeResumeState.Tab.profile)
+                        NavigationStack {
+                            profile.modifier(NativeDeveloperToolbar(close: closeDeveloper))
+                        }
+                        .tabItem { Label(copy.profile, systemImage: "person.crop.circle") }
+                        .tag(NativeResumeState.Tab.profile)
                     }
                 }
             }
@@ -5522,6 +6073,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 selectedTrack = nil
                 selectedLesson = nil
                 catalogFilter.clear()
+                showcaseUniverse = nil
                 showingStudyPlan = false
                 resumeTrackID = nil
                 columns = .automatic
@@ -5593,7 +6145,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 NativeGoalHero(
                     title: copy[.coachWorkspaceTitle], subtitle: copy[.coachPromptHint],
                     theme: NativeTrackTheme(band: 0, symbol: "sparkles"),
-                    readinessTitle: copy.native(.readiness))
+                    readinessTitle: copy.native(.readiness),
+                    code: model.tracks.first(where: {
+                        $0.id.lowercased() == model.profile?.activeTrackId?.lowercased()
+                    })?.code)
                 Text(copy.native(.coachDisclosure))
                     .font(.subheadline).foregroundStyle(.secondary)
                 if case .corrected(let result) = model.outcome, let lesson = model.lesson {
@@ -5630,6 +6185,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 }
             }
             .navigationTitle(copy.coach)
+            .modifier(NativeDeveloperToolbar(close: closeDeveloper))
         }
 
         private var coachPhase: String {
@@ -5708,9 +6264,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 navigation.showsTrack(
                     $0.id, activeID: model.profile?.activeTrackId, openedID: selectedTrack)
                     && (navigation.learn != .explore
-                        || catalogFilter.includes(
-                            code: $0.code, title: $0.title, summary: $0.summary,
-                            available: $0.learningAvailable))
+                        || ((showcaseUniverse?.includes(code: $0.code) ?? true)
+                            && catalogFilter.includes(
+                                code: $0.code, title: $0.title, summary: $0.summary,
+                                available: $0.learningAvailable)))
             }
         }
 
@@ -5725,6 +6282,45 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     NativeTrackAppearance.group(for: $0.code)?.category == category
                 }
             }
+        }
+
+        private func universeTitle(_ universe: NativeShowcaseUniverse) -> String {
+            switch universe {
+            case .azure: "Microsoft Azure"
+            case .github: "GitHub & Copilot"
+            case .data: "Data & Fabric"
+            case .aws: "AWS"
+            case .security:
+                "\(NativeRadarCategory.cloud.title(copy)) · \(NativeRadarCategory.security.title(copy))"
+            }
+        }
+
+        private var ecosystemShowcase: some View {
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(NativeShowcaseUniverse.allCases, id: \.self) { universe in
+                        let tracks = model.tracks.filter { universe.includes(code: $0.code) }
+                        if let first = tracks.first {
+                            let available = tracks.filter(\.learningAvailable).count
+                            Button {
+                                catalogFilter.clear()
+                                showcaseUniverse = showcaseUniverse == universe ? nil : universe
+                            } label: {
+                                NativeShowcaseTile(
+                                    code: first.code, title: universeTitle(universe),
+                                    detail:
+                                        "\(tracks.count) · \(copy.native(.collection))\n\(available) · \(copy[.practiceAvailable])",
+                                    selected: showcaseUniverse == universe)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(showcaseUniverse == universe ? .isSelected : [])
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .scrollIndicators(.hidden)
+            .accessibilityIdentifier("catalog-ecosystem-showcase")
         }
 
         private var learning: some View {
@@ -5793,6 +6389,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 .foregroundStyle(.secondary)
                         }
                         .listRowBackground(Color.clear)
+                        Section { ecosystemShowcase }
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                         Section(copy.native(.findCertification)) {
                             Picker(copy.native(.codeFamily), selection: $catalogFilter.family) {
                                 Text(copy.native(.allFamilies)).tag("")
@@ -5836,9 +6435,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                                 "\(copy.native(.loadedResults)) · \(visibleTracks.count) / \(model.tracks.count)"
                             )
                             .font(.subheadline)
-                            if catalogFilter.isActive {
+                            if catalogFilter.isActive || showcaseUniverse != nil {
                                 Button(copy[.clearFilters], systemImage: "xmark.circle") {
                                     catalogFilter.clear()
+                                    showcaseUniverse = nil
                                 }
                             }
                         }
@@ -5895,13 +6495,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 .scrollContentBackground(.hidden)
                 .background(NativePrism.canvas)
                 .navigationTitle(copy.learn)
+                .modifier(NativeDeveloperToolbar(close: closeDeveloper))
                 .modifier(
                     NativeCatalogSearch(
                         enabled: navigation.learn == .explore, query: $catalogFilter.query))
             } content: {
-                path
+                path.modifier(NativeDeveloperToolbar(close: closeDeveloper))
             } detail: {
-                session
+                session.modifier(NativeDeveloperToolbar(close: closeDeveloper))
             }
             .onChange(of: selectedTrack) { _, id in
                 if let resumeTrackID, resumeTrackID == id {
@@ -5969,7 +6570,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     ContentUnavailableView(
                         copy[.noMatchingTracks], systemImage: "magnifyingglass",
                         description: Text(copy.native(.noMatchesHint)))
-                    Button(copy[.clearFilters]) { catalogFilter.clear() }
+                    Button(copy[.clearFilters]) {
+                        catalogFilter.clear()
+                        showcaseUniverse = nil
+                    }
                 }
             }
         }
@@ -5987,16 +6591,20 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     .font(.headline)
                     ForEach(path.units) { unit in
                         unitProgress(title: unit.title, lessons: unit.lessons, code: path.trackId)
-                        ForEach(unit.lessons) { lesson in
+                        ForEach(Array(unit.lessons.enumerated()), id: \.element.id) {
+                            index, lesson in
                             Button {
                                 selectedTrack = path.trackId
                                 selectedLesson = lesson.id
                                 columns = .detailOnly
                                 compactColumn = .detail
                             } label: {
-                                lessonLabel(lesson, code: path.trackId)
+                                lessonLabel(
+                                    lesson, code: path.trackId, number: index + 1,
+                                    isLast: index == unit.lessons.count - 1)
                             }
                             .buttonStyle(.plain)
+                            .listRowSeparator(.hidden)
                             .disabled(!lesson.canOpen || model.busy || loadingLessonID != nil)
                         }
                     }
@@ -6054,9 +6662,12 @@ struct NativeDemoSnapshot: Codable, Equatable {
             .padding(.vertical, 12)
         }
 
-        private func lessonLabel(_ lesson: PathLesson, code: String) -> some View {
+        private func lessonLabel(
+            _ lesson: PathLesson, code: String, number: Int, isLast: Bool
+        ) -> some View {
             HStack(alignment: .center, spacing: 16) {
                 ZStack {
+                    Circle().fill(NativePrism.surface)
                     Circle().stroke(NativePrism.accent(for: code).opacity(0.15), lineWidth: 4)
                     if let mastery = lesson.masteryPct {
                         Circle().trim(from: 0, to: CGFloat(min(100, max(0, mastery))) / 100)
@@ -6066,7 +6677,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             )
                             .rotationEffect(.degrees(-90))
                     }
-                    Text(lesson.nativeMasteryStage.symbol).font(.title2)
+                    Text(number, format: .number).font(.headline.monospacedDigit())
                         .foregroundStyle(NativePrism.accent(for: code))
                 }
                 .frame(width: 44, height: 44).accessibilityHidden(true)
@@ -6074,15 +6685,34 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     Text(lesson.title).font(.headline).foregroundStyle(.primary)
                     Text("\(copy.minutes(lesson.estMinutes)) · \(activityStatus(lesson.status))")
                         .font(.caption).foregroundStyle(.secondary)
-                    Text(copy[lesson.nativeMasteryStage.copyKey])
-                        .font(.caption).foregroundStyle(NativePrism.accent(for: code))
+                    Text(
+                        "\(lesson.nativeMasteryStage.symbol) \(copy[lesson.nativeMasteryStage.copyKey])"
+                    )
+                    .font(.caption.weight(.semibold)).foregroundStyle(NativePrism.accent(for: code))
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(NativePrism.accent(for: code).opacity(0.1), in: Capsule())
                     if !lesson.canOpen {
                         Text(copy.native(.lockedHint)).font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                Spacer(minLength: 0)
+                Image(systemName: lesson.canOpen ? "play.circle.fill" : "lock.circle")
+                    .font(.title2).foregroundStyle(NativePrism.accent(for: code))
+                    .frame(minWidth: 44, minHeight: 44).accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
             .padding(.vertical, 8)
+            .background(alignment: .leading) {
+                if !isLast {
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(NativePrism.accent(for: code).opacity(0.25))
+                            .frame(width: 3, height: geometry.size.height / 2 + 20)
+                            .offset(x: 20.5, y: geometry.size.height / 2)
+                    }
+                    .accessibilityHidden(true)
+                }
+            }
             .accessibilityElement(children: .combine)
         }
 
@@ -6260,7 +6890,10 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             $0.trackId.lowercased() == goalID.lowercased()
                                 ? $0.readinessScore : nil
                         },
-                        readinessTitle: copy.native(.readiness))
+                        readinessTitle: copy.native(.readiness),
+                        code: model.tracks.first(where: {
+                            $0.id.lowercased() == goalID.lowercased()
+                        })?.code)
                     Text(copy.native(.nextSession)).font(.headline)
                     if let plan = model.studyPlan {
                         if let target = plan.targetExamDate {
@@ -6424,6 +7057,11 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     NativeReadingSection(title: copy.native(.confirmedLearning)) {
                         activityMetrics
                         if let goal = profile.activeTrackId {
+                            if let track = model.tracks.first(where: {
+                                $0.id.lowercased() == goal.lowercased()
+                            }) {
+                                NativeCertificationCrest(code: track.code)
+                            }
                             LabeledContent(
                                 copy.native(.confirmedGoal),
                                 value: model.tracks.first(where: {
@@ -6708,6 +7346,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     }
                 }
                 .navigationTitle("Certigo")
+                .modifier(NativeDeveloperToolbar(close: closeDeveloper))
             }
         }
 
@@ -6718,9 +7357,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                     $0.id == (selectedTrack ?? model.offlinePack?.trackId ?? model.path?.trackId)
                 }) {
                     Section(copy.native(.goalOverview)) {
-                        Label(track.code, systemImage: "books.vertical")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(NativePrism.accent(for: track.code))
+                        if !track.learningAvailable {
+                            NativeCertificationCrest(code: track.code)
+                        }
                         Text(track.title).font(.title2.bold()).accessibilityAddTraits(.isHeader)
                         Text(track.summary)
                         NativeContentLanguageBadges(languages: track.languages ?? [])
@@ -6794,10 +7433,14 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 ForEach(path.units) { unit in
                     Section("\(copy.native(.unit)) · \(unit.title)") {
                         unitProgress(title: unit.title, lessons: unit.lessons, code: path.trackId)
-                        ForEach(unit.lessons) { lesson in
+                        ForEach(Array(unit.lessons.enumerated()), id: \.element.id) {
+                            index, lesson in
                             NavigationLink(value: lesson.id) {
-                                lessonLabel(lesson, code: path.trackId)
+                                lessonLabel(
+                                    lesson, code: path.trackId, number: index + 1,
+                                    isLast: index == unit.lessons.count - 1)
                             }
+                            .listRowSeparator(.hidden)
                             .disabled(
                                 !lesson.canOpen || model.busy || loadingLessonID != nil)
                         }
@@ -7164,6 +7807,7 @@ struct NativeDemoSnapshot: Codable, Equatable {
                 targetID: track.id, confirmedID: model.profile?.activeTrackId,
                 savingID: savingGoalID, busy: model.busy)
             Section(copy.native(.activeGoal)) {
+                NativeCertificationCrest(code: track.code, compact: true)
                 Label(state.status(copy), systemImage: state.symbol)
                     .accessibilityIdentifier("active-goal-status")
                 if let current = model.profile?.activeTrackId,
@@ -7213,6 +7857,9 @@ struct NativeDemoSnapshot: Codable, Equatable {
                             Text(lesson.title).font(.title).bold()
                                 .accessibilityAddTraits(.isHeader)
                                 .id("session-reading-start")
+                            if let track = model.tracks.first(where: { $0.id == lesson.trackId }) {
+                                NativeCertificationCrest(code: track.code, compact: true)
+                            }
                             learningCycle
                             NativeQuestionProgress(
                                 selected: lesson.questions.filter { model.selections[$0.id] != nil }
