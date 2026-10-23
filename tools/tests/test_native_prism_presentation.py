@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from native_sources import native_source
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,24 +16,25 @@ SOURCES = ROOT / "apps/apple/CertigoNative/Sources"
 class NativePrismPresentationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.app = (SOURCES / "CertigoNativeApp.swift").read_text(encoding="utf-8")
+        cls.app = native_source()
         cls.pilot = (SOURCES / "NativeEditorialPilotView.swift").read_text(encoding="utf-8")
 
     def test_native_palette_uses_the_existing_prism_spectrum(self):
-        flutter = (ROOT / "packages/prism_ui/lib/src/tokens/prism_colors.dart").read_text(
+        swift = (ROOT / "apps/apple/CertigoKit/Sources/Prism/PrismColors.swift").read_text(
             encoding="utf-8"
         )
-        for native, dart, extra in (
-            ("ink", "spectrumInk", "info"),
-            ("glow", "spectrumGlow", "infoGlow"),
+        # Legacy screen colors remain frozen until their migration; Flutter is read-only history.
+        for native, expected in (
+            ("ink", ["3B35F2", "901BAE", "A91A66", "924A13", "177331", "176C7A", "1562AA"]),
+            ("glow", ["8097F8", "D764F8", "F95DA5", "EC7B26", "2DBC55", "2CB0C7", "52A2F8"]),
         ):
-            expected = re.search(rf"{dart} = <Color>\[(.*?)\];", flutter, re.S)[1]
-            extra_hex = re.search(rf"\b{extra} = Color\(0xFF([A-F0-9]{{6}})\)", flutter)[1]
             actual = re.search(rf"let {native}: \[UInt32\] = \[(.*?)\]", self.app, re.S)[1]
             self.assertEqual(
-                re.findall(r"0xFF([A-F0-9]{6})", expected) + [extra_hex],
+                expected,
                 re.findall(r"0x([A-F0-9]{6})", actual),
             )
+        self.assertIn("case .accent: values = [0x4338CA, 0x8E8CFF, 0x4338CA, 0xB4B2FF]", swift)
+        self.assertIn("case .accentFill: values = [0x4338CA, 0x5B52F0, 0x3A30B5, 0x5B52F0]", swift)
         self.assertIn("traits.accessibilityContrast == .high", self.app)
         self.assertIn("traits.userInterfaceStyle == .dark", self.app)
 
@@ -53,7 +55,7 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertNotIn(".lineLimit(", self.pilot)
 
     def test_real_actions_and_confirmation_boundaries_remain_wired(self):
-        root = self.app.split("private struct NativeRoot:", 1)[1]
+        root = self.app.split("struct NativeRoot:", 1)[1]
         for action in (
             "model.select(option, question: question)", "model.submit()", "model.retry(saved)",
             "model.refreshHistory()", "model.loadMoreHistory()", "model.reconnectHistory()",
@@ -80,7 +82,7 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertIn("NativePrimaryButton", self.pilot)
 
     def test_catalog_uses_real_metadata_and_local_search(self):
-        root = self.app.split("private struct NativeRoot:", 1)[1]
+        root = self.app.split("struct NativeRoot:", 1)[1]
         for marker in (
             ".searchable(text: $query", "$catalogFilter.query",
             'Picker(copy.native(.codeFamily)', "copy.native(.availableOnly)",
@@ -94,7 +96,7 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertNotIn("Task { await model.search", root)
 
     def test_learning_intentions_and_denominators_stay_distinct(self):
-        root = self.app.split("private struct NativeRoot:", 1)[1]
+        root = self.app.split("struct NativeRoot:", 1)[1]
         for marker in (
             "copy.native(.nextSession)", "copy.native(.learningPlan)",
             "copy.native(.reviewPractice)", "copy.native(.goalOverview)",
@@ -120,7 +122,7 @@ class NativePrismPresentationTests(unittest.TestCase):
         )[0]
         # Both structs must be siblings for the unqualified choice-style call sites.
         self.assertEqual(primary.count("{"), primary.count("}"))
-        root = self.app.split("private struct NativeRoot:", 1)[1].split(
+        root = self.app.split("struct NativeRoot:", 1)[1].split(
             "struct NativeLessonAudioControls:", 1
         )[0]
         styles = set(re.findall(r"\.buttonStyle\(\s*(\w+Style)\(", root))
@@ -155,14 +157,14 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertIn("item.offset + 1", criteria)
 
     def test_busy_material_and_symbol_layers_respect_readability(self):
-        root = self.app.split("private struct NativeRoot:", 1)[1]
+        root = self.app.split("struct NativeRoot:", 1)[1]
         busy = root.split(".safeAreaInset(edge: .bottom)", 1)[1].split(
             ".alert(", 1
         )[0]
         self.assertIn("if reduceTransparency", busy)
         self.assertIn("NativePrism.surface", busy)
         page = self.app.split("struct NativeReadingPage<", 1)[1].split(
-            "private struct NativeCatalogSearch:", 1
+            "struct NativeCatalogSearch:", 1
         )[0]
         self.assertNotIn(".symbolRenderingMode(.hierarchical)", page)
         self.assertIn(".symbolRenderingMode(.monochrome)", self.app)
@@ -194,15 +196,15 @@ class NativePrismPresentationTests(unittest.TestCase):
             "copy.contentLanguageNote",
         ):
             self.assertIn(marker, self.app)
-        self.assertIn("NativeAppLanguagePicker()", self.app.split("private struct NativeEntry:", 1)[1].split("#if canImport(UIKit)", 1)[0])
+        self.assertIn("NativeAppLanguagePicker()", self.app.split("struct NativeEntry:", 1)[1].split("#if canImport(UIKit)", 1)[0])
         self.assertIn("Section(copy.appLanguage) { NativeAppLanguagePicker() }", self.app)
         self.assertNotIn('Locale(identifier: "en")', self.app)
 
     def test_interface_copy_reaches_real_and_demo_navigation_and_actions(self):
-        root = self.app.split("private struct NativeRoot:", 1)[1].split(
+        root = self.app.split("struct NativeRoot:", 1)[1].split(
             "struct NativeLessonAudioControls:", 1
         )[0]
-        demo = self.app.split("private struct NativeDemoRoot:", 1)[1].split(
+        demo = self.app.split("struct NativeDemoRoot:", 1)[1].split(
             "private struct NativeDemoSnapshot:", 1
         )[0]
         for value in (
@@ -284,7 +286,7 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertNotIn('Text("+XP")', self.app)  # The quest contract supplies gems, not XP.
 
     def test_quiz_selection_and_progress_are_not_correctness(self):
-        root = self.app.split("private struct NativeRoot:", 1)[1]
+        root = self.app.split("struct NativeRoot:", 1)[1]
         self.assertIn("NativeAnswerLabel(", root)
         self.assertIn("isSelected: model.selections[question.id] == option.id", root)
         self.assertIn("lesson.questions.filter { model.selections[$0.id] != nil }", root)
@@ -345,7 +347,7 @@ class NativePrismPresentationTests(unittest.TestCase):
 
     def test_preparation_artwork_is_original_vector_art_not_an_earned_badge(self):
         art = self.app.split("struct NativeEcosystemArtwork {", 1)[1].split(
-            "private struct NativeShowcaseTile:", 1
+            "struct NativeShowcaseTile:", 1
         )[0]
         for marker in (
             "enum Silhouette: Sendable", "case pennant, hexagon, octagon",
@@ -376,7 +378,7 @@ class NativePrismPresentationTests(unittest.TestCase):
         self.assertIn('components.contains("GH")', art)
 
     def test_showcase_counts_loaded_tracks_and_clears_its_filter(self):
-        root = self.app.split("private struct NativeRoot:", 1)[1]
+        root = self.app.split("struct NativeRoot:", 1)[1]
         showcase = root.split("private var ecosystemShowcase:", 1)[1].split(
             "private var learning:", 1
         )[0]
@@ -416,7 +418,7 @@ precondition(!NativeShowcaseUniverse.allCases.contains { $0.includes(code: "UNKN
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_numbered_path_preserves_optional_mastery_and_one_navigation_action(self):
-        root = self.app.split("private struct NativeRoot:", 1)[1]
+        root = self.app.split("struct NativeRoot:", 1)[1]
         label = root.split("private func lessonLabel(", 1)[1].split(
             "@ViewBuilder private var smartReview:", 1
         )[0]
@@ -441,7 +443,7 @@ precondition(!NativeShowcaseUniverse.allCases.contains { $0.includes(code: "UNKN
         self.assertIn("closeDeveloper: { dismiss() }", connector)
         self.assertIn("NativeDeveloperToolbar(close: { dismiss() })", connector)
         self.assertIn(".interactiveDismissDisabled()", self.app)
-        toolbar = self.app.split("private struct NativeDeveloperToolbar:", 1)[1].split(
+        toolbar = self.app.split("struct NativeDeveloperToolbar:", 1)[1].split(
             "struct NativeReadinessRing:", 1
         )[0]
         self.assertIn(".topBarTrailing", toolbar)
@@ -465,15 +467,15 @@ precondition(!NativeShowcaseUniverse.allCases.contains { $0.includes(code: "UNKN
         self.assertIn("if let code", hero)
         self.assertIn("NativeCertificationCrest(code: code, compact: true)", hero)
         self.assertIn('Text("Certigo")', self.app)
-        root = self.app.split("private struct NativeRoot:", 1)[1]
+        root = self.app.split("struct NativeRoot:", 1)[1]
         for section in ("private var profile:", "private var path:", "private var session:"):
             surface = root.split(section, 1)[1]
             self.assertIn("NativeCertificationCrest(code: track.code", surface)
         coach = root.split("private var coach:", 1)[1].split("private var coachPhase:", 1)[0]
         self.assertIn("model.profile?.activeTrackId?.lowercased()", coach)
         self.assertIn("})?.code", coach)
-        exam = self.app.split("private struct NativeMockExamView:", 1)[1].split(
-            "private struct NativeNotificationPreferencesView:", 1
+        exam = self.app.split("struct NativeMockExamView:", 1)[1].split(
+            "struct NativeNotificationPreferencesView:", 1
         )[0]
         self.assertIn("NativeCertificationCrest(code: snapshot.exam.trackCode, compact: true)", exam)
         self.assertNotIn('NativeCertificationCrest(code: "AZ-', self.app)
@@ -627,7 +629,7 @@ precondition(!NativeShowcaseUniverse.allCases.contains { $0.includes(code: "UNKN
         ui = self.app.split("#if canImport(SwiftUI)", 1)[1]
         # Stored fixtures and persistence raw values are source content, not application chrome.
         before_fixtures, remainder = ui.split("// A demo-only state machine:", 1)
-        after_fixtures = remainder.split("private struct NativeAccountDeletionView:", 1)[1]
+        after_fixtures = remainder.split("struct NativeAccountDeletionView:", 1)[1]
         for source in (before_fixtures, after_fixtures, self.pilot):
             for literal in re.findall(
                 r'(?:Text|Label|Button|Section|Picker|ContentUnavailableView|'
@@ -688,7 +690,7 @@ precondition(!NativeShowcaseUniverse.allCases.contains { $0.includes(code: "UNKN
         self.assertNotIn("UNUserNotificationCenter", self.app)
 
     def test_summary_only_catalog_entries_keep_details_but_cannot_offer_practice(self):
-        root = self.app.split("private struct NativeRoot:", 1)[1]
+        root = self.app.split("struct NativeRoot:", 1)[1]
         self.assertIn("NavigationLink(value: track.id)", root)
         self.assertIn("NativePracticeBadge(available: track.learningAvailable)", root)
         self.assertIn('accessibilityIdentifier("catalog-practice-availability")', self.app)

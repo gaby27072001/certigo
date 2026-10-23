@@ -28,6 +28,15 @@ def references(body, field):
 
 
 class NativeSourceMembershipTests(unittest.TestCase):
+    def test_phase_one_extraction_files_are_real_target_members(self):
+        from native_sources import EXTRACTED_FILES
+        self.assertEqual(len(EXTRACTED_FILES), 12)
+        for name in EXTRACTED_FILES:
+            self.assertTrue((APP / "Sources" / name).is_file(), name)
+        self.assertLess(
+            len((APP / "Sources/CertigoNativeApp.swift").read_text().splitlines()), 130
+        )
+
     def test_shared_profile_action_runs_the_release_app_target(self):
         scheme = ET.parse(
             APP / "CertigoNative.xcodeproj" / "xcshareddata" / "xcschemes"

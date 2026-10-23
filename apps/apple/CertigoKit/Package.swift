@@ -4,11 +4,12 @@ import PackageDescription
 
 let package = Package(
     name: "CertigoKit",
-    platforms: [.iOS(.v17), .macOS(.v14)],
+    platforms: [.iOS(.v26), .macOS(.v14)],
     products: [
         .library(name: "CertigoCortex", targets: ["CertigoCortex"]),
         .library(name: "CertigoDomain", targets: ["CertigoDomain"]),
         .library(name: "CertigoData", targets: ["CertigoData"]),
+        .library(name: "Prism", targets: ["Prism"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", exact: "5.0.1")
@@ -16,6 +17,7 @@ let package = Package(
     targets: [
         .target(name: "CertigoCortex"),
         .target(name: "CertigoDomain"),
+        .target(name: "Prism", resources: [.process("Resources")]),
         .target(name: "CertigoAppleFileIO"),
         .target(
             name: "CertigoData",
@@ -28,8 +30,12 @@ let package = Package(
         ),
         .testTarget(
             name: "CertigoKitTests",
-            dependencies: ["CertigoCortex", "CertigoDomain", "CertigoData"],
+            dependencies: ["CertigoCortex", "CertigoDomain", "CertigoData", "Prism"],
             resources: [.copy("Fixtures")]
+        ),
+        .testTarget(
+            name: "ArchitectureTests",
+            resources: [.copy("LegacyExceptions.json")]
         ),
     ]
 )
