@@ -205,6 +205,14 @@
             Text(verbatim: "Phase 4 · Session Player & P1 Formats (§6.2–6.4)")
           }
           Section {
+            ForEach(MockExamTimePolicy.allCases) { policy in
+              Text(verbatim: "MockExamTimePolicy · \(policy.title)")
+                .prismTextStyle(.callout)
+            }
+          } header: {
+            Text(verbatim: "Phase 5 · Feedback, Daily Situation & Mock Exam (§14–15)")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(
