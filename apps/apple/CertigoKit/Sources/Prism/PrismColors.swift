@@ -157,6 +157,7 @@ extension PrismRegion {
   public static let azure: Self = .cloud
     public static let networking: Self = .network
     public static let devOps: Self = .devops
+    public static let r1: Self = .cloud
 
   public var displayName: String {
     switch self {

@@ -1048,7 +1048,7 @@ public struct PrismShareCardView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: PrismSpacing.md) {
             HStack(spacing: PrismSpacing.sm) {
-                PrismCrestView(region: payload.region)
+                RegionChip(region: payload.region)
 
                 VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
                     Text(verbatim: payload.region.displayName)
@@ -1105,6 +1105,18 @@ public struct PrismShareCardView: View {
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(payload.id)
     }
+}
+
+public struct PrismSnapshotConfiguration: Equatable, Sendable {
+    public let isDarkMode: Bool
+    public let scale: CGFloat
+
+    public init(isDarkMode: Bool = false, scale: CGFloat = 2.0) {
+        self.isDarkMode = isDarkMode
+        self.scale = scale
+    }
+
+    public static let iPhoneLightStandard = Self(isDarkMode: false, scale: 2.0)
 }
 
 public enum ShareCardRenderer {

@@ -74,14 +74,8 @@ public struct PrismSnapshot: Equatable, Sendable {
         content:
           view
           .environment(\.colorScheme, configuration.appearance.isDark ? .dark : .light)
-          .environment(
-            \.colorSchemeContrast,
-            configuration.appearance.isHighContrast ? .increased : .standard
-          )
           .environment(\.dynamicTypeSize, configuration.dynamicType)
           .environment(\.locale, configuration.locale)
-          .environment(\.accessibilityReduceMotion, true)
-          .environment(\.accessibilityReduceTransparency, true)
           .frame(width: configuration.size.width, height: configuration.size.height))
       renderer.scale = 1
       renderer.isOpaque = true
