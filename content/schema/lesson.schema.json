@@ -103,6 +103,18 @@
             "type": "string",
             "pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"
           }
+        },
+        "skippable": {
+          "type": "boolean",
+          "description": "Whether a worked example block offers 'Je connais déjà' skip test (§6.2)."
+        },
+        "skipVerificationItemId": {
+          "type": "string",
+          "description": "Server-provided verification item id triggered by 'Je connais déjà' (§6.2)."
+        },
+        "diagram": {
+          "type": "object",
+          "description": "Optional structured DiagramSpec for native diagram rendering (§23)."
         }
       },
       "allOf": [
@@ -218,6 +230,60 @@
           "items": {
             "type": "string",
             "pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"
+          }
+        },
+        "format": {
+          "type": "string",
+          "description": "Versioned Prism ItemPayload format identifier (choice, situation, predict, spotTheIssue, ordering, commandComposer, etc. §6.3)."
+        },
+        "artifact": {
+          "type": "object",
+          "description": "Optional technical artifact (code, config, CLI output, log <= 25 lines §6.3)."
+        },
+        "revealOptionsDelayMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1500,
+          "description": "Delay before options appear after prompt (0-1500 ms §6.2)."
+        },
+        "captureConfidence": {
+          "type": "boolean",
+          "description": "Whether ConfidencePicker (Sûr / Plutôt / Au hasard) is displayed before Vérifier (§6.2)."
+        },
+        "misconceptionTags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Named misconception tags associated with distractor options (§6.4)."
+        },
+        "rung": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Concept depth ladder rung (1..5 §6.4, §8)."
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "title",
+              "url",
+              "verifiedAt"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "verifiedAt": {
+                "type": "string"
+              }
+            }
           }
         }
       }

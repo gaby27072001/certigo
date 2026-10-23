@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - 1. SessionProgressHeader Model
 
-public struct PrismSessionProgressModel: Equatable, Codable, Sendable {
+public struct PrismSessionProgressModel: Equatable, Hashable, Codable, Sendable {
     public let currentIndex: Int
     public let totalCount: Int
     public let stepTitle: String
@@ -100,7 +100,7 @@ public enum PrismSessionLength: String, CaseIterable, Codable, Sendable, Identif
     }
 }
 
-public struct SessionLengthOption: Identifiable, Equatable, Codable, Sendable {
+public struct SessionLengthOption: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let length: PrismSessionLength
     public let isSuggested: Bool
 
@@ -125,7 +125,7 @@ public typealias PrismSessionLengthOption = SessionLengthOption
 
 // MARK: - 3. QuestionCard Model
 
-public struct PrismQuestionSpec: Identifiable, Equatable, Codable, Sendable {
+public struct PrismQuestionSpec: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let prompt: String
     public let situationContext: String?
@@ -163,7 +163,7 @@ public typealias QuestionSpec = PrismQuestionSpec
 
 // MARK: - 4. ExplanationCard Model
 
-public struct PrismVerifiedSource: Identifiable, Equatable, Codable, Sendable {
+public struct PrismVerifiedSource: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let title: String
     public let referenceCode: String
@@ -182,7 +182,7 @@ public struct PrismVerifiedSource: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-public struct PrismExplanationSpec: Identifiable, Equatable, Codable, Sendable {
+public struct PrismExplanationSpec: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let title: String
     public let body: String
@@ -208,7 +208,7 @@ public typealias ExplanationSpec = PrismExplanationSpec
 
 // MARK: - 5. WorkedExampleView Models
 
-public struct PrismWorkedStep: Identifiable, Equatable, Codable, Sendable {
+public struct PrismWorkedStep: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let stepNumber: Int
     public let subgoalTitle: String
@@ -233,7 +233,7 @@ public struct PrismWorkedStep: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-public struct PrismWorkedExample: Identifiable, Equatable, Codable, Sendable {
+public struct PrismWorkedExample: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let title: String
     public let problemContext: String
@@ -263,7 +263,7 @@ public struct PrismWorkedExample: Identifiable, Equatable, Codable, Sendable {
 
 // MARK: - 6. DiagramView & DiagramSpec Models
 
-public struct DiagramNode: Identifiable, Equatable, Codable, Sendable {
+public struct DiagramNode: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let label: String
     public let productId: String?
@@ -289,7 +289,7 @@ public struct DiagramNode: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-public struct DiagramEdge: Identifiable, Equatable, Codable, Sendable {
+public struct DiagramEdge: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let fromNodeId: String
     public let toNodeId: String
@@ -311,7 +311,7 @@ public struct DiagramEdge: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-public struct DiagramGroup: Identifiable, Equatable, Codable, Sendable {
+public struct DiagramGroup: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let label: String
     public let region: PrismRegion
@@ -330,7 +330,7 @@ public struct DiagramGroup: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-public struct DiagramSpec: Identifiable, Equatable, Codable, Sendable {
+public struct DiagramSpec: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let title: String
     public let nodes: [DiagramNode]
@@ -404,7 +404,7 @@ public typealias PrismDiagramSpec = DiagramSpec
 
 // MARK: - 7. ArtifactView & PrismArtifactDocument Models
 
-public struct PrismArtifactSpan: Identifiable, Equatable, Codable, Sendable {
+public struct PrismArtifactSpan: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let text: String
     public let syntax: PrismSyntax
@@ -420,7 +420,7 @@ public struct PrismArtifactSpan: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-public struct PrismArtifactLine: Identifiable, Equatable, Codable, Sendable {
+public struct PrismArtifactLine: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let lineNumber: Int
     public let text: String
     public let syntax: PrismSyntax
@@ -450,7 +450,7 @@ public struct PrismArtifactLine: Identifiable, Equatable, Codable, Sendable {
 
 public typealias ArtifactLine = PrismArtifactLine
 
-public struct PrismArtifactDocument: Identifiable, Equatable, Codable, Sendable {
+public struct PrismArtifactDocument: Identifiable, Equatable, Hashable, Codable, Sendable {
     public static let maxCollapsedLines: Int = 25
 
     public let id: String
@@ -505,7 +505,7 @@ public struct PrismArtifactDocument: Identifiable, Equatable, Codable, Sendable 
 
 // MARK: - 8. ChoiceList & PrismChoiceOption Models
 
-public enum PrismChoiceVisualState: String, Equatable, Codable, Sendable {
+public enum PrismChoiceVisualState: String, Equatable, Hashable, Codable, Sendable {
     case neutral
     case selected
     case correctSelected
@@ -543,7 +543,7 @@ public enum PrismChoiceVisualState: String, Equatable, Codable, Sendable {
     }
 }
 
-public struct PrismChoiceOption: Identifiable, Equatable, Codable, Sendable {
+public struct PrismChoiceOption: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let badge: String
     public let text: String
@@ -648,7 +648,7 @@ public typealias ConfidenceLevel = PrismConfidenceLevel
 
 // MARK: - 10. TokenComposer Models
 
-public struct PrismCommandToken: Identifiable, Equatable, Codable, Sendable {
+public struct PrismCommandToken: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let text: String
     public let syntax: PrismSyntax
@@ -664,7 +664,7 @@ public struct PrismCommandToken: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-public struct PrismTokenComposerState: Equatable, Codable, Sendable {
+public struct PrismTokenComposerState: Equatable, Hashable, Codable, Sendable {
     public var availableTokens: [PrismCommandToken]
     public var selectedTokens: [PrismCommandToken]
 
@@ -701,7 +701,7 @@ public struct PrismTokenComposerState: Equatable, Codable, Sendable {
 
 // MARK: - 11. OrderList Models
 
-public struct PrismOrderItem: Identifiable, Equatable, Codable, Sendable {
+public struct PrismOrderItem: Identifiable, Equatable, Hashable, Codable, Sendable {
     public static let maxIndentation: Int = 3
 
     public let id: String
@@ -739,7 +739,7 @@ public struct PrismOrderItem: Identifiable, Equatable, Codable, Sendable {
 
 // MARK: - 12. SlotBoard Models
 
-public struct PrismSlotItem: Identifiable, Equatable, Codable, Sendable {
+public struct PrismSlotItem: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let label: String
     public let detail: String?
@@ -751,7 +751,7 @@ public struct PrismSlotItem: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-public struct PrismSlotTarget: Identifiable, Equatable, Codable, Sendable {
+public struct PrismSlotTarget: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let title: String
     public let subtitle: String?
@@ -763,7 +763,7 @@ public struct PrismSlotTarget: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-public struct PrismSlotBoardState: Equatable, Codable, Sendable {
+public struct PrismSlotBoardState: Equatable, Hashable, Codable, Sendable {
     public var items: [PrismSlotItem]
     public var targets: [PrismSlotTarget]
     public var assignments: [String: String]
@@ -814,7 +814,7 @@ public struct PrismSlotBoardState: Equatable, Codable, Sendable {
 
 // MARK: - 13. EstimateSlider Model
 
-public struct PrismEstimateSpec: Equatable, Codable, Sendable {
+public struct PrismEstimateSpec: Equatable, Hashable, Codable, Sendable {
     public let title: String
     public let unit: String
     public let minimumValue: Double
@@ -860,7 +860,7 @@ public struct PrismEstimateSpec: Equatable, Codable, Sendable {
 
 // MARK: - 14. ExplainInput Model
 
-public struct PrismExplainPromptSpec: Equatable, Codable, Sendable {
+public struct PrismExplainPromptSpec: Equatable, Hashable, Codable, Sendable {
     public let prompt: String
     public let placeholder: String
     public let maxCharacters: Int
@@ -930,7 +930,7 @@ public enum FeedbackVariant: String, CaseIterable, Codable, Sendable {
 
 public typealias PrismFeedbackVariant = FeedbackVariant
 
-public struct PrismFeedbackState: Identifiable, Equatable, Codable, Sendable {
+public struct PrismFeedbackState: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let variant: FeedbackVariant
     public let headline: String
@@ -1028,7 +1028,7 @@ public enum PrismResponsibilityOwner: String, CaseIterable, Codable, Sendable, I
     }
 }
 
-public struct ResponsibilityEntry: Identifiable, Equatable, Codable, Sendable {
+public struct ResponsibilityEntry: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let layerName: String
     public let serviceModel: String
@@ -1054,7 +1054,7 @@ public typealias PrismResponsibilityEntry = ResponsibilityEntry
 
 // MARK: - 17. TakeawayLine Model
 
-public struct PrismTakeawaySpec: Identifiable, Equatable, Codable, Sendable {
+public struct PrismTakeawaySpec: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let title: String
     public let sentence: String
@@ -1075,7 +1075,7 @@ public struct PrismTakeawaySpec: Identifiable, Equatable, Codable, Sendable {
 
 // MARK: - 18. HintLadderView & PrismHintLadder Models
 
-public struct HintStep: Identifiable, Equatable, Codable, Sendable {
+public struct HintStep: Identifiable, Equatable, Hashable, Codable, Sendable {
     public let id: String
     public let level: Int
     public let title: String
@@ -1091,7 +1091,7 @@ public struct HintStep: Identifiable, Equatable, Codable, Sendable {
 
 public typealias PrismHintStep = HintStep
 
-public struct PrismHintLadder: Identifiable, Equatable, Codable, Sendable {
+public struct PrismHintLadder: Identifiable, Equatable, Hashable, Codable, Sendable {
     public static let maxLevel: Int = 4
 
     public let id: String
