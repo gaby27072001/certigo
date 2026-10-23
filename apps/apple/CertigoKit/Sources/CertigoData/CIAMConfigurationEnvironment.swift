@@ -135,7 +135,11 @@ public enum CIAMConfigurationEnvironment {
         let authorityText = try required(authorityKey, from: environment)
         let issuerText = try required(issuerKey, from: environment)
         let authorityKindText = try required(authorityKindKey, from: environment)
-        let apiBaseURLText = try required(apiBaseURLKey, from: environment)
+        let rawAPIBaseURLText = try required(apiBaseURLKey, from: environment)
+        let apiBaseURLText = rawAPIBaseURLText.replacingOccurrences(
+            of: "func-certigo-staging-hwbsyiwa7tqnw.azurewebsites.net",
+            with: "func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net"
+        )
         let apiScope = try required(apiScopeKey, from: environment)
         let apiAudience = try required(apiAudienceKey, from: environment)
         let redirectText = try required(redirectURIKey, from: environment)

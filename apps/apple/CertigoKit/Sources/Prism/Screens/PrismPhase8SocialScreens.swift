@@ -1286,65 +1286,107 @@ public struct EnsembleCompleteScreen: View {
                         PrismAdaptiveStack(spacing: PrismSpacing.s) {
                             PrismBadge(
                                 configuration: PrismBadgeConfiguration(
-                                    text: privacy.isPrivateByDefault ? "Privé par défaut (NS-12)" : "Visibilité personnalisée",
+                                    text: privacy.isPrivateByDefault ? "Privé par défaut" : "Visibilité personnalisée",
                                     semantics: .positive
                                 )
                             )
                             PrismBadge(
                                 configuration: PrismBadgeConfiguration(
-                                    text: privacy.effectiveLeaguesOptIn ? "Ligues opt-in" : "Ligues désactivées",
+                                    text: privacy.effectiveLeaguesOptIn ? "Ligues actives" : "Ligues en option",
                                     semantics: .neutral
                                 )
                             )
                         }
                         PrismText(text: "Pseudonyme : \(privacy.pseudonym)", style: .headline)
                         PrismText(
-                            text: "Aucun import de contacts, aucune localisation, aucun chat libre et aucun échec affiché à autrui (§10).",
+                            text: "Tes progrès restent privés par défaut. Seuls les jalons que tu choisis de partager sont visibles.",
                             style: .footnote,
                             role: .textSecondary
                         )
                     }
                 }
 
-                SquadDetailScreen(
-                    workspace: squadWorkspace,
-                    onInviteToSquad: { onOpenSheet(.createOrJoinSquad) }
-                )
-
-                PrismSection(title: "Défis, Amis & Ligues") {
-                    PrismCard(variant: .standard) {
-                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                            ChallengeCard(model: challengeState.challengeModel)
-                            HStack(spacing: PrismSpacing.s) {
+                PrismSection(title: "Squad coopérative") {
+                    PrismCard(variant: .hero) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                            PrismAdaptiveStack(spacing: PrismSpacing.s) {
+                                BrandLabel(
+                                    product: squadWorkspace.brandProductId,
+                                    context: .learningContent,
+                                    examCode: squadWorkspace.routeCode
+                                )
+                                PrismBadge(
+                                    configuration: PrismBadgeConfiguration(
+                                        text: squadWorkspace.goalModel.isAnonymizedByDefault ? "Contributions anonymisées" : "Pseudonymes visibles",
+                                        semantics: .accent
+                                    )
+                                )
+                            }
+                            SquadGoalView(model: squadWorkspace.goalModel)
+                            if let examMonth = squadWorkspace.targetExamMonth {
+                                PrismText(
+                                    text: "Objectif commun : \(squadWorkspace.routeCode) · \(examMonth)",
+                                    style: .footnote,
+                                    role: .textSecondary
+                                )
+                            }
+                            PrismAdaptiveStack(spacing: PrismSpacing.s) {
                                 Button {
-                                    onOpenCover(.asyncChallenge(id: challengeState.challengeId))
+                                    onNavigate(.squadDetail(id: squadWorkspace.id))
                                 } label: {
-                                    Text(verbatim: "Ouvrir le défi 5 items (S-65)")
+                                    Text(verbatim: "Encourager ma Squad")
+                                        .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(PrismButtonStyle(variant: .primary))
 
                                 Button {
-                                    onNavigate(.friendsList)
+                                    onOpenSheet(.createOrJoinSquad)
                                 } label: {
-                                    Text(verbatim: "Amis (S-63)")
+                                    Text(verbatim: "Inviter (\(squadWorkspace.inviteCode))")
+                                        .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(PrismButtonStyle(variant: .secondary))
                             }
-                            HStack(spacing: PrismSpacing.s) {
-                                Button {
-                                    onNavigate(.progressionLeagues)
-                                } label: {
-                                    Text(verbatim: "Ligues Glicko-2 (S-66)")
-                                }
-                                .buttonStyle(PrismButtonStyle(variant: .secondary))
+                        }
+                    }
+                }
 
-                                Button {
-                                    onNavigate(.dailySituationHistory)
-                                } label: {
-                                    Text(verbatim: "Historique Situations (S-31)")
-                                }
-                                .buttonStyle(PrismButtonStyle(variant: .secondary))
+                PrismSection(title: "Défis asynchrones & Communauté") {
+                    PrismCard(variant: .standard) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                            ChallengeCard(model: challengeState.challengeModel)
+                            Button {
+                                onOpenCover(.asyncChallenge(id: challengeState.challengeId))
+                            } label: {
+                                Text(verbatim: "Relever le défi 5 situations")
+                                    .frame(maxWidth: .infinity)
                             }
+                            .buttonStyle(PrismButtonStyle(variant: .primary))
+
+                            PrismRow(
+                                configuration: PrismRowConfiguration(
+                                    title: "Amis & invitations par code / QR",
+                                    subtitle: "2 amis actifs · 0 import de carnet d'adresses",
+                                    showsChevron: true
+                                ),
+                                action: { onNavigate(.friendsList) }
+                            )
+                            PrismRow(
+                                configuration: PrismRowConfiguration(
+                                    title: "Ligues de progression Glicko-2",
+                                    subtitle: "Opt-in par route · ±3 voisins · 4 sem. sans relégation",
+                                    showsChevron: true
+                                ),
+                                action: { onNavigate(.progressionLeagues) }
+                            )
+                            PrismRow(
+                                configuration: PrismRowConfiguration(
+                                    title: "Historique des Situations du jour",
+                                    subtitle: "Distributions anonymes et cartes de partage",
+                                    showsChevron: true
+                                ),
+                                action: { onNavigate(.dailySituationHistory) }
+                            )
                         }
                     }
                 }

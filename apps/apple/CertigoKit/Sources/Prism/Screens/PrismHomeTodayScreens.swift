@@ -415,7 +415,7 @@ public struct TodayRootScreen: View {
                 if let code = model.activeRouteCode {
                     BrandLabel(
                         product: model.activeRouteProductID,
-                        context: .catalog,
+                        context: .learningContent,
                         examCode: code,
                         size: .medium,
                         flags: flags
@@ -509,7 +509,7 @@ public struct CatalogExplorerScreen: View {
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
                         BrandLabel(
                             product: route.product,
-                            context: .catalog,
+                            context: .learningContent,
                             examCode: route.code,
                             size: .medium,
                             flags: flags

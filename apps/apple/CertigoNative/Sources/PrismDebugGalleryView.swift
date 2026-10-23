@@ -5,7 +5,7 @@
 
   struct PrismDebugGalleryLauncher: ViewModifier {
     @State private var presented = false
-    @State private var showPrismShell = false
+    @State private var showPrismShell = true
     @State private var flags = FeatureFlags()
 
     func body(content: Content) -> some View {
@@ -16,7 +16,7 @@
           content
         }
       }
-      .overlay(alignment: .topTrailing) {
+      .overlay(alignment: .bottomTrailing) {
         HStack(spacing: PrismSpacing.xs) {
           Button {
             showPrismShell.toggle()
@@ -48,7 +48,8 @@
           }
           .accessibilityIdentifier("open-prism-gallery")
         }
-        .padding(PrismSpacing.s)
+        .padding(.horizontal, PrismSpacing.m)
+        .padding(.bottom, PrismSpacing.giant)
       }
       .sheet(
         isPresented: $presented,

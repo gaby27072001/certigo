@@ -194,7 +194,9 @@ public struct BrandRegistry: Sendable {
         flags: FeatureFlags? = nil,
         requireGlobalFlagEnabled: Bool = false
     ) -> BrandResolution {
-        guard let product = productsByID[id.rawValue] else {
+        let resolvedProduct = productsByID[id.rawValue]
+            ?? productsByID.values.first(where: { $0.id.hasSuffix(".\(id.rawValue)") })
+        guard let product = resolvedProduct else {
             return .fallback(
                 officialName: id.rawValue,
                 vendor: "other",

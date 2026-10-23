@@ -771,11 +771,7 @@ public struct PrismIcon: View {
         case let .system(systemName):
             Image(systemName: systemName)
         case let .glyph(glyph):
-            if UIImage(named: glyph.assetName, in: .module, with: nil) != nil {
-                Image(glyph.assetName, bundle: .module)
-            } else {
-                Image(systemName: glyph.sfSymbolFallback)
-            }
+            Image(systemName: glyph.sfSymbolFallback)
         }
     }
 
