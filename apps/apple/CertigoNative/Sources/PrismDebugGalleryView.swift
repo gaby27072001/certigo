@@ -229,6 +229,14 @@
             Text(verbatim: "Phase 7 · Gamification (Rhythm, Milestones, Missions)")
           }
           Section {
+            ForEach(SocialVisibilityScope.allCases) { scope in
+              Text(verbatim: "Visibility · \(scope.title)")
+                .prismTextStyle(.callout)
+            }
+          } header: {
+            Text(verbatim: "Phase 8 · Social, Squads, Challenges & Glicko-2 Leagues (§10)")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(
