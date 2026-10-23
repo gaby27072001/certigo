@@ -50,4 +50,14 @@ struct Phase11HardeningTests {
         let ready = LegacyPathCleanupGovernance(flag: FeatureFlag.allCases[0], daysEnabledInProduction: 14, recordedIncidents: 0)
         #expect(ready.isEligibleForLegacyPathDeletion == true)
     }
+
+    @Test("Unified PrismAppShellCoordinatorModel initializes all 5 tabs, covers, and sheets cleanly")
+    func prismAppShellCoordinatorInitializesAllSurfaces() {
+        let coordinator = PrismAppShellCoordinatorModel()
+        #expect(coordinator.todayModel.activeRouteCode == "AZ-104")
+        #expect(coordinator.atlasModel.visibleFilteredNodes.count == 2)
+        #expect(coordinator.searchModel.filteredResults.count == 2)
+        #expect(coordinator.sessionPlayerMachine.plan.cards.count == 2)
+        #expect(coordinator.mockExamMachine.routeCode == "AZ-104")
+    }
 }

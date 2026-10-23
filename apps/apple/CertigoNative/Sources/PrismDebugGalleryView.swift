@@ -5,10 +5,34 @@
 
   struct PrismDebugGalleryLauncher: ViewModifier {
     @State private var presented = false
+    @State private var showPrismShell = false
+    @State private var flags = FeatureFlags()
 
     func body(content: Content) -> some View {
-      content
-        .overlay(alignment: .topTrailing) {
+      Group {
+        if showPrismShell || flags.isEnabled(.prism) {
+          PrismAppShellView(flags: flags)
+        } else {
+          content
+        }
+      }
+      .overlay(alignment: .topTrailing) {
+        HStack(spacing: PrismSpacing.xs) {
+          Button {
+            showPrismShell.toggle()
+          } label: {
+            Label {
+              Text(verbatim: (showPrismShell || flags.isEnabled(.prism)) ? "Vue Legacy" : "App Prism")
+            } icon: {
+              Image(systemName: "sparkles")
+            }
+            .prismTextStyle(.caption)
+            .frame(minHeight: PrismSize.minTouch)
+            .padding(.horizontal, PrismSpacing.m)
+            .background(PrismColor.surface, in: Capsule())
+          }
+          .accessibilityIdentifier("toggle-prism-shell")
+
           Button {
             presented = true
           } label: {
@@ -23,9 +47,20 @@
             .background(PrismColor.surface, in: Capsule())
           }
           .accessibilityIdentifier("open-prism-gallery")
-          .padding(PrismSpacing.s)
         }
-        .sheet(isPresented: $presented) { PrismDebugGalleryView() }
+        .padding(PrismSpacing.s)
+      }
+      .sheet(
+        isPresented: $presented,
+        onDismiss: {
+          try? flags.loadDebugOverrides(from: .standard)
+        }
+      ) {
+        PrismDebugGalleryView()
+      }
+      .task {
+        try? flags.loadDebugOverrides(from: .standard)
+      }
     }
   }
 
