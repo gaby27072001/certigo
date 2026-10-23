@@ -64,6 +64,15 @@ public struct FeatureFlags: Sendable {
 
     public init() {}
 
+    public func isVendorExplicitlyDisabled(_ vendor: FeatureFlag.BrandVendor) -> Bool {
+        let flag = FeatureFlag.brandIcons(vendor: vendor)
+        if remoteDisabled.contains(flag) { return true }
+        #if DEBUG
+            if debugOverrides[flag] == false { return true }
+        #endif
+        return false
+    }
+
     public func isEnabled(_ flag: FeatureFlag) -> Bool {
         guard !remoteDisabled.contains(flag) else { return false }
         if flag.rawValue.hasPrefix("brand.icons."), flag != .brandIcons,

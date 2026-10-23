@@ -33,11 +33,11 @@ private struct ArchitectureRule {
             id: "print", pattern: #"\bprint\s*\("#,
             suggestion: "Use repository-standard logging."),
         .init(
-            id: "brand-image", pattern: #"Image\s*\([^)\n]*BrandAssets"#,
+            id: "brand-image", pattern: #"Image\s*\([^)\n]*Brand(?:Assets|Registry)"#,
             suggestion: "Use BrandIcon."),
         .init(
             id: "brand-modifier",
-            pattern: #"Brand(?:Icon|Label)\s*\([^;{}]*?\)\s*\.(?:renderingMode|foregroundStyle|tint|colorMultiply|hueRotation|saturation|grayscale|colorInvert|blendMode|mask|clipShape|rotationEffect|rotation3DEffect|scaleEffect|blur|shadow|glassEffect)\s*\("#,
+            pattern: #"Brand(?:Icon|Label)\s*\([^)]*\)(?:\s*\.[A-Za-z0-9_]+\s*\([^)]*\))*\s*\.(?:renderingMode|foregroundStyle|tint|colorMultiply|hueRotation|saturation|grayscale|colorInvert|blendMode|mask|clipShape|rotationEffect|rotation3DEffect|scaleEffect|blur|shadow|glassEffect)\s*\("#,
             suggestion: "Do not alter official brand assets."),
     ]
 }
@@ -119,6 +119,8 @@ private func violations(in source: String, path: String) throws -> [Violation] {
                 // RGBA channel arithmetic defines the palette; other Prism files remain audited.
                 !($0.path == "apps/apple/CertigoKit/Sources/Prism/PrismColors.swift"
                     && $0.rule.id == "color")
+                && !($0.path == "apps/apple/CertigoKit/Sources/Prism/Brand/BrandIcon.swift"
+                    && $0.rule.id == "brand-image")
             }
             if relative.contains("/Sources/CertigoDomain/")
                 || relative.contains("/Sources/CertigoCortex/")

@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "CertigoCortex", targets: ["CertigoCortex"]),
         .library(name: "CertigoDomain", targets: ["CertigoDomain"]),
         .library(name: "CertigoData", targets: ["CertigoData"]),
+        .library(name: "BrandAssets", targets: ["BrandAssets"]),
         .library(name: "Prism", targets: ["Prism"]),
     ],
     dependencies: [
@@ -17,7 +18,16 @@ let package = Package(
     targets: [
         .target(name: "CertigoCortex"),
         .target(name: "CertigoDomain"),
-        .target(name: "Prism", resources: [.process("Resources")]),
+        .target(
+            name: "BrandAssets",
+            dependencies: ["CertigoDomain"],
+            resources: [.process("Resources")]
+        ),
+        .target(
+            name: "Prism",
+            dependencies: ["BrandAssets", "CertigoDomain"],
+            resources: [.process("Resources")]
+        ),
         .target(name: "CertigoAppleFileIO"),
         .target(
             name: "CertigoData",
@@ -30,7 +40,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CertigoKitTests",
-            dependencies: ["CertigoCortex", "CertigoDomain", "CertigoData", "Prism"],
+            dependencies: ["CertigoCortex", "CertigoDomain", "CertigoData", "BrandAssets", "Prism"],
             resources: [.copy("Fixtures")]
         ),
         .testTarget(

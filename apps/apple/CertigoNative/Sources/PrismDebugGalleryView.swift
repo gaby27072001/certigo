@@ -173,6 +173,18 @@
             Text(verbatim: "Phase 2 · Learning · Progress · Social · States · A11y")
           }
           Section {
+            BrandLabel(product: .azureVirtualMachines, context: .learningContent)
+            BrandLabel(product: .microsoftAzure, context: .catalog, examCode: "AZ-900")
+            BrandLabel(product: .m365Excel, context: .learningContent, examCode: "MO-200")
+            NavigationLink {
+              BrandNoticesView()
+            } label: {
+              Text(verbatim: "BrandNoticesView · Marques et mentions légales")
+            }
+          } header: {
+            Text(verbatim: "Phase 2B · Official Brand Assets (§22A)")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(
