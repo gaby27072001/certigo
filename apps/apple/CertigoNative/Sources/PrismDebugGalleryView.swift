@@ -213,6 +213,14 @@
             Text(verbatim: "Phase 5 · Feedback, Daily Situation & Mock Exam (§14–15)")
           }
           Section {
+            ForEach(AtlasPresentationMode.allCases) { mode in
+              Text(verbatim: "AtlasMode · \(mode.title)")
+                .prismTextStyle(.callout)
+            }
+          } header: {
+            Text(verbatim: "Phase 6 · Atlas, Concept, Readiness & Passport (§8, §14–15)")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(
