@@ -245,6 +245,14 @@
             Text(verbatim: "Phase 9 · Contextual AI, S-24, S-44, S-45 & 5-Tier AIRouter (§11)")
           }
           Section {
+            ForEach(OnboardingStep.allCases) { step in
+              Text(verbatim: "\(step.screenCode) · \(step.title)")
+                .prismTextStyle(.callout)
+            }
+          } header: {
+            Text(verbatim: "Phase 10 · Onboarding 60s, Pro StoreKit 2, Settings & iOS Surfaces (§14–15)")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(
