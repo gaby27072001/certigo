@@ -1243,11 +1243,53 @@ public struct AtlasCanvas: View {
         if PrismAtlasLayout.shouldDefaultToList(voiceOverRunning: voiceOverEnabled) {
             AtlasList(nodes: nodes, onSelectNode: onSelectNode)
         } else {
-            VStack(alignment: .leading, spacing: PrismSpacing.sm) {
-                Text(verbatim: "Carte Atlas (\(nodes.count) nœuds actifs)")
-                    .prismTextStyle(.caption)
-                    .foregroundStyle(PrismColor.inkSecondary.color(in: resolvedScheme))
-                AtlasList(nodes: nodes, onSelectNode: onSelectNode)
+            VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                HStack(spacing: PrismSpacing.s) {
+                    Image(systemName: "sparkles.rectangle.stack.fill")
+                        .foregroundStyle(PrismColor.accent)
+                    Text(verbatim: "Constellation des concepts (\(nodes.count) nœuds actifs)")
+                        .prismTextStyle(.subheadline)
+                        .foregroundStyle(PrismColor.inkPrimary.color(in: resolvedScheme))
+                    Spacer()
+                }
+
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: PrismSpacing.s), GridItem(.flexible(), spacing: PrismSpacing.s)],
+                    spacing: PrismSpacing.s
+                ) {
+                    ForEach(nodes) { node in
+                        Button {
+                            onSelectNode(node)
+                        } label: {
+                            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                                HStack(spacing: PrismSpacing.xs) {
+                                    RegionChip(region: node.region)
+                                    Spacer()
+                                }
+                                Text(verbatim: node.code)
+                                    .prismTextStyle(.codeSmall)
+                                    .foregroundStyle(PrismColor.inkSecondary.color(in: resolvedScheme))
+                                Text(verbatim: node.title)
+                                    .prismTextStyle(.subheadline)
+                                    .foregroundStyle(PrismColor.inkPrimary.color(in: resolvedScheme))
+                                    .multilineTextAlignment(.leading)
+                                MasteryGlyph(state: node.masteryState)
+                            }
+                            .padding(PrismSpacing.m)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .fill(PrismColor.surface.color(in: resolvedScheme))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .strokeBorder(node.region.accent.color(in: resolvedScheme), lineWidth: PrismBorder.regular)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(verbatim: node.accessibilityLabel))
+                    }
+                }
             }
         }
     }

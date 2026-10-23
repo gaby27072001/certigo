@@ -644,12 +644,29 @@ public struct DailySituationScreen: View {
 
                 if !machine.hasSubmittedAnswer {
                     ConfidencePicker(selectedConfidence: $machine.selectedConfidence)
+                    Button {
+                        let correctOption = machine.options.first(where: \.isCorrect) ?? machine.options.first
+                        _ = machine.submitAnswer(
+                            correctOptionId: correctOption?.id ?? "a",
+                            authorExplanation: correctOption?.explanation ?? "Explication vérifiée par l'auteur.",
+                            takeaway: "Toujours associer Soft Delete et Purge Protection sur les ressources critiques."
+                        )
+                    } label: {
+                        Text(verbatim: "Valider ma décision")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PrismButtonStyle(variant: .primary))
+                    .disabled(!machine.canSubmit)
                 } else {
+                    if let resolution = machine.feedbackResolution {
+                        FeedbackPanel(state: resolution.feedbackState)
+                    }
                     CommunityDistributionChart(model: machine.communityDistribution)
                     Button {
                         onShare(machine.makeSpoilerFreeShareCard())
                     } label: {
                         Text(verbatim: "Partager sans spoiler")
+                            .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(PrismButtonStyle(variant: .secondary))
                 }
@@ -689,7 +706,7 @@ public struct MockExamIntroScreen: View {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
                 BrandLabel(
                     product: BrandRegistry.productID(forTrackCode: machine.routeCode),
-                    context: .catalog,
+                    context: .learningContent,
                     examCode: machine.routeCode,
                     size: .medium,
                     flags: flags
@@ -753,7 +770,7 @@ public struct MockExamDebriefScreen: View {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
                 BrandLabel(
                     product: BrandRegistry.productID(forTrackCode: debrief.routeCode),
-                    context: .catalog,
+                    context: .learningContent,
                     examCode: debrief.routeCode,
                     size: .medium,
                     flags: flags
@@ -781,6 +798,121 @@ public struct MockExamDebriefScreen: View {
         }
         .background(PrismColor.canvas)
         .navigationTitle(Text(verbatim: "Débrief d'examen blanc"))
+    }
+}
+
+public struct MockExamFlowScreen: View {
+    @Binding public var machine: MockExamStateMachine
+    public let flags: FeatureFlags
+    public let onClose: () -> Void
+
+    public init(
+        machine: Binding<MockExamStateMachine>,
+        flags: FeatureFlags = FeatureFlags(),
+        onClose: @escaping () -> Void = {}
+    ) {
+        self._machine = machine
+        self.flags = flags
+        self.onClose = onClose
+    }
+
+    public var body: some View {
+        if let debrief = machine.debrief {
+            MockExamDebriefScreen(
+                debrief: debrief,
+                flags: flags,
+                onFinish: onClose
+            )
+        } else if let currentQuestion = machine.currentQuestion {
+            ScrollView {
+                VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                    SessionProgressHeader(
+                        currentIndex: machine.currentQuestionIndex + 1,
+                        totalCount: machine.questions.count,
+                        stepTitle: "\(machine.routeCode) · \(currentQuestion.domainTitle)",
+                        closeLabel: "Quitter l'épreuve",
+                        onClose: onClose
+                    )
+
+                    BrandLabel(
+                        product: currentQuestion.item.product,
+                        context: .learningContent,
+                        examCode: machine.routeCode,
+                        size: .small,
+                        flags: flags
+                    )
+
+                    PrismCard(variant: .standard) {
+                        PrismText(text: currentQuestion.item.stem, style: .headline)
+                    }
+
+                    if case .choice(let options, let multi) = currentQuestion.item.payload {
+                        ChoiceList(
+                            options: options,
+                            selectedIds: Binding(
+                                get: { currentQuestion.selectedOptionIds },
+                                set: { machine.recordCurrentSelection(optionIds: $0, confidence: currentQuestion.confidence) }
+                            ),
+                            allowsMultipleSelection: multi,
+                            isRevealed: false
+                        )
+                    }
+
+                    ConfidencePicker(
+                        selectedConfidence: Binding(
+                            get: { currentQuestion.confidence },
+                            set: { machine.recordCurrentSelection(optionIds: currentQuestion.selectedOptionIds, confidence: $0) }
+                        )
+                    )
+
+                    Button {
+                        let readiness = PrismReadinessModel(
+                            band: .readyToTry,
+                            isCalibrated: true,
+                            rawProbability: 0.84,
+                            uncertaintyLow: 0.78,
+                            uncertaintyHigh: 0.89,
+                            evidenceCount: 40,
+                            recommendedActions: ["Consolider Private Endpoint DNS", "Pratiquer Azure Policy vs RBAC"]
+                        )
+                        let coverage = [
+                            PrismObjectiveCoverageItem(
+                                id: currentQuestion.domainId,
+                                objectiveCode: "D1",
+                                title: currentQuestion.domainTitle,
+                                region: .security,
+                                masteryState: .anchored,
+                                verifiedEvidenceCount: 11,
+                                targetEvidenceCount: 12
+                            )
+                        ]
+                        _ = machine.advanceOrFinish(
+                            serverReadiness: readiness,
+                            serverCoverage: coverage,
+                            calibrationSummaryText: "Bonne calibration : tes niveaux de confiance correspondent à ta précision réelle."
+                        )
+                    } label: {
+                        Text(
+                            verbatim: machine.currentQuestionIndex + 1 < machine.questions.count
+                                ? "Question suivante (\(machine.currentQuestionIndex + 1)/\(machine.questions.count))"
+                                : "Terminer et voir le débrief"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PrismButtonStyle(variant: .primary))
+                    .disabled(!currentQuestion.isReadyToAdvance)
+                }
+                .padding(PrismSpacing.l)
+            }
+            .background(PrismColor.canvas)
+            .navigationTitle(Text(verbatim: "Examen blanc"))
+        } else {
+            MockExamIntroScreen(
+                machine: $machine,
+                flags: flags,
+                onStart: {}
+            )
+        }
     }
 }
 #endif

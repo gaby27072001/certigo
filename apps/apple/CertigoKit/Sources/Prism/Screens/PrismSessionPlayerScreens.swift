@@ -636,62 +636,170 @@ public struct SessionPlayerScreen: View {
     @Binding public var stateMachine: SessionPlayerStateMachine
     public let flags: FeatureFlags
     public let onCloseRequested: (Bool) -> Void
+    public let onRequestAIExplain: (String) -> Void
+    @State private var activeFeedback: SessionFeedbackResolution?
 
     public init(
         stateMachine: Binding<SessionPlayerStateMachine>,
         flags: FeatureFlags = FeatureFlags(),
-        onCloseRequested: @escaping (Bool) -> Void = { _ in }
+        onCloseRequested: @escaping (Bool) -> Void = { _ in },
+        onRequestAIExplain: @escaping (String) -> Void = { _ in }
     ) {
         self._stateMachine = stateMachine
         self.flags = flags
         self.onCloseRequested = onCloseRequested
+        self.onRequestAIExplain = onRequestAIExplain
+    }
+
+    private func buildFeedbackResolution(for item: PrismSessionItemModel) -> SessionFeedbackResolution {
+        let selectedId = stateMachine.currentDraft.selectedChoiceIds.first
+        switch item.payload {
+        case .choice(let options, _), .predict(_, let options):
+            let correctOpt = options.first(where: \.isCorrect) ?? options[0]
+            let chosenOpt = options.first(where: { $0.id == selectedId }) ?? options[0]
+            let isCorrect = chosenOpt.id == correctOpt.id
+            return SessionFeedbackResolution(
+                id: "fb-\(item.id)",
+                itemId: item.id,
+                isCorrect: isCorrect,
+                confidence: stateMachine.currentDraft.confidence,
+                aiAvailable: true,
+                chosenOption: chosenOpt,
+                correctOption: correctOpt,
+                allOptions: options,
+                authorExplanation: correctOpt.explanation,
+                takeaway: "Toujours vérifier l'isolation réseau et la résolution DNS privée associée."
+            )
+        default:
+            let fallbackOption = PrismChoiceOption(
+                id: "valid",
+                badge: "✓",
+                text: "Analyse validée",
+                explanation: "Étape vérifiée avec succès.",
+                isCorrect: true
+            )
+            return SessionFeedbackResolution(
+                id: "fb-\(item.id)",
+                itemId: item.id,
+                isCorrect: true,
+                confidence: stateMachine.currentDraft.confidence,
+                aiAvailable: true,
+                chosenOption: fallbackOption,
+                correctOption: fallbackOption,
+                allOptions: [fallbackOption],
+                authorExplanation: "Explication vérifiée par l'auteur.",
+                takeaway: "Pratique régulière et rappel actif ancrent durablement le concept."
+            )
+        }
+    }
+
+    private var completedResultsModel: SessionResultsModel {
+        SessionResultsModel(
+            sessionLength: stateMachine.plan.length,
+            durationSeconds: 300,
+            itemsCompletedCount: stateMachine.plan.cards.count,
+            correctFirstTryCount: stateMachine.plan.cards.count,
+            conceptTransitions: [
+                SessionConceptTransition(
+                    id: "tr-pe",
+                    conceptTitle: "Private Endpoint & DNS privé Azure",
+                    product: .azureVirtualNetwork,
+                    previousState: .practicing,
+                    newState: .anchored
+                )
+            ],
+            updatedRhythm: PrismRhythmWeekModel(
+                weeklyGoalDays: 4,
+                days: [
+                    PrismRhythmDayItem(id: "mon", shortDayLabel: "L", state: .completed),
+                    PrismRhythmDayItem(id: "tue", shortDayLabel: "M", state: .completed),
+                    PrismRhythmDayItem(id: "wed", shortDayLabel: "M", state: .completed),
+                    PrismRhythmDayItem(id: "thu", shortDayLabel: "J", state: .planned),
+                    PrismRhythmDayItem(id: "fri", shortDayLabel: "V", state: .planned),
+                    PrismRhythmDayItem(id: "sat", shortDayLabel: "S", state: .restDay),
+                    PrismRhythmDayItem(id: "sun", shortDayLabel: "D", state: .restDay)
+                ],
+                bestRhythmWeeks: 6,
+                dailyStreakOptIn: true,
+                dailyStreakDays: 6
+            )
+        )
     }
 
     public var body: some View {
-        VStack(spacing: PrismSpacing.m) {
-            SessionProgressHeader(
-                model: stateMachine.progressModel,
-                onClose: {
-                    stateMachine.persistBookmark()
-                    onCloseRequested(stateMachine.currentDraft.hasAnyInputInProgress)
+        if stateMachine.isCompleted {
+            SessionResultsScreen(
+                model: completedResultsModel,
+                flags: flags,
+                onReturnToToday: {
+                    onCloseRequested(false)
                 }
             )
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: PrismSpacing.l) {
-                    if let message = stateMachine.lastOfflineConfirmationMessage {
-                        PrismCard(variant: .feedback) {
-                            PrismText(text: message, style: .subheadline)
-                        }
+        } else {
+            VStack(spacing: PrismSpacing.m) {
+                SessionProgressHeader(
+                    model: stateMachine.progressModel,
+                    onClose: {
+                        stateMachine.persistBookmark()
+                        onCloseRequested(stateMachine.currentDraft.hasAnyInputInProgress)
                     }
+                )
 
-                    if let currentCard = stateMachine.currentCard {
-                        switch currentCard {
-                        case .learning(let card):
-                            LearningCardView(
-                                model: card,
-                                flags: flags,
-                                onSkipTest: { _ = stateMachine.triggerSkipTestIfAvailable() },
-                                onContinue: { stateMachine.advanceToNextCard() }
-                            )
-                        case .item(let item):
-                            SessionItemCardView(
-                                item: item,
-                                draft: $stateMachine.currentDraft,
-                                optionsManuallyRevealed: $stateMachine.optionsManuallyRevealed,
-                                flags: flags,
-                                onVerifyOrSkip: {
-                                    stateMachine.submitCurrentItem(clientAttemptId: item.id)
-                                    stateMachine.advanceToNextCard()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                        if let message = stateMachine.lastOfflineConfirmationMessage {
+                            PrismCard(variant: .feedback) {
+                                PrismText(text: message, style: .subheadline)
+                            }
+                        }
+
+                        if let currentCard = stateMachine.currentCard {
+                            switch currentCard {
+                            case .learning(let card):
+                                LearningCardView(
+                                    model: card,
+                                    flags: flags,
+                                    onSkipTest: { _ = stateMachine.triggerSkipTestIfAvailable() },
+                                    onContinue: {
+                                        activeFeedback = nil
+                                        stateMachine.advanceToNextCard()
+                                    }
+                                )
+                            case .item(let item):
+                                if let resolution = activeFeedback {
+                                    SessionFeedbackPanelScreen(
+                                        resolution: Binding(
+                                            get: { resolution },
+                                            set: { activeFeedback = $0 }
+                                        ),
+                                        onRequestExplainDifferently: {
+                                            onRequestAIExplain(item.conceptId)
+                                        },
+                                        onContinue: {
+                                            activeFeedback = nil
+                                            stateMachine.submitCurrentItem(clientAttemptId: item.id)
+                                            stateMachine.advanceToNextCard()
+                                        }
+                                    )
+                                } else {
+                                    SessionItemCardView(
+                                        item: item,
+                                        draft: $stateMachine.currentDraft,
+                                        optionsManuallyRevealed: $stateMachine.optionsManuallyRevealed,
+                                        flags: flags,
+                                        onVerifyOrSkip: {
+                                            activeFeedback = buildFeedbackResolution(for: item)
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
+                    .padding(PrismSpacing.l)
                 }
-                .padding(PrismSpacing.l)
             }
+            .background(PrismColor.canvas)
         }
-        .background(PrismColor.canvas)
     }
 }
 #endif

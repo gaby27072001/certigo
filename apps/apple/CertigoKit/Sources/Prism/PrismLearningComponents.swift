@@ -1310,75 +1310,42 @@ public struct SessionLengthPicker: View {
 
     public var body: some View {
         let options = SessionLengthOption.allOptions(suggestedLength: suggestedLength)
-        VStack(alignment: .leading, spacing: PrismSpacing.sm) {
-            Text(verbatim: "Durée de séance")
-                .prismTextStyle(PrismLearningStyleResolver.headline)
-
-            ForEach(options) { option in
-                let isSelected = selectedLength == option.length
-                Button {
-                    withAnimation(PrismLearningMotionResolver.animation(reduceMotion: reduceMotion)) {
-                        selectedLength = option.length
-                    }
-                    onSelect?(option.length)
-                } label: {
-                    HStack(alignment: .center, spacing: PrismSpacing.md) {
-                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(
-                                isSelected
-                                    ? PrismLearningPaletteResolver.accentColor
-                                    : PrismLearningPaletteResolver.secondaryAccentColor
-                            )
-
-                        VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                            HStack(spacing: PrismSpacing.xs) {
-                                Text(verbatim: option.title)
-                                    .prismTextStyle(PrismLearningStyleResolver.headline)
-                                Text(verbatim: option.durationLabel)
-                                    .prismTextStyle(.codeSmall)
-                                    .foregroundStyle(.secondary)
-                                if option.isSuggested {
-                                    Text(verbatim: "Suggéré")
-                                        .prismTextStyle(PrismLearningStyleResolver.caption)
-                                        .padding(.horizontal, PrismSpacing.xs)
-                                        .padding(.vertical, PrismSpacing.xs)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: PrismRadius.sm)
-                                                .fill(PrismColor.surfaceRaised)
-                                        )
-                                }
-                            }
-                            Text(verbatim: option.subtitle)
-                                .prismTextStyle(PrismLearningStyleResolver.caption)
-                                .foregroundStyle(.secondary)
+        let activeOption = options.first(where: { $0.length == selectedLength }) ?? options[0]
+        VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+            HStack(spacing: PrismSpacing.xs) {
+                ForEach(options) { option in
+                    let isSelected = selectedLength == option.length
+                    Button {
+                        withAnimation(PrismLearningMotionResolver.animation(reduceMotion: reduceMotion)) {
+                            selectedLength = option.length
                         }
-
-                        Spacer(minLength: PrismSpacing.sm)
+                        onSelect?(option.length)
+                    } label: {
+                        VStack(spacing: PrismSpacing.xxs) {
+                            Text(verbatim: option.title)
+                                .prismTextStyle(PrismLearningStyleResolver.subheadline)
+                                .foregroundStyle(isSelected ? PrismColor.onAccent : PrismColor.textPrimary)
+                            Text(verbatim: option.durationLabel)
+                                .prismTextStyle(.caption)
+                                .foregroundStyle(isSelected ? PrismColor.onAccent : PrismColor.textSecondary)
+                        }
+                        .padding(.horizontal, PrismSpacing.s)
+                        .padding(.vertical, PrismSpacing.xs)
+                        .frame(maxWidth: .infinity, minHeight: PrismSize.minTouch)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                .fill(isSelected ? PrismColor.accentFill : PrismColor.surfaceRaised)
+                        )
                     }
-                    .padding(PrismSpacing.md)
-                    .frame(minHeight: PrismSize.minTouch)
-                    .background(
-                        RoundedRectangle(cornerRadius: PrismRadius.md)
-                            .fill(isSelected ? AnyShapeStyle(PrismColor.surfaceRaised) : AnyShapeStyle(.thinMaterial))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: PrismRadius.md)
-                            .strokeBorder(
-                                isSelected
-                                    ? PrismLearningPaletteResolver.accentColor
-                                    : PrismLearningPaletteResolver.secondaryAccentColor.opacity(0.25)
-                            )
-                    )
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(isSelected ? [.isSelected] : [])
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             }
+            Text(verbatim: activeOption.subtitle)
+                .prismTextStyle(PrismLearningStyleResolver.caption)
+                .foregroundStyle(PrismColor.textSecondary)
         }
-        .padding(PrismSpacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: PrismRadius.lg)
-                .fill(.regularMaterial)
-        )
+        .accessibilityElement(children: .contain)
     }
 }
 

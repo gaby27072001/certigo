@@ -331,16 +331,46 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
                     isConfirmedActiveGoal: true
                 ),
                 CatalogRouteItem(
+                    id: "az-900",
+                    code: "AZ-900",
+                    officialTitle: "Microsoft Azure Fundamentals",
+                    region: .cloud
+                ),
+                CatalogRouteItem(
                     id: "ai-102",
                     code: "AI-102",
-                    officialTitle: "Azure AI Engineer Associate",
+                    officialTitle: "Microsoft Azure AI Engineer Associate",
                     region: .ai
+                ),
+                CatalogRouteItem(
+                    id: "gh-300",
+                    code: "GH-300",
+                    officialTitle: "GitHub Copilot Certification",
+                    region: .devops
                 ),
                 CatalogRouteItem(
                     id: "sc-300",
                     code: "SC-300",
                     officialTitle: "Microsoft Identity and Access Administrator",
                     region: .security
+                ),
+                CatalogRouteItem(
+                    id: "dp-600",
+                    code: "DP-600",
+                    officialTitle: "Microsoft Fabric Analytics Engineer",
+                    region: .data
+                ),
+                CatalogRouteItem(
+                    id: "az-305",
+                    code: "AZ-305",
+                    officialTitle: "Designing Microsoft Azure Infrastructure Solutions",
+                    region: .network
+                ),
+                CatalogRouteItem(
+                    id: "aws-saa",
+                    code: "SAA-C03",
+                    officialTitle: "AWS Certified Solutions Architect – Associate",
+                    region: .cloud
                 )
             ]
         )
@@ -513,6 +543,9 @@ public struct PrismAppShellView: View {
                 model: $coordinator.todayModel,
                 flags: flags,
                 onStartSession: { length, resumeId in
+                    if coordinator.sessionPlayerMachine.isCompleted {
+                        coordinator.sessionPlayerMachine = PrismAppShellCoordinatorModel.defaultSessionPlayerMachine()
+                    }
                     router.presentCover(.sessionPlayer(length: length, resumeSessionId: resumeId))
                 },
                 onOpenDailySituation: {
@@ -702,6 +735,38 @@ public struct PrismAppShellView: View {
                 model: $coordinator.catalogExplorer,
                 flags: flags,
                 onSelectRoute: { item in
+                    let updatedRoutes = coordinator.catalogExplorer.routes.map { route in
+                        CatalogRouteItem(
+                            id: route.id,
+                            code: route.code,
+                            officialTitle: route.officialTitle,
+                            region: route.region,
+                            isConfirmedActiveGoal: route.code == item.code
+                        )
+                    }
+                    coordinator.catalogExplorer = CatalogExplorerModel(
+                        searchQuery: coordinator.catalogExplorer.searchQuery,
+                        selectedRegion: coordinator.catalogExplorer.selectedRegion,
+                        routes: updatedRoutes
+                    )
+                    coordinator.todayModel = TodayScreenModel(
+                        state: coordinator.todayModel.state,
+                        suggestedLength: coordinator.todayModel.suggestedLength,
+                        selectedLength: coordinator.todayModel.selectedLength,
+                        composition: coordinator.todayModel.composition,
+                        activeRouteCode: item.code,
+                        activeRouteTitle: item.officialTitle,
+                        dailySituation: coordinator.todayModel.dailySituation,
+                        rhythm: coordinator.todayModel.rhythm
+                    )
+                    coordinator.routeReadiness = RouteReadinessScreenModel(
+                        routeCode: item.code,
+                        officialTitle: item.officialTitle,
+                        readiness: coordinator.routeReadiness.readiness,
+                        objectiveCoverage: coordinator.routeReadiness.objectiveCoverage,
+                        historyWeeksCount: coordinator.routeReadiness.historyWeeksCount,
+                        estimatedReadyDateRange: coordinator.routeReadiness.estimatedReadyDateRange
+                    )
                     router.push(.routeObjective(trackCode: item.code))
                 }
             )
@@ -772,7 +837,13 @@ public struct PrismAppShellView: View {
                 stateMachine: $coordinator.sessionPlayerMachine,
                 flags: flags,
                 onCloseRequested: { hasUnsavedInput in
+                    if coordinator.sessionPlayerMachine.isCompleted {
+                        coordinator.sessionPlayerMachine = PrismAppShellCoordinatorModel.defaultSessionPlayerMachine()
+                    }
                     router.requestDismissCover(hasUnsavedInputInProgress: hasUnsavedInput)
+                },
+                onRequestAIExplain: { conceptId in
+                    router.presentSheet(.contextualAI(conceptId: conceptId))
                 }
             )
         case .dailySituation:
@@ -787,10 +858,11 @@ public struct PrismAppShellView: View {
                 }
             )
         case .mockExam:
-            MockExamIntroScreen(
+            MockExamFlowScreen(
                 machine: $coordinator.mockExamMachine,
                 flags: flags,
-                onStart: {
+                onClose: {
+                    coordinator.mockExamMachine = PrismAppShellCoordinatorModel.defaultMockExamMachine()
                     router.confirmForceDismissCover()
                 }
             )
