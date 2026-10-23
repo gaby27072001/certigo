@@ -221,6 +221,14 @@
             Text(verbatim: "Phase 6 · Atlas, Concept, Readiness & Passport (§8, §14–15)")
           }
           Section {
+            ForEach(MasteryMilestoneKind.allCases) { kind in
+              Text(verbatim: "Milestone · \(kind.title)")
+                .prismTextStyle(.callout)
+            }
+          } header: {
+            Text(verbatim: "Phase 7 · Gamification (Rhythm, Milestones, Missions)")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(
