@@ -237,6 +237,14 @@
             Text(verbatim: "Phase 8 · Social, Squads, Challenges & Glicko-2 Leagues (§10)")
           }
           Section {
+            ForEach(AIRoutingTier.allCases) { tier in
+              Text(verbatim: "AIRouter Tier \(tier.rawValue) · \(tier.label)")
+                .prismTextStyle(.callout)
+            }
+          } header: {
+            Text(verbatim: "Phase 9 · Contextual AI, S-24, S-44, S-45 & 5-Tier AIRouter (§11)")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(
