@@ -197,6 +197,14 @@
             Text(verbatim: "Phase 3 · Home / Today & Router (§12–14)")
           }
           Section {
+            Text(verbatim: "P1 Formats · choice · situation · predict · spotTheIssue · ordering · commandComposer")
+              .prismTextStyle(.callout)
+            Text(verbatim: "Offline Cache · \(PrismOfflineSessionCache.maxCachedSessions) pre-composed sessions")
+              .prismTextStyle(.caption)
+          } header: {
+            Text(verbatim: "Phase 4 · Session Player & P1 Formats (§6.2–6.4)")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(
