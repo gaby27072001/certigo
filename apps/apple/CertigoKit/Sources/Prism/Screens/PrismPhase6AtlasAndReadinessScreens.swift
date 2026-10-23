@@ -501,15 +501,46 @@ public struct AtlasCompleteScreen: View {
                     }
                 }
 
-                PrismCard(variant: .standard) {
+                PrismCard(variant: .hero) {
                     PrismRow(
                         configuration: PrismRowConfiguration(
-                            title: "Objectifs & routes de certification",
-                            subtitle: "Explorer le catalogue complet",
+                            title: "Catalogue des routes de certification",
+                            subtitle: "Explorer les parcours officiels et choisir ton objectif actif",
                             showsChevron: true
                         ),
                         action: onOpenExplorer
                     )
+                }
+
+                if !model.regions.isEmpty {
+                    PrismSection(title: "Régions & territoires de compétences") {
+                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                            ForEach(model.regions) { regionSummary in
+                                ForEach(regionSummary.territories) { territory in
+                                    PrismCard(variant: .standard) {
+                                        VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                                            PrismAdaptiveStack(spacing: PrismSpacing.s) {
+                                                RegionChip(region: territory.region)
+                                                PrismBadge(
+                                                    configuration: PrismBadgeConfiguration(
+                                                        text: "\(territory.anchoredOrMasteredCount)/\(territory.totalConceptsCount) ancrés",
+                                                        semantics: .positive
+                                                    )
+                                                )
+                                            }
+                                            PrismText(text: territory.title, style: .headline)
+                                            PrismProgressBar(
+                                                configuration: PrismProgressBarConfiguration(
+                                                    progress: territory.ringProgress,
+                                                    label: "Échelon moyen : \(String(format: "%.1f", territory.averageDepthRung))/5"
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 if model.mode == .list {
@@ -624,7 +655,7 @@ public struct RouteReadinessScreen: View {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
                 BrandLabel(
                     product: model.product,
-                    context: .catalog,
+                    context: .learningContent,
                     examCode: model.routeCode,
                     size: .medium,
                     flags: flags
@@ -720,7 +751,7 @@ public struct GlobalSearchScreen: View {
                     VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                         BrandLabel(
                             product: item.product,
-                            context: .catalog,
+                            context: .learningContent,
                             size: .small,
                             flags: flags
                         )

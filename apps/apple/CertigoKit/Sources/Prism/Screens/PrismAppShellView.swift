@@ -98,13 +98,29 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
     }
 
     public static func defaultAtlasModel() -> AtlasScreenModel {
-        let territory = AtlasTerritorySummary(
+        let tIam = AtlasTerritorySummary(
             id: "t-iam",
-            title: "Identité, gouvernance & RBAC",
+            title: "Identité, gouvernance Entra ID & RBAC",
             region: .security,
             totalConceptsCount: 12,
-            anchoredOrMasteredCount: 8,
+            anchoredOrMasteredCount: 9,
+            averageDepthRung: 3.8
+        )
+        let tNet = AtlasTerritorySummary(
+            id: "t-net",
+            title: "Réseaux virtuels, Private Link & DNS hybride",
+            region: .network,
+            totalConceptsCount: 14,
+            anchoredOrMasteredCount: 10,
             averageDepthRung: 3.5
+        )
+        let tAi = AtlasTerritorySummary(
+            id: "t-ai",
+            title: "Architecture IA, Foundry & RAG vectoriel",
+            region: .ai,
+            totalConceptsCount: 10,
+            anchoredOrMasteredCount: 7,
+            averageDepthRung: 3.4
         )
         let nodes = [
             PrismAtlasNode(
@@ -113,8 +129,8 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
                 title: "Private Endpoint & DNS privé",
                 region: .network,
                 masteryState: .anchored,
-                normalizedX: 0.35,
-                normalizedY: 0.42
+                normalizedX: 0.25,
+                normalizedY: 0.35
             ),
             PrismAtlasNode(
                 id: "az104-nsg",
@@ -122,13 +138,35 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
                 title: "Groupes de sécurité réseau (NSG)",
                 region: .security,
                 masteryState: .mastered,
-                normalizedX: 0.65,
-                normalizedY: 0.58
+                normalizedX: 0.55,
+                normalizedY: 0.45
+            ),
+            PrismAtlasNode(
+                id: "sc300-pim",
+                code: "ENTRA-PIM",
+                title: "Privileged Identity Management (Just-In-Time)",
+                region: .security,
+                masteryState: .anchored,
+                normalizedX: 0.72,
+                normalizedY: 0.30
+            ),
+            PrismAtlasNode(
+                id: "ai102-rag",
+                code: "AI-RAG",
+                title: "Recherche hybride vectorielle & reclassement sémantique",
+                region: .ai,
+                masteryState: .practicing,
+                normalizedX: 0.40,
+                normalizedY: 0.70
             )
         ]
         return AtlasScreenModel(
             isVoiceOverRunning: false,
-            regions: [AtlasRegionSummary(region: .security, territories: [territory])],
+            regions: [
+                AtlasRegionSummary(region: .security, territories: [tIam]),
+                AtlasRegionSummary(region: .network, territories: [tNet]),
+                AtlasRegionSummary(region: .ai, territories: [tAi])
+            ],
             nodes: nodes
         )
     }
@@ -519,32 +557,86 @@ public struct PrismAppShellView: View {
             )
 
         case .profile:
-            CompleteSettingsScreen(
-                onSelectSection: { section in
-                    switch section {
-                    case .rhythmAndReminders:
-                        router.push(.settingsRhythmAndReminders, in: .profile)
-                    case .language:
-                        router.push(.settingsLanguage, in: .profile)
-                    case .accessibilityAndCalmMode:
-                        router.push(.settingsAccessibilityAndCalmMode, in: .profile)
-                    case .privacyAndVisibility:
-                        router.push(.settingsPrivacyAndVisibility, in: .profile)
-                    case .contextualAI:
-                        router.push(.settingsAI, in: .profile)
-                    case .offlineData:
-                        router.push(.settingsOfflineData, in: .profile)
-                    case .account:
-                        router.push(.settingsAccount, in: .profile)
-                    case .accountDeletion:
-                        router.push(.settingsAccountDeletion, in: .profile)
-                    case .dataAndMethodology:
-                        router.push(.settingsDataAndMethodology, in: .profile)
-                    case .helpAndReport:
-                        router.push(.settingsBrandNotices, in: .profile)
+            ScrollView {
+                VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                    PassportCard(summary: coordinator.calibrationHistory.passport)
+
+                    RhythmWeekView(model: coordinator.todayModel.rhythm)
+
+                    PrismSection(title: "Progression, Calibration & Pro") {
+                        PrismCard(variant: .standard) {
+                            VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                                PrismRow(
+                                    configuration: PrismRowConfiguration(
+                                        title: "Passeport & calibration Brier",
+                                        subtitle: coordinator.calibrationHistory.calibrationLabel,
+                                        showsChevron: true
+                                    ),
+                                    action: { router.push(.passport, in: .profile) }
+                                )
+                                PrismRow(
+                                    configuration: PrismRowConfiguration(
+                                        title: "Carte de mes fausses idées",
+                                        subtitle: "Paires souvent confondues et comparaisons côte à côte",
+                                        showsChevron: true
+                                    ),
+                                    action: { router.push(.misconceptionsMap, in: .profile) }
+                                )
+                                PrismRow(
+                                    configuration: PrismRowConfiguration(
+                                        title: "CertiGo Pro · Préparation complète",
+                                        subtitle: "Examens blancs illimités, Plongée 35 min & packs hors ligne",
+                                        showsChevron: true
+                                    ),
+                                    action: { router.presentSheet(.certigoPro) }
+                                )
+                            }
+                        }
+                    }
+
+                    PrismSection(title: "Réglages & transparence") {
+                        PrismCard(variant: .standard) {
+                            VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                                PrismRow(
+                                    configuration: PrismRowConfiguration(
+                                        title: "Rythme hebdomadaire & rappels",
+                                        subtitle: "Objectif 3 à 6 j/sem, repos intégré et pause bienveillante",
+                                        showsChevron: true
+                                    ),
+                                    action: { router.push(.settingsRhythmAndReminders, in: .profile) }
+                                )
+                                PrismRow(
+                                    configuration: PrismRowConfiguration(
+                                        title: "Marques et mentions légales",
+                                        subtitle: "80 icônes officielles Tier-1 et licences éditeurs",
+                                        showsChevron: true
+                                    ),
+                                    action: { router.push(.settingsBrandNotices, in: .profile) }
+                                )
+                                PrismRow(
+                                    configuration: PrismRowConfiguration(
+                                        title: "Qualité, accessibilité AX5 & budgets",
+                                        subtitle: "9 App Store Nutrition Labels et métriques de performance",
+                                        showsChevron: true
+                                    ),
+                                    action: { router.push(.settingsAccessibilityAndCalmMode, in: .profile) }
+                                )
+                                PrismRow(
+                                    configuration: PrismRowConfiguration(
+                                        title: "Tous les réglages & gestion du compte",
+                                        subtitle: "Langue, Mode Calme, IA cloud, hors ligne et suppression",
+                                        showsChevron: true
+                                    ),
+                                    action: { router.push(.settings, in: .profile) }
+                                )
+                            }
+                        }
                     }
                 }
-            )
+                .padding(PrismSpacing.l)
+            }
+            .background(PrismColor.canvas)
+            .navigationTitle(Text(verbatim: "Profil"))
 
         case .search:
             GlobalSearchScreen(
