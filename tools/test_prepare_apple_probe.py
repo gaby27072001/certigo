@@ -28,7 +28,7 @@ class PrivateProbeLotTests(unittest.TestCase):
         with patch.object(lot, "check_source"), patch.object(lot.secrets, "token_hex",
                                                            return_value="ab" * 16) as random:
             manifest, checksum = lot.prepare(self.root, self.source, self.team, self.device)
-            random.assert_called_once_with(16)
+            self.assertEqual(random.call_count, 2)
         return manifest, checksum
 
     def verify(self, checksum=None, active=False):
@@ -47,6 +47,22 @@ class PrivateProbeLotTests(unittest.TestCase):
         self.assertNotIn(b"YES", (self.root / lot.LOCAL / "ProbeLot.xcconfig").read_bytes())
         with self.assertRaises(ValueError):
             self.verify(checksum, active=True)
+
+    def test_legacy_sha256_lot_remains_readable(self):
+        manifest, _ = self.prepare()
+        legacy = dict(manifest)
+        legacy.pop("fingerprint_salt")
+        legacy.pop("execution_fingerprint")
+        legacy["schema"] = "certigo.private-probe-lot/v1"
+        legacy["execution_sha256"] = lot.digest(lot.execution(self.team))
+        raw = lot.canonical(legacy)
+        directory = self.root / lot.LOCAL
+        (directory / "manifest.json").write_bytes(raw)
+        (directory / "manifest.fingerprint").unlink()
+        lot.write_new(directory / "manifest.sha256", (lot.digest(raw) + "\n").encode())
+        checked, fingerprint = self.verify()
+        self.assertEqual(checked, legacy)
+        self.assertEqual(fingerprint, lot.digest(raw))
 
     def test_existing_or_partial_lot_never_generates_another_suffix(self):
         self.prepare()
@@ -95,7 +111,10 @@ class PrivateProbeLotTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.verify(checksum)
         # Even a recomputed local checksum does not change the separately approved checksum.
-        (directory / "manifest.sha256").write_text(lot.digest(lot.canonical(manifest)) + "\n")
+        fingerprint = lot.private_fingerprint(
+            lot.canonical(manifest), manifest["fingerprint_salt"],
+        )
+        (directory / "manifest.fingerprint").write_text(fingerprint + "\n")
         with self.assertRaises(ValueError):
             self.verify(checksum)
 
@@ -105,7 +124,7 @@ class PrivateProbeLotTests(unittest.TestCase):
         lot.write_new(directory / "Execution.xcconfig", lot.execution(self.team))
         with self.assertRaises(ValueError):
             self.verify(checksum, active=True)
-        lot.write_new(directory / "approved.sha256", (checksum + "\n").encode())
+        lot.write_new(directory / "approved.fingerprint", (checksum + "\n").encode())
         self.assertEqual(self.verify(checksum, active=True)[0], manifest)
         with self.assertRaises(FileExistsError):
             lot.write_new(directory / "Execution.xcconfig", b"replacement")
@@ -185,12 +204,12 @@ class PrivateProbeLotTests(unittest.TestCase):
             cli("prepare", "--source-sha", source)
         directory = self.root / lot.LOCAL
         manifest = json.loads((directory / "manifest.json").read_bytes())
-        checksum = (directory / "manifest.sha256").read_text().strip()
+        checksum = (directory / "manifest.fingerprint").read_text().strip()
         with self.assertRaises(ValueError):
-            cli("enable", "--approved-manifest-sha256", "0" * 64,
+            cli("enable", "--approved-manifest-fingerprint", "0" * 64,
                 "--accept-standard-ios-and-collision-risk")
         self.assertFalse((directory / "Execution.xcconfig").exists())
-        cli("enable", "--approved-manifest-sha256", checksum,
+        cli("enable", "--approved-manifest-fingerprint", checksum,
             "--accept-standard-ios-and-collision-risk")
         with patch.dict(os.environ, {
             "TARGET_NAME": "CertigoProtectionProbe",
@@ -228,7 +247,7 @@ class PrivateProbeLotTests(unittest.TestCase):
         old, checksum = self.prepare()
         directory = self.root / lot.LOCAL
         lot.write_new(directory / "Execution.xcconfig", lot.execution(self.team))
-        lot.write_new(directory / "approved.sha256", (checksum + "\n").encode())
+        lot.write_new(directory / "approved.fingerprint", (checksum + "\n").encode())
         before = {path.name: path.read_bytes() for path in directory.iterdir()}
         new_root = self.root / "new-checkout"
         (new_root / lot.LOCAL).parent.mkdir(parents=True)
@@ -249,9 +268,9 @@ class PrivateProbeLotTests(unittest.TestCase):
         self.assertEqual((new["team"], new["device"]), (old["team"], old["device"]))
         self.assertEqual(new["source"], "c" * 40)
         self.assertNotEqual(new["suffix"], old["suffix"])
-        self.assertNotEqual((new_directory / "manifest.sha256").read_text().strip(), checksum)
+        self.assertNotEqual((new_directory / "manifest.fingerprint").read_text().strip(), checksum)
         self.assertFalse((new_directory / "Execution.xcconfig").exists())
-        self.assertFalse((new_directory / "approved.sha256").exists())
+        self.assertFalse((new_directory / "approved.fingerprint").exists())
         self.assertEqual(before, {path.name: path.read_bytes() for path in directory.iterdir()})
         self.assertNotIn(self.team, output.getvalue())
         self.assertNotIn(self.device, output.getvalue())
@@ -262,7 +281,7 @@ class PrivateProbeLotTests(unittest.TestCase):
         directory = self.root / lot.LOCAL
         manifest = directory / "manifest.json"
         original = manifest.read_bytes()
-        checksum = directory / "manifest.sha256"
+        checksum = directory / "manifest.fingerprint"
         with self.assertRaises(ValueError):
             lot.identities_from(Path("relative/LocalLot/manifest.json"))
         checksum.unlink()
@@ -283,17 +302,19 @@ class PrivateProbeLotTests(unittest.TestCase):
             mutate(changed)
             raw = lot.canonical(changed)
             manifest.write_bytes(raw)
-            checksum.write_bytes((lot.digest(raw) + "\n").encode())
+            salt = json.loads(manifest.read_bytes())["fingerprint_salt"]
+            checksum.write_bytes((lot.private_fingerprint(raw, salt) + "\n").encode())
             with self.assertRaises(ValueError):
                 lot.identities_from(manifest)
         for raw in (b"{bad", original.replace(b'{"configuration', b'{"device":"duplicate","configuration'),
                     b" " * 32_768):
             manifest.write_bytes(raw)
-            checksum.write_bytes((lot.digest(raw) + "\n").encode())
+            checksum.write_bytes(b"0" * 64 + b"\n")
             with self.assertRaises(ValueError):
                 lot.identities_from(manifest)
         manifest.write_bytes(original)
-        checksum.write_bytes((lot.digest(original) + "\n").encode())
+        salt = json.loads(original)["fingerprint_salt"]
+        checksum.write_bytes((lot.private_fingerprint(original, salt) + "\n").encode())
         for path in (manifest, checksum, directory):
             mode = path.stat().st_mode & 0o777
             path.chmod(0o755 if path == directory else 0o644)

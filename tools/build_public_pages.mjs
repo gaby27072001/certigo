@@ -6,6 +6,15 @@ import { fileURLToPath } from 'node:url';
 import { validatePublicDomainConfiguration } from '../.github/scripts/public-domain-contract.mjs';
 
 const supportEmail = 'gabriel.chambaud@icloud.com';
+const editorialPilotPath = 'backend/src/Certigo.Infrastructure/Learning/Fixtures/responsible-ai-assistants.json';
+const editorialPilotId = 'responsible-ai-assistants';
+const editorialLessonIds = [
+  'verify-claims',
+  'retrieval-not-training',
+  'stop-and-escalate',
+];
+const editorialOrigin = 'https://www.certigo-app.com';
+const productionAppleAppID = 'FFQPC7NC68.com.certigo.mobileapp';
 
 function ensureOutputDirectory(directory) {
   const absolute = resolve(directory);
@@ -106,12 +115,155 @@ function layout(title, canonicalUrl, content) {
 </html>`;
 }
 
+function validateEditorialPilot(pilot) {
+  if (
+    pilot?.id !== editorialPilotId
+    || pilot.status !== 'draft'
+    || pilot.purpose !== 'learning-not-certification'
+    || typeof pilot.title !== 'string'
+    || typeof pilot.scope !== 'string'
+    || !Array.isArray(pilot.lessons)
+    || !Array.isArray(pilot.sources)
+    || pilot.sources.length === 0
+  ) {
+    throw new Error('The editorial pilot does not match the stable public lesson-link contract.');
+  }
+  const lessonIDs = pilot.lessons.map((lesson) => lesson?.id);
+  if (
+    lessonIDs.length !== editorialLessonIds.length
+    || new Set(lessonIDs).size !== lessonIDs.length
+    || editorialLessonIds.some((id) => !lessonIDs.includes(id))
+  ) {
+    throw new Error('The editorial pilot does not match the stable public lesson-link contract.');
+  }
+
+  if (pilot.sources.some((source) =>
+    !source
+    || typeof source.id !== 'string'
+    || typeof source.title !== 'string'
+    || typeof source.checkedOn !== 'string'
+    || typeof source.supports !== 'string'
+    || typeof source.limits !== 'string'
+    || typeof source.url !== 'string'
+  )) {
+    throw new Error('The editorial pilot does not match the stable public lesson-link contract.');
+  }
+  const sources = new Map(pilot.sources.map((source) => [source.id, source]));
+  if (sources.size !== pilot.sources.length) {
+    throw new Error('The editorial pilot does not match the stable public lesson-link contract.');
+  }
+  for (const source of pilot.sources) {
+    let url;
+    try {
+      url = new URL(source.url);
+    } catch {
+      throw new Error(`Invalid editorial pilot source URL: ${source.id}`);
+    }
+    if (
+      url.protocol !== 'https:'
+      || !url.hostname
+      || url.username
+      || url.password
+      || url.search
+      || url.hash
+    ) {
+      throw new Error(`Invalid editorial pilot source URL: ${source.id}`);
+    }
+  }
+  const textArray = (value) =>
+    Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'string');
+  for (const lesson of pilot.lessons) {
+    if (
+      typeof lesson.title !== 'string'
+      || typeof lesson.objective !== 'string'
+      || typeof lesson.hook !== 'string'
+      || !textArray(lesson.keyIdeas)
+      || typeof lesson.workedExample?.situation !== 'string'
+      || !textArray(lesson.workedExample.steps)
+      || typeof lesson.workedExample.decision !== 'string'
+      || typeof lesson.practice?.prompt !== 'string'
+      || !textArray(lesson.practice.successCriteria)
+      || typeof lesson.practice.feedback !== 'string'
+      || typeof lesson.recap !== 'string'
+      || !Number.isInteger(lesson.estimatedMinutes)
+      || lesson.estimatedMinutes <= 0
+      || !textArray(lesson.sourceIds)
+      || lesson.sourceIds.some((sourceID) => !sources.has(sourceID))
+    ) {
+      throw new Error(`Invalid editorial pilot lesson content: ${lesson.id}`);
+    }
+  }
+  return pilot;
+}
+
+function renderEditorialPilotIndex(pilot, canonicalUrl) {
+  const lessons = pilot.lessons.map((lesson) => `
+  <li>
+    <h2><a href="/learn/${htmlEscape(pilot.id)}/${htmlEscape(lesson.id)}/">${htmlEscape(lesson.title)}</a></h2>
+    <p>${htmlEscape(lesson.objective)}</p>
+  </li>`).join('');
+  return layout(
+    `${pilot.title} — Certigo`,
+    canonicalUrl,
+    `<h1>${htmlEscape(pilot.title)}</h1>
+<p><strong>Apprentissage, pas certification · brouillon éditorial</strong></p>
+<p>${htmlEscape(pilot.scope)}</p>
+<h2>Leçons</h2>
+<ol>${lessons}
+</ol>
+<p>Cette version web ne nécessite pas de connexion et n’enregistre aucune activité.</p>`,
+  );
+}
+
+function renderEditorialLesson(pilot, lesson, canonicalUrl) {
+  const list = (items) => `<ul>${items.map((item) => `<li>${htmlEscape(item)}</li>`).join('')}</ul>`;
+  const sources = lesson.sourceIds.map((sourceID) => {
+    const source = pilot.sources.find((candidate) => candidate.id === sourceID);
+    return `<li>
+  <a href="${htmlEscape(source.url)}" target="_blank" rel="noopener noreferrer">${htmlEscape(source.title)}</a>
+  <p>Consultée le ${htmlEscape(source.checkedOn)}. ${htmlEscape(source.supports)}</p>
+  <p>${htmlEscape(source.limits)}</p>
+</li>`;
+  }).join('');
+  const steps = lesson.workedExample.steps
+    .map((step) => `<li>${htmlEscape(step)}</li>`)
+    .join('');
+  return layout(
+    `${lesson.title} — Certigo`,
+    canonicalUrl,
+    `<nav aria-label="Breadcrumb"><a href="/learn/${htmlEscape(pilot.id)}/">${htmlEscape(pilot.title)}</a></nav>
+<p><strong>Apprentissage, pas certification · brouillon éditorial</strong></p>
+<h1>${htmlEscape(lesson.title)}</h1>
+<p><strong>Objectif :</strong> ${htmlEscape(lesson.objective)}</p>
+<p>${htmlEscape(lesson.hook)}</p>
+<p>Durée estimée : ${htmlEscape(String(lesson.estimatedMinutes))} min</p>
+<section><h2>Idées clés</h2>${list(lesson.keyIdeas)}</section>
+<section>
+  <h2>Exemple résolu</h2>
+  <p>${htmlEscape(lesson.workedExample.situation)}</p>
+  <ol>${steps}</ol>
+  <p><strong>Décision :</strong> ${htmlEscape(lesson.workedExample.decision)}</p>
+</section>
+<section>
+  <h2>Pratique formative · sans réponse enregistrée</h2>
+  <p>${htmlEscape(lesson.practice.prompt)}</p>
+  ${list(lesson.practice.successCriteria)}
+  <p>${htmlEscape(lesson.practice.feedback)}</p>
+</section>
+<section><h2>À retenir</h2><p>${htmlEscape(lesson.recap)}</p></section>
+<section><h2>Sources et limites</h2><ul>${sources}</ul></section>
+<p>La lecture web ne crée pas de compte, ne transmet pas de réponse et n’enregistre aucune activité.</p>
+<p><a href="/learn/${htmlEscape(pilot.id)}/">Revenir à la liste des leçons</a></p>`,
+  );
+}
+
 export async function buildPublicPages({
   root,
   output,
   publicWebOrigin,
   publicDomainVerified,
   appleCiamDomainReconfigured,
+  iosUniversalLinksBuildVerified = false,
 }) {
   const publicDomain = validatePublicDomainConfiguration({
     environment: 'prod',
@@ -123,18 +275,45 @@ export async function buildPublicPages({
     // unconfigured domain must stop the build instead of producing pages with no home.
     activationRequested: true,
   });
+  if (typeof iosUniversalLinksBuildVerified !== 'boolean') {
+    throw new Error('iosUniversalLinksBuildVerified must be a boolean.');
+  }
+  if (
+    iosUniversalLinksBuildVerified
+    && publicDomain.publicWebOrigin !== editorialOrigin
+  ) {
+    throw new Error(`Universal Links can only be enabled for ${editorialOrigin}.`);
+  }
   const privacy = await readFile(resolve(root, 'docs/legal/privacy-policy.md'), 'utf8');
   const deletion = await readFile(resolve(root, 'docs/legal/account-deletion.md'), 'utf8');
+  const editorialPilot = validateEditorialPilot(
+    JSON.parse(await readFile(resolve(root, editorialPilotPath), 'utf8')),
+  );
   const mailto = `mailto:${supportEmail}?subject=${encodeURIComponent('Suppression de compte Certigo')}`;
 
   const privacyPath = resolve(output, 'privacy-policy/index.html');
   const deletionPath = resolve(output, 'account-deletion/index.html');
   const indexPath = resolve(output, 'index.html');
+  const editorialIndexPath = resolve(output, `learn/${editorialPilot.id}/index.html`);
+  const editorialLessonPaths = editorialPilot.lessons.map((lesson) => ({
+    lesson,
+    path: resolve(output, `learn/${editorialPilot.id}/${lesson.id}/index.html`),
+  }));
+  const aasaPath = resolve(output, '.well-known/apple-app-site-association.json');
   const configPath = resolve(output, 'staticwebapp.config.json');
   ensureOutputDirectory(dirname(privacyPath));
   ensureOutputDirectory(dirname(deletionPath));
   ensureOutputDirectory(dirname(indexPath));
-  for (const filePath of [configPath, indexPath, privacyPath, deletionPath]) {
+  const expectedOutputPaths = [
+    configPath,
+    indexPath,
+    privacyPath,
+    deletionPath,
+    editorialIndexPath,
+    ...editorialLessonPaths.map(({ path }) => path),
+    ...(iosUniversalLinksBuildVerified ? [aasaPath] : []),
+  ];
+  for (const filePath of expectedOutputPaths) {
     outputFileStat(filePath);
   }
 
@@ -151,22 +330,48 @@ export async function buildPublicPages({
   // rewrite et non redirect : Apple ne suit aucune redirection. La distinction
   // est invisible dans un navigateur et fatale pour un lien profond, qui echoue
   // alors en silence en ouvrant le navigateur au lieu de l'application.
+  const routes = iosUniversalLinksBuildVerified
+    ? [
+      {
+        route: '/.well-known/apple-app-site-association',
+        rewrite: '/.well-known/apple-app-site-association.json',
+      },
+    ]
+    : [];
   writeOutputFile(
     configPath,
     `${JSON.stringify(
       {
         mimeTypes: { '.json': 'application/json' },
-        routes: [
-          {
-            route: '/.well-known/apple-app-site-association',
-            rewrite: '/.well-known/apple-app-site-association.json',
-          },
-        ],
+        routes,
       },
       null,
       2,
     )}\n`,
   );
+  if (iosUniversalLinksBuildVerified) {
+    writeOutputFile(
+      aasaPath,
+      `${JSON.stringify(
+        {
+          applinks: {
+            apps: [],
+            details: [
+              {
+                appID: productionAppleAppID,
+                paths: editorialPilot.lessons.flatMap(({ id }) => [
+                  `/learn/${editorialPilot.id}/${id}`,
+                  `/learn/${editorialPilot.id}/${id}/`,
+                ]),
+              },
+            ],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  }
 
   // Azure Static Web Apps refuse de publier un dossier sans fichier par defaut
   // a la racine, et son client rend un code de sortie 0 en le refusant : le
@@ -184,12 +389,31 @@ rassemble les documents publics de l’application.</p>
 <ul>
   <li><a href="/privacy-policy/">Politique de confidentialité</a></li>
   <li><a href="/account-deletion/">Demander la suppression d’un compte</a></li>
+  <li><a href="/learn/${htmlEscape(editorialPilot.id)}/">Pilote éditorial d’apprentissage</a></li>
 </ul>
 <p>Contact : <a href="mailto:${htmlEscape(supportEmail)}">${htmlEscape(supportEmail)}</a></p>
 <p><small>Certigo est une plateforme indépendante, non affiliée aux organismes de
 certification dont elle prépare les examens.</small></p>`,
     ),
   );
+
+  writeOutputFile(
+    editorialIndexPath,
+    renderEditorialPilotIndex(
+      editorialPilot,
+      `${publicDomain.publicWebOrigin}/learn/${editorialPilot.id}/`,
+    ),
+  );
+  for (const { lesson, path } of editorialLessonPaths) {
+    writeOutputFile(
+      path,
+      renderEditorialLesson(
+        editorialPilot,
+        lesson,
+        `${publicDomain.publicWebOrigin}/learn/${editorialPilot.id}/${lesson.id}/`,
+      ),
+    );
+  }
 
   writeOutputFile(
     privacyPath,
@@ -224,11 +448,16 @@ const currentFile = fileURLToPath(import.meta.url);
 if (process.argv[1] && resolve(process.argv[1]) === currentFile) {
   const outputIndex = process.argv.indexOf('--output');
   const output = outputIndex >= 0 ? process.argv[outputIndex + 1] : '_site';
+  const buildVerifiedFlag = process.env.APPLE_UNIVERSAL_LINKS_COMPATIBLE_BUILD_VERIFIED;
+  if (buildVerifiedFlag !== undefined && !['true', 'false'].includes(buildVerifiedFlag)) {
+    throw new Error('APPLE_UNIVERSAL_LINKS_COMPATIBLE_BUILD_VERIFIED must be true or false.');
+  }
   await buildPublicPages({
     root: process.cwd(),
     output: resolve(output),
     publicWebOrigin: process.env.PUBLIC_WEB_ORIGIN,
     publicDomainVerified: process.env.PUBLIC_DOMAIN_VERIFIED,
     appleCiamDomainReconfigured: process.env.APPLE_CIAM_DOMAIN_RECONFIGURED,
+    iosUniversalLinksBuildVerified: buildVerifiedFlag === 'true',
   });
 }

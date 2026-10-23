@@ -47,6 +47,7 @@ public struct CIAMConfiguration: Sendable {
             guard let host = authority.host, host.hasSuffix(".ciamlogin.com"),
                 host.split(separator: ".").count == 3,
                 authority.path.isEmpty || authority.path == "/"
+                    || authority.path == "/\(tenantPath)"
             else { throw CIAMConfigurationError.invalidAuthority }
         case .customDomain:
             guard authority.path == "/\(tenantPath)" else {

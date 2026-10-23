@@ -4,7 +4,15 @@
   "title": "Certigo Lesson",
   "description": "Content-as-code definition of a single lesson. Authored in YAML, validated against this schema in CI, then published to Cosmos (content container, partitioned by trackId).",
   "type": "object",
-  "required": ["id", "trackId", "unitId", "domainId", "title", "estMinutes", "blocks"],
+  "required": [
+    "id",
+    "trackId",
+    "unitId",
+    "domainId",
+    "title",
+    "estMinutes",
+    "blocks"
+  ],
   "additionalProperties": false,
   "properties": {
     "id": {
@@ -12,79 +20,198 @@
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
       "description": "Stable lesson id, e.g. az900-l-capex-opex."
     },
-    "trackId": { "type": "string", "description": "Owning certification track, e.g. az-900." },
-    "unitId": { "type": "string" },
-    "domainId": { "type": "string", "description": "Exam domain this lesson maps to." },
-    "title": { "type": "string", "minLength": 3, "maxLength": 80 },
-    "estMinutes": { "type": "integer", "minimum": 1, "maximum": 20 },
+    "trackId": {
+      "type": "string",
+      "description": "Owning certification track, e.g. az-900."
+    },
+    "unitId": {
+      "type": "string"
+    },
+    "domainId": {
+      "type": "string",
+      "description": "Exam domain this lesson maps to."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 80
+    },
+    "estMinutes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
     "blocks": {
       "type": "array",
       "minItems": 2,
-      "items": { "$ref": "#/$defs/block" }
+      "items": {
+        "$ref": "#/$defs/block"
+      }
+    },
+    "products": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"
+      },
+      "description": "Optional list of official product IDs from content/brands/registry.yaml (§22A.4)."
     }
   },
   "$defs": {
     "block": {
       "type": "object",
-      "required": ["type", "conceptId"],
+      "required": [
+        "type",
+        "conceptId"
+      ],
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["hook", "concept", "example", "code", "check", "recap"]
+          "enum": [
+            "hook",
+            "concept",
+            "example",
+            "code",
+            "check",
+            "recap"
+          ]
         },
         "conceptId": {
           "type": "string",
           "description": "Atomic concept taught/verified — links content to Cortex mastery state."
         },
-        "title": { "type": "string" },
-        "body": { "type": "string", "description": "Markdown (concept/example/recap/hook)." },
-        "code": { "type": "string" },
-        "language": { "type": "string" },
-        "check": { "$ref": "#/$defs/item" }
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string",
+          "description": "Markdown (concept/example/recap/hook)."
+        },
+        "code": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "check": {
+          "$ref": "#/$defs/item"
+        },
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"
+          }
+        },
+        "skippable": {
+          "type": "boolean",
+          "description": "Whether a worked example block offers 'Je connais déjà' skip test (§6.2)."
+        },
+        "skipVerificationItemId": {
+          "type": "string",
+          "description": "Server-provided verification item id triggered by 'Je connais déjà' (§6.2)."
+        },
+        "diagram": {
+          "type": "object",
+          "description": "Optional structured DiagramSpec for native diagram rendering (§23)."
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "code" } } },
-          "then": { "required": ["code"] }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "code"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "code"
+            ]
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "check" } } },
-          "then": { "required": ["check"] }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "check"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "check"
+            ]
+          }
         }
       ]
     },
     "item": {
       "type": "object",
       "description": "A quiz item. The answer key (correct, explanation) is authored here but STRIPPED before the public payload is sent to clients — grading is server-side.",
-      "required": ["id", "conceptId", "type", "stem", "options", "correct", "explanation"],
+      "required": [
+        "id",
+        "conceptId",
+        "type",
+        "stem",
+        "options",
+        "correct",
+        "explanation"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string" },
-        "conceptId": { "type": "string" },
+        "id": {
+          "type": "string"
+        },
+        "conceptId": {
+          "type": "string"
+        },
         "type": {
           "type": "string",
-          "enum": ["mcq", "multi", "scenario", "cloze", "ordering", "matchPairs", "spotTheIssue", "applied"]
+          "enum": [
+            "mcq",
+            "multi",
+            "scenario",
+            "cloze",
+            "ordering",
+            "matchPairs",
+            "spotTheIssue",
+            "applied"
+          ]
         },
-        "stem": { "type": "string", "minLength": 5 },
+        "stem": {
+          "type": "string",
+          "minLength": 5
+        },
         "options": {
           "type": "array",
           "minItems": 2,
           "maxItems": 6,
           "items": {
             "type": "object",
-            "required": ["id", "label"],
+            "required": [
+              "id",
+              "label"
+            ],
             "additionalProperties": false,
             "properties": {
-              "id": { "type": "string" },
-              "label": { "type": "string" }
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
             }
           }
         },
         "correct": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Option ids that are correct (one for mcq, many for multi/ordering)."
         },
         "explanation": {
@@ -97,6 +224,67 @@
           "minimum": 1,
           "maximum": 3,
           "description": "1 recall · 2 apply · 3 analyze."
+        },
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"
+          }
+        },
+        "format": {
+          "type": "string",
+          "description": "Versioned Prism ItemPayload format identifier (choice, situation, predict, spotTheIssue, ordering, commandComposer, etc. §6.3)."
+        },
+        "artifact": {
+          "type": "object",
+          "description": "Optional technical artifact (code, config, CLI output, log <= 25 lines §6.3)."
+        },
+        "revealOptionsDelayMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1500,
+          "description": "Delay before options appear after prompt (0-1500 ms §6.2)."
+        },
+        "captureConfidence": {
+          "type": "boolean",
+          "description": "Whether ConfidencePicker (Sûr / Plutôt / Au hasard) is displayed before Vérifier (§6.2)."
+        },
+        "misconceptionTags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Named misconception tags associated with distractor options (§6.4)."
+        },
+        "rung": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Concept depth ladder rung (1..5 §6.4, §8)."
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "title",
+              "url",
+              "verifiedAt"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "verifiedAt": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     }

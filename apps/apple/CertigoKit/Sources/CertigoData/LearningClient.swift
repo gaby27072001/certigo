@@ -14,6 +14,7 @@ public actor LearningClient {
     private var current: APICredentials?
     private var generation = UUID()
     private var sending: Set<String> = []
+    private var deletionContext: APICredentials?
 
     public init(
         api: CertigoAPI, store: SubmissionStore, runtimeStore: RuntimeContentStore? = nil,
@@ -26,6 +27,7 @@ public actor LearningClient {
     }
 
     public func connect(accessToken: String) async throws -> Profile {
+        guard deletionContext == nil else { throw APIError.staleSession }
         generation = UUID()
         current = nil
         let requestGeneration = generation
@@ -40,6 +42,71 @@ public actor LearningClient {
     public func disconnect() {
         generation = UUID()
         current = nil
+        deletionContext = nil
+    }
+
+    public func pauseForAccountDeletion() async throws -> String {
+        let context = try credentials()
+        generation = UUID()
+        runtimeGeneration = UUID()
+        current = nil
+        deletionContext = context
+        await store.suspend(ownerId: context.ownerId, apiScope: api.scope, suspended: true)
+        guard deletionContext?.generation == context.generation else {
+            throw APIError.staleSession
+        }
+        return context.ownerId
+    }
+
+    public func recoverAccountDeletion(accessToken: String, ownerId: String?) {
+        generation = UUID()
+        runtimeGeneration = UUID()
+        current = nil
+        deletionContext = APICredentials(
+            ownerId: ownerId ?? "", accessToken: accessToken, generation: generation)
+    }
+
+    public func cancelAccountDeletion() async throws {
+        guard let context = deletionContext else { throw APIError.staleSession }
+        await store.suspend(ownerId: context.ownerId, apiScope: api.scope, suspended: false)
+        guard deletionContext?.generation == context.generation else {
+            throw APIError.staleSession
+        }
+        generation = UUID()
+        current = APICredentials(
+            ownerId: context.ownerId, accessToken: context.accessToken, generation: generation)
+        deletionContext = nil
+    }
+
+    public func accountDeletion(submit: Bool = false, proof: String? = nil)
+        async throws -> AccountDeletion
+    {
+        guard let context = deletionContext else { throw APIError.unauthorized }
+        let value = try await api.accountDeletion(
+            accessToken: context.accessToken, proof: proof, submit: submit)
+        guard deletionContext?.generation == context.generation else {
+            throw APIError.staleSession
+        }
+        return value
+    }
+
+    public func purgeDeletedAccount(ownerId: String) async throws {
+        guard !ownerId.isEmpty else { throw APIError.configuration }
+        generation = UUID()
+        runtimeGeneration = UUID()
+        current = nil
+        deletionContext = nil
+        await store.suspend(ownerId: ownerId, apiScope: api.scope, suspended: true)
+        try await store.purge(ownerId: ownerId, apiScope: api.scope)
+        try runtimeStore?.purge(ownerId: ownerId, apiScope: api.scope)
+    }
+
+    public func history(limit: Int = 20, cursor: String? = nil) async throws -> LearningHistoryPage
+    {
+        let context = try credentials()
+        let page = try await api.history(credentials: context, limit: limit, cursor: cursor)
+        try assertCurrent(context)
+        return page
     }
 
     public func catalog() async throws -> [Track] {
@@ -52,6 +119,71 @@ public actor LearningClient {
     public func path(trackId: String) async throws -> LearningPath {
         let context = try credentials()
         let value = try await api.path(trackId: trackId, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func explainAnswer(_ request: TutorExplainRequest) async throws -> TutorExplanation {
+        let context = try credentials()
+        let value = try await api.explainAnswer(request, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func nextBestRecommendations(trackId: String) async throws -> NextBestRecommendations {
+        let context = try credentials()
+        let value = try await api.nextBestRecommendations(trackId: trackId, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func generateMockExam(_ request: MockExamRequest) async throws -> MockExam {
+        let context = try credentials()
+        let value = try await api.generateMockExam(request, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func submitMockExam(_ request: SubmitMockExamRequest) async throws -> MockExamResult {
+        let context = try credentials()
+        let value = try await api.submitMockExam(request, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func achievements() async throws -> AchievementBoard {
+        let context = try credentials()
+        let value = try await api.achievements(credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func quests() async throws -> QuestBoard {
+        let context = try credentials()
+        let value = try await api.quests(credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func notificationPlan() async throws -> NotificationPlan {
+        let context = try credentials()
+        let value = try await api.notificationPlan(credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func notificationSettings() async throws -> NotificationSettings {
+        let context = try credentials()
+        let value = try await api.notificationSettings(credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func updateNotificationSettings(_ settings: NotificationSettings)
+        async throws -> NotificationSettings
+    {
+        let context = try credentials()
+        let value = try await api.updateNotificationSettings(settings, credentials: context)
         try assertCurrent(context)
         return value
     }
@@ -75,6 +207,40 @@ public actor LearningClient {
     public func lesson(trackId: String, lessonId: String) async throws -> Lesson {
         let context = try credentials()
         let value = try await api.lesson(trackId: trackId, lessonId: lessonId, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func editorialPilot(pilotId: String) async throws -> EditorialPilotSnapshot {
+        let context = try credentials()
+        let value = try await api.editorialPilot(pilotId: pilotId, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func pilotHistory(_ snapshot: EditorialPilotSnapshot) async throws -> PilotHistory {
+        let context = try credentials()
+        let value = try await api.pilotHistory(snapshot, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func recordPilotLessonAccess(
+        _ snapshot: EditorialPilotSnapshot, lessonId: String
+    ) async throws -> PilotLessonProgress {
+        let context = try credentials()
+        let value = try await api.recordPilotLessonAccess(
+            snapshot, lessonId: lessonId, credentials: context)
+        try assertCurrent(context)
+        return value
+    }
+
+    public func markPilotLessonRead(
+        _ snapshot: EditorialPilotSnapshot, lessonId: String
+    ) async throws -> PilotLessonProgress {
+        let context = try credentials()
+        let value = try await api.markPilotLessonRead(
+            snapshot, lessonId: lessonId, credentials: context)
         try assertCurrent(context)
         return value
     }
@@ -120,6 +286,25 @@ public actor LearningClient {
         let context = try credentials()
         guard let runtimeStore else { throw APIError.configuration }
         return try runtimeStore.active(ownerId: context.ownerId, apiScope: api.scope)
+    }
+
+    public func cachedQuestionPack(trackId: String, manifestId: String? = nil) throws
+        -> OfflineQuestionPack?
+    {
+        let context = try credentials()
+        guard let runtimeStore else { return nil }
+        return try runtimeStore.questionPack(
+            trackId: trackId, ownerId: context.ownerId, apiScope: api.scope,
+            manifestId: manifestId)
+    }
+
+    public func pinPublicContent(manifestId: String) throws {
+        let context = try credentials()
+        guard let runtimeStore else { throw APIError.configuration }
+        try runtimeStore.retainPins([
+            RuntimeManifestPin(
+                ownerId: context.ownerId, apiScope: api.scope, manifestId: manifestId)
+        ])
     }
 
     public func restorePreviousPublicContent() throws -> RuntimeContentSnapshot {
@@ -192,7 +377,8 @@ public actor LearningClient {
             try assertCurrent(context)
             return .pendingCorrection
         } catch let error as APIError {
-            if error != .unauthorized {
+            // Cancellation does not establish whether the server committed this attempt.
+            if error != .unauthorized && error != .transport(URLError.cancelled.rawValue) {
                 try await store.recordFailure("api:\(error)", entry: entry)
             }
             try assertCurrent(context)

@@ -54,6 +54,7 @@ coverage/
 **/ios/Flutter/flutter_export_environment.sh
 **/ios/Runner.app.dSYM.zip
 *.ipa
+apps/apple/CertigoNative/CertigoNative.xcodeproj/xcuserdata/*/xcschemes/CertigoNative Local.xcscheme
 
 # Android
 **/android/.gradle/

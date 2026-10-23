@@ -20,6 +20,13 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def private_fingerprint(data, salt):
+    require(isinstance(salt, str) and re.fullmatch(r"[0-9a-f]{32}", salt) is not None,
+            "Invalid private fingerprint salt")
+    return hashlib.scrypt(data, salt=bytes.fromhex(salt), n=2**14, r=8, p=1,
+                          maxmem=64 * 1024 * 1024, dklen=32).hex()
+
+
 def canonical(value):
     return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
@@ -82,10 +89,19 @@ def validate_manifest(raw):
         manifest = json.loads(raw, object_pairs_hook=unique_pairs)
     except (UnicodeError, json.JSONDecodeError, RecursionError):
         raise ValueError("Malformed private lot manifest") from None
-    require(isinstance(manifest, dict) and set(manifest) == {
+    legacy = isinstance(manifest, dict) and manifest.get("schema") == "certigo.private-probe-lot/v1"
+    current = isinstance(manifest, dict) and manifest.get("schema") == "certigo.private-probe-lot/v2"
+    legacy_fields = {
         "schema", "source", "suffix", "host", "tests", "team", "device", "selectors",
         "configuration_sha256", "execution_sha256",
-    } and manifest["schema"] == "certigo.private-probe-lot/v1", "Unexpected lot manifest")
+    }
+    current_fields = (legacy_fields - {"execution_sha256"}) | {
+        "fingerprint_salt", "execution_fingerprint",
+    }
+    require(isinstance(manifest, dict)
+            and ((legacy and set(manifest) == legacy_fields)
+                 or (current and set(manifest) == current_fields)),
+            "Unexpected lot manifest")
     require(isinstance(manifest["source"], str)
             and re.fullmatch(r"[0-9a-f]{40}", manifest["source"]) is not None,
             "Invalid private manifest source")
@@ -95,8 +111,13 @@ def validate_manifest(raw):
     require(isinstance(manifest["device"], str)
             and re.fullmatch(r"[A-Za-z0-9-]{8,80}", manifest["device"]) is not None,
             "Invalid selected device binding")
+    execution_fingerprint = (
+        digest(execution(manifest["team"])) if legacy else
+        private_fingerprint(execution(manifest["team"]), manifest["fingerprint_salt"])
+    )
+    execution_field = "execution_sha256" if legacy else "execution_fingerprint"
     require(manifest["configuration_sha256"] == digest(configuration(manifest["suffix"]))
-            and manifest["execution_sha256"] == digest(execution(manifest["team"])),
+            and manifest[execution_field] == execution_fingerprint,
             "Private manifest configuration binding changed")
     return manifest
 
@@ -145,11 +166,19 @@ def identities_from(path):
                     return data
 
             raw = read("manifest.json")
-            recorded = read("manifest.sha256")
+            manifest = validate_manifest(raw)
+            checksum_name = (
+                "manifest.sha256" if manifest["schema"] == "certigo.private-probe-lot/v1" else
+                "manifest.fingerprint"
+            )
+            recorded = read(checksum_name)
         finally:
             os.close(directory)
-        require(recorded == (digest(raw) + "\n").encode(), "Previous manifest checksum mismatch")
-        manifest = validate_manifest(raw)
+        fingerprint = (
+            digest(raw) if manifest["schema"] == "certigo.private-probe-lot/v1" else
+            private_fingerprint(raw, manifest["fingerprint_salt"])
+        )
+        require(recorded == (fingerprint + "\n").encode(), "Previous manifest checksum mismatch")
     except OSError:
         raise ValueError("Cannot safely read the selected previous private manifest") from None
     return manifest["team"], manifest["device"]
@@ -164,32 +193,43 @@ def prepare(root, source, team, device):
     # Existence is a stop, including an incomplete previous attempt. Never regenerate on retry.
     directory.mkdir(mode=0o700)
     suffix = secrets.token_hex(16)
+    fingerprint_salt = secrets.token_hex(16)
     host, tests = probe_bundles(suffix)
     config = configuration(suffix)
     manifest = {
-        "schema": "certigo.private-probe-lot/v1", "source": source, "suffix": suffix,
+        "schema": "certigo.private-probe-lot/v2", "source": source, "suffix": suffix,
         "host": host, "tests": tests, "team": team, "device": device,
         "selectors": sorted(PROBE_SELECTORS), "configuration_sha256": digest(config),
-        "execution_sha256": digest(execution(team)),
+        "fingerprint_salt": fingerprint_salt,
+        "execution_fingerprint": private_fingerprint(execution(team), fingerprint_salt),
     }
     raw = canonical(manifest)
     write_new(directory / "manifest.json", raw)
-    write_new(directory / "manifest.sha256", (digest(raw) + "\n").encode())
+    checksum = private_fingerprint(raw, fingerprint_salt)
+    write_new(directory / "manifest.fingerprint", (checksum + "\n").encode())
     write_new(directory / "ProbeLot.xcconfig", config)
-    return manifest, digest(raw)
+    return manifest, checksum
 
 
-def verify(root, expected_digest=None, active=False):
+def verify(root, expected_fingerprint=None, active=False):
     directory = root / LOCAL
     require(directory.is_dir() and not directory.is_symlink(), "Prepare a private lot first")
     if os.name == "posix":
         require(directory.stat().st_uid == os.getuid() and directory.stat().st_mode & 0o077 == 0,
                 "Private lot directory must be owner-only")
     raw = private_read(directory / "manifest.json")
-    recorded = private_read(directory / "manifest.sha256").decode().strip()
-    require(digest(raw) == recorded and (expected_digest is None or recorded == expected_digest),
-            "Lot digest differs from the separately reviewed manifest")
     manifest = validate_manifest(raw)
+    checksum_name = (
+        "manifest.sha256" if manifest["schema"] == "certigo.private-probe-lot/v1" else
+        "manifest.fingerprint"
+    )
+    recorded = private_read(directory / checksum_name).decode().strip()
+    fingerprint = (
+        digest(raw) if manifest["schema"] == "certigo.private-probe-lot/v1" else
+        private_fingerprint(raw, manifest["fingerprint_salt"])
+    )
+    require(fingerprint == recorded and (expected_fingerprint is None or recorded == expected_fingerprint),
+            "Lot digest differs from the separately reviewed manifest")
     check_source(root, manifest["source"])
     config = configuration(manifest["suffix"])
     require(private_read(directory / "ProbeLot.xcconfig") == config, "Lot configuration changed")
@@ -197,7 +237,11 @@ def verify(root, expected_digest=None, active=False):
     path = directory / "Execution.xcconfig"
     if active or path.exists() or path.is_symlink():
         require(private_read(path) == activation, "Execution configuration missing or changed")
-        require(private_read(directory / "approved.sha256").decode().strip() == recorded,
+        approval_name = (
+            "approved.sha256" if manifest["schema"] == "certigo.private-probe-lot/v1" else
+            "approved.fingerprint"
+        )
+        require(private_read(directory / approval_name).decode().strip() == recorded,
                 "Lot differs from the manifest approved before enabling signing")
     return manifest, recorded
 
@@ -224,7 +268,8 @@ def main():
                         help="Reuse only team/device from an explicitly selected private manifest")
     sub.add_parser("verify")
     activate = sub.add_parser("enable")
-    activate.add_argument("--approved-manifest-sha256", required=True)
+    activate.add_argument("--approved-manifest-fingerprint", "--approved-manifest-sha256",
+                          dest="approved_manifest_fingerprint", required=True)
     activate.add_argument("--accept-standard-ios-and-collision-risk", action="store_true", required=True)
     sub.add_parser("verify-build")
     args = parser.parse_args()
@@ -241,11 +286,15 @@ def main():
         print("Prepared unsigned lot. Do not test until this exact manifest is approved.")
     else:
         manifest, checksum = verify(
-            root, getattr(args, "approved_manifest_sha256", None),
+            root, getattr(args, "approved_manifest_fingerprint", None),
             active=args.command == "verify-build",
         )
         if args.command == "enable":
-            write_new(root / LOCAL / "approved.sha256", (checksum + "\n").encode())
+            approval_name = (
+                "approved.sha256" if manifest["schema"] == "certigo.private-probe-lot/v1" else
+                "approved.fingerprint"
+            )
+            write_new(root / LOCAL / approval_name, (checksum + "\n").encode())
             write_new(root / LOCAL / "Execution.xcconfig", execution(manifest["team"]))
             print("Signing configuration enabled for the approved lot; no build/install performed.")
         if args.command == "verify-build":
@@ -253,7 +302,7 @@ def main():
     # Never print team/device identifiers or profile/account data.
     print("HOST=" + manifest["host"])
     print("TEST=" + manifest["tests"])
-    print("MANIFEST_SHA256=" + checksum)
+    print("MANIFEST_FINGERPRINT=" + checksum)
 
 
 if __name__ == "__main__":

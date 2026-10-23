@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(CertigoDomain)
+    import CertigoDomain
+#endif
+
 private enum DemoTestFailure: Error {
     case assertion(String)
 }
@@ -12,6 +16,275 @@ struct NativeDemoFlowTests {
             count += 1
             print("PASS \(name)")
         }
+        try check(
+            NativeLearningDuration.total([3, 7, 10]) == 20, "loaded activity minutes add exactly")
+        try check(NativeLearningDuration.total([]) == 0, "empty loaded duration is zero")
+        try check(NativeLearningDuration.total([-1]) == nil, "negative duration is unavailable")
+        try check(
+            NativeLearningDuration.total([Int.max, 1]) == nil, "duration overflow is unavailable")
+        try check(
+            NativeDeclaredContentLanguage.badges([]).isEmpty,
+            "missing content language is never guessed")
+        try check(
+            NativeDeclaredContentLanguage.badges(["fr-FR", "en_US", "fr", "EN"]) == ["EN", "FR"],
+            "declared regional languages produce unique FR and EN badges")
+        try check(
+            NativeDeclaredContentLanguage.badges(["french", "frenchish", "english", "de"]).isEmpty,
+            "content language badges do not use title or substring guesses")
+        #if canImport(CertigoDomain)
+            for (status, stage) in [
+                ("locked", MasteryStage.notStarted), ("available", .notStarted),
+                ("inProgress", .learning), ("completed", .practicing), ("mastered", .mastered),
+            ] {
+                let lesson = try JSONDecoder().decode(
+                    PathLesson.self,
+                    from: Data(
+                        """
+                        {"id":"synthetic","title":"Synthetic","status":"\(status)",
+                        "estMinutes":5,"masteryPct":100}
+                        """.utf8))
+                try check(
+                    lesson.nativeMasteryStage == stage,
+                    "server \(status) maps conservatively, without an exam-ready inference")
+            }
+            for language in AppLanguage.allCases {
+                let copy = AppInterfaceCopy(language: language)
+                for key in AppInterfaceCopy.NativeLabel.allCases {
+                    try check(
+                        !copy.native(key).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                        "native chrome \(key) exists in \(language.rawValue)")
+                }
+                try check(
+                    copy.minutes(7).contains("7") && !copy.minutes(7).contains("{"),
+                    "duration replaces the localized unit template in \(language.rawValue)")
+                let goal = NativeActiveGoalPresentation(
+                    targetID: "new", confirmedID: "old", savingID: "new", busy: true)
+                try check(
+                    goal.status(copy) == copy.native(.goalPending)
+                        && goal.action(copy) == copy.native(.savingGoal),
+                    "pending goal labels use the current \(language.rawValue) locale")
+                for objective in NativeDemoFlow.Objective.allCases {
+                    var flow = NativeDemoFlow()
+                    flow.choose(objective)
+                    try check(
+                        !objective.displayName(copy).isEmpty
+                            && !objective.displayTitle(copy).isEmpty
+                            && flow.startLabel(copy) == copy.native(.demoExploreSituation)
+                            && flow.activitySummary(copy) == copy.native(.demoSituationNoGrade),
+                        "demo objective and preparation localized in \(language.rawValue)")
+                    flow.select(0)
+                    try check(
+                        flow.resumeLabel(copy) == copy.native(.demoResumeChoice),
+                        "editable demo choice localized in \(language.rawValue)")
+                    flow.submit()
+                    try check(
+                        flow.activitySummary(copy) == copy.native(.demoAnswerPending),
+                        "pending demo answer has localized honest status in \(language.rawValue)")
+                    flow.receiveMockExplanation(offline: false)
+                    try check(
+                        flow.resumeLabel(copy) == copy.native(.demoReadExplanation)
+                            && flow.activitySummary(copy)
+                                == copy.native(.demoExplanationAvailable),
+                        "fictional feedback localized in \(language.rawValue)")
+                }
+                for stage in NativeDemoPracticeStage.allCases {
+                    let label = NativeDemoPracticeProgress(current: stage)
+                        .accessibilityLabel(copy)
+                    try check(
+                        label.contains(stage.label(copy))
+                            && label.contains(copy.native(.demoStageHint)),
+                        "stage accessibility is localized in \(language.rawValue)")
+                }
+                for category in NativeRadarCategory.allCases {
+                    try check(
+                        !category.title(copy).isEmpty,
+                        "Radar category \(category.rawValue) localized in \(language.rawValue)")
+                }
+            }
+        #endif
+        for (code, band) in [
+            ("AZ-900", 0), ("AI-900", 1), ("PL-900", 2), ("MS-900", 3),
+            ("DP-900", 4), ("SC-900", 5), (" ai-102 ", 1), ("", 0), ("UNKNOWN-1", 0),
+        ] {
+            try check(
+                NativeTrackAppearance.band(for: code) == band,
+                "stable Prism band for \(code.debugDescription)")
+        }
+        let radarGroups: [(NativeRadarCategory, String, [String])] = [
+            (.cloud, "MICROSOFT", ["MICROSOFT", "MSFT"]),
+            (.cloud, "AWS", ["AWS"]),
+            (.cloud, "GCP", ["GCP", "GOOGLE-CLOUD"]),
+            (.cloud, "ORACLE", ["ORACLE", "OCI"]),
+            (.ai, "OPENAI", ["OPENAI", "OAI"]),
+            (.ai, "ANTHROPIC", ["ANTHROPIC", "CLAUDE"]),
+            (.ai, "MISTRAL", ["MISTRAL", "MISTRAL-AI"]),
+            (.ai, "NVIDIA", ["NVIDIA", "NV", "DLI"]),
+            (.ai, "HF", ["HF", "HUGGINGFACE", "HUGGING-FACE"]),
+            (.ai, "COHERE", ["COHERE"]),
+            (.ai, "META", ["META", "META-AI"]),
+            (.apple, "APPLE", ["APPLE"]),
+            (.data, "DATABRICKS", ["DATABRICKS", "DBX"]),
+            (.data, "SNOWFLAKE", ["SNOWFLAKE", "SNOW", "SNOWPRO"]),
+            (.data, "MONGODB", ["MONGODB"]),
+            (.data, "CONFLUENT", ["CONFLUENT"]),
+            (.data, "DBT", ["DBT", "DBT-LABS"]),
+            (.devops, "CNCF", ["CNCF", "LF", "LINUX-FOUNDATION-CNCF", "CKA", "CKAD", "CKS"]),
+            (.devops, "HASHICORP", ["HASHICORP", "TERRAFORM", "VAULT"]),
+            (.devops, "GITHUB", ["GITHUB", "GH"]),
+            (.devops, "REDHAT", ["REDHAT", "RED-HAT", "RH", "RHCSA", "RHCE"]),
+            (.devops, "DOCKER", ["DOCKER"]),
+            (.devops, "GITLAB", ["GITLAB"]),
+            (.security, "CISCO", ["CISCO", "CCNA", "CCNP"]),
+            (.security, "COMPTIA", ["COMPTIA", "SY0", "N10"]),
+            (.security, "ISC2", ["ISC2", "CISSP"]),
+            (.security, "ISACA", ["ISACA", "CISM", "CISA"]),
+            (.security, "OFFSEC", ["OFFSEC", "OSCP"]),
+            (.security, "PALOALTO", ["PALOALTO", "PALO-ALTO-NETWORKS"]),
+            (.security, "CLOUDFLARE", ["CLOUDFLARE"]),
+            (.enterprise, "SALESFORCE", ["SALESFORCE", "SF"]),
+            (.enterprise, "SERVICENOW", ["SERVICENOW", "CSA", "CAD"]),
+            (.enterprise, "SAP", ["SAP"]),
+            (.enterprise, "ATLASSIAN", ["ATLASSIAN"]),
+            (.enterprise, "PMI", ["PMI", "PMP", "PSM", "PMI-SCRUM"]),
+        ]
+        try check(radarGroups.count == 35, "display mapping covers all 35 Radar groups")
+        try check(
+            Set(radarGroups.map { $0.0 }) == Set(NativeRadarCategory.allCases),
+            "all seven Radar categories have namespace coverage")
+        try check(
+            Set(NativeRadarCategory.allCases.map(\.band)).count == 7,
+            "each Radar category owns a distinct Prism display band")
+        for (category, family, prefixes) in radarGroups {
+            for prefix in prefixes {
+                for code in [prefix, " \(prefix.lowercased())_foundation-2026 "] {
+                    try check(
+                        NativeTrackAppearance.group(for: code)?.category == category
+                            && NativeCatalogFilter.family(for: code) == family
+                            && NativeTrackAppearance.band(for: code) == category.band,
+                        "Radar namespace \(code) has stable family category and accent")
+                }
+            }
+        }
+        for prefix in ["AZ", "AI", "PL", "MS", "DP", "SC"] {
+            try check(
+                NativeCatalogFilter.family(for: "\(prefix)-900") == prefix
+                    && NativeTrackAppearance.group(for: "\(prefix)-900")?.category == .cloud,
+                "Microsoft subject family is preserved independently of Radar provider grouping")
+        }
+        for code in ["OPENAIX-100", "GHOST-100", "SFDCUSTOM-1", "CKADDITION", "UNKNOWN-2026", ""] {
+            try check(
+                NativeTrackAppearance.group(for: code) == nil
+                    && NativeTrackAppearance.band(for: code) == 0,
+                "unknown or lookalike namespace is never an inferred provider: \(code)")
+        }
+        var radarFilter = NativeCatalogFilter()
+        radarFilter.category = .ai
+        try check(radarFilter.isActive, "code category alone activates filtering")
+        try check(
+            radarFilter.includes(code: "OAI-101", title: "", summary: "", available: false),
+            "unavailable summary stays discoverable in its code category")
+        try check(
+            !radarFilter.includes(code: "SAP-101", title: "", summary: "", available: true),
+            "category filter excludes a different namespace category")
+        radarFilter.family = "OPENAI"
+        radarFilter.availableOnly = true
+        radarFilter.query = "foundation"
+        try check(
+            radarFilter.includes(
+                code: "OAI-101", title: "Foundation", summary: "", available: true),
+            "alias family category search and availability filters intersect")
+        try check(
+            !radarFilter.includes(
+                code: "OPENAI-101", title: "Foundation", summary: "", available: false),
+            "availability never promotes a summary-only entry to playable practice")
+        try check(
+            !radarFilter.includes(
+                code: "CLAUDE-101", title: "Foundation", summary: "", available: true),
+            "family filter still applies within the same category")
+        radarFilter.clear()
+        try check(
+            !radarFilter.isActive && radarFilter.category == nil && radarFilter.family.isEmpty,
+            "clear filters removes Radar category family query and availability")
+        var catalog = NativeCatalogFilter()
+        try check(!catalog.isActive, "catalog starts unfiltered")
+        try check(
+            catalog.includes(code: "AZ-900", title: "Cloud", summary: "Basics", available: false),
+            "unfiltered catalog preserves unavailable entries for discovery")
+        catalog.query = "  SéCURité  "
+        try check(
+            catalog.includes(code: "SC-900", title: "Securite", summary: "", available: true),
+            "catalog search ignores case diacritics and surrounding spaces")
+        try check(
+            !catalog.includes(code: "AZ-900", title: "Cloud", summary: "Basics", available: true),
+            "catalog no-match is not an empty source catalog")
+        catalog.query = "cloud"
+        try check(
+            catalog.includes(
+                code: "AZ-900", title: "Basics", summary: "Cloud concepts", available: true),
+            "catalog searches summary")
+        catalog.query = "sc-9"
+        try check(
+            catalog.includes(code: "SC-900", title: "Security", summary: "", available: true),
+            "catalog searches certification code")
+        catalog.query = ""
+        catalog.family = "SC"
+        catalog.availableOnly = true
+        try check(
+            !catalog.includes(code: "SC-900", title: "", summary: "", available: false),
+            "availability and family filters intersect")
+        try check(
+            !catalog.includes(code: "AZ-900", title: "", summary: "", available: true),
+            "family filter never includes another code family")
+        try check(
+            catalog.includes(code: "sc-900", title: "", summary: "", available: true),
+            "family normalization matches the actual code prefix")
+        try check(
+            NativeCatalogFilter.family(for: " AWS-SAA ") == "AWS",
+            "code family supports catalog prefixes without provider inference")
+        try check(NativeCatalogFilter.family(for: "") == "", "empty family is not invented")
+        let retained = catalog
+        try check(
+            retained.family == "SC" && retained.availableOnly,
+            "filter value survives view reconstruction")
+        catalog.clear()
+        try check(
+            !catalog.isActive && catalog.query.isEmpty && catalog.family.isEmpty
+                && !catalog.availableOnly, "clear resets query and all supported facets together")
+        let emptyCoverage = NativePathCoverage(units: [])
+        try check(
+            emptyCoverage.totalActivities == 0 && emptyCoverage.totalUnits == 0,
+            "empty loaded path has explicit zero denominators")
+        let coverage = NativePathCoverage(units: [
+            ["completed", "mastered"], ["available", "inProgress", "locked"], [],
+        ])
+        try check(
+            coverage.completedActivities == 2 && coverage.totalActivities == 5,
+            "coverage includes only server completed or mastered activities")
+        try check(
+            coverage.completedUnits == 1 && coverage.totalUnits == 3,
+            "empty units do not become completed by vacuous truth")
+        try check(
+            coverage.remainingActivities == 3 && coverage.lockedActivities == 1,
+            "remaining work includes locked activities without fabricated prerequisite")
+        let unknown = NativePathCoverage(units: [["futureStatus"]])
+        try check(
+            unknown.completedActivities == 0 && unknown.remainingActivities == 1,
+            "unknown status never turns into confirmed activity")
+        var destination = NativeActivityDestination(lessonID: "first", title: "First activity")
+        destination = NativeActivityDestination(lessonID: "second", title: "Second activity")
+        try check(
+            destination.lessonID == "second" && destination.resumeTitle == "Resume Second activity",
+            "resume title and target derive from one current activity snapshot")
+        try check(
+            destination.actionTitle("Practice again") == "Practice again · Second activity",
+            "practice label names its current activity and differs from read again")
+        try check(
+            destination.actionTitle("Reprendre") == "Reprendre · Second activity",
+            "localized action preserves the current source-language activity title")
+        destination = NativeActivityDestination(lessonID: "first", title: "First activity")
+        try check(
+            destination.lessonID == "first" && !destination.resumeTitle.contains("Second"),
+            "rapid presentation selection has no cached previous title")
         var flow = NativeDemoFlow()
         flow.select(1)
         flow.submit()
@@ -156,9 +429,7 @@ struct NativeDemoFlowTests {
         var workshop = NativeDemoFlow()
         workshop.choose(.fundamentals)
         try check(
-            workshop.startRoute == .preparation
-                && workshop.startLabel == "Explore the situation"
-                && workshop.resumeLabel == "Start a question",
+            workshop.startRoute == .preparation && !workshop.canSubmit,
             "new objective leads to preparation before the question")
         let preparationNavigation = try NativeDemoNavigationState.make(
             selectedTab: .objective, objectivePath: [.preparation], catalogPath: [],
@@ -232,8 +503,8 @@ struct NativeDemoFlowTests {
         }
         try check(rejectedEmptyResume, "follow-up cannot invent an exercise without an objective")
         try check(
-            workshop.activitySummary.contains("no verdict"),
-            "reviewed summary cannot present a grade or certification progress")
+            workshop.phase == .reviewed && !workshop.canSubmit,
+            "reviewed demo cannot submit again without an explicit practice restart")
         for goal in NativeDemoFlow.Objective.allCases {
             for option in NativeDemoFlow.options.indices {
                 var example = NativeDemoFlow()
@@ -305,21 +576,18 @@ struct NativeDemoFlowTests {
         try check(rejectedConflictingSection, "a conflicting Learn tab and section is rejected")
         try check(
             NativeDemoFlow.Objective.fundamentals.rawValue == "Cloud · découverte"
-                && NativeDemoFlow.Objective.operations.rawValue == "Cloud · exploitation"
-                && NativeDemoFlow.Objective.fundamentals.displayName == "Cloud · discovery",
-            "English interface labels do not rewrite persisted goal identifiers")
+                && NativeDemoFlow.Objective.operations.rawValue == "Cloud · exploitation",
+            "interface localization does not rewrite persisted goal identifiers")
         let browsingGoal = NativeActiveGoalPresentation(
             targetID: "new-goal", confirmedID: "old-goal", savingID: nil, busy: false)
         try check(
-            browsingGoal.canChoose && !browsingGoal.isConfirmed
-                && browsingGoal.status == "Viewing a goal · not selected",
+            browsingGoal.canChoose && !browsingGoal.isConfirmed,
             "browsing another goal never presents it as confirmed")
         let savingGoal = NativeActiveGoalPresentation(
             targetID: "new-goal", confirmedID: "old-goal", savingID: "new-goal", busy: true)
         try check(
             !savingGoal.canChoose && !savingGoal.isConfirmed
-                && savingGoal.symbol == "clock"
-                && savingGoal.status.contains("waiting for the server"),
+                && savingGoal.symbol == "clock",
             "saving blocks duplicate action without optimistic goal confirmation")
         let confirmedGoal = NativeActiveGoalPresentation(
             targetID: "new-goal", confirmedID: "new-goal", savingID: nil, busy: false)
@@ -400,10 +668,223 @@ struct NativeDemoFlowTests {
         try check(
             explanationProgress.state(for: .situation) == .completed
                 && explanationProgress.state(for: .decision) == .completed
-                && explanationProgress.state(for: .explanation) == .current
-                && explanationProgress.accessibilityLabel
-                    .contains("not whether an answer is correct"),
-            "explanation stage explicitly separates flow progress from answer correctness")
+                && explanationProgress.state(for: .explanation) == .current,
+            "explanation stage completes the reading flow")
+        var persistence = NativeDemoPersistence.awaitingRestoration
+        var storedSnapshot = "not yet restored"
+        try persistence.save(snapshot, to: &storedSnapshot)
+        try check(
+            storedSnapshot == "not yet restored" && persistence == .awaitingRestoration,
+            "initial loading cannot replace stored demo data")
+        let freshSnapshot = try NativeDemoSnapshot.make(
+            flow: NativeDemoFlow(),
+            navigation: NativeDemoNavigationState(
+                selectedTab: .catalog, objectivePath: [], catalogPath: []))
+        let validSnapshot = String(decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)
+        let futureSnapshot = validSnapshot.replacingOccurrences(
+            of: "\"schema\":1", with: "\"schema\":2")
+        try check(futureSnapshot != validSnapshot, "future-schema fixture changes the schema")
+        for rejectedSnapshot in ["not json · é", futureSnapshot] {
+            persistence = .awaitingRestoration
+            storedSnapshot = rejectedSnapshot
+            var rejected = false
+            do {
+                _ = try persistence.restore(storedSnapshot)
+            } catch {
+                rejected = true
+            }
+            try check(
+                rejected && persistence == .preservingRejectedSnapshot,
+                "invalid or future demo restoration blocks automatic persistence")
+            for destination in NativeDemoDestination.allCases {
+                let changedNavigation = try NativeDemoNavigationState.make(
+                    selectedTab: .selecting(destination, learnSection: .myLearning),
+                    objectivePath: [.exercise], catalogPath: [],
+                    flow: workshop, learnSection: .myLearning)
+                let changedSnapshot = try NativeDemoSnapshot.make(
+                    flow: workshop, navigation: changedNavigation)
+                try persistence.save(changedSnapshot, to: &storedSnapshot)
+                try check(
+                    Array(storedSnapshot.utf8) == Array(rejectedSnapshot.utf8),
+                    "\(destination) navigation preserves rejected snapshot bytes")
+            }
+            try persistence.save(freshSnapshot, to: &storedSnapshot)
+            try check(
+                Array(storedSnapshot.utf8) == Array(rejectedSnapshot.utf8),
+                "new in-memory demo work cannot overwrite a rejected snapshot")
+            persistence.reset(&storedSnapshot)
+            try check(
+                storedSnapshot.isEmpty && persistence == .ready,
+                "explicit demo reset alone clears rejected storage and re-enables saving")
+            try persistence.save(freshSnapshot, to: &storedSnapshot)
+            try check(
+                try NativeDemoSnapshot.restore(Data(storedSnapshot.utf8)) == freshSnapshot,
+                "a fresh demo persists normally after explicit reset")
+        }
+        persistence = .awaitingRestoration
+        storedSnapshot = validSnapshot
+        try check(
+            try persistence.restore(storedSnapshot) == snapshot && persistence == .ready,
+            "valid restoration preserves the saved flow and enables persistence")
+        try persistence.save(freshSnapshot, to: &storedSnapshot)
+        try check(
+            try NativeDemoSnapshot.restore(Data(storedSnapshot.utf8)) == freshSnapshot,
+            "normal restored demo accepts subsequent saves")
+        persistence = .awaitingRestoration
+        storedSnapshot = ""
+        try check(
+            try persistence.restore(storedSnapshot) == nil && persistence == .ready,
+            "an empty installation finishes restoration without inventing saved activity")
+        try persistence.save(snapshot, to: &storedSnapshot)
+        try check(
+            try NativeDemoSnapshot.restore(Data(storedSnapshot.utf8)) == snapshot,
+            "first-run demo activity persists after empty restoration")
+        let readingContent = NativeLessonReadingContent(
+            lessonTitle: "  Loaded lesson  ",
+            blocks: [
+                (type: "hook", title: "Situation", body: "Hook paragraph"),
+                (type: "concept", title: "Concept", body: "Concept paragraph\n\nSecond paragraph"),
+                (type: "example", title: nil, body: "Example paragraph"),
+                (type: "code", title: "Do not read code", body: "Excluded code"),
+                (type: "check", title: "Do not read questions", body: "Excluded question"),
+                (type: "recap", title: "Takeaway", body: "Recap paragraph"),
+                (type: "unknown", title: "Do not read unknown blocks", body: "Excluded unknown"),
+            ])
+        try check(
+            readingContent.parts == [
+                .title("  Loaded lesson  "), .title("Situation"), .markdown("Hook paragraph"),
+                .title("Concept"), .markdown("Concept paragraph\n\nSecond paragraph"),
+                .markdown("Example paragraph"), .title("Takeaway"), .markdown("Recap paragraph"),
+            ],
+            "audio selects pedagogical titles and bodies in order, excluding code/check/unknown")
+        var renderedBodies: [String] = []
+        try check(
+            try readingContent.spokenText { body in
+                renderedBodies.append(body)
+                return body
+            } == """
+                Loaded lesson
+
+                Situation
+
+                Hook paragraph
+
+                Concept
+
+                Concept paragraph
+
+                Second paragraph
+
+                Example paragraph
+
+                Takeaway
+
+                Recap paragraph
+                """,
+            "audio assembles every selected paragraph in reading order")
+        try check(
+            renderedBodies == [
+                "Hook paragraph", "Concept paragraph\n\nSecond paragraph",
+                "Example paragraph", "Recap paragraph",
+            ],
+            "only body Markdown is sent to the renderer; literal titles are preserved")
+        let editorialReading = NativeLessonReadingContent(
+            editorialTitle: "Assistants responsables",
+            objective: "Repérer les responsabilités humaines.",
+            hook: "Un assistant propose une réponse.",
+            keyIdeas: ["Définir le périmètre.", "Prévoir une supervision."],
+            exampleSituation: "Une équipe automatise un tri.",
+            exampleSteps: ["Vérifier les données.", "Prévoir une escalade."],
+            exampleDecision: "Une personne garde la décision finale.",
+            recap: "L’automatisation reste sous contrôle humain."
+        )
+        try check(
+            editorialReading.parts == [
+                .title("Assistants responsables"),
+                .text("Repérer les responsabilités humaines."),
+                .text("Un assistant propose une réponse."),
+                .title("Idées clés"),
+                .text("Définir le périmètre."),
+                .text("Prévoir une supervision."),
+                .title("Exemple résolu"),
+                .text("Une équipe automatise un tri."),
+                .text("1. Vérifier les données."),
+                .text("2. Prévoir une escalade."),
+                .text("Une personne garde la décision finale."),
+                .title("À retenir"),
+                .text("L’automatisation reste sous contrôle humain."),
+            ],
+            "editorial audio follows only the displayed pedagogical allowlist in order")
+        var editorialMarkdownBodies: [String] = []
+        let editorialSpeech = try editorialReading.spokenText { body in
+            editorialMarkdownBodies.append(body)
+            return body
+        }
+        try check(
+            editorialMarkdownBodies.isEmpty
+                && editorialSpeech == """
+                    Assistants responsables
+
+                    Repérer les responsabilités humaines.
+
+                    Un assistant propose une réponse.
+
+                    Idées clés
+
+                    Définir le périmètre.
+
+                    Prévoir une supervision.
+
+                    Exemple résolu
+
+                    Une équipe automatise un tri.
+
+                    1. Vérifier les données.
+
+                    2. Prévoir une escalade.
+
+                    Une personne garde la décision finale.
+
+                    À retenir
+
+                    L’automatisation reste sous contrôle humain.
+                    """,
+            "editorial audio preserves plain text without Markdown conversion")
+        enum ReadingFailure: Error { case invalidMarkdown }
+        var renderingFailed = false
+        do {
+            _ = try readingContent.spokenText { _ in throw ReadingFailure.invalidMarkdown }
+        } catch ReadingFailure.invalidMarkdown {
+            renderingFailed = true
+        }
+        try check(
+            renderingFailed,
+            "renderer failure aborts the complete reading rather than skipping a body")
+        try check(
+            try NativeLessonReadingContent(
+                lessonTitle: " \n ", blocks: [(type: "recap", title: nil, body: "\t")]
+            ).spokenText { $0 } == "",
+            "missing and whitespace-only lesson text never invents audio content")
+        try check(
+            try NativeLessonReadingContent(
+                lessonTitle: "Équipe — 日本語",
+                blocks: [(type: "concept", title: nil, body: "Données\n\n学習")]
+            ).spokenText { $0 } == "Équipe — 日本語\n\nDonnées\n\n学習",
+            "portable assembly preserves original multilingual text and paragraph boundaries")
+        #if canImport(Darwin)
+            let markdownText = try NativeLessonReadingContent.plainText(
+                "**Comprendre** le [cloud](https://example.invalid/hidden-url).\n\n次の段落")
+            try check(
+                markdownText == "Comprendre le cloud.\n\n次の段落",
+                "Apple Markdown extraction strips markup and link targets but preserves paragraphs")
+            try check(
+                try NativeLessonReadingContent(
+                    lessonTitle: "Lesson",
+                    blocks: [(type: "concept", title: "Section", body: "*First*.\n\nSecond.")]
+                ).spokenText(renderingMarkdown: NativeLessonReadingContent.plainText)
+                    == "Lesson\n\nSection\n\nFirst.\n\nSecond.",
+                "Apple Markdown renderer is wired into full lesson assembly")
+        #endif
         print(
             "\(count) Foundation presentation/demo checks passed; no Apple UI was compiled or rendered."
         )

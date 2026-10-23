@@ -150,6 +150,182 @@ public struct CertigoAPI: Sendable {
         return try lesson.validated(trackId: trackId, lessonId: lessonId)
     }
 
+    public func explainAnswer(
+        _ explanationRequest: TutorExplainRequest, credentials: APICredentials
+    ) async throws -> TutorExplanation {
+        // The tutor is an authenticated unversioned Functions route, not a content URL.
+        guard baseURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "api",
+            [explanationRequest.trackId, explanationRequest.lessonId, explanationRequest.itemId]
+                .allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        else { throw APIError.configuration }
+        let body = try Self.encoder().encode(explanationRequest)
+        let (data, response) = try await request(
+            ["tutor", "explain"], token: credentials.accessToken, body: body)
+        guard response.statusCode == 200 else { throw APIError.invalidResponse }
+        let value = try Self.decode(TutorExplanation.self, from: data)
+        guard value.itemId.caseInsensitiveCompare(explanationRequest.itemId) == .orderedSame,
+            !value.conceptId.isEmpty, !value.headline.isEmpty,
+            !value.points.isEmpty, value.points.allSatisfy({ !$0.isEmpty }),
+            value.personalization.attempts >= 0,
+            (0...value.personalization.attempts).contains(value.personalization.errors),
+            (0...100).contains(value.personalization.accuracyPct)
+        else { throw APIError.invalidResponse }
+        return value
+    }
+
+    public func nextBestRecommendations(trackId: String, credentials: APICredentials)
+        async throws -> NextBestRecommendations
+    {
+        let value: NextBestRecommendations = try await learningService(
+            ["me", "recommendations", trackId], credentials: credentials)
+        guard value.trackId == trackId,
+            value.items.allSatisfy({
+                (0...100).contains($0.priority) && (0...100).contains($0.masteryPct)
+                    && (0...100).contains($0.forgettingRiskPct) && $0.estMinutes >= 0
+            })
+        else { throw APIError.invalidResponse }
+        return value
+    }
+
+    public func generateMockExam(_ value: MockExamRequest, credentials: APICredentials)
+        async throws -> MockExam
+    {
+        guard !value.trackId.isEmpty else { throw APIError.configuration }
+        let exam: MockExam = try await learningService(
+            ["exam", "generate"], credentials: credentials, body: Self.encoder().encode(value))
+        guard exam.trackId == value.trackId,
+            value.publicManifestId == nil || exam.publicManifestId == value.publicManifestId
+        else { throw APIError.invalidResponse }
+        return try exam.validated()
+    }
+
+    public func submitMockExam(_ value: SubmitMockExamRequest, credentials: APICredentials)
+        async throws -> MockExamResult
+    {
+        guard UUID(uuidString: value.clientAttemptId) != nil,
+            !value.trackId.isEmpty, !value.examId.isEmpty, !value.answers.isEmpty,
+            Set(value.answers.map(\.itemId)).count == value.answers.count
+        else { throw APIError.configuration }
+        let result: MockExamResult = try await learningService(
+            ["exam", "submit"], credentials: credentials, body: Self.encoder().encode(value))
+        guard result.examId == value.examId, !result.attemptId.isEmpty,
+            (0...100).contains(result.pct), (0...1_000).contains(result.scaledScore),
+            result.total > 0, (0...result.total).contains(result.correct),
+            Set(result.results.map(\.itemId)).count == result.results.count,
+            Set(result.results.map(\.itemId)).isSubset(of: Set(value.answers.map(\.itemId)))
+        else { throw APIError.invalidResponse }
+        return result
+    }
+
+    public func achievements(credentials: APICredentials) async throws -> AchievementBoard {
+        try await learningService(["achievements"], credentials: credentials)
+    }
+
+    public func quests(credentials: APICredentials) async throws -> QuestBoard {
+        try await learningService(["quests"], credentials: credentials)
+    }
+
+    public func notificationPlan(credentials: APICredentials) async throws -> NotificationPlan {
+        try await learningService(["me", "notifications", "plan"], credentials: credentials)
+    }
+
+    public func notificationSettings(credentials: APICredentials) async throws
+        -> NotificationSettings
+    {
+        try await learningService(["me", "notifications", "settings"], credentials: credentials)
+    }
+
+    public func updateNotificationSettings(
+        _ settings: NotificationSettings, credentials: APICredentials
+    ) async throws -> NotificationSettings {
+        try await learningService(
+            ["me", "notifications", "settings"], credentials: credentials,
+            body: Self.encoder().encode(settings))
+    }
+
+    private func learningService<T: Decodable>(
+        _ route: [String], credentials: APICredentials, body: Data? = nil
+    ) async throws -> T {
+        guard baseURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "api" else {
+            throw APIError.configuration
+        }
+        let (data, response) = try await request(route, token: credentials.accessToken, body: body)
+        guard response.statusCode == 200 else { throw APIError.invalidResponse }
+        return try Self.decode(T.self, from: data)
+    }
+
+    public func editorialPilot(
+        pilotId: String, credentials: APICredentials
+    ) async throws -> EditorialPilotSnapshot {
+        let (data, response) = try await request(
+            ["pilots", pilotId, "content"], token: credentials.accessToken)
+        guard let digest = response.value(forHTTPHeaderField: "x-certigo-pilot-content-digest"),
+            response.value(forHTTPHeaderField: "etag") == "\"\(digest)\"",
+            digest.range(of: "^sha256:[0-9a-f]{64}$", options: .regularExpression) != nil
+        else { throw ContractError.malformed("editorial pilot response headers") }
+        do {
+            let actual = try CanonicalQuestionReader.digest(data)
+            guard digest == "sha256:\(actual.sha256)" else {
+                throw ContractError.malformed("editorial pilot content digest")
+            }
+            let pilot = try Self.decode(EditorialPilot.self, from: data).validated()
+            guard pilot.id == pilotId else {
+                throw ContractError.malformed("editorial pilot response identity")
+            }
+            return try EditorialPilotSnapshot(pilot: pilot, contentDigest: digest).validated()
+        } catch is DecodingError {
+            throw APIError.invalidResponse
+        }
+    }
+
+    public func pilotHistory(
+        _ snapshot: EditorialPilotSnapshot, credentials: APICredentials
+    ) async throws -> PilotHistory {
+        _ = try snapshot.validated()
+        let (data, _) = try await request(
+            ["me", "pilots", snapshot.pilot.id, "history", snapshot.contentDigest],
+            token: credentials.accessToken)
+        return try Self.decode(PilotHistory.self, from: data).validated(for: snapshot)
+    }
+
+    public func recordPilotLessonAccess(
+        _ snapshot: EditorialPilotSnapshot, lessonId: String, credentials: APICredentials
+    ) async throws -> PilotLessonProgress {
+        try await recordPilotLessonActivity(
+            snapshot, lessonId: lessonId, activity: "access", credentials: credentials)
+    }
+
+    public func markPilotLessonRead(
+        _ snapshot: EditorialPilotSnapshot, lessonId: String, credentials: APICredentials
+    ) async throws -> PilotLessonProgress {
+        try await recordPilotLessonActivity(
+            snapshot, lessonId: lessonId, activity: "read", credentials: credentials)
+    }
+
+    private func recordPilotLessonActivity(
+        _ snapshot: EditorialPilotSnapshot,
+        lessonId: String,
+        activity: String,
+        credentials: APICredentials
+    ) async throws -> PilotLessonProgress {
+        _ = try snapshot.validated()
+        guard snapshot.pilot.lessons.contains(where: { $0.id == lessonId }),
+            activity == "access" || activity == "read"
+        else { throw ContractError.malformed("editorial pilot activity") }
+        let (data, _) = try await request(
+            [
+                "me", "pilots", snapshot.pilot.id, "lessons", lessonId,
+                activity, snapshot.contentDigest,
+            ],
+            token: credentials.accessToken,
+            method: "POST")
+        let result = try Self.decode(PilotLessonProgress.self, from: data)
+        guard result.lessonId == lessonId,
+            activity != "read" || result.markedReadAt != nil
+        else { throw ContractError.malformed("editorial pilot activity response") }
+        return result
+    }
+
     public func submit(
         lessonId: String, submission: QuizSubmission, credentials: APICredentials
     ) async throws -> QuizResult {
@@ -161,8 +337,44 @@ public struct CertigoAPI: Sendable {
         return try Self.decode(QuizResult.self, from: data).validated(for: submission)
     }
 
+    public func history(
+        credentials: APICredentials, limit: Int = 20, cursor: String? = nil
+    ) async throws -> LearningHistoryPage {
+        guard baseURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "api",
+            (1...50).contains(limit), LearningHistoryPage.validCursor(cursor)
+        else { throw APIError.configuration }
+        var query = [URLQueryItem(name: "limit", value: String(limit))]
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        let (data, response) = try await request(
+            ["me", "history"], token: credentials.accessToken, query: query)
+        guard response.statusCode == 200 else { throw APIError.invalidResponse }
+        let page = try Self.decode(LearningHistoryPage.self, from: data)
+        guard page.items.count <= limit else { throw APIError.invalidResponse }
+        return page
+    }
+
+    public func accountDeletion(accessToken: String, proof: String? = nil, submit: Bool = false)
+        async throws -> AccountDeletion
+    {
+        // Functions exposes this route under /api, not the versioned learning prefix.
+        guard baseURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "api"
+        else { throw APIError.configuration }
+        let (data, response) = try await request(
+            ["account", "deletion"], token: accessToken, method: submit ? "POST" : "GET",
+            reauthentication: proof)
+        let value = try Self.decode(AccountDeletion.self, from: data).validated()
+        guard
+            submit
+                ? ((response.statusCode == 202 && value.status == .pending)
+                    || (response.statusCode == 200 && value.status == .completed))
+                : response.statusCode == 200
+        else { throw APIError.invalidResponse }
+        return value
+    }
+
     private func request(
-        _ segments: [String], token: String, body: Data? = nil
+        _ segments: [String], token: String, body: Data? = nil, method: String? = nil,
+        reauthentication: String? = nil, query: [URLQueryItem] = []
     ) async throws -> (Data, HTTPURLResponse) {
         guard !token.isEmpty, !token.contains("\r"), !token.contains("\n") else {
             throw APIError.unauthorized
@@ -176,12 +388,28 @@ public struct CertigoAPI: Sendable {
             }
             url.appendPathComponent(segment)
         }
+        if !query.isEmpty {
+            guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+                throw APIError.configuration
+            }
+            components.queryItems = query
+            guard let queryURL = components.url else { throw APIError.configuration }
+            url = queryURL
+        }
         var request = URLRequest(url: url)
-        request.httpMethod = body == nil ? "GET" : "POST"
+        if !query.isEmpty { request.cachePolicy = .reloadIgnoringLocalCacheData }
+        request.httpMethod = method ?? (body == nil ? "GET" : "POST")
         request.httpBody = body
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(UUID().uuidString, forHTTPHeaderField: "x-correlation-id")
+        if let reauthentication {
+            guard !reauthentication.isEmpty,
+                reauthentication.utf8.count <= 32_768,
+                reauthentication.rangeOfCharacter(from: .whitespacesAndNewlines) == nil
+            else { throw APIError.configuration }
+            request.setValue(reauthentication, forHTTPHeaderField: "X-Certigo-Reauthentication")
+        }
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let data: Data
         let response: HTTPURLResponse

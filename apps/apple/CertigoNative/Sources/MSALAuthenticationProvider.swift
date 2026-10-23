@@ -3,26 +3,42 @@ import Foundation
 import MSAL
 import UIKit
 
-/// Unwired Apple-only candidate. Compilation, callbacks/cache and live auth still require Apple proof.
+/// MSAL adapter; Apple compilation, callback/cache and live identity validation remain separate gates.
 @MainActor
-final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
+final class MSALAuthenticationProvider: CIAMAccountDeletionProvider {
     private let application: MSALPublicClientApplication
     private let configuration: CIAMConfiguration
     private let presentation: @MainActor () throws -> UIViewController
     private var accountIdentifier: String?
     private var returnedAuthority: MSALAuthority?
     private var busy = false
+    var deletionAccountIdentifier: String? { accountIdentifier }
 
     init(
         configuration: CIAMConfiguration,
         presentation: @escaping @MainActor () throws -> UIViewController
     ) throws {
-        guard Bundle.main.bundleIdentifier == CIAMDevelopmentCandidate.bundleIdentifier,
-            configuration.redirectURI.absoluteString == CIAMDevelopmentCandidate.redirect
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier,
+            configuration.redirectURI.absoluteString
+                == "msauth.\(bundleIdentifier)://auth",
+            let callbackScheme = configuration.redirectURI.scheme,
+            let urlTypes = Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes")
+                as? [[String: Any]],
+            urlTypes.contains(where: {
+                ($0["CFBundleURLSchemes"] as? [String] ?? []).contains {
+                    $0.caseInsensitiveCompare(callbackScheme) == .orderedSame
+                }
+            })
         else { throw CIAMAuthenticationFailure.configuration }
         let authority: MSALCIAMAuthority
         do {
-            authority = try MSALCIAMAuthority(url: configuration.authority)
+            // MSAL 2.16 synthesizes <host-prefix>.onmicrosoft.com for pathless CIAM URLs.
+            let authorityURL =
+                configuration.authority.path.isEmpty || configuration.authority.path == "/"
+                ? configuration.authority.appendingPathComponent(
+                    configuration.tenantID.lowercased())
+                : configuration.authority
+            authority = try MSALCIAMAuthority(url: authorityURL)
         } catch {
             throw Self.failure(error)
         }
@@ -30,7 +46,7 @@ final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
             clientId: configuration.clientID, redirectUri: configuration.redirectURI.absoluteString,
             authority: authority)
         // Official SDK private-group option; no shared Keychain entitlement or broker is enabled.
-        parameters.cacheConfig.keychainSharingGroup = CIAMDevelopmentCandidate.bundleIdentifier
+        parameters.cacheConfig.keychainSharingGroup = bundleIdentifier
         MSALGlobalConfig.brokerAvailability = .none
         MSALGlobalConfig.loggerConfig.logLevel = .nothing
         // Redirect verification stays enabled; knownAuthorities is not used to bypass validation.
@@ -101,6 +117,62 @@ final class MSALAuthenticationProvider: CIAMAuthenticationProvider {
         }
         guard !Task.isCancelled else { throw CIAMAuthenticationFailure.cancelled }
         return try accept(result)
+    }
+
+    func reauthenticateForAccountDeletion() async throws -> CIAMDeletionProof {
+        guard !busy else { throw CIAMAuthenticationFailure.operationInProgress }
+        guard !Task.isCancelled else { throw CIAMAuthenticationFailure.cancelled }
+        guard let identifier = accountIdentifier else {
+            throw CIAMAuthenticationFailure.accountMissing
+        }
+        let controller = try presentation()
+        guard controller.viewIfLoaded?.window != nil else {
+            throw CIAMAuthenticationFailure.configuration
+        }
+        let web = MSALWebviewParameters(authPresentationViewController: controller)
+        web.webviewType = .authenticationSession
+        web.prefersEphemeralWebBrowserSession = true
+        let parameters = MSALInteractiveTokenParameters(
+            scopes: [configuration.apiScope], webviewParameters: web)
+        parameters.account = try application.account(forIdentifier: identifier)
+        parameters.authority = returnedAuthority
+        parameters.promptType = .login
+        parameters.extraQueryParameters = ["max_age": "0"]
+        busy = true
+        defer { busy = false }
+        let result: MSALResult = try await withCheckedThrowingContinuation { continuation in
+            application.acquireToken(with: parameters) { result, error in
+                Self.complete(result, error, continuation)
+            }
+        }
+        guard !Task.isCancelled else { throw CIAMAuthenticationFailure.cancelled }
+        guard result.account.identifier == identifier else {
+            throw CIAMAuthenticationFailure.accountChanged
+        }
+        guard let idToken = result.idToken, !idToken.isEmpty else {
+            throw CIAMAuthenticationFailure.invalidToken
+        }
+        let proof = CIAMDeletionProof(
+            accessToken: try accept(result), idToken: idToken, accountIdentifier: identifier)
+        return try proof.validated(
+            expectedAccount: identifier, clientID: configuration.clientID, now: Date())
+    }
+
+    func removeAccountForDeletion(identifier: String) async throws {
+        guard !busy else { throw CIAMAuthenticationFailure.operationInProgress }
+        guard !identifier.isEmpty else { throw CIAMAuthenticationFailure.accountMissing }
+        do {
+            let accounts = try application.allAccounts()
+            if let account = accounts.first(where: { $0.identifier == identifier }) {
+                try application.remove(account)
+            }
+            if accountIdentifier == identifier {
+                accountIdentifier = nil
+                returnedAuthority = nil
+            }
+        } catch {
+            throw Self.failure(error)
+        }
     }
 
     func removeLocalAccount() async throws {
