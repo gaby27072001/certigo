@@ -185,6 +185,18 @@
             Text(verbatim: "Phase 2B · Official Brand Assets (§22A)")
           }
           Section {
+            ForEach(AppTab.allCases) { tab in
+              HStack(spacing: PrismSpacing.s) {
+                Image(systemName: tab.selectedSymbolName)
+                  .foregroundStyle(PrismColor.accent)
+                Text(verbatim: "\(tab.title) (\(tab.rawValue))")
+                  .prismTextStyle(.body)
+              }
+            }
+          } header: {
+            Text(verbatim: "Phase 3 · Home / Today & Router (§12–14)")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(
