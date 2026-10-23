@@ -36,12 +36,12 @@ public enum PrismSize {
   public static let brandXL: CGFloat = 56
 }
 
-public enum PrismTextStyle: String, CaseIterable, Sendable {
+public enum PrismTextStyle: String, Codable, Hashable, CaseIterable, Sendable {
   case display, title1, title2, title3, headline, body, editorial, callout
   case subheadline, footnote, caption, code, codeSmall, numeric
 }
 
-public enum PrismMotionToken: String, CaseIterable, Sendable {
+public enum PrismMotionToken: String, Codable, Hashable, CaseIterable, Sendable {
   case quick, snappy, smooth, expressive
 }
 
@@ -53,6 +53,7 @@ public struct PrismResolvedMotion: Equatable, Sendable {
 }
 
 public enum PrismMotion {
+  public static var allCases: [PrismMotionToken] { PrismMotionToken.allCases }
   /// Selection feedback, card orientation, spatial continuity, earned celebration respectively.
   public static func resolve(
     _ token: PrismMotionToken, reduceMotion: Bool
@@ -71,21 +72,21 @@ public enum PrismMotion {
   }
 }
 
-public enum PrismHapticToken: String, CaseIterable, Sendable {
+public enum PrismHapticToken: String, Codable, Hashable, CaseIterable, Sendable {
   case selection, correct, incorrectSoft, warning, declic
 }
 
-public enum PrismSoundToken: String, CaseIterable, Sendable {
+public enum PrismSoundToken: String, Codable, Hashable, CaseIterable, Sendable {
   case answer, declic, milestone
 }
 
-public enum PrismMaterialRole: String, CaseIterable, Sendable {
+public enum PrismMaterialRole: String, Codable, Hashable, CaseIterable, Sendable {
   case navigationGlass, floatingControlGlass
 
   public func usesOpaqueSurface(reduceTransparency: Bool) -> Bool { reduceTransparency }
 }
 
-public enum PrismCelebrationLevel: Int, CaseIterable, Sendable {
+public enum PrismCelebrationLevel: Int, Codable, Hashable, CaseIterable, Sendable {
   case tick = 0
   case pulse = 1
   case refraction = 2
@@ -94,4 +95,48 @@ public enum PrismCelebrationLevel: Int, CaseIterable, Sendable {
   public func resolved(calmMode: Bool) -> Self {
     calmMode && rawValue > Self.pulse.rawValue ? .pulse : self
   }
+}
+
+extension PrismSpacing {
+  public static let sm: CGFloat = s
+  public static let md: CGFloat = m
+  public static let lg: CGFloat = l
+}
+
+extension PrismRadius {
+  public static let xs: CGFloat = 4
+  public static let sm: CGFloat = s
+  public static let md: CGFloat = m
+  public static let lg: CGFloat = l
+  public static let pill: CGFloat = 999
+}
+
+public enum PrismBorder {
+  public static let hairline: CGFloat = 1
+  public static let thin: CGFloat = 1
+  public static let regular: CGFloat = 1
+  public static let standard: CGFloat = 1.5
+  public static let emphasis: CGFloat = 2
+  public static let strong: CGFloat = 2
+  public static let thick: CGFloat = 2
+}
+
+extension PrismTextStyle {
+  public var usesMonospacedDigits: Bool {
+    self == .code || self == .codeSmall || self == .numeric
+  }
+}
+
+public typealias PrismMotionSpec = PrismResolvedMotion
+
+extension PrismSize {
+  public static let minTapTarget: CGFloat = minTouch
+  public static let progressBarHeight: CGFloat = 8
+}
+
+extension PrismRadius {
+  public static let button: CGFloat = m
+  public static let card: CGFloat = l
+  public static let chip: CGFloat = s
+  public static let heroCard: CGFloat = xl
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-public enum PrismAppearance: String, CaseIterable, Sendable {
+public enum PrismAppearance: String, Codable, Hashable, CaseIterable, Sendable {
   case light, dark, highContrastLight, highContrastDark
 
   public var isDark: Bool { self == .dark || self == .highContrastDark }
@@ -50,7 +50,7 @@ public struct PrismRGBA: Equatable, Sendable {
   }
 }
 
-public enum PrismColorRole: String, CaseIterable, Sendable {
+public enum PrismColorRole: String, Codable, Hashable, CaseIterable, Sendable {
   case canvas, surface, surfaceRaised, surfaceArtifact
   case textPrimary, textSecondary, textTertiary, separator
   case accent, accentFill, onAccent, positive, negative, caution, brandPlate
@@ -87,7 +87,7 @@ public enum PrismColorRole: String, CaseIterable, Sendable {
   }
 }
 
-public enum PrismRegion: String, CaseIterable, Sendable {
+public enum PrismRegion: String, Codable, Hashable, CaseIterable, Sendable {
   case cloud, ai, data, security, network, devops, code, systems
 
   public func rgba(in appearance: PrismAppearance) -> PrismRGBA {
@@ -121,7 +121,7 @@ public struct PrismRegionSoft: Equatable, Sendable {
   }
 }
 
-public enum PrismSyntax: String, CaseIterable, Sendable {
+public enum PrismSyntax: String, Codable, Hashable, CaseIterable, Sendable {
   case plain, keyword, string, comment, number, type, flaggedLineBackground
 
   public func rgba(in appearance: PrismAppearance) -> PrismRGBA {
@@ -136,5 +136,49 @@ public enum PrismSyntax: String, CaseIterable, Sendable {
     case .flaggedLineBackground: values = [0xFDE7E9, 0x4A1D22, 0xFDE7E9, 0x4A1D22]
     }
     return PrismRGBA(hex: values[PrismAppearance.allCases.firstIndex(of: appearance)!])
+  }
+}
+
+extension PrismColorRole {
+  public static let accentPrimary: Self = .accent
+  public static let accentSubtle: Self = .surfaceRaised
+  public static let surfaceElevated: Self = .surfaceRaised
+  public static let borderSubtle: Self = .separator
+  public static let borderStrong: Self = .textPrimary
+  public static let positiveSubtle: Self = .surfaceRaised
+  public static let cautionSubtle: Self = .surfaceRaised
+  public static let negativeSubtle: Self = .surfaceRaised
+  public static let inkPrimary: Self = .textPrimary
+  public static let inkSecondary: Self = .textSecondary
+  public static let inkMuted: Self = .textTertiary
+}
+
+extension PrismRegion {
+  public static let azure: Self = .cloud
+
+  public var displayName: String {
+    switch self {
+    case .cloud: "Cloud"
+    case .ai: "AI"
+    case .data: "Data"
+    case .security: "Security"
+    case .network: "Network"
+    case .devops: "DevOps"
+    case .code: "Code"
+    case .systems: "Systems"
+    }
+  }
+
+  public var sfSymbolFallback: String {
+    switch self {
+    case .cloud: "cloud.fill"
+    case .ai: "sparkles"
+    case .data: "cylinder.split.1x2.fill"
+    case .security: "lock.shield.fill"
+    case .network: "network"
+    case .devops: "gearshape.2.fill"
+    case .code: "chevron.left.forwardslash.chevron.right"
+    case .systems: "cpu.fill"
+    }
   }
 }
