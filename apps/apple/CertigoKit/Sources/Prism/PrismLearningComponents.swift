@@ -1194,8 +1194,8 @@ private enum PrismLearningStyleResolver {
 }
 
 private enum PrismLearningMotionResolver {
-    static var defaultToken: PrismMotion {
-        PrismMotion.allCases.first!
+    static var defaultToken: PrismMotionToken {
+        PrismMotionToken.allCases.first!
     }
 
     static func animation(reduceMotion: Bool) -> Animation? {
@@ -1344,7 +1344,7 @@ public struct SessionLengthPicker: View {
                                         .padding(.vertical, PrismSpacing.xs)
                                         .background(
                                             RoundedRectangle(cornerRadius: PrismRadius.sm)
-                                                .fill(PrismSyntax.flaggedLineBackground)
+                                                .fill(PrismSyntax.flaggedLineBackground.color)
                                         )
                                 }
                             }
@@ -1359,7 +1359,7 @@ public struct SessionLengthPicker: View {
                     .frame(minHeight: PrismSize.minTouch)
                     .background(
                         RoundedRectangle(cornerRadius: PrismRadius.md)
-                            .fill(isSelected ? AnyShapeStyle(PrismSyntax.flaggedLineBackground) : AnyShapeStyle(.thinMaterial))
+                            .fill(isSelected ? AnyShapeStyle(PrismSyntax.flaggedLineBackground.color) : AnyShapeStyle(.thinMaterial))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: PrismRadius.md)
@@ -1441,7 +1441,7 @@ public struct QuestionCard: View {
                     .frame(minWidth: PrismSize.minTouch, minHeight: PrismSize.minTouch)
                     .background(
                         RoundedRectangle(cornerRadius: PrismRadius.md)
-                            .fill(PrismSyntax.flaggedLineBackground)
+                            .fill(PrismSyntax.flaggedLineBackground.color)
                     )
                 }
                 .buttonStyle(.plain)
@@ -1577,7 +1577,7 @@ public struct WorkedExampleView: View {
                         .frame(minWidth: PrismSize.minTouch, minHeight: PrismSize.minTouch)
                         .background(
                             RoundedRectangle(cornerRadius: PrismRadius.md)
-                                .fill(PrismSyntax.flaggedLineBackground)
+                                .fill(PrismSyntax.flaggedLineBackground.color)
                         )
                     }
                     .buttonStyle(.plain)
@@ -1948,7 +1948,7 @@ public struct ArtifactView: View {
                     .frame(minHeight: PrismSize.minTouch, alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: PrismRadius.sm)
-                            .fill(isSelected ? AnyShapeStyle(PrismSyntax.flaggedLineBackground) : AnyShapeStyle(.clear))
+                            .fill(isSelected ? AnyShapeStyle(PrismSyntax.flaggedLineBackground.color) : AnyShapeStyle(.clear))
                     )
                 }
                 .buttonStyle(.plain)
@@ -2064,7 +2064,7 @@ public struct ChoiceList: View {
                         .frame(minHeight: PrismSize.minTouch)
                         .background(
                             RoundedRectangle(cornerRadius: PrismRadius.md)
-                                .fill(isSelected ? AnyShapeStyle(PrismSyntax.flaggedLineBackground) : AnyShapeStyle(.thinMaterial))
+                                .fill(isSelected ? AnyShapeStyle(PrismSyntax.flaggedLineBackground.color) : AnyShapeStyle(.thinMaterial))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: PrismRadius.md)
@@ -2158,7 +2158,7 @@ public struct ConfidencePicker: View {
                         .frame(maxWidth: .infinity, minHeight: PrismSize.minTouch)
                         .background(
                             RoundedRectangle(cornerRadius: PrismRadius.md)
-                                .fill(isSelected ? AnyShapeStyle(PrismSyntax.flaggedLineBackground) : AnyShapeStyle(.thinMaterial))
+                                .fill(isSelected ? AnyShapeStyle(PrismSyntax.flaggedLineBackground.color) : AnyShapeStyle(.thinMaterial))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: PrismRadius.md)
@@ -2222,7 +2222,7 @@ public struct TokenComposer: View {
                                     .frame(minHeight: PrismSize.minTouch)
                                     .background(
                                         RoundedRectangle(cornerRadius: PrismRadius.sm)
-                                            .fill(PrismSyntax.flaggedLineBackground)
+                                            .fill(PrismSyntax.flaggedLineBackground.color)
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -2404,7 +2404,7 @@ public struct SlotBoard: View {
                             .frame(minHeight: PrismSize.minTouch)
                             .background(
                                 RoundedRectangle(cornerRadius: PrismRadius.md)
-                                    .fill(isSelected ? AnyShapeStyle(PrismSyntax.flaggedLineBackground) : AnyShapeStyle(.thinMaterial))
+                                    .fill(isSelected ? AnyShapeStyle(PrismSyntax.flaggedLineBackground.color) : AnyShapeStyle(.thinMaterial))
                             )
                         }
                         .buttonStyle(.plain)
@@ -2447,7 +2447,7 @@ public struct SlotBoard: View {
                             .padding(.vertical, PrismSpacing.xs)
                             .background(
                                 RoundedRectangle(cornerRadius: PrismRadius.sm)
-                                    .fill(PrismSyntax.flaggedLineBackground)
+                                    .fill(PrismSyntax.flaggedLineBackground.color)
                             )
                         } else {
                             Text(verbatim: "Emplacement libre")
@@ -2594,7 +2594,7 @@ public struct ExplainInput: View {
                         .frame(minWidth: PrismSize.minTouch, minHeight: PrismSize.minTouch)
                         .background(
                             RoundedRectangle(cornerRadius: PrismRadius.md)
-                                .fill(isDictating ? AnyShapeStyle(PrismSyntax.flaggedLineBackground) : AnyShapeStyle(.thinMaterial))
+                                .fill(isDictating ? AnyShapeStyle(PrismSyntax.flaggedLineBackground.color) : AnyShapeStyle(.thinMaterial))
                         )
                     }
                     .buttonStyle(.plain)
@@ -2654,7 +2654,7 @@ public struct FeedbackPanel: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: PrismRadius.md)
-                        .fill(PrismSyntax.flaggedLineBackground)
+                        .fill(PrismSyntax.flaggedLineBackground.color)
                 )
             }
 
@@ -2728,7 +2728,7 @@ public struct ResponsibilityMatrix: View {
                     .padding(.vertical, PrismSpacing.xs)
                     .background(
                         RoundedRectangle(cornerRadius: PrismRadius.sm)
-                            .fill(PrismSyntax.flaggedLineBackground)
+                            .fill(PrismSyntax.flaggedLineBackground.color)
                     )
                 }
                 .padding(PrismSpacing.sm)
@@ -2823,7 +2823,7 @@ public struct HintLadderView: View {
                         .frame(minHeight: PrismSize.minTouch)
                         .background(
                             RoundedRectangle(cornerRadius: PrismRadius.sm)
-                                .fill(PrismSyntax.flaggedLineBackground)
+                                .fill(PrismSyntax.flaggedLineBackground.color)
                         )
                     }
                     .buttonStyle(.plain)
