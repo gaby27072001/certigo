@@ -55,7 +55,7 @@ public struct FeatureFlag: RawRepresentable, Hashable, Sendable, CaseIterable {
 
 /// Remote configuration can disable an experience, never activate an unaccepted one.
 /// Transport/authenticity belongs to the configuration source, not this domain resolver.
-public struct FeatureFlags: Sendable {
+public struct FeatureFlags: Equatable, Sendable {
     private var remoteDisabled: Set<FeatureFlag> = []
     #if DEBUG
         private var debugOverrides: [FeatureFlag: Bool] = [:]
