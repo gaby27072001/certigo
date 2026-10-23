@@ -134,7 +134,7 @@ test('only emits the production AASA after an explicitly verified compatible bui
 
 test('URL receipt only stages a link; access and read operations stay at their V1 boundary', async () => {
   const nativeApp = await readFile(
-    resolve('apps/apple/CertigoNative/Sources/NativeEntryViews.swift'),
+    resolve('apps/apple/CertigoNative/Sources/CertigoNativeApp.swift'),
     'utf8',
   );
   const handlerStart = nativeApp.indexOf('private func handleIncomingURL');
@@ -146,11 +146,8 @@ test('URL receipt only stages a link; access and read operations stay at their V
     handler,
     /connect\(|loadEditorialPilot\(|accessEditorialPilotLesson\(|markEditorialPilotLessonRead\(/,
   );
-  assert.match(nativeApp, /Button\(copy\.native\(\.openLinkedLesson\)/);
-  const rootView = await readFile(
-    resolve('apps/apple/CertigoNative/Sources/NativeRootView.swift'), 'utf8',
-  );
-  assert.match(rootView, /Button\(\s*copy\.native\(\.openLinkedLesson\)/);
+  assert.match(nativeApp, /Button\("Continue to linked lesson"/);
+  assert.match(nativeApp, /Button\("Open linked lesson"/);
 
   const pilotView = await readFile(
     resolve('apps/apple/CertigoNative/Sources/NativeEditorialPilotView.swift'),
@@ -160,7 +157,7 @@ test('URL receipt only stages a link; access and read operations stay at their V
   assert.doesNotMatch(pilotView, /\.task \{[^}]*markRead\(\)/s);
   assert.match(
     pilotView,
-    /NativePrimaryButton\(title: copy\.native\(\.markRead\), symbol: "checkmark"\)\s*\{\s*Task \{ await markRead\(\) \}\s*\}/s,
+    /Button\("Marquer comme lue"\) \{\s*Task \{ await markRead\(\) \}\s*\}/s,
   );
 });
 
