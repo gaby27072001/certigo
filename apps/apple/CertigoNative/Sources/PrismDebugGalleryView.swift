@@ -130,6 +130,49 @@
             Text(verbatim: "Motion · Haptics · Sounds · Materials · Celebrations")
           }
           Section {
+            PrismText(text: "PrismText · Display / Body / Code", style: .headline)
+            ForEach(PrismGlyph.allCases, id: \.rawValue) { glyph in
+              HStack(spacing: PrismSpacing.s) {
+                PrismIcon(glyph: glyph, accessibilityLabel: glyph.rawValue)
+                Text(verbatim: glyph.rawValue).prismTextStyle(.caption)
+              }
+            }
+            ForEach(PrismCardVariant.allCases, id: \.rawValue) { variant in
+              PrismCard(variant: variant) {
+                Text(verbatim: "PrismCard · \(variant.rawValue)").prismTextStyle(.body)
+              }
+            }
+            PrismProgressBar(
+              configuration: PrismProgressBarConfiguration(
+                progress: 0.68, accessibilityLabel: "Progress"))
+            PrismProgressRing(
+              configuration: PrismProgressRingConfiguration(
+                progress: 0.75, centerLabel: "75%", accessibilityLabel: "Ring"))
+          } header: {
+            Text(verbatim: "Phase 2 · Core Components (Foundation)")
+          }
+          Section {
+            ForEach(PrismSessionLength.allCases) { length in
+              Text(verbatim: "SessionLength · \(length.rawValue) · \(length.defaultMinutes)m")
+                .prismTextStyle(.callout)
+            }
+            ForEach(PrismConfidenceLevel.allCases) { level in
+              Text(verbatim: "Confidence · \(level.rawValue) · \(level.title)")
+                .prismTextStyle(.callout)
+            }
+            ForEach(PrismMasteryState.allCases, id: \.rawValue) { state in
+              MasteryGlyph(state: state)
+            }
+            ForEach(PrismReadinessBand.allCases, id: \.rawValue) { band in
+              Text(verbatim: "ReadinessBand · \(band.rawValue) · \(band.label)")
+                .prismTextStyle(.caption)
+            }
+            PrismOfflineBanner(
+              model: PrismOfflineBannerModel(cachedSessionsCount: 2, queuedSubmissionsCount: 1))
+          } header: {
+            Text(verbatim: "Phase 2 · Learning · Progress · Social · States · A11y")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(

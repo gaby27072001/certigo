@@ -31,6 +31,43 @@
     public static let negative = color(.negative)
     public static let caution = color(.caution)
     public static let brandPlate = color(.brandPlate)
+    public static let accentPrimary = accent
+    public static let accentSubtle = surfaceRaised
+    public static let borderStrong = textPrimary
+    public static let borderSubtle = separator
+    public static let surfaceElevated = surfaceRaised
+    public static let surfacePrimary = surface
+    public static let surfaceSecondary = surfaceRaised
+    public static let inkPrimary = textPrimary
+    public static let inkSecondary = textSecondary
+    public static let inkMuted = textTertiary
+    public static let brandPrimary = accent
+    public static let feedbackInfo = accent
+    public static let feedbackSuccess = positive
+    public static let feedbackWarning = caution
+    public static let danger = negative
+    public static let engage = accent
+    public static let engageSoft = surfaceRaised
+    public static let focus = accent
+    public static let focusSoft = surfaceRaised
+    public static let info = PrismRegion.cloud.color
+    public static let infoSoft = surfaceRaised
+    public static let mastery = PrismRegion.ai.color
+    public static let masterySoft = surfaceRaised
+    public static let success = positive
+    public static let successSoft = surfaceRaised
+    public static let warning = caution
+  }
+
+  public typealias PrismSemanticColor = Color
+  public typealias PrismColorScheme = ColorScheme
+
+  extension Color {
+    public func color(in scheme: ColorScheme) -> Color { self }
+  }
+
+  extension PrismRegion {
+    public var accent: Color { color }
   }
 
   extension PrismRegion {
