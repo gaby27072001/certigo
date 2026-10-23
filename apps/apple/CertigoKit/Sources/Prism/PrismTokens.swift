@@ -1,3 +1,4 @@
+@_exported import BrandAssets
 import Foundation
 
 public enum PrismSpacing {

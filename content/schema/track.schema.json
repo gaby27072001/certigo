@@ -4,24 +4,55 @@
   "title": "Certigo Track",
   "description": "A certification track: weighted exam domains and an ordered list of units. Domain weights MUST sum to 1.0 and drive the Readiness Score.",
   "type": "object",
-  "required": ["id", "code", "title", "domains", "units"],
+  "required": [
+    "id",
+    "code",
+    "title",
+    "domains",
+    "units"
+  ],
   "additionalProperties": false,
   "properties": {
-    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
-    "code": { "type": "string", "description": "Official exam code, e.g. AZ-900." },
-    "title": { "type": "string" },
-    "summary": { "type": "string" },
-    "level": { "type": "string", "enum": ["fundamentals", "associate", "expert"] },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "code": {
+      "type": "string",
+      "description": "Official exam code, e.g. AZ-900."
+    },
+    "title": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "level": {
+      "type": "string",
+      "enum": [
+        "fundamentals",
+        "associate",
+        "expert"
+      ]
+    },
     "domains": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "name", "weight"],
+        "required": [
+          "id",
+          "name",
+          "weight"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
           "weight": {
             "type": "number",
             "minimum": 0,
@@ -36,19 +67,41 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "domainId", "title", "lessons"],
+        "required": [
+          "id",
+          "domainId",
+          "title",
+          "lessons"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
-          "domainId": { "type": "string" },
-          "title": { "type": "string" },
+          "id": {
+            "type": "string"
+          },
+          "domainId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
           "lessons": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "description": "Lesson id (file in lessons/)." }
+            "items": {
+              "type": "string",
+              "description": "Lesson id (file in lessons/)."
+            }
           }
         }
       }
+    },
+    "products": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"
+      },
+      "description": "Optional list of official product IDs from content/brands/registry.yaml (§22A.4)."
     }
   }
 }

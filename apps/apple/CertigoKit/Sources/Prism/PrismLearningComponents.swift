@@ -260,6 +260,7 @@ public struct DiagramNode: Identifiable, Equatable, Codable, Sendable {
     public let id: String
     public let label: String
     public let productId: String?
+    public var product: String? { productId }
     public let region: PrismRegion
     public let groupId: String?
     public let roleDescription: String?
