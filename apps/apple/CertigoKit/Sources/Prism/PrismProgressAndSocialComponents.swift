@@ -1171,6 +1171,20 @@ public struct AtlasList: View {
         self.onSelectNode = onSelectNode
     }
 
+    public init(
+        nodes: [PrismAtlasNode],
+        selectedRegion: PrismRegion? = nil,
+        selectedState: PrismMasteryState?,
+        onSelectNode: @escaping (PrismAtlasNode) -> Void = { _ in }
+    ) {
+        self.init(
+            nodes: nodes,
+            selectedRegion: selectedRegion,
+            selectedMastery: selectedState,
+            onSelectNode: onSelectNode
+        )
+    }
+
     private var resolvedScheme: PrismColorScheme {
         colorScheme == .dark ? .dark : .light
     }

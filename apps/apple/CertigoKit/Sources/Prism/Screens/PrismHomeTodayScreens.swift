@@ -469,6 +469,14 @@ public struct CatalogExplorerScreen: View {
         self.onSelectGoal = onSelectGoal
     }
 
+    public init(
+        model: Binding<CatalogExplorerModel>,
+        flags: FeatureFlags = FeatureFlags(),
+        onSelectRoute: @escaping (CatalogRouteItem) -> Void
+    ) {
+        self.init(model: model, flags: flags, onSelectGoal: onSelectRoute)
+    }
+
     public var body: some View {
         List {
             Section {

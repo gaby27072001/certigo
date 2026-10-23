@@ -668,12 +668,35 @@ public struct PrismTokenComposerState: Equatable, Hashable, Codable, Sendable {
     public var availableTokens: [PrismCommandToken]
     public var selectedTokens: [PrismCommandToken]
 
+    public var commandPrefix: String
+
     public init(
+        commandPrefix: String = "",
         availableTokens: [PrismCommandToken],
         selectedTokens: [PrismCommandToken] = []
     ) {
+        self.commandPrefix = commandPrefix
         self.availableTokens = availableTokens
         self.selectedTokens = selectedTokens
+    }
+
+    public init(
+        commandPrefix: String = "",
+        availableTokens: [PrismCommandToken],
+        selectedTokenIds: [String]
+    ) {
+        self.commandPrefix = commandPrefix
+        self.availableTokens = availableTokens
+        let byId = Dictionary(uniqueKeysWithValues: availableTokens.map { ($0.id, $0) })
+        self.selectedTokens = selectedTokenIds.compactMap { byId[$0] }
+    }
+
+    public var selectedTokenIds: [String] {
+        get { selectedTokens.map(\.id) }
+        set {
+            let byId = Dictionary(uniqueKeysWithValues: availableTokens.map { ($0.id, $0) })
+            selectedTokens = newValue.compactMap { byId[$0] }
+        }
     }
 
     public var composedCommand: String {
@@ -1071,6 +1094,15 @@ public struct PrismTakeawaySpec: Identifiable, Equatable, Hashable, Codable, Sen
         self.sentence = sentence
         self.region = region
     }
+
+    public init(
+        id: String = "takeaway",
+        title: String = "À retenir",
+        text: String,
+        region: PrismRegion = PrismRegion.allCases.first!
+    ) {
+        self.init(id: id, title: title, sentence: text, region: region)
+    }
 }
 
 // MARK: - 18. HintLadderView & PrismHintLadder Models
@@ -1360,7 +1392,7 @@ public struct QuestionCard: View {
 
     public init(
         spec: PrismQuestionSpec,
-        areOptionsRevealed: Binding<Bool>
+        areOptionsRevealed: Binding<Bool> = .constant(true)
     ) {
         self.spec = spec
         self._areOptionsRevealed = areOptionsRevealed
@@ -1959,6 +1991,37 @@ public struct ChoiceList: View {
         self.isRevealed = isRevealed
     }
 
+    public init(
+        options: [PrismChoiceOption],
+        selectedIds: Binding<Set<String>>,
+        allowsMultipleSelection: Bool = false,
+        isRevealed: Bool = false
+    ) {
+        self.init(
+            options: options,
+            selectedOptionIds: selectedIds,
+            allowsMultipleSelection: allowsMultipleSelection,
+            isRevealed: isRevealed
+        )
+    }
+
+    public init(
+        options: [PrismChoiceOption],
+        selectedIds: Binding<[String]>,
+        allowsMultipleSelection: Bool = false,
+        isRevealed: Bool = false
+    ) {
+        self.init(
+            options: options,
+            selectedOptionIds: Binding(
+                get: { Set(selectedIds.wrappedValue) },
+                set: { selectedIds.wrappedValue = Array($0).sorted() }
+            ),
+            allowsMultipleSelection: allowsMultipleSelection,
+            isRevealed: isRevealed
+        )
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: PrismSpacing.sm) {
             ForEach(options) { option in
@@ -2066,6 +2129,10 @@ public struct ConfidencePicker: View {
 
     public init(selectedLevel: Binding<PrismConfidenceLevel?>) {
         self._selectedLevel = selectedLevel
+    }
+
+    public init(selectedConfidence: Binding<PrismConfidenceLevel?>) {
+        self._selectedLevel = selectedConfidence
     }
 
     public var body: some View {
