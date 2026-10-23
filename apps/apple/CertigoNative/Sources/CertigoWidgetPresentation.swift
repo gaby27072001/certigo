@@ -76,7 +76,7 @@ struct CertigoWidgetCardView: View {
       accessoryCircular(snapshot)
     case .accessoryRectangular, .accessoryInline:
       accessoryRectangular(snapshot)
-    @unknown default:
+    default:
       unavailable
     }
   }
