@@ -10,9 +10,19 @@
     <line id="Capline-M" x1="263" y1="1055.54" x2="3036" y2="1055.54" />
     <line id="Baseline-L" x1="263" y1="1556" x2="3036" y2="1556" />
     <line id="Capline-L" x1="263" y1="1485.54" x2="3036" y2="1485.54" />
+    <line id="left-margin-Ultralight-S" x1="515" y1="600" x2="515" y2="722" />
+    <line id="right-margin-Ultralight-S" x1="595" y1="600" x2="595" y2="722" />
+    <line id="left-margin-Regular-S" x1="1340" y1="600" x2="1340" y2="722" />
+    <line id="right-margin-Regular-S" x1="1420" y1="600" x2="1420" y2="722" />
+    <line id="left-margin-Black-S" x1="2815" y1="600" x2="2815" y2="722" />
+    <line id="right-margin-Black-S" x1="2895" y1="600" x2="2895" y2="722" />
+    <line id="left-margin-Regular-M" x1="1335" y1="1030" x2="1335" y2="1152" />
+    <line id="right-margin-Regular-M" x1="1425" y1="1030" x2="1425" y2="1152" />
   </g>
   <g id="Symbols">
+    <g id="Ultralight-S"><path d="M555 626 L595 661 L555 696 L515 661 Z"/></g>
     <g id="Regular-S"><path d="M1380 626 L1420 661 L1380 696 L1340 661 Z"/></g>
+    <g id="Black-S"><path d="M2855 626 L2895 661 L2855 696 L2815 661 Z"/></g>
     <g id="Regular-M"><path d="M1380 1056 L1425 1091 L1380 1126 L1335 1091 Z"/></g>
     <g id="Regular-L"><path d="M1380 1486 L1430 1521 L1380 1556 L1330 1521 Z"/></g>
   </g>

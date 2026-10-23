@@ -556,8 +556,8 @@ public struct PrismAppShellView: View {
                         router.push(.conceptDetail(id: result.id), in: .search)
                     case .route:
                         router.push(.routeObjective(trackCode: result.id), in: .search)
-                    case .situation:
-                        router.presentCover(.dailySituation)
+                    case .product:
+                        router.push(.catalogExplorer, in: .search)
                     }
                 }
             )

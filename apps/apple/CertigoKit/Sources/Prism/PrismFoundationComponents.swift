@@ -698,6 +698,22 @@ public struct PrismText: View {
         )
     }
 
+    public init(
+        text: String,
+        style: PrismTextStyle = .body,
+        role: PrismColorRole = .textPrimary,
+        lineLimit: Int? = nil,
+        isMonospacedDigits: Bool = false
+    ) {
+        self.init(
+            text,
+            style: style,
+            role: role,
+            lineLimit: lineLimit,
+            isMonospacedDigits: isMonospacedDigits
+        )
+    }
+
     public var body: some View {
         Group {
             if configuration.isMonospacedDigits {

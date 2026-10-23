@@ -155,6 +155,8 @@ extension PrismColorRole {
 
 extension PrismRegion {
   public static let azure: Self = .cloud
+    public static let networking: Self = .network
+    public static let devOps: Self = .devops
 
   public var displayName: String {
     switch self {
