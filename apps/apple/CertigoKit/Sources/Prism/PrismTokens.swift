@@ -40,6 +40,7 @@ public enum PrismSize {
 public enum PrismTextStyle: String, Codable, Hashable, CaseIterable, Sendable {
   case display, title1, title2, title3, headline, body, editorial, callout
   case subheadline, footnote, caption, code, codeSmall, numeric
+    public static let caption1: Self = .caption
 }
 
 public enum PrismMotionToken: String, Codable, Hashable, CaseIterable, Sendable {

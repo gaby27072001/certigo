@@ -744,7 +744,7 @@ public struct PrismAppShellView: View {
         case .certigoPro:
             CertigoProSheetScreen()
         case .shareCard(let payload):
-            ShareCardRenderer(payload: payload)
+            PrismShareCardView(payload: payload)
         }
     }
 }

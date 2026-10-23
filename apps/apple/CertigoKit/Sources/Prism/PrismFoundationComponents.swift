@@ -486,6 +486,7 @@ public enum PrismBadgeSemantics: Equatable, Hashable, Sendable {
     case caution
     case negative
     case region(PrismRegion)
+    public static let warning: Self = .caution
 
     public var foregroundRole: PrismColorRole {
         switch self {
