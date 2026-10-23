@@ -179,10 +179,10 @@
             }
             PrismProgressBar(
               configuration: PrismProgressBarConfiguration(
-                progress: 0.68, accessibilityLabel: "Progress"))
+                progress: 0.68, label: "Progress"))
             PrismProgressRing(
               configuration: PrismProgressRingConfiguration(
-                progress: 0.75, centerLabel: "75%", accessibilityLabel: "Ring"))
+                progress: 0.75, centerLabel: "75%"))
           } header: {
             Text(verbatim: "Phase 2 · Core Components (Foundation)")
           }
@@ -199,11 +199,11 @@
               MasteryGlyph(state: state)
             }
             ForEach(PrismReadinessBand.allCases, id: \.rawValue) { band in
-              Text(verbatim: "ReadinessBand · \(band.rawValue) · \(band.label)")
+              Text(verbatim: "ReadinessBand · \(band.rawValue) · \(band.title)")
                 .prismTextStyle(.caption)
             }
             PrismOfflineBanner(
-              model: PrismOfflineBannerModel(cachedSessionsCount: 2, queuedSubmissionsCount: 1))
+              model: PrismOfflineBannerModel(cachedPlayableSessionsCount: 2, queuedSubmissionsCount: 1))
           } header: {
             Text(verbatim: "Phase 2 · Learning · Progress · Social · States · A11y")
           }

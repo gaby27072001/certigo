@@ -522,7 +522,6 @@ public struct AtlasCompleteScreen: View {
                 } else {
                     AtlasCanvas(
                         nodes: model.visibleFilteredNodes,
-                        selectedRegion: model.selectedRegion,
                         onSelectNode: onSelectNode
                     )
                 }
