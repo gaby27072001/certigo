@@ -253,6 +253,14 @@
             Text(verbatim: "Phase 10 · Onboarding 60s, Pro StoreKit 2, Settings & iOS Surfaces (§14–15)")
           }
           Section {
+            ForEach(AppStoreAccessibilityNutritionLabel.allCases) { label in
+              Text(verbatim: "App Store Label · \(label.storeDisplayName)")
+                .prismTextStyle(.callout)
+            }
+          } header: {
+            Text(verbatim: "Phase 11 · Accessibility AX5, Budgets §30 & App Store Labels (§28–34)")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(
