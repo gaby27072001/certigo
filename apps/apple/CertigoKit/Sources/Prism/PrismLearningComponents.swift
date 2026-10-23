@@ -42,6 +42,13 @@ public struct PrismSessionProgressModel: Equatable, Codable, Sendable {
 // MARK: - 2. SessionLengthPicker & PrismSessionLength Models
 
 public enum PrismSessionLength: String, CaseIterable, Codable, Sendable, Identifiable {
+    public var defaultMinutes: Int {
+        switch self {
+        case .express: 5
+        case .standard: 15
+        case .deepDive: 35
+        }
+    }
     case express
     case standard
     case deepDive

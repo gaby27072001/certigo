@@ -279,7 +279,7 @@ public struct PrismCelebrationConfig: Equatable, Sendable, Identifiable {
 
 // MARK: - 7. Share Card Payload & Spoiler-Free Validation (§15 NS-7, §19, §22A.7)
 
-public struct PrismShareCardPayload: Equatable, Sendable, Identifiable {
+public struct PrismShareCardPayload: Equatable, Hashable, Sendable, Identifiable {
     public static let forbiddenThirdPartyBrands: [String] = [
         "microsoft", "amazon", "aws", "google", "gcp", "cisco", "comptia", "oracle", "ibm", "hashicorp", "red hat"
     ]
