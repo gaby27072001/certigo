@@ -485,6 +485,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.dev.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -510,6 +512,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.dev.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -534,6 +538,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				CURRENT_PROJECT_VERSION = "$(CERTIGO_DISTRIBUTION_BUILD)";
+				MARKETING_VERSION = "$(CERTIGO_DISTRIBUTION_VERSION)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.mobileapp.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

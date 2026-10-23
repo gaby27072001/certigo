@@ -322,15 +322,7 @@ struct NativeWidgetGalleryView: View {
     var applicationIsActive: Bool { UIApplication.shared.applicationState == .active }
 
     func setAlternateIconName(_ name: String?) async throws {
-      try await withCheckedThrowingContinuation { continuation in
-        UIApplication.shared.setAlternateIconName(name) { error in
-          if let error {
-            continuation.resume(throwing: error)
-          } else {
-            continuation.resume()
-          }
-        }
-      }
+      try await UIApplication.shared.setAlternateIconName(name)
     }
   }
 
@@ -538,7 +530,7 @@ struct NativeWidgetGalleryView: View {
     } catch let clearError as CertigoWidgetStoreError {
       error = clearError
     } catch {
-      error = .storageUnavailable
+      self.error = .storageUnavailable
     }
   }
 
@@ -550,7 +542,7 @@ struct NativeWidgetGalleryView: View {
     } catch let storeError as CertigoWidgetStoreError {
       error = storeError
     } catch {
-      error = .storageUnavailable
+      self.error = .storageUnavailable
     }
     reloadTimelines()
   }
