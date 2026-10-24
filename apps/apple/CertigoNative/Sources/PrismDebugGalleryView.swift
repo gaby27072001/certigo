@@ -16,40 +16,40 @@
           content
         }
       }
-      .overlay(alignment: .bottomTrailing) {
-        HStack(spacing: PrismSpacing.xs) {
+      .overlay(alignment: .topTrailing) {
+        Menu {
           Button {
             showPrismShell.toggle()
           } label: {
             Label {
-              Text(verbatim: (showPrismShell || flags.isEnabled(.prism)) ? "Vue Legacy" : "App Prism")
+              Text(
+                verbatim: (showPrismShell || flags.isEnabled(.prism))
+                  ? "Basculer vers Connexion CIAM / Vue Classique"
+                  : "Basculer vers App Prism (5 onglets)"
+              )
             } icon: {
-              Image(systemName: "sparkles")
+              Image(systemName: "arrow.triangle.2.circlepath")
             }
-            .prismTextStyle(.caption)
-            .frame(minHeight: PrismSize.minTouch)
-            .padding(.horizontal, PrismSpacing.m)
-            .background(PrismColor.surface, in: Capsule())
           }
-          .accessibilityIdentifier("toggle-prism-shell")
-
           Button {
             presented = true
           } label: {
             Label {
-              Text(verbatim: "Prism D-1")
+              Text(verbatim: "Inspecteur & Flags Prism (D-1)")
             } icon: {
               Image(systemName: "slider.horizontal.3")
             }
-            .prismTextStyle(.caption)
-            .frame(minHeight: PrismSize.minTouch)
-            .padding(.horizontal, PrismSpacing.m)
-            .background(PrismColor.surface, in: Capsule())
           }
-          .accessibilityIdentifier("open-prism-gallery")
+        } label: {
+          Image(systemName: "slider.horizontal.3")
+            .prismTextStyle(.subheadline)
+            .foregroundStyle(PrismColor.textSecondary)
+            .frame(width: PrismSize.minTouch, height: PrismSize.minTouch)
+            .background(PrismColor.surfaceRaised, in: Circle())
         }
-        .padding(.horizontal, PrismSpacing.m)
-        .padding(.bottom, PrismSpacing.giant)
+        .accessibilityIdentifier("open-prism-gallery")
+        .padding(.trailing, PrismSpacing.m)
+        .padding(.top, PrismSpacing.xs)
       }
       .sheet(
         isPresented: $presented,
