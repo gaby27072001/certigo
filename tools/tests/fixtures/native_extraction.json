@@ -1,0 +1,154 @@
+{
+  "NativeCatalogModels.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        1,
+        306
+      ],
+      [
+        8523,
+        8565
+      ]
+    ],
+    "prefix": "",
+    "suffix": "",
+    "sha256": "618530cbee44c6defe2b366deb504c279faf4b01a7015efd98a505a5da15d602"
+  },
+  "NativeCopyCatalog.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        307,
+        2744
+      ]
+    ],
+    "prefix": "import Foundation\n\n#if canImport(CertigoDomain)\n    import CertigoDomain\n\n",
+    "suffix": "#endif\n",
+    "sha256": "723d4998a07864b973808d4f54d43a234c3d218f68ee072f9da6ba33a68925b6"
+  },
+  "NativeSharedComponents.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        2756,
+        2772
+      ],
+      [
+        3159,
+        4140
+      ]
+    ],
+    "prefix": "import Foundation\n\n#if canImport(SwiftUI)\n    import AVFoundation\n    import CertigoData\n    import CertigoDomain\n    import Observation\n    import SwiftUI\n    import UIKit\n\n",
+    "suffix": "#endif\n",
+    "sha256": "7fb8d488430a515e5b1c1d534b15ee078e0d71179ab6e39971a62516e97e59d5"
+  },
+  "NativeStudyAndExamViews.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        2774,
+        3062
+      ]
+    ],
+    "prefix": "import Foundation\n\n#if canImport(SwiftUI)\n    import AVFoundation\n    import CertigoData\n    import CertigoDomain\n    import Observation\n    import SwiftUI\n    import UIKit\n\n",
+    "suffix": "#endif\n",
+    "sha256": "2f09e5edec522d629922bf1f77438485ecde1da15a51fa79261e378d8530d2ef"
+  },
+  "CertigoNativeApp.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        3064,
+        3157
+      ]
+    ],
+    "prefix": "import Foundation\n\n#if canImport(SwiftUI)\n    import AVFoundation\n    import CertigoData\n    import CertigoDomain\n    import Observation\n    import SwiftUI\n    import UIKit\n\n",
+    "suffix": "#endif\n",
+    "sha256": "c5acd22f56711755de8e6dc33f3f3e8598825674c1ee27e4c32b9ba6464372c1"
+  },
+  "NativeEntryViews.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        4142,
+        4582
+      ]
+    ],
+    "prefix": "import Foundation\n\n#if canImport(SwiftUI)\n    import AVFoundation\n    import CertigoData\n    import CertigoDomain\n    import Observation\n    import SwiftUI\n    import UIKit\n\n",
+    "suffix": "#endif\n",
+    "sha256": "df46ebdf3a48f7ca8e4aaab05f2e1aab65f391ba96f89c3d4b52f0d752ab88e3"
+  },
+  "NativeDemoViews.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        4584,
+        5470
+      ]
+    ],
+    "prefix": "import Foundation\n\n#if canImport(SwiftUI)\n    import AVFoundation\n    import CertigoData\n    import CertigoDomain\n    import Observation\n    import SwiftUI\n    import UIKit\n\n",
+    "suffix": "#endif\n",
+    "sha256": "a18927b3f0d7b2a263a047007893be6eaccf9af8831990087f159b25b75d07d2"
+  },
+  "NativeDemoModels.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        5473,
+        5827
+      ]
+    ],
+    "prefix": "import Foundation\n\n",
+    "suffix": "",
+    "sha256": "8826d6cb2adec913b84c6fdfb991332c234846b104156a00f5694914d9b162f8"
+  },
+  "NativeAccountDeletionView.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        5830,
+        5988
+      ]
+    ],
+    "prefix": "import Foundation\n\n#if canImport(SwiftUI)\n    import AVFoundation\n    import CertigoData\n    import CertigoDomain\n    import Observation\n    import SwiftUI\n    import UIKit\n\n",
+    "suffix": "#endif\n",
+    "sha256": "43eb3fa9194ab891a951dcebca3bd56da79dbc7808c8a76d04a684b44f57df03"
+  },
+  "NativeRootView.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        5990,
+        8241
+      ]
+    ],
+    "prefix": "import Foundation\n\n#if canImport(SwiftUI)\n    import AVFoundation\n    import CertigoData\n    import CertigoDomain\n    import Observation\n    import SwiftUI\n    import UIKit\n\n",
+    "suffix": "#endif\n",
+    "sha256": "253a3b0392e06efb4cc6d4f5e481d8d1d6c9c9cf5620fb169369e9aad8bbc73d"
+  },
+  "NativeLessonAudioViews.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        8243,
+        8445
+      ]
+    ],
+    "prefix": "import Foundation\n\n#if canImport(SwiftUI)\n    import AVFoundation\n    import CertigoData\n    import CertigoDomain\n    import Observation\n    import SwiftUI\n    import UIKit\n\n",
+    "suffix": "#endif\n",
+    "sha256": "6668b9ad723897dc840191dd5291c550059d246baa8acc09ec34b8dcc56ce9e6"
+  },
+  "NativeLessonReadingContent.swift": {
+    "baseline": "778f9c247ceb9c0db29fb931a8573bd328b492ab",
+    "ranges": [
+      [
+        8448,
+        8521
+      ]
+    ],
+    "prefix": "import Foundation\n\n",
+    "suffix": "",
+    "sha256": "8bc9e088f2a7869d239a6ef7a114be2a08430f6a3b24175546f18a936c447d6c"
+  }
+}

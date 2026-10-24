@@ -1,4 +1,13 @@
 import { parseDocument } from 'yaml';
+import {
+  nativeAppleWorkflowFile,
+  validateNativeAppleWorkflow,
+} from './native-apple-workflow-policy.mjs';
+import path from 'node:path';
+import {
+  isReviewedGenerationJob,
+  isReviewedMainCodeqlJob,
+} from './backend-deploy-workflow-policy.mjs';
 import { isHostedLinuxCiRunner, validateHostedLinuxJob } from './linux-ci-runner-policy.mjs';
 
 // Ensembles de labels autorisés, sur le YAML analysé. La règle textuelle de
@@ -18,7 +27,10 @@ function isAllowedLabelSet(labels) {
   ));
 }
 
-export function validateRunnerLabels(text, label) {
+export function validateRunnerLabels(text, label, { trustedRoot } = {}) {
+  if (path.basename(label) === nativeAppleWorkflowFile) {
+    return validateNativeAppleWorkflow(text, label);
+  }
   const document = parseDocument(text, {
     merge: false,
     strict: true,
@@ -45,6 +57,12 @@ export function validateRunnerLabels(text, label) {
       || typeof job !== 'object'
       || Array.isArray(job)
       || !Object.hasOwn(job, 'runs-on')
+    ) {
+      continue;
+    }
+    if (
+      isReviewedGenerationJob(text, label, jobId, trustedRoot)
+      || isReviewedMainCodeqlJob(text, label, jobId, trustedRoot)
     ) {
       continue;
     }

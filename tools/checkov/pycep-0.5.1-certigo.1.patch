@@ -1,0 +1,172 @@
+--- a/pycep/bicep.lark
++++ b/pycep/bicep.lark
+@@ -57,7 +57,7 @@
+ 
+ loop_object: STRING "in" "items" "(" value_brackets ")"
+ 
+-loop_range: ["(" STRING ","] STRING ")"? "in" "range" "(" value_brackets "," value_brackets ")"
++loop_range.2: ["(" STRING ","] STRING ")"? "in" _RANGE_FUNC "(" value_brackets "," value_brackets ")"
+ 
+ // deploy condition
+ 
+@@ -69,7 +69,7 @@
+ 
+ array: "[" _CPP_COMMENT_NL~0..10 (value_brackets ("," value_brackets)* _CPP_COMMENT_NL~0..5)* "]"
+ 
+-object: "{" _CPP_COMMENT_NL~0..10 ((pair ("," pair)* | child_resource) _CPP_COMMENT_NL~0..5)* "}"
++object: "{" _CPP_COMMENT_NL* ((pair ("," pair)* | child_resource) _CPP_COMMENT_NL*)* "}"
+ 
+ pair: key ":" (value_brackets | loop) "?"?
+ 
+@@ -116,7 +116,7 @@
+ _ARRAY.1: ("array" | "sys.array") "("
+ array_func: _ARRAY value_brackets ")"
+ 
+-concat: ("concat" | "sys.concat") "(" value_brackets ("," value_brackets)* ")"
++concat: ("concat" | "sys.concat") "(" _CPP_COMMENT_NL? value_brackets ("," _CPP_COMMENT_NL? value_brackets)* _CPP_COMMENT_NL? ")"
+ 
+ contains: ("contains" | "sys.contains") "(" value_brackets "," value_brackets ")"
+ 
+@@ -143,7 +143,7 @@
+ 
+ take: ("take" | "sys.take") "(" value_brackets "," value_brackets ")"
+ 
+-union: ("union" | "sys.union") "(" value_brackets ("," _CPP_COMMENT_NL? value_brackets)+ _CPP_COMMENT_NL? ")" ["." STRING]
++union: ("union" | "sys.union") "(" _CPP_COMMENT_NL? value_brackets ("," _CPP_COMMENT_NL? value_brackets)+ _CPP_COMMENT_NL? ")" ["." STRING]
+ 
+ // functions - date
+ 
+@@ -181,20 +181,31 @@
+ 
+ // functions - lambda
+ 
+-?function_lambda: filter
++?function_lambda: filter | map_func | reduce_func | to_object_func
++
++map_func: ("map" | "sys.map") "(" _CPP_COMMENT_NL? value_brackets "," _CPP_COMMENT_NL? STRING "=>" value_brackets _CPP_COMMENT_NL? ")"
++
++reduce_func: ("reduce" | "sys.reduce") "(" _CPP_COMMENT_NL? value_brackets "," _CPP_COMMENT_NL? value_brackets "," _CPP_COMMENT_NL? "(" STRING "," STRING ")" "=>" value_brackets _CPP_COMMENT_NL? ")"
++
++to_object_func: ("toObject" | "sys.toObject") "(" _CPP_COMMENT_NL? value_brackets "," _CPP_COMMENT_NL? STRING "=>" value_brackets "," _CPP_COMMENT_NL? STRING "=>" value_brackets _CPP_COMMENT_NL? ")"
+ 
+ filter: ("filter" | "sys.filter") "(" value_brackets "," STRING "=>" value_brackets ")"
+ 
+ // functions - logical
+ 
+-?function_logical: bool_func
++?function_logical: bool_func | fail_func
++
++fail_func: ("fail" | "sys.fail") "(" value_brackets ")"
+ 
+ _BOOL.1: ("bool" | "sys.bool") "("
+ bool_func: _BOOL value_brackets ")"
+ 
+ // functions - numeric
+ 
+-?function_numeric: int_func
++?function_numeric: int_func | range_func
++
++_RANGE_FUNC.1: /(?:sys\.)?range(?=[ \t]*\()/
++range_func: _RANGE_FUNC "(" value_brackets "," value_brackets ")"
+ 
+ _INT.1: ("int" | "sys.int") "("
+ int_func: _INT value_brackets ")"
+@@ -226,7 +237,7 @@
+ _RESOURCE_ID.1: ("resourceId" | "az.resourceId") "("
+ resource_id: _RESOURCE_ID value_brackets ("," value_brackets)~1..9 _CPP_COMMENT_NL? ")"
+ 
+-subscription_resource_id: ("subscriptionResourceId" | "az.subscriptionResourceId") "(" value_brackets ("," value_brackets)~1..3 ")"
++subscription_resource_id: ("subscriptionResourceId" | "az.subscriptionResourceId") "(" _CPP_COMMENT_NL? value_brackets ("," _CPP_COMMENT_NL? value_brackets)~1..3 _CPP_COMMENT_NL? ")"
+ 
+ tenant_resource_id: ("tenantResourceId" | "az.tenantResourceId") "(" value_brackets ("," value_brackets)~1..2 ")"
+ 
+@@ -268,7 +279,7 @@
+ format: _FORMAT _CPP_COMMENT_NL? value_brackets ("," value_brackets)+ _CPP_COMMENT_NL? ")"
+ 
+ _GUID.1: ("guid" | "sys.guid") "("
+-guid: _GUID value_brackets ("," value_brackets)* ")"
++guid: _GUID _CPP_COMMENT_NL? value_brackets ("," _CPP_COMMENT_NL? value_brackets)* _CPP_COMMENT_NL? ")"
+ 
+ index_of: ("indexOf" | "sys.indexOf") "(" value_brackets "," value_brackets ")"
+ 
+@@ -282,7 +293,7 @@
+ 
+ split: ("split" | "sys.split") "(" value_brackets "," value_brackets ")" ["[" INT "]"]
+ 
+-join: ("join" | "sys.join") "(" value_brackets "," value_brackets ")"
++join: ("join" | "sys.join") "(" _CPP_COMMENT_NL? value_brackets "," _CPP_COMMENT_NL? value_brackets _CPP_COMMENT_NL? ")"
+ 
+ starts_with: ("startsWith" | "sys.startsWith") "(" value_brackets "," value_brackets ")"
+ 
+@@ -343,7 +354,7 @@
+ 
+ coalesce: value_brackets "??" value_brackets
+ 
+-conditional: value_brackets "?" value_brackets ":" value_brackets
++conditional: value_brackets ("?" | _TERNARY_QUESTION) value_brackets (":" | _TERNARY_COLON) value_brackets
+ 
+ // operators - numeric
+ 
+@@ -378,6 +389,9 @@
+ 
+ EXISTING: "existing"
+ 
++_TERNARY_QUESTION.2: /[ \t]*\r?\n[ \t]*\?/
++_TERNARY_COLON.2: /[ \t]*\r?\n[ \t]*:/
++
+ STRING: /(?!(sys|az)\.)[a-zA-Z_]([\w_])*/
+ QUOTED_STRING: "'" /[a-zA-Z_]([\w_.])*/ "'"
+ INDEXED: /(?=[\w][\w_.]+(.(get|list)[a-zA-Z]*\(('[\w-]+'|[\w.]+)?\)|[\[\]])+)(.(get|list)[a-zA-Z]*\(('[\w-]+'|[\w.]+)?\)|\[[\w\[\]_().']+\]|[\w_\-\/.,'= ])+/
+--- a/pycep/transformer.py
++++ b/pycep/transformer.py
+@@ -889,6 +889,50 @@
+     #
+     ####################
+ 
++    def range_func(self, args: tuple[pycep_typing.PossibleValue, pycep_typing.PossibleValue]) -> dict[str, Any]:
++        start, count = args
++        return {"type": "range", "parameters": {"start": start, "count": count}}
++
++    def fail_func(self, args: tuple[pycep_typing.PossibleValue]) -> dict[str, Any]:
++        return {"type": "fail", "parameters": {"message": args[0]}}
++
++    def reduce_func(self, args: tuple) -> dict[str, Any]:
++        input_array, initial_value, accumulator, item, expression = args
++        return {
++            "type": "reduce",
++            "parameters": {
++                "input_array": input_array,
++                "initial_value": initial_value,
++                "accumulator": str(accumulator),
++                "input_element": str(item),
++                "expression": expression,
++            },
++        }
++
++    def to_object_func(self, args: tuple) -> dict[str, Any]:
++        input_array, key_item, key_expression, value_item, value_expression = args
++        return {
++            "type": "toObject",
++            "parameters": {
++                "input_array": input_array,
++                "key_element": str(key_item),
++                "key_expression": key_expression,
++                "value_element": str(value_item),
++                "value_expression": value_expression,
++            },
++        }
++
++    def map_func(self, args: tuple[pycep_typing.PossibleValue, Token, pycep_typing.PossibleValue]) -> dict[str, Any]:
++        input_array, input_element, expression = args
++        return {
++            "type": "map",
++            "parameters": {
++                "input_array": input_array,
++                "input_element": str(input_element),
++                "expression": expression,
++            },
++        }
++
+     def filter(self, args: tuple[pycep_typing.PossibleValue, Token, pycep_typing.PossibleValue]) -> pycep_typing.Filter:
+         input_array, input_element, expression = args
+ 

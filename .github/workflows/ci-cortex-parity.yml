@@ -43,7 +43,7 @@ jobs:
     name: Detect changed paths
     needs: freshness
     if: ${{ always() && github.event_name == 'pull_request_target' && needs.freshness.outputs.current != 'false' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -69,7 +69,7 @@ jobs:
       && (github.event_name != 'pull_request_target' || needs.freshness.outputs.current != 'false')
       && (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name != 'pull_request_target' || needs.changes.outputs.relevant != 'false')
-    runs-on: [self-hosted, Linux, X64, certigo-pr]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read

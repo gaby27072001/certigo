@@ -71,6 +71,10 @@ if (
 ) {
   throw 'Image transition is blocked until APT and Flutter network artifacts are fully locked.'
 }
+& node (Join-Path $scriptRoot 'validate-network-inputs.mjs') --prepare-contract
+if ($LASTEXITCODE -ne 0) {
+  throw 'The exact network lock contract commit must be available and verified before validation.'
+}
 & node (Join-Path $scriptRoot 'validate-network-inputs.mjs')
 if ($LASTEXITCODE -ne 0) {
   throw 'Network lock files and exhaustive offline consumption must be validated before any Azure call.'

@@ -1,0 +1,24 @@
+{
+  "attemptId": "demo-attempt",
+  "scorePct": 0,
+  "results": [
+    {
+      "itemId": "demo-item",
+      "correct": false,
+      "conceptId": "demo-concept",
+      "correctAnswer": ["a"],
+      "explanation": "Synthetic feedback returned only after submission.",
+      "masteryDelta": -0.05
+    }
+  ],
+  "rewards": {
+    "xpEarned": 0,
+    "newXp": 100,
+    "levelUp": false,
+    "streakExtended": false,
+    "gemsEarned": 0,
+    "achievementsUnlocked": []
+  },
+  "weakConcepts": ["demo-concept"],
+  "nextReviewDueAt": "2026-10-02T12:00:00+00:00"
+}

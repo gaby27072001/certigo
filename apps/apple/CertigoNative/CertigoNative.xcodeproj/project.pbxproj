@@ -1,0 +1,643 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		000000000000000000000101 /* Prism in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000102 /* Prism */; };
+		000000000000000000000103 /* PrismDebugGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000104 /* PrismDebugGalleryView.swift */; };
+		000000000000000000000001 /* CertigoNativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000011 /* CertigoNativeApp.swift */; };
+		000000000000000000000002 /* NativeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000012 /* NativeModel.swift */; };
+		000000000000000000000003 /* CredentialVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000013 /* CredentialVault.swift */; };
+		000000000000000000000004 /* CertigoDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000041 /* CertigoDomain */; };
+		000000000000000000000005 /* CertigoData in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000042 /* CertigoData */; };
+		000000000000000000000006 /* MSALAuthenticationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000015 /* MSALAuthenticationProvider.swift */; };
+		000000000000000000000007 /* MSAL in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000044 /* MSAL */; };
+		000000000000000000000008 /* Certigo.icon in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000016 /* Certigo.icon */; };
+		000000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000017 /* PrivacyInfo.xcprivacy */; };
+		00000000000000000000000A /* NativeEditorialPilotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000018 /* NativeEditorialPilotView.swift */; };
+		0000000000000000000000A1 /* CertigoWidgetPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000B1 /* CertigoWidgetPresentation.swift */; };
+		0000000000000000000000A2 /* NativeWidgetGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000B2 /* NativeWidgetGalleryView.swift */; };
+		0000000000000000000000A3 /* CertigoWidgetPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000B1 /* CertigoWidgetPresentation.swift */; };
+		0000000000000000000000A4 /* CertigoWidgetExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000B3 /* CertigoWidgetExtension.swift */; };
+		0000000000000000000000A5 /* CertigoWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000B5 /* CertigoWidgetExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		0000000000000000000000A6 /* CertigoData in Frameworks */ = {isa = PBXBuildFile; productRef = 0000000000000000000000B6 /* CertigoData */; };
+		0000000000000000000000A7 /* CertigoDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 0000000000000000000000B7 /* CertigoDomain */; };
+		0000000000000000000000D1 /* CertigoAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000D2 /* CertigoAssets.xcassets */; };
+		0000000000000000000000F1 /* NativeCatalogModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E1 /* NativeCatalogModels.swift */; };
+		0000000000000000000000F2 /* NativeCopyCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E2 /* NativeCopyCatalog.swift */; };
+		0000000000000000000000F3 /* NativeSharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E3 /* NativeSharedComponents.swift */; };
+		0000000000000000000000F4 /* NativeStudyAndExamViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E4 /* NativeStudyAndExamViews.swift */; };
+		0000000000000000000000F5 /* NativeEntryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E5 /* NativeEntryViews.swift */; };
+		0000000000000000000000F6 /* NativeDemoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E6 /* NativeDemoViews.swift */; };
+		0000000000000000000000F7 /* NativeDemoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E7 /* NativeDemoModels.swift */; };
+		0000000000000000000000F8 /* NativeAccountDeletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E8 /* NativeAccountDeletionView.swift */; };
+		0000000000000000000000F9 /* NativeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E9 /* NativeRootView.swift */; };
+		0000000000000000000000FA /* NativeLessonAudioViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000EA /* NativeLessonAudioViews.swift */; };
+		0000000000000000000000FB /* NativeLessonReadingContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000EB /* NativeLessonReadingContent.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		000000000000000000000104 /* PrismDebugGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrismDebugGalleryView.swift; sourceTree = "<group>"; };
+		000000000000000000000011 /* CertigoNativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertigoNativeApp.swift; sourceTree = "<group>"; };
+		000000000000000000000012 /* NativeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeModel.swift; sourceTree = "<group>"; };
+		000000000000000000000013 /* CredentialVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialVault.swift; sourceTree = "<group>"; };
+		000000000000000000000014 /* CertigoNative.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = CertigoNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000015 /* MSALAuthenticationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MSALAuthenticationProvider.swift; sourceTree = "<group>"; };
+		000000000000000000000016 /* Certigo.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Certigo.icon; sourceTree = "<group>"; };
+		000000000000000000000017 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		000000000000000000000018 /* NativeEditorialPilotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeEditorialPilotView.swift; sourceTree = "<group>"; };
+		0000000000000000000000B1 /* CertigoWidgetPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertigoWidgetPresentation.swift; sourceTree = "<group>"; };
+		0000000000000000000000B2 /* NativeWidgetGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWidgetGalleryView.swift; sourceTree = "<group>"; };
+		0000000000000000000000B3 /* CertigoWidgetExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertigoWidgetExtension.swift; sourceTree = "<group>"; };
+		0000000000000000000000B4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		0000000000000000000000B5 /* CertigoWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = CertigoWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		0000000000000000000000D2 /* CertigoAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = CertigoAssets.xcassets; sourceTree = "<group>"; };
+		0000000000000000000000E1 /* NativeCatalogModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCatalogModels.swift; sourceTree = "<group>"; };
+		0000000000000000000000E2 /* NativeCopyCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCopyCatalog.swift; sourceTree = "<group>"; };
+		0000000000000000000000E3 /* NativeSharedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSharedComponents.swift; sourceTree = "<group>"; };
+		0000000000000000000000E4 /* NativeStudyAndExamViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeStudyAndExamViews.swift; sourceTree = "<group>"; };
+		0000000000000000000000E5 /* NativeEntryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeEntryViews.swift; sourceTree = "<group>"; };
+		0000000000000000000000E6 /* NativeDemoViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDemoViews.swift; sourceTree = "<group>"; };
+		0000000000000000000000E7 /* NativeDemoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDemoModels.swift; sourceTree = "<group>"; };
+		0000000000000000000000E8 /* NativeAccountDeletionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAccountDeletionView.swift; sourceTree = "<group>"; };
+		0000000000000000000000E9 /* NativeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRootView.swift; sourceTree = "<group>"; };
+		0000000000000000000000EA /* NativeLessonAudioViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeLessonAudioViews.swift; sourceTree = "<group>"; };
+		0000000000000000000000EB /* NativeLessonReadingContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeLessonReadingContent.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		000000000000000000000031 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000004 /* CertigoDomain in Frameworks */,
+				000000000000000000000005 /* CertigoData in Frameworks */,
+				000000000000000000000101 /* Prism in Frameworks */,
+				000000000000000000000007 /* MSAL in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000020 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000021 /* Sources */,
+				000000000000000000000023 /* Resources */,
+				000000000000000000000022 /* Products */,
+				0000000000000000000000B8 /* WidgetExtension */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000023 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000016 /* Certigo.icon */,
+				000000000000000000000017 /* PrivacyInfo.xcprivacy */,
+				0000000000000000000000D2 /* CertigoAssets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		000000000000000000000021 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000011 /* CertigoNativeApp.swift */,
+				000000000000000000000104 /* PrismDebugGalleryView.swift */,
+				0000000000000000000000EB /* NativeLessonReadingContent.swift */,
+				0000000000000000000000EA /* NativeLessonAudioViews.swift */,
+				0000000000000000000000E9 /* NativeRootView.swift */,
+				0000000000000000000000E8 /* NativeAccountDeletionView.swift */,
+				0000000000000000000000E7 /* NativeDemoModels.swift */,
+				0000000000000000000000E6 /* NativeDemoViews.swift */,
+				0000000000000000000000E5 /* NativeEntryViews.swift */,
+				0000000000000000000000E4 /* NativeStudyAndExamViews.swift */,
+				0000000000000000000000E3 /* NativeSharedComponents.swift */,
+				0000000000000000000000E2 /* NativeCopyCatalog.swift */,
+				0000000000000000000000E1 /* NativeCatalogModels.swift */,
+				000000000000000000000012 /* NativeModel.swift */,
+				000000000000000000000013 /* CredentialVault.swift */,
+				000000000000000000000015 /* MSALAuthenticationProvider.swift */,
+				000000000000000000000018 /* NativeEditorialPilotView.swift */,
+				0000000000000000000000B1 /* CertigoWidgetPresentation.swift */,
+				0000000000000000000000B2 /* NativeWidgetGalleryView.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		000000000000000000000022 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000014 /* CertigoNative.app */,
+				0000000000000000000000B5 /* CertigoWidgetExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		0000000000000000000000B8 /* WidgetExtension */ = {
+			isa = PBXGroup;
+			children = (
+				0000000000000000000000B3 /* CertigoWidgetExtension.swift */,
+				0000000000000000000000B4 /* Info.plist */,
+			);
+			path = WidgetExtension;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000000000050 /* CertigoNative */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000071 /* Build configuration list for PBXNativeTarget "CertigoNative" */;
+			buildPhases = (
+				000000000000000000000033 /* Validate distribution version */,
+				000000000000000000000030 /* Sources */,
+				000000000000000000000031 /* Frameworks */,
+				000000000000000000000032 /* Resources */,
+				0000000000000000000000B9 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0000000000000000000000BA /* PBXTargetDependency */,
+			);
+			name = CertigoNative;
+			packageProductDependencies = (
+				000000000000000000000041 /* CertigoDomain */,
+				000000000000000000000042 /* CertigoData */,
+				000000000000000000000102 /* Prism */,
+				000000000000000000000044 /* MSAL */,
+			);
+			productName = CertigoNative;
+			productReference = 000000000000000000000014 /* CertigoNative.app */;
+			productType = "com.apple.product-type.application";
+		};
+		0000000000000000000000BC /* CertigoWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0000000000000000000000BD /* Build configuration list for PBXNativeTarget "CertigoWidgetExtension" */;
+			buildPhases = (
+				0000000000000000000000C1 /* Sources */,
+				0000000000000000000000C2 /* Frameworks */,
+				0000000000000000000000C3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CertigoWidgetExtension;
+			packageProductDependencies = (
+				0000000000000000000000B6 /* CertigoData */,
+				0000000000000000000000B7 /* CertigoDomain */,
+			);
+			productName = CertigoWidgetExtension;
+			productReference = 0000000000000000000000B5 /* CertigoWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		0000000000000000000000BA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0000000000000000000000BC /* CertigoWidgetExtension */;
+			targetProxy = 0000000000000000000000BB /* PBXContainerItemProxy */;
+		};
+		0000000000000000000000BB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000060 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0000000000000000000000BC;
+			remoteInfo = CertigoWidgetExtension;
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000060 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2600;
+			};
+			buildConfigurationList = 000000000000000000000070 /* Build configuration list for PBXProject "CertigoNative" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = fr;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				fr,
+				en,
+				Base,
+			);
+			mainGroup = 000000000000000000000020;
+			packageReferences = (
+				000000000000000000000040 /* XCLocalSwiftPackageReference "../CertigoKit" */,
+				000000000000000000000043 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */,
+			);
+			productRefGroup = 000000000000000000000022 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000000000050 /* CertigoNative */,
+				0000000000000000000000BC /* CertigoWidgetExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		000000000000000000000032 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000008 /* Certigo.icon in Resources */,
+				000000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */,
+				0000000000000000000000D1 /* CertigoAssets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0000000000000000000000B9 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				0000000000000000000000A5 /* CertigoWidgetExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		000000000000000000000033 /* Validate distribution version */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../../../tools/validate_native_distribution.sh",
+			);
+			name = "Validate distribution version";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"$CONFIGURATION\" = Distribution ]; then\n  /bin/sh \"$SRCROOT/../../../tools/validate_native_distribution.sh\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		000000000000000000000030 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000001 /* CertigoNativeApp.swift in Sources */,
+				000000000000000000000103 /* PrismDebugGalleryView.swift in Sources */,
+				0000000000000000000000FB /* NativeLessonReadingContent.swift in Sources */,
+				0000000000000000000000FA /* NativeLessonAudioViews.swift in Sources */,
+				0000000000000000000000F9 /* NativeRootView.swift in Sources */,
+				0000000000000000000000F8 /* NativeAccountDeletionView.swift in Sources */,
+				0000000000000000000000F7 /* NativeDemoModels.swift in Sources */,
+				0000000000000000000000F6 /* NativeDemoViews.swift in Sources */,
+				0000000000000000000000F5 /* NativeEntryViews.swift in Sources */,
+				0000000000000000000000F4 /* NativeStudyAndExamViews.swift in Sources */,
+				0000000000000000000000F3 /* NativeSharedComponents.swift in Sources */,
+				0000000000000000000000F2 /* NativeCopyCatalog.swift in Sources */,
+				0000000000000000000000F1 /* NativeCatalogModels.swift in Sources */,
+				000000000000000000000002 /* NativeModel.swift in Sources */,
+				000000000000000000000003 /* CredentialVault.swift in Sources */,
+				000000000000000000000006 /* MSALAuthenticationProvider.swift in Sources */,
+				00000000000000000000000A /* NativeEditorialPilotView.swift in Sources */,
+				0000000000000000000000A1 /* CertigoWidgetPresentation.swift in Sources */,
+				0000000000000000000000A2 /* NativeWidgetGalleryView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0000000000000000000000C1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0000000000000000000000A3 /* CertigoWidgetPresentation.swift in Sources */,
+				0000000000000000000000A4 /* CertigoWidgetExtension.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0000000000000000000000C2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0000000000000000000000A6 /* CertigoData in Frameworks */,
+				0000000000000000000000A7 /* CertigoDomain in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0000000000000000000000C3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		000000000000000000000084 /* Distribution */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Distribution;
+		};
+		000000000000000000000085 /* Distribution */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
+					CertigoIconStreakFire,
+					CertigoIconStreakAtRisk,
+					CertigoIconMasteryGold,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = Certigo;
+				CODE_SIGNING_ALLOWED = NO;
+				CURRENT_PROJECT_VERSION = "$(CERTIGO_DISTRIBUTION_BUILD)";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DistributionInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Certigo;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = "$(CERTIGO_DISTRIBUTION_VERSION)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.mobileapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = CERTIGO_PRODUCTION_DISTRIBUTION;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Distribution;
+		};
+		000000000000000000000080 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		000000000000000000000081 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		000000000000000000000082 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
+					CertigoIconStreakFire,
+					CertigoIconStreakAtRisk,
+					CertigoIconMasteryGold,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = Certigo;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_ENTITLEMENTS = CertigoNative.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DevelopmentInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Certigo Dev";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.dev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		000000000000000000000083 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
+					CertigoIconStreakFire,
+					CertigoIconStreakAtRisk,
+					CertigoIconMasteryGold,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = Certigo;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_ENTITLEMENTS = CertigoNative.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DevelopmentInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Certigo Dev";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.dev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		0000000000000000000000C4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WidgetExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.dev.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		0000000000000000000000C5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WidgetExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.native.dev.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		0000000000000000000000C6 /* Distribution */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WidgetExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				CURRENT_PROJECT_VERSION = "$(CERTIGO_DISTRIBUTION_BUILD)";
+				MARKETING_VERSION = "$(CERTIGO_DISTRIBUTION_VERSION)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.certigo.mobileapp.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = CERTIGO_PRODUCTION_DISTRIBUTION;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Distribution;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		000000000000000000000070 /* Build configuration list for PBXProject "CertigoNative" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000000000080 /* Debug */,
+				000000000000000000000081 /* Release */,
+				000000000000000000000084 /* Distribution */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000000000000000000000071 /* Build configuration list for PBXNativeTarget "CertigoNative" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000000000082 /* Debug */,
+				000000000000000000000083 /* Release */,
+				000000000000000000000085 /* Distribution */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0000000000000000000000BD /* XCConfigurationList for PBXNativeTarget "CertigoWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0000000000000000000000C4 /* Debug */,
+				0000000000000000000000C5 /* Release */,
+				0000000000000000000000C6 /* Distribution */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		000000000000000000000040 /* XCLocalSwiftPackageReference "../CertigoKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../CertigoKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		000000000000000000000043 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AzureAD/microsoft-authentication-library-for-objc.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.16.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		000000000000000000000102 /* Prism */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000040 /* XCLocalSwiftPackageReference "../CertigoKit" */;
+			productName = Prism;
+		};
+		000000000000000000000041 /* CertigoDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000040 /* XCLocalSwiftPackageReference "../CertigoKit" */;
+			productName = CertigoDomain;
+		};
+		000000000000000000000042 /* CertigoData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000040 /* XCLocalSwiftPackageReference "../CertigoKit" */;
+			productName = CertigoData;
+		};
+		000000000000000000000044 /* MSAL */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000043 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */;
+			productName = MSAL;
+		};
+		0000000000000000000000B6 /* CertigoData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000040 /* XCLocalSwiftPackageReference "../CertigoKit" */;
+			productName = CertigoData;
+		};
+		0000000000000000000000B7 /* CertigoDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000040 /* XCLocalSwiftPackageReference "../CertigoKit" */;
+			productName = CertigoDomain;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 000000000000000000000060 /* Project object */;
+}

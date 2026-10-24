@@ -1,0 +1,30 @@
+{
+  "schema": "certigo.content.package-manifest/v3",
+  "channel": "public",
+  "artifact": "public",
+  "algorithm": "sha256",
+  "serialization": "json-sorted-keys-compact-utf8-lf",
+  "fileCount": 2,
+  "files": [
+    {
+      "id": "aws.clf-c02.domain-1.portee-globale-elasticite.001",
+      "path": "questions/aws/clf-c02-001.json",
+      "resourceType": "question",
+      "hash": "f316636c33dcc80994cfc33d6504a0db05785d5f4221a0930daf3e8184eaa0ba",
+      "size": 623
+    },
+    {
+      "id": "microsoft.az-900.section-1.cloud-models.001",
+      "path": "questions/microsoft/az-900-001.json",
+      "resourceType": "question",
+      "hash": "878f3ddfc11f7a60896da88fcd4aa4000f29f7fbaac854aa32b8695b3c4679f0",
+      "size": 700,
+      "provider": "microsoft",
+      "certification": "microsoft:az-900",
+      "blueprintVersion": "2026-08-17",
+      "objective": "section-1"
+    }
+  ],
+  "manifestId": "sha256:248eb967705fb7126a7eaf159a68ac9b51c61ff8170b2ed6b62ae7c036f350c0",
+  "rootHash": "248eb967705fb7126a7eaf159a68ac9b51c61ff8170b2ed6b62ae7c036f350c0"
+}

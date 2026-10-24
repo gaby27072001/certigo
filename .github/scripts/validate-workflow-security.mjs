@@ -10,7 +10,10 @@ import {
   dartSastWorkflowFile,
   validateDartSastWorkflow,
 } from './dart-sast-workflow-policy.mjs';
-import { validateBackendDeployWorkspace } from './backend-deploy-workflow-policy.mjs';
+import {
+  isReviewedGenerationJob,
+  validateBackendDeployWorkspace,
+} from './backend-deploy-workflow-policy.mjs';
 import { validateOsvWorkflowPolicy } from './osv-workflow-policy.mjs';
 import { validateWorkflowConcurrency } from './workflow-concurrency-policy.mjs';
 import {
@@ -21,6 +24,7 @@ import {
 } from './workflow-manifest-consistency.mjs';
 import { validateRequiredContexts } from './required-context-policy.mjs';
 import { validateRunnerLabels } from './workflow-runner-labels.mjs';
+import { isExactNativeAppleWorkflow } from './native-apple-workflow-policy.mjs';
 import { validatePersistentCachePolicy } from './workflow-security-cache-policy.mjs';
 import { parseDocument } from 'yaml';
 import { hostedLinuxRunner, isHostedLinuxCiRunner, isPrLinuxCiRunner } from './linux-ci-runner-policy.mjs';
@@ -354,11 +358,19 @@ function validateWorkflow(file) {
   }
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed.startsWith('runs-on:') && !allowedRunnerLines.has(trimmed)) {
+    if (
+      trimmed.startsWith('runs-on:')
+      && !allowedRunnerLines.has(trimmed)
+      && !isExactNativeAppleWorkflow(text, file)
+      && !(trimmed === 'runs-on: ubuntu-24.04' && (
+        isReviewedGenerationJob(text, file, 'build', controlRoot)
+        || isReviewedGenerationJob(text, file, 'bicep-build', controlRoot)
+      ))
+    ) {
       errors.push(`${file}: runner must use a fixed Azure self-hosted label set`);
     }
   }
-  errors.push(...validateRunnerLabels(text, file));
+  errors.push(...validateRunnerLabels(text, file, { trustedRoot: controlRoot }));
   if (
     lines.some(
       (line) => line.trim().startsWith('runs-on:') && line.includes('certigo-ci'),
@@ -453,6 +465,7 @@ function validateWorkflow(file) {
       trustedOnlyWorkflowFiles.has(fileName)
       && job.text.includes('runs-on:')
       && !job.text.includes('certigo-trusted')
+      && !isReviewedGenerationJob(text, file, job.id, controlRoot)
     ) {
       errors.push(`${file}: operational job ${job.id} must use certigo-trusted`);
     }
@@ -1147,12 +1160,11 @@ function validateRepositoryInvariants() {
     'github.event.pull_request.head.repo.full_name == github.repository',
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}",
     "ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}",
-    'path: .untrusted-source',
     'path: .trusted-control',
     "- '.github/scripts/**/*.js'",
     "- '.github/scripts/**/*.mjs'",
   ]) {
-    if (!codeql.includes(marker)) {
+    if (marker === prLinuxRunner ? !hasPrCiRunner(codeql, 'codeql.yml') : !codeql.includes(marker)) {
       errors.push(`codeql.yml: missing Azure/same-repository invariant ${marker}`);
     }
   }
@@ -1161,7 +1173,6 @@ function validateRepositoryInvariants() {
     'output: ${{ env.CODEQL_RESULTS_DIR }}',
     'upload: always',
     'security-events: write',
-    'source-root: .untrusted-source',
     'config-file: ./.trusted-control/.github/codeql/codeql-config.yml',
     'checkout_path: ${{ env.UNTRUSTED_SOURCE_DIR }}',
     'name: Enforce CodeQL severity threshold',
@@ -1169,6 +1180,29 @@ function validateRepositoryInvariants() {
   ]) {
     if (!codeql.includes(marker)) {
       errors.push(`codeql.yml: missing SARIF enforcement invariant ${marker}`);
+    }
+  }
+  const codeqlDocument = parseDocument(codeql).toJS();
+  for (const id of ['analyze', 'analyze-main']) {
+    const job = codeqlDocument.jobs?.[id];
+    if (!job) continue;
+    const sourceCheckout = job.steps?.find((step) => step.uses?.startsWith('actions/checkout@'));
+    const init = job.steps?.find((step) => step.name === 'Initialize CodeQL');
+    const source = sourceCheckout?.with?.path;
+    const reset = job.steps?.find((step) => step.name === 'Reset trusted control checkout path');
+    const trustedCheckout = job.steps?.find((step) => step.with?.path === '.trusted-control');
+    const expectedDirectory = source === '.' ? '${{ github.workspace }}'
+      : '${{ github.workspace }}/.untrusted-source';
+    if (!['.', '.untrusted-source'].includes(source)
+      || init?.with?.['source-root'] !== source
+      || job.env?.UNTRUSTED_SOURCE_DIR !== expectedDirectory) {
+      errors.push(`codeql.yml: ${id} must keep source checkout, extraction root and SARIF checkout coherent`);
+    }
+    if (source === '.' && (reset?.shell !== 'bash'
+      || reset.run !== 'node -e \'require("node:fs").rmSync(process.env.TRUSTED_CONTROL_DIR, { recursive: true, force: true });\''
+      || job.steps.indexOf(sourceCheckout) >= job.steps.indexOf(reset)
+      || job.steps.indexOf(reset) >= job.steps.indexOf(trustedCheckout))) {
+      errors.push(`codeql.yml: ${id} must reset candidate-controlled path before immutable control checkout`);
     }
   }
   for (const marker of [
@@ -1689,10 +1723,18 @@ function validateRepositoryInvariants() {
     '--directory "$UNTRUSTED_SOURCE_DIR/infra"',
     '--config-file "$TRUSTED_CONTROL_DIR/.checkov.yaml"',
     'failed_checks',
+    '--output cli --output json',
+    '--output-file-path "console,$CHECKOV_SCAN_LOG.json"',
+    'python "$TRUSTED_CONTROL_DIR/.github/scripts/checkov_report_gate.py"',
+    '"$CHECKOV_SCAN_LOG.json" "$scan_status" | tee -a "$GITHUB_STEP_SUMMARY"',
+    'Checkov report is incomplete, has blocking findings, or has zero effective coverage.',
   ]) {
     if (!iacScan.includes(marker)) {
       errors.push(`security-scan.yml: missing fail-closed output invariant ${marker}`);
     }
+  }
+  if (/(?:^|\s)(?:--quiet|-q)(?=\s|$)/m.test(iacScan)) {
+    errors.push('security-scan.yml: quiet mode removes required JSON report records');
   }
   if (
     !branchProtection.required_status_checks.contexts.includes('Security / Required gate')

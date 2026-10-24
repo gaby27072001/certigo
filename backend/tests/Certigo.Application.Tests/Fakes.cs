@@ -203,7 +203,8 @@ internal sealed class InMemoryAttemptRepository : IAttemptRepository
 
     public Task CreateAsync(AttemptRecord attempt, CancellationToken cancellationToken = default)
     {
-        if (_store.Any(a => string.Equals(a.Id, attempt.Id, StringComparison.Ordinal)))
+        if (_store.Any(a => string.Equals(a.Id, attempt.Id, StringComparison.Ordinal)
+            && string.Equals(a.UserId, attempt.UserId, StringComparison.Ordinal)))
         {
             throw new DuplicateRecordException($"Attempt '{attempt.Id}' already exists.");
         }
@@ -216,6 +217,28 @@ internal sealed class InMemoryAttemptRepository : IAttemptRepository
     {
         var recent = _store.Where(a => a.UserId == userId && a.SubmittedAt >= since).ToList();
         return Task.FromResult(new RecentActivity(recent.Count, recent.Sum(a => a.Result.Rewards.XpEarned)));
+    }
+
+    public Task<AttemptHistoryWindow> ListHistoryWindowAsync(
+        string userId,
+        AttemptHistoryPosition? after,
+        int maximumRecords,
+        CancellationToken cancellationToken = default)
+    {
+        var records = _store
+            .Where(attempt => attempt.UserId == userId
+                && attempt.Id.StartsWith("attempt::", StringComparison.Ordinal)
+                && (after is null
+                    || attempt.SubmittedAt < after.SubmittedAt
+                    || (attempt.SubmittedAt == after.SubmittedAt
+                        && string.CompareOrdinal(attempt.Id, after.Id) < 0)))
+            .OrderByDescending(attempt => attempt.SubmittedAt)
+            .ThenByDescending(attempt => attempt.Id, StringComparer.Ordinal)
+            .Take(maximumRecords + 1)
+            .ToArray();
+        return Task.FromResult(new AttemptHistoryWindow(
+            records.Take(maximumRecords).ToArray(),
+            records.Length > maximumRecords));
     }
 }
 
@@ -282,7 +305,8 @@ internal sealed class InMemoryEventRepository : IEventRepository
 
     public Task AddAsync(LearningEvent learningEvent, CancellationToken cancellationToken = default)
     {
-        if (Events.All(existing => !string.Equals(existing.Id, learningEvent.Id, StringComparison.Ordinal)))
+        if (Events.All(existing => !string.Equals(existing.Id, learningEvent.Id, StringComparison.Ordinal)
+            || !string.Equals(existing.UserId, learningEvent.UserId, StringComparison.Ordinal)))
         {
             Events.Add(learningEvent);
         }

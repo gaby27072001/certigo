@@ -1,0 +1,4807 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-10-23T09:30:00Z",
+  "nonAffiliationNotice": "CertiGo est une application indépendante. Elle n'est ni affiliée à, ni autorisée, sponsorisée ou approuvée par les éditeurs cités, dont Microsoft Corporation et GitHub, Inc. Les noms, icônes et logos de produits appartiennent à leurs propriétaires respectifs et ne sont utilisés que pour identifier leurs produits.",
+  "vendors": [
+    {
+      "id": "microsoft",
+      "name": "Microsoft",
+      "notice": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/"
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "notice": "GitHub et Octicons sont des marques de GitHub, Inc. Les icônes Primer Octicons sont distribuées sous licence MIT.",
+      "termsUrl": "https://github.com/primer/octicons/blob/main/LICENSE"
+    },
+    {
+      "id": "aws",
+      "name": "Amazon Web Services",
+      "notice": "Amazon Web Services, AWS et Amazon Bedrock sont des marques d'Amazon.com, Inc. ou de ses sociétés affiliées.",
+      "termsUrl": "https://aws.amazon.com/architecture/icons/"
+    },
+    {
+      "id": "google",
+      "name": "Google Cloud",
+      "notice": "Google Cloud est une marque de Google LLC.",
+      "termsUrl": "https://cloud.google.com/icons"
+    },
+    {
+      "id": "cncf",
+      "name": "CNCF / Linux Foundation",
+      "notice": "Kubernetes® est une marque déposée de The Linux Foundation. CertiGo is not affiliated with or otherwise sponsored by CNCF.",
+      "termsUrl": "https://github.com/kubernetes/community/tree/main/icons"
+    },
+    {
+      "id": "linux",
+      "name": "Linux",
+      "notice": "Linux® is the registered trademark of Linus Torvalds in the U.S. and other countries.",
+      "termsUrl": "https://www.linuxfoundation.org/legal/the-linux-mark"
+    },
+    {
+      "id": "cisco",
+      "name": "Cisco",
+      "notice": "Cisco, CCNA et CCNP sont des marques déposées de Cisco Systems, Inc.",
+      "termsUrl": "https://www.cisco.com/c/en/us/about/brand-center/network-topology-icons.html"
+    },
+    {
+      "id": "other",
+      "name": "Autres éditeurs",
+      "notice": "Toutes les autres marques citées appartiennent à leurs propriétaires respectifs.",
+      "termsUrl": "https://www.apple.com/legal/intellectual-property/guidelinesfor3rdparties.html"
+    }
+  ],
+  "icons": [
+    {
+      "iconId": "b001-ms-azure",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/general/10007-icon-service-Resource-Groups.svg",
+      "storedFilename": "b001-ms-azure.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "4d2b2eacb37735849d2e556074ac8564f92fada70672b40985c77ea666e82977",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b002-az-virtual-machi",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/compute/10021-icon-service-Virtual-Machine.svg",
+      "storedFilename": "b002-az-virtual-machi.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "092d18ffadec9ec0e5af129186dc7bc2a80544011e55f965604ed4b13873e0fc",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b003-az-virtual-machi",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/compute/10034-icon-service-VM-Scale-Sets.svg",
+      "storedFilename": "b003-az-virtual-machi.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "a53772c07fe89cdbb876ce77e22dba0863c1459173b77a1eec73fbdd2048637f",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b004-az-app-service",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/app services/10035-icon-service-App-Services.svg",
+      "storedFilename": "b004-az-app-service.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "529d83fc80637a96b6d27f6cfac7536e1c5f9b1b67f58aef4e2e3d6f47fd4925",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b005-az-functions",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/compute/10029-icon-service-Function-Apps.svg",
+      "storedFilename": "b005-az-functions.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "1a6c9c108d5f63f7b78bc6fbc464059acd2eaa8c1d111e9bcd28a8b2cdf470b9",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b006-az-container-ins",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/compute/10104-icon-service-Container-Instances.svg",
+      "storedFilename": "b006-az-container-ins.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "7d8c8ebd6a298a2cbc892b1ec73e9c379bd97ea5715ac5923d816bc132db7d77",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b008-az-container-reg",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/containers/10105-icon-service-Container-Registries.svg",
+      "storedFilename": "b008-az-container-reg.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "c134b0a442f203a7eeeb6f99a1f02ed34e51373d7fca59f96c9f125874c9d7d4",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b009-az-kubernetes-se",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/compute/10023-icon-service-Kubernetes-Services.svg",
+      "storedFilename": "b009-az-kubernetes-se.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "81954a481503057498d543a51863b2eb4673284e109662cdc421051d11dba25c",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b010-az-virtual-deskt",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/other/00327-icon-service-Azure-Virtual-Desktop.svg",
+      "storedFilename": "b010-az-virtual-deskt.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "34e8873ecd2196493128bbc74a328fb97febeec1c619c374870b74e044fd93ed",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b011-az-storage",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/storage/10086-icon-service-Storage-Accounts.svg",
+      "storedFilename": "b011-az-storage.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "7190d3bb14ce30ce74bd0af873915830fe821e8c5f6ef6f3149e6f7cfb2aa4f7",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b012-az-blob-storage",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/general/10780-icon-service-Blob-Block.svg",
+      "storedFilename": "b012-az-blob-storage.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "649cdb593d0c7f56a227e4c28df40a3e5c489e303867d32502af2ee4b4865ea3",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b014-az-file-sync",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/storage/10093-icon-service-Storage-Sync-Services.svg",
+      "storedFilename": "b014-az-file-sync.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "520f26b73e53e4c1b0024c23b88f3a428a1c406abf7e09b4838e1d190536811e",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b018-az-managed-disks",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/compute/10032-icon-service-Disks.svg",
+      "storedFilename": "b018-az-managed-disks.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "7ab5cc684d995ff898448b32424a55bbb5c6669a83a0bb7c547047fec21f292f",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b019-az-virtual-netwo",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/networking/10061-icon-service-Virtual-Networks.svg",
+      "storedFilename": "b019-az-virtual-netwo.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "64a5e75ecef2f9f69067faa2eb131266cb8f2858706f8ab74bfea5ad0d98b14d",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b020-az-network-secur",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/networking/10067-icon-service-Network-Security-Groups.svg",
+      "storedFilename": "b020-az-network-secur.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "cf4023ddaa11961904e1e4601864ccd20b9f60686cb38ad7f8ff8385d855c4de",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b021-az-application-s",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/security/10244-icon-service-Application-Security-Groups.svg",
+      "storedFilename": "b021-az-application-s.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "006bd4e287d64816894faa2d807f451d00dad7c175edc5385a9ce1ac60613178",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b022-az-load-balancer",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/networking/10062-icon-service-Load-Balancers.svg",
+      "storedFilename": "b022-az-load-balancer.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "169edfa4edbc0cab6fdc1eef9243925588504a16f7729734e0e2161a9ca1d16c",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b023-az-application-g",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/networking/10076-icon-service-Application-Gateways.svg",
+      "storedFilename": "b023-az-application-g.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "531e668e47cf61872b2811ec67dcc103cee2ecc1d272f07132d6196d68ba6c19",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b024-az-web-applicati",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/networking/10362-icon-service-Web-Application-Firewall-Policies(WAF).svg",
+      "storedFilename": "b024-az-web-applicati.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "b790e4e7b7617c8155025ab238cfab39a303df74dc030dbe9943a6eef2732255",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b025-az-vpn-gateway",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/networking/10063-icon-service-Virtual-Network-Gateways.svg",
+      "storedFilename": "b025-az-vpn-gateway.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "5ed14416dafff4e946fae5b68b9c86e8c9a9bbaa37ab94324a5d94c5cfbcb106",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b026-az-expressroute",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/networking/10079-icon-service-ExpressRoute-Circuits.svg",
+      "storedFilename": "b026-az-expressroute.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "0087cb8e3027b750c18249915b620e67348d12cb6d147f10c6a701976c948696",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b027-az-dns",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/networking/10064-icon-service-DNS-Zones.svg",
+      "storedFilename": "b027-az-dns.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "e6aaa1380e974af7d0aba1bb8380ecfab3f95182a595a28692aa3f963bcf9fac",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b028-az-bastion",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/networking/02422-icon-service-Bastions.svg",
+      "storedFilename": "b028-az-bastion.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "7d3c33e355b9e180bb96491492ff856e379c27b3e7920526e2552c9b1593d3cb",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b029-az-firewall",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/networking/10084-icon-service-Firewalls.svg",
+      "storedFilename": "b029-az-firewall.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "154c416cc15b95b7c6c1ab61a5ecb33f14845197b7d163bd9dc6f1968c14be1e",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b030-az-network-watch",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/monitor/10066-icon-service-Network-Watcher.svg",
+      "storedFilename": "b030-az-network-watch.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "1e4b0ae5284577e33bbbc05b9e38e58acfa9b7947041e4768e8c82d4fff43413",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b031-az-monitor",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/management + governance/00001-icon-service-Monitor.svg",
+      "storedFilename": "b031-az-monitor.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "1396f59a7d8fd7505a423842b987c9b343a092263d1ab5c7b0d94d58d8b17448",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b032-az-log-analytics",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/analytics/00009-icon-service-Log-Analytics-Workspaces.svg",
+      "storedFilename": "b032-az-log-analytics.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "7a244a8d7260e84be5c904185db7b04994fe6ed345e2b224163bc5f7e3d97ce0",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b033-az-application-i",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/devops/00012-icon-service-Application-Insights.svg",
+      "storedFilename": "b033-az-application-i.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "36c73dea8b1598fbfff84890a2b409600f1339eec8c1bf1a896439e9da8f9dca",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b034-az-backup",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/management + governance/00017-icon-service-Recovery-Services-Vaults.svg",
+      "storedFilename": "b034-az-backup.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "f086695b1a1afd7e2988e3a858e68105a0f3ad5ef798d7ab37f4266c4f32a6b8",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b035-az-site-recovery",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/management + governance/00017-icon-service-Recovery-Services-Vaults.svg",
+      "storedFilename": "b035-az-site-recovery.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "f086695b1a1afd7e2988e3a858e68105a0f3ad5ef798d7ab37f4266c4f32a6b8",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b036-az-policy",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/containers/032487601-icon-service-AKS-Network-Policy.svg",
+      "storedFilename": "b036-az-policy.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "e24e5d882b5f9aa69c275c15bf15aa6ba1816bfc9c60cea6fcd2d5149d4903b9",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b037-ms-cost-manageme",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/general/00004-icon-service-Cost-Management-and-Billing.svg",
+      "storedFilename": "b037-ms-cost-manageme.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "b44611f260bf85610a7442ac64b427030e835aa5339cb51f423dff6d1f3028d7",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b038-az-resource-mana",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/general/10007-icon-service-Resource-Groups.svg",
+      "storedFilename": "b038-az-resource-mana.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "4d2b2eacb37735849d2e556074ac8564f92fada70672b40985c77ea666e82977",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b039-az-arc",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/management + governance/00756-icon-service-Azure-Arc.svg",
+      "storedFilename": "b039-az-arc.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "00f4a57d6e0391bec619a9298d114f783dbb7dd4165d44242202ca37d00d9bfa",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b040-az-automation",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/management + governance/00022-icon-service-Automation-Accounts.svg",
+      "storedFilename": "b040-az-automation.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "4ad2825c024842fa6ea8875cf4098a8574b33b329301163282a7c6df43d6d7b4",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b041-az-app-configura",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/integration/10219-icon-service-App-Configuration.svg",
+      "storedFilename": "b041-az-app-configura.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "d39322382b9894cee4c3608e56e44217376ac8e4fa98a5d2e9c0c7ed27155e6a",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b042-az-powershell",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/other/00559-icon-service-Azure-Cloud-Shell.svg",
+      "storedFilename": "b042-az-powershell.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "88fab60bd377a95e184c6b60766c6754bb6824029a778e9c536ddc245fcd567e",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b043-az-sql-database",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/databases/10130-icon-service-SQL-Database.svg",
+      "storedFilename": "b043-az-sql-database.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "a26124a2b188ccf910520c935c726f7364e0f5935d7a4319ebcab9c80a40e475",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b044-az-sql-managed-i",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/databases/10136-icon-service-SQL-Managed-Instance.svg",
+      "storedFilename": "b044-az-sql-managed-i.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "ecf79797b7a8f7825eb4c987b1269d035fe3408f999149f29106fc24a62b0452",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b045-sql-server-on-az",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/databases/10132-icon-service-SQL-Server.svg",
+      "storedFilename": "b045-sql-server-on-az.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "72c6104c5f2199f6eaebbc215c5cb78dea9c1d571b95f470341ca7f83eee5be8",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b046-az-cosmos-db",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/databases/10121-icon-service-Azure-Cosmos-DB.svg",
+      "storedFilename": "b046-az-cosmos-db.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "b6f1f2afac15762d1de44366d34984c5a3e6e58f94d9e81407ac01565212e8e3",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b047-az-database-for",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/databases/10131-icon-service-Azure-Database-PostgreSQL-Server.svg",
+      "storedFilename": "b047-az-database-for.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "8232e8ecfbd607ce3b54646199805a823646d71e552f9aa71e7a3952cde35620",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b048-az-database-for",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/databases/10122-icon-service-Azure-Database-MySQL-Server.svg",
+      "storedFilename": "b048-az-database-for.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "c04e7d46a45d722e9fde06976843263cb1ef80fd6a5005dd9ce720aa130688ee",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b049-az-database-for",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/databases/10123-icon-service-Azure-Database-MariaDB-Server.svg",
+      "storedFilename": "b049-az-database-for.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "a2c81a54e0ae4ad92c2b31657e6c47cc334717463e9db6755b925f420b0bd377",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b050-az-synapse-analy",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/analytics/00606-icon-service-Azure-Synapse-Analytics.svg",
+      "storedFilename": "b050-az-synapse-analy.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "7eacb3ab0ffd5b76cc06e34ff41333aed79db0d41852397468486ddb63c2c314",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b051-az-data-factory",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/analytics/10126-icon-service-Data-Factories.svg",
+      "storedFilename": "b051-az-data-factory.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "a16a9c345c72e9342874425ea5883900df601ec815e5babbcf67085d5e2fa582",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b052-az-databricks",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/analytics/10787-icon-service-Azure-Databricks.svg",
+      "storedFilename": "b052-az-databricks.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "ea499005b9f8ed811d14e5e048fe6138ca2aa89250373c71e32f39793acb8dc4",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b053-az-machine-learn",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/038470510-icon-service-Azure-Machine-Learning.svg",
+      "storedFilename": "b053-az-machine-learn.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "66af628f9dd7e49def76a4f6d90f262a5b47866098bc7b97042b541017992ad2",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b054-az-openai-servic",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/03438-icon-service-Azure-OpenAI.svg",
+      "storedFilename": "b054-az-openai-servic.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "4859f2c78b6b81acbbaf94e7348cb7dcbe97955a038be903de01cf46a7206aad",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b055-ms-foundry",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/03513-icon-service-AI-Studio.svg",
+      "storedFilename": "b055-ms-foundry.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "d8c441accab0e6c5a43abdf320d2fa48dc17074275f2d15576c2932d32621531",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b056-az-ai-services",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/10162-icon-service-Cognitive-Services.svg",
+      "storedFilename": "b056-az-ai-services.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "7f1d2831085f00103df5f6fd6305bdbbbe4c4530e98831d7ce6508d236c467c2",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b057-az-ai-vision",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/00792-icon-service-Computer-Vision.svg",
+      "storedFilename": "b057-az-ai-vision.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "e8c8ac48a0b516a0ea2c752b4aff5ddc53891a5aa311eb26772df5052b8e9a8a",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b058-az-ai-face",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/00794-icon-service-Face-APIs.svg",
+      "storedFilename": "b058-az-ai-face.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "ff69c438cd80ec53fc7bd06bfc9741c24c7ba9c104f85feaacd9602d9dcff636",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b059-az-ai-document-i",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/00819-icon-service-Form-Recognizers.svg",
+      "storedFilename": "b059-az-ai-document-i.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "196e5db33e32027349ee7250df79dfaf96b65e57a30a98662e6dd08d6d0c7360",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b060-az-ai-language",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/02876-icon-service-Language.svg",
+      "storedFilename": "b060-az-ai-language.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "f12b76e62d2d0b5a0249c48a958eca2f49aab3eea739a7e4802672d24c4a6704",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b061-az-ai-translator",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/00800-icon-service-Translator-Text.svg",
+      "storedFilename": "b061-az-ai-translator.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "5cc2410242860335313c7b31aa5346f14b4e448e511f331d63a42d754d53e029",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b062-az-ai-speech",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/00797-icon-service-Speech-Services.svg",
+      "storedFilename": "b062-az-ai-speech.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "3f758eccdf371534309a50e8688bd75e685246f80485a741588d13bef69a7eb3",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b063-az-ai-search",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/10044-icon-service-Cognitive-Search.svg",
+      "storedFilename": "b063-az-ai-search.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "f7af1213ce089236593835cb5564d6d3f01358cba6488fe562aa8bbc8adc3b38",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b064-az-bot-service",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/ai + machine learning/10165-icon-service-Bot-Services.svg",
+      "storedFilename": "b064-az-bot-service.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "df1d3d5d84d2f1fa27ccbbd5198cec7e67834b3cd1d7a58d7e4343f128a55ea8",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b065-az-devops",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/devops/10261-icon-service-Azure-DevOps.svg",
+      "storedFilename": "b065-az-devops.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "15b5068ceeb28f0f3cf566aa8cf99619f99d47059d7a91fda0ef47091a71a041",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b066-ms-entra-id",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-entra",
+      "kitVersion": "2023-10",
+      "sourceUrl": "https://learn.microsoft.com/en-us/entra/architecture/architecture-icons",
+      "fileInKit": "Microsoft Entra architecture icons - Oct 2023/Microsoft Entra color icons SVG/Microsoft Entra ID color icon.svg",
+      "storedFilename": "b066-ms-entra-id.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-entra-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "efd9f54562bfb78bf3c77aecdd5fc31b61fce8a1cec78c4370b41fc470e54eda",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b067-ms-defender-for",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/security/10241-icon-service-Microsoft-Defender-for-Cloud.svg",
+      "storedFilename": "b067-ms-defender-for.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "23ab6fbba1cd0ac5ffdc6ee7084e7cac3029c402dc18b8896331626f135c9513",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b068-ms-sentinel",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-azure-v24",
+      "kitVersion": "V24",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "fileInKit": "Azure_Public_Service_Icons/Icons/security/10248-icon-service-Azure-Sentinel.svg",
+      "storedFilename": "b068-ms-sentinel.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-azure-v24-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "754537541da48fd4957180d452bd64dfc4a9bbe4de4cbfdfa833ef8af556d16f",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b069-ms-fabric",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-fabric",
+      "kitVersion": "v6.1.0",
+      "sourceUrl": "https://learn.microsoft.com/en-us/fabric/fundamentals/icons",
+      "fileInKit": "v6.1.0/package/dist/svg/data_warehouse_24_color.svg",
+      "storedFilename": "b069-ms-fabric.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-fabric-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "59e7c16f8443e6789723e4a4b210d3f6e18f3776699cb67e3b910581f8d23a3e",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b070-ms-power-platfor",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-power-platform",
+      "kitVersion": "2025-12",
+      "sourceUrl": "https://learn.microsoft.com/en-us/power-platform/guidance/icons",
+      "fileInKit": "Power Platform/PowerPlatform_scalable.svg",
+      "storedFilename": "b070-ms-power-platfor.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-power-platform-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "c58871d6adac53a51512341e65055d0ec12f29948a001666c11dc7b5bb5fe142",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b071-ms-copilot-studi",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-power-platform",
+      "kitVersion": "2025-12",
+      "sourceUrl": "https://learn.microsoft.com/en-us/power-platform/guidance/icons",
+      "fileInKit": "CopilotStudio_scalable.svg",
+      "storedFilename": "b071-ms-copilot-studi.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-power-platform-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "c614fa6b9b7d33048c6c4efcdd508e5b7818d296cbd1cd7d8848bb2dd1be4fd0",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b072-ms-dataverse",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-power-platform",
+      "kitVersion": "2025-12",
+      "sourceUrl": "https://learn.microsoft.com/en-us/power-platform/guidance/icons",
+      "fileInKit": "Power Platform/Dataverse_scalable.svg",
+      "storedFilename": "b072-ms-dataverse.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-power-platform-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "df71c0111148d116515a02c5cb07483caad2bcb779664fa16fd837a4709504ab",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b073-ai-builder",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-power-platform",
+      "kitVersion": "2025-12",
+      "sourceUrl": "https://learn.microsoft.com/en-us/power-platform/guidance/icons",
+      "fileInKit": "Power Platform/AIBuilder_scalable.svg",
+      "storedFilename": "b073-ai-builder.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-power-platform-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "09354060aae6bfd903f3ff8246e90fce8514f4c56c603e676931fd99d338cfa8",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b074-ms-dynamics-365",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-dynamics-365",
+      "kitVersion": "2026-02",
+      "sourceUrl": "https://learn.microsoft.com/en-us/dynamics365/get-started/icons",
+      "fileInKit": "Dynamics 365 Product Family Icons/Dynamics365_scalable.svg",
+      "storedFilename": "b074-ms-dynamics-365.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-dynamics-365-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "5017e931a0f5e724247a9c49e15e22bb22e252d5343e0a40f7f38366d2aeb388",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b075-ms-d365-business",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-dynamics-365",
+      "kitVersion": "2026-02",
+      "sourceUrl": "https://learn.microsoft.com/en-us/dynamics365/get-started/icons",
+      "fileInKit": "Dynamics 365 App Icons/BusinessCentral_scalable.svg",
+      "storedFilename": "b075-ms-d365-business.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-dynamics-365-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "5effb9327ab3914ba1a4660c1a95282253ba6fb911580d227c62a222a4a76be8",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b076-ms-d365-contact",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-dynamics-365",
+      "kitVersion": "2026-02",
+      "sourceUrl": "https://learn.microsoft.com/en-us/dynamics365/get-started/icons",
+      "fileInKit": "Dynamics 365 App Icons/ContactCenter_scalable.svg",
+      "storedFilename": "b076-ms-d365-contact.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-dynamics-365-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "8b1a36486dbcdce1442a9915dbed2140c660205c9916d4603f49e08b40807778",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b077-ms-d365-customer",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-dynamics-365",
+      "kitVersion": "2026-02",
+      "sourceUrl": "https://learn.microsoft.com/en-us/dynamics365/get-started/icons",
+      "fileInKit": "Dynamics 365 App Icons/CustomerServices_scalable.svg",
+      "storedFilename": "b077-ms-d365-customer.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-dynamics-365-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "ecea20ecc386e7b92b22b79fcbad0d1c0672d6ed6df62d32fb08a6963ab9741a",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b078-ms-d365-field-se",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-dynamics-365",
+      "kitVersion": "2026-02",
+      "sourceUrl": "https://learn.microsoft.com/en-us/dynamics365/get-started/icons",
+      "fileInKit": "Dynamics 365 App Icons/FieldService_scalable.svg",
+      "storedFilename": "b078-ms-d365-field-se.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-dynamics-365-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "b2d85d1a9abb56524483c5c56a89bff50ee10f6668e12354da87242c228b8177",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b079-ms-d365-finance",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-dynamics-365",
+      "kitVersion": "2026-02",
+      "sourceUrl": "https://learn.microsoft.com/en-us/dynamics365/get-started/icons",
+      "fileInKit": "Dynamics 365 App Icons/Finance_scalable.svg",
+      "storedFilename": "b079-ms-d365-finance.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-dynamics-365-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "ed70dcb0929202676654afe9455f4647f918ca92b5576ae447a86cf341461cab",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b080-ms-d365-supply-c",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-dynamics-365",
+      "kitVersion": "2026-02",
+      "sourceUrl": "https://learn.microsoft.com/en-us/dynamics365/get-started/icons",
+      "fileInKit": "Dynamics 365 App Icons/SupplyChainManagement_scalable.svg",
+      "storedFilename": "b080-ms-d365-supply-c.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-dynamics-365-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "4590d6037d9ff7b2eb255b90d36547a4e29cfd1690444de741a29a1a9057d8a6",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b081-ms-d365-sales",
+      "vendor": "microsoft",
+      "tier": 1,
+      "kit": "microsoft-dynamics-365",
+      "kitVersion": "2026-02",
+      "sourceUrl": "https://learn.microsoft.com/en-us/dynamics365/get-started/icons",
+      "fileInKit": "Dynamics 365 App Icons/Sales_scalable.svg",
+      "storedFilename": "b081-ms-d365-sales.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+      "termsSnapshot": "docs/legal/brand-terms/microsoft-dynamics-365-2026-10-23.html",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Microsoft, Azure, Microsoft Entra, Microsoft Fabric, Microsoft Power Platform, Microsoft Dynamics 365, Microsoft Sentinel et Microsoft Defender sont des marques du groupe de sociétés Microsoft.",
+      "sha256": "af510c3f019faab2488dd8bdc2d0c358188ba242aec6ce6410663be5c8cfd3f4",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b103-github-plateform",
+      "vendor": "github",
+      "tier": 1,
+      "kit": "github-octicons",
+      "kitVersion": "19.41.0",
+      "sourceUrl": "https://github.com/primer/octicons",
+      "fileInKit": "icons/git-branch-24.svg",
+      "storedFilename": "b103-github-plateform.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://github.com/primer/octicons/blob/main/LICENSE",
+      "termsSnapshot": "docs/legal/brand-terms/github-octicons-2026-10-23.txt",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "GitHub et Octicons sont des marques de GitHub, Inc. Les icônes Primer Octicons sont distribuées sous licence MIT.",
+      "sha256": "76b97dde63b49eaa91978209f31f09c829cd690959fbcd7bbafdf96fa0a81474",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b104-github-actions",
+      "vendor": "github",
+      "tier": 1,
+      "kit": "github-octicons",
+      "kitVersion": "19.41.0",
+      "sourceUrl": "https://github.com/primer/octicons",
+      "fileInKit": "icons/workflow-24.svg",
+      "storedFilename": "b104-github-actions.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://github.com/primer/octicons/blob/main/LICENSE",
+      "termsSnapshot": "docs/legal/brand-terms/github-octicons-2026-10-23.txt",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "GitHub et Octicons sont des marques de GitHub, Inc. Les icônes Primer Octicons sont distribuées sous licence MIT.",
+      "sha256": "31d362f1d9058cc83142a88c190024d7ba7c8df5d6ed3992674e97f90a23781f",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b105-github-advanced",
+      "vendor": "github",
+      "tier": 1,
+      "kit": "github-octicons",
+      "kitVersion": "19.41.0",
+      "sourceUrl": "https://github.com/primer/octicons",
+      "fileInKit": "icons/shield-check-24.svg",
+      "storedFilename": "b105-github-advanced.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://github.com/primer/octicons/blob/main/LICENSE",
+      "termsSnapshot": "docs/legal/brand-terms/github-octicons-2026-10-23.txt",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "GitHub et Octicons sont des marques de GitHub, Inc. Les icônes Primer Octicons sont distribuées sous licence MIT.",
+      "sha256": "c3d8431670df464574184292e9c9a4c211b9bbd60639b8d2d5248aa493af9fa3",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    },
+    {
+      "iconId": "b111-kubernetes-cncf",
+      "vendor": "cncf",
+      "tier": 1,
+      "kit": "kubernetes-icons",
+      "kitVersion": "main",
+      "sourceUrl": "https://github.com/kubernetes/community/tree/main/icons",
+      "fileInKit": "icons/svg/resources/unlabeled/pod.svg",
+      "storedFilename": "b111-kubernetes-cncf.svg",
+      "downloadedAt": "2026-10-23T09:30:00Z",
+      "termsUrl": "https://github.com/kubernetes/community/tree/main/icons",
+      "termsSnapshot": "docs/legal/brand-terms/kubernetes-icons-2026-10-23.txt",
+      "termsAcceptedBy": "Gabriel Chambaud (Propriétaire CertiGo — DR-010 APPROVED)",
+      "termsAcceptedAt": "2026-10-22T19:34:00Z",
+      "permissionEvidence": null,
+      "permittedContexts": [
+        "diagram",
+        "learningContent",
+        "catalog"
+      ],
+      "constraints": {
+        "minSizePt": 20,
+        "clearSpaceRatio": 0.25,
+        "neutralPlateRequired": true,
+        "darkVariantAvailable": false
+      },
+      "attribution": "Kubernetes® est une marque déposée de The Linux Foundation. CertiGo is not affiliated with or otherwise sponsored by CNCF.",
+      "sha256": "3356f7ca970f811da2b1aa34a0f13e846255378727809ab6629837a842db0a2d",
+      "status": "approved",
+      "verifiedAt": "2026-10-23",
+      "verifiedBy": "CertiGo BrandAssets Audit (DR-010)"
+    }
+  ],
+  "products": [
+    {
+      "id": "microsoft.microsoft-azure",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Azure",
+      "aliases": [
+        "AZ",
+        "Azure"
+      ],
+      "tier": 1,
+      "icon": "b001-ms-azure",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-virtual-machines",
+      "vendor": "microsoft",
+      "officialName": "Azure Virtual Machines",
+      "aliases": [
+        "Machine virtuelle",
+        "Machines virtuelles",
+        "VM",
+        "machine virtuelle",
+        "machines virtuelles"
+      ],
+      "tier": 1,
+      "icon": "b002-az-virtual-machi",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-virtual-machine-scale-sets",
+      "vendor": "microsoft",
+      "officialName": "Azure Virtual Machine Scale Sets",
+      "aliases": [
+        "VMSS",
+        "groupe identique",
+        "groupes identiques"
+      ],
+      "tier": 1,
+      "icon": "b003-az-virtual-machi",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-app-service",
+      "vendor": "microsoft",
+      "officialName": "Azure App Service",
+      "aliases": [
+        "App Service"
+      ],
+      "tier": 1,
+      "icon": "b004-az-app-service",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-functions",
+      "vendor": "microsoft",
+      "officialName": "Azure Functions",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b005-az-functions",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-container-instances",
+      "vendor": "microsoft",
+      "officialName": "Azure Container Instances",
+      "aliases": [
+        "ACI"
+      ],
+      "tier": 1,
+      "icon": "b006-az-container-ins",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-container-apps",
+      "vendor": "microsoft",
+      "officialName": "Azure Container Apps",
+      "aliases": [],
+      "tier": 1,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 1 (couvert) : Azure architecture icons V24 (learn.microsoft.com/azure/architecture/icons) — containers/Container-Apps.svg (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-container-registry",
+      "vendor": "microsoft",
+      "officialName": "Azure Container Registry",
+      "aliases": [
+        "ACR"
+      ],
+      "tier": 1,
+      "icon": "b008-az-container-reg",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-kubernetes-service-aks",
+      "vendor": "microsoft",
+      "officialName": "Azure Kubernetes Service (AKS)",
+      "aliases": [
+        "AKS",
+        "Azure Kubernetes Service"
+      ],
+      "tier": 1,
+      "icon": "b009-az-kubernetes-se",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-virtual-desktop",
+      "vendor": "microsoft",
+      "officialName": "Azure Virtual Desktop",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b010-az-virtual-deskt",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-storage",
+      "vendor": "microsoft",
+      "officialName": "Azure Storage",
+      "aliases": [
+        "Compte de stockage",
+        "Comptes de stockage",
+        "StorageV2",
+        "compte de stockage"
+      ],
+      "tier": 1,
+      "icon": "b011-az-storage",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-blob-storage",
+      "vendor": "microsoft",
+      "officialName": "Azure Blob Storage",
+      "aliases": [
+        "Blob"
+      ],
+      "tier": 1,
+      "icon": "b012-az-blob-storage",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-files",
+      "vendor": "microsoft",
+      "officialName": "Azure Files",
+      "aliases": [],
+      "tier": 1,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 1 (couvert) : Azure architecture icons V24 (learn.microsoft.com/azure/architecture/icons) — storage/Azure-Fileshare.svg (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-file-sync",
+      "vendor": "microsoft",
+      "officialName": "Azure File Sync",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b014-az-file-sync",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-queue-storage",
+      "vendor": "microsoft",
+      "officialName": "Azure Queue Storage",
+      "aliases": [],
+      "tier": 1,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 1 (couvert) : Azure architecture icons V24 (learn.microsoft.com/azure/architecture/icons) — storage/Queue-Storage.svg (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-table-storage",
+      "vendor": "microsoft",
+      "officialName": "Azure Table Storage",
+      "aliases": [],
+      "tier": 1,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 1 (couvert) : Azure architecture icons V24 (learn.microsoft.com/azure/architecture/icons) — storage/Table-Storage.svg (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-data-lake-storage",
+      "vendor": "microsoft",
+      "officialName": "Azure Data Lake Storage",
+      "aliases": [],
+      "tier": 1,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 1 (couvert) : Azure architecture icons V24 (learn.microsoft.com/azure/architecture/icons) — storage/Data-Lake-Storage.svg (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-managed-disks",
+      "vendor": "microsoft",
+      "officialName": "Azure Managed Disks",
+      "aliases": [
+        "Azure Disk Encryption",
+        "Premium SSD",
+        "Standard HDD",
+        "Standard SSD",
+        "Ultra Disk",
+        "disques managés"
+      ],
+      "tier": 1,
+      "icon": "b018-az-managed-disks",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-virtual-network",
+      "vendor": "microsoft",
+      "officialName": "Azure Virtual Network",
+      "aliases": [
+        "Réseau virtuel",
+        "Réseaux virtuels",
+        "VNet",
+        "VNets",
+        "réseau virtuel"
+      ],
+      "tier": 1,
+      "icon": "b019-az-virtual-netwo",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-network-security-groups-nsg",
+      "vendor": "microsoft",
+      "officialName": "Azure Network Security Groups (NSG)",
+      "aliases": [
+        "NSG",
+        "groupe de sécurité réseau",
+        "groupes de sécurité réseau"
+      ],
+      "tier": 1,
+      "icon": "b020-az-network-secur",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-application-security-groups-asg",
+      "vendor": "microsoft",
+      "officialName": "Azure Application Security Groups (ASG)",
+      "aliases": [
+        "ASG",
+        "groupes de sécurité d'application"
+      ],
+      "tier": 1,
+      "icon": "b021-az-application-s",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-load-balancer",
+      "vendor": "microsoft",
+      "officialName": "Azure Load Balancer",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b022-az-load-balancer",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-application-gateway",
+      "vendor": "microsoft",
+      "officialName": "Azure Application Gateway",
+      "aliases": [
+        "Application Gateway"
+      ],
+      "tier": 1,
+      "icon": "b023-az-application-g",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-web-application-firewall-waf",
+      "vendor": "microsoft",
+      "officialName": "Azure Web Application Firewall (WAF)",
+      "aliases": [
+        "WAF"
+      ],
+      "tier": 1,
+      "icon": "b024-az-web-applicati",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-vpn-gateway",
+      "vendor": "microsoft",
+      "officialName": "Azure VPN Gateway",
+      "aliases": [
+        "VPN Gateway",
+        "VPN site-à-site"
+      ],
+      "tier": 1,
+      "icon": "b025-az-vpn-gateway",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-expressroute",
+      "vendor": "microsoft",
+      "officialName": "Azure ExpressRoute",
+      "aliases": [
+        "ExpressRoute"
+      ],
+      "tier": 1,
+      "icon": "b026-az-expressroute",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-dns",
+      "vendor": "microsoft",
+      "officialName": "Azure DNS",
+      "aliases": [
+        "zones DNS privées"
+      ],
+      "tier": 1,
+      "icon": "b027-az-dns",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-bastion",
+      "vendor": "microsoft",
+      "officialName": "Azure Bastion",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b028-az-bastion",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-firewall",
+      "vendor": "microsoft",
+      "officialName": "Azure Firewall",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b029-az-firewall",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-network-watcher",
+      "vendor": "microsoft",
+      "officialName": "Azure Network Watcher",
+      "aliases": [
+        "Network Watcher"
+      ],
+      "tier": 1,
+      "icon": "b030-az-network-watch",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-monitor",
+      "vendor": "microsoft",
+      "officialName": "Azure Monitor",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b031-az-monitor",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-log-analytics",
+      "vendor": "microsoft",
+      "officialName": "Azure Log Analytics",
+      "aliases": [
+        "Log Analytics"
+      ],
+      "tier": 1,
+      "icon": "b032-az-log-analytics",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-application-insights",
+      "vendor": "microsoft",
+      "officialName": "Azure Application Insights",
+      "aliases": [
+        "Application Insights"
+      ],
+      "tier": 1,
+      "icon": "b033-az-application-i",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-backup",
+      "vendor": "microsoft",
+      "officialName": "Azure Backup",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b034-az-backup",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-site-recovery",
+      "vendor": "microsoft",
+      "officialName": "Azure Site Recovery",
+      "aliases": [
+        "ASR",
+        "coffre Recovery Services"
+      ],
+      "tier": 1,
+      "icon": "b035-az-site-recovery",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-policy",
+      "vendor": "microsoft",
+      "officialName": "Azure Policy",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b036-az-policy",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-cost-management",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Cost Management",
+      "aliases": [
+        "Cost Management",
+        "Pricing Calculator",
+        "TCO Calculator"
+      ],
+      "tier": 1,
+      "icon": "b037-ms-cost-manageme",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-resource-manager-arm",
+      "vendor": "microsoft",
+      "officialName": "Azure Resource Manager (ARM)",
+      "aliases": [
+        "Groupe de gestion",
+        "Groupe de ressources",
+        "Resource Health",
+        "Verrous de ressources",
+        "groupe de gestion",
+        "groupe de ressources",
+        "groupes de gestion",
+        "groupes de ressources",
+        "verrou de ressource",
+        "verrous de ressource"
+      ],
+      "tier": 1,
+      "icon": "b038-az-resource-mana",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-arc",
+      "vendor": "microsoft",
+      "officialName": "Azure Arc",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b039-az-arc",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-automation",
+      "vendor": "microsoft",
+      "officialName": "Azure Automation",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b040-az-automation",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-app-configuration",
+      "vendor": "microsoft",
+      "officialName": "Azure App Configuration",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b041-az-app-configura",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-powershell",
+      "vendor": "microsoft",
+      "officialName": "Azure PowerShell",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b042-az-powershell",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-sql-database",
+      "vendor": "microsoft",
+      "officialName": "Azure SQL Database",
+      "aliases": [
+        "Azure SQL"
+      ],
+      "tier": 1,
+      "icon": "b043-az-sql-database",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-sql-managed-instance",
+      "vendor": "microsoft",
+      "officialName": "Azure SQL Managed Instance",
+      "aliases": [
+        "Managed Instance"
+      ],
+      "tier": 1,
+      "icon": "b044-az-sql-managed-i",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.sql-server-on-azure-virtual-machines",
+      "vendor": "microsoft",
+      "officialName": "SQL Server on Azure Virtual Machines",
+      "aliases": [
+        "SQL Server",
+        "SQL Server sur VM",
+        "SQL Server sur machine virtuelle"
+      ],
+      "tier": 1,
+      "icon": "b045-sql-server-on-az",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-cosmos-db",
+      "vendor": "microsoft",
+      "officialName": "Azure Cosmos DB",
+      "aliases": [
+        "Cosmos DB"
+      ],
+      "tier": 1,
+      "icon": "b046-az-cosmos-db",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-database-for-postgresql",
+      "vendor": "microsoft",
+      "officialName": "Azure Database for PostgreSQL",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b047-az-database-for",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-database-for-mysql",
+      "vendor": "microsoft",
+      "officialName": "Azure Database for MySQL",
+      "aliases": [
+        "for MySQL"
+      ],
+      "tier": 1,
+      "icon": "b048-az-database-for",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-database-for-mariadb",
+      "vendor": "microsoft",
+      "officialName": "Azure Database for MariaDB",
+      "aliases": [
+        "for MariaDB"
+      ],
+      "tier": 1,
+      "icon": "b049-az-database-for",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-synapse-analytics",
+      "vendor": "microsoft",
+      "officialName": "Azure Synapse Analytics",
+      "aliases": [
+        "Azure Synapse"
+      ],
+      "tier": 1,
+      "icon": "b050-az-synapse-analy",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-data-factory",
+      "vendor": "microsoft",
+      "officialName": "Azure Data Factory",
+      "aliases": [
+        "Data Factory"
+      ],
+      "tier": 1,
+      "icon": "b051-az-data-factory",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-databricks",
+      "vendor": "microsoft",
+      "officialName": "Azure Databricks",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b052-az-databricks",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-machine-learning",
+      "vendor": "microsoft",
+      "officialName": "Azure Machine Learning",
+      "aliases": [
+        "AutoML",
+        "Azure Machine Learning designer"
+      ],
+      "tier": 1,
+      "icon": "b053-az-machine-learn",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-openai-service",
+      "vendor": "microsoft",
+      "officialName": "Azure OpenAI Service",
+      "aliases": [
+        "Azure OpenAI"
+      ],
+      "tier": 1,
+      "icon": "b054-az-openai-servic",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-foundry",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Foundry",
+      "aliases": [
+        "Foundry",
+        "Foundry Tools"
+      ],
+      "tier": 1,
+      "icon": "b055-ms-foundry",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-ai-services",
+      "vendor": "microsoft",
+      "officialName": "Azure AI Services",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b056-az-ai-services",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-ai-vision",
+      "vendor": "microsoft",
+      "officialName": "Azure AI Vision",
+      "aliases": [
+        "Custom Vision"
+      ],
+      "tier": 1,
+      "icon": "b057-az-ai-vision",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-ai-face",
+      "vendor": "microsoft",
+      "officialName": "Azure AI Face",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b058-az-ai-face",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-ai-document-intelligence",
+      "vendor": "microsoft",
+      "officialName": "Azure AI Document Intelligence",
+      "aliases": [
+        "Document Intelligence",
+        "Form Recognizer"
+      ],
+      "tier": 1,
+      "icon": "b059-az-ai-document-i",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-ai-language",
+      "vendor": "microsoft",
+      "officialName": "Azure AI Language",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b060-az-ai-language",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-ai-translator",
+      "vendor": "microsoft",
+      "officialName": "Azure AI Translator",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b061-az-ai-translator",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-ai-speech",
+      "vendor": "microsoft",
+      "officialName": "Azure AI Speech",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b062-az-ai-speech",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-ai-search",
+      "vendor": "microsoft",
+      "officialName": "Azure AI Search",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b063-az-ai-search",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-bot-service",
+      "vendor": "microsoft",
+      "officialName": "Azure Bot Service",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b064-az-bot-service",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.azure-devops",
+      "vendor": "microsoft",
+      "officialName": "Azure DevOps",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b065-az-devops",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-entra-id",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Entra ID",
+      "aliases": [
+        "Azure AD",
+        "Entra",
+        "Entra Connect",
+        "Entra ID",
+        "Microsoft Entra"
+      ],
+      "tier": 1,
+      "icon": "b066-ms-entra-id",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-defender-for-cloud",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Defender for Cloud",
+      "aliases": [
+        "Defender for Cloud"
+      ],
+      "tier": 1,
+      "icon": "b067-ms-defender-for",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-sentinel",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Sentinel",
+      "aliases": [
+        "Sentinel"
+      ],
+      "tier": 1,
+      "icon": "b068-ms-sentinel",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-fabric",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Fabric",
+      "aliases": [
+        "Data & Fabric",
+        "FABRIC"
+      ],
+      "tier": 1,
+      "icon": "b069-ms-fabric",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-power-platform",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Power Platform",
+      "aliases": [
+        "Power Platform"
+      ],
+      "tier": 1,
+      "icon": "b070-ms-power-platfor",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-copilot-studio",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Copilot Studio",
+      "aliases": [
+        "Copilot Studio"
+      ],
+      "tier": 1,
+      "icon": "b071-ms-copilot-studi",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-dataverse",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Dataverse",
+      "aliases": [
+        "Dataverse"
+      ],
+      "tier": 1,
+      "icon": "b072-ms-dataverse",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.ai-builder",
+      "vendor": "microsoft",
+      "officialName": "AI Builder",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b073-ai-builder",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-dynamics-365",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Dynamics 365",
+      "aliases": [
+        "Customer Engagement apps",
+        "Dynamics 365"
+      ],
+      "tier": 1,
+      "icon": "b074-ms-dynamics-365",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-dynamics-365-business-central",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Dynamics 365 Business Central",
+      "aliases": [
+        "Business Central",
+        "Dynamics 365 Business Central"
+      ],
+      "tier": 1,
+      "icon": "b075-ms-d365-business",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-dynamics-365-contact-center",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Dynamics 365 Contact Center",
+      "aliases": [
+        "Dynamics 365 Contact Center"
+      ],
+      "tier": 1,
+      "icon": "b076-ms-d365-contact",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-dynamics-365-customer-service",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Dynamics 365 Customer Service",
+      "aliases": [
+        "Dynamics 365 Customer Service"
+      ],
+      "tier": 1,
+      "icon": "b077-ms-d365-customer",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-dynamics-365-field-service",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Dynamics 365 Field Service",
+      "aliases": [
+        "Dynamics 365 Field Service"
+      ],
+      "tier": 1,
+      "icon": "b078-ms-d365-field-se",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-dynamics-365-finance",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Dynamics 365 Finance",
+      "aliases": [
+        "Dynamics 365 Finance",
+        "Finance and Operations Apps"
+      ],
+      "tier": 1,
+      "icon": "b079-ms-d365-finance",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-dynamics-365-supply-chain-management",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Dynamics 365 Supply Chain Management",
+      "aliases": [
+        "Dynamics 365 Supply Chain Management",
+        "Supply Chain Management"
+      ],
+      "tier": 1,
+      "icon": "b080-ms-d365-supply-c",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-dynamics-365-sales",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Dynamics 365 Sales",
+      "aliases": [
+        "Dynamics 365 Sales"
+      ],
+      "tier": 1,
+      "icon": "b081-ms-d365-sales",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.power-bi",
+      "vendor": "microsoft",
+      "officialName": "Power BI",
+      "aliases": [
+        "Power BI Desktop",
+        "Power BI Mobile",
+        "service Power BI"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Power Platform icons / Microsoft 365 Trademark Guidelines (icône d'application soumise à licence) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.power-apps",
+      "vendor": "microsoft",
+      "officialName": "Power Apps",
+      "aliases": [],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Power Platform icons / Microsoft 365 Trademark Guidelines (icône d'application soumise à licence) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.power-automate",
+      "vendor": "microsoft",
+      "officialName": "Power Automate",
+      "aliases": [],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Power Platform icons / Microsoft 365 Trademark Guidelines (icône d'application soumise à licence) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.power-pages",
+      "vendor": "microsoft",
+      "officialName": "Power Pages",
+      "aliases": [],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Power Platform icons / Microsoft 365 Trademark Guidelines (icône d'application soumise à licence) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-365",
+      "vendor": "microsoft",
+      "officialName": "Microsoft 365",
+      "aliases": [
+        "M365",
+        "Microsoft 365 Apps",
+        "Office 2016",
+        "Office 2019",
+        "Office 365",
+        "covering Office"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-copilot",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Copilot",
+      "aliases": [
+        "Microsoft 365 Copilot"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-word",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Word",
+      "aliases": [
+        "Word (Office",
+        "Word Associate",
+        "Word Expert",
+        "Word,",
+        "covering Word"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-excel",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Excel",
+      "aliases": [
+        "Excel",
+        "Excel (Office",
+        "Excel Associate",
+        "Excel Expert",
+        "Excel for Accounting",
+        "Excel for Business Finance",
+        "covering Excel"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-powerpoint",
+      "vendor": "microsoft",
+      "officialName": "Microsoft PowerPoint",
+      "aliases": [
+        "PowerPoint (Office",
+        "PowerPoint Associate",
+        "covering PowerPoint"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-outlook",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Outlook",
+      "aliases": [
+        "Outlook (Office",
+        "Outlook Associate",
+        "covering Outlook"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-access",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Access",
+      "aliases": [
+        "Access (Office",
+        "Access Expert",
+        "covering Access"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-teams",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Teams",
+      "aliases": [
+        "Teams Administrator"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-defender-xdr",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Defender XDR",
+      "aliases": [
+        "Defender XDR",
+        "Microsoft 365 Security Center",
+        "Microsoft Defender"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-defender-for-endpoint",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Defender for Endpoint",
+      "aliases": [
+        "Defender pour Endpoint"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-defender-for-identity",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Defender for Identity",
+      "aliases": [
+        "Defender pour Identity"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-defender-for-office-365",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Defender for Office 365",
+      "aliases": [
+        "Defender pour Office 365"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-defender-for-cloud-apps",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Defender for Cloud Apps",
+      "aliases": [
+        "Defender for Cloud Apps"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Microsoft 365 Trademark Guidelines (licence de marque requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-purview",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Purview",
+      "aliases": [
+        "Compliance Manager",
+        "Purview",
+        "Service Trust Portal"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (repli) : Aucune icône officielle confirmée pour cet usage (§22A.3) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.windows-windows-server",
+      "vendor": "microsoft",
+      "officialName": "Windows / Windows Server",
+      "aliases": [
+        "Windows Server",
+        "covering Windows"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Windows Trademark Guidelines (symbole Windows soumis à licence) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-certified-programme-et-badges-de-certification",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Certified (programme et badges de certification)",
+      "aliases": [
+        "Microsoft 365 Certified",
+        "Microsoft Certified"
+      ],
+      "tier": 3,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 3 (repli) : Interdit (§22A.2 Niveau 3 — aucun badge ni crête de certification ; code et intitulé en texte uniquement) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "microsoft.microsoft-office-specialist-programme-et-badges-mos",
+      "vendor": "microsoft",
+      "officialName": "Microsoft Office Specialist (programme et badges MOS)",
+      "aliases": [
+        "Microsoft Office Specialist"
+      ],
+      "tier": 3,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 3 (repli) : Interdit (§22A.2 & §22A.3 Niveau 3 — badges réservés aux distributeurs agréés Certiport ; texte uniquement) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "github.github-plateforme-foundations-administration",
+      "vendor": "github",
+      "officialName": "GitHub (plateforme & Foundations / Administration)",
+      "aliases": [
+        "GITHUB",
+        "GitHub Administration",
+        "GitHub Foundations",
+        "covering GitHub"
+      ],
+      "tier": 1,
+      "icon": "b103-github-plateform",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "github.github-actions",
+      "vendor": "github",
+      "officialName": "GitHub Actions",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b104-github-actions",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "github.github-advanced-security",
+      "vendor": "github",
+      "officialName": "GitHub Advanced Security",
+      "aliases": [],
+      "tier": 1,
+      "icon": "b105-github-advanced",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "github.github-copilot",
+      "vendor": "github",
+      "officialName": "GitHub Copilot",
+      "aliases": [
+        "GitHub & Copilot"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : GitHub Brand Toolkit (brand.github.com) (glyphe Copilot traité comme logo de niveau 2) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "github.github-certifications-badges-github-certified",
+      "vendor": "github",
+      "officialName": "GitHub Certifications (badges GitHub Certified)",
+      "aliases": [
+        "GitHub Certified"
+      ],
+      "tier": 3,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 3 (repli) : Interdit (§22A.3 Niveau 3 — badges de certification GitHub interdits) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "aws.amazon-web-services-aws",
+      "vendor": "aws",
+      "officialName": "Amazon Web Services (AWS)",
+      "aliases": [
+        "AWS",
+        "aws"
+      ],
+      "tier": 1,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 1 (autorisation à demander) : AWS Architecture Icons (aws.amazon.com/architecture/icons — .diagram uniquement ; logo AWS interdit hors texte) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "aws.amazon-bedrock",
+      "vendor": "aws",
+      "officialName": "Amazon Bedrock",
+      "aliases": [
+        "Amazon Bedrock Knowledge Bases"
+      ],
+      "tier": 1,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 1 (couvert) : AWS Architecture Icons — Machine Learning / Amazon Bedrock (.diagram uniquement) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "google.google-cloud",
+      "vendor": "google",
+      "officialName": "Google Cloud",
+      "aliases": [
+        "GCP",
+        "GOOGLE-CLOUD",
+        "gcp"
+      ],
+      "tier": 1,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 1 (couvert) : Google Cloud product icons (cloud.google.com/icons) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "cncf.kubernetes-cncf",
+      "vendor": "cncf",
+      "officialName": "Kubernetes / CNCF",
+      "aliases": [
+        "CKA",
+        "CKAD",
+        "CKS",
+        "CNCF",
+        "Kubernetes",
+        "LINUX-FOUNDATION"
+      ],
+      "tier": 1,
+      "icon": "b111-kubernetes-cncf",
+      "status": "approved",
+      "permittedContexts": [
+        "diagram",
+        "learningContent",
+        "catalog"
+      ],
+      "fallbackReason": "Repli automatique hors des contextes autorisés (.catalog / .passport requièrent une autorisation de Niveau 2 — DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "linux.linux",
+      "vendor": "linux",
+      "officialName": "Linux",
+      "aliases": [
+        "machine virtuelle Linux"
+      ],
+      "tier": 1,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 1 (couvert) : Tux (Larry Ewing) avec crédit dans les leçons Linux (.learningContent) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.databricks",
+      "vendor": "other",
+      "officialName": "Databricks",
+      "aliases": [
+        "DATABRICKS",
+        "DBX"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Charte Databricks (§22A.3 — demande d'autorisation écrite requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.sap",
+      "vendor": "other",
+      "officialName": "SAP",
+      "aliases": [
+        "SAP Workloads"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Charte SAP (§22A.3 — demande d'autorisation écrite requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.openai",
+      "vendor": "other",
+      "officialName": "OpenAI",
+      "aliases": [
+        "OAI",
+        "OPENAI"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Charte OpenAI (§22A.3 — demande d'autorisation écrite requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.oracle-cloud-infrastructure-oci",
+      "vendor": "other",
+      "officialName": "Oracle Cloud Infrastructure (OCI)",
+      "aliases": [
+        "OCI",
+        "ORACLE"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Charte Oracle OCI (§22A.3 — demande d'autorisation écrite requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.snowflake",
+      "vendor": "other",
+      "officialName": "Snowflake",
+      "aliases": [
+        "SNOWFLAKE",
+        "SNOWPRO"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Charte Snowflake (§22A.3 — demande d'autorisation écrite requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.hashicorp-terraform-vault",
+      "vendor": "other",
+      "officialName": "HashiCorp Terraform / Vault",
+      "aliases": [
+        "HASHICORP",
+        "TERRAFORM",
+        "VAULT"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Charte HashiCorp (§22A.3 — demande d'autorisation écrite requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.docker",
+      "vendor": "other",
+      "officialName": "Docker",
+      "aliases": [
+        "DOCKER"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Charte Docker (§22A.3 — demande d'autorisation écrite requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "cisco.cisco-network-topology-icons-ccna-ccnp",
+      "vendor": "cisco",
+      "officialName": "Cisco (Network Topology Icons / CCNA / CCNP)",
+      "aliases": [
+        "CCNA",
+        "CCNP",
+        "CISCO"
+      ],
+      "tier": 1,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 1 (couvert) : Cisco Network Topology Icons (cisco.com — niveau 1 en .diagram/.learningContent ; niveau 3 pour logos Cisco/CCNA/CCNP) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.salesforce",
+      "vendor": "other",
+      "officialName": "Salesforce",
+      "aliases": [
+        "SALESFORCE"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "pending-permission",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (autorisation à demander) : Charte Salesforce (§22A.3 — demande d'autorisation écrite requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.red-hat-rhcsa-rhce",
+      "vendor": "other",
+      "officialName": "Red Hat (RHCSA / RHCE)",
+      "aliases": [
+        "RED-HAT",
+        "REDHAT",
+        "RHCE",
+        "RHCSA"
+      ],
+      "tier": 3,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 3 (repli) : Charte Red Hat (§22A.3 — tous logos, badges et codes d'examen RHCSA/RHCE interdits) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.comptia-comptia-security-network",
+      "vendor": "other",
+      "officialName": "CompTIA (CompTIA Security+ / Network+)",
+      "aliases": [
+        "COMPTIA",
+        "N10",
+        "SY0"
+      ],
+      "tier": 3,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 3 (repli) : Charte CompTIA (§22A.3 — tous logos et badges interdits ; texte « CompTIA Security+ » uniquement) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.isc2-cissp",
+      "vendor": "other",
+      "officialName": "ISC2 (CISSP®)",
+      "aliases": [
+        "CISSP",
+        "ISC2"
+      ],
+      "tier": 3,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 3 (repli) : Charte ISC2 (§22A.3 — tous logos et badges interdits ; texte « CISSP® » uniquement) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.postgresql",
+      "vendor": "other",
+      "officialName": "PostgreSQL",
+      "aliases": [],
+      "tier": 2,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (repli) : PostgreSQL Logo Policy (usage nominatif ou repli texte) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.mysql",
+      "vendor": "other",
+      "officialName": "MySQL",
+      "aliases": [],
+      "tier": 2,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (repli) : Oracle / MySQL Trademark Policy (repli texte hors Azure Database for MySQL) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.mariadb",
+      "vendor": "other",
+      "officialName": "MariaDB",
+      "aliases": [],
+      "tier": 2,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (repli) : MariaDB Trademark Policy (repli texte hors Azure Database for MariaDB) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.mongodb",
+      "vendor": "other",
+      "officialName": "MongoDB",
+      "aliases": [
+        "MONGODB"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (repli) : MongoDB Brand Guidelines (autorisation requise) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.apache-spark",
+      "vendor": "other",
+      "officialName": "Apache Spark",
+      "aliases": [
+        "Spark"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (repli) : Apache Trademark Policy (usage nominatif en texte) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.apache-cassandra",
+      "vendor": "other",
+      "officialName": "Apache Cassandra",
+      "aliases": [
+        "Cassandra"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (repli) : Apache Trademark Policy (usage nominatif en texte) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.apache-tinkerpop-gremlin",
+      "vendor": "other",
+      "officialName": "Apache TinkerPop Gremlin",
+      "aliases": [
+        "Gremlin"
+      ],
+      "tier": 2,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 2 (repli) : Apache Trademark Policy (usage nominatif en texte) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    },
+    {
+      "id": "other.anthropic-mistral-nvidia-hugging-face-cohere-meta-confluent-dbt-gitlab-isaca-offsec-palo-alto-cloudflare-servicenow-atlassian-pmi",
+      "vendor": "other",
+      "officialName": "Anthropic / Mistral / NVIDIA / Hugging Face / Cohere / Meta / Confluent / dbt / GitLab / ISACA / OffSec / Palo Alto / Cloudflare / ServiceNow / Atlassian / PMI",
+      "aliases": [
+        "ANTHROPIC",
+        "ATLASSIAN",
+        "CLAUDE",
+        "CLOUDFLARE",
+        "COHERE",
+        "CONFLUENT",
+        "DBT",
+        "GITLAB",
+        "HUGGINGFACE",
+        "ISACA",
+        "META",
+        "MISTRAL",
+        "NVIDIA",
+        "OFFSEC",
+        "PALOALTO",
+        "PMI",
+        "SERVICENOW"
+      ],
+      "tier": 3,
+      "icon": null,
+      "status": "fallback",
+      "permittedContexts": [],
+      "fallbackReason": "Niveau 3 (repli) : Aucun kit autorisé (préfixes prospectifs dans CertigoNativeApp.swift L53-87 sans parcours dans content/) (DR-010)",
+      "fallbackDate": "2026-10-23",
+      "decisionRef": "DR-010"
+    }
+  ]
+}

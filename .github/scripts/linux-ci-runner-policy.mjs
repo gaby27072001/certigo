@@ -16,9 +16,17 @@ export const linuxCiJobs = Object.freeze({
   'security-scan.yml': Object.freeze(['iac-scan']),
 });
 
+const scannerReadOnlyJobs = Object.freeze({
+  'codeql.yml': Object.freeze(['changes', 'analyze', 'security-gate']),
+  'security-gate.yml': Object.freeze(['changes', 'security-gate']),
+});
+
 export function isHostedLinuxCiRunner(file, jobId, runner) {
   return runner === hostedLinuxRunner
-    && linuxCiJobs[path.basename(file)]?.includes(jobId) === true;
+    && (
+      linuxCiJobs[path.basename(file)]?.includes(jobId) === true
+      || scannerReadOnlyJobs[path.basename(file)]?.includes(jobId) === true
+    );
 }
 
 export function isPrLinuxCiRunner(file, jobId, runner) {
@@ -56,8 +64,11 @@ export function validateHostedLinuxJob(workflow, job, jobId, file) {
     errors.push(`${file}: hosted Linux job ${jobId} must not receive secrets, environments, or cloud identity`);
   }
   if (
-    path.basename(file) === 'ci-project-state.yml'
-    && jobId === 'validate'
+    (
+      (path.basename(file) === 'ci-project-state.yml' && jobId === 'validate')
+      || (['codeql.yml', 'security-gate.yml'].includes(path.basename(file))
+        && jobId === 'security-gate')
+    )
     && /github\.event\.pull_request\.head\.(?:sha|ref)|\.untrusted-source|\.untrusted-restore/iu
       .test(JSON.stringify(job))
   ) {

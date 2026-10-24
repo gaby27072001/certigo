@@ -1,14 +1,19 @@
 # Pages légales — contrat de publication
 
-> **Ce fichier n'est pas publié.** `tools/build_public_pages.mjs` ne lit que
-> `privacy-policy.md` et `account-deletion.md`. Toute note de procédure écrite
-> dans l'un de ces deux fichiers deviendrait du contenu public : les mettre ici.
+> **Ce fichier n'est pas publié.** `tools/build_public_pages.mjs` lit
+> `privacy-policy.md`, `account-deletion.md` et le pilote éditorial public
+> `backend/src/Certigo.Infrastructure/Learning/Fixtures/responsible-ai-assistants.json`.
+> Les notes opérationnelles écrites dans les deux documents légaux deviendraient
+> du contenu public : les mettre ici.
 
-## Ce qui sert la production
+## Cible de production
 
 `https://www.certigo-app.com` est servi par **Azure Static Web Apps** depuis
-[#406](https://github.com/gchambaud_microsoft/Certigo/pull/406). Les deux routes
-publiques sont `/privacy-policy/` et `/account-deletion/`.
+[#406](https://github.com/gchambaud_microsoft/Certigo/pull/406). Le dépôt
+prépare aussi les pages du pilote
+`/learn/responsible-ai-assistants/{lessonId}/`, générées à partir du fixture
+éditorial. Ce changement prépare leur publication, sans déployer ni modifier
+les pages actuellement servies.
 
 GitHub Pages **n'est pas activé** sur le dépôt : `GET repos/.../pages` rend 404,
 et `https://gchambaud_microsoft.github.io/Certigo/privacy-policy/` rend 404
@@ -30,9 +35,9 @@ dans [`../deployment-runbook.md`](../deployment-runbook.md) reste valide en tant
 que chemin d'activation *GitHub Pages*, mais elle ne touche pas Azure Static Web
 Apps.
 
-**Conséquence : la publication en production est manuelle.** Éditer
-`privacy-policy.md` ou `account-deletion.md` et fusionner la pull request ne
-change rien à ce qui est servi.
+**Conséquence : la publication en production est manuelle.** Éditer les
+documents légaux ou le fixture éditorial et fusionner la pull request ne change
+rien à ce qui est servi.
 
 ## Pourquoi il n'y a pas de déclencheur automatique — et pourquoi ne pas en poser
 
@@ -108,19 +113,24 @@ C'est le seul contrôle de dérive disponible. Il n'est pas automatisable dans u
 workflow tant que le scellé tient, donc **il doit être lancé à la main après
 chaque édition des pages légales**.
 
-`/.well-known/apple-app-site-association` rend `404` : la route de réécriture
-est générée, mais le fichier cible n'est pas encore produit. C'est le
-comportement attendu et documenté dans
-[`../PUBLIC_DOMAIN_MIGRATION.md`](../PUBLIC_DOMAIN_MIGRATION.md) — ne pas le
-traiter comme une régression de publication.
+Par défaut, le générateur ne produit ni AASA ni réécriture pour
+`/.well-known/apple-app-site-association` : cette route doit donc rester absente
+jusqu'à la vérification d'un build de production `com.certigo.mobileapp`
+capable de traiter les liens du pilote. Après cette preuve seulement, le
+générateur peut être exécuté avec
+`APPLE_UNIVERSAL_LINKS_COMPATIBLE_BUILD_VERIFIED=true`; il émet alors l'AASA
+pour l'identifiant vérifié `FFQPC7NC68.com.certigo.mobileapp`. Le build doit
+toujours viser `https://www.certigo-app.com`. Le bundle de développement
+`com.certigo.native.dev` n'est pas ajouté à l'AASA et son préfixe n'est pas
+supposé.
 
 ## État mesuré le 2026-09-08
 
-Les deux routes sont **à jour** : `npm run check:public-pages` rend `0` contre
-le rendu de `a49caff1`. Elles y ont été portées par une publication manuelle du
-2026-09-08, après une divergence de `/privacy-policy/` qui servait encore le
-rendu de `ccbbbd06` (#406) sans le paragraphe sur la collecte de rapports de
-plantage introduit par `fbb66b43`
+Les deux routes légales sont **à jour** : `npm run check:public-pages` rend `0`
+contre le rendu de `a49caff1`. Elles y ont été portées par une publication
+manuelle du 2026-09-08, après une divergence de `/privacy-policy/` qui servait
+encore le rendu de `ccbbbd06` (#406) sans le paragraphe sur la collecte de
+rapports de plantage introduit par `fbb66b43`
 ([#374](https://github.com/gchambaud_microsoft/Certigo/pull/374)).
 
 Cet état est invalidé par **toute fusion touchant `docs/legal/*.md` ou
