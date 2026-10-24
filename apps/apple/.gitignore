@@ -1,0 +1,4 @@
+.build/
+.swiftpm/
+DerivedData/
+CertigoNative/CertigoNative.xcodeproj/xcuserdata/*/xcschemes/CertigoNative Local.xcscheme

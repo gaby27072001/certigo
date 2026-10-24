@@ -38,4 +38,35 @@ final class CIAMProviderPolicyTests: XCTestCase {
                 domain: "synthetic-msal", code: -50_000, msalDomain: "synthetic-msal",
                 underlyingNetworkCode: NSURLErrorNotConnectedToInternet), .network)
     }
+
+    func testDatedCandidateCannotTurnObservedFlutterRedirectsIntoNativeRegistration() {
+        XCTAssertThrowsError(
+            try CIAMDevelopmentCandidate.validatedMetadata(
+                registeredRedirects: CIAMDevelopmentCandidate.historicallyRegisteredRedirects,
+                declaredSchemes: ["msauth.com.certigo.native.dev"], otherAppSchemes: ["certigo"])
+        ) {
+            XCTAssertEqual($0 as? CIAMConfigurationError, .redirectNotRegistered)
+        }
+    }
+
+    func testHypotheticalRegistrationIsMetadataOnlyAndStillChecksCollision() throws {
+        let registered = CIAMDevelopmentCandidate.historicallyRegisteredRedirects.union([
+            CIAMDevelopmentCandidate.redirect
+        ])
+        let value = try CIAMDevelopmentCandidate.validatedMetadata(
+            registeredRedirects: registered, declaredSchemes: ["msauth.com.certigo.native.dev"],
+            otherAppSchemes: ["certigo"])
+        XCTAssertEqual(value.tenantID, CIAMDevelopmentCandidate.tenantID)
+        XCTAssertEqual(
+            value.apiScope, "api://\(CIAMDevelopmentCandidate.apiAudience)/user_impersonation")
+        XCTAssertEqual(value.authority.path, "")
+        XCTAssertEqual(value.issuer.path, "/\(value.tenantID)/v2.0")
+        XCTAssertThrowsError(
+            try CIAMDevelopmentCandidate.validatedMetadata(
+                registeredRedirects: registered, declaredSchemes: ["msauth.com.certigo.native.dev"],
+                otherAppSchemes: ["MSAUTH.COM.CERTIGO.NATIVE.DEV"])
+        ) {
+            XCTAssertEqual($0 as? CIAMConfigurationError, .callbackCollision)
+        }
+    }
 }
