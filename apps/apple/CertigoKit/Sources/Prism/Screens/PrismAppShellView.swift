@@ -486,6 +486,8 @@ import SwiftUI
 public struct PrismAppShellView: View {
     @State private var router: AppRouterState
     @State private var coordinator: PrismAppShellCoordinatorModel
+    @State private var showCourseTray = false
+    @State private var selectedBrandFilter: String = "all"
     public let flags: FeatureFlags
 
     public init(
@@ -506,32 +508,80 @@ public struct PrismAppShellView: View {
     }
 
     public var body: some View {
-        TabView(selection: $router.selectedTab) {
-            ForEach(AppTab.allCases) { tab in
-                NavigationStack(path: pathBinding(for: tab)) {
-                    rootScreen(for: tab)
-                        .navigationDestination(for: AppRoute.self) { route in
-                            destinationScreen(for: route)
+        ZStack(alignment: .top) {
+            VStack(spacing: .zero) {
+                PrismDuolingoTopBar(
+                    activeRouteCode: coordinator.todayModel.activeRouteCode ?? "AZ-104",
+                    activeProduct: coordinator.todayModel.activeRouteProductID,
+                    streakDays: coordinator.todayModel.rhythm.dailyStreakDays ?? 12,
+                    isTrayOpen: showCourseTray,
+                    flags: flags,
+                    onToggleTray: {
+                        showCourseTray.toggle()
+                    }
+                )
+
+                ZStack(alignment: .bottom) {
+                    TabView(selection: $router.selectedTab) {
+                        ForEach(AppTab.allCases) { tab in
+                            NavigationStack(path: pathBinding(for: tab)) {
+                                rootScreen(for: tab)
+                                    .navigationDestination(for: AppRoute.self) { route in
+                                        destinationScreen(for: route)
+                                    }
+                            }
+                            .toolbar(.hidden, for: .tabBar)
+                            .tag(tab)
                         }
-                }
-                .tabItem {
-                    Label(
-                        tab.title,
-                        systemImage: tab.symbolName(isSelected: router.selectedTab == tab)
+                    }
+
+                    PrismCustomBottomBar(
+                        selectedTab: $router.selectedTab
                     )
                 }
-                .tag(tab)
+            }
+
+            if showCourseTray {
+                PrismCourseSwitcherTrayView(
+                    activeRouteCode: coordinator.todayModel.activeRouteCode ?? "AZ-104",
+                    selectedBrandFilter: $selectedBrandFilter,
+                    flags: flags,
+                    onSelectCourse: { code, title in
+                        coordinator.todayModel.activeRouteCode = code
+                        coordinator.todayModel.activeRouteTitle = title
+                        for idx in coordinator.catalogExplorer.routes.indices {
+                            coordinator.catalogExplorer.routes[idx].isConfirmedActiveGoal =
+                                (coordinator.catalogExplorer.routes[idx].code == code)
+                        }
+                        showCourseTray = false
+                    },
+                    onOpenFullCatalog: {
+                        showCourseTray = false
+                        router.selectedTab = .today
+                        router.push(.catalogExplorer, in: .today)
+                    },
+                    onDismiss: {
+                        showCourseTray = false
+                    }
+                )
+                .padding(.top, PrismSize.primaryButtonHeight)
             }
         }
+        .fontDesign(.rounded)
+        .preferredColorScheme(.light)
         .fullScreenCover(item: $router.activeCover) { cover in
             NavigationStack {
                 coverScreen(for: cover)
             }
+            .fontDesign(.rounded)
+            .preferredColorScheme(.light)
         }
         .sheet(item: $router.activeSheet) { sheet in
             NavigationStack {
                 sheetScreen(for: sheet)
             }
+            .fontDesign(.rounded)
+            .preferredColorScheme(.light)
         }
     }
 
@@ -563,38 +613,79 @@ public struct PrismAppShellView: View {
             )
 
         case .atlas:
-            AtlasCompleteScreen(
-                model: $coordinator.atlasModel,
-                onSelectRegion: { summary in
-                    router.push(.regionDetail(summary.region), in: .atlas)
-                },
-                onSelectNode: { node in
-                    router.push(.conceptDetail(id: node.id), in: .atlas)
-                },
-                onOpenExplorer: {
-                    router.push(.catalogExplorer, in: .atlas)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                    PrismPracticeHubHeaderView(
+                        activeRouteCode: coordinator.todayModel.activeRouteCode ?? "AZ-104",
+                        onStartMockExam: {
+                            coordinator.mockExamMachine = PrismAppShellCoordinatorModel.defaultMockExamMachine()
+                            router.presentCover(.mockExam(trackCode: coordinator.todayModel.activeRouteCode ?? "AZ-104"))
+                        },
+                        onStartErrorReview: {
+                            if coordinator.sessionPlayerMachine.isCompleted {
+                                coordinator.sessionPlayerMachine = PrismAppShellCoordinatorModel.defaultSessionPlayerMachine()
+                            }
+                            router.presentCover(.sessionPlayer(length: .standard, resumeSessionId: nil))
+                        },
+                        onOpenCatalogExplorer: {
+                            router.push(.catalogExplorer, in: .atlas)
+                        }
+                    )
+
+                    AtlasCompleteScreen(
+                        model: $coordinator.atlasModel,
+                        onSelectRegion: { summary in
+                            router.push(.regionDetail(summary.region), in: .atlas)
+                        },
+                        onSelectNode: { node in
+                            router.push(.conceptDetail(id: node.id), in: .atlas)
+                        },
+                        onOpenExplorer: {
+                            router.push(.catalogExplorer, in: .atlas)
+                        }
+                    )
                 }
-            )
+                .padding(.bottom, PrismSpacing.giant)
+            }
+            .background(PrismColor.canvas)
+            .toolbar(.hidden, for: .navigationBar)
 
         case .ensemble:
-            EnsembleCompleteScreen(
-                onNavigate: { route in
-                    router.push(route, in: .ensemble)
-                },
-                onOpenSheet: { sheet in
-                    router.presentSheet(sheet)
-                },
-                onOpenCover: { cover in
-                    router.presentCover(cover)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                    PrismLeaguesHeaderView(
+                        activeRouteCode: coordinator.todayModel.activeRouteCode ?? "AZ-104",
+                        flags: flags
+                    )
+                    .padding(.horizontal, PrismSpacing.l)
+                    .padding(.top, PrismSpacing.s)
+
+                    EnsembleCompleteScreen(
+                        onNavigate: { route in
+                            router.push(route, in: .ensemble)
+                        },
+                        onOpenSheet: { sheet in
+                            router.presentSheet(sheet)
+                        },
+                        onOpenCover: { cover in
+                            router.presentCover(cover)
+                        }
+                    )
                 }
-            )
+                .padding(.bottom, PrismSpacing.giant)
+            }
+            .background(PrismColor.canvas)
+            .toolbar(.hidden, for: .navigationBar)
 
         case .profile:
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: PrismSpacing.l) {
-                    PassportCard(summary: coordinator.calibrationHistory.passport)
+                    PrismProfileDomainMasteryCardView(
+                        activeRouteCode: coordinator.todayModel.activeRouteCode ?? "AZ-104",
+                        flags: flags
+                    )
 
-                    RhythmWeekView(model: coordinator.todayModel.rhythm)
+                    PassportCard(summary: coordinator.calibrationHistory.passport)
 
                     PrismSection(title: "Progression, Calibration & Pro") {
                         PrismCard(variant: .standard) {
@@ -618,7 +709,7 @@ public struct PrismAppShellView: View {
                                 PrismRow(
                                     configuration: PrismRowConfiguration(
                                         title: "CertiGo Pro · Préparation complète",
-                                        subtitle: "Examens blancs illimités, Plongée 35 min & packs hors ligne",
+                                        subtitle: "Examens blancs illimités & packs hors ligne",
                                         showsChevron: true
                                     ),
                                     action: { router.presentSheet(.certigoPro) }
@@ -667,28 +758,53 @@ public struct PrismAppShellView: View {
                     }
                 }
                 .padding(PrismSpacing.l)
+                .padding(.bottom, PrismSpacing.giant)
             }
             .background(PrismColor.canvas)
-            .navigationTitle(Text(verbatim: "Profil"))
+            .toolbar(.hidden, for: .navigationBar)
 
         case .search:
-            GlobalSearchScreen(
-                model: $coordinator.searchModel,
-                flags: flags,
-                onSelectResult: { result in
-                    switch result.kind {
-                    case .concept:
-                        router.push(.conceptDetail(id: result.id), in: .search)
-                    case .route:
-                        router.push(.routeObjective(trackCode: result.id), in: .search)
-                    case .product:
-                        router.push(.catalogExplorer, in: .search)
-                    }
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                    PrismCentralAICoachView(
+                        activeRouteCode: coordinator.todayModel.activeRouteCode ?? "AZ-104",
+                        onStartTrapQuestions: {
+                            if coordinator.sessionPlayerMachine.isCompleted {
+                                coordinator.sessionPlayerMachine = PrismAppShellCoordinatorModel.defaultSessionPlayerMachine()
+                            }
+                            router.presentCover(.sessionPlayer(length: .standard, resumeSessionId: nil))
+                        },
+                        onCompareServices: {
+                            router.presentSheet(.compareConcepts(leftId: "Service Endpoint", rightId: "Private Endpoint"))
+                        },
+                        onAskContextualAI: {
+                            router.presentSheet(.contextualAI(contextId: coordinator.todayModel.activeRouteCode ?? "AZ-104"))
+                        }
+                    )
+                    .padding(.horizontal, PrismSpacing.l)
+                    .padding(.top, PrismSpacing.s)
+
+                    GlobalSearchScreen(
+                        model: $coordinator.searchModel,
+                        flags: flags,
+                        onSelectResult: { result in
+                            switch result.kind {
+                            case .concept:
+                                router.push(.conceptDetail(id: result.id), in: .search)
+                            case .route:
+                                router.push(.routeObjective(trackCode: result.id), in: .search)
+                            case .product:
+                                router.push(.catalogExplorer, in: .search)
+                            }
+                        }
+                    )
                 }
-            )
+                .padding(.bottom, PrismSpacing.giant)
+            }
+            .background(PrismColor.canvas)
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
-
     @ViewBuilder
     private func destinationScreen(for route: AppRoute) -> some View {
         switch route {
@@ -909,6 +1025,642 @@ public struct PrismAppShellView: View {
             CertigoProSheetScreen()
         case .shareCard(let payload):
             PrismShareCardView(payload: payload)
+        }
+    }
+}
+
+// MARK: - 3. Duolingo Top Bar, Brand/Cert Switcher Tray & 5-Slot Bottom Bar with Central AI
+
+private struct PrismDuolingoTopBar: View {
+    let activeRouteCode: String
+    let activeProduct: BrandProductID
+    let streakDays: Int
+    let isTrayOpen: Bool
+    let flags: FeatureFlags
+    let onToggleTray: () -> Void
+
+    var body: some View {
+        HStack(spacing: PrismSpacing.s) {
+            Button {
+                onToggleTray()
+            } label: {
+                HStack(spacing: PrismSpacing.xs) {
+                    BrandIcon(
+                        product: activeProduct,
+                        context: .learningContent,
+                        size: .small,
+                        flags: flags
+                    )
+                    Text(verbatim: activeRouteCode)
+                        .prismTextStyle(.headline)
+                        .foregroundStyle(isTrayOpen ? PrismColor.accent : PrismColor.textPrimary)
+                    Image(systemName: isTrayOpen ? "chevron.up" : "chevron.down")
+                        .prismTextStyle(.caption)
+                        .foregroundStyle(isTrayOpen ? PrismColor.accent : PrismColor.textSecondary)
+                }
+                .padding(.horizontal, PrismSpacing.m)
+                .padding(.vertical, PrismSpacing.xs)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.stepPill, style: .continuous)
+                        .fill(isTrayOpen ? PrismColor.accent.opacity(0.12) : PrismColor.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: PrismRadius.stepPill, style: .continuous)
+                        .strokeBorder(
+                            isTrayOpen ? PrismColor.accent : PrismColor.separator,
+                            lineWidth: PrismBorder.standard
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("top-course-switcher-button")
+
+            Spacer(minLength: PrismSpacing.xs)
+
+            HStack(spacing: PrismSpacing.xs) {
+                statPill(symbol: "flame.fill", value: "\(streakDays)", color: PrismColor.caution)
+                statPill(symbol: "diamond.fill", value: "1 480", color: PrismColor.accent)
+                statPill(symbol: "heart.fill", value: "5", color: PrismColor.negative)
+            }
+        }
+        .padding(.horizontal, PrismSpacing.l)
+        .padding(.vertical, PrismSpacing.s)
+        .background(PrismColor.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(PrismColor.separator.opacity(0.5))
+                .frame(height: PrismBorder.hairline)
+        }
+    }
+
+    @ViewBuilder
+    private func statPill(symbol: String, value: String, color: Color) -> some View {
+        HStack(spacing: PrismSpacing.xxs) {
+            Image(systemName: symbol)
+                .prismTextStyle(.caption)
+                .foregroundStyle(color)
+            Text(verbatim: value)
+                .prismTextStyle(.subheadline)
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, PrismSpacing.s)
+        .padding(.vertical, PrismSpacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                .fill(PrismColor.canvas)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                .strokeBorder(PrismColor.separator, lineWidth: PrismBorder.regular)
+        )
+    }
+}
+
+private struct PrismCourseSwitcherTrayView: View {
+    struct BrandFilterSpec: Identifiable {
+        let id: String
+        let label: String
+        let product: BrandProductID
+    }
+
+    struct CourseItemSpec: Identifiable {
+        var id: String { code }
+        let code: String
+        let title: String
+        let brandId: String
+        let progressText: String
+        let product: BrandProductID
+    }
+
+    let activeRouteCode: String
+    @Binding var selectedBrandFilter: String
+    let flags: FeatureFlags
+    let onSelectCourse: (String, String) -> Void
+    let onOpenFullCatalog: () -> Void
+    let onDismiss: () -> Void
+
+    private var brandFilters: [BrandFilterSpec] {
+        [
+            .init(id: "all", label: "Toutes (39)", product: .azureVirtualNetwork),
+            .init(id: "microsoft", label: "Microsoft", product: .azureVirtualNetwork),
+            .init(id: "aws", label: "AWS", product: BrandProductID("aws-vpc")),
+            .init(id: "gcp", label: "Google", product: BrandProductID("gcp-compute-engine")),
+            .init(id: "github", label: "GitHub", product: BrandProductID("github-copilot")),
+            .init(id: "cncf", label: "CNCF", product: BrandProductID("kubernetes"))
+        ]
+    }
+
+    private var courses: [CourseItemSpec] {
+        let all: [CourseItemSpec] = [
+            .init(code: "AZ-104", title: "Administrateur Microsoft Azure", brandId: "microsoft", progressText: "Unité 3 · 68 % prêt", product: .azureVirtualNetwork),
+            .init(code: "AI-102", title: "Azure AI Engineer & Foundry", brandId: "microsoft", progressText: "Unité 2 · 42 % prêt", product: BrandProductID("azure-openai")),
+            .init(code: "AZ-305", title: "Solutions Architect Expert", brandId: "microsoft", progressText: "Unité 4 · 54 % prêt", product: .azureVirtualMachines),
+            .init(code: "SAA-C03", title: "AWS Solutions Architect Assoc.", brandId: "aws", progressText: "Unité 1 · 20 % prêt", product: BrandProductID("aws-vpc")),
+            .init(code: "ACE", title: "Google Associate Cloud Engineer", brandId: "gcp", progressText: "Nouveau parcours", product: BrandProductID("gcp-compute-engine")),
+            .init(code: "GH-300", title: "GitHub Copilot Certification", brandId: "github", progressText: "Unité 2 · 75 % prêt", product: BrandProductID("github-copilot")),
+            .init(code: "CKA", title: "Certified Kubernetes Admin", brandId: "cncf", progressText: "Unité 1 · 35 % prêt", product: BrandProductID("kubernetes"))
+        ]
+        if selectedBrandFilter == "all" { return all }
+        return all.filter { $0.brandId == selectedBrandFilter }
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            PrismColor.textPrimary.opacity(0.32)
+                .ignoresSafeArea()
+                .onTapGesture { onDismiss() }
+
+            VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                Text(verbatim: "CHOISIR UNE MARQUE (LOGOS DÉTOURÉS)")
+                    .prismTextStyle(.caption)
+                    .foregroundStyle(PrismColor.textSecondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: PrismSpacing.s) {
+                        ForEach(brandFilters) { brand in
+                            let isSelected = selectedBrandFilter == brand.id
+                            Button {
+                                selectedBrandFilter = brand.id
+                            } label: {
+                                VStack(spacing: PrismSpacing.xxs) {
+                                    BrandIcon(
+                                        product: brand.product,
+                                        context: .learningContent,
+                                        size: .small,
+                                        flags: flags
+                                    )
+                                    Text(verbatim: brand.label)
+                                        .prismTextStyle(.caption)
+                                        .foregroundStyle(isSelected ? PrismColor.accent : PrismColor.textPrimary)
+                                }
+                                .frame(minWidth: PrismSize.brandFilterWidth)
+                                .padding(.vertical, PrismSpacing.s)
+                                .padding(.horizontal, PrismSpacing.s)
+                                .background(
+                                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                        .fill(isSelected ? PrismColor.accent.opacity(0.12) : PrismColor.canvas)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                        .strokeBorder(
+                                            isSelected ? PrismColor.accent : PrismColor.separator,
+                                            lineWidth: isSelected ? PrismBorder.strong : PrismBorder.regular
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                Text(verbatim: "CHANGER DE CERTIFICATION ACTIVE")
+                    .prismTextStyle(.caption)
+                    .foregroundStyle(PrismColor.textSecondary)
+
+                ForEach(courses) { course in
+                    let isActive = course.code == activeRouteCode
+                    Button {
+                        onSelectCourse(course.code, course.title)
+                    } label: {
+                        HStack(spacing: PrismSpacing.m) {
+                            BrandIcon(
+                                product: course.product,
+                                context: .learningContent,
+                                size: .medium,
+                                flags: flags
+                            )
+                            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                Text(verbatim: course.code)
+                                    .prismTextStyle(.caption)
+                                    .foregroundStyle(PrismColor.accent)
+                                Text(verbatim: course.title)
+                                    .prismTextStyle(.subheadline)
+                                    .foregroundStyle(PrismColor.textPrimary)
+                                Text(verbatim: course.progressText)
+                                    .prismTextStyle(.caption)
+                                    .foregroundStyle(PrismColor.textSecondary)
+                            }
+                            Spacer(minLength: PrismSpacing.xs)
+                            if isActive {
+                                PrismBadge(
+                                    configuration: PrismBadgeConfiguration(
+                                        text: "Actif",
+                                        semantics: .accent
+                                    )
+                                )
+                            }
+                        }
+                        .padding(PrismSpacing.m)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                .fill(isActive ? PrismColor.accent.opacity(0.1) : PrismColor.canvas)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                .strokeBorder(
+                                    isActive ? PrismColor.accent : PrismColor.separator,
+                                    lineWidth: isActive ? PrismBorder.strong : PrismBorder.regular
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button {
+                    onOpenFullCatalog()
+                } label: {
+                    Text(verbatim: "+ Explorer les 39 certifications du catalogue")
+                        .prismTextStyle(.subheadline)
+                        .foregroundStyle(PrismColor.accent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, PrismSpacing.s)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                .fill(PrismColor.canvas)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(PrismSpacing.l)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                    .fill(PrismColor.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                    .strokeBorder(PrismColor.separator, lineWidth: PrismBorder.standard)
+            )
+            .padding(.horizontal, PrismSpacing.m)
+            .padding(.top, PrismSpacing.xs)
+        }
+    }
+}
+
+private struct PrismCustomBottomBar: View {
+    @Binding var selectedTab: AppTab
+
+    var body: some View {
+        ZStack {
+            HStack(spacing: PrismSpacing.xs) {
+                tabButton(tab: .today, title: "Parcours", symbol: "point.bottomleft.forward.to.point.topright.scurvepath.fill")
+                tabButton(tab: .atlas, title: "Pratique", symbol: "target")
+
+                Spacer()
+                    .frame(width: PrismSize.centerAIHalo)
+
+                tabButton(tab: .ensemble, title: "Ligues", symbol: "trophy.fill")
+                tabButton(tab: .profile, title: "Profil", symbol: "person.crop.circle.fill")
+            }
+            .padding(.horizontal, PrismSpacing.s)
+            .frame(height: PrismSize.bottomBarHeight)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.bottomBar, style: .continuous)
+                    .fill(PrismColor.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: PrismRadius.bottomBar, style: .continuous)
+                    .strokeBorder(PrismColor.separator, lineWidth: PrismBorder.standard)
+            )
+
+            Button {
+                selectedTab = .search
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: PrismRadius.centerAIHalo, style: .continuous)
+                        .fill(PrismColor.surface)
+                        .frame(width: PrismSize.centerAIHalo, height: PrismSize.centerAIHalo)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: PrismRadius.centerAIHalo, style: .continuous)
+                                .strokeBorder(
+                                    selectedTab == .search ? PrismRegion.ai.color : PrismColor.separator,
+                                    lineWidth: PrismBorder.strong
+                                )
+                        )
+
+                    RoundedRectangle(cornerRadius: PrismRadius.centerAI, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [PrismColor.accent, PrismRegion.ai.color],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: PrismSize.centerAIButton, height: PrismSize.centerAIButton)
+                        .overlay(
+                            VStack(spacing: PrismSpacing.xxs) {
+                                Image(systemName: "sparkles")
+                                    .prismTextStyle(.title3)
+                                    .foregroundStyle(PrismColor.onAccent)
+                                Text(verbatim: "IA")
+                                    .prismTextStyle(.caption)
+                                    .foregroundStyle(PrismColor.onAccent)
+                            }
+                        )
+                }
+            }
+            .buttonStyle(.plain)
+            .offset(y: -PrismSpacing.s)
+            .accessibilityIdentifier("bottom-central-ai-button")
+        }
+        .padding(.horizontal, PrismSpacing.m)
+        .padding(.bottom, PrismSpacing.xs)
+    }
+
+    @ViewBuilder
+    private func tabButton(tab: AppTab, title: String, symbol: String) -> some View {
+        let isSelected = selectedTab == tab
+        Button {
+            selectedTab = tab
+        } label: {
+            VStack(spacing: PrismSpacing.xxs) {
+                Image(systemName: symbol)
+                    .prismTextStyle(.headline)
+                Text(verbatim: title)
+                    .prismTextStyle(.caption)
+            }
+            .foregroundStyle(isSelected ? PrismColor.accent : PrismColor.textSecondary)
+            .frame(maxWidth: .infinity)
+            .frame(height: PrismSize.tabItemHeight)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .fill(isSelected ? PrismColor.accent.opacity(0.12) : PrismColor.surface.opacity(0.01))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct PrismPracticeHubHeaderView: View {
+    let activeRouteCode: String
+    let onStartMockExam: () -> Void
+    let onStartErrorReview: () -> Void
+    let onOpenCatalogExplorer: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            PrismText(text: "Entraînement ciblé · \(activeRouteCode)", style: .title2)
+            PrismText(
+                text: "Renforce tes points faibles et prépare le jour J sans question de durée.",
+                style: .subheadline,
+                role: .textSecondary
+            )
+
+            PrismCard(variant: .hero) {
+                VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                    PrismBadge(
+                        configuration: PrismBadgeConfiguration(
+                            text: "CONDITIONS RÉELLES PEARSON VUE",
+                            semantics: .accent
+                        )
+                    )
+                    PrismText(text: "Examen Blanc Officiel \(activeRouteCode)", style: .title3)
+                    PrismText(
+                        text: "50 questions · Score requis 700/1000 · Rapport par domaine",
+                        style: .subheadline,
+                        role: .textSecondary
+                    )
+                    Button {
+                        onStartMockExam()
+                    } label: {
+                        Text(verbatim: "LANCER UN EXAMEN BLANC")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PrismButtonStyle(variant: .primary))
+                }
+            }
+
+            PrismCard(variant: .standard) {
+                VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                    PrismRow(
+                        configuration: PrismRowConfiguration(
+                            title: "Corriger mes erreurs récentes (12)",
+                            subtitle: "Questions ratées cette semaine · +30 XP",
+                            showsChevron: true
+                        ),
+                        action: onStartErrorReview
+                    )
+                    PrismRow(
+                        configuration: PrismRowConfiguration(
+                            title: "Mini-Lab CLI & Bicep interactif",
+                            subtitle: "Compléter les commandes Azure CLI manquantes",
+                            showsChevron: true
+                        ),
+                        action: onStartErrorReview
+                    )
+                    PrismRow(
+                        configuration: PrismRowConfiguration(
+                            title: "Catalogue des 39 certifications",
+                            subtitle: "Changer d'objectif ou explorer toutes les marques",
+                            showsChevron: true
+                        ),
+                        action: onOpenCatalogExplorer
+                    )
+                }
+            }
+        }
+        .padding(.horizontal, PrismSpacing.l)
+        .padding(.top, PrismSpacing.s)
+    }
+}
+
+private struct PrismCentralAICoachView: View {
+    let activeRouteCode: String
+    let onStartTrapQuestions: () -> Void
+    let onCompareServices: () -> Void
+    let onAskContextualAI: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                HStack(spacing: PrismSpacing.s) {
+                    Image(systemName: "sparkles")
+                        .prismTextStyle(.title2)
+                        .foregroundStyle(PrismColor.onAccent)
+                    Text(verbatim: "PRISM COPILOT IA · ARCHITECTURE COACH")
+                        .prismTextStyle(.caption)
+                        .foregroundStyle(PrismColor.onAccent.opacity(0.9))
+                }
+                Text(verbatim: "Que veux-tu maîtriser ?")
+                    .prismTextStyle(.title2)
+                    .foregroundStyle(PrismColor.onAccent)
+                Text(verbatim: "Synchronisé : \(activeRouteCode) · Unité 3 (Isolation VNet & DNS privé)")
+                    .prismTextStyle(.footnote)
+                    .foregroundStyle(PrismColor.onAccent.opacity(0.92))
+            }
+            .padding(PrismSpacing.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.unitBanner, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [PrismColor.accent, PrismRegion.ai.color],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+
+            PrismCard(variant: .standard) {
+                VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                    PrismText(text: "SYNTHÈSE VISUELLE INSTANTANÉE", style: .caption, role: .accent)
+                    PrismText(text: "Pourquoi VNet-Hub avait besoin du lien DNS ?", style: .headline)
+                    PrismText(
+                        text: "VM Hub ──► Zone DNS Privée (VNet Link) ──► 10.2.0.5",
+                        style: .callout,
+                        role: .accent
+                    )
+                    PrismText(
+                        text: "Astuce examen : Microsoft pose cette question dans 80 % des cas avec un VNet Hub-and-Spoke où le lien DNS a été oublié sur le Hub.",
+                        style: .subheadline,
+                        role: .textSecondary
+                    )
+                }
+            }
+
+            PrismCard(variant: .standard) {
+                VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                    PrismRow(
+                        configuration: PrismRowConfiguration(
+                            title: "Générer 3 questions pièges sur Private Endpoint",
+                            subtitle: "Ciblé sur tes dernières hésitations \(activeRouteCode)",
+                            showsChevron: true
+                        ),
+                        action: onStartTrapQuestions
+                    )
+                    PrismRow(
+                        configuration: PrismRowConfiguration(
+                            title: "Comparer Service Endpoint vs Private Endpoint",
+                            subtitle: "Tableau récapitulatif pour ne plus jamais confondre",
+                            showsChevron: true
+                        ),
+                        action: onCompareServices
+                    )
+                    PrismRow(
+                        configuration: PrismRowConfiguration(
+                            title: "Poser une question à Prism Copilot IA",
+                            subtitle: "Explication ancrée sur la documentation officielle",
+                            showsChevron: true
+                        ),
+                        action: onAskContextualAI
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct PrismLeaguesHeaderView: View {
+    let activeRouteCode: String
+    let flags: FeatureFlags
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                Text(verbatim: "LIGUE DIAMANT · SEMAINE 6 · FIN DANS 2J 14H")
+                    .prismTextStyle(.caption)
+                    .foregroundStyle(PrismColor.onAccent.opacity(0.9))
+                Text(verbatim: "Zone de Promotion Top 5")
+                    .prismTextStyle(.title2)
+                    .foregroundStyle(PrismColor.onAccent)
+                Text(verbatim: "Squad CloudOps FR · Mission : 840 / 1 000 XP complétés")
+                    .prismTextStyle(.footnote)
+                    .foregroundStyle(PrismColor.onAccent.opacity(0.9))
+            }
+            .padding(PrismSpacing.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.unitBanner, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [PrismRegion.ai.color, PrismColor.accent],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+
+            PrismCard(variant: .standard) {
+                VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                    leaderRow(rank: "1", name: "Sarah Chen", cert: "AZ-305", xp: "2 140 XP", isMe: false, product: .azureVirtualMachines)
+                    leaderRow(rank: "2", name: "Gabriel C. (Toi)", cert: activeRouteCode, xp: "1 890 XP", isMe: true, product: .azureVirtualNetwork)
+                    leaderRow(rank: "3", name: "Lucas Meyer", cert: "AI-102", xp: "1 720 XP", isMe: false, product: BrandProductID("azure-openai"))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func leaderRow(rank: String, name: String, cert: String, xp: String, isMe: Bool, product: BrandProductID) -> some View {
+        HStack(spacing: PrismSpacing.m) {
+            Text(verbatim: rank)
+                .prismTextStyle(.headline)
+                .foregroundStyle(isMe ? PrismColor.accent : PrismColor.caution)
+            BrandIcon(
+                product: product,
+                context: .learningContent,
+                size: .small,
+                flags: flags
+            )
+            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                Text(verbatim: name)
+                    .prismTextStyle(.subheadline)
+                    .foregroundStyle(isMe ? PrismColor.accent : PrismColor.textPrimary)
+                Text(verbatim: "Objectif : \(cert)")
+                    .prismTextStyle(.caption)
+                    .foregroundStyle(PrismColor.textSecondary)
+            }
+            Spacer(minLength: PrismSpacing.xs)
+            Text(verbatim: xp)
+                .prismTextStyle(.subheadline)
+                .foregroundStyle(isMe ? PrismColor.accent : PrismColor.textPrimary)
+        }
+        .padding(.vertical, PrismSpacing.xs)
+    }
+}
+
+private struct PrismProfileDomainMasteryCardView: View {
+    let activeRouteCode: String
+    let flags: FeatureFlags
+
+    var body: some View {
+        PrismCard(variant: .standard) {
+            VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                HStack(spacing: PrismSpacing.m) {
+                    BrandIcon(
+                        product: .azureVirtualNetwork,
+                        context: .learningContent,
+                        size: .large,
+                        flags: flags
+                    )
+                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                        PrismText(text: "Gabriel Chambaud", style: .title3)
+                        PrismText(
+                            text: "Cloud Architect · 78 % prêt pour \(activeRouteCode)",
+                            style: .subheadline,
+                            role: .accent
+                        )
+                    }
+                }
+
+                PrismText(text: "MAÎTRISE PAR DOMAINE OFFICIEL (\(activeRouteCode))", style: .caption, role: .textSecondary)
+                domainRow(title: "Identité & Gouvernance Entra ID", percent: "88 %", color: PrismColor.positive)
+                domainRow(title: "Stockage & Sécurité des données", percent: "82 %", color: PrismColor.positive)
+                domainRow(title: "Réseaux virtuels & DNS privé", percent: "68 %", color: PrismColor.accent)
+                domainRow(title: "Supervision Azure Monitor & Backup", percent: "54 %", color: PrismColor.caution)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func domainRow(title: String, percent: String, color: Color) -> some View {
+        HStack {
+            Text(verbatim: title)
+                .prismTextStyle(.subheadline)
+                .foregroundStyle(PrismColor.textPrimary)
+            Spacer(minLength: PrismSpacing.xs)
+            Text(verbatim: percent)
+                .prismTextStyle(.subheadline)
+                .foregroundStyle(color)
         }
     }
 }

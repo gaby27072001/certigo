@@ -30,14 +30,13 @@ public enum PrismBrandIconSize: CaseIterable, Equatable, Sendable {
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
 
-/// Renders an unmodified official publisher icon on a neutral plate, or falls back cleanly (§22A.6, §22A.8).
+/// Renders an unmodified cut-out official publisher icon (logo détouré, sans fond blanc) or falls back cleanly (§22A.6, §22A.8).
 public struct BrandIcon: View {
     public let product: BrandProductID
     public let context: BrandContext
     public let size: PrismBrandIconSize
     public let registry: BrandRegistry
     public let flags: FeatureFlags?
-    @Environment(\.colorSchemeContrast) private var contrast
 
     public init(
         product: BrandProductID,
@@ -65,18 +64,6 @@ public struct BrandIcon: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: size.points, height: size.points)
-                .padding(size.clearSpacePadding)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
-                        .fill(PrismColor.brandPlate)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
-                        .strokeBorder(
-                            contrast == .increased ? PrismColor.textPrimary : PrismColor.separator,
-                            lineWidth: contrast == .increased ? PrismBorder.strong : PrismBorder.hairline
-                        )
-                )
                 .accessibilityIgnoresInvertColors(true)
                 .accessibilityLabel(Text(verbatim: officialName))
                 .accessibilityAddTraits(.isImage)

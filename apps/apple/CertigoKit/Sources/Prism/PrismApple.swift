@@ -88,20 +88,20 @@
     /// `display` is scaled relative to largeTitle rather than a fixed-point feature font.
     public func font(displaySize: CGFloat = 40) -> Font {
       switch self {
-      case .display: .system(size: displaySize, weight: .bold)
-      case .title1: .title
-      case .title2: .title2
-      case .title3: .title3
-      case .headline: .headline
-      case .body: .body
-      case .editorial: .system(.body, design: .serif)
-      case .callout: .callout
-      case .subheadline: .subheadline
-      case .footnote: .footnote
-      case .caption: .caption
-      case .code: .system(.body, design: .monospaced).monospacedDigit()
-      case .codeSmall: .system(.callout, design: .monospaced).monospacedDigit()
-      case .numeric: .body.monospacedDigit()
+      case .display: .system(size: displaySize, weight: .black, design: .rounded)
+      case .title1: .system(.title, design: .rounded, weight: .heavy)
+      case .title2: .system(.title2, design: .rounded, weight: .heavy)
+      case .title3: .system(.title3, design: .rounded, weight: .bold)
+      case .headline: .system(.headline, design: .rounded, weight: .bold)
+      case .body: .system(.body, design: .rounded, weight: .semibold)
+      case .editorial: .system(.body, design: .rounded, weight: .semibold)
+      case .callout: .system(.callout, design: .rounded, weight: .bold)
+      case .subheadline: .system(.subheadline, design: .rounded, weight: .semibold)
+      case .footnote: .system(.footnote, design: .rounded, weight: .semibold)
+      case .caption: .system(.caption, design: .rounded, weight: .bold)
+      case .code: .system(.body, design: .monospaced, weight: .semibold).monospacedDigit()
+      case .codeSmall: .system(.callout, design: .monospaced, weight: .semibold).monospacedDigit()
+      case .numeric: .system(.body, design: .rounded, weight: .heavy).monospacedDigit()
       }
     }
   }
