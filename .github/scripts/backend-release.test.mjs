@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import {
   mkdirSync,
   mkdtempSync,
@@ -10,6 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { loadDeploymentState } from './backend-deployment-state.mjs';
 import YAML from 'yaml';
 
 const repositoryRoot = path.resolve(
@@ -48,6 +50,145 @@ const releaseTransferScript = path.join(
   'transfer-backend-release.sh',
 );
 const commitSha = '0123456789abcdef0123456789abcdef01234567';
+
+function stateFixture(t) {
+  const root = mkdtempSync(path.join(tmpdir(), 'certigo-state-reader-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, 'state.json');
+  const state = {
+    schema: 'certigo.backend.deployment-state/v1',
+    environment: 'staging',
+    current: {
+      commitSha,
+      packageSha256: 'a'.repeat(64),
+      blobName: `deployments/${commitSha}.zip`,
+      sourceRunId: 1234,
+      operation: 'promotion',
+      deployedAt: '2026-08-15T10:00:00Z',
+    },
+    previous: null,
+  };
+  writeFileSync(file, JSON.stringify(state));
+  return { root, file, state };
+}
+
+test('state reader preserves absent, empty, valid and legacy symlink behavior', (t) => {
+  const { root, file, state } = stateFixture(t);
+  assert.equal(loadDeploymentState('', 'staging'), null);
+  assert.equal(loadDeploymentState(path.join(root, 'missing'), 'staging'), null);
+  assert.deepEqual(loadDeploymentState(file, 'staging'), state);
+  const link = path.join(root, 'linked.json');
+  fs.symlinkSync(file, link);
+  assert.deepEqual(loadDeploymentState(link, 'staging'), state);
+  writeFileSync(file, '');
+  assert.equal(loadDeploymentState(file, 'staging'), null);
+});
+
+test('state reader uses the opened object despite a pathname replacement and closes it', (t) => {
+  const { file, state } = stateFixture(t);
+  const open = fs.openSync;
+  let descriptor;
+  t.mock.method(fs, 'openSync', (target, ...args) => {
+    descriptor = open(target, ...args);
+    fs.renameSync(file, `${file}.opened`);
+    writeFileSync(file, '{"replacement":true}');
+    return descriptor;
+  });
+  assert.deepEqual(loadDeploymentState(file, 'staging'), state);
+  assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+});
+
+test('state reader propagates nonmissing open and read errors and closes on read failure', (t) => {
+  const { file } = stateFixture(t);
+  const openError = Object.assign(new Error('denied'), { code: 'EACCES' });
+  const openMock = t.mock.method(fs, 'openSync', () => { throw openError; });
+  assert.throws(() => loadDeploymentState(file, 'staging'), openError);
+  openMock.mock.restore();
+  const open = fs.openSync;
+  let descriptor;
+  t.mock.method(fs, 'openSync', (...args) => {
+    descriptor = open(...args);
+    return descriptor;
+  });
+  const readError = Object.assign(new Error('read failed'), { code: 'ENOENT' });
+  t.mock.method(fs, 'readFileSync', () => { throw readError; });
+  assert.throws(() => loadDeploymentState(file, 'staging'), readError);
+  assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+});
+
+test('state reader retains JSON, schema, environment and release validation', (t) => {
+  const { file, state } = stateFixture(t);
+  for (const contents of [
+    '{',
+    JSON.stringify({ ...state, schema: 'unexpected' }),
+    JSON.stringify({ ...state, environment: 'prod' }),
+    JSON.stringify({ ...state, current: { ...state.current, commitSha: 'invalid' } }),
+    JSON.stringify({ ...state, previous: {} }),
+  ]) {
+    writeFileSync(file, contents);
+    assert.throws(() => loadDeploymentState(file, 'staging'));
+  }
+});
+
+test('state reader preserves size-zero FIFO null without blocking, consuming bytes or leaking descriptors', (t) => {
+  const { root } = stateFixture(t);
+  const fifo = path.join(root, 'state.fifo');
+  execFileSync('mkfifo', [fifo]);
+  const script = `
+    import assert from 'node:assert/strict';
+    import fs from 'node:fs';
+    import { loadDeploymentState } from ${JSON.stringify(new URL('./backend-deployment-state.mjs', import.meta.url).href)};
+    const fifo = ${JSON.stringify(fifo)};
+    const open = fs.openSync;
+    let descriptor;
+    fs.openSync = (...args) => {
+      descriptor = open(...args);
+      return descriptor;
+    };
+    assert.equal(loadDeploymentState(fifo, 'staging'), null);
+    assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+    const writer = open(fifo, fs.constants.O_RDWR | fs.constants.O_NONBLOCK);
+    try {
+      fs.writeSync(writer, 'unconsumed');
+      assert.equal(loadDeploymentState(fifo, 'staging'), null);
+      assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+      const buffer = Buffer.alloc(10);
+      assert.equal(fs.readSync(writer, buffer), 10);
+      assert.equal(buffer.toString(), 'unconsumed');
+    } finally {
+      fs.closeSync(writer);
+    }
+    assert.equal(loadDeploymentState(fifo, 'staging'), null);
+    assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+  `;
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
+    encoding: 'utf8',
+    timeout: 10000,
+    killSignal: 'SIGKILL',
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test('state reader closes on fstat failure and does not read size-zero opened objects', (t) => {
+  const { file } = stateFixture(t);
+  const open = fs.openSync;
+  const inspect = fs.fstatSync;
+  let descriptor;
+  t.mock.method(fs, 'openSync', (...args) => {
+    descriptor = open(...args);
+    return descriptor;
+  });
+  const failure = Object.assign(new Error('stat failed'), { code: 'EIO' });
+  const inspectMock = t.mock.method(fs, 'fstatSync', () => { throw failure; });
+  assert.throws(() => loadDeploymentState(file, 'staging'), failure);
+  assert.throws(() => inspect(descriptor), { code: 'EBADF' });
+  inspectMock.mock.restore();
+  t.mock.method(fs, 'fstatSync', () => ({ size: 0 }));
+  t.mock.method(fs, 'readFileSync', () => { throw new Error('unexpected read of size-zero object'); });
+  assert.equal(loadDeploymentState(file, 'staging'), null);
+  assert.throws(() => inspect(descriptor), { code: 'EBADF' });
+});
 
 function createRelease() {
   const root = mkdtempSync(path.join(tmpdir(), 'certigo-backend-release-'));
