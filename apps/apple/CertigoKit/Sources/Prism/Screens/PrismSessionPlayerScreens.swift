@@ -485,7 +485,6 @@ public struct SessionItemCardView: View {
     @Binding public var optionsManuallyRevealed: Bool
     public let flags: FeatureFlags
     public let onVerifyOrSkip: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         item: PrismSessionItemModel,
@@ -511,32 +510,16 @@ public struct SessionItemCardView: View {
             )
 
             PrismCard(variant: .standard) {
-                PrismText(text: item.stem, style: .headline)
+                PrismText(text: item.stem, style: .title3)
             }
 
-            if !item.shouldShowOptionsImmediately(
-                reduceMotion: reduceMotion,
-                manuallyRevealed: optionsManuallyRevealed
-            ) {
-                Button {
-                    optionsManuallyRevealed = true
-                } label: {
-                    Text(verbatim: "Voir les options")
-                }
-                .buttonStyle(PrismButtonStyle(variant: .secondary))
-            } else {
-                payloadBody
-            }
-
-            if item.captureConfidence || item.isMockExamMode, item.payload.isSupported {
-                ConfidencePicker(selectedConfidence: $draft.confidence)
-            }
+            payloadBody
 
             if item.payload.isSupported {
                 Button {
                     onVerifyOrSkip()
                 } label: {
-                    Text(verbatim: "Vérifier")
+                    Text(verbatim: "VÉRIFIER")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PrismButtonStyle(variant: .primary))

@@ -146,3 +146,34 @@ extension PrismRadius {
   public static let chip: CGFloat = s
   public static let heroCard: CGFloat = xl
 }
+
+extension PrismSize {
+  public static let pathNode: CGFloat = 64
+  public static let pathNodeActive: CGFloat = 74
+  public static let pathNodeRing: CGFloat = 88
+  public static let pathNodeIcon: CGFloat = 26
+  public static let pathNodeActiveIcon: CGFloat = 30
+  public static let pathStageWidth: CGFloat = 345
+  public static let pathStageHeight: CGFloat = 536
+  public static let pathTrackStroke: CGFloat = 10
+  public static let centerAIButton: CGFloat = 58
+  public static let centerAIHalo: CGFloat = 66
+  public static let centerAIIcon: CGFloat = 24
+  public static let bottomBarHeight: CGFloat = 66
+  public static let tabItemHeight: CGFloat = 50
+  public static let optionBadge: CGFloat = 32
+  public static let statIcon: CGFloat = 15
+  public static let lipDepth: CGFloat = 5
+  public static let brandFilterWidth: CGFloat = 72
+}
+
+extension PrismRadius {
+  public static let pathNode: CGFloat = 32
+  public static let pathNodeActive: CGFloat = 37
+  public static let pathNodeRing: CGFloat = 44
+  public static let centerAI: CGFloat = 21
+  public static let centerAIHalo: CGFloat = 24
+  public static let bottomBar: CGFloat = 33
+  public static let unitBanner: CGFloat = 22
+  public static let stepPill: CGFloat = 14
+}

@@ -16,41 +16,6 @@
           content
         }
       }
-      .overlay(alignment: .topTrailing) {
-        Menu {
-          Button {
-            showPrismShell.toggle()
-          } label: {
-            Label {
-              Text(
-                verbatim: (showPrismShell || flags.isEnabled(.prism))
-                  ? "Basculer vers Connexion CIAM / Vue Classique"
-                  : "Basculer vers App Prism (5 onglets)"
-              )
-            } icon: {
-              Image(systemName: "arrow.triangle.2.circlepath")
-            }
-          }
-          Button {
-            presented = true
-          } label: {
-            Label {
-              Text(verbatim: "Inspecteur & Flags Prism (D-1)")
-            } icon: {
-              Image(systemName: "slider.horizontal.3")
-            }
-          }
-        } label: {
-          Image(systemName: "slider.horizontal.3")
-            .prismTextStyle(.subheadline)
-            .foregroundStyle(PrismColor.textSecondary)
-            .frame(width: PrismSize.minTouch, height: PrismSize.minTouch)
-            .background(PrismColor.surfaceRaised, in: Circle())
-        }
-        .accessibilityIdentifier("open-prism-gallery")
-        .padding(.trailing, PrismSpacing.m)
-        .padding(.top, PrismSpacing.xs)
-      }
       .sheet(
         isPresented: $presented,
         onDismiss: {

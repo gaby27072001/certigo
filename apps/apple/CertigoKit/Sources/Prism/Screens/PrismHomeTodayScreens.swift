@@ -257,6 +257,7 @@ public struct TodayRootScreen: View {
     public let onOpenRouteObjective: (String) -> Void
     public let onOpenCatalogExplorer: () -> Void
     public let onRetry: () -> Void
+    @State private var showUnitGuideSheet = false
 
     public init(
         model: Binding<TodayScreenModel>,
@@ -279,18 +280,10 @@ public struct TodayRootScreen: View {
     }
 
     public var body: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
                 if let offlineBanner = model.offlineBanner {
                     PrismOfflineBanner(model: offlineBanner)
-                }
-
-                if model.isGuestMode {
-                    PrismToast(
-                        model: .guestSaveInvitation(),
-                        onAction: {},
-                        onDismiss: {}
-                    )
                 }
 
                 switch model.state {
@@ -307,151 +300,468 @@ public struct TodayRootScreen: View {
                 case .error(let errorModel):
                     PrismErrorState(model: errorModel, onRetry: onRetry)
                 case .content:
-                    contentCards
+                    duolingoPathContent
                 }
             }
-            .padding(PrismSpacing.l)
+            .padding(.horizontal, PrismSpacing.l)
+            .padding(.top, PrismSpacing.s)
+            .padding(.bottom, PrismSpacing.giant)
         }
         .background(PrismColor.canvas)
-        .navigationTitle(Text(verbatim: "Aujourd'hui"))
+        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showUnitGuideSheet) {
+            PrismUnitGuideSheetView(
+                routeCode: model.activeRouteCode ?? "AZ-104",
+                unitTitle: unitBannerTitle
+            )
+        }
+    }
+
+    private var unitBannerSupertitle: String {
+        switch model.activeRouteCode ?? "AZ-104" {
+        case "AI-102": return "UNITÉ 2 · AGENTS & RAG VECTORIEL"
+        case "AZ-305": return "UNITÉ 4 · HAUTE DISPONIBILITÉ"
+        case "SAA-C03": return "UNITÉ 1 · VPC & RÉSEAU AWS"
+        case "GH-300": return "UNITÉ 2 · INGÉNIERIE DE CONTEXTE"
+        case "CKA": return "UNITÉ 1 · CONTROL PLANE KUBERNETES"
+        default: return "UNITÉ 3 · RÉSEAUX HYBRIDES"
+        }
+    }
+
+    private var unitBannerTitle: String {
+        switch model.activeRouteCode ?? "AZ-104" {
+        case "AI-102": return "Foundry Agent Service & AI Search"
+        case "AZ-305": return "Architecture Multi-Régions & DR"
+        case "SAA-C03": return "VPC Endpoints & AWS PrivateLink"
+        case "GH-300": return "Instructions, Agents & Sécurité"
+        case "CKA": return "RBAC, NetworkPolicies & CoreDNS"
+        default: return "Isolation VNet & DNS privé"
+        }
+    }
+
+    private var pathSteps: [PrismPathStepSpec] {
+        switch model.activeRouteCode ?? "AZ-104" {
+        case "AI-102":
+            return [
+                .init(id: "s1", title: "Déploiement Modèles", subtitle: nil, state: .done, symbol: "checkmark", alignment: .centerRight),
+                .init(id: "s2", title: "Indexation AI Search", subtitle: nil, state: .done, symbol: "shield.fill", alignment: .leadingRight),
+                .init(id: "s3", title: "Orchestration Agents", subtitle: "Étape 3 sur 5", state: .active, symbol: "sparkles", alignment: .trailingLeft),
+                .init(id: "s4", title: "Guardrails & Sécurité", subtitle: nil, state: .locked, symbol: "lock.fill", alignment: .farTrailingLeft),
+                .init(id: "s5", title: "Coffre de l'Unité 2", subtitle: "Défi synthèse", state: .chest, symbol: "shippingbox.fill", alignment: .leadingRight)
+            ]
+        case "SAA-C03":
+            return [
+                .init(id: "s1", title: "Subnets & NACL", subtitle: nil, state: .done, symbol: "checkmark", alignment: .centerRight),
+                .init(id: "s2", title: "VPC Peering", subtitle: nil, state: .done, symbol: "shield.fill", alignment: .leadingRight),
+                .init(id: "s3", title: "AWS PrivateLink", subtitle: "Étape 3 sur 5", state: .active, symbol: "point.3.connected.trianglepath.dotted", alignment: .trailingLeft),
+                .init(id: "s4", title: "Transit Gateway", subtitle: nil, state: .locked, symbol: "lock.fill", alignment: .farTrailingLeft),
+                .init(id: "s5", title: "Coffre de l'Unité 1", subtitle: "Défi synthèse", state: .chest, symbol: "shippingbox.fill", alignment: .leadingRight)
+            ]
+        default:
+            return [
+                .init(id: "s1", title: "Sous-réseaux & NSG", subtitle: nil, state: .done, symbol: "checkmark", alignment: .centerRight),
+                .init(id: "s2", title: "Peering VNet", subtitle: nil, state: .done, symbol: "shield.fill", alignment: .leadingRight),
+                .init(id: "s3", title: "Private Endpoint & DNS", subtitle: "Étape 3 sur 5", state: .active, symbol: "point.3.connected.trianglepath.dotted", alignment: .trailingLeft),
+                .init(id: "s4", title: "Pare-feu Azure & UDR", subtitle: nil, state: .locked, symbol: "lock.fill", alignment: .farTrailingLeft),
+                .init(id: "s5", title: "Coffre de l'Unité 3", subtitle: "Situation du jour", state: .chest, symbol: "shippingbox.fill", alignment: .leadingRight)
+            ]
+        }
     }
 
     @ViewBuilder
-    private var contentCards: some View {
-        if model.isWelcomeBackState {
-            PrismCard(variant: .standard) {
-                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                    PrismText(text: "Bon retour", style: .headline)
-                    PrismText(
-                        text: "Reprends tranquillement par une séance Express de 5 minutes.",
-                        style: .subheadline,
-                        role: .textSecondary
-                    )
-                }
+    private var duolingoPathContent: some View {
+        // 1. Unit Header Banner (Duolingo Style + Guide Button, zero duration selector!)
+        HStack(alignment: .center, spacing: PrismSpacing.m) {
+            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                Text(verbatim: unitBannerSupertitle)
+                    .prismTextStyle(.caption)
+                    .foregroundStyle(PrismColor.onAccent.opacity(0.85))
+                Text(verbatim: unitBannerTitle)
+                    .prismTextStyle(.title3)
+                    .foregroundStyle(PrismColor.onAccent)
+                Text(verbatim: "5 étapes · Objectif examen : 25–30 %")
+                    .prismTextStyle(.footnote)
+                    .foregroundStyle(PrismColor.onAccent.opacity(0.9))
             }
-        }
-
-        // 1. Hero Session Card (Single Primary Action — §7, §15 NS-2)
-        PrismCard(variant: .hero) {
-            VStack(alignment: .leading, spacing: PrismSpacing.m) {
-                BrandLabel(
-                    product: model.composition.recommendedProduct,
-                    context: .learningContent,
-                    size: .small,
-                    flags: flags
-                )
-
-                PrismText(text: model.composition.recommendedConceptTitle, style: .title2)
-                PrismText(
-                    text: model.composition.compositionSummaryText,
-                    style: .subheadline,
-                    role: .textSecondary
-                )
-
-                SessionLengthPicker(
-                    selectedLength: $model.selectedLength,
-                    suggestedLength: model.suggestedLength
-                )
-
-                Button {
-                    onStartSession(model.selectedLength, model.interruptedSession?.sessionId)
-                } label: {
-                    Text(verbatim: model.primaryActionTitle)
-                        .frame(maxWidth: .infinity)
+            Spacer(minLength: PrismSpacing.xs)
+            Button {
+                showUnitGuideSheet = true
+            } label: {
+                HStack(spacing: PrismSpacing.xs) {
+                    Image(systemName: "book.closed.fill")
+                        .prismTextStyle(.subheadline)
+                    Text(verbatim: "Guide")
+                        .prismTextStyle(.subheadline)
                 }
-                .buttonStyle(PrismButtonStyle(variant: .primary))
-                .accessibilityIdentifier("today-primary-session-cta")
+                .foregroundStyle(PrismColor.onAccent)
+                .padding(.horizontal, PrismSpacing.m)
+                .padding(.vertical, PrismSpacing.s)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.stepPill, style: .continuous)
+                        .fill(PrismColor.onAccent.opacity(0.2))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: PrismRadius.stepPill, style: .continuous)
+                        .strokeBorder(PrismColor.onAccent.opacity(0.45), lineWidth: PrismBorder.standard)
+                )
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("unit-guide-button")
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text(verbatim: model.sessionCardVoiceOverSummary))
-
-        // 2. Daily Situation Card (§5.5, §14 S-30)
-        PrismCard(variant: .situation) {
-            VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                PrismAdaptiveStack(spacing: PrismSpacing.s) {
-                    PrismBadge(
-                        configuration: PrismBadgeConfiguration(
-                            text: model.dailySituation.isCompletedToday ? "Accomplie" : "Situation du jour",
-                            semantics: model.dailySituation.isCompletedToday ? .positive : .accent
+        .padding(PrismSpacing.l)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: PrismRadius.unitBanner, style: .continuous)
+                    .fill(PrismRegion.network.color)
+                    .offset(y: PrismSize.lipDepth)
+                RoundedRectangle(cornerRadius: PrismRadius.unitBanner, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [PrismColor.accent, PrismRegion.network.color],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
                     )
-                    BrandLabel(
-                        product: model.dailySituation.product,
-                        context: .learningContent,
-                        size: .small,
-                        flags: flags
-                    )
-                }
-                PrismText(text: model.dailySituation.title, style: .headline)
-                Button {
+            }
+        )
+
+        // 2. Winding S-Curve Stepping-Stone Path (No session duration picker!)
+        PrismDuolingoWindingPathView(
+            steps: pathSteps,
+            onTapStep: { step in
+                switch step.state {
+                case .done, .active:
+                    onStartSession(.standard, model.interruptedSession?.sessionId)
+                case .chest:
                     onOpenDailySituation()
-                } label: {
-                    Text(verbatim: model.dailySituation.isCompletedToday ? "Voir la distribution" : "Relever la Situation")
+                case .locked:
+                    break
                 }
-                .buttonStyle(PrismButtonStyle(variant: .secondary))
             }
-        }
+        )
+        .padding(.top, PrismSpacing.s)
+    }
+}
 
-        // 3. Weekly Rhythm Card (§7, §9)
-        RhythmWeekView(model: model.rhythm)
+public struct PrismPathStepSpec: Identifiable, Equatable, Sendable {
+    public enum StepState: String, Equatable, Sendable {
+        case done, active, locked, chest
+    }
+    public enum RowAlignment: String, Equatable, Sendable {
+        case centerRight, leadingRight, trailingLeft, farTrailingLeft
+    }
+    public let id: String
+    public let title: String
+    public let subtitle: String?
+    public let state: StepState
+    public let symbol: String
+    public let alignment: RowAlignment
+}
 
-        // 4. Memory Summary Card (S-11, §8)
-        PrismCard(variant: .standard) {
-            PrismRow(
-                configuration: PrismRowConfiguration(
-                    title: "Mémoire · \(model.memoryAnchoredCount) concepts ancrés",
-                    subtitle: "\(model.memoryDueSoonCount) à raviver bientôt",
-                    showsChevron: true
-                ),
-                action: onOpenMemoryDetail
-            )
-        }
+private struct PrismDuolingoWindingPathView: View {
+    let steps: [PrismPathStepSpec]
+    let onTapStep: (PrismPathStepSpec) -> Void
 
-        // 5. Active Objective Card with BrandLabel (§22A.5, §34.1 line 814)
-        PrismCard(variant: .standard) {
-            VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                PrismText(text: "Objectif actif", style: .CaptionHeadlineBridge.style, role: .textSecondary)
-                if let code = model.activeRouteCode {
-                    BrandLabel(
-                        product: model.activeRouteProductID,
-                        context: .learningContent,
-                        examCode: code,
-                        size: .medium,
-                        flags: flags
+    var body: some View {
+        ZStack {
+            // Smooth S-Curve Track behind the stepping stones
+            Canvas { context, size in
+                let w = size.width
+                let h = size.height
+                let p1 = CGPoint(x: w * 0.46, y: h * 0.08)
+                let p2 = CGPoint(x: w * 0.25, y: h * 0.27)
+                let p3 = CGPoint(x: w * 0.62, y: h * 0.52)
+                let p4 = CGPoint(x: w * 0.72, y: h * 0.75)
+                let p5 = CGPoint(x: w * 0.34, y: h * 0.93)
+
+                var donePath = Path()
+                donePath.move(to: p1)
+                donePath.addCurve(
+                    to: p2,
+                    control1: CGPoint(x: w * 0.46, y: h * 0.18),
+                    control2: CGPoint(x: w * 0.25, y: h * 0.18)
+                )
+                donePath.addCurve(
+                    to: p3,
+                    control1: CGPoint(x: w * 0.25, y: h * 0.39),
+                    control2: CGPoint(x: w * 0.62, y: h * 0.39)
+                )
+                context.stroke(
+                    donePath,
+                    with: .color(PrismColor.positive),
+                    style: StrokeStyle(lineWidth: PrismSize.pathTrackStroke, lineCap: .round)
+                )
+
+                var lockedPath = Path()
+                lockedPath.move(to: p3)
+                lockedPath.addCurve(
+                    to: p4,
+                    control1: CGPoint(x: w * 0.62, y: h * 0.64),
+                    control2: CGPoint(x: w * 0.72, y: h * 0.64)
+                )
+                lockedPath.addCurve(
+                    to: p5,
+                    control1: CGPoint(x: w * 0.72, y: h * 0.84),
+                    control2: CGPoint(x: w * 0.34, y: h * 0.84)
+                )
+                context.stroke(
+                    lockedPath,
+                    with: .color(PrismColor.separator),
+                    style: StrokeStyle(
+                        lineWidth: PrismSize.pathTrackStroke,
+                        lineCap: .round,
+                        dash: [PrismSpacing.xxs, PrismSpacing.l]
                     )
-                    Button {
-                        onOpenRouteObjective(code)
-                    } label: {
-                        Text(verbatim: "Voir ma préparation · \(code)")
+                )
+            }
+
+            VStack(spacing: PrismSpacing.xxl) {
+                ForEach(steps) { step in
+                    stepRow(for: step)
+                }
+            }
+            .padding(.vertical, PrismSpacing.s)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func stepRow(for step: PrismPathStepSpec) -> some View {
+        switch step.alignment {
+        case .centerRight:
+            HStack(spacing: PrismSpacing.m) {
+                Spacer(minLength: PrismSpacing.xxl)
+                nodeButton(for: step)
+                stepLabelPill(for: step)
+                Spacer(minLength: PrismSpacing.xs)
+            }
+        case .leadingRight:
+            HStack(spacing: PrismSpacing.m) {
+                nodeButton(for: step)
+                    .padding(.leading, PrismSpacing.xl)
+                stepLabelPill(for: step)
+                Spacer(minLength: PrismSpacing.xs)
+            }
+        case .trailingLeft:
+            VStack(spacing: PrismSpacing.xs) {
+                // Floating "COMMENCER" callout pill above the active stepping stone
+                Button {
+                    onTapStep(step)
+                } label: {
+                    Text(verbatim: "COMMENCER")
+                        .prismTextStyle(.caption)
+                        .foregroundStyle(PrismColor.accent)
+                        .padding(.horizontal, PrismSpacing.m)
+                        .padding(.vertical, PrismSpacing.xs)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.stepPill, style: .continuous)
+                                .fill(PrismColor.surface)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: PrismRadius.stepPill, style: .continuous)
+                                .strokeBorder(PrismColor.accent, lineWidth: PrismBorder.strong)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("today-primary-session-cta")
+
+                HStack(spacing: PrismSpacing.m) {
+                    Spacer(minLength: PrismSpacing.xs)
+                    stepLabelPill(for: step)
+                    nodeButton(for: step)
+                        .padding(.trailing, PrismSpacing.xl)
+                }
+            }
+        case .farTrailingLeft:
+            HStack(spacing: PrismSpacing.m) {
+                Spacer(minLength: PrismSpacing.s)
+                stepLabelPill(for: step)
+                nodeButton(for: step)
+                    .padding(.trailing, PrismSpacing.m)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func nodeButton(for step: PrismPathStepSpec) -> some View {
+        let isActive = step.state == .active
+        let nodeDim = isActive ? PrismSize.pathNodeActive : PrismSize.pathNode
+
+        Button {
+            onTapStep(step)
+        } label: {
+            ZStack {
+                if isActive {
+                    Circle()
+                        .fill(PrismColor.accent.opacity(0.14))
+                        .frame(width: PrismSize.pathNodeRing, height: PrismSize.pathNodeRing)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(PrismColor.accent, lineWidth: PrismBorder.strong)
+                        )
+                }
+
+                // 3D Bottom Lip
+                Circle()
+                    .fill(lipColor(for: step.state))
+                    .frame(width: nodeDim, height: nodeDim)
+                    .offset(y: PrismSize.lipDepth)
+
+                // Main Circular Stepping-Stone Face with Cut-Out Icon (no white box!)
+                Circle()
+                    .fill(faceColor(for: step.state))
+                    .frame(width: nodeDim, height: nodeDim)
+                    .overlay(
+                        Image(systemName: step.symbol)
+                            .prismTextStyle(isActive ? .title2 : .title3)
+                            .foregroundStyle(
+                                step.state == .locked ? PrismColor.textSecondary : PrismColor.onAccent
+                            )
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(step.state == .locked)
+    }
+
+    @ViewBuilder
+    private func stepLabelPill(for step: PrismPathStepSpec) -> some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+            Text(verbatim: step.title)
+                .prismTextStyle(.subheadline)
+                .foregroundStyle(
+                    step.state == .locked ? PrismColor.textSecondary : PrismColor.textPrimary
+                )
+            if let subtitle = step.subtitle {
+                Text(verbatim: subtitle)
+                    .prismTextStyle(.caption)
+                    .foregroundStyle(
+                        step.state == .chest ? PrismColor.caution : PrismColor.accent
+                    )
+            }
+        }
+        .padding(.horizontal, PrismSpacing.m)
+        .padding(.vertical, PrismSpacing.s)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: PrismRadius.stepPill, style: .continuous)
+                    .fill(PrismColor.separator.opacity(0.45))
+                    .offset(y: PrismSpacing.xxs)
+                RoundedRectangle(cornerRadius: PrismRadius.stepPill, style: .continuous)
+                    .fill(PrismColor.surface)
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.stepPill, style: .continuous)
+                .strokeBorder(
+                    step.state == .active ? PrismColor.accent : PrismColor.separator,
+                    lineWidth: step.state == .active ? PrismBorder.strong : PrismBorder.regular
+                )
+        )
+    }
+
+    private func faceColor(for state: PrismPathStepSpec.StepState) -> Color {
+        switch state {
+        case .done: return PrismColor.positive
+        case .active: return PrismColor.accent
+        case .chest: return PrismColor.caution
+        case .locked: return PrismColor.surfaceRaised
+        }
+    }
+
+    private func lipColor(for state: PrismPathStepSpec.StepState) -> Color {
+        switch state {
+        case .done: return PrismColor.positive.opacity(0.72)
+        case .active: return PrismRegion.network.color
+        case .chest: return PrismColor.caution.opacity(0.75)
+        case .locked: return PrismColor.separator
+        }
+    }
+}
+
+public struct PrismUnitGuideSheetView: View {
+    public let routeCode: String
+    public let unitTitle: String
+    @Environment(\.dismiss) private var dismiss
+
+    public init(routeCode: String, unitTitle: String) {
+        self.routeCode = routeCode
+        self.unitTitle = unitTitle
+    }
+
+    public var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                    PrismCard(variant: .hero) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                            PrismBadge(
+                                configuration: PrismBadgeConfiguration(
+                                    text: "GUIDE D'UNITÉ · \(routeCode)",
+                                    semantics: .accent
+                                )
+                            )
+                            PrismText(text: unitTitle, style: .title2)
+                            PrismText(
+                                text: "Schéma d'architecture, commandes CLI et pièges classiques de l'examen.",
+                                style: .subheadline,
+                                role: .textSecondary
+                            )
+                        }
                     }
-                    .buttonStyle(PrismButtonStyle(variant: .tertiary))
-                } else {
-                    Button {
-                        onOpenCatalogExplorer()
-                    } label: {
-                        Text(verbatim: "Choisir un objectif dans l'Atlas")
+
+                    PrismCard(variant: .standard) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                            PrismText(text: "1. SCHÉMA D'ARCHITECTURE À RETENIR", style: .caption, role: .accent)
+                            PrismText(
+                                text: "VM (10.0.0.4) ──► Private Endpoint (10.2.0.5) ──► Stockage Blob",
+                                style: .headline
+                            )
+                            PrismText(
+                                text: "• Le trafic reste 100 % sur le backbone Microsoft Azure.\n• La zone privatelink.blob.core.windows.net DOIT être liée au VNet via un Virtual Network Link.",
+                                style: .subheadline,
+                                role: .textSecondary
+                            )
+                        }
                     }
-                    .buttonStyle(PrismButtonStyle(variant: .secondary))
+
+                    PrismCard(variant: .standard) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                            PrismText(text: "2. COMMANDES AZURE CLI INDISPENSABLES", style: .caption, role: .accent)
+                            PrismText(
+                                text: "az network private-dns zone create -g rg-prod -n privatelink.blob.core.windows.net\naz network private-dns link vnet create -g rg-prod -z privatelink.blob... -v vnet-hub -e false",
+                                style: .codeSmall
+                            )
+                        }
+                    }
+
+                    PrismCard(variant: .standard) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                            PrismText(text: "3. PIÈGE CLASSIQUE À L'EXAMEN", style: .caption, role: .caution)
+                            PrismText(
+                                text: "• Service Endpoint : garde l'IP publique du service PaaS.\n• Private Endpoint : attribue une IP privée de ton sous-réseau.\n• L'auto-registration DNS (-e true) ne sert que pour les VM, pas pour les Private Endpoints PaaS.",
+                                style: .subheadline,
+                                role: .textSecondary
+                            )
+                        }
+                    }
+                }
+                .padding(PrismSpacing.l)
+            }
+            .background(PrismColor.canvas)
+            .navigationTitle(Text(verbatim: "Guide de l'unité"))
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text(verbatim: "Fermer")
+                    }
                 }
             }
         }
-
-        // 6. Tomorrow Preview (§7)
-        PrismText(text: model.tomorrowPreviewText, style: .footnote, role: .textSecondary)
     }
 }
-
-private enum CaptionHeadlineBridge {
-    static let style: PrismTextStyle = .caption
-}
-
-extension PrismTextStyle {
-    fileprivate static var CaptionHeadlineBridge: CaptionHeadlineBridge.Type {
-        Prism.CaptionHeadlineBridge.self
-    }
-}
-
 // MARK: - Catalog Explorer Screen (S-46, §14, §22A.5)
 
 public struct CatalogExplorerScreen: View {
