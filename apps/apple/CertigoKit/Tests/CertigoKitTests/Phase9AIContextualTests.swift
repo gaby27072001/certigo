@@ -107,4 +107,115 @@ struct Phase9AIContextualTests {
             #expect(scenario.passedGuardrail == true)
         }
     }
+
+    @Test("06A..06D AI Hub State Machine manages all 4 validated modes, ASCII diagram & exam tip in 06B")
+    func aiHubFourModesAndStructuredResponse06B() {
+        var hub = CertiGoAIHubStateMachine()
+        #expect(CertiGoAIHubScreenMode.allCases == [.home06A, .writtenResponse06B, .liveVoice06C, .historyDrawer06D])
+        #expect(hub.activeMode == .home06A)
+        #expect(hub.activeMode.screenCode == "06A")
+
+        hub.openWrittenResponse06B()
+        #expect(hub.activeMode == .writtenResponse06B)
+        #expect(hub.activeMode.screenCode == "06B")
+        #expect(hub.activeWrittenResponse.asciiDiagram.contains("privatelink.blob.core.windows.net") == true)
+        #expect(hub.activeWrittenResponse.examTip.contains("Astuce examen") == true)
+
+        hub.openHistoryDrawer06D()
+        #expect(hub.activeMode == .historyDrawer06D)
+        #expect(hub.isHistoryDrawerOpen == true)
+        #expect(hub.activeMode.screenCode == "06D")
+
+        hub.closeHistoryDrawer06D()
+        #expect(hub.activeMode == .home06A)
+        #expect(hub.isHistoryDrawerOpen == false)
+    }
+
+    @Test("06C Live Voice session defaults to Nova 1.0x with background audio on locked screen enabled")
+    func aiHubLiveVoiceNovaAndLockedScreenBackgroundAudio() {
+        var hub = CertiGoAIHubStateMachine()
+        #expect(hub.selectedVoice == "Nova")
+        #expect(hub.playbackSpeed == 1.0)
+        #expect(hub.voiceSpeedBadgeText == "Nova 1.0x")
+        #expect(hub.backgroundAudioLockedScreenEnabled == true)
+        #expect(hub.isListening == false)
+        #expect(hub.isSpeaking == false)
+
+        hub.startLiveVoiceSession()
+        #expect(hub.activeMode == .liveVoice06C)
+        #expect(hub.activeMode.screenCode == "06C")
+        #expect(hub.isListening == true)
+        #expect(hub.isSpeaking == false)
+
+        hub.configureLiveVoice(voice: "Nova", speed: 1.2, backgroundAudioLockedScreenEnabled: true)
+        #expect(hub.voiceSpeedBadgeText == "Nova 1.2x")
+        #expect(hub.backgroundAudioLockedScreenEnabled == true)
+
+        hub.configureLiveVoice(voice: "Nova", speed: 1.0, backgroundAudioLockedScreenEnabled: true)
+        #expect(hub.voiceSpeedBadgeText == "Nova 1.0x")
+
+        hub.stopLiveVoiceSession()
+        #expect(hub.activeMode == .home06A)
+        #expect(hub.isListening == false)
+        #expect(hub.isSpeaking == false)
+    }
+
+    @Test("06D Push History Drawer (85% width) groups Today and Last 7 Days, filters by search, and opens in 1 tap")
+    func aiHubHistoryDrawer85PercentGroupingSearchAndOneTapOpen() {
+        var hub = CertiGoAIHubStateMachine()
+        #expect(CertiGoAIHubStateMachine.historyDrawerWidthRatio == 0.85)
+        #expect(CertiGoAIHubStateMachine.historyDrawerWidthPercent == 85)
+        #expect(CertiGoAIHubStateMachine.historyDrawerWidthPoints == PrismSize.drawerWidth)
+        #expect(CertiGoAIHistoryTimeGroup.today.title == "Aujourd'hui")
+        #expect(CertiGoAIHistoryTimeGroup.lastSevenDays.title == "7 derniers jours")
+
+        #expect(hub.todayConversations.count == 2)
+        #expect(hub.lastSevenDaysConversations.count == 2)
+
+        hub.openHistoryDrawer06D()
+        #expect(hub.activeMode == .historyDrawer06D)
+
+        hub.historySearchQuery = "PrivateLink"
+        #expect(hub.filteredConversations.count == 2)
+
+        hub.historySearchQuery = ""
+        let opened = hub.openConversationInOneTap(id: "conv-7d-saa-vpce")
+        #expect(opened?.routeCode == "SAA-C03")
+        #expect(hub.activeMode == .writtenResponse06B)
+        #expect(hub.selectedConversationId == "conv-7d-saa-vpce")
+        #expect(hub.activeWrittenResponse.id == "resp-06b-saa-vpce")
+    }
+
+    @Test("AI Hub state machine automatically redacts secrets before routing written and voice prompts through 5-level AIRouter")
+    func aiHubAutomaticSecretRedactionAndFiveTierRouting() {
+        let cloudRouter = AIRouter(configuration: AIRouterConfiguration(
+            onDeviceFoundationAvailable: false,
+            privateCloudComputeAvailable: false,
+            cloudAIEnabledInSettings: true,
+            hasNamedCloudProviderConsent: true,
+            serverEndpointAvailable: true,
+            simulatedLatencyMs: 320
+        ))
+        var hub = CertiGoAIHubStateMachine(router: cloudRouter)
+        #expect(hub.activeRoutingTier == .serverTutorExplain)
+
+        let rawSecretPrompt = "Explique DNS avec Bearer tok_secret_987 et api_key=sk-live-999 pour dev@contoso.com"
+        let writtenRouted = hub.submitWrittenPrompt(rawSecretPrompt)
+        #expect(hub.activeMode == .writtenResponse06B)
+        #expect(writtenRouted.tier == .serverTutorExplain)
+        #expect(writtenRouted.creditsMastery == false)
+        #expect(hub.lastRedactedInput.contains("tok_secret_987") == false)
+        #expect(hub.lastRedactedInput.contains("sk-live-999") == false)
+        #expect(hub.lastRedactedInput.contains("dev@contoso.com") == false)
+        #expect(hub.lastRedactedInput.contains("[EXPURGÉ]") == true)
+        #expect(hub.todayConversations.first?.title.contains("[EXPURGÉ]") == true)
+
+        let voiceRouted = hub.submitVoiceUtterance("Mon secret=topsecret123 et mail ops@contoso.com")
+        #expect(hub.activeMode == .liveVoice06C)
+        #expect(hub.isListening == false)
+        #expect(hub.isSpeaking == true)
+        #expect(voiceRouted.redactedLearnerInput.contains("topsecret123") == false)
+        #expect(voiceRouted.redactedLearnerInput.contains("ops@contoso.com") == false)
+        #expect(hub.liveVoice.activeUserTranscript.contains("[EXPURGÉ]") == true)
+    }
 }
