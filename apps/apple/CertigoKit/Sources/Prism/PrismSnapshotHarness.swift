@@ -647,7 +647,16 @@ public enum CertiGoMasterScreenCatalog {
     guard Set(allScreens.map(\.nodeId)).count == expectedScreenCount else { return false }
     guard onboardingScreens.count == 11 else { return false }
     guard questionFormatScreens.count == 10 else { return false }
+    guard CertiGoMotionSpecCatalog.verifyAllInvariants() else { return false }
     return allScreens.allSatisfy { $0.verifyVisualInvariants() }
+  }
+
+  public static var page13MotionSpecs: [CertiGoMotionPresetSpec] {
+    CertiGoMotionSpecCatalog.allSpecs
+  }
+
+  public static var page13AnimationFrames: [CertiGoPage13AnimationFrameDescriptor] {
+    CertiGoMotionSpecCatalog.allPage13Frames
   }
 }
 
@@ -936,6 +945,33 @@ public enum CertiGoMasterScreenCatalog {
         size: size,
         locale: locale
       )
+    }
+  }
+
+  extension CertiGoMotionSpecCatalog {
+    @MainActor
+    public static func renderDeterministicPNG(
+      for preset: CertiGoAnimationPresetID,
+      isAfterTransitionState: Bool = true,
+      calmMode: Bool = false,
+      appearance: PrismAppearance = .light,
+      dynamicType: DynamicTypeSize = .large,
+      size: CGSize = PrismSnapshotHarness.defaultFigmaCanvasSize,
+      locale: Locale = Locale(identifier: "fr")
+    ) throws -> Data {
+      let configuration = PrismSnapshotHarness.Configuration(
+        size: size,
+        appearance: appearance,
+        dynamicType: dynamicType,
+        locale: locale
+      )
+      let view = CertiGoPage13MotionShowcaseScreen(
+        preset: preset,
+        isAfterTransitionState: isAfterTransitionState,
+        calmMode: calmMode
+      )
+      let snapshot = try PrismSnapshotHarness.render(view, configuration: configuration)
+      return try PrismSnapshotHarness.pngData(snapshot)
     }
   }
 #endif
