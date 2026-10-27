@@ -1,4 +1,5 @@
 #if DEBUG && canImport(SwiftUI)
+  import CertigoData
   import CertigoDomain
   import Prism
   import SwiftUI
@@ -7,11 +8,35 @@
     @State private var presented = false
     @State private var showPrismShell = true
     @State private var flags = FeatureFlags()
+    @State private var model = NativeModel()
+    @State private var coordinator = PrismAppShellCoordinatorModel()
+      .withPersistedPreferencesLoaded(from: .shared)
+    private let preferenceStore = CertigoParallelTracksPreferenceStore.shared
+
+    private var liveCoordinator: PrismAppShellCoordinatorModel {
+      let persisted = CertigoParallelTracksPreferenceStore.shared.loadOrDefault()
+      return coordinator
+        .withPersistedPreferencesLoaded(from: preferenceStore)
+        .synchronized(
+          profile: model.profile,
+          tracks: model.tracks.isEmpty ? nil : model.tracks,
+          learningPath: model.path,
+          lesson: model.lesson,
+          mockExam: model.examSnapshot?.exam,
+          tutorExplanation: model.tutorExplanation,
+          parallelTracksPreference: persisted,
+          preferenceStore: preferenceStore
+        )
+    }
 
     func body(content: Content) -> some View {
       Group {
         if showPrismShell || flags.isEnabled(.prism) {
-          PrismAppShellView(flags: flags)
+          PrismAppShellView(
+            coordinator: liveCoordinator,
+            flags: flags,
+            preferenceStore: preferenceStore
+          )
         } else {
           content
         }
@@ -20,12 +45,25 @@
         isPresented: $presented,
         onDismiss: {
           try? flags.loadDebugOverrides(from: .standard)
+          coordinator.applyPersistedPreferences(preferenceStore.loadOrDefault())
         }
       ) {
         PrismDebugGalleryView()
       }
       .task {
         try? flags.loadDebugOverrides(from: .standard)
+        let persisted = CertigoParallelTracksPreferenceStore.shared.loadOrDefault()
+        coordinator.applyPersistedPreferences(persisted)
+        coordinator = coordinator.synchronized(
+          profile: model.profile,
+          tracks: model.tracks.isEmpty ? nil : model.tracks,
+          learningPath: model.path,
+          lesson: model.lesson,
+          mockExam: model.examSnapshot?.exam,
+          tutorExplanation: model.tutorExplanation,
+          parallelTracksPreference: persisted,
+          preferenceStore: preferenceStore
+        )
       }
     }
   }

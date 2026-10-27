@@ -271,4 +271,176 @@ struct Phase11HardeningTests {
         #expect(synced.calibrationHistory.passport.holderPseudonym == "Gabriel Chambaud")
         #expect(synced.calibrationHistory.passport.holderInitials == "GC")
     }
+
+    @Test("Full live cycle: CertigoParallelTracksPreferenceStore save -> PrismAppShellCoordinatorModel load -> synchronize with Profile, Catalog, LearningPath, and ReadinessSnapshot")
+    func parallelTracksStoreToCoordinatorLiveSynchronizationCycle() throws {
+        let defaults = UserDefaults.standard
+        let key = "certigo.parallel-tracks.phase11-cycle.\(UUID().uuidString)"
+        defer { defaults.removeObject(forKey: key) }
+
+        let store = CertigoParallelTracksPreferenceStore(defaults: defaults, key: key)
+
+        // 1. Save persisted preferences in CertigoParallelTracksPreferenceStore
+        let initialPrefs = CertigoParallelTracksPreference(
+            parallelTrackCodes: ["AZ-104", "SAA-C03", "CKA"],
+            activeTrackCode: "SAA-C03",
+            aiFrontierTrackCodes: ["AI-OPENAI", "AI-CLAUDE", "AI-FOUNDRY", "AI-MISTRAL"],
+            bilingualTechnicalTermsEN: true,
+            strictTimed90Min: false
+        )
+        try store.save(initialPrefs)
+
+        // 2. Load persisted preferences into PrismAppShellCoordinatorModel
+        var coordinator = PrismAppShellCoordinatorModel()
+            .withPersistedPreferencesLoaded(from: store)
+        #expect(coordinator.parallelTracksPreference == initialPrefs)
+        #expect(coordinator.todayModel.activeRouteCode == "SAA-C03")
+        #expect(coordinator.routeReadiness.routeCode == "SAA-C03")
+        #expect(coordinator.mockExamMachine.routeCode == "SAA-C03")
+        #expect(coordinator.mockExamMachine.timePolicy == .untimed)
+        #expect(coordinator.mockExamMachine.baseDurationMinutes == 40)
+        #expect(coordinator.calibrationHistory.passport.routes.map(\.examCode) == ["AZ-104", "SAA-C03", "CKA"])
+
+        // Also verify applyPersistedPreferences(_:) directly
+        var directCoordinator = PrismAppShellCoordinatorModel()
+        directCoordinator.applyPersistedPreferences(store.loadOrDefault())
+        #expect(directCoordinator == coordinator)
+
+        // 3. Synchronize with live Profile, Catalog, LearningPath, and ReadinessSnapshot
+        let profile = Profile(
+            id: "user-lot-k",
+            displayName: "Gabriel Chambaud",
+            xp: 3120,
+            activeTrackId: "ai-102",
+            level: 9,
+            streakDays: 21,
+            dailyGoalXp: 50,
+            dailyXpEarned: 50,
+            gems: 540
+        )
+        let catalog = Catalog(
+            tracks: [
+                Track(
+                    id: "az-104",
+                    code: "AZ-104",
+                    title: "Microsoft Azure Administrator",
+                    summary: "Identity, Network & Compute",
+                    learningAvailable: true
+                ),
+                Track(
+                    id: "saa-c03",
+                    code: "SAA-C03",
+                    title: "AWS Certified Solutions Architect - Associate",
+                    summary: "VPC, IAM & Resilient Architectures",
+                    learningAvailable: true
+                ),
+                Track(
+                    id: "ai-102",
+                    code: "AI-102",
+                    title: "Microsoft Azure AI Engineer Associate",
+                    summary: "Foundry, RAG & Multi-Agent Orchestration",
+                    learningAvailable: true
+                ),
+                Track(
+                    id: "cka",
+                    code: "CKA",
+                    title: "Certified Kubernetes Administrator",
+                    summary: "Control Plane, Scheduling & Networking",
+                    learningAvailable: true
+                )
+            ]
+        )
+        let learningPath = LearningPath(
+            trackId: "ai-102",
+            trackName: "Microsoft Azure AI Engineer Associate",
+            readinessScore: 84,
+            units: [
+                PathUnit(
+                    id: "u-foundry-live",
+                    title: "Agents Foundry & Recherche Vectorielle",
+                    lessons: [
+                        PathLesson(
+                            id: "l-foundry-1",
+                            title: "Index HNSW et Semantic Ranker L2",
+                            status: .mastered,
+                            estMinutes: 10,
+                            masteryPct: 95
+                        ),
+                        PathLesson(
+                            id: "l-foundry-2",
+                            title: "Gouvernance et garde-fous Content Safety",
+                            status: .completed,
+                            estMinutes: 12,
+                            masteryPct: 88
+                        ),
+                        PathLesson(
+                            id: "l-foundry-3",
+                            title: "Évaluation RAG et traçabilité OpenTelemetry",
+                            status: .inProgress,
+                            estMinutes: 15,
+                            masteryPct: 72
+                        )
+                    ],
+                    domainId: "dom-foundry",
+                    status: "inProgress"
+                )
+            ],
+            domains: [
+                DomainProgress(
+                    id: "dom-foundry",
+                    name: "Concevoir et gouverner des agents IA",
+                    weight: 1.0,
+                    score: 84
+                )
+            ],
+            readinessTrend7d: 11
+        )
+        let readinessSnapshot = ReadinessSnapshot(
+            trackId: "ai-102",
+            score: 86,
+            trend7d: 11,
+            domains: [
+                DomainReadinessSummary(
+                    domainId: "dom-foundry",
+                    weight: 1.0,
+                    coverage: 0.95,
+                    mastery: 0.9,
+                    score: 86
+                )
+            ]
+        )
+
+        coordinator.synchronize(
+            profile: profile,
+            catalog: catalog,
+            learningPath: learningPath,
+            readinessSnapshot: readinessSnapshot,
+            preferenceStore: store
+        )
+
+        #expect(coordinator.todayModel.activeRouteCode == "AI-102")
+        #expect(coordinator.todayModel.activeRouteTitle == "Microsoft Azure AI Engineer Associate")
+        #expect(coordinator.todayModel.rhythm.dailyStreakDays == 21)
+        #expect(coordinator.todayModel.composition.recommendedConceptTitle == "Évaluation RAG et traçabilité OpenTelemetry")
+        #expect(coordinator.parallelTracksPreference.activeTrackCode == "AI-102")
+        #expect(coordinator.parallelTracksPreference.parallelTrackCodes == ["AZ-104", "SAA-C03", "CKA", "AI-102"])
+        #expect(coordinator.parallelTracksPreference.aiFrontierTrackCodes == ["AI-OPENAI", "AI-CLAUDE", "AI-FOUNDRY", "AI-MISTRAL"])
+        #expect(coordinator.catalogExplorer.routes.count == 4)
+        #expect(coordinator.catalogExplorer.routes.first(where: { $0.code == "AI-102" })?.isConfirmedActiveGoal == true)
+        #expect(coordinator.atlasModel.nodes.count == 3)
+        #expect(coordinator.memoryDetail.items.count == 3)
+        #expect(coordinator.routeReadiness.routeCode == "AI-102")
+        #expect(coordinator.routeReadiness.readiness.band == .veryReady)
+        #expect(coordinator.mockExamMachine.routeCode == "AI-102")
+        #expect(coordinator.mockExamMachine.timePolicy == .untimed)
+        #expect(coordinator.mockExamMachine.baseDurationMinutes == 40)
+        #expect(coordinator.calibrationHistory.passport.holderPseudonym == "Gabriel Chambaud")
+        #expect(coordinator.calibrationHistory.passport.routes.map(\.examCode) == ["AZ-104", "SAA-C03", "CKA", "AI-102"])
+
+        // Verify store persisted the synchronized active track and parallel track list
+        let persistedAfterSync = store.loadOrDefault()
+        #expect(persistedAfterSync.activeTrackCode == "AI-102")
+        #expect(persistedAfterSync.parallelTrackCodes == ["AZ-104", "SAA-C03", "CKA", "AI-102"])
+        #expect(persistedAfterSync.strictTimed90Min == false)
+    }
 }

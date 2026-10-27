@@ -1,4 +1,5 @@
 import BrandAssets
+@_exported import CertigoData
 import CertigoDomain
 import Foundation
 
@@ -488,6 +489,18 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
 
     // MARK: - Live CertigoDomain / CertigoData Synchronization Bridge
 
+    public mutating func applyPersistedPreferences(_ prefs: CertigoParallelTracksPreference) {
+        applyParallelTracksPreference(prefs)
+    }
+
+    public func withPersistedPreferencesLoaded(
+        from store: CertigoParallelTracksPreferenceStore = .shared
+    ) -> PrismAppShellCoordinatorModel {
+        var next = self
+        next.applyPersistedPreferences(store.loadOrDefault())
+        return next
+    }
+
     public mutating func synchronize(
         profile: Profile? = nil,
         catalog: Catalog? = nil,
@@ -497,7 +510,8 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
         readinessSnapshot: ReadinessSnapshot? = nil,
         mockExam: MockExam? = nil,
         tutorExplanation: TutorExplanation? = nil,
-        parallelTracksPreference: CertigoParallelTracksPreference? = nil
+        parallelTracksPreference: CertigoParallelTracksPreference? = nil,
+        preferenceStore: CertigoParallelTracksPreferenceStore? = nil
     ) {
         self = synchronized(
             profile: profile,
@@ -508,7 +522,8 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
             readinessSnapshot: readinessSnapshot,
             mockExam: mockExam,
             tutorExplanation: tutorExplanation,
-            parallelTracksPreference: parallelTracksPreference
+            parallelTracksPreference: parallelTracksPreference,
+            preferenceStore: preferenceStore
         )
     }
 
@@ -521,22 +536,23 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
         readinessSnapshot: ReadinessSnapshot? = nil,
         mockExam: MockExam? = nil,
         tutorExplanation: TutorExplanation? = nil,
-        parallelTracksPreference: CertigoParallelTracksPreference? = nil
+        parallelTracksPreference: CertigoParallelTracksPreference? = nil,
+        preferenceStore: CertigoParallelTracksPreferenceStore? = nil
     ) -> PrismAppShellCoordinatorModel {
         var next = self
         if let parallelTracksPreference {
-            next.parallelTracksPreference = parallelTracksPreference
-            next.todayModel.activeRouteCode = parallelTracksPreference.activeTrackCode
-            let activeDescriptor = CertiGoMultiTrackAndAIContentCatalog.track(forCode: parallelTracksPreference.activeTrackCode)
-            next.todayModel.activeRouteTitle = activeDescriptor.officialTitle
+            next.applyPersistedPreferences(parallelTracksPreference)
+        } else if let preferenceStore {
+            next.applyPersistedPreferences(preferenceStore.loadOrDefault())
         }
         let availableTracks = catalog?.tracks ?? tracks ?? []
-        let candidateTrackId = profile?.activeTrackId
+        let candidateTrackId: String? = profile?.activeTrackId
             ?? learningPath?.trackId
             ?? readinessSnapshot?.trackId
             ?? lesson?.trackId
             ?? mockExam?.trackId
             ?? parallelTracksPreference?.activeTrackCode
+            ?? next.parallelTracksPreference.activeTrackCode
 
         let matchedTrack = availableTracks.first { track in
             guard let candidateTrackId else { return false }
@@ -573,6 +589,28 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
         let activeRegion = Self.region(forTrackCode: resolvedRouteCode, title: resolvedRouteTitle)
         let activeProduct = BrandRegistry.productID(forTrackCode: resolvedRouteCode)
         next.parallelTracksPreference.setActiveTrack(resolvedRouteCode)
+        let passportRouteBadges: [PrismRouteBadgeModel] = next.parallelTracksPreference.parallelTrackCodes.map { code in
+            if code.caseInsensitiveCompare(resolvedRouteCode) == .orderedSame {
+                return PrismRouteBadgeModel(
+                    examCode: resolvedRouteCode,
+                    officialTitle: resolvedRouteTitle,
+                    region: activeRegion
+                )
+            }
+            if let matched = availableTracks.first(where: { $0.code.caseInsensitiveCompare(code) == .orderedSame }) {
+                return PrismRouteBadgeModel(
+                    examCode: matched.code,
+                    officialTitle: matched.title,
+                    region: Self.region(forTrackCode: matched.code, title: matched.title)
+                )
+            }
+            let descriptor = CertiGoMultiTrackAndAIContentCatalog.track(forCode: code)
+            return PrismRouteBadgeModel(
+                examCode: descriptor.code,
+                officialTitle: descriptor.officialTitle,
+                region: descriptor.region
+            )
+        }
 
         // 1. Synchronize Catalog & Global Search routes
         if !availableTracks.isEmpty {
@@ -639,7 +677,7 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
                 anchoredConceptsCount: existingPassport.anchoredConceptsCount,
                 masteredConceptsCount: existingPassport.masteredConceptsCount,
                 completedRhythmWeeks: existingPassport.completedRhythmWeeks,
-                routes: [updatedRouteBadge],
+                routes: passportRouteBadges.isEmpty ? [updatedRouteBadge] : passportRouteBadges,
                 verificationLinks: existingPassport.verificationLinks
             )
             next.calibrationHistory = CalibrationHistoryScreenModel(
@@ -749,6 +787,11 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
             }
 
             let existingPassport = next.calibrationHistory.passport
+            let fallbackRouteBadge = PrismRouteBadgeModel(
+                examCode: resolvedRouteCode,
+                officialTitle: resolvedRouteTitle,
+                region: activeRegion
+            )
             next.calibrationHistory = CalibrationHistoryScreenModel(
                 passport: PrismPassportSummary(
                     holderPseudonym: existingPassport.holderPseudonym,
@@ -757,7 +800,7 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
                     anchoredConceptsCount: max(anchoredLessons.count, existingPassport.anchoredConceptsCount),
                     masteredConceptsCount: max(masteredLessons.count, existingPassport.masteredConceptsCount),
                     completedRhythmWeeks: existingPassport.completedRhythmWeeks,
-                    routes: [PrismRouteBadgeModel(examCode: resolvedRouteCode, officialTitle: resolvedRouteTitle, region: activeRegion)],
+                    routes: passportRouteBadges.isEmpty ? [fallbackRouteBadge] : passportRouteBadges,
                     verificationLinks: existingPassport.verificationLinks
                 ),
                 samples: next.calibrationHistory.samples,
@@ -966,6 +1009,15 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
                 timePolicy: next.mockExamMachine.timePolicy,
                 questions: questions.isEmpty ? next.mockExamMachine.questions : questions
             )
+        } else {
+            next.mockExamMachine = MockExamStateMachine(
+                examId: "exam-\(resolvedRouteCode.lowercased())",
+                routeCode: resolvedRouteCode,
+                routeTitle: resolvedRouteTitle,
+                baseDurationMinutes: next.parallelTracksPreference.strictTimed90Min ? 90 : 40,
+                timePolicy: next.parallelTracksPreference.strictTimed90Min ? .standardTimed : .untimed,
+                questions: next.mockExamMachine.questions
+            )
         }
 
         // 7. Synchronize TutorExplanation into ContextualAISessionState & ConceptDetail
@@ -1044,6 +1096,10 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
                     catalog: searchItems
                 )
             }
+        }
+
+        if let preferenceStore {
+            try? preferenceStore.save(next.parallelTracksPreference)
         }
 
         return next
@@ -1200,15 +1256,19 @@ public struct PrismAppShellView: View {
     @State private var showCourseTray = false
     @State private var selectedBrandFilter: String = "all"
     public let flags: FeatureFlags
+    public let preferenceStore: CertigoParallelTracksPreferenceStore
 
     public init(
         router: AppRouterState = AppRouterState(),
-        coordinator: PrismAppShellCoordinatorModel = PrismAppShellCoordinatorModel(),
-        flags: FeatureFlags = FeatureFlags()
+        coordinator: PrismAppShellCoordinatorModel = PrismAppShellCoordinatorModel()
+            .withPersistedPreferencesLoaded(from: .shared),
+        flags: FeatureFlags = FeatureFlags(),
+        preferenceStore: CertigoParallelTracksPreferenceStore = .shared
     ) {
         self._router = State(initialValue: router)
         self._coordinator = State(initialValue: coordinator)
         self.flags = flags
+        self.preferenceStore = preferenceStore
     }
 
     private func pathBinding(for tab: AppTab) -> Binding<[AppRoute]> {
@@ -1259,14 +1319,17 @@ public struct PrismAppShellView: View {
                     selectedBrandFilter: $selectedBrandFilter,
                     flags: flags,
                     onSelectCourse: { code, _ in
-                        coordinator.activateTrack(code: code)
+                        coordinator.activateTrack(code: code, persistTo: .standard)
+                        try? preferenceStore.save(coordinator.parallelTracksPreference)
                         showCourseTray = false
                     },
                     onToggleParallelTrack: { code in
-                        coordinator.toggleParallelTrack(code: code)
+                        coordinator.toggleParallelTrack(code: code, persistTo: .standard)
+                        try? preferenceStore.save(coordinator.parallelTracksPreference)
                     },
                     onToggleAIFrontierTrack: { code in
-                        coordinator.toggleAIFrontierTrack(code: code)
+                        coordinator.toggleAIFrontierTrack(code: code, persistTo: .standard)
+                        try? preferenceStore.save(coordinator.parallelTracksPreference)
                     },
                     onOpenFullCatalog: {
                         showCourseTray = false
@@ -1282,6 +1345,15 @@ public struct PrismAppShellView: View {
         }
         .fontDesign(.rounded)
         .preferredColorScheme(.light)
+        .task {
+            let persisted = preferenceStore.loadOrDefault()
+            if coordinator.parallelTracksPreference != persisted {
+                coordinator.applyPersistedPreferences(persisted)
+            }
+        }
+        .onChange(of: coordinator.parallelTracksPreference) { _, updated in
+            try? preferenceStore.save(updated)
+        }
         .fullScreenCover(item: $router.activeCover) { cover in
             NavigationStack {
                 coverScreen(for: cover)
@@ -1564,7 +1636,8 @@ public struct PrismAppShellView: View {
                 model: $coordinator.catalogExplorer,
                 flags: flags,
                 onSelectRoute: { item in
-                    coordinator.activateTrack(code: item.code)
+                    coordinator.activateTrack(code: item.code, persistTo: .standard)
+                    try? preferenceStore.save(coordinator.parallelTracksPreference)
                     router.push(.routeObjective(trackCode: item.code))
                 }
             )
@@ -1608,7 +1681,10 @@ public struct PrismAppShellView: View {
             CompleteSettingsScreen(
                 parallelTracksPreference: Binding(
                     get: { coordinator.parallelTracksPreference },
-                    set: { coordinator.applyParallelTracksPreference($0) }
+                    set: {
+                        coordinator.applyPersistedPreferences($0)
+                        try? preferenceStore.save(coordinator.parallelTracksPreference)
+                    }
                 )
             )
         case .settingsRhythmAndReminders:
@@ -1623,7 +1699,10 @@ public struct PrismAppShellView: View {
             CompleteSettingsScreen(
                 parallelTracksPreference: Binding(
                     get: { coordinator.parallelTracksPreference },
-                    set: { coordinator.applyParallelTracksPreference($0) }
+                    set: {
+                        coordinator.applyPersistedPreferences($0)
+                        try? preferenceStore.save(coordinator.parallelTracksPreference)
+                    }
                 )
             )
         case .settingsBrandNotices:
@@ -1641,7 +1720,8 @@ public struct PrismAppShellView: View {
                     parallelTracksPreference: coordinator.parallelTracksPreference
                 ),
                 onApplyParallelTracksPreference: { preference in
-                    coordinator.applyParallelTracksPreference(preference)
+                    coordinator.applyPersistedPreferences(preference)
+                    try? preferenceStore.save(coordinator.parallelTracksPreference)
                 },
                 onFinishOnboarding: {
                     router.confirmForceDismissCover()
