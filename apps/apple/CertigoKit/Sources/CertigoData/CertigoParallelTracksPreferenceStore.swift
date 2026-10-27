@@ -8,6 +8,7 @@ public enum CertigoParallelTracksPreferenceStoreError: Error, Equatable, Sendabl
 }
 
 public final class CertigoParallelTracksPreferenceStore: @unchecked Sendable {
+    public static let shared = CertigoParallelTracksPreferenceStore()
     public static let defaultKey = CertigoParallelTracksPreference.storageKey
 
     private let defaults: UserDefaults
