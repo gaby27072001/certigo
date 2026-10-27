@@ -585,6 +585,8 @@ public struct MockExamDebriefModel: Codable, Equatable, Hashable, Sendable {
 }
 
 public struct MockExamStateMachine: Codable, Equatable, Hashable, Sendable {
+    public static let cockpitWindowSize: Int = 5
+
     public let examId: String
     public let routeCode: String
     public let routeTitle: String
@@ -594,6 +596,7 @@ public struct MockExamStateMachine: Codable, Equatable, Hashable, Sendable {
     public private(set) var currentQuestionIndex: Int
     public private(set) var isStarted: Bool
     public private(set) var debrief: MockExamDebriefModel?
+    public private(set) var flaggedQuestionIds: Set<String> = []
 
     public init(
         examId: String,
@@ -601,7 +604,8 @@ public struct MockExamStateMachine: Codable, Equatable, Hashable, Sendable {
         routeTitle: String,
         baseDurationMinutes: Int = 45,
         timePolicy: MockExamTimePolicy = .standardTimed,
-        questions: [MockExamQuestionRecord]
+        questions: [MockExamQuestionRecord],
+        flaggedQuestionIds: Set<String> = []
     ) {
         self.examId = examId
         self.routeCode = routeCode
@@ -612,6 +616,7 @@ public struct MockExamStateMachine: Codable, Equatable, Hashable, Sendable {
         self.currentQuestionIndex = 0
         self.isStarted = false
         self.debrief = nil
+        self.flaggedQuestionIds = flaggedQuestionIds
     }
 
     /// §6.2: ZERO feedback is ever shown during a mock exam.
@@ -628,6 +633,80 @@ public struct MockExamStateMachine: Codable, Equatable, Hashable, Sendable {
               currentQuestionIndex >= 0, currentQuestionIndex < questions.count
         else { return nil }
         return questions[currentQuestionIndex]
+    }
+
+    public func isQuestionFlagged(_ id: String) -> Bool {
+        flaggedQuestionIds.contains(id)
+    }
+
+    public var isCurrentQuestionFlagged: Bool {
+        guard currentQuestionIndex >= 0, currentQuestionIndex < questions.count else {
+            return false
+        }
+        return isQuestionFlagged(questions[currentQuestionIndex].id)
+    }
+
+    public mutating func toggleFlagOnCurrentQuestion() {
+        guard debrief == nil,
+              currentQuestionIndex >= 0,
+              currentQuestionIndex < questions.count
+        else { return }
+        let questionId = questions[currentQuestionIndex].id
+        if flaggedQuestionIds.contains(questionId) {
+            flaggedQuestionIds.remove(questionId)
+        } else {
+            flaggedQuestionIds.insert(questionId)
+        }
+    }
+
+    public mutating func jumpToQuestion(at index: Int) {
+        guard !questions.isEmpty else { return }
+        currentQuestionIndex = min(max(0, index), questions.count - 1)
+    }
+
+    public mutating func selectQuestionNumber(_ number: Int) {
+        jumpToQuestion(at: number - 1)
+    }
+
+    /// Écran 23 Validated: 1-based sliding window of up to 5 question numbers around the active item (e.g. `[12, 13, 14, 15, 16]`).
+    public var cockpitNavigatorWindow: [Int] {
+        let total = questions.count
+        guard total > 0 else {
+            return [12, 13, 14, 15, 16]
+        }
+        if total <= Self.cockpitWindowSize {
+            return Array(1...total)
+        }
+        let currentNumber = min(max(1, currentQuestionIndex + 1), total)
+        let start = min(max(1, currentNumber - 2), total - (Self.cockpitWindowSize - 1))
+        let end = min(total, start + (Self.cockpitWindowSize - 1))
+        return Array(start...end)
+    }
+
+    public func cockpitNavigatorItemLabel(forQuestionNumber number: Int) -> String {
+        let total = max(questions.count, number)
+        let index = number - 1
+        if index == currentQuestionIndex {
+            return "[\(number)/\(total)]"
+        }
+        guard index >= 0, index < questions.count else {
+            return "\(number)"
+        }
+        let record = questions[index]
+        if isQuestionFlagged(record.id) {
+            return "\(number) 🏳"
+        }
+        if !record.selectedOptionIds.isEmpty {
+            return "\(number) ✓"
+        }
+        return "\(number)"
+    }
+
+    /// Écran 23 Validated: formatted quick navigator strip (`12 ✓ · 13 🏳 · [14/50] · 15 · 16`).
+    public var cockpitNavigatorBannerText: String {
+        cockpitNavigatorWindow
+            .map { cockpitNavigatorItemLabel(forQuestionNumber: $0) }
+            .joined(separator: " · ")
     }
 
     public mutating func startExam(policy: MockExamTimePolicy? = nil) {
@@ -1295,6 +1374,52 @@ public struct MockExamFlowScreen: View {
                         onClose: onClose
                     )
 
+                    // Écran 23 Validated: Timed Exam Cockpit Bar with Flagging (🏳) & Quick Navigator Window
+                    PrismCard(variant: .standard) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                            HStack(spacing: PrismSpacing.s) {
+                                PrismBadge(
+                                    configuration: PrismBadgeConfiguration(
+                                        text: machine.timePolicy.title,
+                                        semantics: .accent
+                                    )
+                                )
+                                Spacer()
+                                Button {
+                                    machine.toggleFlagOnCurrentQuestion()
+                                } label: {
+                                    Text(
+                                        verbatim: machine.isCurrentQuestionFlagged
+                                            ? "🏳 Marquée"
+                                            : "🏳 Marquer"
+                                    )
+                                }
+                                .buttonStyle(PrismButtonStyle(variant: .tertiary))
+                            }
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: PrismSpacing.xs) {
+                                    ForEach(machine.cockpitNavigatorWindow, id: \.self) { questionNumber in
+                                        PrismChip(
+                                            configuration: PrismChipConfiguration(
+                                                title: machine.cockpitNavigatorItemLabel(forQuestionNumber: questionNumber),
+                                                isSelected: questionNumber == machine.currentQuestionIndex + 1
+                                            )
+                                        ) {
+                                            machine.selectQuestionNumber(questionNumber)
+                                        }
+                                    }
+                                }
+                            }
+
+                            PrismText(
+                                text: machine.cockpitNavigatorBannerText,
+                                style: .caption,
+                                role: .textSecondary
+                            )
+                        }
+                    }
+
                     BrandLabel(
                         product: currentQuestion.item.product,
                         context: .learningContent,
@@ -1303,9 +1428,12 @@ public struct MockExamFlowScreen: View {
                         flags: flags
                     )
 
-                    PrismCard(variant: .standard) {
-                        PrismText(text: currentQuestion.item.stem, style: .headline)
-                    }
+                    CertiGoSpeechBubbleHeaderView(
+                        region: currentQuestion.item.resolvedRegion,
+                        badgeText: currentQuestion.item.resolvedFigmaQuestionFormat.badgeTitle,
+                        questionText: currentQuestion.item.stem,
+                        poseOverride: currentQuestion.item.resolvedSpecialistMascotPose
+                    )
 
                     if case .choice(let options, let multi) = currentQuestion.item.payload {
                         ChoiceList(

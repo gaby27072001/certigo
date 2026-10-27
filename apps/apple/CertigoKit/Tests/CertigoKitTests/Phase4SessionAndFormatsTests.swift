@@ -162,4 +162,88 @@ import Testing
         #expect(CertiGoOfficialAssetCatalog.awsServiceAssetName("Amazon-EC2") == "AWSServices/Amazon-EC2")
         #expect(CertiGoOfficialAssetCatalog.gcpServiceAssetName("bigquery") == "GCPServices/gcp-bigquery")
     }
+
+    @Test func sessionItemModelResolvesAllTenFigmaQuestionFormatsSpecialistMascotAndScreen05BackgroundDimming() {
+        let az104Exercises = CertiGoMultiTrackAndAIContentCatalog.exercises(forTrackCode: "AZ-104")
+        #expect(az104Exercises.count == 10)
+
+        for exercise in az104Exercises {
+            #expect(exercise.sessionItem.resolvedFigmaQuestionFormat == exercise.format)
+            #expect(exercise.sessionItem.resolvedFigmaQuestionFormat.badgeTitle == exercise.badgeTitle)
+        }
+
+        let explicitOverrideItem = PrismSessionItemModel(
+            id: "custom-item",
+            conceptId: "az.custom",
+            product: .azureVirtualNetwork,
+            stem: "Question personnalisée",
+            payload: .choice(
+                options: [
+                    PrismChoiceOption(id: "a", badge: "A", text: "Option A", explanation: "Explication A"),
+                ],
+                allowsMultipleSelection: false
+            ),
+            questionFormatOverride: .q02ServiceGrid2x2
+        )
+        #expect(explicitOverrideItem.resolvedFigmaQuestionFormat == .q02ServiceGrid2x2)
+        #expect(explicitOverrideItem.resolvedFigmaQuestionFormat.badgeTitle == "GRILLE 2×2 SERVICES OFFICIELS")
+
+        // Verify 3/4 right specialist mascot pose resolution across product domains
+        let cloudItem = PrismSessionItemModel(
+            id: "m-cloud",
+            conceptId: "az.vm",
+            product: .microsoftAzure,
+            stem: "Cloud",
+            payload: .choice(options: [], allowsMultipleSelection: false)
+        )
+        let securityItem = PrismSessionItemModel(
+            id: "m-sec",
+            conceptId: "az.entra",
+            product: .microsoftEntraID,
+            stem: "Security",
+            payload: .choice(options: [], allowsMultipleSelection: false)
+        )
+        let networkItem = PrismSessionItemModel(
+            id: "m-net",
+            conceptId: "az.vnet",
+            product: .azureVirtualNetwork,
+            stem: "Network",
+            payload: .choice(options: [], allowsMultipleSelection: false)
+        )
+        let devopsItem = PrismSessionItemModel(
+            id: "m-dev",
+            conceptId: "k8s.pod",
+            product: .kubernetes,
+            stem: "Containers",
+            payload: .choice(options: [], allowsMultipleSelection: false)
+        )
+        let dataItem = PrismSessionItemModel(
+            id: "m-data",
+            conceptId: "az.sql",
+            product: .azureSQLDatabase,
+            stem: "Data",
+            payload: .choice(options: [], allowsMultipleSelection: false)
+        )
+        let aiItem = PrismSessionItemModel(
+            id: "m-ai",
+            conceptId: "az.foundry",
+            product: .microsoftFoundry,
+            stem: "AI",
+            payload: .choice(options: [], allowsMultipleSelection: false)
+        )
+
+        #expect(cloudItem.resolvedSpecialistMascotPose == .specialistCloudAzure)
+        #expect(securityItem.resolvedSpecialistMascotPose == .specialistSecurityEntra)
+        #expect(networkItem.resolvedSpecialistMascotPose == .specialistNetworkVNet)
+        #expect(devopsItem.resolvedSpecialistMascotPose == .specialistCLIContainers)
+        #expect(dataItem.resolvedSpecialistMascotPose == .specialistDataSQL)
+        #expect(aiItem.resolvedSpecialistMascotPose == .specialistAICoach)
+
+        // Verify Screen 05 background question dimming at 62% opacity when explanation sheet is open
+        let plan = PrismSessionPlan(id: "plan-dim", length: .express, cards: [.item(networkItem)])
+        let machine = SessionPlayerStateMachine(plan: plan)
+        #expect(machine.dimsBackgroundQuestionWhenAIExplanationOpen)
+        #expect(machine.backgroundDimOpacityWhenSheetOpen == 0.62)
+        #expect(SessionPlayerStateMachine.validatedBackgroundDimOpacityWhenSheetOpen == 0.62)
+    }
 }
