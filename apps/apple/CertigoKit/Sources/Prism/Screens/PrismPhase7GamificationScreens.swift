@@ -103,6 +103,92 @@ public struct WelcomeBackBannerModel: Codable, Equatable, Hashable, Sendable {
     }
 }
 
+// MARK: - 1B. Page 12 Figma Pro — RES-02 Reprise Bienveillante Zéro Culpabilité (§7, §9, §16.7, DR-005)
+
+public struct CertiGoZeroGuiltWelcomeBackModel: Codable, Equatable, Hashable, Sendable {
+    public static let screenCode: String = "RES-02"
+    public static let defaultPreservedAnchoredConceptsCount: Int = 28
+    public static let defaultSuggestedExpressMinutes: Int = 5
+    public static let defaultFreeCatchUpRecallsCount: Int = 3
+
+    public let screenCode: String
+    public let mascotPose: CertiGoMascotPose
+    public let awayDaysCount: Int
+    public let preservedAnchoredConceptsCount: Int
+    public let suggestedExpressMinutes: Int
+    public let freeCatchUpRecallsCount: Int
+    public var completedCatchUpRecallsCount: Int
+    public let activeParallelRouteCodes: [String]
+    public let headline: String
+    public let supportiveMessage: String
+    public let suggestedLength: PrismSessionLength
+
+    public init(
+        screenCode: String = Self.screenCode,
+        mascotPose: CertiGoMascotPose = .emotionOopsCaring,
+        awayDaysCount: Int = 5,
+        preservedAnchoredConceptsCount: Int = Self.defaultPreservedAnchoredConceptsCount,
+        suggestedExpressMinutes: Int = Self.defaultSuggestedExpressMinutes,
+        freeCatchUpRecallsCount: Int = Self.defaultFreeCatchUpRecallsCount,
+        completedCatchUpRecallsCount: Int = 0,
+        activeParallelRouteCodes: [String] = ["AZ-104", "SAA-C03", "AI-FRONTIER"],
+        headline: String = "Bon retour parmi nous · Zéro culpabilité",
+        supportiveMessage: String = "Tes 28 concepts ancrés dans l'Atlas sont intégralement préservés. Reprends en douceur avec une séance Express de 5 minutes ou valide un jour par 3 rappels différés gratuits.",
+        suggestedLength: PrismSessionLength = .express
+    ) {
+        self.screenCode = screenCode
+        self.mascotPose = mascotPose
+        self.awayDaysCount = max(1, awayDaysCount)
+        self.preservedAnchoredConceptsCount = max(0, preservedAnchoredConceptsCount)
+        self.suggestedExpressMinutes = max(1, suggestedExpressMinutes)
+        self.freeCatchUpRecallsCount = max(1, freeCatchUpRecallsCount)
+        self.completedCatchUpRecallsCount = max(0, completedCatchUpRecallsCount)
+        self.activeParallelRouteCodes = activeParallelRouteCodes
+        self.headline = headline
+        self.supportiveMessage = supportiveMessage
+        self.suggestedLength = suggestedLength
+    }
+
+    /// Page 12 `RES-02` & §7 / §16.7 invariant: zero guilt or loss-inducing copy.
+    public var hasGuiltInducingCopy: Bool {
+        let lower = "\(headline) \(supportiveMessage)".lowercased()
+        let forbidden = ["perdu", "cassé", "éteinte", "dommage", "coupable", "retard", "pénalité", "échec"]
+        return forbidden.contains { lower.contains($0) }
+    }
+
+    public var containsGuiltOrLossCopy: Bool {
+        hasGuiltInducingCopy
+    }
+
+    /// §9 & DR-005 invariant: never sells paid streak freezes.
+    public var sellsPaidStreakFreeze: Bool {
+        false
+    }
+
+    public var canRedeemFreeCatchUpDay: Bool {
+        completedCatchUpRecallsCount >= freeCatchUpRecallsCount
+    }
+
+    public mutating func recordCompletedCatchUpRecall() {
+        completedCatchUpRecallsCount += 1
+    }
+
+    public mutating func redeemFreeCatchUpDayIfEligible() -> Bool {
+        guard canRedeemFreeCatchUpDay else { return false }
+        completedCatchUpRecallsCount -= freeCatchUpRecallsCount
+        return true
+    }
+
+    public var legacyBannerModel: WelcomeBackBannerModel {
+        WelcomeBackBannerModel(
+            awayDaysCount: awayDaysCount,
+            headline: headline,
+            supportiveMessage: supportiveMessage,
+            suggestedLength: suggestedLength
+        )
+    }
+}
+
 // MARK: - 2. Mastery Milestones (§9, `celebrations.v1`)
 
 public enum MasteryMilestoneKind: String, Codable, CaseIterable, Equatable, Hashable, Sendable, Identifiable {
@@ -317,6 +403,100 @@ public struct WelcomeBackCardView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PrismButtonStyle(variant: .primary))
+            }
+        }
+    }
+}
+
+public struct CertiGoZeroGuiltWelcomeBackView: View {
+    public let model: CertiGoZeroGuiltWelcomeBackModel
+    public let onStartExpressSession: () -> Void
+    public let onStartFreeCatchUpRecalls: () -> Void
+
+    public init(
+        model: CertiGoZeroGuiltWelcomeBackModel = CertiGoZeroGuiltWelcomeBackModel(),
+        onStartExpressSession: @escaping () -> Void = {},
+        onStartFreeCatchUpRecalls: @escaping () -> Void = {}
+    ) {
+        self.model = model
+        self.onStartExpressSession = onStartExpressSession
+        self.onStartFreeCatchUpRecalls = onStartFreeCatchUpRecalls
+    }
+
+    public var body: some View {
+        PrismCard(variant: .hero) {
+            VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                HStack(alignment: .center, spacing: PrismSpacing.m) {
+                    CertiGoMascotView(pose: model.mascotPose, size: PrismSize.mascotQuiz)
+
+                    VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                        HStack(spacing: PrismSpacing.xs) {
+                            PrismBadge(
+                                configuration: PrismBadgeConfiguration(
+                                    text: model.screenCode,
+                                    semantics: .accent
+                                )
+                            )
+                            PrismBadge(
+                                configuration: PrismBadgeConfiguration(
+                                    text: "Zéro culpabilité",
+                                    semantics: .positive
+                                )
+                            )
+                        }
+                        PrismText(text: model.headline, style: .title3)
+                    }
+                }
+
+                PrismText(text: model.supportiveMessage, style: .body, role: .textSecondary)
+
+                PrismAdaptiveStack(spacing: PrismSpacing.s) {
+                    PrismBadge(
+                        configuration: PrismBadgeConfiguration(
+                            text: "\(model.preservedAnchoredConceptsCount) concepts ancrés préservés",
+                            semantics: .positive
+                        )
+                    )
+                    PrismBadge(
+                        configuration: PrismBadgeConfiguration(
+                            text: "Express \(model.suggestedExpressMinutes) min",
+                            semantics: .accent
+                        )
+                    )
+                    PrismBadge(
+                        configuration: PrismBadgeConfiguration(
+                            text: "\(model.freeCatchUpRecallsCount) rappels différés gratuits",
+                            semantics: .neutral
+                        )
+                    )
+                }
+
+                HStack(spacing: PrismSpacing.xs) {
+                    ForEach(model.activeParallelRouteCodes, id: \.self) { code in
+                        PrismBadge(
+                            configuration: PrismBadgeConfiguration(
+                                text: code,
+                                semantics: .neutral
+                            )
+                        )
+                    }
+                }
+
+                Button {
+                    onStartExpressSession()
+                } label: {
+                    Text(verbatim: "Reprendre avec une séance Express (\(model.suggestedExpressMinutes) min)")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PrismButtonStyle(variant: .primary))
+
+                Button {
+                    onStartFreeCatchUpRecalls()
+                } label: {
+                    Text(verbatim: "Valider un jour via \(model.freeCatchUpRecallsCount) rappels différés gratuits")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PrismButtonStyle(variant: .secondary))
             }
         }
     }

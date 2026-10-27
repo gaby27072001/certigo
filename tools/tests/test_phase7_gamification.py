@@ -19,7 +19,9 @@ class Phase7GamificationTests(unittest.TestCase):
             "public struct WeeklyMissionBoardModel:",
             "public struct CooperativeEventBannerModel:",
             "public struct GamificationSurfacePolicy:",
+            "public struct CertiGoZeroGuiltWelcomeBackModel:",
             "public struct WelcomeBackCardView: View",
+            "public struct CertiGoZeroGuiltWelcomeBackView: View",
             "public struct WeeklyRhythmSettingsScreen: View",
             "public struct MasteryMilestonesAndMissionsScreen: View",
         ]:
