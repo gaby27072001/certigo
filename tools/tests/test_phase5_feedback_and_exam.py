@@ -15,11 +15,14 @@ class Phase5FeedbackAndExamTests(unittest.TestCase):
             "public struct SessionResultsModel:",
             "public struct DailySituationStateMachine:",
             "public enum MockExamTimePolicy:",
+            "public struct CertiGoExamBarometerCarouselModel:",
+            "public struct MockExamDebriefModel:",
             "public struct MockExamStateMachine:",
             "public struct SessionFeedbackPanelScreen: View",
             "public struct SessionResultsScreen: View",
             "public struct DailySituationScreen: View",
             "public struct MockExamIntroScreen: View",
+            "public struct CertiGoExamBarometerCarouselView: View",
             "public struct MockExamDebriefScreen: View",
         ]:
             self.assertIn(symbol, text, f"Missing {symbol} in PrismPhase5FeedbackAndExamScreens.swift")

@@ -340,6 +340,219 @@ public struct MockExamQuestionRecord: Codable, Equatable, Hashable, Sendable, Id
     }
 }
 
+public enum CertiGoExamBarometerCardIndex: Int, CaseIterable, Codable, Equatable, Hashable, Sendable, Identifiable {
+    case graduatedBarometer = 0
+    case paceAndConfidenceCalibration = 1
+    case errorAnalysisAndAICoachRelaunch = 2
+
+    public var id: Int { rawValue }
+
+    public var cardNumber: Int {
+        rawValue + 1
+    }
+
+    public var paginationDotsLabel: String {
+        switch self {
+        case .graduatedBarometer:
+            "● ○ ○"
+        case .paceAndConfidenceCalibration:
+            "○ ● ○"
+        case .errorAnalysisAndAICoachRelaunch:
+            "○ ○ ●"
+        }
+    }
+
+    public var shortTitle: String {
+        switch self {
+        case .graduatedBarometer:
+            "Carte 1 · Baromètre"
+        case .paceAndConfidenceCalibration:
+            "Carte 2 · Rythme & Confiance"
+        case .errorAnalysisAndAICoachRelaunch:
+            "Carte 3 · Erreurs & Coach IA"
+        }
+    }
+}
+
+public struct CertiGoOfficialDomainScoreRow: Codable, Equatable, Hashable, Sendable, Identifiable {
+    public let id: String
+    public let domainCode: String
+    public let domainTitle: String
+    public let percentage: Int
+    public let region: PrismRegion
+
+    public init(
+        id: String,
+        domainCode: String,
+        domainTitle: String,
+        percentage: Int,
+        region: PrismRegion
+    ) {
+        self.id = id
+        self.domainCode = domainCode
+        self.domainTitle = domainTitle
+        self.percentage = min(max(percentage, 0), 100)
+        self.region = region
+    }
+
+    public var isPassingDomain: Bool {
+        percentage >= 70
+    }
+
+    public var normalizedProgress: Double {
+        Double(percentage) / 100.0
+    }
+
+    public var formattedScore: String {
+        "\(percentage) %"
+    }
+
+    public static let defaultOfficialDomains: [CertiGoOfficialDomainScoreRow] = [
+        CertiGoOfficialDomainScoreRow(
+            id: "dom-identity",
+            domainCode: "D1",
+            domainTitle: "Identité et gouvernance Entra ID",
+            percentage: 92,
+            region: .security
+        ),
+        CertiGoOfficialDomainScoreRow(
+            id: "dom-storage",
+            domainCode: "D2",
+            domainTitle: "Stockage et sécurité des données",
+            percentage: 84,
+            region: .data
+        ),
+        CertiGoOfficialDomainScoreRow(
+            id: "dom-compute",
+            domainCode: "D3",
+            domainTitle: "Calcul et ressources Azure",
+            percentage: 78,
+            region: .cloud
+        ),
+        CertiGoOfficialDomainScoreRow(
+            id: "dom-network",
+            domainCode: "D4",
+            domainTitle: "Réseaux virtuels et DNS privé",
+            percentage: 58,
+            region: .network
+        ),
+        CertiGoOfficialDomainScoreRow(
+            id: "dom-monitor",
+            domainCode: "D5",
+            domainTitle: "Supervision et sauvegarde",
+            percentage: 76,
+            region: .devops
+        )
+    ]
+}
+
+public struct CertiGoExamBarometerCarouselModel: Codable, Equatable, Hashable, Sendable {
+    public static let requiredCardCount: Int = 3
+    public static let officialPassingThreshold: Int = 700
+    public static let officialMaxScore: Int = 1000
+
+    public let scaledScore: Int
+    public let passingThreshold: Int
+    public let maxScore: Int
+    public let averageSecondsPerQuestion: Int
+    public let sureAnswersPrecisionPercentage: Int
+    public let errorsToReviewCount: Int
+    public let priorityWeakDomainTitle: String
+    public let coachAIRelaunchActionTitle: String
+    public let officialDomainScores: [CertiGoOfficialDomainScoreRow]
+
+    public var selectedCardIndex: CertiGoExamBarometerCardIndex
+    public private(set) var coachAIRelaunchTriggeredCount: Int
+
+    public init(
+        scaledScore: Int = 785,
+        passingThreshold: Int = Self.officialPassingThreshold,
+        maxScore: Int = Self.officialMaxScore,
+        averageSecondsPerQuestion: Int = 18,
+        sureAnswersPrecisionPercentage: Int = 91,
+        errorsToReviewCount: Int = 6,
+        priorityWeakDomainTitle: String = "Réseaux virtuels et DNS privé",
+        coachAIRelaunchActionTitle: String = "Relancer avec le Coach IA",
+        officialDomainScores: [CertiGoOfficialDomainScoreRow] = CertiGoOfficialDomainScoreRow.defaultOfficialDomains,
+        selectedCardIndex: CertiGoExamBarometerCardIndex = .graduatedBarometer,
+        coachAIRelaunchTriggeredCount: Int = 0
+    ) {
+        self.maxScore = max(100, maxScore)
+        self.passingThreshold = min(max(0, passingThreshold), self.maxScore)
+        self.scaledScore = min(max(0, scaledScore), self.maxScore)
+        self.averageSecondsPerQuestion = max(1, averageSecondsPerQuestion)
+        self.sureAnswersPrecisionPercentage = min(max(sureAnswersPrecisionPercentage, 0), 100)
+        self.errorsToReviewCount = max(0, errorsToReviewCount)
+        self.priorityWeakDomainTitle = priorityWeakDomainTitle
+        self.coachAIRelaunchActionTitle = coachAIRelaunchActionTitle
+        self.officialDomainScores = officialDomainScores
+        self.selectedCardIndex = selectedCardIndex
+        self.coachAIRelaunchTriggeredCount = max(0, coachAIRelaunchTriggeredCount)
+    }
+
+    public var cardsCount: Int {
+        CertiGoExamBarometerCardIndex.allCases.count
+    }
+
+    public var isPassed: Bool {
+        scaledScore >= passingThreshold
+    }
+
+    public var surplusPoints: Int {
+        scaledScore - passingThreshold
+    }
+
+    public var normalizedScoreProgress: Double {
+        Double(scaledScore) / Double(maxScore)
+    }
+
+    public var paginationDotsText: String {
+        selectedCardIndex.paginationDotsLabel
+    }
+
+    public var card1VerdictBadgeText: String {
+        isPassed
+            ? "ADMIS · SEUIL \(passingThreshold) DÉPASSÉ ✓"
+            : "SOUS LE SEUIL \(passingThreshold)"
+    }
+
+    public var card1GraduatedScaleText: String {
+        let checkSuffix = isPassed ? " ✓" : ""
+        return "0 ── Seuil \(passingThreshold) ── \(scaledScore) / \(maxScore)\(checkSuffix) ── \(maxScore)"
+    }
+
+    public var card2PaceAndCalibrationText: String {
+        "\(averageSecondsPerQuestion)s/question · \(sureAnswersPrecisionPercentage) % de précision sur les réponses sûres"
+    }
+
+    public var card3ErrorAnalysisTitle: String {
+        "Analyse des erreurs & Relance ciblée avec le Coach IA"
+    }
+
+    public var card3ErrorAnalysisDetailText: String {
+        "\(errorsToReviewCount) erreurs ciblées sur \(priorityWeakDomainTitle)"
+    }
+
+    public mutating func selectCard(_ index: CertiGoExamBarometerCardIndex) {
+        selectedCardIndex = index
+    }
+
+    public mutating func advanceToNextCard() {
+        let nextRaw = (selectedCardIndex.rawValue + 1) % CertiGoExamBarometerCardIndex.allCases.count
+        selectedCardIndex = CertiGoExamBarometerCardIndex(rawValue: nextRaw) ?? .graduatedBarometer
+    }
+
+    public mutating func returnToPreviousCard() {
+        let count = CertiGoExamBarometerCardIndex.allCases.count
+        let prevRaw = (selectedCardIndex.rawValue - 1 + count) % count
+        selectedCardIndex = CertiGoExamBarometerCardIndex(rawValue: prevRaw) ?? .graduatedBarometer
+    }
+
+    public mutating func triggerCoachAIRelaunch() {
+        coachAIRelaunchTriggeredCount += 1
+    }
+}
+
 public struct MockExamDebriefModel: Codable, Equatable, Hashable, Sendable {
     public let routeCode: String
     public let routeTitle: String
@@ -348,6 +561,7 @@ public struct MockExamDebriefModel: Codable, Equatable, Hashable, Sendable {
     public let objectiveCoverage: [PrismObjectiveCoverageItem]
     public let calibrationSummaryText: String
     public let detectedMisconceptions: [String]
+    public var barometerCarousel: CertiGoExamBarometerCarouselModel
 
     public init(
         routeCode: String,
@@ -356,7 +570,8 @@ public struct MockExamDebriefModel: Codable, Equatable, Hashable, Sendable {
         readiness: PrismReadinessModel,
         objectiveCoverage: [PrismObjectiveCoverageItem],
         calibrationSummaryText: String,
-        detectedMisconceptions: [String] = []
+        detectedMisconceptions: [String] = [],
+        barometerCarousel: CertiGoExamBarometerCarouselModel = CertiGoExamBarometerCarouselModel()
     ) {
         self.routeCode = routeCode
         self.routeTitle = routeTitle
@@ -365,6 +580,7 @@ public struct MockExamDebriefModel: Codable, Equatable, Hashable, Sendable {
         self.objectiveCoverage = objectiveCoverage
         self.calibrationSummaryText = calibrationSummaryText
         self.detectedMisconceptions = detectedMisconceptions
+        self.barometerCarousel = barometerCarousel
     }
 }
 
@@ -786,19 +1002,223 @@ public struct MockExamIntroScreen: View {
     }
 }
 
+public struct CertiGoExamBarometerCarouselView: View {
+    @Binding public var carousel: CertiGoExamBarometerCarouselModel
+    public let onTriggerCoachAIRelaunch: () -> Void
+
+    public init(
+        carousel: Binding<CertiGoExamBarometerCarouselModel>,
+        onTriggerCoachAIRelaunch: @escaping () -> Void = {}
+    ) {
+        self._carousel = carousel
+        self.onTriggerCoachAIRelaunch = onTriggerCoachAIRelaunch
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: PrismSpacing.xs) {
+                    ForEach(CertiGoExamBarometerCardIndex.allCases) { card in
+                        PrismChip(
+                            configuration: PrismChipConfiguration(
+                                title: card.shortTitle,
+                                isSelected: carousel.selectedCardIndex == card
+                            )
+                        ) {
+                            carousel.selectCard(card)
+                        }
+                    }
+                }
+            }
+
+            // Écran 24 Validated: Swipeable Pearson VUE 3-Card Barometer Carousel
+            PrismCard(variant: .hero) {
+                VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                    switch carousel.selectedCardIndex {
+                    case .graduatedBarometer:
+                        HStack {
+                            PrismBadge(
+                                configuration: PrismBadgeConfiguration(
+                                    text: carousel.card1VerdictBadgeText,
+                                    semantics: carousel.isPassed ? .positive : .warning
+                                )
+                            )
+                            Spacer()
+                            PrismText(
+                                text: "\(carousel.scaledScore) / \(carousel.maxScore) ›",
+                                style: .title3,
+                                role: carousel.isPassed ? .positive : .caution
+                            )
+                        }
+                        PrismText(
+                            text: carousel.card1GraduatedScaleText,
+                            style: .codeSmall,
+                            role: .accent
+                        )
+                        PrismProgressBar(
+                            configuration: PrismProgressBarConfiguration(
+                                progress: carousel.normalizedScoreProgress,
+                                colorRole: carousel.isPassed ? .positive : .caution,
+                                label: "Seuil officiel Pearson VUE : \(carousel.passingThreshold) / \(carousel.maxScore)"
+                            )
+                        )
+
+                    case .paceAndConfidenceCalibration:
+                        HStack {
+                            PrismBadge(
+                                configuration: PrismBadgeConfiguration(
+                                    text: "CARTE 2 · RYTHME CHRONO & CALIBRATION",
+                                    semantics: .accent
+                                )
+                            )
+                            Spacer()
+                        }
+                        PrismText(
+                            text: carousel.card2PaceAndCalibrationText,
+                            style: .headline
+                        )
+                        PrismText(
+                            text: "Cadence régulière sous la cible de 90 min sans précipitation sur les questions d'architecture.",
+                            style: .footnote,
+                            role: .textSecondary
+                        )
+
+                    case .errorAnalysisAndAICoachRelaunch:
+                        HStack {
+                            PrismBadge(
+                                configuration: PrismBadgeConfiguration(
+                                    text: "CARTE 3 · ANALYSE DES ERREURS & COACH IA",
+                                    semantics: .warning
+                                )
+                            )
+                            Spacer()
+                        }
+                        PrismText(
+                            text: carousel.card3ErrorAnalysisTitle,
+                            style: .headline
+                        )
+                        PrismText(
+                            text: carousel.card3ErrorAnalysisDetailText,
+                            style: .subheadline,
+                            role: .textSecondary
+                        )
+                        Button {
+                            carousel.triggerCoachAIRelaunch()
+                            onTriggerCoachAIRelaunch()
+                        } label: {
+                            Text(verbatim: carousel.coachAIRelaunchActionTitle)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(PrismButtonStyle(variant: .primary))
+                    }
+                }
+            }
+
+            HStack(spacing: PrismSpacing.xs) {
+                Button {
+                    carousel.returnToPreviousCard()
+                } label: {
+                    Text(verbatim: "‹")
+                        .prismTextStyle(.headline)
+                        .foregroundStyle(PrismColor.textSecondary)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+                ForEach(CertiGoExamBarometerCardIndex.allCases) { card in
+                    Button {
+                        carousel.selectCard(card)
+                    } label: {
+                        if carousel.selectedCardIndex == card {
+                            RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
+                                .fill(PrismColor.accent)
+                                .frame(
+                                    width: PrismSize.carouselDotActive,
+                                    height: PrismSize.carouselDotInactive
+                                )
+                        } else {
+                            Circle()
+                                .fill(PrismColor.separator)
+                                .frame(
+                                    width: PrismSize.carouselDotInactive,
+                                    height: PrismSize.carouselDotInactive
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                PrismText(
+                    text: carousel.paginationDotsText,
+                    style: .caption,
+                    role: .textSecondary
+                )
+                Spacer()
+
+                Button {
+                    carousel.advanceToNextCard()
+                } label: {
+                    Text(verbatim: "›")
+                        .prismTextStyle(.headline)
+                        .foregroundStyle(PrismColor.textSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Clean Bottom White Card listing Official Domain Scores
+            PrismCard(variant: .standard) {
+                VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                    PrismText(
+                        text: "SCORES PAR DOMAINE OFFICIEL",
+                        style: .caption,
+                        role: .textSecondary
+                    )
+                    ForEach(carousel.officialDomainScores) { domainRow in
+                        VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                            HStack(spacing: PrismSpacing.s) {
+                                RegionChip(region: domainRow.region)
+                                PrismText(
+                                    text: "\(domainRow.domainCode) · \(domainRow.domainTitle)",
+                                    style: .subheadline
+                                )
+                                Spacer()
+                                PrismText(
+                                    text: domainRow.formattedScore,
+                                    style: .subheadline,
+                                    role: domainRow.isPassingDomain ? .positive : .caution
+                                )
+                            }
+                            PrismProgressBar(
+                                configuration: PrismProgressBarConfiguration(
+                                    progress: domainRow.normalizedProgress,
+                                    colorRole: domainRow.isPassingDomain ? .positive : .caution
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 public struct MockExamDebriefScreen: View {
     public let debrief: MockExamDebriefModel
     public let flags: FeatureFlags
     public let onFinish: () -> Void
+    public let onTriggerCoachAIRelaunch: () -> Void
+    @State private var carouselState: CertiGoExamBarometerCarouselModel
 
     public init(
         debrief: MockExamDebriefModel,
         flags: FeatureFlags = FeatureFlags(),
-        onFinish: @escaping () -> Void = {}
+        onFinish: @escaping () -> Void = {},
+        onTriggerCoachAIRelaunch: @escaping () -> Void = {}
     ) {
         self.debrief = debrief
         self.flags = flags
         self.onFinish = onFinish
+        self.onTriggerCoachAIRelaunch = onTriggerCoachAIRelaunch
+        self._carouselState = State(initialValue: debrief.barometerCarousel)
     }
 
     public var body: some View {
@@ -812,39 +1232,10 @@ public struct MockExamDebriefScreen: View {
                     flags: flags
                 )
 
-                // Écran 24 Validated: Swipeable Pearson VUE Graduated Barometer Card + ● ○ ○ Pagination Dots
-                PrismCard(variant: .hero) {
-                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                        HStack {
-                            PrismBadge(
-                                configuration: PrismBadgeConfiguration(
-                                    text: "ADMIS · SEUIL 700 DÉPASSÉ ✓",
-                                    semantics: .positive
-                                )
-                            )
-                            Spacer()
-                            PrismText(text: "785 / 1000 ›", style: .title3, role: .positive)
-                        }
-                        PrismText(
-                            text: "0 ────────── Seuil 700 ──── [ 785 ] ──── 1000",
-                            style: .codeSmall,
-                            role: .accent
-                        )
-                    }
-                }
-                HStack(spacing: PrismSpacing.xs) {
-                    Spacer()
-                    RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
-                        .fill(PrismColor.accent)
-                        .frame(width: PrismSize.carouselDotActive, height: PrismSize.carouselDotInactive)
-                    Circle()
-                        .fill(PrismColor.separator)
-                        .frame(width: PrismSize.carouselDotInactive, height: PrismSize.carouselDotInactive)
-                    Circle()
-                        .fill(PrismColor.separator)
-                        .frame(width: PrismSize.carouselDotInactive, height: PrismSize.carouselDotInactive)
-                    Spacer()
-                }
+                CertiGoExamBarometerCarouselView(
+                    carousel: $carouselState,
+                    onTriggerCoachAIRelaunch: onTriggerCoachAIRelaunch
+                )
 
                 ReadinessBandView(model: debrief.readiness)
                 ObjectiveCoverageList(items: debrief.objectiveCoverage)
