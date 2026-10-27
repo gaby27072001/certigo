@@ -561,6 +561,11 @@ public struct OnboardingFlowCoverScreen: View {
                         }
                         CertiGoMascotView(pose: .angleFrontCelebration, size: PrismSize.mascotPath)
                         PrismText(text: "CertiGo · Multi-Certifications & Veille IA", style: .title3)
+                        BrandLabel(
+                            product: stateMachine.selectedBrandProductId,
+                            context: .catalog,
+                            examCode: stateMachine.selectedRouteCode
+                        )
                         PrismText(
                             text: "Suis plusieurs parcours en parallèle (\(stateMachine.selectedParallelRoutes.joined(separator: " · "))) et les cours sur les Grands Acteurs de l'IA (OpenAI, Claude, Gemini, Foundry, Copilot). Nouveau contenu chaque semaine !",
                             style: .footnote,
