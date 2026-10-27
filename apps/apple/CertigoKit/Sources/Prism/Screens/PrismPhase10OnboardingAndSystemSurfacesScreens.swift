@@ -305,10 +305,11 @@ public struct AccountDeletionConfirmationModel: Codable, Equatable, Hashable, Se
     }
 }
 
-// MARK: - 4. iOS System Surfaces: Widgets (W-1..W-3, NS-14), Live Activities (LA-1..LA-3), Control Center (CC-1), App Intents & Spotlight (AI-1)
+// MARK: - 4. iOS System Surfaces: Widgets (W-1..W-3, W-Radar, NS-14), Live Activities (LA-1..LA-3), Control Center (CC-1), App Intents & Spotlight (AI-1)
 
 public enum CertigoWidgetSurfaceKind: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
     case todayProgress          // W-1
+    case aiRadarLive            // W-Radar
     case dailySituation         // W-2
     case interactiveReviewCard  // W-3 (NS-14)
 
@@ -317,6 +318,7 @@ public enum CertigoWidgetSurfaceKind: String, CaseIterable, Codable, Hashable, S
     public var code: String {
         switch self {
         case .todayProgress: "W-1"
+        case .aiRadarLive: "W-Radar"
         case .dailySituation: "W-2"
         case .interactiveReviewCard: "W-3"
         }
@@ -325,10 +327,142 @@ public enum CertigoWidgetSurfaceKind: String, CaseIterable, Codable, Hashable, S
     public var title: String {
         switch self {
         case .todayProgress: "Widget Aujourd'hui (W-1)"
+        case .aiRadarLive: "Widget Radar IA Live (W-Radar)"
         case .dailySituation: "Widget Situation du jour (W-2)"
         case .interactiveReviewCard: "Widget Carte de révision interactive (W-3 · NS-14)"
         }
     }
+
+    public var validatedSummary: String {
+        switch self {
+        case .todayProgress:
+            "Série 🔥 12j · 10/10 min ✓ · AZ-104 + 2"
+        case .aiRadarLive:
+            "Nouveau cours IA : Claude 4 & Agents MCP"
+        case .dailySituation:
+            "Protection d'un coffre Key Vault critique · +25 XP"
+        case .interactiveReviewCard:
+            "3 options (A, B, C) · File d'attente en arrière-plan sans ouvrir l'app"
+        }
+    }
+}
+
+public struct TodayProgressWidgetSurfaceModel: Codable, Equatable, Hashable, Sendable {
+    public static let widgetCode: String = "W-1"
+    public let streakDays: Int
+    public let streakBadgeText: String
+    public let dailyGoalStatusText: String
+    public let parallelActiveTracksBadge: String
+    public let parallelRouteCodes: [String]
+    public let deepLinkURL: String
+
+    /// §22A.7 & DR-004 invariants: no answer keys and no third-party publisher logos in WidgetKit extensions.
+    public var storesAnswerKeyInWidgetContainer: Bool { false }
+    public var rendersThirdPartyBrandLogoInWidgetExtension: Bool { false }
+
+    public init(
+        streakDays: Int = 12,
+        streakBadgeText: String = "🔥 12j",
+        dailyGoalStatusText: String = "10/10 min ✓",
+        parallelActiveTracksBadge: String = "AZ-104 + 2",
+        parallelRouteCodes: [String] = ["AZ-104", "SAA-C03", "GH-300"],
+        deepLinkURL: String = "certigo://widget/learn"
+    ) {
+        self.streakDays = max(0, streakDays)
+        self.streakBadgeText = streakBadgeText
+        self.dailyGoalStatusText = dailyGoalStatusText
+        self.parallelActiveTracksBadge = parallelActiveTracksBadge
+        self.parallelRouteCodes = parallelRouteCodes
+        self.deepLinkURL = deepLinkURL
+    }
+}
+
+public struct AIRadarLiveWidgetSurfaceModel: Codable, Equatable, Hashable, Sendable {
+    public static let widgetCode: String = "W-Radar"
+    public let badgeText: String
+    public let headline: String
+    public let subtitle: String
+    public let region: PrismRegion
+    public let deepLinkURL: String
+
+    /// §22A.7 invariant: uses Prism region styling, never third-party trademarked logos in WidgetKit extensions.
+    public var storesAnswerKeyInWidgetContainer: Bool { false }
+    public var rendersThirdPartyBrandLogoInWidgetExtension: Bool { false }
+
+    public init(
+        badgeText: String = "RADAR IA LIVE",
+        headline: String = "Nouveau cours IA : Claude 4 & Agents MCP",
+        subtitle: String = "Veille Grands Acteurs IA · Prompt Caching & MCP",
+        region: PrismRegion = .ai,
+        deepLinkURL: String = "certigo://widget/learn"
+    ) {
+        self.badgeText = badgeText
+        self.headline = headline
+        self.subtitle = subtitle
+        self.region = region
+        self.deepLinkURL = deepLinkURL
+    }
+}
+
+public struct DailySituationWidgetSurfaceModel: Codable, Equatable, Hashable, Sendable {
+    public static let widgetCode: String = "W-2"
+    public let situationId: String
+    public let title: String
+    public let rewardText: String
+    public let region: PrismRegion
+    public let deepLinkURL: String
+
+    public var summaryText: String {
+        "\(title) · \(rewardText)"
+    }
+
+    /// §22A.7 & DR-004 invariants: no answer keys and no third-party publisher logos in WidgetKit extensions.
+    public var storesAnswerKeyInWidgetContainer: Bool { false }
+    public var rendersThirdPartyBrandLogoInWidgetExtension: Bool { false }
+
+    public init(
+        situationId: String = "sit-2026-10-23",
+        title: String = "Protection d'un coffre Key Vault critique",
+        rewardText: String = "+25 XP",
+        region: PrismRegion = .security,
+        deepLinkURL: String = "certigo://widget/review"
+    ) {
+        self.situationId = situationId
+        self.title = title
+        self.rewardText = rewardText
+        self.region = region
+        self.deepLinkURL = deepLinkURL
+    }
+}
+
+public struct ReviewCardWidgetOption: Identifiable, Codable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let optionCode: String
+    public let label: String
+
+    public init(id: String, optionCode: String, label: String) {
+        self.id = id
+        self.optionCode = optionCode
+        self.label = label
+    }
+
+    public static let defaultOptions: [ReviewCardWidgetOption] = [
+        ReviewCardWidgetOption(
+            id: "w3-opt-a",
+            optionCode: "A",
+            label: "Priorité 100 · DenyAllInBound"
+        ),
+        ReviewCardWidgetOption(
+            id: "w3-opt-b",
+            optionCode: "B",
+            label: "Priorité 200 · AllowVNetInBound"
+        ),
+        ReviewCardWidgetOption(
+            id: "w3-opt-c",
+            optionCode: "C",
+            label: "Priorité 65000 · AllowAzureLoadBalancer"
+        )
+    ]
 }
 
 public struct QueuedWidgetReviewResponse: Identifiable, Codable, Equatable, Hashable, Sendable {
@@ -344,32 +478,40 @@ public struct QueuedWidgetReviewResponse: Identifiable, Codable, Equatable, Hash
 }
 
 public struct ReviewCardWidgetQueueModel: Codable, Equatable, Hashable, Sendable {
+    public static let widgetCode: String = "W-3"
     public let cardId: String
     public let routeCode: String
     public let region: PrismRegion
     public let promptSummary: String
+    public let options: [ReviewCardWidgetOption]
     public private(set) var queuedResponses: [QueuedWidgetReviewResponse]
 
-    /// §15 NS-14, DR-004 & §22A.7 invariants: queues response without opening app, never stores answer key in widget container, no third-party brand logo on widget extension.
+    /// §15 NS-14, DR-004 & §22A.7 invariants: queues response without opening app, 0 answer key stored in widget container, 0 third-party brand logo on widget extension.
     public var queuesResponseWithoutOpeningApp: Bool { true }
     public var storesAnswerKeyInWidgetContainer: Bool { false }
     public var rendersThirdPartyBrandLogoInWidgetExtension: Bool { false }
+    public var answerKeyCountInWidgetContainer: Int { 0 }
+    public var thirdPartyLogoCountInWidgetExtension: Int { 0 }
+    public var optionCodes: [String] { options.map(\.optionCode) }
 
     public init(
         cardId: String = "w3-card-az104-nsg",
         routeCode: String = "AZ-104",
         region: PrismRegion = .azure,
         promptSummary: String = "Priorité d'évaluation des règles entrantes NSG",
+        options: [ReviewCardWidgetOption] = ReviewCardWidgetOption.defaultOptions,
         queuedResponses: [QueuedWidgetReviewResponse] = []
     ) {
         self.cardId = cardId
         self.routeCode = routeCode
         self.region = region
         self.promptSummary = promptSummary
+        self.options = options
         self.queuedResponses = queuedResponses
     }
 
     public mutating func enqueueAnswerFromWidget(optionCode: String) {
+        guard options.contains(where: { $0.optionCode == optionCode }) else { return }
         let entry = QueuedWidgetReviewResponse(
             id: "queued-\(cardId)-\(optionCode)",
             cardId: cardId,
@@ -400,7 +542,7 @@ public enum CertigoLiveActivityKind: String, CaseIterable, Codable, Hashable, Se
         switch self {
         case .mockExamSession: "Examen blanc en cours (LA-1)"
         case .deepDiveSession: "Séance Plongée 25 min (LA-2)"
-        case .examDayCompanion: "Compagnon Jour J d'examen (LA-3)"
+        case .examDayCompanion: "Compagnon Jour J en Mode Calme (LA-3)"
         }
     }
 }
@@ -413,40 +555,117 @@ public struct CertigoLiveActivityState: Identifiable, Codable, Equatable, Hashab
     public let completedItems: Int
     public let totalItems: Int
     public let isUntimedMode: Bool
+    public let timerLabel: String
+    public let progressSubtitle: String
+    public let statusDetailLabel: String
+    public let isCalmModeActive: Bool
+    public let showsAnxietyInducingNewQuestions: Bool
 
     /// §22A.7: Never render third-party publisher logos on Lock Screen / Dynamic Island Live Activities.
     public var rendersThirdPartyBrandLogoInLiveActivity: Bool { false }
+    public var thirdPartyLogoCountInLiveActivity: Int { 0 }
+
+    public var dynamicIslandSummary: String {
+        switch kind {
+        case .mockExamSession:
+            "\(timerLabel) · \(progressSubtitle) · \(statusDetailLabel)"
+        case .deepDiveSession:
+            "\(progressSubtitle) · \(statusDetailLabel)"
+        case .examDayCompanion:
+            "\(progressSubtitle) · \(statusDetailLabel)"
+        }
+    }
 
     public init(
         id: String = "la-az104-active",
         kind: CertigoLiveActivityKind = .mockExamSession,
         routeCode: String = "AZ-104",
         region: PrismRegion = .azure,
-        completedItems: Int = 12,
-        totalItems: Int = 40,
-        isUntimedMode: Bool = false
+        completedItems: Int? = nil,
+        totalItems: Int? = nil,
+        isUntimedMode: Bool? = nil,
+        timerLabel: String? = nil,
+        progressSubtitle: String? = nil,
+        statusDetailLabel: String? = nil,
+        isCalmModeActive: Bool? = nil,
+        showsAnxietyInducingNewQuestions: Bool = false
     ) {
+        let resolvedCompleted: Int
+        let resolvedTotal: Int
+        let resolvedUntimed: Bool
+        let resolvedTimer: String
+        let resolvedProgress: String
+        let resolvedStatus: String
+        let resolvedCalm: Bool
+
+        switch kind {
+        case .mockExamSession:
+            resolvedCompleted = completedItems ?? 14
+            resolvedTotal = totalItems ?? 50
+            resolvedUntimed = isUntimedMode ?? false
+            resolvedTimer = timerLabel ?? "⏱️ 64:18"
+            resolvedProgress = progressSubtitle ?? "Question \(resolvedCompleted)/\(resolvedTotal)"
+            resolvedStatus = statusDetailLabel ?? "Seuil 700/1000"
+            resolvedCalm = isCalmModeActive ?? false
+        case .deepDiveSession:
+            resolvedCompleted = completedItems ?? 4
+            resolvedTotal = totalItems ?? 6
+            resolvedUntimed = isUntimedMode ?? false
+            resolvedTimer = timerLabel ?? "25 min"
+            resolvedProgress = progressSubtitle ?? "\(resolvedCompleted)/\(resolvedTotal) étapes"
+            resolvedStatus = statusDetailLabel ?? "Série protégée"
+            resolvedCalm = isCalmModeActive ?? false
+        case .examDayCompanion:
+            resolvedCompleted = completedItems ?? 3
+            resolvedTotal = totalItems ?? 3
+            resolvedUntimed = isUntimedMode ?? true
+            resolvedTimer = timerLabel ?? "Mode Calme"
+            resolvedProgress = progressSubtitle ?? "3 Fiches Mémo Clés"
+            resolvedStatus = statusDetailLabel ?? "Zéro nouvelle question anxiogène"
+            resolvedCalm = isCalmModeActive ?? true
+        }
+
         self.id = id
         self.kind = kind
         self.routeCode = routeCode
         self.region = region
-        self.completedItems = max(0, completedItems)
-        self.totalItems = max(1, totalItems)
-        self.isUntimedMode = isUntimedMode
+        self.completedItems = max(0, resolvedCompleted)
+        self.totalItems = max(1, resolvedTotal)
+        self.isUntimedMode = resolvedUntimed
+        self.timerLabel = resolvedTimer
+        self.progressSubtitle = resolvedProgress
+        self.statusDetailLabel = resolvedStatus
+        self.isCalmModeActive = resolvedCalm
+        self.showsAnxietyInducingNewQuestions = showsAnxietyInducingNewQuestions
     }
+
+    public static let validatedPage11Activities: [CertigoLiveActivityState] = [
+        CertigoLiveActivityState(id: "la1", kind: .mockExamSession),
+        CertigoLiveActivityState(id: "la2", kind: .deepDiveSession),
+        CertigoLiveActivityState(id: "la3", kind: .examDayCompanion)
+    ]
 }
 
 public struct ExpressSessionControlWidgetModel: Codable, Equatable, Hashable, Sendable {
     public static let controlCode: String = "CC-1"
     public static let targetDurationMinutes: Int = 5
     public let title: String
+    public let subtitle: String
+    public let sfSymbolName: String
     public let deepLinkURL: String
+
+    /// §22A.7: Control Center controls use SF Symbols and CertiGo copy, never third-party brand logos.
+    public var rendersThirdPartyBrandLogoInControlCenter: Bool { false }
 
     public init(
         title: String = "Express 5 min",
+        subtitle: String = "Bouton Centre de Contrôle iOS 18",
+        sfSymbolName: String = "bolt.fill",
         deepLinkURL: String = "certigo://session/express?duration=5"
     ) {
         self.title = title
+        self.subtitle = subtitle
+        self.sfSymbolName = sfSymbolName
         self.deepLinkURL = deepLinkURL
     }
 }
@@ -819,24 +1038,29 @@ public struct CompleteSettingsScreen: View {
     }
 }
 
-// MARK: - 8. iOS System Surfaces Preview Screen (W-1..W-3, LA-1..LA-3, CC-1, AI-1)
+// MARK: - 8. iOS System Surfaces Preview Screen (Page 11 Figma Pro: W-1, W-Radar, W-2, W-3 NS-14, LA-1..LA-3, CC-1, AI-1)
 
 public struct SystemSurfacesPreviewScreen: View {
+    public let todayWidget: TodayProgressWidgetSurfaceModel
+    public let radarWidget: AIRadarLiveWidgetSurfaceModel
+    public let dailySituationWidget: DailySituationWidgetSurfaceModel
     @State private var reviewWidgetQueue: ReviewCardWidgetQueueModel
     public let liveActivities: [CertigoLiveActivityState]
     public let controlWidget: ExpressSessionControlWidgetModel
     public let spotlightEntities: [CertigoSpotlightConceptEntity]
 
     public init(
+        todayWidget: TodayProgressWidgetSurfaceModel = TodayProgressWidgetSurfaceModel(),
+        radarWidget: AIRadarLiveWidgetSurfaceModel = AIRadarLiveWidgetSurfaceModel(),
+        dailySituationWidget: DailySituationWidgetSurfaceModel = DailySituationWidgetSurfaceModel(),
         reviewWidgetQueue: ReviewCardWidgetQueueModel = ReviewCardWidgetQueueModel(),
-        liveActivities: [CertigoLiveActivityState] = [
-            CertigoLiveActivityState(id: "la1", kind: .mockExamSession),
-            CertigoLiveActivityState(id: "la2", kind: .deepDiveSession),
-            CertigoLiveActivityState(id: "la3", kind: .examDayCompanion)
-        ],
+        liveActivities: [CertigoLiveActivityState] = CertigoLiveActivityState.validatedPage11Activities,
         controlWidget: ExpressSessionControlWidgetModel = ExpressSessionControlWidgetModel(),
         spotlightEntities: [CertigoSpotlightConceptEntity] = CertigoSpotlightConceptEntity.defaultEntities
     ) {
+        self.todayWidget = todayWidget
+        self.radarWidget = radarWidget
+        self.dailySituationWidget = dailySituationWidget
         self._reviewWidgetQueue = State(initialValue: reviewWidgetQueue)
         self.liveActivities = liveActivities
         self.controlWidget = controlWidget
@@ -846,38 +1070,191 @@ public struct SystemSurfacesPreviewScreen: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
-                PrismSection(title: "Widgets W-1 / W-2 / W-3 (NS-14)") {
-                    PrismCard(variant: .standard) {
-                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                            RegionChip(region: reviewWidgetQueue.region)
-                            PrismText(text: reviewWidgetQueue.promptSummary, style: .headline)
-                            Button {
-                                reviewWidgetQueue.enqueueAnswerFromWidget(optionCode: "A")
-                            } label: {
-                                Text(verbatim: "Mettre la réponse en file sans ouvrir l'app (NS-14)")
+                PrismSection(title: "Page 11 · Widgets iOS 18 (W-1, W-Radar, W-2, W-3 · NS-14)") {
+                    VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                        // W-1 : Série 🔥 12j + objectif quotidien 10/10 min ✓ + parcours actifs en parallèle (AZ-104 + 2)
+                        PrismCard(variant: .standard) {
+                            VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                                HStack(spacing: PrismSpacing.s) {
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: TodayProgressWidgetSurfaceModel.widgetCode,
+                                            semantics: .accent
+                                        )
+                                    )
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: todayWidget.streakBadgeText,
+                                            semantics: .caution
+                                        )
+                                    )
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: todayWidget.dailyGoalStatusText,
+                                            semantics: .positive
+                                        )
+                                    )
+                                    Spacer(minLength: PrismSpacing.xs)
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: todayWidget.parallelActiveTracksBadge,
+                                            semantics: .neutral
+                                        )
+                                    )
+                                }
+                                PrismText(
+                                    text: "Série \(todayWidget.streakBadgeText) · Objectif quotidien \(todayWidget.dailyGoalStatusText) · Parcours parallèles (\(todayWidget.parallelActiveTracksBadge))",
+                                    style: .subheadline,
+                                    role: .textPrimary
+                                )
                             }
-                            .buttonStyle(PrismButtonStyle(variant: .primary))
+                        }
+
+                        // W-Radar : Widget Radar IA Live (Nouveau cours IA : Claude 4 & Agents MCP)
+                        PrismCard(variant: .standard) {
+                            VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                                HStack(spacing: PrismSpacing.s) {
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: AIRadarLiveWidgetSurfaceModel.widgetCode,
+                                            semantics: .region(radarWidget.region)
+                                        )
+                                    )
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: radarWidget.badgeText,
+                                            semantics: .accent
+                                        )
+                                    )
+                                }
+                                PrismText(text: radarWidget.headline, style: .headline)
+                                PrismText(text: radarWidget.subtitle, style: .caption, role: .textSecondary)
+                            }
+                        }
+
+                        // W-2 : Situation du jour (Protection d'un coffre Key Vault critique · +25 XP)
+                        PrismCard(variant: .standard) {
+                            VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                                HStack(spacing: PrismSpacing.s) {
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: DailySituationWidgetSurfaceModel.widgetCode,
+                                            semantics: .region(dailySituationWidget.region)
+                                        )
+                                    )
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: dailySituationWidget.rewardText,
+                                            semantics: .positive
+                                        )
+                                    )
+                                }
+                                PrismText(text: dailySituationWidget.summaryText, style: .headline)
+                            }
+                        }
+
+                        // W-3 (NS-14) : Carte de révision interactive sur l'écran d'accueil avec 3 options (A, B, C)
+                        PrismCard(variant: .standard) {
+                            VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                                HStack(spacing: PrismSpacing.s) {
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: "\(ReviewCardWidgetQueueModel.widgetCode) · NS-14",
+                                            semantics: .accent
+                                        )
+                                    )
+                                    RegionChip(region: reviewWidgetQueue.region)
+                                    Spacer(minLength: PrismSpacing.xs)
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: "0 clé · 0 logo tiers (§22A.7)",
+                                            semantics: .neutral
+                                        )
+                                    )
+                                }
+                                PrismText(text: reviewWidgetQueue.promptSummary, style: .headline)
+                                HStack(spacing: PrismSpacing.s) {
+                                    ForEach(reviewWidgetQueue.options) { option in
+                                        Button {
+                                            reviewWidgetQueue.enqueueAnswerFromWidget(optionCode: option.optionCode)
+                                        } label: {
+                                            Text(verbatim: option.optionCode)
+                                        }
+                                        .buttonStyle(PrismButtonStyle(variant: .secondary))
+                                    }
+                                }
+                                ForEach(reviewWidgetQueue.options) { option in
+                                    PrismText(
+                                        text: "\(option.optionCode). \(option.label)",
+                                        style: .caption,
+                                        role: .textSecondary
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
-                PrismSection(title: "Live Activities LA-1 / LA-2 / LA-3 & Control Center CC-1") {
+                PrismSection(title: "Dynamic Island & Live Activities (LA-1 / LA-2 / LA-3)") {
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
                         ForEach(liveActivities) { activity in
+                            PrismCard(variant: .standard) {
+                                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                                    HStack(spacing: PrismSpacing.s) {
+                                        PrismBadge(
+                                            configuration: PrismBadgeConfiguration(
+                                                text: activity.kind.code,
+                                                semantics: .accent
+                                            )
+                                        )
+                                        PrismText(text: activity.kind.title, style: .subheadline)
+                                    }
+                                    PrismText(
+                                        text: activity.dynamicIslandSummary,
+                                        style: .footnote,
+                                        role: .textSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                PrismSection(title: "Control Center iOS 18 (CC-1) & Spotlight (AI-1)") {
+                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                        PrismCard(variant: .standard) {
+                            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                                HStack(spacing: PrismSpacing.s) {
+                                    PrismIcon(
+                                        systemName: controlWidget.sfSymbolName,
+                                        style: .headline,
+                                        role: .accentPrimary
+                                    )
+                                    PrismText(
+                                        text: "\(ExpressSessionControlWidgetModel.controlCode) · \(controlWidget.title)",
+                                        style: .headline
+                                    )
+                                }
+                                PrismText(
+                                    text: "\(controlWidget.subtitle) · \(controlWidget.deepLinkURL)",
+                                    style: .caption,
+                                    role: .textSecondary
+                                )
+                            }
+                        }
+
+                        ForEach(spotlightEntities) { entity in
                             PrismCard(variant: .standard) {
                                 HStack(spacing: PrismSpacing.s) {
                                     PrismBadge(
                                         configuration: PrismBadgeConfiguration(
-                                            text: activity.kind.code,
-                                            semantics: .accent
+                                            text: "AI-1 · \(entity.routeCode)",
+                                            semantics: .region(entity.region)
                                         )
                                     )
-                                    PrismText(text: activity.kind.title, style: .subheadline)
+                                    PrismText(text: entity.conceptTitle, style: .subheadline)
                                 }
                             }
-                        }
-                        PrismCard(variant: .standard) {
-                            PrismText(text: "\(ExpressSessionControlWidgetModel.controlCode) · \(controlWidget.title)", style: .headline)
                         }
                     }
                 }

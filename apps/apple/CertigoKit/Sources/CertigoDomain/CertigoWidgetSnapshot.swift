@@ -54,6 +54,12 @@ public struct CertigoWidgetSnapshot: Codable, Equatable, Sendable {
   public let studyPlanDailyMinutes: Int?
   public let targetExamDate: Date?
   public let language: AppLanguage
+  public let parallelTracksSummary: String?
+  public let aiRadarHeadline: String?
+
+  /// §15 NS-14, DR-004 & §22A.7 invariants: never store answer keys or render third-party logos in widget containers.
+  public var storesAnswerKeyInWidgetContainer: Bool { false }
+  public var rendersThirdPartyBrandLogoInWidgetExtension: Bool { false }
 
   public init(
     updatedAt: Date = .now,
@@ -70,6 +76,8 @@ public struct CertigoWidgetSnapshot: Codable, Equatable, Sendable {
     studyPlanDailyMinutes: Int?,
     targetExamDate: Date?,
     language: AppLanguage,
+    parallelTracksSummary: String? = nil,
+    aiRadarHeadline: String? = nil,
     revision: UUID = UUID()
   ) throws {
     self.schemaVersion = Self.currentSchemaVersion
@@ -88,6 +96,8 @@ public struct CertigoWidgetSnapshot: Codable, Equatable, Sendable {
     self.studyPlanDailyMinutes = studyPlanDailyMinutes
     self.targetExamDate = targetExamDate
     self.language = language
+    self.parallelTracksSummary = parallelTracksSummary
+    self.aiRadarHeadline = aiRadarHeadline
     _ = try validated()
   }
 
@@ -165,6 +175,10 @@ public struct CertigoWidgetSnapshot: Codable, Equatable, Sendable {
         }
     } ?? true
     let titleIsValid = activeTrackTitle.map { !$0.isEmpty && $0.utf8.count <= 160 } ?? true
+    let parallelSummaryIsValid =
+      parallelTracksSummary.map { !$0.isEmpty && $0.utf8.count <= 64 } ?? true
+    let radarHeadlineIsValid =
+      aiRadarHeadline.map { !$0.isEmpty && $0.utf8.count <= 160 } ?? true
     let dayIsValid = Self.parseDay(studyDay) != nil
     guard schemaVersion == Self.currentSchemaVersion,
       updatedAt.timeIntervalSince1970.isFinite, updatedAt.timeIntervalSince1970 >= 0,
@@ -179,7 +193,7 @@ public struct CertigoWidgetSnapshot: Codable, Equatable, Sendable {
       studyPlanDailyMinutes.map({ (1...1_440).contains($0) }) ?? true,
       targetExamDate.map({ $0.timeIntervalSince1970.isFinite && $0.timeIntervalSince1970 >= 0 })
         ?? true,
-      codeIsValid, titleIsValid,
+      codeIsValid, titleIsValid, parallelSummaryIsValid, radarHeadlineIsValid,
       activeTrackCode == nil || activeTrackTitle != nil,
       !serverStreakRisk || (streakDays ?? 0) > 0
     else {
