@@ -1096,4 +1096,24 @@ public struct ProfileSkeletonScreen: View {
         .navigationTitle(Text(verbatim: "Profil"))
     }
 }
+
+/// Legacy Phase 3 compatibility subview for rhythm & session length calibration sheets.
+public struct TodayCalibrationSummaryAccessoryView: View {
+    @Binding public var model: TodayScreenModel
+
+    public init(model: Binding<TodayScreenModel>) {
+        self._model = model
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+            SessionLengthPicker(
+                selectedLength: $model.selectedLength,
+                suggestedLength: model.suggestedLength
+            )
+            RhythmWeekView(model: model.rhythm)
+        }
+    }
+}
+
 #endif
