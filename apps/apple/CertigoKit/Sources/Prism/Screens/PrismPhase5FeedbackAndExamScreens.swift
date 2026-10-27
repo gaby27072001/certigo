@@ -545,6 +545,12 @@ public struct SessionResultsScreen: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                HStack {
+                    Spacer()
+                    CertiGoMascotView(pose: .angleFrontCelebration, size: PrismSize.mascotHero)
+                    Spacer()
+                }
+
                 PrismCelebration(
                     config: PrismCelebrationConfig(
                         level: model.celebrationLevel,
@@ -714,6 +720,36 @@ public struct MockExamIntroScreen: View {
 
                 PrismText(text: "Examen blanc · \(machine.routeTitle)", style: .title2)
 
+                // Écran 22 Validated: Apple Pay Floating Launch Card with Real Official Certification Crest
+                PrismCard(variant: .hero) {
+                    VStack(spacing: PrismSpacing.m) {
+                        CertiGoOfficialCrestView(routeCode: machine.routeCode, size: PrismSize.crestHero)
+                        PrismBadge(
+                            configuration: PrismBadgeConfiguration(
+                                text: "SIMULATION OFFICIELLE PEARSON VUE · \(machine.routeCode) ★",
+                                semantics: .accent
+                            )
+                        )
+                        HStack(spacing: PrismSpacing.m) {
+                            VStack(spacing: PrismSpacing.xxs) {
+                                PrismText(text: "QUESTIONS", style: .caption, role: .textSecondary)
+                                PrismText(text: "50 items", style: .headline)
+                            }
+                            .frame(maxWidth: .infinity)
+                            VStack(spacing: PrismSpacing.xxs) {
+                                PrismText(text: "DURÉE STRICTE", style: .caption, role: .textSecondary)
+                                PrismText(text: "90 min", style: .headline)
+                            }
+                            .frame(maxWidth: .infinity)
+                            VStack(spacing: PrismSpacing.xxs) {
+                                PrismText(text: "SCORE REQUIS", style: .caption, role: .textSecondary)
+                                PrismText(text: "700 / 1000", style: .headline, role: .accent)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+
                 PrismCard(variant: .standard) {
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
                         PrismText(text: "Conditions de l'épreuve (NS-11)", style: .headline)
@@ -775,6 +811,40 @@ public struct MockExamDebriefScreen: View {
                     size: .medium,
                     flags: flags
                 )
+
+                // Écran 24 Validated: Swipeable Pearson VUE Graduated Barometer Card + ● ○ ○ Pagination Dots
+                PrismCard(variant: .hero) {
+                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                        HStack {
+                            PrismBadge(
+                                configuration: PrismBadgeConfiguration(
+                                    text: "ADMIS · SEUIL 700 DÉPASSÉ ✓",
+                                    semantics: .positive
+                                )
+                            )
+                            Spacer()
+                            PrismText(text: "785 / 1000 ›", style: .title3, role: .positive)
+                        }
+                        PrismText(
+                            text: "0 ────────── Seuil 700 ──── [ 785 ] ──── 1000",
+                            style: .codeSmall,
+                            role: .accent
+                        )
+                    }
+                }
+                HStack(spacing: PrismSpacing.xs) {
+                    Spacer()
+                    RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
+                        .fill(PrismColor.accent)
+                        .frame(width: PrismSize.carouselDotActive, height: PrismSize.carouselDotInactive)
+                    Circle()
+                        .fill(PrismColor.separator)
+                        .frame(width: PrismSize.carouselDotInactive, height: PrismSize.carouselDotInactive)
+                    Circle()
+                        .fill(PrismColor.separator)
+                        .frame(width: PrismSize.carouselDotInactive, height: PrismSize.carouselDotInactive)
+                    Spacer()
+                }
 
                 ReadinessBandView(model: debrief.readiness)
                 ObjectiveCoverageList(items: debrief.objectiveCoverage)

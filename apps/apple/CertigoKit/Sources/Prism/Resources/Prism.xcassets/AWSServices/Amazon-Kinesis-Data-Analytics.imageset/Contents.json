@@ -1,0 +1,18 @@
+{
+  "images": [
+    {
+      "filename": "Amazon-Kinesis-Data-Analytics.svg",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "properties": {
+    "preserves-vector-representation": true,
+    "scales": [
+      "single"
+    ]
+  }
+}

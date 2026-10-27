@@ -34,6 +34,46 @@ public enum OnboardingStep: Int, CaseIterable, Codable, Comparable, Hashable, Se
     }
 }
 
+
+/// The 11 validated Figma Pro Onboarding screens on Page 07 (`OB-01` to `OB-08B`).
+public enum OnboardingFigmaScreenID: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
+    case ob01OpeningArch = "OB-01"
+    case ob02Objectives = "OB-02"
+    case ob03aMultiCertifications = "OB-03A"
+    case ob03bAIActorsAndLivingCatalog = "OB-03B"
+    case ob04CalibrationAndDeadline = "OB-04"
+    case ob06aDailyRhythm = "OB-06A"
+    case ob06bIOSPushNotificationAlert = "OB-06B"
+    case ob06cIOSHomeScreenWidgetSheet = "OB-06C"
+    case ob07DualCurvePlan = "OB-07"
+    case ob08aOneTapProfile = "OB-08A"
+    case ob08bAppleSignInFaceIDSheet = "OB-08B"
+
+    public var id: String { rawValue }
+}
+
+public struct CertigoProFeatureComparisonRow: Identifiable, Codable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let featureTitle: String
+    public let freeTierValue: String
+    public let proTierValue: String
+
+    public init(id: String, featureTitle: String, freeTierValue: String, proTierValue: String) {
+        self.id = id
+        self.featureTitle = featureTitle
+        self.freeTierValue = freeTierValue
+        self.proTierValue = proTierValue
+    }
+
+    public static let validatedRows: [CertigoProFeatureComparisonRow] = [
+        .init(id: "tracks", featureTitle: "Certifications suivies en parallèle", freeTierValue: "1 max", proTierValue: "Illimité ✓"),
+        .init(id: "exams", featureTitle: "Examens Blancs Pearson VUE (90m)", freeTierValue: "1 démo", proTierValue: "Illimités ✓"),
+        .init(id: "ai-coach", featureTitle: "Coach IA Vocal Live & Lab CLI", freeTierValue: "3 / jour", proTierValue: "Illimité 24/7 ✓"),
+        .init(id: "ai-actors", featureTitle: "Cours Grands Acteurs IA & Radar Tech", freeTierValue: "Aperçu", proTierValue: "Accès complet ✓"),
+        .init(id: "offline", featureTitle: "Téléchargement Hors-Ligne (Train/Avion)", freeTierValue: "—", proTierValue: "Inclus ✓")
+    ]
+}
+
 public enum OnboardingAuthProvider: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
     case signInWithApple
     case passkey
@@ -71,6 +111,12 @@ public struct OnboardingFlowStateMachine: Codable, Equatable, Hashable, Sendable
     public var usesFreeTextFields: Bool { false }
     public var isPlayableOffline: Bool { true }
     public var showsPaywallBeforeFirstValue: Bool { false }
+    public var currentFigmaScreen: OnboardingFigmaScreenID = .ob01OpeningArch
+    public var selectedParallelRoutes: [String] = ["AZ-104", "SAA-C03", "GH-300"]
+    public var selectedAIActorTopics: [String] = ["OpenAI & GPT", "Anthropic Claude", "Google Gemini", "Microsoft Foundry & Copilot"]
+    public var projectedScoreWithCertiGo: Int { 845 }
+    public var projectedScoreWithoutCertiGo: Int { 580 }
+    public var showsTopReminderBannerOnProfileStep: Bool { false }
 
     public init(
         currentStep: OnboardingStep = .welcomeRegionAndTrack,
@@ -468,7 +514,7 @@ public struct CertigoSpotlightConceptEntity: Identifiable, Codable, Equatable, H
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
 
-// MARK: - 5. Onboarding Flow Cover Screen (S-01..S-06, NS-1)
+// MARK: - 5. Onboarding Flow Cover Screen (OB-01..OB-08B & S-01..S-06, NS-1)
 
 public struct OnboardingFlowCoverScreen: View {
     @State private var stateMachine: OnboardingFlowStateMachine
@@ -485,30 +531,63 @@ public struct OnboardingFlowCoverScreen: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
-                PrismCard(variant: .hero) {
-                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                        PrismAdaptiveStack(spacing: PrismSpacing.s) {
-                            PrismBadge(
-                                configuration: PrismBadgeConfiguration(
-                                    text: stateMachine.currentStep.screenCode,
-                                    semantics: .accent
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: PrismSpacing.xs) {
+                        ForEach(OnboardingFigmaScreenID.allCases) { screen in
+                            PrismChip(
+                                configuration: PrismChipConfiguration(
+                                    title: screen.rawValue,
+                                    isSelected: stateMachine.currentFigmaScreen == screen
                                 )
-                            )
-                            BrandLabel(
-                                product: stateMachine.selectedBrandProductId,
-                                context: .learningContent,
-                                examCode: stateMachine.selectedRouteCode
-                            )
+                            ) {
+                                stateMachine.currentFigmaScreen = screen
+                            }
                         }
-                        PrismText(text: stateMachine.currentStep.title, style: .title3)
+                    }
+                }
+
+                // OB-01 Curved 4-Brand Arch (Google, Microsoft, Official AWS, GitHub) + Mascot Blason 1A
+                PrismCard(variant: .hero) {
+                    VStack(spacing: PrismSpacing.m) {
+                        HStack(spacing: PrismSpacing.m) {
+                            ForEach(["google", "microsoft", "aws", "github"], id: \.self) { vendor in
+                                CertiGoBrandLogoView(vendorId: vendor, size: PrismSize.brandM)
+                                    .padding(PrismSpacing.s)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                            .fill(PrismColor.surface)
+                                    )
+                            }
+                        }
+                        CertiGoMascotView(pose: .angleFrontCelebration, size: PrismSize.mascotPath)
+                        PrismText(text: "CertiGo · Multi-Certifications & Veille IA", style: .title3)
                         PrismText(
-                            text: "NS-1 : 1re décision en ≤ 2 écrans, 0 champ texte, jouable hors ligne, 0 paywall avant la 1re valeur.",
+                            text: "Suis plusieurs parcours en parallèle (\(stateMachine.selectedParallelRoutes.joined(separator: " · "))) et les cours sur les Grands Acteurs de l'IA (OpenAI, Claude, Gemini, Foundry, Copilot). Nouveau contenu chaque semaine !",
                             style: .footnote,
                             role: .textSecondary
                         )
                     }
                 }
 
+                // OB-07 Clean Dual-Curve Projection Card (Avec CertiGo vs Sans CertiGo)
+                PrismCard(variant: .standard) {
+                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                        PrismBadge(
+                            configuration: PrismBadgeConfiguration(
+                                text: "AVEC CERTIGO · \(stateMachine.projectedScoreWithCertiGo) / 1000 ✓",
+                                semantics: .accent
+                            )
+                        )
+                        PrismBadge(
+                            configuration: PrismBadgeConfiguration(
+                                text: "SANS CERTIGO · \(stateMachine.projectedScoreWithoutCertiGo) / 1000",
+                                semantics: .neutral
+                            )
+                        )
+                    }
+                }
+
+                // Interactive Flow & Native iOS Pop-ups (Push OB-06B, Widget OB-06C, Apple Sign-In OB-08B)
                 PrismCard(variant: .standard) {
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
                         switch stateMachine.currentStep {
@@ -520,7 +599,7 @@ public struct OnboardingFlowCoverScreen: View {
                                     productId: BrandProductID("microsoft-entra-id")
                                 )
                             } label: {
-                                Text(verbatim: "Choisir AZ-104 et lancer la Situation de découverte (S-02)")
+                                Text(verbatim: "Choisir mes parcours en parallèle (OB-03A & OB-03B)")
                             }
                             .buttonStyle(PrismButtonStyle(variant: .primary))
 
@@ -528,7 +607,7 @@ public struct OnboardingFlowCoverScreen: View {
                             Button {
                                 stateMachine.answerDiscoverySituation(optionCode: "A")
                             } label: {
-                                Text(verbatim: "Valider la 1re décision hors ligne (Option A)")
+                                Text(verbatim: "Valider mes objectifs & la veille IA")
                             }
                             .buttonStyle(PrismButtonStyle(variant: .primary))
 
@@ -536,7 +615,7 @@ public struct OnboardingFlowCoverScreen: View {
                             Button {
                                 stateMachine.advanceToNextStep()
                             } label: {
-                                Text(verbatim: "Continuer")
+                                Text(verbatim: "Continuer vers le Plan Avec vs Sans CertiGo (OB-07)")
                             }
                             .buttonStyle(PrismButtonStyle(variant: .primary))
 
@@ -555,7 +634,7 @@ public struct OnboardingFlowCoverScreen: View {
                                 _ = stateMachine.grantNotificationPermissionIfEligible()
                                 onFinishOnboarding()
                             } label: {
-                                Text(verbatim: "Activer les rappels de rythme et commencer")
+                                Text(verbatim: "Autoriser les notifications iOS & Ajouter le Widget")
                             }
                             .buttonStyle(PrismButtonStyle(variant: .primary))
                         }
@@ -569,7 +648,7 @@ public struct OnboardingFlowCoverScreen: View {
     }
 }
 
-// MARK: - 6. CertiGo Pro StoreKit 2 Sheet Screen (S-73, `pro.v1`)
+// MARK: - 6. CertiGo Pro StoreKit 2 Sheet Screen (Écran 27 Variante 27-A Validée)
 
 public struct CertigoProSheetScreen: View {
     @State private var model: CertigoProPaywallModel
@@ -590,15 +669,24 @@ public struct CertigoProSheetScreen: View {
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
                         PrismBadge(
                             configuration: PrismBadgeConfiguration(
-                                text: "CertiGo Pro · StoreKit 2 (S-73)",
+                                text: "CERTIGO PRO ✦ · TABLEAU COMPARATIF (27-A)",
                                 semantics: .accent
                             )
                         )
-                        PrismText(
-                            text: "Présenté uniquement après la première valeur d'apprentissage (§34.1).",
-                            style: .subheadline,
-                            role: .textSecondary
-                        )
+                        ForEach(CertigoProFeatureComparisonRow.validatedRows) { row in
+                            HStack(spacing: PrismSpacing.s) {
+                                Text(verbatim: row.featureTitle)
+                                    .prismTextStyle(.subheadline)
+                                    .foregroundStyle(PrismColor.textPrimary)
+                                Spacer(minLength: PrismSpacing.xs)
+                                Text(verbatim: row.freeTierValue)
+                                    .prismTextStyle(.caption)
+                                    .foregroundStyle(PrismColor.textSecondary)
+                                Text(verbatim: row.proTierValue)
+                                    .prismTextStyle(.caption)
+                                    .foregroundStyle(PrismColor.accent)
+                            }
+                        }
                         ForEach(CertigoProBillingCycle.allCases) { cycle in
                             PrismChip(
                                 configuration: PrismChipConfiguration(
@@ -625,7 +713,7 @@ public struct CertigoProSheetScreen: View {
     }
 }
 
-// MARK: - 7. Complete Settings (S-74..S-84) & Account Deletion (S-82)
+// MARK: - 7. Complete Settings (Écran 28 Style 1 ChatGPT iOS 2026) & Account Deletion (S-82)
 
 public struct CompleteSettingsScreen: View {
     @State private var deletionModel: AccountDeletionConfirmationModel
@@ -642,6 +730,19 @@ public struct CompleteSettingsScreen: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                PrismSection(title: "PARAMÈTRES · STYLE 1 CHATGPT iOS 2026") {
+                    PrismCard(variant: .standard) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                            settingsMonoRow(symbol: "square.stack.3d.up", title: "Parcours actifs en parallèle", value: "AZ-104 + 2 ›", section: .account)
+                            settingsMonoRow(symbol: "globe", title: "Langue des cours & examens", value: "FR + Termes EN ›", section: .language)
+                            settingsMonoRow(symbol: "timer", title: "Mode Examen Blanc (Pearson)", value: "Chrono 90m ›", section: .dataAndMethodology)
+                            settingsMonoRow(symbol: "arrow.down.circle", title: "Cours téléchargés (Hors-Ligne)", value: "142 Mo ›", section: .offlineData)
+                            settingsMonoRow(symbol: "waveform", title: "Coach IA Vocal Live & Arrière-plan", value: "Nova (1,0×) ›", section: .contextualAI)
+                            settingsMonoRow(symbol: "bell", title: "Rappel quotidien & Radar Hebdo IA", value: "19:30 ›", section: .rhythmAndReminders)
+                        }
+                    }
+                }
+
                 PrismSection(title: "Réglages complets (S-74 … S-84)") {
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
                         ForEach(SettingsSectionDestination.allCases) { section in
@@ -687,7 +788,29 @@ public struct CompleteSettingsScreen: View {
             .padding(PrismSpacing.l)
         }
         .background(PrismColor.canvas)
-        .navigationTitle(Text(verbatim: "Réglages"))
+        .navigationTitle(Text(verbatim: "Paramètres"))
+    }
+
+    @ViewBuilder
+    private func settingsMonoRow(symbol: String, title: String, value: String, section: SettingsSectionDestination) -> some View {
+        Button {
+            onSelectSection(section)
+        } label: {
+            HStack(spacing: PrismSpacing.s) {
+                Image(systemName: symbol)
+                    .prismTextStyle(.subheadline)
+                    .foregroundStyle(PrismColor.textPrimary)
+                Text(verbatim: title)
+                    .prismTextStyle(.subheadline)
+                    .foregroundStyle(PrismColor.textPrimary)
+                Spacer(minLength: PrismSpacing.xs)
+                Text(verbatim: value)
+                    .prismTextStyle(.caption)
+                    .foregroundStyle(PrismColor.accent)
+            }
+            .padding(.vertical, PrismSpacing.xxs)
+        }
+        .buttonStyle(.plain)
     }
 }
 

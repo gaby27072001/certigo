@@ -1183,11 +1183,9 @@ private struct PrismCourseSwitcherTrayView: View {
                                 selectedBrandFilter = brand.id
                             } label: {
                                 VStack(spacing: PrismSpacing.xxs) {
-                                    BrandIcon(
-                                        product: brand.product,
-                                        context: .learningContent,
-                                        size: .small,
-                                        flags: flags
+                                    CertiGoBrandLogoView(
+                                        vendorId: brand.id == "all" ? "azure" : brand.id,
+                                        size: PrismSize.brandS
                                     )
                                     Text(verbatim: brand.label)
                                         .prismTextStyle(.caption)
@@ -1223,11 +1221,9 @@ private struct PrismCourseSwitcherTrayView: View {
                         onSelectCourse(course.code, course.title)
                     } label: {
                         HStack(spacing: PrismSpacing.m) {
-                            BrandIcon(
-                                product: course.product,
-                                context: .learningContent,
-                                size: .medium,
-                                flags: flags
+                            CertiGoOfficialCrestView(
+                                routeCode: course.code,
+                                size: PrismSize.brandM
                             )
                             VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
                                 Text(verbatim: course.code)
@@ -1626,16 +1622,17 @@ private struct PrismProfileDomainMasteryCardView: View {
         PrismCard(variant: .standard) {
             VStack(alignment: .leading, spacing: PrismSpacing.m) {
                 HStack(spacing: PrismSpacing.m) {
-                    BrandIcon(
-                        product: .azureVirtualNetwork,
-                        context: .learningContent,
-                        size: .large,
-                        flags: flags
-                    )
+                    ZStack(alignment: .bottomTrailing) {
+                        CertiGoOfficialCrestView(routeCode: activeRouteCode, size: PrismSize.crestCard)
+                        Image(systemName: "pencil.circle.fill")
+                            .prismTextStyle(.headline)
+                            .foregroundStyle(PrismColor.accent)
+                            .background(Circle().fill(PrismColor.surface))
+                    }
                     VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
                         PrismText(text: "Gabriel Chambaud", style: .title3)
                         PrismText(
-                            text: "Cloud Architect · 78 % prêt pour \(activeRouteCode)",
+                            text: "Cloud Architect · \(activeRouteCode) & SAA-C03",
                             style: .subheadline,
                             role: .accent
                         )

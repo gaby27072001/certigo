@@ -1,0 +1,18 @@
+{
+  "images": [
+    {
+      "filename": "Open-3D-Engine.svg",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "properties": {
+    "preserves-vector-representation": true,
+    "scales": [
+      "single"
+    ]
+  }
+}

@@ -653,6 +653,20 @@ public struct RouteReadinessScreen: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                // Écran 26 Validated: Official Certification Crest Hero Card
+                PrismCard(variant: .hero) {
+                    VStack(spacing: PrismSpacing.s) {
+                        CertiGoOfficialCrestView(routeCode: model.routeCode, size: PrismSize.crestHero)
+                        PrismBadge(
+                            configuration: PrismBadgeConfiguration(
+                                text: "CERTIFICATION OFFICIELLE · \(model.routeCode)",
+                                semantics: .accent
+                            )
+                        )
+                        PrismText(text: model.officialTitle, style: .title2)
+                    }
+                }
+
                 BrandLabel(
                     product: model.product,
                     context: .learningContent,
@@ -660,8 +674,6 @@ public struct RouteReadinessScreen: View {
                     size: .medium,
                     flags: flags
                 )
-
-                PrismText(text: model.officialTitle, style: .title2)
 
                 ReadinessBandView(model: model.readiness)
 
@@ -706,6 +718,35 @@ public struct PassportAndCalibrationScreen: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                // Écran 08B-1 Validé (Haut) : Indice de Forme 84 %, Radar 5 Axes, 3 Compteurs & Heatmap 8 Semaines
+                PrismCard(variant: .hero) {
+                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                        HStack {
+                            PrismBadge(configuration: PrismBadgeConfiguration(text: "INDICE DE FORME EXAMEN · 84 % (PRÊT ✓)", semantics: .positive))
+                            Spacer()
+                        }
+                        PrismText(text: "Seuil officiel Pearson VUE (700/1000) dépassé de +85 pts", style: .headline)
+                        PrismText(text: "📈 +12 % cette semaine · Radar 5 Axes : Identité 92 % · Stockage 84 % · Calcul 78 % · Réseau 58 % · Supervision 76 %", style: .footnote, role: .textSecondary)
+                        HStack(spacing: PrismSpacing.s) {
+                            PrismBadge(configuration: PrismBadgeConfiguration(text: "⏱️ 18s / quest.", semantics: .accent))
+                            PrismBadge(configuration: PrismBadgeConfiguration(text: "🎯 88 % 1er essai", semantics: .positive))
+                            PrismBadge(configuration: PrismBadgeConfiguration(text: "🔥 24h 40m (8 sem.)", semantics: .warning))
+                        }
+                    }
+                }
+
+                // Écran 08B-2 Validé (Bas en défilant) : 3 Anneaux de Performance, Courbe /1000 & Forces / À Travailler
+                PrismCard(variant: .standard) {
+                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                        PrismText(text: "ANNEAUX D'ACTIVITÉ & PROGRESSION EXAMEN (/1000)", style: .caption, role: .accent)
+                        PrismText(text: "● Objectif Quotidien : 15 / 15 min (100 %)", style: .subheadline)
+                        PrismText(text: "● Précision QCM : 88 % (Cible 80 %)", style: .subheadline)
+                        PrismText(text: "● Labs & Oral IA : 6 / 5 séances", style: .subheadline)
+                        PrismText(text: "Courbe Examen Blanc : Sem. 1 (540) ──► Sem. 2 (640) ──► Sem. 3 (730) ──► Sem. 4 (810 / 1000 ✓)", style: .footnote, role: .positive)
+                        PrismText(text: "💪 Points Forts : Entra ID & RBAC (92 %) · 🎯 À Travailler : Réseaux VNet & DNS Privé (58 %)", style: .footnote, role: .textSecondary)
+                    }
+                }
+
                 PassportCard(summary: model.passport)
 
                 PrismCard(variant: .standard) {

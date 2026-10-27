@@ -1,0 +1,18 @@
+{
+  "images": [
+    {
+      "filename": "Azure-AD-B2C.svg",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "properties": {
+    "preserves-vector-representation": true,
+    "scales": [
+      "single"
+    ]
+  }
+}
