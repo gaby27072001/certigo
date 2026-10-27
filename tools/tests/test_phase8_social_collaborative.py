@@ -36,6 +36,13 @@ class Phase8SocialCollaborativeTests(unittest.TestCase):
             "public struct InviteFriendSheetScreen",
             "public struct AsyncChallengeCoverScreen",
             "public struct ProgressionLeaguesScreen",
+            "public enum CertiGoSocialHubSegment",
+            "public struct CertiGoSocialPodiumEntry",
+            "public struct CertiGoSocialFriendActivityItem",
+            "public struct CertiGoSocialHubModel",
+            "public struct CertiGoPodium3DView",
+            "public struct CertiGoFriendsActivityView",
+            "public struct CertiGoSocialHubCompleteView",
             "public struct EnsembleCompleteScreen",
         ]
         for symbol in required_symbols:
@@ -43,6 +50,8 @@ class Phase8SocialCollaborativeTests(unittest.TestCase):
         self.assertIn("public static let noDemotionProtectedWeeks: Int = 4", content)
         self.assertIn("public static let maxGraceWeeks: Int = 2", content)
         self.assertIn("public static let neighborsWindowRadius: Int = 3", content)
+        self.assertIn("sendOneTapSaluerKudos(toFriendId:", content)
+        self.assertIn("CertiGoOfficialCrestView(", content)
         self.assertIn("BrandLabel(", content)
 
     def test_phase8_registered_in_debug_gallery_and_report_complete(self) -> None:

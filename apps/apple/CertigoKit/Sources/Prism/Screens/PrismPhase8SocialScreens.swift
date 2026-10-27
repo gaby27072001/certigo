@@ -662,6 +662,467 @@ public struct ProgressionLeagueModel: Codable, Equatable, Hashable, Sendable {
     ]
 }
 
+// MARK: - 6B. Validated Figma Pro Screens 07A (3D Weekly Podium) & 25 (Mes Amis (12) & Ajouter un Ami)
+
+public enum CertiGoSocialHubSegment: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
+    case podium07A = "🏆 Podium Semaine (07A)"
+    case friends25 = "👥 Mes Amis (12) (25)"
+
+    public var id: String { rawValue }
+
+    public var screenCode: String {
+        switch self {
+        case .podium07A: "07A"
+        case .friends25: "25"
+        }
+    }
+
+    public var title: String {
+        switch self {
+        case .podium07A: "🏆 Podium Semaine"
+        case .friends25: "👥 Mes Amis (12)"
+        }
+    }
+
+    public var segmentedLabel: String {
+        rawValue
+    }
+}
+
+public struct CertiGoSocialPodiumEntry: Identifiable, Codable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let rank: Int
+    public let rankLabel: String
+    public let displayName: String
+    public let initials: String
+    public let xpPoints: Int
+    public let xpFormatted: String
+    public let routeCode: String
+    public let brandProductId: BrandProductID
+    public let region: PrismRegion
+    public let isCurrentLearner: Bool
+
+    /// §10: Zero failure exposure on podium or league standings.
+    public var visibleFailureCount: Int { 0 }
+
+    public var isInTopFivePromotionZone: Bool {
+        rank <= CertiGoSocialHubModel.topPromotionCutoffRank
+    }
+
+    public var officialCrestAssetName: String {
+        CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: routeCode)
+    }
+
+    public var summaryLine: String {
+        "\(rankLabel) \(displayName) · \(xpFormatted) · \(routeCode)"
+    }
+
+    public var pedestalHeightPoints: CGFloat {
+        switch rank {
+        case 1:
+            PrismSize.podiumFirstHeight
+        case 2:
+            PrismSize.podiumSecondHeight
+        case 3:
+            PrismSize.podiumThirdHeight
+        default:
+            PrismSize.minTouch
+        }
+    }
+
+    public init(
+        id: String,
+        rank: Int,
+        rankLabel: String,
+        displayName: String,
+        initials: String,
+        xpPoints: Int,
+        xpFormatted: String,
+        routeCode: String,
+        brandProductId: BrandProductID,
+        region: PrismRegion,
+        isCurrentLearner: Bool = false
+    ) {
+        self.id = id
+        self.rank = max(1, rank)
+        self.rankLabel = rankLabel
+        self.displayName = displayName
+        self.initials = initials
+        self.xpPoints = max(0, xpPoints)
+        self.xpFormatted = xpFormatted
+        self.routeCode = routeCode
+        self.brandProductId = brandProductId
+        self.region = region
+        self.isCurrentLearner = isCurrentLearner
+    }
+
+    public static let defaultTopThree: [CertiGoSocialPodiumEntry] = [
+        CertiGoSocialPodiumEntry(
+            id: "podium-1-sarah",
+            rank: 1,
+            rankLabel: "1er",
+            displayName: "Sarah Chen",
+            initials: "SC",
+            xpPoints: 2140,
+            xpFormatted: "2 140 XP",
+            routeCode: "AZ-305",
+            brandProductId: .azureVirtualMachines,
+            region: .cloud,
+            isCurrentLearner: false
+        ),
+        CertiGoSocialPodiumEntry(
+            id: "podium-2-gabriel",
+            rank: 2,
+            rankLabel: "2e",
+            displayName: "Gabriel C.",
+            initials: "GC",
+            xpPoints: 1890,
+            xpFormatted: "1 890 XP",
+            routeCode: "AZ-104",
+            brandProductId: .azureVirtualNetwork,
+            region: .cloud,
+            isCurrentLearner: true
+        ),
+        CertiGoSocialPodiumEntry(
+            id: "podium-3-lucas",
+            rank: 3,
+            rankLabel: "3e",
+            displayName: "Lucas Meyer",
+            initials: "LM",
+            xpPoints: 1720,
+            xpFormatted: "1 720 XP",
+            routeCode: "AI-102",
+            brandProductId: BrandProductID("azure-openai"),
+            region: .ai,
+            isCurrentLearner: false
+        )
+    ]
+
+    public static let defaultPromotionZoneEntries: [CertiGoSocialPodiumEntry] = defaultTopThree + [
+        CertiGoSocialPodiumEntry(
+            id: "podium-4-ines",
+            rank: 4,
+            rankLabel: "4e",
+            displayName: "Inès Mansouri",
+            initials: "IM",
+            xpPoints: 1640,
+            xpFormatted: "1 640 XP",
+            routeCode: "SC-300",
+            brandProductId: .microsoftEntraID,
+            region: .security,
+            isCurrentLearner: false
+        ),
+        CertiGoSocialPodiumEntry(
+            id: "podium-5-thomas",
+            rank: 5,
+            rankLabel: "5e",
+            displayName: "Thomas V.",
+            initials: "TV",
+            xpPoints: 1580,
+            xpFormatted: "1 580 XP",
+            routeCode: "SAA-C03",
+            brandProductId: BrandProductID("aws-vpc"),
+            region: .cloud,
+            isCurrentLearner: false
+        )
+    ]
+}
+
+public struct CertiGoSocialFriendActivityItem: Identifiable, Codable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let displayName: String
+    public let initials: String
+    public let region: PrismRegion
+    public let routeCode: String
+    public let brandProductId: BrandProductID
+    public let realtimeActivityText: String
+    public let streakDays: Int
+    public private(set) var saluerKudosSentCount: Int
+
+    /// §10: Failures are never exposed in the friends activity feed.
+    public var visibleFailureCount: Int { 0 }
+
+    public var activityAndStreakLine: String {
+        "\(realtimeActivityText) · 🔥 \(streakDays)j"
+    }
+
+    public var hasSentSaluerKudos: Bool {
+        saluerKudosSentCount > 0
+    }
+
+    public var saluerButtonLabel: String {
+        hasSentSaluerKudos ? "👏 Salué !" : CertiGoSocialHubModel.saluerActionLabel
+    }
+
+    public var officialCrestAssetName: String {
+        CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: routeCode)
+    }
+
+    public init(
+        id: String,
+        displayName: String,
+        initials: String,
+        region: PrismRegion,
+        routeCode: String,
+        brandProductId: BrandProductID,
+        realtimeActivityText: String,
+        streakDays: Int,
+        saluerKudosSentCount: Int = 0
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.initials = initials
+        self.region = region
+        self.routeCode = routeCode
+        self.brandProductId = brandProductId
+        self.realtimeActivityText = realtimeActivityText
+        self.streakDays = max(1, streakDays)
+        self.saluerKudosSentCount = max(0, saluerKudosSentCount)
+    }
+
+    public mutating func recordSaluerKudos() {
+        saluerKudosSentCount += 1
+    }
+
+    public static let defaultTwelveFriends: [CertiGoSocialFriendActivityItem] = [
+        CertiGoSocialFriendActivityItem(
+            id: "friend-sarah",
+            displayName: "Sarah Chen",
+            initials: "SC",
+            region: .cloud,
+            routeCode: "AZ-305",
+            brandProductId: .azureVirtualMachines,
+            realtimeActivityText: "A terminé Rôles RBAC",
+            streakDays: 12
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-alizee",
+            displayName: "Alizée-Cloud",
+            initials: "AL",
+            region: .cloud,
+            routeCode: "AZ-104",
+            brandProductId: .azureVirtualNetwork,
+            realtimeActivityText: "A validé Private Endpoint & DNS privé",
+            streakDays: 9
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-lucas",
+            displayName: "Lucas Meyer",
+            initials: "LM",
+            region: .ai,
+            routeCode: "AI-102",
+            brandProductId: BrandProductID("azure-openai"),
+            realtimeActivityText: "A maîtrisé Recherche hybride RAG",
+            streakDays: 15
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-karim",
+            displayName: "Karim-Sec",
+            initials: "KM",
+            region: .security,
+            routeCode: "SC-300",
+            brandProductId: .microsoftEntraID,
+            realtimeActivityText: "A complété Entra ID PIM Just-In-Time",
+            streakDays: 7
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-ines",
+            displayName: "Inès Mansouri",
+            initials: "IM",
+            region: .security,
+            routeCode: "AZ-500",
+            brandProductId: BrandProductID("azure-key-vault"),
+            realtimeActivityText: "A ancré Protection Key Vault HSM",
+            streakDays: 11
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-thomas",
+            displayName: "Thomas V.",
+            initials: "TV",
+            region: .cloud,
+            routeCode: "SAA-C03",
+            brandProductId: BrandProductID("aws-vpc"),
+            realtimeActivityText: "A terminé AWS PrivateLink & VPC Endpoints",
+            streakDays: 6
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-sora",
+            displayName: "Sora-AI",
+            initials: "SR",
+            region: .ai,
+            routeCode: "GH-300",
+            brandProductId: BrandProductID("github-copilot"),
+            realtimeActivityText: "A validé Garde-fous GitHub Copilot",
+            streakDays: 14
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-leo",
+            displayName: "Léo-Data",
+            initials: "LD",
+            region: .data,
+            routeCode: "DP-600",
+            brandProductId: .microsoftAzure,
+            realtimeActivityText: "A terminé OneLake & Direct Lake Fabric",
+            streakDays: 8
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-maya",
+            displayName: "Maya-Dev",
+            initials: "MD",
+            region: .devops,
+            routeCode: "AZ-400",
+            brandProductId: .microsoftAzure,
+            realtimeActivityText: "A validé Pipelines OIDC sans secret",
+            streakDays: 10
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-yanis",
+            displayName: "Yanis-Ops",
+            initials: "YO",
+            region: .systems,
+            routeCode: "CKA",
+            brandProductId: BrandProductID("kubernetes"),
+            realtimeActivityText: "A maîtrisé NetworkPolicies Kubernetes",
+            streakDays: 5
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-chloe",
+            displayName: "Chloé-AI",
+            initials: "CA",
+            region: .cloud,
+            routeCode: "ACE",
+            brandProductId: BrandProductID("gcp-compute-engine"),
+            realtimeActivityText: "A complété IAM & VPC Shared Google Cloud",
+            streakDays: 13
+        ),
+        CertiGoSocialFriendActivityItem(
+            id: "friend-nadia",
+            displayName: "Nadia-Net",
+            initials: "NN",
+            region: .network,
+            routeCode: "AZ-700",
+            brandProductId: .azureVirtualNetwork,
+            realtimeActivityText: "A terminé ExpressRoute & BGP hybride",
+            streakDays: 19
+        )
+    ]
+}
+
+public struct CertiGoSocialHubModel: Codable, Equatable, Hashable, Sendable {
+    public static let topPromotionCutoffRank: Int = 5
+    public static let defaultFriendsTotalCount: Int = 12
+    public static let saluerActionLabel: String = "👏 Saluer"
+
+    public var selectedSegment: CertiGoSocialHubSegment
+    public var privacy: SocialPrivacySettingsModel
+    public var leagueHeaderTitle: String
+    public var promotionZoneTitle: String
+    public var podiumEntries: [CertiGoSocialPodiumEntry]
+    public var friends: [CertiGoSocialFriendActivityItem]
+    public var invitePayload: FriendInvitePayload
+    public var friendCodeOrQRInput: String
+    public private(set) var sentSaluerFriendIds: Set<String>
+    public private(set) var addedFriendCodes: [String]
+
+    /// NS-12 & §10 strict invariants: private profile by default, leagues opt-in by default (false), zero contact book import, zero failure exposure.
+    public var isProfilePrivateByDefault: Bool {
+        privacy.isPrivateByDefault
+    }
+
+    public var areLeaguesOptedInByDefault: Bool {
+        false
+    }
+
+    public var isLeagueCurrentlyOptedIn: Bool {
+        privacy.effectiveLeaguesOptIn
+    }
+
+    public var importsAddressBookContacts: Bool {
+        privacy.allowsContactImport || invitePayload.importsAddressBookContacts
+    }
+
+    public var exposesFailuresToOthers: Bool {
+        privacy.exposesFailuresToOthers
+            || podiumEntries.contains(where: { $0.visibleFailureCount > 0 })
+            || friends.contains(where: { $0.visibleFailureCount > 0 })
+    }
+
+    public var topThreePodium: [CertiGoSocialPodiumEntry] {
+        podiumEntries
+            .filter { $0.rank <= 3 }
+            .sorted { $0.rank < $1.rank }
+    }
+
+    /// 3D Podium visual order: 2nd (left), 1st (center highest), 3rd (right).
+    public var visualPodiumOrder: [CertiGoSocialPodiumEntry] {
+        let top = topThreePodium
+        guard top.count == 3 else { return top }
+        return [top[1], top[0], top[2]]
+    }
+
+    public var topFivePromotionEntries: [CertiGoSocialPodiumEntry] {
+        podiumEntries
+            .filter { $0.rank <= Self.topPromotionCutoffRank }
+            .sorted { $0.rank < $1.rank }
+    }
+
+    public var friendsCount: Int {
+        friends.count
+    }
+
+    public init(
+        selectedSegment: CertiGoSocialHubSegment = .podium07A,
+        privacy: SocialPrivacySettingsModel = SocialPrivacySettingsModel(),
+        leagueHeaderTitle: String = "LIGUE DIAMANT · SEMAINE 6 · FIN DANS 2J 14H",
+        promotionZoneTitle: String = "Zone de Promotion Top 5",
+        podiumEntries: [CertiGoSocialPodiumEntry] = CertiGoSocialPodiumEntry.defaultPromotionZoneEntries,
+        friends: [CertiGoSocialFriendActivityItem] = CertiGoSocialFriendActivityItem.defaultTwelveFriends,
+        invitePayload: FriendInvitePayload = FriendInvitePayload(inviteCode: "CERTIGO-2026"),
+        friendCodeOrQRInput: String = "",
+        sentSaluerFriendIds: Set<String> = [],
+        addedFriendCodes: [String] = []
+    ) {
+        self.selectedSegment = selectedSegment
+        self.privacy = privacy
+        self.leagueHeaderTitle = leagueHeaderTitle
+        self.promotionZoneTitle = promotionZoneTitle
+        self.podiumEntries = podiumEntries
+        self.friends = friends
+        self.invitePayload = invitePayload
+        self.friendCodeOrQRInput = friendCodeOrQRInput
+        self.sentSaluerFriendIds = sentSaluerFriendIds
+        self.addedFriendCodes = addedFriendCodes
+    }
+
+    public mutating func selectSegment(_ segment: CertiGoSocialHubSegment) {
+        selectedSegment = segment
+    }
+
+    /// Sends a 1-tap `👏 Saluer` encouragement kudos to a friend on Screen 25.
+    @discardableResult
+    public mutating func sendOneTapSaluerKudos(toFriendId friendId: String) -> Bool {
+        guard let index = friends.firstIndex(where: { $0.id == friendId }) else {
+            return false
+        }
+        friends[index].recordSaluerKudos()
+        sentSaluerFriendIds.insert(friendId)
+        return true
+    }
+
+    /// Adds a friend via invite code or QR payload on Screen 25 without importing contacts (§10).
+    @discardableResult
+    public mutating func addFriendByCodeOrQR(_ rawCode: String) -> Bool {
+        guard privacy.canShareExternalInviteLink else { return false }
+        let normalized = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard normalized.count >= 4 else { return false }
+        if !addedFriendCodes.contains(normalized) {
+            addedFriendCodes.append(normalized)
+        }
+        friendCodeOrQRInput = ""
+        return true
+    }
+}
+
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
 
@@ -1246,10 +1707,244 @@ public struct ProgressionLeaguesScreen: View {
     }
 }
 
-// MARK: - 11. Complete Ensemble Hub Screen (S-60 Phase 8, §10, §15 NS-12)
+// MARK: - 11. Complete Ensemble Hub Screen (S-60 Phase 8, Écrans 07A & 25, §10, §15 NS-12)
+
+public struct CertiGoPodium3DView: View {
+    public let model: CertiGoSocialHubModel
+
+    public init(model: CertiGoSocialHubModel = CertiGoSocialHubModel()) {
+        self.model = model
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.l) {
+            PrismCard(variant: .hero) {
+                VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                    PrismAdaptiveStack(spacing: PrismSpacing.s) {
+                        PrismBadge(
+                            configuration: PrismBadgeConfiguration(
+                                text: model.leagueHeaderTitle,
+                                semantics: .accent
+                            )
+                        )
+                        PrismBadge(
+                            configuration: PrismBadgeConfiguration(
+                                text: model.promotionZoneTitle,
+                                semantics: .positive
+                            )
+                        )
+                    }
+
+                    HStack(alignment: .bottom, spacing: PrismSpacing.s) {
+                        ForEach(model.visualPodiumOrder) { entry in
+                            VStack(spacing: PrismSpacing.xs) {
+                                CertiGoOfficialCrestView(
+                                    routeCode: entry.routeCode,
+                                    size: entry.rank == 1 ? PrismSize.crestCard : PrismSize.brandL
+                                )
+                                PrismBadge(
+                                    configuration: PrismBadgeConfiguration(
+                                        text: entry.rankLabel,
+                                        semantics: entry.rank == 1 ? .positive : (entry.isCurrentLearner ? .accent : .neutral)
+                                    )
+                                )
+                                PrismText(
+                                    text: entry.displayName,
+                                    style: entry.isCurrentLearner ? .headline : .subheadline,
+                                    role: entry.isCurrentLearner ? .accent : .textPrimary
+                                )
+                                PrismText(
+                                    text: entry.xpFormatted,
+                                    style: .caption,
+                                    role: .textSecondary
+                                )
+                                PrismText(
+                                    text: entry.routeCode,
+                                    style: .caption,
+                                    role: .accent
+                                )
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .fill(entry.rank == 1 ? PrismColor.accent : PrismColor.surfaceRaised)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: entry.pedestalHeightPoints)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+            }
+
+            PrismSection(title: model.promotionZoneTitle) {
+                PrismCard(variant: .standard) {
+                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                        ForEach(model.topFivePromotionEntries) { entry in
+                            HStack(spacing: PrismSpacing.s) {
+                                PrismBadge(
+                                    configuration: PrismBadgeConfiguration(
+                                        text: entry.rankLabel,
+                                        semantics: entry.isCurrentLearner ? .accent : .positive
+                                    )
+                                )
+                                CertiGoOfficialCrestView(
+                                    routeCode: entry.routeCode,
+                                    size: PrismSize.brandM
+                                )
+                                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                    PrismText(
+                                        text: entry.summaryLine,
+                                        style: entry.isCurrentLearner ? .headline : .subheadline
+                                    )
+                                    BrandLabel(
+                                        product: entry.brandProductId,
+                                        context: .learningContent,
+                                        examCode: entry.routeCode
+                                    )
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+public struct CertiGoFriendsActivityView: View {
+    @Binding public var model: CertiGoSocialHubModel
+    public let onOpenInviteSheet: () -> Void
+
+    public init(
+        model: Binding<CertiGoSocialHubModel>,
+        onOpenInviteSheet: @escaping () -> Void = {}
+    ) {
+        self._model = model
+        self.onOpenInviteSheet = onOpenInviteSheet
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.l) {
+            PrismSection(title: "Ajouter un ami par code ou QR (Écran 25 · S-67)") {
+                PrismCard(variant: .standard) {
+                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                        PrismAdaptiveStack(spacing: PrismSpacing.s) {
+                            PrismBadge(
+                                configuration: PrismBadgeConfiguration(
+                                    text: "Mon code : \(model.invitePayload.inviteCode)",
+                                    semantics: .accent
+                                )
+                            )
+                            PrismBadge(
+                                configuration: PrismBadgeConfiguration(
+                                    text: "0 import de carnet d'adresses (§10)",
+                                    semantics: .positive
+                                )
+                            )
+                        }
+                        PrismText(
+                            text: "Partage ton code ou scanne un QR CertiGo sans jamais importer tes contacts.",
+                            style: .footnote,
+                            role: .textSecondary
+                        )
+                        PrismAdaptiveStack(spacing: PrismSpacing.s) {
+                            Button {
+                                _ = model.addFriendByCodeOrQR(
+                                    model.friendCodeOrQRInput.isEmpty ? model.invitePayload.inviteCode : model.friendCodeOrQRInput
+                                )
+                            } label: {
+                                Text(verbatim: "Ajouter par code")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(PrismButtonStyle(variant: .primary))
+
+                            Button {
+                                onOpenInviteSheet()
+                            } label: {
+                                Text(verbatim: "Scanner / Afficher QR")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(PrismButtonStyle(variant: .secondary))
+                        }
+                    }
+                }
+            }
+
+            PrismSection(title: "Activité en temps réel · Mes Amis (\(model.friendsCount))") {
+                VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                    ForEach(model.friends) { friend in
+                        PrismCard(variant: .standard) {
+                            HStack(spacing: PrismSpacing.s) {
+                                CertiGoOfficialCrestView(
+                                    routeCode: friend.routeCode,
+                                    size: PrismSize.brandM
+                                )
+                                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                    PrismText(text: friend.displayName, style: .headline)
+                                    PrismText(
+                                        text: friend.activityAndStreakLine,
+                                        style: .footnote,
+                                        role: .textSecondary
+                                    )
+                                }
+                                Spacer()
+                                Button {
+                                    _ = model.sendOneTapSaluerKudos(toFriendId: friend.id)
+                                } label: {
+                                    Text(verbatim: friend.saluerButtonLabel)
+                                }
+                                .buttonStyle(PrismButtonStyle(variant: friend.hasSentSaluerKudos ? .primary : .secondary))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+public struct CertiGoSocialHubCompleteView: View {
+    @Binding public var model: CertiGoSocialHubModel
+    public let onOpenInviteSheet: () -> Void
+
+    public init(
+        model: Binding<CertiGoSocialHubModel>,
+        onOpenInviteSheet: @escaping () -> Void = {}
+    ) {
+        self._model = model
+        self.onOpenInviteSheet = onOpenInviteSheet
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.l) {
+            HStack(spacing: PrismSpacing.xs) {
+                ForEach(CertiGoSocialHubSegment.allCases) { segment in
+                    PrismChip(
+                        configuration: PrismChipConfiguration(
+                            title: segment.segmentedLabel,
+                            isSelected: model.selectedSegment == segment
+                        )
+                    ) {
+                        model.selectSegment(segment)
+                    }
+                }
+            }
+
+            switch model.selectedSegment {
+            case .podium07A:
+                CertiGoPodium3DView(model: model)
+            case .friends25:
+                CertiGoFriendsActivityView(
+                    model: $model,
+                    onOpenInviteSheet: onOpenInviteSheet
+                )
+            }
+        }
+    }
+}
 
 public struct EnsembleCompleteScreen: View {
     @State private var privacy: SocialPrivacySettingsModel
+    @State private var socialHub: CertiGoSocialHubModel
     public let squadWorkspace: SquadWorkspaceModel
     public let challengeState: AsyncChallengeStateMachine
     public let leagueModel: ProgressionLeagueModel
@@ -1260,6 +1955,7 @@ public struct EnsembleCompleteScreen: View {
 
     public init(
         privacy: SocialPrivacySettingsModel = SocialPrivacySettingsModel(),
+        socialHub: CertiGoSocialHubModel = CertiGoSocialHubModel(),
         squadWorkspace: SquadWorkspaceModel = SquadWorkspaceModel(),
         challengeState: AsyncChallengeStateMachine = AsyncChallengeStateMachine(),
         leagueModel: ProgressionLeagueModel = ProgressionLeagueModel(),
@@ -1269,6 +1965,7 @@ public struct EnsembleCompleteScreen: View {
         onOpenCover: @escaping (AppFullScreenCoverRoute) -> Void = { _ in }
     ) {
         self._privacy = State(initialValue: privacy)
+        self._socialHub = State(initialValue: socialHub)
         self.squadWorkspace = squadWorkspace
         self.challengeState = challengeState
         self.leagueModel = leagueModel
@@ -1305,6 +2002,13 @@ public struct EnsembleCompleteScreen: View {
                         )
                     }
                 }
+
+                CertiGoSocialHubCompleteView(
+                    model: $socialHub,
+                    onOpenInviteSheet: {
+                        onOpenSheet(.inviteFriend)
+                    }
+                )
 
                 PrismSection(title: "Squad coopérative") {
                     PrismCard(variant: .hero) {
