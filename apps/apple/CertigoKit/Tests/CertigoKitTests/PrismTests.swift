@@ -111,6 +111,167 @@ import Testing
       try PrismSnapshot(width: 1, height: 1, pixels: Data())
     }
   }
+
+  @Test func masterFigmaScreenCatalogRegistersAll53ValidatedScreensWithUniqueNodeIdsAndChapters() throws {
+    let expectedCodes: [String] = [
+      "OB-01", "OB-02", "OB-03A", "OB-03B", "OB-04", "OB-06A", "OB-06B", "OB-06C", "OB-07", "OB-08A", "OB-08B",
+      "01", "02", "03", "04", "05",
+      "06A", "06B", "06C", "06D",
+      "07A", "08", "08B-1", "08B-2",
+      "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28",
+      "Q_TYPE_01", "Q_TYPE_02", "Q_TYPE_03", "Q_TYPE_04", "Q_TYPE_05",
+      "Q_TYPE_06", "Q_TYPE_07", "Q_TYPE_08", "Q_TYPE_09", "Q_TYPE_10",
+      "SYS-01", "SYS-02", "RES-01", "RES-02",
+    ]
+    #expect(expectedCodes.count == 53)
+    #expect(CertiGoMasterScreenCatalog.expectedScreenCount == 53)
+    #expect(CertiGoMasterScreenCatalog.allScreens.count == 53)
+    #expect(CertiGoMasterScreenCatalog.allScreenCodes == expectedCodes)
+    #expect(Set(CertiGoMasterScreenCatalog.allScreens.map(\.screenCode)).count == 53)
+    #expect(Set(CertiGoMasterScreenCatalog.allScreens.map(\.nodeId)).count == 53)
+    #expect(CertiGoMasterScreenCatalog.onboardingScreens.count == 11)
+    #expect(CertiGoMasterScreenCatalog.questionFormatScreens.count == 10)
+    #expect(CertiGoMasterScreenCatalog.verifyAllInvariants())
+
+    for chapter in CertiGoFigmaChapter.allCases {
+      #expect(!CertiGoMasterScreenCatalog.screens(in: chapter).isEmpty)
+    }
+
+    for descriptor in CertiGoMasterScreenCatalog.allScreens {
+      #expect(!descriptor.nodeId.isEmpty)
+      #expect(descriptor.nodeId.contains(":"))
+      #expect(!descriptor.title.isEmpty)
+      #expect(!descriptor.chapter.isEmpty)
+      #expect(CertiGoMasterScreenCatalog.descriptor(forScreenCode: descriptor.screenCode) == descriptor)
+      #expect(CertiGoMasterScreenCatalog.descriptor(forNodeId: descriptor.nodeId) == descriptor)
+    }
+  }
+
+  @Test func masterFigmaScreenCatalogEnforcesMascotPlacementInvariants() throws {
+    let screen01 = try #require(CertiGoMasterScreenCatalog.descriptor(forScreenCode: "01"))
+    #expect(screen01.nodeId == "37:375")
+    #expect(screen01.mascotPose == .angle34LeftPath)
+    #expect(screen01.mascotCount == 1)
+    #expect(screen01.verifyMascotPlacementInvariant())
+
+    let screen19 = try #require(CertiGoMasterScreenCatalog.descriptor(forScreenCode: "19"))
+    #expect(screen19.nodeId == "26:912")
+    #expect(screen19.mascotPose == .angleFrontCelebration)
+    #expect(screen19.mascotCount == 1)
+    #expect(screen19.verifyMascotPlacementInvariant())
+
+    for code in ["20", "22", "27"] {
+      let screen = try #require(CertiGoMasterScreenCatalog.descriptor(forScreenCode: code))
+      #expect(screen.mascotPose == nil, "Expected nil mascot on screen \(code)")
+      #expect(screen.mascotCount == 0, "Expected 0 mascot count on screen \(code)")
+      #expect(screen.verifyMascotPlacementInvariant())
+    }
+
+    for index in 1...10 {
+      let code = String(format: "Q_TYPE_%02d", index)
+      let screen = try #require(CertiGoMasterScreenCatalog.descriptor(forScreenCode: code))
+      let pose = try #require(screen.mascotPose, "Expected specialist mascot on \(code)")
+      #expect(pose.isRight34Specialist, "Expected 3/4 right specialist mascot on \(code), got \(pose)")
+      #expect(pose.isRight34QuizPose)
+      #expect(screen.mascotCount == 1)
+      #expect(screen.verifyMascotPlacementInvariant())
+    }
+
+    let res01 = try #require(CertiGoMasterScreenCatalog.descriptor(forScreenCode: "RES-01"))
+    #expect(res01.nodeId == "162:93")
+    #expect(res01.mascotPose == .poseReaderMemo)
+
+    let res02 = try #require(CertiGoMasterScreenCatalog.descriptor(forScreenCode: "RES-02"))
+    #expect(res02.nodeId == "162:120")
+    #expect(res02.mascotPose == .emotionOopsCaring)
+
+    let sys01 = try #require(CertiGoMasterScreenCatalog.descriptor(forScreenCode: "SYS-01"))
+    #expect(sys01.nodeId == "161:93")
+    #expect(sys01.mascotPose == .emotionOnFire)
+
+    let sys02 = try #require(CertiGoMasterScreenCatalog.descriptor(forScreenCode: "SYS-02"))
+    #expect(sys02.nodeId == "161:134")
+    #expect(sys02.mascotPose == nil)
+
+    // Negative checks: violating mascot placement rules must fail verification
+    let invalidScreen01 = CertiGoMasterFigmaScreenDescriptor(
+      screenCode: "01",
+      nodeId: "37:375",
+      title: "Invalid 01",
+      chapterKind: .homeAndWaymoPath,
+      figmaPageId: "0:1",
+      mascotPose: .angleFrontCelebration
+    )
+    #expect(!invalidScreen01.verifyMascotPlacementInvariant())
+    #expect(!invalidScreen01.verifyVisualInvariants())
+
+    let invalidScreen22 = CertiGoMasterFigmaScreenDescriptor(
+      screenCode: "22",
+      nodeId: "26:1009",
+      title: "Invalid 22",
+      chapterKind: .pearsonVueExamSimulationPage09,
+      figmaPageId: "0:1",
+      mascotPose: .posePresenter
+    )
+    #expect(!invalidScreen22.verifyMascotPlacementInvariant())
+    #expect(!invalidScreen22.verifyVisualInvariants())
+
+    let invalidQuestionScreen = CertiGoMasterFigmaScreenDescriptor(
+      screenCode: "Q_TYPE_01",
+      nodeId: "73:393",
+      title: "Invalid Q_TYPE_01",
+      chapterKind: .questionsAndTenFormatsPage06,
+      figmaPageId: "70:649",
+      mascotPose: .angle34LeftPath
+    )
+    #expect(!invalidQuestionScreen.verifyMascotPlacementInvariant())
+    #expect(!invalidQuestionScreen.verifyVisualInvariants())
+  }
+
+  @Test func masterFigmaScreenCatalogEnforcesZeroGeometricRegressionInvariants() {
+    for descriptor in CertiGoMasterScreenCatalog.allScreens {
+      #expect(descriptor.hasZeroTextOverlap, "Text overlap detected on \(descriptor.screenCode)")
+      #expect(descriptor.hasZeroBoxOverflow, "Box overflow detected on \(descriptor.screenCode)")
+      #expect(descriptor.clipsRoundedCorners, "Unclipped rounded corners on \(descriptor.screenCode)")
+      #expect(descriptor.canvasWidth == 393)
+      #expect(descriptor.canvasHeight == 852)
+      #expect(descriptor.passesVisualInvariants)
+      #expect(descriptor.verifyVisualInvariants())
+    }
+
+    let overlapping = CertiGoMasterFigmaScreenDescriptor(
+      screenCode: "OB-01",
+      nodeId: "132:182",
+      title: "Overlap",
+      chapterKind: .onboardingPage07,
+      figmaPageId: "102:257",
+      mascotPose: .angleFrontCelebration,
+      hasZeroTextOverlap: false
+    )
+    #expect(!overlapping.verifyVisualInvariants())
+
+    let overflowing = CertiGoMasterFigmaScreenDescriptor(
+      screenCode: "OB-01",
+      nodeId: "132:182",
+      title: "Overflow",
+      chapterKind: .onboardingPage07,
+      figmaPageId: "102:257",
+      mascotPose: .angleFrontCelebration,
+      hasZeroBoxOverflow: false
+    )
+    #expect(!overflowing.verifyVisualInvariants())
+
+    let unclipped = CertiGoMasterFigmaScreenDescriptor(
+      screenCode: "OB-01",
+      nodeId: "132:182",
+      title: "Unclipped",
+      chapterKind: .onboardingPage07,
+      figmaPageId: "102:257",
+      mascotPose: .angleFrontCelebration,
+      clipsRoundedCorners: false
+    )
+    #expect(!unclipped.verifyVisualInvariants())
+  }
 }
 
 #if canImport(SwiftUI) && canImport(UIKit)
@@ -137,6 +298,24 @@ import Testing
                   PrismSnapshotHarness.pngData(snapshot))))
           }
         }
+      }
+    }
+
+    @MainActor @Test func masterScreenCatalogRendersDeterministicPNGSnapshotsAcrossFourAppearancesAndThreeDynamicTypes() throws {
+      #expect(PrismSnapshotHarness.normativeAppearances == PrismAppearance.allCases)
+      #expect(PrismSnapshotHarness.normativeDynamicTypeSizes == [.large, .accessibility3, .accessibility5])
+
+      let matrix = try CertiGoMasterScreenCatalog.renderSnapshotMatrix(
+        forScreenCode: "01",
+        size: CGSize(width: 393, height: 852)
+      )
+      #expect(matrix.count == 12)
+      for entry in matrix {
+        #expect(entry.screenCode == "01")
+        #expect(entry.nodeId == "37:375")
+        #expect(!entry.pngData.isEmpty)
+        let decoded = try PrismSnapshotHarness.decodePNG(entry.pngData)
+        #expect(decoded.matches(entry.snapshot))
       }
     }
   }
