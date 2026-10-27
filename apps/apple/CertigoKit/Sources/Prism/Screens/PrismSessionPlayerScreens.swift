@@ -23,6 +23,38 @@ public struct SituationDecisionStep: Codable, Equatable, Hashable, Sendable, Ide
     }
 }
 
+
+/// The 10 Validated Interactive Question Formats (`Q_TYPE_01` to `Q_TYPE_10` on Page 06 Figma Pro).
+public enum CertiGoQuestionFormatID: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
+    case q01ScenarioQCM = "Q_TYPE_01"
+    case q02ServiceGrid2x2 = "Q_TYPE_02"
+    case q03InteractiveDiagram = "Q_TYPE_03"
+    case q04IOSKeyboardInput = "Q_TYPE_04"
+    case q05WordBankBricks = "Q_TYPE_05"
+    case q06MatchingPairs = "Q_TYPE_06"
+    case q07JSONBugDiagnosis = "Q_TYPE_07"
+    case q08ScopeHierarchyOrdering = "Q_TYPE_08"
+    case q09ArchitectureVerdict = "Q_TYPE_09"
+    case q10MultiSelectCheckboxes = "Q_TYPE_10"
+
+    public var id: String { rawValue }
+
+    public var badgeTitle: String {
+        switch self {
+        case .q01ScenarioQCM: "SCÉNARIO ARCHITECTURE"
+        case .q02ServiceGrid2x2: "GRILLE 2×2 SERVICES OFFICIELS"
+        case .q03InteractiveDiagram: "SCHÉMA INTERACTIF"
+        case .q04IOSKeyboardInput: "SAISIE CLAVIER iOS"
+        case .q05WordBankBricks: "ASSEMBLAGE DE BRIQUES CLI"
+        case .q06MatchingPairs: "PAIRES À RELIER (SYMBOLES ↔ RÔLES)"
+        case .q07JSONBugDiagnosis: "DIAGNOSTIC DE RÈGLE JSON"
+        case .q08ScopeHierarchyOrdering: "CLASSER DANS L'ORDRE"
+        case .q09ArchitectureVerdict: "VERDICT FLUX RÉSEAU"
+        case .q10MultiSelectCheckboxes: "MULTI-SÉLECTION (2 RÉPONSES)"
+        }
+    }
+}
+
 public enum PrismItemFormatPayload: Codable, Equatable, Hashable, Sendable {
     /// P1: Single or multi-choice question with optional confidence picker.
     case choice(options: [PrismChoiceOption], allowsMultipleSelection: Bool)
@@ -444,6 +476,13 @@ public struct LearningCardView: View {
                 flags: flags
             )
 
+            CertiGoSpeechBubbleHeaderView(
+                region: .network,
+                badgeText: "DÉCLIC ARCHITECTURE · 20S",
+                questionText: model.title,
+                poseOverride: .emotionAhaIdea
+            )
+
             switch model.kind {
             case .openingQuestion(let prompt, let contextNote):
                 QuestionCard(
@@ -509,9 +548,11 @@ public struct SessionItemCardView: View {
                 flags: flags
             )
 
-            PrismCard(variant: .standard) {
-                PrismText(text: item.stem, style: .title3)
-            }
+            CertiGoSpeechBubbleHeaderView(
+                region: .cloud,
+                badgeText: "SCÉNARIO ARCHITECTURE",
+                questionText: item.stem
+            )
 
             payloadBody
 

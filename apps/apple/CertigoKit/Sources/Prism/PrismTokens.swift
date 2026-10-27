@@ -177,3 +177,38 @@ extension PrismRadius {
   public static let unitBanner: CGFloat = 22
   public static let stepPill: CGFloat = 14
 }
+
+extension PrismSize {
+  public static let mascotQuiz: CGFloat = 76
+  public static let mascotPath: CGFloat = 84
+  public static let mascotHero: CGFloat = 120
+  public static let crestHero: CGFloat = 96
+  public static let crestPedestal: CGFloat = 100
+  public static let crestCard: CGFloat = 64
+  public static let avatarLarge: CGFloat = 80
+  public static let avatarEditBadge: CGFloat = 28
+  public static let speechPointerWidth: CGFloat = 12
+  public static let speechPointerHeight: CGFloat = 20
+  public static let drawerWidth: CGFloat = 334
+  public static let barometerTrackHeight: CGFloat = 12
+  public static let barometerThresholdWidth: CGFloat = 3
+  public static let barometerThresholdHeight: CGFloat = 28
+  public static let carouselDotActive: CGFloat = 18
+  public static let carouselDotInactive: CGFloat = 6
+  public static let ringOuter: CGFloat = 108
+  public static let ringMiddle: CGFloat = 82
+  public static let ringInner: CGFloat = 56
+  public static let heatmapCellWidth: CGFloat = 21
+  public static let heatmapCellHeight: CGFloat = 16
+  public static let podiumFirstHeight: CGFloat = 96
+  public static let podiumSecondHeight: CGFloat = 76
+  public static let podiumThirdHeight: CGFloat = 62
+  public static let dividerThickness: CGFloat = 1
+  public static let dividerHeight: CGFloat = 40
+}
+
+extension PrismRadius {
+  public static let sheet: CGFloat = 32
+  public static let mascotBubble: CGFloat = 20
+  public static let crestPedestal: CGFloat = 28
+}

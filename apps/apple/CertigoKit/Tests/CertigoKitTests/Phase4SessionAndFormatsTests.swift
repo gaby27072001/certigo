@@ -147,4 +147,19 @@ import Testing
         #expect(machine.queuedOfflineSubmissionIds == ["attempt-001"])
         #expect(machine.lastOfflineConfirmationMessage == PrismOfflineSessionCache.offlineQueuedMessage)
     }
+
+    @Test func validatedMascotLibraryQuestionFormatsAnd900AssetCatalogResolveDeterministically() {
+        #expect(CertiGoMascotPose.allCases.count == 24)
+        #expect(CertiGoQuestionFormatID.allCases.count == 10)
+        #expect(CertiGoMascotPose.specialist(for: .cloud) == .specialistCloudAzure)
+        #expect(CertiGoMascotPose.specialist(for: .security) == .specialistSecurityEntra)
+        #expect(CertiGoMascotPose.specialist(for: .network) == .specialistNetworkVNet)
+        #expect(CertiGoMascotPose.specialist(for: .ai) == .specialistAICoach)
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "AZ-104") == "Certifications/ms-official-associate-badge")
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "SAA-C03") == "Certifications/tech-aws-solutions-architect")
+        #expect(CertiGoOfficialAssetCatalog.brandLogoAssetName(forVendorId: "aws") == "BrandLogos/brand-aws-official")
+        #expect(CertiGoOfficialAssetCatalog.azureServiceAssetName("Virtual-Machines") == "AzureServices/Virtual-Machines")
+        #expect(CertiGoOfficialAssetCatalog.awsServiceAssetName("Amazon-EC2") == "AWSServices/Amazon-EC2")
+        #expect(CertiGoOfficialAssetCatalog.gcpServiceAssetName("bigquery") == "GCPServices/gcp-bigquery")
+    }
 }

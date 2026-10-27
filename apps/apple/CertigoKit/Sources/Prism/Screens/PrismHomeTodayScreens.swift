@@ -569,7 +569,9 @@ private struct PrismDuolingoWindingPathView: View {
                     Spacer(minLength: PrismSpacing.xs)
                     stepLabelPill(for: step)
                     nodeButton(for: step)
-                        .padding(.trailing, PrismSpacing.xl)
+                    // Écran 01 Validated: Single 3/4 Left-Facing Mascot pointing toward the active step
+                    CertiGoMascotView(pose: .angle34LeftPath, size: PrismSize.mascotPath)
+                        .padding(.trailing, PrismSpacing.s)
                 }
             }
         case .farTrailingLeft:
@@ -675,6 +677,61 @@ private struct PrismDuolingoWindingPathView: View {
         case .active: return PrismRegion.network.color
         case .chest: return PrismColor.caution.opacity(0.75)
         case .locked: return PrismColor.separator
+        }
+    }
+}
+
+
+/// Écran 03 Validé : Feuille Flottante Épurée (Mix B+C : Haut Centré + 3 Boutons `[ 📖 | COMMENCER | ✦ ]`).
+public struct PrismStepPreviewSheetView: View {
+    public let stepTitle: String
+    public let stepSubtitle: String
+    public let onOpenMemo: () -> Void
+    public let onStartStep: () -> Void
+    public let onAskAICoach: () -> Void
+
+    public init(
+        stepTitle: String = "Rôles RBAC & PIM",
+        stepSubtitle: String = "ÉTAPE 3 SUR 5 · +25 XP · ~4 MIN",
+        onOpenMemo: @escaping () -> Void = {},
+        onStartStep: @escaping () -> Void = {},
+        onAskAICoach: @escaping () -> Void = {}
+    ) {
+        self.stepTitle = stepTitle
+        self.stepSubtitle = stepSubtitle
+        self.onOpenMemo = onOpenMemo
+        self.onStartStep = onStartStep
+        self.onAskAICoach = onAskAICoach
+    }
+
+    public var body: some View {
+        PrismCard(variant: .hero) {
+            VStack(spacing: PrismSpacing.m) {
+                PrismBadge(configuration: PrismBadgeConfiguration(text: stepSubtitle, semantics: .accent))
+                PrismText(text: stepTitle, style: .title2)
+                PrismText(
+                    text: "Moindre privilège, portée d'attribution (Management Group ➔ Ressource) & activation Just-In-Time.",
+                    style: .subheadline,
+                    role: .textSecondary
+                )
+                HStack(spacing: PrismSpacing.s) {
+                    Button(action: onOpenMemo) {
+                        Text(verbatim: "📖 Mémo")
+                    }
+                    .buttonStyle(PrismButtonStyle(variant: .secondary))
+
+                    Button(action: onStartStep) {
+                        Text(verbatim: "COMMENCER")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PrismButtonStyle(variant: .primary))
+
+                    Button(action: onAskAICoach) {
+                        Text(verbatim: "✦ IA")
+                    }
+                    .buttonStyle(PrismButtonStyle(variant: .secondary))
+                }
+            }
         }
     }
 }

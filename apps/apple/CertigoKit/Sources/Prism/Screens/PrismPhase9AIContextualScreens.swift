@@ -4,6 +4,17 @@ import Foundation
 
 // MARK: - 1. Grounded Provenance, Local Secret Redaction & 5-Level AIRouter (§11, §38)
 
+
+/// Validated 4-Screen AI Hub Modes (`06A` Home, `06B` Gemini Written Response, `06C` Live Voice, `06D` 85% Push History Drawer).
+public enum CertiGoAIHubScreenMode: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
+    case home06A = "06A · Accueil IA"
+    case writtenResponse06B = "06B · Réponse Gemini"
+    case liveVoice06C = "06C · Vocal Live"
+    case historyDrawer06D = "06D · Historique 85%"
+
+    public var id: String { rawValue }
+}
+
 public enum AIRoutingTier: Int, CaseIterable, Codable, Comparable, Hashable, Sendable, Identifiable {
     case onDeviceFoundationModel = 1
     case privateCloudCompute = 2
@@ -615,18 +626,21 @@ public struct ContextualAISheetScreen: View {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
                 PrismCard(variant: .standard) {
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                        PrismAdaptiveStack(spacing: PrismSpacing.s) {
-                            BrandLabel(
-                                product: sessionState.brandProductId,
-                                context: .learningContent,
-                                examCode: sessionState.routeCode
-                            )
-                            PrismBadge(
-                                configuration: PrismBadgeConfiguration(
-                                    text: routedResponse.provenanceBadge,
-                                    semantics: .accent
+                        HStack(spacing: PrismSpacing.m) {
+                            CertiGoMascotView(pose: .specialistAICoach, size: PrismSize.mascotQuiz)
+                            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                                BrandLabel(
+                                    product: sessionState.brandProductId,
+                                    context: .learningContent,
+                                    examCode: sessionState.routeCode
                                 )
-                            )
+                                PrismBadge(
+                                    configuration: PrismBadgeConfiguration(
+                                        text: routedResponse.provenanceBadge,
+                                        semantics: .accent
+                                    )
+                                )
+                            }
                         }
                         PrismText(
                             text: routedResponse.specificProgressLabel,
