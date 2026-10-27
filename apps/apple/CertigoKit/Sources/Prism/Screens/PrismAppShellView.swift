@@ -17,6 +17,8 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
     public var conceptDetail: ConceptDetailScreenModel
     public var routeReadiness: RouteReadinessScreenModel
     public var calibrationHistory: CalibrationHistoryScreenModel
+    public var contextualAISession: ContextualAISessionState
+    public var latestTutorExplanation: TutorExplanation?
 
     public init(
         todayModel: TodayScreenModel = Self.defaultTodayModel(),
@@ -30,7 +32,9 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
         memoryDetail: MemoryDetailScreenModel = Self.defaultMemoryDetail(),
         conceptDetail: ConceptDetailScreenModel = Self.defaultConceptDetail(),
         routeReadiness: RouteReadinessScreenModel = Self.defaultRouteReadiness(),
-        calibrationHistory: CalibrationHistoryScreenModel = Self.defaultCalibrationHistory()
+        calibrationHistory: CalibrationHistoryScreenModel = Self.defaultCalibrationHistory(),
+        contextualAISession: ContextualAISessionState = ContextualAISessionState(),
+        latestTutorExplanation: TutorExplanation? = nil
     ) {
         self.todayModel = todayModel
         self.atlasModel = atlasModel
@@ -44,6 +48,8 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
         self.conceptDetail = conceptDetail
         self.routeReadiness = routeReadiness
         self.calibrationHistory = calibrationHistory
+        self.contextualAISession = contextualAISession
+        self.latestTutorExplanation = latestTutorExplanation
     }
 
     public static func defaultRhythmWeek() -> PrismRhythmWeekModel {
@@ -476,6 +482,697 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
             recentSessionsCount: 12
         )
     }
+
+    // MARK: - Live CertigoDomain / CertigoData Synchronization Bridge
+
+    public mutating func synchronize(
+        profile: Profile? = nil,
+        catalog: Catalog? = nil,
+        tracks: [Track]? = nil,
+        learningPath: LearningPath? = nil,
+        lesson: Lesson? = nil,
+        readinessSnapshot: ReadinessSnapshot? = nil,
+        mockExam: MockExam? = nil,
+        tutorExplanation: TutorExplanation? = nil
+    ) {
+        self = synchronized(
+            profile: profile,
+            catalog: catalog,
+            tracks: tracks,
+            learningPath: learningPath,
+            lesson: lesson,
+            readinessSnapshot: readinessSnapshot,
+            mockExam: mockExam,
+            tutorExplanation: tutorExplanation
+        )
+    }
+
+    public func synchronized(
+        profile: Profile? = nil,
+        catalog: Catalog? = nil,
+        tracks: [Track]? = nil,
+        learningPath: LearningPath? = nil,
+        lesson: Lesson? = nil,
+        readinessSnapshot: ReadinessSnapshot? = nil,
+        mockExam: MockExam? = nil,
+        tutorExplanation: TutorExplanation? = nil
+    ) -> PrismAppShellCoordinatorModel {
+        var next = self
+        let availableTracks = catalog?.tracks ?? tracks ?? []
+        let candidateTrackId = profile?.activeTrackId
+            ?? learningPath?.trackId
+            ?? readinessSnapshot?.trackId
+            ?? lesson?.trackId
+            ?? mockExam?.trackId
+
+        let matchedTrack = availableTracks.first { track in
+            guard let candidateTrackId else { return false }
+            return track.id.caseInsensitiveCompare(candidateTrackId) == .orderedSame
+                || track.code.caseInsensitiveCompare(candidateTrackId) == .orderedSame
+        }
+
+        let resolvedRouteCode: String = {
+            if let matchedTrack {
+                return matchedTrack.code
+            }
+            if let mockExam, candidateTrackId == nil || candidateTrackId == mockExam.trackId {
+                return mockExam.trackCode
+            }
+            if let candidateTrackId, !candidateTrackId.isEmpty {
+                return Self.normalizedRouteCode(from: candidateTrackId)
+            }
+            return next.todayModel.activeRouteCode ?? "AZ-104"
+        }()
+
+        let resolvedRouteTitle: String = {
+            if let matchedTrack {
+                return matchedTrack.title
+            }
+            if let learningPath, !learningPath.trackName.isEmpty {
+                return learningPath.trackName
+            }
+            if let mockExam, !mockExam.trackTitle.isEmpty {
+                return mockExam.trackTitle
+            }
+            return next.todayModel.activeRouteTitle ?? "Microsoft Azure Administrator"
+        }()
+
+        let activeRegion = Self.region(forTrackCode: resolvedRouteCode, title: resolvedRouteTitle)
+        let activeProduct = BrandRegistry.productID(forTrackCode: resolvedRouteCode)
+
+        // 1. Synchronize Catalog & Global Search routes
+        if !availableTracks.isEmpty {
+            let routeItems = availableTracks.map { track in
+                CatalogRouteItem(
+                    id: track.id,
+                    code: track.code,
+                    officialTitle: track.title,
+                    region: Self.region(forTrackCode: track.code, title: track.title),
+                    product: BrandRegistry.productID(forTrackCode: track.code),
+                    availablePracticeCount: track.learningAvailable ? 12 : 0,
+                    isConfirmedActiveGoal: track.code.caseInsensitiveCompare(resolvedRouteCode) == .orderedSame
+                        || (candidateTrackId != nil && track.id.caseInsensitiveCompare(candidateTrackId!) == .orderedSame)
+                )
+            }
+            next.catalogExplorer = CatalogExplorerModel(
+                routes: routeItems,
+                selectedRegion: next.catalogExplorer.selectedRegion,
+                searchQuery: next.catalogExplorer.searchQuery,
+                onlyWithAvailableExercises: next.catalogExplorer.onlyWithAvailableExercises
+            )
+        } else if candidateTrackId != nil || mockExam != nil {
+            next.catalogExplorer.routes = next.catalogExplorer.routes.map { route in
+                var copy = route
+                copy.isConfirmedActiveGoal = route.code.caseInsensitiveCompare(resolvedRouteCode) == .orderedSame
+                return copy
+            }
+        }
+
+        // 2. Synchronize Profile (streak, rhythm, passport holder & active route)
+        if let profile {
+            let streak = max(0, profile.streakDays ?? next.rhythmPlanner.dailyStreakDays)
+            next.rhythmPlanner = WeeklyRhythmPlannerModel(
+                targetDaysPerWeek: next.rhythmPlanner.targetDaysPerWeek,
+                completedDaysThisWeek: next.rhythmPlanner.completedDaysThisWeek,
+                bestRhythmWeeks: next.rhythmPlanner.bestRhythmWeeks,
+                pauseWeeksRemaining: next.rhythmPlanner.pauseWeeksRemaining,
+                completedCatchUpRecalls: next.rhythmPlanner.completedCatchUpRecalls,
+                dailyStreakDays: streak,
+                dailyStreakEnabled: profile.streakDays != nil ? true : next.rhythmPlanner.dailyStreakEnabled,
+                days: next.rhythmPlanner.days
+            )
+            next.todayModel.rhythm = PrismRhythmWeekModel(
+                weeklyGoalDays: next.rhythmPlanner.targetDaysPerWeek,
+                days: next.rhythmPlanner.days,
+                bestRhythmWeeks: next.rhythmPlanner.bestRhythmWeeks,
+                dailyStreakOptIn: next.rhythmPlanner.dailyStreakEnabled,
+                dailyStreakDays: streak
+            )
+            next.todayModel.activeRouteCode = resolvedRouteCode
+            next.todayModel.activeRouteTitle = resolvedRouteTitle
+
+            let initials = Self.initials(from: profile.displayName)
+            let existingPassport = next.calibrationHistory.passport
+            let updatedRouteBadge = PrismRouteBadgeModel(
+                examCode: resolvedRouteCode,
+                officialTitle: resolvedRouteTitle,
+                region: activeRegion
+            )
+            let updatedPassport = PrismPassportSummary(
+                holderPseudonym: profile.displayName,
+                holderInitials: initials,
+                primaryRegion: activeRegion,
+                anchoredConceptsCount: existingPassport.anchoredConceptsCount,
+                masteredConceptsCount: existingPassport.masteredConceptsCount,
+                completedRhythmWeeks: existingPassport.completedRhythmWeeks,
+                routes: [updatedRouteBadge],
+                verificationLinks: existingPassport.verificationLinks
+            )
+            next.calibrationHistory = CalibrationHistoryScreenModel(
+                passport: updatedPassport,
+                samples: next.calibrationHistory.samples,
+                recentSessionsCount: next.calibrationHistory.recentSessionsCount
+            )
+        }
+
+        // 3. Synchronize LearningPath (Today, Atlas, MemoryDetail, Search concepts, Passport counts)
+        if let learningPath {
+            let allLessons = learningPath.units.flatMap(\.lessons)
+            let anchoredLessons = allLessons.filter { $0.status == .completed || $0.status == .mastered }
+            let masteredLessons = allLessons.filter { $0.status == .mastered }
+            let openLessons = allLessons.filter { $0.status == .available || $0.status == .inProgress }
+            let recommendedLesson = allLessons.first(where: { $0.status == .inProgress })
+                ?? allLessons.first(where: { $0.status == .available })
+                ?? allLessons.first
+
+            next.todayModel = TodayScreenModel(
+                state: .content,
+                suggestedLength: next.todayModel.suggestedLength,
+                selectedLength: next.todayModel.selectedLength,
+                composition: TodaySessionAtomSummary(
+                    dueRecallsCount: max(1, anchoredLessons.count),
+                    newConceptsCount: max(1, openLessons.count),
+                    recommendedConceptTitle: recommendedLesson?.title
+                        ?? learningPath.units.first?.title
+                        ?? next.todayModel.composition.recommendedConceptTitle,
+                    recommendedProduct: activeProduct
+                ),
+                activeRouteCode: resolvedRouteCode,
+                activeRouteTitle: resolvedRouteTitle,
+                dailySituation: next.todayModel.dailySituation,
+                rhythm: next.todayModel.rhythm,
+                memoryAnchoredCount: anchoredLessons.count,
+                memoryDueSoonCount: openLessons.count,
+                interruptedSession: next.todayModel.interruptedSession,
+                offlineBanner: next.todayModel.offlineBanner,
+                isGuestMode: next.todayModel.isGuestMode,
+                isWelcomeBackState: next.todayModel.isWelcomeBackState,
+                tomorrowPreviewText: next.todayModel.tomorrowPreviewText
+            )
+
+            let territories: [AtlasTerritorySummary] = learningPath.units.map { unit in
+                let total = max(1, unit.lessons.count)
+                let anchored = unit.lessons.filter { $0.status == .completed || $0.status == .mastered }.count
+                let region = Self.region(forTrackCode: resolvedRouteCode, title: unit.title)
+                let avgRung = anchored > 0 ? 3.8 : 2.4
+                return AtlasTerritorySummary(
+                    id: unit.id,
+                    title: unit.title,
+                    region: region,
+                    totalConceptsCount: total,
+                    anchoredOrMasteredCount: anchored,
+                    averageDepthRung: avgRung
+                )
+            }
+
+            let groupedByRegion = Dictionary(grouping: territories, by: \.region)
+            let regionSummaries = PrismRegion.allCases.compactMap { region -> AtlasRegionSummary? in
+                guard let list = groupedByRegion[region], !list.isEmpty else { return nil }
+                return AtlasRegionSummary(region: region, territories: list)
+            }
+
+            let atlasNodes: [PrismAtlasNode] = allLessons.enumerated().map { index, pathLesson in
+                let count = max(1, allLessons.count)
+                let normX = min(max(0.2 + (Double(index % 4) * 0.2), 0.1), 0.9)
+                let normY = min(max(0.2 + (Double(index) / Double(count)) * 0.65, 0.1), 0.9)
+                return PrismAtlasNode(
+                    id: pathLesson.id,
+                    code: "\(resolvedRouteCode)-\(index + 1)",
+                    title: pathLesson.title,
+                    region: Self.region(forTrackCode: resolvedRouteCode, title: pathLesson.title),
+                    masteryState: Self.masteryState(for: pathLesson.status),
+                    normalizedX: normX,
+                    normalizedY: normY
+                )
+            }
+
+            if !regionSummaries.isEmpty || !atlasNodes.isEmpty {
+                next.atlasModel = AtlasScreenModel(
+                    mode: next.atlasModel.mode,
+                    selectedRegion: next.atlasModel.selectedRegion,
+                    selectedState: next.atlasModel.selectedState,
+                    regions: regionSummaries.isEmpty ? next.atlasModel.regions : regionSummaries,
+                    nodes: atlasNodes.isEmpty ? next.atlasModel.nodes : atlasNodes
+                )
+            }
+
+            if !allLessons.isEmpty {
+                let memoryItems = allLessons.enumerated().map { index, pathLesson in
+                    let retention = Double(pathLesson.masteryPct ?? (pathLesson.status == .mastered ? 92 : 68)) / 100.0
+                    return MemoryConceptItem(
+                        id: pathLesson.id,
+                        conceptTitle: pathLesson.title,
+                        product: activeProduct,
+                        masteryState: Self.masteryState(for: pathLesson.status),
+                        predictedRetention: retention,
+                        lastReviewedDaysAgo: index + 1
+                    )
+                }
+                next.memoryDetail = MemoryDetailScreenModel(
+                    forecastPoints: next.memoryDetail.forecastPoints,
+                    items: memoryItems
+                )
+            }
+
+            let existingPassport = next.calibrationHistory.passport
+            next.calibrationHistory = CalibrationHistoryScreenModel(
+                passport: PrismPassportSummary(
+                    holderPseudonym: existingPassport.holderPseudonym,
+                    holderInitials: existingPassport.holderInitials,
+                    primaryRegion: activeRegion,
+                    anchoredConceptsCount: max(anchoredLessons.count, existingPassport.anchoredConceptsCount),
+                    masteredConceptsCount: max(masteredLessons.count, existingPassport.masteredConceptsCount),
+                    completedRhythmWeeks: existingPassport.completedRhythmWeeks,
+                    routes: [PrismRouteBadgeModel(examCode: resolvedRouteCode, officialTitle: resolvedRouteTitle, region: activeRegion)],
+                    verificationLinks: existingPassport.verificationLinks
+                ),
+                samples: next.calibrationHistory.samples,
+                recentSessionsCount: next.calibrationHistory.recentSessionsCount
+            )
+
+            if readinessSnapshot == nil {
+                let derivedDomains = (learningPath.domains ?? []).map { dom in
+                    DomainReadinessSummary(
+                        domainId: dom.id,
+                        weight: dom.weight,
+                        coverage: Double(min(max(dom.score, 0), 100)) / 100.0,
+                        mastery: Double(min(max(dom.score, 0), 100)) / 100.0,
+                        score: dom.score
+                    )
+                }
+                let derivedSnapshot = ReadinessSnapshot(
+                    trackId: learningPath.trackId,
+                    score: learningPath.readinessScore,
+                    trend7d: learningPath.readinessTrend7d ?? 0,
+                    domains: derivedDomains
+                )
+                next.routeReadiness = Self.makeRouteReadinessModel(
+                    snapshot: derivedSnapshot,
+                    routeCode: resolvedRouteCode,
+                    officialTitle: resolvedRouteTitle,
+                    domainNamesById: Dictionary(uniqueKeysWithValues: (learningPath.domains ?? []).map { ($0.id, $0.name) }),
+                    fallback: next.routeReadiness
+                )
+            }
+        }
+
+        // 4. Synchronize Lesson into SessionPlayerStateMachine & ConceptDetail
+        if let lesson {
+            var cards: [PrismSessionCardAtom] = []
+            var skipItems: [String: PrismSessionItemModel] = [:]
+            let firstQuestionId = lesson.questions.first?.id
+
+            for (index, block) in lesson.blocks.enumerated() {
+                if let question = block.check {
+                    let options = question.options.enumerated().map { optIdx, opt in
+                        return PrismChoiceOption(
+                            id: opt.id,
+                            badge: Self.optionBadge(at: optIdx),
+                            text: opt.label,
+                            explanation: opt.label
+                        )
+                    }
+                    let sessionItem = PrismSessionItemModel(
+                        id: question.id,
+                        conceptId: question.conceptId,
+                        product: activeProduct,
+                        rung: 3,
+                        difficulty: 2,
+                        stem: question.stem,
+                        captureConfidence: true,
+                        payload: .choice(options: options, allowsMultipleSelection: false)
+                    )
+                    cards.append(.item(sessionItem))
+                    skipItems[question.id] = sessionItem
+                } else {
+                    let cardId = "\(lesson.id)-block-\(index)"
+                    let conceptId = lesson.questions.first?.conceptId ?? lesson.id
+                    let cardTitle = block.title ?? lesson.title
+                    let bodyText = block.body ?? block.code ?? lesson.title
+                    let kind: PrismLearningCardKind
+                    switch block.type {
+                    case "hook":
+                        kind = .openingQuestion(prompt: bodyText, contextNote: cardTitle)
+                    case "example":
+                        let example = PrismWorkedExample(
+                            id: "\(cardId)-we",
+                            title: cardTitle,
+                            problemContext: bodyText,
+                            steps: [
+                                PrismWorkedStep(
+                                    id: "\(cardId)-s1",
+                                    stepNumber: 1,
+                                    subgoalTitle: cardTitle,
+                                    detail: bodyText
+                                )
+                            ],
+                            conclusion: bodyText,
+                            isSkippable: firstQuestionId != nil
+                        )
+                        kind = .workedExample(example, skipVerificationItemId: firstQuestionId)
+                    case "code":
+                        let codeSource = block.code ?? bodyText
+                        let lines = codeSource.split(separator: "\n", omittingEmptySubsequences: false)
+                            .enumerated()
+                            .map { lineIdx, line in
+                                PrismArtifactLine(lineNumber: lineIdx + 1, text: String(line))
+                            }
+                        let doc = PrismArtifactDocument(
+                            id: "\(cardId)-code",
+                            title: cardTitle,
+                            language: "cli",
+                            lines: lines.isEmpty ? [PrismArtifactLine(lineNumber: 1, text: codeSource)] : lines
+                        )
+                        kind = .artifactStudy(doc, takeaway: bodyText)
+                    default:
+                        kind = .explanation(
+                            PrismExplanationSpec(
+                                id: "\(cardId)-exp",
+                                title: cardTitle,
+                                body: bodyText,
+                                keyPoints: [bodyText]
+                            )
+                        )
+                    }
+                    cards.append(
+                        .learning(
+                            PrismLearningCardModel(
+                                id: cardId,
+                                conceptId: conceptId,
+                                title: cardTitle,
+                                product: activeProduct,
+                                kind: kind
+                            )
+                        )
+                    )
+                }
+            }
+
+            if !cards.isEmpty {
+                let plan = PrismSessionPlan(
+                    id: "plan-\(lesson.id)",
+                    length: next.todayModel.selectedLength,
+                    cards: cards,
+                    skipVerificationItems: skipItems
+                )
+                next.sessionPlayerMachine = SessionPlayerStateMachine(plan: plan)
+            }
+
+            let primaryConceptId = lesson.questions.first?.conceptId ?? lesson.id
+            let summaryText = lesson.blocks.compactMap(\.body).first ?? lesson.title
+            next.conceptDetail = ConceptDetailScreenModel(
+                id: primaryConceptId,
+                code: resolvedRouteCode,
+                title: lesson.title,
+                summary: summaryText,
+                product: activeProduct,
+                region: activeRegion,
+                masteryState: next.conceptDetail.masteryState,
+                depthLadder: PrismDepthLadderModel(
+                    conceptTitle: lesson.title,
+                    currentLevel: next.conceptDetail.depthLadder.currentLevel,
+                    practiceOffPhoneRecommended: true
+                ),
+                predictedRetention: next.conceptDetail.predictedRetention,
+                forecastPoints: next.conceptDetail.forecastPoints,
+                activeMisconception: next.conceptDetail.activeMisconception
+            )
+        }
+
+        // 5. Synchronize ReadinessSnapshot into RouteReadinessScreenModel
+        if let readinessSnapshot {
+            let domainNames = Dictionary(
+                uniqueKeysWithValues: (learningPath?.domains ?? []).map { ($0.id, $0.name) }
+            )
+            next.routeReadiness = Self.makeRouteReadinessModel(
+                snapshot: readinessSnapshot,
+                routeCode: resolvedRouteCode,
+                officialTitle: resolvedRouteTitle,
+                domainNamesById: domainNames,
+                fallback: next.routeReadiness
+            )
+        }
+
+        // 6. Synchronize MockExam into MockExamStateMachine
+        if let mockExam {
+            let domainTitles = Dictionary(
+                uniqueKeysWithValues: mockExam.blueprint.map { ($0.domainId, $0.name) }
+            )
+            let examProduct = BrandRegistry.productID(forTrackCode: mockExam.trackCode)
+            let questions: [MockExamQuestionRecord] = mockExam.items.map { item in
+                let options = item.options.enumerated().map { optIdx, opt in
+                    return PrismChoiceOption(
+                        id: opt.id,
+                        badge: Self.optionBadge(at: optIdx),
+                        text: opt.label,
+                        explanation: opt.label
+                    )
+                }
+                let sessionItem = PrismSessionItemModel(
+                    id: item.itemId,
+                    conceptId: item.lessonId,
+                    product: examProduct,
+                    stem: item.stem,
+                    captureConfidence: true,
+                    isMockExamMode: true,
+                    payload: .choice(options: options, allowsMultipleSelection: false)
+                )
+                return MockExamQuestionRecord(
+                    item: sessionItem,
+                    domainId: item.domainId,
+                    domainTitle: domainTitles[item.domainId] ?? item.domainId
+                )
+            }
+            let durationMinutes = max(5, mockExam.timeLimitSeconds / 60)
+            next.mockExamMachine = MockExamStateMachine(
+                examId: mockExam.examId,
+                routeCode: mockExam.trackCode,
+                routeTitle: mockExam.trackTitle,
+                baseDurationMinutes: durationMinutes,
+                timePolicy: next.mockExamMachine.timePolicy,
+                questions: questions.isEmpty ? next.mockExamMachine.questions : questions
+            )
+        }
+
+        // 7. Synchronize TutorExplanation into ContextualAISessionState & ConceptDetail
+        if let tutorExplanation {
+            next.latestTutorExplanation = tutorExplanation
+            let excerptParts = [tutorExplanation.headline] + tutorExplanation.points + [tutorExplanation.recommendation]
+            let excerptText = excerptParts
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: " • ")
+            let snippet = AIGroundedSnippet(
+                id: "tutor-\(tutorExplanation.itemId)",
+                cardTitle: tutorExplanation.headline,
+                verifiedDateLabel: tutorExplanation.source,
+                excerpt: excerptText.isEmpty ? tutorExplanation.headline : excerptText,
+                officialDocURL: "https://learn.microsoft.com/"
+            )
+            next.contextualAISession = ContextualAISessionState(
+                conceptId: tutorExplanation.conceptId,
+                brandProductId: activeProduct,
+                routeCode: resolvedRouteCode,
+                snippet: snippet,
+                hintLadder: next.contextualAISession.hintLadder,
+                whyTurnCount: next.contextualAISession.whyTurnCount,
+                showOptionalAnalogy: next.contextualAISession.showOptionalAnalogy,
+                feedbackSignal: next.contextualAISession.feedbackSignal,
+                router: next.contextualAISession.router
+            )
+            let misconception = tutorExplanation.personalization.topConfusedOption
+                ?? (tutorExplanation.personalization.recurringStruggle ? tutorExplanation.recommendation : next.conceptDetail.activeMisconception)
+            next.conceptDetail = ConceptDetailScreenModel(
+                id: tutorExplanation.conceptId,
+                code: resolvedRouteCode,
+                title: tutorExplanation.headline,
+                summary: tutorExplanation.points.first ?? tutorExplanation.recommendation,
+                product: activeProduct,
+                region: activeRegion,
+                masteryState: tutorExplanation.correct ? .anchored : .practicing,
+                depthLadder: next.conceptDetail.depthLadder,
+                predictedRetention: Double(min(max(tutorExplanation.personalization.accuracyPct, 0), 100)) / 100.0,
+                forecastPoints: next.conceptDetail.forecastPoints,
+                activeMisconception: misconception
+            )
+        }
+
+        // 8. Rebuild GlobalSearchScreenModel catalog when routes, path, or lesson change
+        if !availableTracks.isEmpty || learningPath != nil || lesson != nil {
+            var searchItems: [GlobalSearchResultItem] = []
+            for node in next.atlasModel.nodes {
+                searchItems.append(
+                    GlobalSearchResultItem(
+                        id: node.id,
+                        kind: .concept,
+                        title: node.title,
+                        subtitle: node.code,
+                        product: activeProduct,
+                        region: node.region
+                    )
+                )
+            }
+            for route in next.catalogExplorer.routes {
+                searchItems.append(
+                    GlobalSearchResultItem(
+                        id: route.code,
+                        kind: .route,
+                        title: "\(route.code) · \(route.officialTitle)",
+                        subtitle: route.isConfirmedActiveGoal ? "Route de certification active" : "Route du catalogue",
+                        product: route.product,
+                        region: route.region
+                    )
+                )
+            }
+            if !searchItems.isEmpty {
+                next.searchModel = GlobalSearchScreenModel(
+                    query: next.searchModel.query,
+                    catalog: searchItems
+                )
+            }
+        }
+
+        return next
+    }
+
+    private static func normalizedRouteCode(from rawTrackId: String) -> String {
+        let trimmed = rawTrackId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "AZ-104" }
+        return trimmed.uppercased()
+    }
+
+    private static func optionBadge(at index: Int) -> String {
+        let letters = ["A", "B", "C", "D", "E", "F", "G", "H"]
+        return letters[max(0, index) % letters.count]
+    }
+
+    private static func initials(from displayName: String) -> String {
+        let parts = displayName
+            .split(whereSeparator: { $0.isWhitespace || $0 == "-" || $0 == "_" })
+            .filter { !$0.isEmpty }
+        if parts.count >= 2,
+           let first = parts.first?.first,
+           let second = parts.dropFirst().first?.first
+        {
+            return "\(first)\(second)".uppercased()
+        }
+        let cleaned = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? "CG" : String(cleaned.prefix(2)).uppercased()
+    }
+
+    private static func masteryState(for status: NodeStatus) -> PrismMasteryState {
+        switch status {
+        case .locked:
+            return .undiscovered
+        case .available:
+            return .discovered
+        case .inProgress:
+            return .practicing
+        case .completed:
+            return .anchored
+        case .mastered:
+            return .mastered
+        }
+    }
+
+    private static func region(forTrackCode code: String, title: String = "") -> PrismRegion {
+        let upper = code.uppercased()
+        let lowerTitle = title.lowercased()
+        if upper.hasPrefix("AI-") || lowerTitle.contains("ia") || lowerTitle.contains("foundry") || lowerTitle.contains("openai") {
+            return .ai
+        }
+        if upper.hasPrefix("SC-") || lowerTitle.contains("sécurité") || lowerTitle.contains("identit") || lowerTitle.contains("entra") || lowerTitle.contains("security") {
+            return .security
+        }
+        if upper.hasPrefix("DP-") || lowerTitle.contains("fabric") || lowerTitle.contains("data") || lowerTitle.contains("données") {
+            return .data
+        }
+        if upper.hasPrefix("GH-") || upper == "AZ-400" || lowerTitle.contains("copilot") || lowerTitle.contains("devops") || lowerTitle.contains("github") {
+            return .devops
+        }
+        if upper == "AZ-700" || lowerTitle.contains("réseau") || lowerTitle.contains("vnet") || lowerTitle.contains("dns") || lowerTitle.contains("network") {
+            return .network
+        }
+        if upper.hasPrefix("CK") || lowerTitle.contains("kubernetes") {
+            return .systems
+        }
+        return .cloud
+    }
+
+    private static func makeRouteReadinessModel(
+        snapshot: ReadinessSnapshot,
+        routeCode: String,
+        officialTitle: String,
+        domainNamesById: [String: String],
+        fallback: RouteReadinessScreenModel
+    ) -> RouteReadinessScreenModel {
+        let clampedScore = min(max(snapshot.score, 0), 100)
+        let band: PrismReadinessBand = {
+            if snapshot.domains.isEmpty && clampedScore == 0 {
+                return .insufficientEvidence
+            }
+            if clampedScore >= 85 { return .veryReady }
+            if clampedScore >= 70 { return .readyToTry }
+            if clampedScore >= 50 { return .onTrack }
+            return .notYet
+        }()
+
+        let coverageItems: [PrismObjectiveCoverageItem] = snapshot.domains.enumerated().map { idx, dom in
+            let title = domainNamesById[dom.domainId] ?? dom.domainId
+            let stage = (try? MasteryStage.resolved(coverage: dom.coverage, mastery: dom.mastery, score: dom.score)) ?? .learning
+            let mastery: PrismMasteryState = {
+                switch stage {
+                case .notStarted: return .undiscovered
+                case .learning: return .discovered
+                case .practicing: return .practicing
+                case .mastered: return .anchored
+                case .examReady: return .mastered
+                }
+            }()
+            let verifiedCount = max(0, Int((min(max(dom.coverage, 0.0), 1.0) * 10.0).rounded()))
+            return PrismObjectiveCoverageItem(
+                id: dom.domainId,
+                objectiveCode: "D\(idx + 1)",
+                title: title,
+                region: Self.region(forTrackCode: routeCode, title: title),
+                masteryState: mastery,
+                verifiedEvidenceCount: verifiedCount,
+                targetEvidenceCount: 10
+            )
+        }
+
+        let rawProb = Double(clampedScore) / 100.0
+        let totalEvidence = max(
+            snapshot.domains.count * 4,
+            coverageItems.reduce(0) { $0 + $1.verifiedEvidenceCount }
+        )
+        let weakestDomains = coverageItems
+            .sorted { $0.verifiedEvidenceCount < $1.verifiedEvidenceCount }
+            .prefix(2)
+            .map { "Renforcer \($0.title)" }
+
+        let readiness = PrismReadinessModel(
+            band: band,
+            isCalibrated: totalEvidence > 0 && band != .insufficientEvidence,
+            rawProbability: rawProb,
+            uncertaintyLow: max(0.0, rawProb - 0.08),
+            uncertaintyHigh: min(1.0, rawProb + 0.08),
+            evidenceCount: totalEvidence,
+            recommendedActions: weakestDomains.isEmpty ? fallback.readiness.recommendedActions : Array(weakestDomains)
+        )
+
+        return RouteReadinessScreenModel(
+            routeCode: routeCode,
+            officialTitle: officialTitle,
+            product: BrandRegistry.productID(forTrackCode: routeCode),
+            region: Self.region(forTrackCode: routeCode, title: officialTitle),
+            isConfirmedOnServer: true,
+            readiness: readiness,
+            objectiveCoverage: coverageItems.isEmpty ? fallback.objectiveCoverage : coverageItems,
+            historyWeeksCount: max(3, fallback.historyWeeksCount),
+            estimatedReadyDateRange: fallback.estimatedReadyDateRange
+        )
+    }
 }
 
 #if canImport(SwiftUI) && canImport(UIKit)
@@ -778,7 +1475,7 @@ public struct PrismAppShellView: View {
                             router.presentSheet(.compareConcepts(leftId: "Service Endpoint", rightId: "Private Endpoint"))
                         },
                         onAskContextualAI: {
-                            router.presentSheet(.contextualAI(contextId: coordinator.todayModel.activeRouteCode ?? "AZ-104"))
+                            router.presentSheet(.contextualAI(conceptId: coordinator.todayModel.activeRouteCode ?? "AZ-104"))
                         }
                     )
                     .padding(.horizontal, PrismSpacing.l)
@@ -861,9 +1558,9 @@ public struct PrismAppShellView: View {
                         )
                     }
                     coordinator.catalogExplorer = CatalogExplorerModel(
-                        searchQuery: coordinator.catalogExplorer.searchQuery,
+                        routes: updatedRoutes,
                         selectedRegion: coordinator.catalogExplorer.selectedRegion,
-                        routes: updatedRoutes
+                        searchQuery: coordinator.catalogExplorer.searchQuery
                     )
                     coordinator.todayModel = TodayScreenModel(
                         state: coordinator.todayModel.state,
@@ -996,6 +1693,7 @@ public struct PrismAppShellView: View {
         switch sheet {
         case .contextualAI:
             ContextualAISheetScreen(
+                sessionState: coordinator.contextualAISession,
                 onOpenCompareSheet: { left, right in
                     router.presentSheet(.compareConcepts(leftId: left, rightId: right))
                 }

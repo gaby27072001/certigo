@@ -54,21 +54,21 @@ public enum TodayScreenState: Equatable, Sendable {
 }
 
 public struct TodayScreenModel: Equatable, Sendable {
-    public let state: TodayScreenState
+    public var state: TodayScreenState
     public let suggestedLength: PrismSessionLength
     public var selectedLength: PrismSessionLength
-    public let composition: TodaySessionAtomSummary
-    public let activeRouteCode: String?
-    public let activeRouteTitle: String?
-    public let dailySituation: TodayDailySituationSummary
-    public let rhythm: PrismRhythmWeekModel
-    public let memoryAnchoredCount: Int
-    public let memoryDueSoonCount: Int
-    public let interruptedSession: InterruptedSessionAccessory?
-    public let offlineBanner: PrismOfflineBannerModel?
-    public let isGuestMode: Bool
-    public let isWelcomeBackState: Bool
-    public let tomorrowPreviewText: String
+    public var composition: TodaySessionAtomSummary
+    public var activeRouteCode: String?
+    public var activeRouteTitle: String?
+    public var dailySituation: TodayDailySituationSummary
+    public var rhythm: PrismRhythmWeekModel
+    public var memoryAnchoredCount: Int
+    public var memoryDueSoonCount: Int
+    public var interruptedSession: InterruptedSessionAccessory?
+    public var offlineBanner: PrismOfflineBannerModel?
+    public var isGuestMode: Bool
+    public var isWelcomeBackState: Bool
+    public var tomorrowPreviewText: String
 
     public init(
         state: TodayScreenState = .content,
@@ -131,7 +131,7 @@ public struct CatalogRouteItem: Codable, Equatable, Hashable, Sendable, Identifi
     public let region: PrismRegion
     public let product: BrandProductID
     public let availablePracticeCount: Int
-    public let isConfirmedActiveGoal: Bool
+    public var isConfirmedActiveGoal: Bool
 
     public init(
         id: String,
@@ -153,7 +153,7 @@ public struct CatalogRouteItem: Codable, Equatable, Hashable, Sendable, Identifi
 }
 
 public struct CatalogExplorerModel: Equatable, Sendable {
-    public let routes: [CatalogRouteItem]
+    public var routes: [CatalogRouteItem]
     public var selectedRegion: PrismRegion?
     public var searchQuery: String
     public var onlyWithAvailableExercises: Bool

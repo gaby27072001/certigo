@@ -4,7 +4,7 @@ public enum ContractError: Error, Equatable, Sendable {
     case malformed(String)
     case unsupported(String)
 }
-public struct Profile: Decodable, Sendable {
+public struct Profile: Decodable, Equatable, Sendable {
     public let id: String
     public let displayName: String
     public let xp: Int
@@ -14,11 +14,43 @@ public struct Profile: Decodable, Sendable {
     public let dailyGoalXp: Int?
     public let dailyXpEarned: Int?
     public let gems: Int?
+
+    public init(
+        id: String,
+        displayName: String,
+        xp: Int,
+        activeTrackId: String? = nil,
+        level: Int? = nil,
+        streakDays: Int? = nil,
+        dailyGoalXp: Int? = nil,
+        dailyXpEarned: Int? = nil,
+        gems: Int? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.xp = xp
+        self.activeTrackId = activeTrackId
+        self.level = level
+        self.streakDays = streakDays
+        self.dailyGoalXp = dailyGoalXp
+        self.dailyXpEarned = dailyXpEarned
+        self.gems = gems
+    }
 }
-public struct Catalog: Decodable, Sendable {
+public struct Catalog: Decodable, Equatable, Sendable {
     public let schema: String
     public let sourceSchema: String
     public let tracks: [Track]
+
+    public init(
+        schema: String = "certigo.app-certification-catalog/v2",
+        sourceSchema: String = "certigo.certification-catalog/v1",
+        tracks: [Track]
+    ) {
+        self.schema = schema
+        self.sourceSchema = sourceSchema
+        self.tracks = tracks
+    }
 
     public func validated() throws -> Self {
         guard schema == "certigo.app-certification-catalog/v2",
@@ -34,27 +66,66 @@ public struct Catalog: Decodable, Sendable {
         return self
     }
 }
-public struct Track: Decodable, Identifiable, Sendable {
+public struct Track: Decodable, Equatable, Identifiable, Sendable {
     public let id: String
     public let code: String
     public let title: String
     public let summary: String
     public let learningAvailable: Bool
     public let languages: [String]?
+
+    public init(
+        id: String,
+        code: String,
+        title: String,
+        summary: String,
+        learningAvailable: Bool = true,
+        languages: [String]? = nil
+    ) {
+        self.id = id
+        self.code = code
+        self.title = title
+        self.summary = summary
+        self.learningAvailable = learningAvailable
+        self.languages = languages
+    }
 }
-public struct LearningPath: Decodable, Sendable {
+public struct LearningPath: Decodable, Equatable, Sendable {
     public let trackId: String
     public let trackName: String
     public let readinessScore: Int
     public let units: [PathUnit]
     public let domains: [DomainProgress]?
     public let readinessTrend7d: Int?
+
+    public init(
+        trackId: String,
+        trackName: String,
+        readinessScore: Int,
+        units: [PathUnit],
+        domains: [DomainProgress]? = nil,
+        readinessTrend7d: Int? = nil
+    ) {
+        self.trackId = trackId
+        self.trackName = trackName
+        self.readinessScore = readinessScore
+        self.units = units
+        self.domains = domains
+        self.readinessTrend7d = readinessTrend7d
+    }
 }
 public struct DomainProgress: Decodable, Equatable, Sendable {
     public let id: String
     public let name: String
     public let weight: Double
     public let score: Int
+
+    public init(id: String, name: String, weight: Double, score: Int) {
+        self.id = id
+        self.name = name
+        self.weight = weight
+        self.score = score
+    }
 }
 public struct PathUnit: Decodable, Identifiable, Equatable, Sendable {
     public let id: String
@@ -62,8 +133,22 @@ public struct PathUnit: Decodable, Identifiable, Equatable, Sendable {
     public let lessons: [PathLesson]
     public let domainId: String?
     public let status: String?
+
+    public init(
+        id: String,
+        title: String,
+        lessons: [PathLesson],
+        domainId: String? = nil,
+        status: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.lessons = lessons
+        self.domainId = domainId
+        self.status = status
+    }
 }
-public enum NodeStatus: String, Decodable, Sendable {
+public enum NodeStatus: String, Decodable, Equatable, Sendable {
     case locked, available, inProgress, completed, mastered
 }
 public struct PathLesson: Decodable, Identifiable, Equatable, Sendable {
@@ -72,6 +157,20 @@ public struct PathLesson: Decodable, Identifiable, Equatable, Sendable {
     public let status: NodeStatus
     public let estMinutes: Int
     public let masteryPct: Int?
+
+    public init(
+        id: String,
+        title: String,
+        status: NodeStatus,
+        estMinutes: Int,
+        masteryPct: Int? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.status = status
+        self.estMinutes = estMinutes
+        self.masteryPct = masteryPct
+    }
 
     public var canOpen: Bool { status != .locked }
 }
@@ -209,12 +308,26 @@ public struct PilotHistory: Decodable, Sendable {
     }
 }
 
-public struct Lesson: Codable, Sendable {
+public struct Lesson: Codable, Equatable, Sendable {
     public let id: String
     public let trackId: String
     public let title: String
     public let blocks: [LessonBlock]
     public var publicManifestId: String?
+
+    public init(
+        id: String,
+        trackId: String,
+        title: String,
+        blocks: [LessonBlock],
+        publicManifestId: String? = nil
+    ) {
+        self.id = id
+        self.trackId = trackId
+        self.title = title
+        self.blocks = blocks
+        self.publicManifestId = publicManifestId
+    }
 
     public var questions: [QuizItem] { blocks.compactMap(\.check) }
 
@@ -240,19 +353,47 @@ public struct Lesson: Codable, Sendable {
         return self
     }
 }
-public struct LessonBlock: Codable, Sendable {
+public struct LessonBlock: Codable, Equatable, Sendable {
     public let type: String
     public let title: String?
     public let body: String?
     public let code: String?
     public let check: QuizItem?
+
+    public init(
+        type: String,
+        title: String? = nil,
+        body: String? = nil,
+        code: String? = nil,
+        check: QuizItem? = nil
+    ) {
+        self.type = type
+        self.title = title
+        self.body = body
+        self.code = code
+        self.check = check
+    }
 }
-public struct QuizItem: Codable, Identifiable, Sendable {
+public struct QuizItem: Codable, Equatable, Identifiable, Sendable {
     public let id: String
     public let conceptId: String
     public let type: String
     public let stem: String
     public let options: [QuizOption]
+
+    public init(
+        id: String,
+        conceptId: String,
+        type: String = "mcq",
+        stem: String,
+        options: [QuizOption]
+    ) {
+        self.id = id
+        self.conceptId = conceptId
+        self.type = type
+        self.stem = stem
+        self.options = options
+    }
 
     public func validateCapability() throws {
         guard type == "mcq" else { throw ContractError.unsupported("itemType:\(type)") }
@@ -267,6 +408,11 @@ public struct QuizItem: Codable, Identifiable, Sendable {
 public struct QuizOption: Codable, Identifiable, Equatable, Sendable {
     public let id: String
     public let label: String
+
+    public init(id: String, label: String) {
+        self.id = id
+        self.label = label
+    }
 }
 public struct QuizAnswer: Codable, Equatable, Sendable {
     public let itemId: String
