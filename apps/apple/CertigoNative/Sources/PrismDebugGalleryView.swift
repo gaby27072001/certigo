@@ -262,6 +262,38 @@
             Text(verbatim: "Phase 11 · Accessibility AX5, Budgets §30 & App Store Labels (§28–34)")
           }
           Section {
+            CertiGoSpeechBubbleHeaderView(
+              region: .cloud,
+              badgeText: "SCÉNARIO ARCHITECTURE",
+              questionText: "Quel service Azure isole le trafic réseau entrant d'un sous-réseau ?"
+            )
+            HStack(spacing: PrismSpacing.s) {
+              CertiGoOfficialCrestView(routeCode: "AZ-104", size: PrismSize.crestCard)
+              CertiGoOfficialCrestView(routeCode: "SAA-C03", size: PrismSize.crestCard)
+              CertiGoOfficialCrestView(routeCode: "GH-300", size: PrismSize.crestCard)
+            }
+            HStack(spacing: PrismSpacing.s) {
+              CertiGoBrandLogoView(vendorId: "microsoft", size: PrismSize.brandM)
+              CertiGoBrandLogoView(vendorId: "aws", size: PrismSize.brandM)
+              CertiGoBrandLogoView(vendorId: "gcp", size: PrismSize.brandM)
+              CertiGoBrandLogoView(vendorId: "github", size: PrismSize.brandM)
+            }
+            ForEach(CertiGoMascotPose.allCases, id: \.rawValue) { pose in
+              HStack(spacing: PrismSpacing.s) {
+                CertiGoMascotView(pose: pose, size: PrismSize.brandL)
+                Text(verbatim: "\(pose.displayName) · \(pose.rawValue)")
+                  .prismTextStyle(.caption)
+              }
+            }
+            Text(
+              verbatim:
+                "Catalog · \(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "AZ-104")) · \(CertiGoOfficialAssetCatalog.brandLogoAssetName(forVendorId: "aws")) · \(CertiGoOfficialAssetCatalog.azureServiceAssetName("Virtual-Machines")) · \(CertiGoOfficialAssetCatalog.awsServiceAssetName("Amazon-EC2")) · \(CertiGoOfficialAssetCatalog.gcpServiceAssetName("bigquery"))"
+            )
+            .prismTextStyle(.caption)
+          } header: {
+            Text(verbatim: "Figma Pro · 24 Mascots Blason 1A & 900 Official Assets")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(

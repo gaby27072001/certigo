@@ -47,16 +47,52 @@ class PrismFoundationsTests(unittest.TestCase):
 
     def test_gallery_and_its_only_entry_are_debug_only(self):
         sources = ROOT / "apps/apple/CertigoNative/Sources"
-        gallery = (sources / "PrismDebugGalleryView.swift").read_text()
+        gallery = (sources / "PrismDebugGalleryView.swift").read_text(encoding="utf-8")
         self.assertTrue(gallery.startswith("#if DEBUG && canImport(SwiftUI)"))
         self.assertTrue(gallery.rstrip().endswith("#endif"))
-        app = (sources / "CertigoNativeApp.swift").read_text()
+        app = (sources / "CertigoNativeApp.swift").read_text(encoding="utf-8")
         self.assertRegex(
             app, r"#if DEBUG\s+\.modifier\(PrismDebugGalleryLauncher\(\)\)\s+#endif"
         )
         self.assertIn("flags.applyRemoteJSON", gallery)
         self.assertIn("flags.saveDebugOverrides", gallery)
         self.assertIn("configurationError = true", gallery)
+        for component in (
+            "CertiGoSpeechBubbleHeaderView(",
+            "CertiGoOfficialCrestView(",
+            "CertiGoBrandLogoView(",
+            "CertiGoMascotView(",
+            "CertiGoMascotPose.allCases",
+            "CertiGoOfficialAssetCatalog.certificationAssetName",
+        ):
+            self.assertIn(component, gallery, component)
+
+    def test_prism_catalog_exposes_900_namespaced_official_assets_and_xcode_links_prism(self):
+        catalog = PRISM / "Resources/Prism.xcassets"
+        expected_folders = {
+            "AWSServices": 287,
+            "AzureServices": 291,
+            "BrandLogos": 32,
+            "Certifications": 52,
+            "GCPServices": 214,
+            "Mascots": 24,
+        }
+        total = 0
+        for folder, expected_count in expected_folders.items():
+            folder_dir = catalog / folder
+            self.assertTrue(folder_dir.is_dir(), folder)
+            folder_meta = json.loads((folder_dir / "Contents.json").read_text(encoding="utf-8"))
+            self.assertTrue(folder_meta.get("properties", {}).get("provides-namespace"), folder)
+            imagesets = list(folder_dir.glob("*.imageset"))
+            self.assertEqual(len(imagesets), expected_count, folder)
+            total += len(imagesets)
+        self.assertEqual(total, 900)
+        pbxproj = (
+            ROOT / "apps/apple/CertigoNative/CertigoNative.xcodeproj/project.pbxproj"
+        ).read_text(encoding="utf-8")
+        self.assertIn("000000000000000000000101 /* Prism in Frameworks */", pbxproj)
+        self.assertIn("000000000000000000000102 /* Prism */", pbxproj)
+        self.assertIn("000000000000000000000103 /* PrismDebugGalleryView.swift in Sources */", pbxproj)
 
     def test_extracted_shared_types_are_visible_across_files(self):
         source = (
