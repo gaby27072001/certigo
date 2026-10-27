@@ -63,6 +63,13 @@ public struct MockExamBlueprintDomain: Codable, Equatable, Sendable {
     public let name: String
     public let weight: Double
     public let itemCount: Int
+
+    public init(domainId: String, name: String, weight: Double, itemCount: Int) {
+        self.domainId = domainId
+        self.name = name
+        self.weight = weight
+        self.itemCount = itemCount
+    }
 }
 public struct MockExamItem: Codable, Equatable, Sendable {
     public let itemId: String
@@ -71,6 +78,22 @@ public struct MockExamItem: Codable, Equatable, Sendable {
     public let type: String
     public let stem: String
     public let options: [QuizOption]
+
+    public init(
+        itemId: String,
+        lessonId: String,
+        domainId: String,
+        type: String = "mcq",
+        stem: String,
+        options: [QuizOption]
+    ) {
+        self.itemId = itemId
+        self.lessonId = lessonId
+        self.domainId = domainId
+        self.type = type
+        self.stem = stem
+        self.options = options
+    }
 }
 public struct MockExam: Codable, Equatable, Sendable {
     public let examId: String
@@ -82,6 +105,28 @@ public struct MockExam: Codable, Equatable, Sendable {
     public let blueprint: [MockExamBlueprintDomain]
     public let items: [MockExamItem]
     public let publicManifestId: String?
+
+    public init(
+        examId: String,
+        trackId: String,
+        trackCode: String,
+        trackTitle: String,
+        timeLimitSeconds: Int,
+        passingScore: Int,
+        blueprint: [MockExamBlueprintDomain],
+        items: [MockExamItem],
+        publicManifestId: String? = nil
+    ) {
+        self.examId = examId
+        self.trackId = trackId
+        self.trackCode = trackCode
+        self.trackTitle = trackTitle
+        self.timeLimitSeconds = timeLimitSeconds
+        self.passingScore = passingScore
+        self.blueprint = blueprint
+        self.items = items
+        self.publicManifestId = publicManifestId
+    }
 
     public func validated() throws -> Self {
         guard !examId.isEmpty, !trackId.isEmpty, timeLimitSeconds >= 0,
