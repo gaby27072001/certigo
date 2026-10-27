@@ -27,7 +27,10 @@ class Phase11HardeningTests(unittest.TestCase):
             "public enum NormativeAnalyticsEventName",
             "public struct CriticalJourneyDescriptor",
             "public struct LegacyPathCleanupGovernance",
+            "public struct CertiGoOfflinePackEntry",
+            "public struct CertiGoOfflinePackManagerModel",
             "public struct Phase11HardeningDashboardScreen",
+            "public struct CertiGoOfflineResilienceScreen",
         ):
             self.assertIn(symbol, content)
         analytics_text = ANALYTICS_DOC.read_text(encoding="utf-8")

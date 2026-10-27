@@ -51,6 +51,35 @@ struct Phase11HardeningTests {
         #expect(ready.isEligibleForLegacyPathDeletion == true)
     }
 
+    @Test("Page 12 RES-01 offline pack manager enforces 142 MB multi-track packs, DR-004 queue, and reader memo mascot")
+    func res01OfflinePackManagerEnforces142MBAndDR004Invariants() {
+        var manager = CertiGoOfflinePackManagerModel()
+        #expect(manager.screenCode == "RES-01")
+        #expect(manager.mascotPose == .poseReaderMemo)
+        #expect(manager.storesAnswerKeysOffline == false)
+        #expect(manager.maxPrecomposedSessionsPerTrack == 2)
+        #expect(manager.conformsToDR004OfflinePolicy == true)
+        #expect(manager.packs.count == 3)
+        #expect(manager.packs.map(\.sizeMB) == [68, 52, 22])
+        #expect(manager.totalDownloadedSizeMB == 142)
+        #expect(manager.totalDownloadedSizeLabel == "142 Mo")
+        #expect(manager.totalPlayableOfflineSessionsCount == 6)
+
+        manager.enqueueOfflineSubmission(clientAttemptId: "attempt-az104-offline-1")
+        #expect(manager.queuedSubmissionsCount == 2)
+        manager.enqueueOfflineSubmission(clientAttemptId: "attempt-ai-frontier-offline-3")
+        #expect(manager.queuedSubmissionsCount == 3)
+        #expect(manager.lastSyncConfirmationMessage == PrismOfflineSessionCache.offlineQueuedMessage)
+
+        let flushed = manager.synchronizeQueuedSubmissionsOnReconnect()
+        #expect(flushed == 3)
+        #expect(manager.queuedSubmissionsCount == 0)
+        #expect(manager.isAirplaneOrTrainOfflineMode == false)
+
+        manager.togglePackDownload(id: "offline-pack-ai-frontier")
+        #expect(manager.totalDownloadedSizeMB == 120)
+    }
+
     @Test("Unified PrismAppShellCoordinatorModel initializes all 5 tabs, covers, and sheets cleanly")
     func prismAppShellCoordinatorInitializesAllSurfaces() {
         let coordinator = PrismAppShellCoordinatorModel()

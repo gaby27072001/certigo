@@ -37,6 +37,28 @@ import Testing
         #expect(banner.suggestedLength == .express)
     }
 
+    @Test func res02ZeroGuiltWelcomeBackModelEnforcesCaringMascotPreservedConceptsAndFreeCatchUp() {
+        var model = CertiGoZeroGuiltWelcomeBackModel()
+        #expect(model.screenCode == "RES-02")
+        #expect(model.mascotPose == .emotionOopsCaring)
+        #expect(model.hasGuiltInducingCopy == false)
+        #expect(model.containsGuiltOrLossCopy == false)
+        #expect(model.sellsPaidStreakFreeze == false)
+        #expect(model.preservedAnchoredConceptsCount == 28)
+        #expect(model.suggestedExpressMinutes == 5)
+        #expect(model.freeCatchUpRecallsCount == 3)
+        #expect(model.suggestedLength == .express)
+        #expect(!model.canRedeemFreeCatchUpDay)
+
+        model.recordCompletedCatchUpRecall()
+        model.recordCompletedCatchUpRecall()
+        model.recordCompletedCatchUpRecall()
+        #expect(model.canRedeemFreeCatchUpDay)
+        #expect(model.redeemFreeCatchUpDayIfEligible() == true)
+        #expect(model.completedCatchUpRecallsCount == 0)
+        #expect(!model.legacyBannerModel.containsGuiltOrLossCopy)
+    }
+
     @Test func missionsCapAtThreeWithSquadMissionAndMilestonesCiteLearningRules() {
         let missions = (1...5).map { idx in
             WeeklyMissionItem(

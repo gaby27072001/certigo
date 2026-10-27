@@ -298,6 +298,195 @@ public struct LegacyPathCleanupGovernance: Equatable, Hashable, Sendable {
     }
 }
 
+// MARK: - 4B. Page 12 Figma Pro — RES-01 Mode Hors-Ligne Train / Avion 142 Mo (§6.2, §19, §29, DR-004)
+
+public struct CertiGoOfflinePackEntry: Identifiable, Codable, Equatable, Hashable, Sendable {
+    public static let maxPrecomposedSessionsPerTrack: Int = PrismOfflineSessionCache.maxCachedSessions
+
+    public let id: String
+    public let routeCode: String
+    public let title: String
+    public let subtitle: String
+    public let brandProductId: BrandProductID
+    public let region: PrismRegion
+    public let sizeMB: Int
+    public var precomposedSessionsCount: Int
+    public var memoCardsCount: Int
+    public var isDownloaded: Bool
+
+    /// DR-004 invariant: offline packs never store server-side answer keys on device.
+    public var storesAnswerKeysOffline: Bool { false }
+
+    public init(
+        id: String,
+        routeCode: String,
+        title: String,
+        subtitle: String,
+        brandProductId: BrandProductID,
+        region: PrismRegion,
+        sizeMB: Int,
+        precomposedSessionsCount: Int = Self.maxPrecomposedSessionsPerTrack,
+        memoCardsCount: Int = 16,
+        isDownloaded: Bool = true
+    ) {
+        self.id = id
+        self.routeCode = routeCode
+        self.title = title
+        self.subtitle = subtitle
+        self.brandProductId = brandProductId
+        self.region = region
+        self.sizeMB = max(0, sizeMB)
+        self.precomposedSessionsCount = min(max(0, precomposedSessionsCount), Self.maxPrecomposedSessionsPerTrack)
+        self.memoCardsCount = max(0, memoCardsCount)
+        self.isDownloaded = isDownloaded
+    }
+
+    public var sizeLabel: String {
+        "\(sizeMB) Mo"
+    }
+
+    public static let validatedPage12Packs: [CertiGoOfflinePackEntry] = [
+        CertiGoOfflinePackEntry(
+            id: "offline-pack-az104",
+            routeCode: "AZ-104",
+            title: "AZ-104 · Microsoft Azure Administrator",
+            subtitle: "2 séances pré-composées + fiches mémo VNet, Entra ID & Storage",
+            brandProductId: .microsoftAzure,
+            region: .cloud,
+            sizeMB: 68,
+            precomposedSessionsCount: 2,
+            memoCardsCount: 24,
+            isDownloaded: true
+        ),
+        CertiGoOfflinePackEntry(
+            id: "offline-pack-saac03",
+            routeCode: "SAA-C03",
+            title: "SAA-C03 · AWS Solutions Architect Associate",
+            subtitle: "2 séances pré-composées + fiches mémo VPC, IAM & Résilience Multi-AZ",
+            brandProductId: .aws,
+            region: .network,
+            sizeMB: 52,
+            precomposedSessionsCount: 2,
+            memoCardsCount: 18,
+            isDownloaded: true
+        ),
+        CertiGoOfflinePackEntry(
+            id: "offline-pack-ai-frontier",
+            routeCode: "AI-FRONTIER",
+            title: "Veille IA Claude 4 / GPT / Foundry",
+            subtitle: "2 séances pré-composées + fiches mémo Agents MCP, Prompt Caching & RAG",
+            brandProductId: .microsoftFoundry,
+            region: .ai,
+            sizeMB: 22,
+            precomposedSessionsCount: 2,
+            memoCardsCount: 12,
+            isDownloaded: true
+        )
+    ]
+}
+
+public struct CertiGoOfflinePackManagerModel: Codable, Equatable, Hashable, Sendable {
+    public static let screenCode: String = "RES-01"
+    public static let validatedTotalOfflineSizeMB: Int = 142
+    public static let maxPrecomposedSessionsPerTrack: Int = PrismOfflineSessionCache.maxCachedSessions
+    public static let dr004QueuedSyncMessage: String = PrismOfflineSessionCache.offlineQueuedMessage
+
+    public let screenCode: String
+    public let mascotPose: CertiGoMascotPose
+    public var isAirplaneOrTrainOfflineMode: Bool
+    public var packs: [CertiGoOfflinePackEntry]
+    public private(set) var queuedClientAttemptIds: [String]
+    public private(set) var lastSyncConfirmationMessage: String?
+    public var isSyncingOnReconnect: Bool
+
+    /// DR-004 invariants: never store answer keys on device and cap pre-composed offline sessions at 2 per track.
+    public var storesAnswerKeysOffline: Bool { false }
+    public var maxPrecomposedSessionsPerTrack: Int { Self.maxPrecomposedSessionsPerTrack }
+
+    public init(
+        screenCode: String = Self.screenCode,
+        mascotPose: CertiGoMascotPose = .poseReaderMemo,
+        isAirplaneOrTrainOfflineMode: Bool = true,
+        packs: [CertiGoOfflinePackEntry] = CertiGoOfflinePackEntry.validatedPage12Packs,
+        queuedClientAttemptIds: [String] = ["attempt-az104-offline-1", "attempt-saac03-offline-2"],
+        lastSyncConfirmationMessage: String? = PrismOfflineSessionCache.offlineQueuedMessage,
+        isSyncingOnReconnect: Bool = false
+    ) {
+        self.screenCode = screenCode
+        self.mascotPose = mascotPose
+        self.isAirplaneOrTrainOfflineMode = isAirplaneOrTrainOfflineMode
+        self.packs = packs
+        var deduplicated: [String] = []
+        for attemptId in queuedClientAttemptIds where !deduplicated.contains(attemptId) {
+            deduplicated.append(attemptId)
+        }
+        self.queuedClientAttemptIds = deduplicated
+        self.lastSyncConfirmationMessage = lastSyncConfirmationMessage
+        self.isSyncingOnReconnect = isSyncingOnReconnect
+    }
+
+    public var downloadedPacks: [CertiGoOfflinePackEntry] {
+        packs.filter(\.isDownloaded)
+    }
+
+    public var totalDownloadedSizeMB: Int {
+        downloadedPacks.reduce(0) { $0 + $1.sizeMB }
+    }
+
+    public var totalDownloadedSizeLabel: String {
+        "\(totalDownloadedSizeMB) Mo"
+    }
+
+    public var totalPlayableOfflineSessionsCount: Int {
+        downloadedPacks.reduce(0) { $0 + min($1.precomposedSessionsCount, Self.maxPrecomposedSessionsPerTrack) }
+    }
+
+    public var totalOfflineMemoCardsCount: Int {
+        downloadedPacks.reduce(0) { $0 + $1.memoCardsCount }
+    }
+
+    public var queuedSubmissionsCount: Int {
+        queuedClientAttemptIds.count
+    }
+
+    public var conformsToDR004OfflinePolicy: Bool {
+        !storesAnswerKeysOffline
+            && maxPrecomposedSessionsPerTrack == 2
+            && packs.allSatisfy { !$0.storesAnswerKeysOffline && $0.precomposedSessionsCount <= Self.maxPrecomposedSessionsPerTrack }
+    }
+
+    public var offlineBannerModel: PrismOfflineBannerModel {
+        PrismOfflineBannerModel(
+            cachedPlayableSessionsCount: totalPlayableOfflineSessionsCount,
+            queuedSubmissionsCount: queuedSubmissionsCount,
+            isSyncing: isSyncingOnReconnect
+        )
+    }
+
+    public mutating func enqueueOfflineSubmission(clientAttemptId: String) {
+        let trimmed = clientAttemptId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if !queuedClientAttemptIds.contains(trimmed) {
+            queuedClientAttemptIds.append(trimmed)
+        }
+        lastSyncConfirmationMessage = Self.dr004QueuedSyncMessage
+    }
+
+    public mutating func synchronizeQueuedSubmissionsOnReconnect() -> Int {
+        let flushedCount = queuedClientAttemptIds.count
+        queuedClientAttemptIds.removeAll()
+        isAirplaneOrTrainOfflineMode = false
+        isSyncingOnReconnect = false
+        lastSyncConfirmationMessage = "Synchronisation idempotente terminée (\(flushedCount) réponse(s))"
+        return flushedCount
+    }
+
+    public mutating func togglePackDownload(id: String) {
+        guard let index = packs.firstIndex(where: { $0.id == id }) else { return }
+        packs[index].isDownloaded.toggle()
+    }
+}
+
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
 
@@ -386,6 +575,149 @@ public struct Phase11HardeningDashboardScreen: View {
         }
         .background(PrismColor.canvas)
         .navigationTitle(Text(verbatim: "Qualité & Hardening (Phase 11)"))
+    }
+}
+
+// MARK: - 6. Page 12 Figma Pro — RES-01 Offline Resilience & RES-02 Zero-Guilt Welcome Back Screen
+
+public struct CertiGoOfflineResilienceScreen: View {
+    @State private var manager: CertiGoOfflinePackManagerModel
+    public let welcomeBackModel: CertiGoZeroGuiltWelcomeBackModel
+    public let onStartOfflinePack: (CertiGoOfflinePackEntry) -> Void
+    public let onStartExpressWelcomeBack: () -> Void
+
+    public init(
+        manager: CertiGoOfflinePackManagerModel = CertiGoOfflinePackManagerModel(),
+        welcomeBackModel: CertiGoZeroGuiltWelcomeBackModel = CertiGoZeroGuiltWelcomeBackModel(),
+        onStartOfflinePack: @escaping (CertiGoOfflinePackEntry) -> Void = { _ in },
+        onStartExpressWelcomeBack: @escaping () -> Void = {}
+    ) {
+        self._manager = State(initialValue: manager)
+        self.welcomeBackModel = welcomeBackModel
+        self.onStartOfflinePack = onStartOfflinePack
+        self.onStartExpressWelcomeBack = onStartExpressWelcomeBack
+    }
+
+    public var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                PrismOfflineBanner(model: manager.offlineBannerModel)
+
+                PrismCard(variant: .hero) {
+                    VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                        HStack(alignment: .center, spacing: PrismSpacing.m) {
+                            CertiGoMascotView(pose: manager.mascotPose, size: PrismSize.mascotQuiz)
+
+                            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                                HStack(spacing: PrismSpacing.xs) {
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: manager.screenCode,
+                                            semantics: .accent
+                                        )
+                                    )
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: "Mode Train / Avion · \(manager.totalDownloadedSizeLabel)",
+                                            semantics: .positive
+                                        )
+                                    )
+                                }
+                                PrismText(
+                                    text: "Continuité Hors-Ligne Multi-Parcours",
+                                    style: .title3
+                                )
+                                PrismText(
+                                    text: "\(manager.totalPlayableOfflineSessionsCount) séances pré-composées (\(manager.maxPrecomposedSessionsPerTrack)/parcours) · \(manager.totalOfflineMemoCardsCount) fiches mémo · DR-004 (0 corrigé stocké hors-ligne).",
+                                    style: .footnote,
+                                    role: .textSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+
+                PrismSection(title: "Packs Hors-Ligne Téléchargés (\(manager.totalDownloadedSizeLabel))") {
+                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                        ForEach(manager.packs) { pack in
+                            PrismCard(variant: .standard) {
+                                VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                                    PrismAdaptiveStack(spacing: PrismSpacing.s) {
+                                        BrandLabel(
+                                            product: pack.brandProductId,
+                                            context: .learningContent,
+                                            examCode: pack.routeCode
+                                        )
+                                        PrismBadge(
+                                            configuration: PrismBadgeConfiguration(
+                                                text: pack.sizeLabel,
+                                                semantics: .region(pack.region)
+                                            )
+                                        )
+                                        PrismBadge(
+                                            configuration: PrismBadgeConfiguration(
+                                                text: "\(pack.precomposedSessionsCount)/\(CertiGoOfflinePackManagerModel.maxPrecomposedSessionsPerTrack) séances",
+                                                semantics: .positive
+                                            )
+                                        )
+                                    }
+                                    PrismText(text: pack.title, style: .headline)
+                                    PrismText(text: pack.subtitle, style: .footnote, role: .textSecondary)
+                                    Button {
+                                        onStartOfflinePack(pack)
+                                    } label: {
+                                        Text(verbatim: "Ouvrir le pack hors-ligne (\(pack.sizeLabel))")
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(PrismButtonStyle(variant: .secondary))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                PrismSection(title: "File d'attente Hors-Ligne Idempotente (DR-004)") {
+                    PrismCard(variant: .standard) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                            PrismAdaptiveStack(spacing: PrismSpacing.s) {
+                                PrismBadge(
+                                    configuration: PrismBadgeConfiguration(
+                                        text: "\(manager.queuedSubmissionsCount) en file d'attente",
+                                        semantics: manager.queuedSubmissionsCount > 0 ? .caution : .positive
+                                    )
+                                )
+                                PrismBadge(
+                                    configuration: PrismBadgeConfiguration(
+                                        text: "0 clé de réponse locale (DR-004)",
+                                        semantics: .neutral
+                                    )
+                                )
+                            }
+                            if let message = manager.lastSyncConfirmationMessage {
+                                PrismText(text: message, style: .subheadline, role: .textSecondary)
+                            }
+                            Button {
+                                _ = manager.synchronizeQueuedSubmissionsOnReconnect()
+                            } label: {
+                                Text(verbatim: "Synchroniser à la reconnexion (idempotent)")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(PrismButtonStyle(variant: .primary))
+                        }
+                    }
+                }
+
+                PrismSection(title: "Reprise Bienveillante Zéro Culpabilité (RES-02)") {
+                    CertiGoZeroGuiltWelcomeBackView(
+                        model: welcomeBackModel,
+                        onStartExpressSession: onStartExpressWelcomeBack
+                    )
+                }
+            }
+            .padding(PrismSpacing.l)
+        }
+        .background(PrismColor.canvas)
+        .navigationTitle(Text(verbatim: "Résilience Hors-Ligne (Page 12)"))
     }
 }
 #endif
