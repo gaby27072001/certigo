@@ -154,4 +154,69 @@ struct Phase8SocialAndCollaborativeTests {
         league.recordMasteryPoints(100)
         #expect(league.dailyMasteryPointsEarned == ProgressionLeagueModel.dailyMasteryPointsCap)
     }
+
+    @Test("07A & 25 Social Hub segmented switch, 3D Top 3 Podium with official crests, Top 5 promotion zone & NS-12 defaults")
+    func socialHubPodium07AAndPrivacyInvariants() {
+        var hub = CertiGoSocialHubModel()
+        #expect(hub.isProfilePrivateByDefault == true)
+        #expect(hub.areLeaguesOptedInByDefault == false)
+        #expect(hub.isLeagueCurrentlyOptedIn == false)
+        #expect(hub.importsAddressBookContacts == false)
+        #expect(hub.exposesFailuresToOthers == false)
+
+        #expect(hub.selectedSegment == .podium07A)
+        #expect(hub.selectedSegment.screenCode == "07A")
+        #expect(hub.selectedSegment.segmentedLabel == "🏆 Podium Semaine (07A)")
+        #expect(CertiGoSocialHubSegment.friends25.screenCode == "25")
+        #expect(CertiGoSocialHubSegment.friends25.segmentedLabel == "👥 Mes Amis (12) (25)")
+
+        let top3 = hub.topThreePodium
+        #expect(top3.count == 3)
+        #expect(top3[0].summaryLine == "1er Sarah Chen · 2 140 XP · AZ-305")
+        #expect(top3[0].officialCrestAssetName == "Certifications/ms-official-expert-badge")
+        #expect(top3[0].pedestalHeightPoints == PrismSize.podiumFirstHeight)
+
+        #expect(top3[1].summaryLine == "2e Gabriel C. · 1 890 XP · AZ-104")
+        #expect(top3[1].isCurrentLearner == true)
+        #expect(top3[1].officialCrestAssetName == "Certifications/ms-official-associate-badge")
+        #expect(top3[1].pedestalHeightPoints == PrismSize.podiumSecondHeight)
+
+        #expect(top3[2].summaryLine == "3e Lucas Meyer · 1 720 XP · AI-102")
+        #expect(top3[2].officialCrestAssetName == "Certifications/ms-official-associate-badge")
+        #expect(top3[2].pedestalHeightPoints == PrismSize.podiumThirdHeight)
+
+        let visualOrder = hub.visualPodiumOrder
+        #expect(visualOrder.map(\.rank) == [2, 1, 3])
+
+        let top5 = hub.topFivePromotionEntries
+        #expect(top5.count == 5)
+        #expect(top5.allSatisfy { $0.isInTopFivePromotionZone && $0.visibleFailureCount == 0 })
+
+        hub.selectSegment(.friends25)
+        #expect(hub.selectedSegment == .friends25)
+    }
+
+    @Test("Écran 25 Mes Amis (12), ajout par code/QR sans import de contacts, activité temps réel et 👏 Saluer en 1 tap")
+    func socialHubFriends25AndOneTapSaluerKudos() {
+        var hub = CertiGoSocialHubModel(selectedSegment: .friends25)
+        #expect(hub.friendsCount == 12)
+        #expect(hub.friends.first?.activityAndStreakLine == "A terminé Rôles RBAC · 🔥 12j")
+        #expect(hub.friends.first?.saluerButtonLabel == "👏 Saluer")
+        #expect(hub.friends.allSatisfy { $0.visibleFailureCount == 0 })
+
+        let sent = hub.sendOneTapSaluerKudos(toFriendId: "friend-sarah")
+        #expect(sent == true)
+        #expect(hub.sentSaluerFriendIds.contains("friend-sarah") == true)
+        #expect(hub.friends.first?.hasSentSaluerKudos == true)
+        #expect(hub.friends.first?.saluerKudosSentCount == 1)
+        #expect(hub.friends.first?.saluerButtonLabel == "👏 Salué !")
+
+        let unknownSent = hub.sendOneTapSaluerKudos(toFriendId: "friend-unknown")
+        #expect(unknownSent == false)
+
+        let added = hub.addFriendByCodeOrQR(" az305-qr ")
+        #expect(added == true)
+        #expect(hub.addedFriendCodes == ["AZ305-QR"])
+        #expect(hub.importsAddressBookContacts == false)
+    }
 }
