@@ -253,4 +253,64 @@ import Testing
         #expect(carousel.officialDomainScores.map(\.percentage) == [92, 84, 78, 58, 76])
         #expect(carousel.officialDomainScores.filter { !$0.isPassingDomain }.map(\.domainCode) == ["D4"])
     }
+
+    @Test func mockExamCockpitScreen23SupportsQuestionFlaggingAndSlidingNavigatorWindow() {
+        let questions = (1...50).map { number in
+            MockExamQuestionRecord(
+                item: PrismSessionItemModel(
+                    id: "mex-q\(number)",
+                    conceptId: "az.q\(number)",
+                    product: .azureVirtualNetwork,
+                    stem: "Question d'examen \(number)",
+                    captureConfidence: true,
+                    isMockExamMode: true,
+                    payload: .choice(
+                        options: [
+                            PrismChoiceOption(id: "a", badge: "A", text: "Option A", explanation: "Explication A"),
+                            PrismChoiceOption(id: "b", badge: "B", text: "Option B", explanation: "Explication B"),
+                        ],
+                        allowsMultipleSelection: false
+                    )
+                ),
+                domainId: "dom-network",
+                domainTitle: "Réseaux virtuels"
+            )
+        }
+
+        var exam = MockExamStateMachine(
+            examId: "exam-cockpit-23",
+            routeCode: "AZ-104",
+            routeTitle: "Microsoft Azure Administrator",
+            baseDurationMinutes: 90,
+            timePolicy: .standardTimed,
+            questions: questions
+        )
+        exam.startExam()
+
+        // Navigate to Question 12 (1-based) and record an answer (✓)
+        exam.selectQuestionNumber(12)
+        #expect(exam.currentQuestionIndex == 11)
+        exam.recordCurrentSelection(optionIds: ["a"], confidence: .sure)
+
+        // Navigate to Question 13 (1-based) and flag it (🏳)
+        exam.selectQuestionNumber(13)
+        #expect(exam.currentQuestionIndex == 12)
+        #expect(!exam.isQuestionFlagged("mex-q13"))
+        exam.toggleFlagOnCurrentQuestion()
+        #expect(exam.isQuestionFlagged("mex-q13"))
+        #expect(exam.isCurrentQuestionFlagged)
+        #expect(exam.flaggedQuestionIds == ["mex-q13"])
+
+        // Toggle off and back on to verify idempotent toggling
+        exam.toggleFlagOnCurrentQuestion()
+        #expect(!exam.isQuestionFlagged("mex-q13"))
+        exam.toggleFlagOnCurrentQuestion()
+        #expect(exam.isQuestionFlagged("mex-q13"))
+
+        // Navigate to Question 14 (1-based) — active item in [14/50]
+        exam.selectQuestionNumber(14)
+        #expect(exam.currentQuestionIndex == 13)
+        #expect(exam.cockpitNavigatorWindow == [12, 13, 14, 15, 16])
+        #expect(exam.cockpitNavigatorBannerText == "12 ✓ · 13 🏳 · [14/50] · 15 · 16")
+    }
 }

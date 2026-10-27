@@ -101,6 +101,7 @@ public struct PrismSessionItemModel: Codable, Equatable, Hashable, Sendable, Ide
     public let captureConfidence: Bool
     public let isMockExamMode: Bool
     public let payload: PrismItemFormatPayload
+    public let questionFormatOverride: CertiGoQuestionFormatID?
 
     public init(
         id: String,
@@ -112,7 +113,8 @@ public struct PrismSessionItemModel: Codable, Equatable, Hashable, Sendable, Ide
         revealOptionsDelayMs: Int = 0,
         captureConfidence: Bool = false,
         isMockExamMode: Bool = false,
-        payload: PrismItemFormatPayload
+        payload: PrismItemFormatPayload,
+        questionFormatOverride: CertiGoQuestionFormatID? = nil
     ) {
         self.id = id
         self.conceptId = conceptId
@@ -124,10 +126,152 @@ public struct PrismSessionItemModel: Codable, Equatable, Hashable, Sendable, Ide
         self.captureConfidence = captureConfidence
         self.isMockExamMode = isMockExamMode
         self.payload = payload
+        self.questionFormatOverride = questionFormatOverride
     }
 
     public func shouldShowOptionsImmediately(reduceMotion: Bool, manuallyRevealed: Bool) -> Bool {
         manuallyRevealed || reduceMotion || revealOptionsDelayMs == 0
+    }
+
+    /// Deduces the validated Figma question format (`Q_TYPE_01` to `Q_TYPE_10`) from `questionFormatOverride` or `payload`.
+    public var resolvedFigmaQuestionFormat: CertiGoQuestionFormatID {
+        if let questionFormatOverride {
+            return questionFormatOverride
+        }
+        let lowerId = "\(id) \(conceptId)".lowercased()
+        let lowerStem = stem.lowercased()
+        switch payload {
+        case .choice(let options, let allowsMultipleSelection):
+            if allowsMultipleSelection || lowerId.contains("q10") {
+                return .q10MultiSelectCheckboxes
+            }
+            if lowerId.contains("q06")
+                || options.contains(where: { $0.text.contains("↔") })
+                || lowerStem.contains("relie")
+            {
+                return .q06MatchingPairs
+            }
+            if lowerId.contains("q02")
+                || lowerStem.contains("2×2")
+                || lowerStem.contains("2x2")
+                || options.contains(where: { $0.text.contains(" — ") })
+            {
+                return .q02ServiceGrid2x2
+            }
+            return .q01ScenarioQCM
+
+        case .situation:
+            return .q03InteractiveDiagram
+
+        case .commandComposer(_, let availableTokens):
+            if lowerId.contains("q04")
+                || lowerStem.contains("saisis")
+                || availableTokens.contains(where: { $0.id.lowercased().contains("q04") })
+                || availableTokens.isEmpty
+            {
+                return .q04IOSKeyboardInput
+            }
+            return .q05WordBankBricks
+
+        case .spotTheIssue:
+            return .q07JSONBugDiagnosis
+
+        case .ordering:
+            return .q08ScopeHierarchyOrdering
+
+        case .predict:
+            return .q09ArchitectureVerdict
+
+        case .unsupported(let rawFormat):
+            if let matched = CertiGoQuestionFormatID(rawValue: rawFormat.uppercased()) {
+                return matched
+            }
+            return .q01ScenarioQCM
+        }
+    }
+
+    /// Resolves the semantic `PrismRegion` associated with `product`.
+    public var resolvedRegion: PrismRegion {
+        let raw = product.rawValue.lowercased()
+        if product == .azureVirtualNetwork
+            || product == .azureLoadBalancer
+            || raw.contains("network")
+            || raw.contains("vnet")
+            || raw.contains("load-balancer")
+            || raw.contains("dns")
+            || raw.contains("cisco")
+            || raw.contains("vpc")
+            || raw.contains("privatelink")
+        {
+            return .network
+        }
+        if product == .microsoftEntraID
+            || product == .microsoftDefenderForCloud
+            || product == .microsoftSentinel
+            || product == .githubAdvancedSecurity
+            || raw.contains("entra")
+            || raw.contains("defender")
+            || raw.contains("sentinel")
+            || raw.contains("security")
+            || raw.contains("key-vault")
+            || raw.contains("iam")
+            || raw.contains("vault")
+        {
+            return .security
+        }
+        if product == .azureStorage
+            || product == .azureCosmosDB
+            || product == .azureSQLDatabase
+            || product == .microsoftFabric
+            || product == .microsoftDataverse
+            || raw.contains("storage")
+            || raw.contains("cosmos")
+            || raw.contains("sql")
+            || raw.contains("fabric")
+            || raw.contains("dataverse")
+            || raw.contains("data")
+            || raw.contains("bigquery")
+        {
+            return .data
+        }
+        if product == .azureOpenAIService
+            || product == .microsoftFoundry
+            || product == .microsoftCopilotStudio
+            || product == .aiBuilder
+            || product == .githubCopilot
+            || product == .amazonBedrock
+            || raw.contains("openai")
+            || raw.contains("foundry")
+            || raw.contains("copilot")
+            || raw.contains("ai")
+            || raw.contains("bedrock")
+            || raw.contains("claude")
+            || raw.contains("anthropic")
+            || raw.contains("gemini")
+            || raw.contains("mistral")
+        {
+            return .ai
+        }
+        if product == .githubPlatform
+            || product == .githubActions
+            || product == .kubernetes
+            || raw.contains("github")
+            || raw.contains("kubernetes")
+            || raw.contains("cncf")
+            || raw.contains("docker")
+            || raw.contains("terraform")
+            || raw.contains("cli")
+            || raw.contains("container")
+            || raw.contains("devops")
+        {
+            return .devops
+        }
+        return .cloud
+    }
+
+    /// Resolves the 3/4 right domain specialist mascot pose via `CertiGoMascotPose.specialist(for:)`.
+    public var resolvedSpecialistMascotPose: CertiGoMascotPose {
+        CertiGoMascotPose.specialist(for: resolvedRegion)
     }
 }
 
@@ -309,6 +453,7 @@ public struct PrismOfflineSessionCache: Codable, Equatable, Sendable {
 
 public struct SessionPlayerStateMachine: Equatable, Sendable {
     public static let verificationIndicatorThresholdMs: Int = 300
+    public static let validatedBackgroundDimOpacityWhenSheetOpen: Double = 0.62
 
     public let plan: PrismSessionPlan
     public private(set) var currentIndex: Int
@@ -320,12 +465,17 @@ public struct SessionPlayerStateMachine: Equatable, Sendable {
     public private(set) var lastOfflineConfirmationMessage: String?
     public private(set) var emittedUnsupportedFormats: [String]
     public private(set) var latestBookmark: PrismSessionBookmark?
+    public var backgroundDimOpacityWhenSheetOpen: Double
+
+    /// Écran 05 Validated: dims the top background question to 62% opacity when the AI/error explanation sheet is open.
+    public var dimsBackgroundQuestionWhenAIExplanationOpen: Bool { true }
 
     public init(
         plan: PrismSessionPlan,
         initialBookmark: PrismSessionBookmark? = nil,
         isOffline: Bool = false,
-        now: Date = Date()
+        now: Date = Date(),
+        backgroundDimOpacityWhenSheetOpen: Double = Self.validatedBackgroundDimOpacityWhenSheetOpen
     ) {
         self.plan = plan
         if let initialBookmark,
@@ -347,6 +497,7 @@ public struct SessionPlayerStateMachine: Equatable, Sendable {
         self.queuedOfflineSubmissionIds = []
         self.lastOfflineConfirmationMessage = nil
         self.emittedUnsupportedFormats = []
+        self.backgroundDimOpacityWhenSheetOpen = backgroundDimOpacityWhenSheetOpen
         initializeOrderedItemsIfNeeded()
     }
 
@@ -549,9 +700,10 @@ public struct SessionItemCardView: View {
             )
 
             CertiGoSpeechBubbleHeaderView(
-                region: .cloud,
-                badgeText: "SCÉNARIO ARCHITECTURE",
-                questionText: item.stem
+                region: item.resolvedRegion,
+                badgeText: item.resolvedFigmaQuestionFormat.badgeTitle,
+                questionText: item.stem,
+                poseOverride: item.resolvedSpecialistMascotPose
             )
 
             payloadBody
@@ -791,6 +943,20 @@ public struct SessionPlayerScreen: View {
                                 )
                             case .item(let item):
                                 if let resolution = activeFeedback {
+                                    SessionItemCardView(
+                                        item: item,
+                                        draft: $stateMachine.currentDraft,
+                                        optionsManuallyRevealed: $stateMachine.optionsManuallyRevealed,
+                                        flags: flags,
+                                        onVerifyOrSkip: {}
+                                    )
+                                    .opacity(
+                                        stateMachine.dimsBackgroundQuestionWhenAIExplanationOpen
+                                            ? stateMachine.backgroundDimOpacityWhenSheetOpen
+                                            : 1.0
+                                    )
+                                    .disabled(true)
+
                                     SessionFeedbackPanelScreen(
                                         resolution: Binding(
                                             get: { resolution },
