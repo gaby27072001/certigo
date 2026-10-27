@@ -205,6 +205,19 @@ extension PrismSize {
   public static let podiumThirdHeight: CGFloat = 62
   public static let dividerThickness: CGFloat = 1
   public static let dividerHeight: CGFloat = 40
+  public static let celebrationJumpOffset: CGFloat = 18
+}
+
+extension PrismMotion {
+  public static var allAnimationPresets: [CertiGoAnimationPresetID] {
+    CertiGoAnimationPresetID.allCases
+  }
+
+  public static func resolve(
+    _ preset: CertiGoAnimationPresetID, reduceMotion: Bool
+  ) -> PrismResolvedMotion {
+    preset.resolved(reduceMotion: reduceMotion)
+  }
 }
 
 extension PrismRadius {

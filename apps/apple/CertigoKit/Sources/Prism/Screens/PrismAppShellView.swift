@@ -1243,6 +1243,17 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
             estimatedReadyDateRange: fallback.estimatedReadyDateRange
         )
     }
+
+    public var motionSpecsCatalog: [CertiGoMotionPresetSpec] {
+        CertiGoMotionSpecCatalog.allSpecs
+    }
+
+    public func resolvedMotion(
+        for preset: CertiGoAnimationPresetID,
+        reduceMotion: Bool
+    ) -> PrismResolvedMotion {
+        preset.resolved(reduceMotion: reduceMotion)
+    }
 }
 
 #if canImport(SwiftUI) && canImport(UIKit)
