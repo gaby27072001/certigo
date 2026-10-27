@@ -1,4 +1,5 @@
 import BrandAssets
+import CertigoData
 import CertigoDomain
 import Foundation
 import Prism
@@ -135,5 +136,105 @@ struct MultiTrackAndAIContentCatalogTests {
             // 1 WorkedExample learning card + 10 interactive question format items = 11 cards
             #expect(coordinator.sessionPlayerMachine.plan.cards.count == 11)
         }
+    }
+
+    @Test("CertigoParallelTracksPreference persists and reloads parallel tracks, active certification, AI frontier watch, bilingual EN terms, and 90m timed exam mode")
+    func parallelTracksPreferencePersistenceAndStoreRoundTrip() throws {
+        let defaults = UserDefaults.standard
+        let key = "certigo.parallel-tracks.test.\(UUID().uuidString)"
+        defer { defaults.removeObject(forKey: key) }
+
+        let store = CertigoParallelTracksPreferenceStore(defaults: defaults, key: key)
+        #expect(try store.load() == nil)
+
+        var preference = CertigoParallelTracksPreference()
+        #expect(preference.parallelTrackCodes == ["AZ-104", "SAA-C03", "GH-300"])
+        #expect(preference.activeTrackCode == "AZ-104")
+        #expect(preference.aiFrontierTrackCodes == ["AI-OPENAI", "AI-CLAUDE", "AI-GEMINI", "AI-FOUNDRY"])
+        #expect(preference.bilingualTechnicalTermsEN == true)
+        #expect(preference.strictTimed90Min == true)
+        #expect(preference.settingsParallelTracksSummary == "AZ-104 + 2 ›")
+        #expect(preference.settingsLanguageSummary == "FR + Termes EN ›")
+        #expect(preference.settingsMockExamSummary == "Chrono 90m ›")
+
+        preference.addParallelTrack("CKA")
+        preference.setActiveTrack("SAA-C03")
+        preference.addAIFrontierTrack("AI-MISTRAL")
+        preference.bilingualTechnicalTermsEN = false
+        preference.strictTimed90Min = false
+
+        try store.save(preference)
+        let reloaded = try #require(try store.load())
+        #expect(reloaded == preference)
+        #expect(reloaded.parallelTrackCodes == ["AZ-104", "SAA-C03", "GH-300", "CKA"])
+        #expect(reloaded.activeTrackCode == "SAA-C03")
+        #expect(reloaded.aiFrontierTrackCodes == ["AI-OPENAI", "AI-CLAUDE", "AI-GEMINI", "AI-FOUNDRY", "AI-MISTRAL"])
+        #expect(reloaded.bilingualTechnicalTermsEN == false)
+        #expect(reloaded.strictTimed90Min == false)
+        #expect(reloaded.settingsParallelTracksSummary == "SAA-C03 + 3 ›")
+        #expect(reloaded.settingsLanguageSummary == "FR uniquement ›")
+        #expect(reloaded.settingsMockExamSummary == "Mode libre ›")
+
+        let updated = try store.update { current in
+            current.removeParallelTrack("SAA-C03")
+        }
+        #expect(updated.activeTrackCode == "AZ-104")
+        #expect(updated.parallelTrackCodes == ["AZ-104", "GH-300", "CKA"])
+
+        store.reset()
+        #expect(try store.load() == nil)
+    }
+
+    @Test("Coordinator, OnboardingFlowStateMachine, and settings stay coherently synchronized across parallel track additions, removals, and active switches")
+    func coordinatorAndOnboardingSynchronizeParallelTracksAndAIFrontier() throws {
+        let defaults = UserDefaults.standard
+        let key = "certigo.parallel-tracks.sync.\(UUID().uuidString)"
+        defer { defaults.removeObject(forKey: key) }
+
+        var onboarding = OnboardingFlowStateMachine()
+        #expect(onboarding.selectedParallelRoutes == ["AZ-104", "SAA-C03", "GH-300"])
+        #expect(onboarding.selectedAIFrontierTrackCodes == ["AI-OPENAI", "AI-CLAUDE", "AI-GEMINI", "AI-FOUNDRY"])
+
+        onboarding.toggleParallelRoute("CKA")
+        onboarding.toggleAIFrontierTrack("AI-MISTRAL")
+        onboarding.selectRoute(
+            region: .cloud,
+            routeCode: "SAA-C03",
+            productId: BrandProductID("aws-vpc")
+        )
+
+        let builtPref = onboarding.buildParallelTracksPreference()
+        #expect(builtPref.activeTrackCode == "SAA-C03")
+        #expect(builtPref.parallelTrackCodes == ["AZ-104", "SAA-C03", "GH-300", "CKA"])
+        #expect(builtPref.aiFrontierTrackCodes.contains("AI-MISTRAL"))
+
+        var coordinator = PrismAppShellCoordinatorModel()
+        coordinator.applyParallelTracksPreference(builtPref, persistTo: defaults, key: key)
+
+        #expect(coordinator.todayModel.activeRouteCode == "SAA-C03")
+        #expect(coordinator.routeReadiness.routeCode == "SAA-C03")
+        #expect(coordinator.mockExamMachine.routeCode == "SAA-C03")
+        #expect(coordinator.mockExamMachine.baseDurationMinutes == 90)
+        #expect(coordinator.mockExamMachine.timePolicy == .standardTimed)
+        #expect(coordinator.calibrationHistory.passport.routes.map(\.examCode) == ["AZ-104", "SAA-C03", "GH-300", "CKA"])
+
+        // Removing the active track falls back to the first remaining parallel track and updates the whole shell
+        coordinator.removeParallelTrack(code: "SAA-C03", persistTo: defaults, key: key)
+        #expect(coordinator.parallelTracksPreference.activeTrackCode == "AZ-104")
+        #expect(coordinator.todayModel.activeRouteCode == "AZ-104")
+        #expect(coordinator.routeReadiness.routeCode == "AZ-104")
+        #expect(coordinator.mockExamMachine.routeCode == "AZ-104")
+        #expect(coordinator.calibrationHistory.passport.routes.map(\.examCode) == ["AZ-104", "GH-300", "CKA"])
+
+        // Toggling mock exam mode updates MockExamStateMachine and persists
+        coordinator.setStrictTimed90Min(false, persistTo: defaults, key: key)
+        #expect(coordinator.mockExamMachine.timePolicy == .untimed)
+        #expect(coordinator.mockExamMachine.baseDurationMinutes == 40)
+
+        var reloadedCoordinator = PrismAppShellCoordinatorModel()
+        reloadedCoordinator.loadParallelTracksPreference(from: defaults, key: key)
+        #expect(reloadedCoordinator.parallelTracksPreference == coordinator.parallelTracksPreference)
+        #expect(reloadedCoordinator.todayModel.activeRouteCode == "AZ-104")
+        #expect(reloadedCoordinator.mockExamMachine.timePolicy == .untimed)
     }
 }

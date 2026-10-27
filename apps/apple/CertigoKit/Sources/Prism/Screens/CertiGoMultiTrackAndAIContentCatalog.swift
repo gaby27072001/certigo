@@ -408,6 +408,11 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
 
     public static func track(forCode code: String) -> CertiGoTrackDescriptor {
         let normalized = code.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized == "AI-CLAUDE",
+            let claude = aiFrontierTracks.first(where: { $0.code.uppercased() == "AI-ANTHROPIC" })
+        {
+            return claude
+        }
         if let found = allTracks.first(where: { $0.code.uppercased() == normalized || $0.id.uppercased() == normalized }) {
             return found
         }
@@ -419,6 +424,9 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
 
     public static func aiFrontierTrack(titledOrCoded query: String) -> CertiGoTrackDescriptor? {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if trimmed == "ai-claude" {
+            return aiFrontierTracks.first(where: { $0.code.uppercased() == "AI-ANTHROPIC" })
+        }
         return aiFrontierTracks.first {
             $0.code.lowercased() == trimmed
                 || $0.id.lowercased() == trimmed
@@ -2058,9 +2066,14 @@ extension CatalogExplorerModel {
 }
 
 extension PrismAppShellCoordinatorModel {
-    public mutating func activateTrack(code: String) {
+    public mutating func activateTrack(
+        code: String,
+        persistTo defaults: UserDefaults? = nil,
+        key: String = CertigoParallelTracksPreference.storageKey
+    ) {
         let descriptor = CertiGoMultiTrackAndAIContentCatalog.track(forCode: code)
         let activeUnit = descriptor.activeUnit
+        parallelTracksPreference.setActiveTrack(code)
         todayModel = TodayScreenModel(
             state: todayModel.state,
             suggestedLength: todayModel.suggestedLength,
@@ -2078,6 +2091,171 @@ extension PrismAppShellCoordinatorModel {
         )
         sessionPlayerMachine = CertiGoMultiTrackAndAIContentCatalog.sessionMachine(forTrackCode: descriptor.code)
         catalogExplorer = CatalogExplorerModel.multiTrackAndAIExplorer(activeRouteCode: descriptor.code)
+        routeReadiness = RouteReadinessScreenModel(
+            routeCode: descriptor.code,
+            officialTitle: descriptor.officialTitle,
+            product: descriptor.product,
+            region: descriptor.region,
+            isConfirmedOnServer: routeReadiness.isConfirmedOnServer,
+            readiness: routeReadiness.readiness,
+            objectiveCoverage: routeReadiness.objectiveCoverage,
+            historyWeeksCount: routeReadiness.historyWeeksCount,
+            estimatedReadyDateRange: routeReadiness.estimatedReadyDateRange
+        )
+        mockExamMachine = MockExamStateMachine(
+            examId: "exam-\(descriptor.code.lowercased())",
+            routeCode: descriptor.code,
+            routeTitle: descriptor.officialTitle,
+            baseDurationMinutes: parallelTracksPreference.strictTimed90Min ? 90 : 40,
+            timePolicy: parallelTracksPreference.strictTimed90Min ? .standardTimed : .untimed,
+            questions: mockExamMachine.questions
+        )
+        refreshPassportRoutesFromParallelPreference()
+        if let defaults {
+            try? parallelTracksPreference.save(to: defaults, key: key)
+        }
+    }
+
+    public mutating func applyParallelTracksPreference(
+        _ preference: CertigoParallelTracksPreference,
+        persistTo defaults: UserDefaults? = nil,
+        key: String = CertigoParallelTracksPreference.storageKey
+    ) {
+        parallelTracksPreference = preference
+        activateTrack(code: preference.activeTrackCode, persistTo: defaults, key: key)
+    }
+
+    public mutating func addParallelTrack(
+        code: String,
+        persistTo defaults: UserDefaults? = nil,
+        key: String = CertigoParallelTracksPreference.storageKey
+    ) {
+        parallelTracksPreference.addParallelTrack(code)
+        refreshPassportRoutesFromParallelPreference()
+        if let defaults {
+            try? parallelTracksPreference.save(to: defaults, key: key)
+        }
+    }
+
+    public mutating func removeParallelTrack(
+        code: String,
+        persistTo defaults: UserDefaults? = nil,
+        key: String = CertigoParallelTracksPreference.storageKey
+    ) {
+        let previousActive = parallelTracksPreference.activeTrackCode
+        parallelTracksPreference.removeParallelTrack(code)
+        if parallelTracksPreference.activeTrackCode != previousActive {
+            activateTrack(code: parallelTracksPreference.activeTrackCode, persistTo: defaults, key: key)
+        } else {
+            refreshPassportRoutesFromParallelPreference()
+            if let defaults {
+                try? parallelTracksPreference.save(to: defaults, key: key)
+            }
+        }
+    }
+
+    public mutating func toggleParallelTrack(
+        code: String,
+        persistTo defaults: UserDefaults? = nil,
+        key: String = CertigoParallelTracksPreference.storageKey
+    ) {
+        let previousActive = parallelTracksPreference.activeTrackCode
+        parallelTracksPreference.toggleParallelTrack(code)
+        if parallelTracksPreference.activeTrackCode != previousActive {
+            activateTrack(code: parallelTracksPreference.activeTrackCode, persistTo: defaults, key: key)
+        } else {
+            refreshPassportRoutesFromParallelPreference()
+            if let defaults {
+                try? parallelTracksPreference.save(to: defaults, key: key)
+            }
+        }
+    }
+
+    public mutating func toggleAIFrontierTrack(
+        code: String,
+        persistTo defaults: UserDefaults? = nil,
+        key: String = CertigoParallelTracksPreference.storageKey
+    ) {
+        let previousActive = parallelTracksPreference.activeTrackCode
+        parallelTracksPreference.toggleAIFrontierTrack(code)
+        if parallelTracksPreference.activeTrackCode != previousActive {
+            activateTrack(code: parallelTracksPreference.activeTrackCode, persistTo: defaults, key: key)
+        } else if let defaults {
+            try? parallelTracksPreference.save(to: defaults, key: key)
+        }
+    }
+
+    public mutating func setBilingualTechnicalTerms(
+        _ enabled: Bool,
+        persistTo defaults: UserDefaults? = nil,
+        key: String = CertigoParallelTracksPreference.storageKey
+    ) {
+        parallelTracksPreference.bilingualTechnicalTermsEN = enabled
+        if let defaults {
+            try? parallelTracksPreference.save(to: defaults, key: key)
+        }
+    }
+
+    public mutating func setStrictTimed90Min(
+        _ enabled: Bool,
+        persistTo defaults: UserDefaults? = nil,
+        key: String = CertigoParallelTracksPreference.storageKey
+    ) {
+        parallelTracksPreference.strictTimed90Min = enabled
+        mockExamMachine = MockExamStateMachine(
+            examId: mockExamMachine.examId,
+            routeCode: mockExamMachine.routeCode,
+            routeTitle: mockExamMachine.routeTitle,
+            baseDurationMinutes: enabled ? 90 : 40,
+            timePolicy: enabled ? .standardTimed : .untimed,
+            questions: mockExamMachine.questions
+        )
+        if let defaults {
+            try? parallelTracksPreference.save(to: defaults, key: key)
+        }
+    }
+
+    public mutating func loadParallelTracksPreference(
+        from defaults: UserDefaults = .standard,
+        key: String = CertigoParallelTracksPreference.storageKey
+    ) {
+        if let loaded = try? CertigoParallelTracksPreference.load(from: defaults, key: key) {
+            applyParallelTracksPreference(loaded)
+        }
+    }
+
+    public func saveParallelTracksPreference(
+        to defaults: UserDefaults = .standard,
+        key: String = CertigoParallelTracksPreference.storageKey
+    ) throws {
+        try parallelTracksPreference.save(to: defaults, key: key)
+    }
+
+    internal mutating func refreshPassportRoutesFromParallelPreference() {
+        let routeBadges = parallelTracksPreference.parallelTrackCodes.map { code in
+            let descriptor = CertiGoMultiTrackAndAIContentCatalog.track(forCode: code)
+            return PrismRouteBadgeModel(
+                examCode: descriptor.code,
+                officialTitle: descriptor.officialTitle,
+                region: descriptor.region
+            )
+        }
+        guard !routeBadges.isEmpty else { return }
+        let existingPassport = calibrationHistory.passport
+        calibrationHistory = CalibrationHistoryScreenModel(
+            passport: PrismPassportSummary(
+                holderPseudonym: existingPassport.holderPseudonym,
+                holderInitials: existingPassport.holderInitials,
+                primaryRegion: existingPassport.primaryRegion,
+                anchoredConceptsCount: existingPassport.anchoredConceptsCount,
+                masteredConceptsCount: existingPassport.masteredConceptsCount,
+                completedRhythmWeeks: existingPassport.completedRhythmWeeks,
+                routes: routeBadges,
+                verificationLinks: existingPassport.verificationLinks
+            ),
+            samples: calibrationHistory.samples,
+            recentSessionsCount: calibrationHistory.recentSessionsCount
+        )
     }
 }
 
