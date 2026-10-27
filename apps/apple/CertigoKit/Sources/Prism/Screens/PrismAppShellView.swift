@@ -19,6 +19,7 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
     public var calibrationHistory: CalibrationHistoryScreenModel
     public var contextualAISession: ContextualAISessionState
     public var latestTutorExplanation: TutorExplanation?
+    public var parallelTracksPreference: CertigoParallelTracksPreference
 
     public init(
         todayModel: TodayScreenModel = Self.defaultTodayModel(),
@@ -34,7 +35,8 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
         routeReadiness: RouteReadinessScreenModel = Self.defaultRouteReadiness(),
         calibrationHistory: CalibrationHistoryScreenModel = Self.defaultCalibrationHistory(),
         contextualAISession: ContextualAISessionState = ContextualAISessionState(),
-        latestTutorExplanation: TutorExplanation? = nil
+        latestTutorExplanation: TutorExplanation? = nil,
+        parallelTracksPreference: CertigoParallelTracksPreference = CertigoParallelTracksPreference()
     ) {
         self.todayModel = todayModel
         self.atlasModel = atlasModel
@@ -50,6 +52,7 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
         self.calibrationHistory = calibrationHistory
         self.contextualAISession = contextualAISession
         self.latestTutorExplanation = latestTutorExplanation
+        self.parallelTracksPreference = parallelTracksPreference
     }
 
     public static func defaultRhythmWeek() -> PrismRhythmWeekModel {
@@ -493,7 +496,8 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
         lesson: Lesson? = nil,
         readinessSnapshot: ReadinessSnapshot? = nil,
         mockExam: MockExam? = nil,
-        tutorExplanation: TutorExplanation? = nil
+        tutorExplanation: TutorExplanation? = nil,
+        parallelTracksPreference: CertigoParallelTracksPreference? = nil
     ) {
         self = synchronized(
             profile: profile,
@@ -503,7 +507,8 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
             lesson: lesson,
             readinessSnapshot: readinessSnapshot,
             mockExam: mockExam,
-            tutorExplanation: tutorExplanation
+            tutorExplanation: tutorExplanation,
+            parallelTracksPreference: parallelTracksPreference
         )
     }
 
@@ -515,15 +520,23 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
         lesson: Lesson? = nil,
         readinessSnapshot: ReadinessSnapshot? = nil,
         mockExam: MockExam? = nil,
-        tutorExplanation: TutorExplanation? = nil
+        tutorExplanation: TutorExplanation? = nil,
+        parallelTracksPreference: CertigoParallelTracksPreference? = nil
     ) -> PrismAppShellCoordinatorModel {
         var next = self
+        if let parallelTracksPreference {
+            next.parallelTracksPreference = parallelTracksPreference
+            next.todayModel.activeRouteCode = parallelTracksPreference.activeTrackCode
+            let activeDescriptor = CertiGoMultiTrackAndAIContentCatalog.track(forCode: parallelTracksPreference.activeTrackCode)
+            next.todayModel.activeRouteTitle = activeDescriptor.officialTitle
+        }
         let availableTracks = catalog?.tracks ?? tracks ?? []
         let candidateTrackId = profile?.activeTrackId
             ?? learningPath?.trackId
             ?? readinessSnapshot?.trackId
             ?? lesson?.trackId
             ?? mockExam?.trackId
+            ?? parallelTracksPreference?.activeTrackCode
 
         let matchedTrack = availableTracks.first { track in
             guard let candidateTrackId else { return false }
@@ -559,6 +572,7 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
 
         let activeRegion = Self.region(forTrackCode: resolvedRouteCode, title: resolvedRouteTitle)
         let activeProduct = BrandRegistry.productID(forTrackCode: resolvedRouteCode)
+        next.parallelTracksPreference.setActiveTrack(resolvedRouteCode)
 
         // 1. Synchronize Catalog & Global Search routes
         if !availableTracks.isEmpty {
@@ -1241,16 +1255,18 @@ public struct PrismAppShellView: View {
             if showCourseTray {
                 PrismCourseSwitcherTrayView(
                     activeRouteCode: coordinator.todayModel.activeRouteCode ?? "AZ-104",
+                    parallelTracksPreference: coordinator.parallelTracksPreference,
                     selectedBrandFilter: $selectedBrandFilter,
                     flags: flags,
-                    onSelectCourse: { code, title in
-                        coordinator.todayModel.activeRouteCode = code
-                        coordinator.todayModel.activeRouteTitle = title
-                        for idx in coordinator.catalogExplorer.routes.indices {
-                            coordinator.catalogExplorer.routes[idx].isConfirmedActiveGoal =
-                                (coordinator.catalogExplorer.routes[idx].code == code)
-                        }
+                    onSelectCourse: { code, _ in
+                        coordinator.activateTrack(code: code)
                         showCourseTray = false
+                    },
+                    onToggleParallelTrack: { code in
+                        coordinator.toggleParallelTrack(code: code)
+                    },
+                    onToggleAIFrontierTrack: { code in
+                        coordinator.toggleAIFrontierTrack(code: code)
                     },
                     onOpenFullCatalog: {
                         showCourseTray = false
@@ -1548,38 +1564,7 @@ public struct PrismAppShellView: View {
                 model: $coordinator.catalogExplorer,
                 flags: flags,
                 onSelectRoute: { item in
-                    let updatedRoutes = coordinator.catalogExplorer.routes.map { route in
-                        CatalogRouteItem(
-                            id: route.id,
-                            code: route.code,
-                            officialTitle: route.officialTitle,
-                            region: route.region,
-                            isConfirmedActiveGoal: route.code == item.code
-                        )
-                    }
-                    coordinator.catalogExplorer = CatalogExplorerModel(
-                        routes: updatedRoutes,
-                        selectedRegion: coordinator.catalogExplorer.selectedRegion,
-                        searchQuery: coordinator.catalogExplorer.searchQuery
-                    )
-                    coordinator.todayModel = TodayScreenModel(
-                        state: coordinator.todayModel.state,
-                        suggestedLength: coordinator.todayModel.suggestedLength,
-                        selectedLength: coordinator.todayModel.selectedLength,
-                        composition: coordinator.todayModel.composition,
-                        activeRouteCode: item.code,
-                        activeRouteTitle: item.officialTitle,
-                        dailySituation: coordinator.todayModel.dailySituation,
-                        rhythm: coordinator.todayModel.rhythm
-                    )
-                    coordinator.routeReadiness = RouteReadinessScreenModel(
-                        routeCode: item.code,
-                        officialTitle: item.officialTitle,
-                        readiness: coordinator.routeReadiness.readiness,
-                        objectiveCoverage: coordinator.routeReadiness.objectiveCoverage,
-                        historyWeeksCount: coordinator.routeReadiness.historyWeeksCount,
-                        estimatedReadyDateRange: coordinator.routeReadiness.estimatedReadyDateRange
-                    )
+                    coordinator.activateTrack(code: item.code)
                     router.push(.routeObjective(trackCode: item.code))
                 }
             )
@@ -1620,7 +1605,12 @@ public struct PrismAppShellView: View {
         case .passport, .historyAndCalibration:
             PassportAndCalibrationScreen(model: coordinator.calibrationHistory)
         case .settings:
-            CompleteSettingsScreen()
+            CompleteSettingsScreen(
+                parallelTracksPreference: Binding(
+                    get: { coordinator.parallelTracksPreference },
+                    set: { coordinator.applyParallelTracksPreference($0) }
+                )
+            )
         case .settingsRhythmAndReminders:
             WeeklyRhythmSettingsScreen(model: $coordinator.rhythmPlanner)
         case .settingsLanguage, .settingsAccessibilityAndCalmMode, .settingsOfflineData, .settingsAccount, .settingsDataAndMethodology:
@@ -1630,7 +1620,12 @@ public struct PrismAppShellView: View {
         case .settingsAI:
             ContextualAISheetScreen()
         case .settingsAccountDeletion:
-            CompleteSettingsScreen()
+            CompleteSettingsScreen(
+                parallelTracksPreference: Binding(
+                    get: { coordinator.parallelTracksPreference },
+                    set: { coordinator.applyParallelTracksPreference($0) }
+                )
+            )
         case .settingsBrandNotices:
             BrandNoticesView()
         }
@@ -1641,6 +1636,13 @@ public struct PrismAppShellView: View {
         switch cover {
         case .onboarding:
             OnboardingFlowCoverScreen(
+                stateMachine: OnboardingFlowStateMachine(
+                    selectedRouteCode: coordinator.parallelTracksPreference.activeTrackCode,
+                    parallelTracksPreference: coordinator.parallelTracksPreference
+                ),
+                onApplyParallelTracksPreference: { preference in
+                    coordinator.applyParallelTracksPreference(preference)
+                },
                 onFinishOnboarding: {
                     router.confirmForceDismissCover()
                 }
@@ -1814,28 +1816,73 @@ private struct PrismDuolingoTopBar: View {
     }
 }
 
-private struct PrismCourseSwitcherTrayView: View {
-    struct BrandFilterSpec: Identifiable {
-        let id: String
-        let label: String
-        let product: BrandProductID
+public struct PrismCourseSwitcherTrayView: View {
+    public struct BrandFilterSpec: Identifiable, Equatable, Sendable {
+        public let id: String
+        public let label: String
+        public let product: BrandProductID
+
+        public init(id: String, label: String, product: BrandProductID) {
+            self.id = id
+            self.label = label
+            self.product = product
+        }
     }
 
-    struct CourseItemSpec: Identifiable {
-        var id: String { code }
-        let code: String
-        let title: String
-        let brandId: String
-        let progressText: String
-        let product: BrandProductID
+    public struct CourseItemSpec: Identifiable, Equatable, Sendable {
+        public var id: String { code }
+        public let code: String
+        public let title: String
+        public let brandId: String
+        public let progressText: String
+        public let product: BrandProductID
+
+        public init(
+            code: String,
+            title: String,
+            brandId: String,
+            progressText: String,
+            product: BrandProductID
+        ) {
+            self.code = code
+            self.title = title
+            self.brandId = brandId
+            self.progressText = progressText
+            self.product = product
+        }
     }
 
-    let activeRouteCode: String
-    @Binding var selectedBrandFilter: String
-    let flags: FeatureFlags
-    let onSelectCourse: (String, String) -> Void
-    let onOpenFullCatalog: () -> Void
-    let onDismiss: () -> Void
+    public let activeRouteCode: String
+    public let parallelTracksPreference: CertigoParallelTracksPreference
+    @Binding public var selectedBrandFilter: String
+    public let flags: FeatureFlags
+    public let onSelectCourse: (String, String) -> Void
+    public let onToggleParallelTrack: (String) -> Void
+    public let onToggleAIFrontierTrack: (String) -> Void
+    public let onOpenFullCatalog: () -> Void
+    public let onDismiss: () -> Void
+
+    public init(
+        activeRouteCode: String = "AZ-104",
+        parallelTracksPreference: CertigoParallelTracksPreference = CertigoParallelTracksPreference(),
+        selectedBrandFilter: Binding<String>,
+        flags: FeatureFlags = FeatureFlags(),
+        onSelectCourse: @escaping (String, String) -> Void = { _, _ in },
+        onToggleParallelTrack: @escaping (String) -> Void = { _ in },
+        onToggleAIFrontierTrack: @escaping (String) -> Void = { _ in },
+        onOpenFullCatalog: @escaping () -> Void = {},
+        onDismiss: @escaping () -> Void = {}
+    ) {
+        self.activeRouteCode = activeRouteCode
+        self.parallelTracksPreference = parallelTracksPreference
+        self._selectedBrandFilter = selectedBrandFilter
+        self.flags = flags
+        self.onSelectCourse = onSelectCourse
+        self.onToggleParallelTrack = onToggleParallelTrack
+        self.onToggleAIFrontierTrack = onToggleAIFrontierTrack
+        self.onOpenFullCatalog = onOpenFullCatalog
+        self.onDismiss = onDismiss
+    }
 
     private var brandFilters: [BrandFilterSpec] {
         [
@@ -1862,7 +1909,7 @@ private struct PrismCourseSwitcherTrayView: View {
         return all.filter { $0.brandId == selectedBrandFilter }
     }
 
-    var body: some View {
+    public var body: some View {
         ZStack(alignment: .top) {
             PrismColor.textPrimary.opacity(0.32)
                 .ignoresSafeArea()
@@ -1909,55 +1956,83 @@ private struct PrismCourseSwitcherTrayView: View {
                     }
                 }
 
-                Text(verbatim: "CHANGER DE CERTIFICATION ACTIVE")
+                Text(verbatim: "PARCOURS EN PARALLÈLE (\(parallelTracksPreference.parallelTrackCodes.count)) & VEILLE IA (\(parallelTracksPreference.aiFrontierTrackCodes.count))")
                     .prismTextStyle(.caption)
                     .foregroundStyle(PrismColor.textSecondary)
 
                 ForEach(courses) { course in
                     let isActive = course.code == activeRouteCode
-                    Button {
-                        onSelectCourse(course.code, course.title)
-                    } label: {
-                        HStack(spacing: PrismSpacing.m) {
-                            CertiGoOfficialCrestView(
-                                routeCode: course.code,
-                                size: PrismSize.brandM
-                            )
-                            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                                Text(verbatim: course.code)
-                                    .prismTextStyle(.caption)
-                                    .foregroundStyle(PrismColor.accent)
-                                Text(verbatim: course.title)
-                                    .prismTextStyle(.subheadline)
-                                    .foregroundStyle(PrismColor.textPrimary)
-                                Text(verbatim: course.progressText)
-                                    .prismTextStyle(.caption)
-                                    .foregroundStyle(PrismColor.textSecondary)
-                            }
-                            Spacer(minLength: PrismSpacing.xs)
-                            if isActive {
-                                PrismBadge(
-                                    configuration: PrismBadgeConfiguration(
-                                        text: "Actif",
-                                        semantics: .accent
-                                    )
+                    let isTrackedInParallel = parallelTracksPreference.isTrackingParallelCertification(course.code)
+                    HStack(spacing: PrismSpacing.m) {
+                        Button {
+                            onSelectCourse(course.code, course.title)
+                        } label: {
+                            HStack(spacing: PrismSpacing.m) {
+                                CertiGoOfficialCrestView(
+                                    routeCode: course.code,
+                                    size: PrismSize.brandM
                                 )
+                                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                    Text(verbatim: course.code)
+                                        .prismTextStyle(.caption)
+                                        .foregroundStyle(PrismColor.accent)
+                                    Text(verbatim: course.title)
+                                        .prismTextStyle(.subheadline)
+                                        .foregroundStyle(PrismColor.textPrimary)
+                                    Text(verbatim: course.progressText)
+                                        .prismTextStyle(.caption)
+                                        .foregroundStyle(PrismColor.textSecondary)
+                                }
+                                Spacer(minLength: PrismSpacing.xs)
+                                if isActive {
+                                    PrismBadge(
+                                        configuration: PrismBadgeConfiguration(
+                                            text: "Actif",
+                                            semantics: .accent
+                                        )
+                                    )
+                                }
                             }
                         }
-                        .padding(PrismSpacing.m)
-                        .background(
-                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                                .fill(isActive ? PrismColor.accent.opacity(0.1) : PrismColor.canvas)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                                .strokeBorder(
-                                    isActive ? PrismColor.accent : PrismColor.separator,
-                                    lineWidth: isActive ? PrismBorder.strong : PrismBorder.regular
-                                )
-                        )
+                        .buttonStyle(.plain)
+
+                        Button {
+                            onToggleParallelTrack(course.code)
+                        } label: {
+                            Image(systemName: isTrackedInParallel ? "checkmark.circle.fill" : "plus.circle")
+                                .prismTextStyle(.title3)
+                                .foregroundStyle(isTrackedInParallel ? PrismColor.positive : PrismColor.textSecondary)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .padding(PrismSpacing.m)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                            .fill(isActive ? PrismColor.accent.opacity(0.1) : PrismColor.canvas)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                            .strokeBorder(
+                                isActive ? PrismColor.accent : PrismColor.separator,
+                                lineWidth: isActive ? PrismBorder.strong : PrismBorder.regular
+                            )
+                    )
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: PrismSpacing.xs) {
+                        ForEach(CertigoParallelTracksPreference.defaultAIFrontierTrackCodes, id: \.self) { aiCode in
+                            let isFollowed = parallelTracksPreference.isTrackingAIFrontier(aiCode)
+                            PrismChip(
+                                configuration: PrismChipConfiguration(
+                                    title: aiCode,
+                                    isSelected: isFollowed
+                                )
+                            ) {
+                                onToggleAIFrontierTrack(aiCode)
+                            }
+                        }
+                    }
                 }
 
                 Button {

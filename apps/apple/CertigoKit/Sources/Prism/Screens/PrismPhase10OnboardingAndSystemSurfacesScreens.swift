@@ -112,7 +112,31 @@ public struct OnboardingFlowStateMachine: Codable, Equatable, Hashable, Sendable
     public var isPlayableOffline: Bool { true }
     public var showsPaywallBeforeFirstValue: Bool { false }
     public var currentFigmaScreen: OnboardingFigmaScreenID = .ob01OpeningArch
-    public var selectedParallelRoutes: [String] = ["AZ-104", "SAA-C03", "GH-300"]
+    public var parallelTracksPreference: CertigoParallelTracksPreference
+    public var selectedParallelRoutes: [String] {
+        get { parallelTracksPreference.parallelTrackCodes }
+        set {
+            parallelTracksPreference = CertigoParallelTracksPreference(
+                parallelTrackCodes: newValue,
+                activeTrackCode: selectedRouteCode,
+                aiFrontierTrackCodes: parallelTracksPreference.aiFrontierTrackCodes,
+                bilingualTechnicalTermsEN: parallelTracksPreference.bilingualTechnicalTermsEN,
+                strictTimed90Min: parallelTracksPreference.strictTimed90Min
+            )
+        }
+    }
+    public var selectedAIFrontierTrackCodes: [String] {
+        get { parallelTracksPreference.aiFrontierTrackCodes }
+        set {
+            parallelTracksPreference = CertigoParallelTracksPreference(
+                parallelTrackCodes: parallelTracksPreference.parallelTrackCodes,
+                activeTrackCode: selectedRouteCode,
+                aiFrontierTrackCodes: newValue,
+                bilingualTechnicalTermsEN: parallelTracksPreference.bilingualTechnicalTermsEN,
+                strictTimed90Min: parallelTracksPreference.strictTimed90Min
+            )
+        }
+    }
     public var selectedAIActorTopics: [String] = ["OpenAI & GPT", "Anthropic Claude", "Google Gemini", "Microsoft Foundry & Copilot"]
     public var projectedScoreWithCertiGo: Int { 845 }
     public var projectedScoreWithoutCertiGo: Int { 580 }
@@ -127,7 +151,8 @@ public struct OnboardingFlowStateMachine: Codable, Equatable, Hashable, Sendable
         weeklyGoalDays: Int = 4,
         targetExamHorizonLabel: String = "Dans 2 mois",
         hasCompletedFirstValueSession: Bool = false,
-        notificationsAuthorized: Bool = false
+        notificationsAuthorized: Bool = false,
+        parallelTracksPreference: CertigoParallelTracksPreference? = nil
     ) {
         self.currentStep = currentStep
         self.selectedRegion = selectedRegion
@@ -138,6 +163,9 @@ public struct OnboardingFlowStateMachine: Codable, Equatable, Hashable, Sendable
         self.targetExamHorizonLabel = targetExamHorizonLabel
         self.hasCompletedFirstValueSession = hasCompletedFirstValueSession
         self.notificationsAuthorized = notificationsAuthorized
+        var resolvedPref = parallelTracksPreference ?? CertigoParallelTracksPreference()
+        resolvedPref.setActiveTrack(selectedRouteCode)
+        self.parallelTracksPreference = resolvedPref
     }
 
     public var canPromptForNotifications: Bool {
@@ -148,7 +176,21 @@ public struct OnboardingFlowStateMachine: Codable, Equatable, Hashable, Sendable
         selectedRegion = region
         selectedRouteCode = routeCode
         selectedBrandProductId = productId
+        parallelTracksPreference.setActiveTrack(routeCode)
         currentStep = .discoverySituation
+    }
+
+    public mutating func toggleParallelRoute(_ code: String) {
+        parallelTracksPreference.toggleParallelTrack(code)
+        selectedRouteCode = parallelTracksPreference.activeTrackCode
+    }
+
+    public mutating func toggleAIFrontierTrack(_ code: String) {
+        parallelTracksPreference.toggleAIFrontierTrack(code)
+    }
+
+    public func buildParallelTracksPreference() -> CertigoParallelTracksPreference {
+        parallelTracksPreference
     }
 
     public mutating func answerDiscoverySituation(optionCode: String) {
@@ -737,13 +779,16 @@ import SwiftUI
 
 public struct OnboardingFlowCoverScreen: View {
     @State private var stateMachine: OnboardingFlowStateMachine
+    public let onApplyParallelTracksPreference: (CertigoParallelTracksPreference) -> Void
     public let onFinishOnboarding: () -> Void
 
     public init(
         stateMachine: OnboardingFlowStateMachine = OnboardingFlowStateMachine(),
+        onApplyParallelTracksPreference: @escaping (CertigoParallelTracksPreference) -> Void = { _ in },
         onFinishOnboarding: @escaping () -> Void = {}
     ) {
         self._stateMachine = State(initialValue: stateMachine)
+        self.onApplyParallelTracksPreference = onApplyParallelTracksPreference
         self.onFinishOnboarding = onFinishOnboarding
     }
 
@@ -786,7 +831,7 @@ public struct OnboardingFlowCoverScreen: View {
                             examCode: stateMachine.selectedRouteCode
                         )
                         PrismText(
-                            text: "Suis plusieurs parcours en parallèle (\(stateMachine.selectedParallelRoutes.joined(separator: " · "))) et les cours sur les Grands Acteurs de l'IA (OpenAI, Claude, Gemini, Foundry, Copilot). Nouveau contenu chaque semaine !",
+                            text: "Suis plusieurs parcours en parallèle (\(stateMachine.selectedParallelRoutes.joined(separator: " · "))) et les cours sur les Grands Acteurs de l'IA (\(stateMachine.selectedAIFrontierTrackCodes.joined(separator: " · "))). Nouveau contenu chaque semaine !",
                             style: .footnote,
                             role: .textSecondary
                         )
@@ -822,6 +867,7 @@ public struct OnboardingFlowCoverScreen: View {
                                     routeCode: "AZ-104",
                                     productId: BrandProductID("microsoft-entra-id")
                                 )
+                                onApplyParallelTracksPreference(stateMachine.parallelTracksPreference)
                             } label: {
                                 Text(verbatim: "Choisir mes parcours en parallèle (OB-03A & OB-03B)")
                             }
@@ -856,6 +902,7 @@ public struct OnboardingFlowCoverScreen: View {
                         case .notificationPermissionSheet:
                             Button {
                                 _ = stateMachine.grantNotificationPermissionIfEligible()
+                                onApplyParallelTracksPreference(stateMachine.parallelTracksPreference)
                                 onFinishOnboarding()
                             } label: {
                                 Text(verbatim: "Autoriser les notifications iOS & Ajouter le Widget")
@@ -941,14 +988,23 @@ public struct CertigoProSheetScreen: View {
 
 public struct CompleteSettingsScreen: View {
     @State private var deletionModel: AccountDeletionConfirmationModel
+    @State private var localPreference: CertigoParallelTracksPreference
+    private let externalPreferenceBinding: Binding<CertigoParallelTracksPreference>?
     public let onSelectSection: (SettingsSectionDestination) -> Void
 
     public init(
         deletionModel: AccountDeletionConfirmationModel = AccountDeletionConfirmationModel(),
+        parallelTracksPreference: Binding<CertigoParallelTracksPreference>? = nil,
         onSelectSection: @escaping (SettingsSectionDestination) -> Void = { _ in }
     ) {
         self._deletionModel = State(initialValue: deletionModel)
+        self._localPreference = State(initialValue: parallelTracksPreference?.wrappedValue ?? CertigoParallelTracksPreference())
+        self.externalPreferenceBinding = parallelTracksPreference
         self.onSelectSection = onSelectSection
+    }
+
+    private var preferenceBinding: Binding<CertigoParallelTracksPreference> {
+        externalPreferenceBinding ?? $localPreference
     }
 
     public var body: some View {
@@ -957,12 +1013,64 @@ public struct CompleteSettingsScreen: View {
                 PrismSection(title: "PARAMÈTRES · STYLE 1 CHATGPT iOS 2026") {
                     PrismCard(variant: .standard) {
                         VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                            settingsMonoRow(symbol: "square.stack.3d.up", title: "Parcours actifs en parallèle", value: "AZ-104 + 2 ›", section: .account)
-                            settingsMonoRow(symbol: "globe", title: "Langue des cours & examens", value: "FR + Termes EN ›", section: .language)
-                            settingsMonoRow(symbol: "timer", title: "Mode Examen Blanc (Pearson)", value: "Chrono 90m ›", section: .dataAndMethodology)
+                            settingsMonoRow(
+                                symbol: "square.stack.3d.up",
+                                title: "Parcours actifs en parallèle",
+                                value: preferenceBinding.wrappedValue.settingsParallelTracksSummary,
+                                section: .account
+                            )
+                            settingsMonoRow(
+                                symbol: "globe",
+                                title: "Langue des cours & examens",
+                                value: preferenceBinding.wrappedValue.settingsLanguageSummary,
+                                section: .language
+                            )
+                            settingsMonoRow(
+                                symbol: "timer",
+                                title: "Mode Examen Blanc (Pearson)",
+                                value: preferenceBinding.wrappedValue.settingsMockExamSummary,
+                                section: .dataAndMethodology
+                            )
                             settingsMonoRow(symbol: "arrow.down.circle", title: "Cours téléchargés (Hors-Ligne)", value: "142 Mo ›", section: .offlineData)
                             settingsMonoRow(symbol: "waveform", title: "Coach IA Vocal Live & Arrière-plan", value: "Nova (1,0×) ›", section: .contextualAI)
                             settingsMonoRow(symbol: "bell", title: "Rappel quotidien & Radar Hebdo IA", value: "19:30 ›", section: .rhythmAndReminders)
+                        }
+                    }
+                }
+
+                PrismSection(title: "Multi-Parcours en parallèle & Veille Grands Acteurs IA") {
+                    PrismCard(variant: .standard) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                            Toggle(isOn: preferenceBinding.bilingualTechnicalTermsEN) {
+                                Text(verbatim: "Mode bilingue d'examen (FR + Termes techniques EN)")
+                            }
+                            Toggle(isOn: preferenceBinding.strictTimed90Min) {
+                                Text(verbatim: "Mode Examen Blanc Pearson VUE strict (Chrono 90 min)")
+                            }
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: PrismSpacing.xs) {
+                                    ForEach(CertigoParallelTracksPreference.defaultParallelTrackCodes, id: \.self) { code in
+                                        PrismChip(
+                                            configuration: PrismChipConfiguration(
+                                                title: code,
+                                                isSelected: preferenceBinding.wrappedValue.isTrackingParallelCertification(code)
+                                            )
+                                        ) {
+                                            preferenceBinding.wrappedValue.toggleParallelTrack(code)
+                                        }
+                                    }
+                                    ForEach(CertigoParallelTracksPreference.defaultAIFrontierTrackCodes, id: \.self) { aiCode in
+                                        PrismChip(
+                                            configuration: PrismChipConfiguration(
+                                                title: aiCode,
+                                                isSelected: preferenceBinding.wrappedValue.isTrackingAIFrontier(aiCode)
+                                            )
+                                        ) {
+                                            preferenceBinding.wrappedValue.toggleAIFrontierTrack(aiCode)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
