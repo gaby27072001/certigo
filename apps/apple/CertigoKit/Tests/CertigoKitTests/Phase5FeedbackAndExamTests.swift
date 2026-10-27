@@ -213,4 +213,44 @@ import Testing
         #expect(exam.debrief != nil)
         #expect(exam.debrief?.readiness.formattedProbability == nil)
     }
+
+    @Test func pearsonVueBarometerCarouselScreen24ExposesThreeCardsPaginationDotsAndOfficialDomainScores() {
+        var carousel = CertiGoExamBarometerCarouselModel()
+
+        #expect(carousel.cardsCount == 3)
+        #expect(carousel.isPassed)
+        #expect(carousel.surplusPoints == 85)
+        #expect(carousel.selectedCardIndex == .graduatedBarometer)
+        #expect(carousel.paginationDotsText == "● ○ ○")
+
+        // Carte 1 : Baromètre gradué officiel
+        #expect(carousel.card1GraduatedScaleText == "0 ── Seuil 700 ── 785 / 1000 ✓ ── 1000")
+        #expect(carousel.card1VerdictBadgeText == "ADMIS · SEUIL 700 DÉPASSÉ ✓")
+
+        // Carte 2 : Rythme chrono & Calibration de confiance
+        carousel.advanceToNextCard()
+        #expect(carousel.selectedCardIndex == .paceAndConfidenceCalibration)
+        #expect(carousel.paginationDotsText == "○ ● ○")
+        #expect(carousel.card2PaceAndCalibrationText == "18s/question · 91 % de précision sur les réponses sûres")
+
+        // Carte 3 : Analyse des erreurs & Relance ciblée avec le Coach IA
+        carousel.advanceToNextCard()
+        #expect(carousel.selectedCardIndex == .errorAnalysisAndAICoachRelaunch)
+        #expect(carousel.paginationDotsText == "○ ○ ●")
+        #expect(carousel.card3ErrorAnalysisTitle == "Analyse des erreurs & Relance ciblée avec le Coach IA")
+
+        carousel.triggerCoachAIRelaunch()
+        #expect(carousel.coachAIRelaunchTriggeredCount == 1)
+
+        // Cycle back to Carte 1 and check previous navigation
+        carousel.advanceToNextCard()
+        #expect(carousel.selectedCardIndex == .graduatedBarometer)
+        carousel.returnToPreviousCard()
+        #expect(carousel.selectedCardIndex == .errorAnalysisAndAICoachRelaunch)
+
+        // Official domain score rows for the bottom white card
+        #expect(carousel.officialDomainScores.count == 5)
+        #expect(carousel.officialDomainScores.map(\.percentage) == [92, 84, 78, 58, 76])
+        #expect(carousel.officialDomainScores.filter { !$0.isPassingDomain }.map(\.domainCode) == ["D4"])
+    }
 }

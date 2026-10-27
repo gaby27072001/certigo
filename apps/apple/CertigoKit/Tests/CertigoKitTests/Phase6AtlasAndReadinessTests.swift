@@ -174,4 +174,74 @@ import Testing
         search.query = "Foundry"
         #expect(search.filteredResults.map(\.id) == ["r-ai"])
     }
+
+    @Test func proStatisticsDashboard08B1And08B2CoversRadarTelemetryHeatmapRingsCurveAndOneTapActions() {
+        var dashboard = CertiGoProStatisticsDashboardModel()
+
+        // Volet Haut (08B-1): Indice 84 %, +85 pts au-dessus du seuil 700, Radar 5 Axes, 3 Compteurs, Heatmap 8 semaines (56 jours)
+        #expect(dashboard.examReadinessIndexPercentage == 84)
+        #expect(dashboard.pointsAboveOfficialThreshold == 85)
+        #expect(dashboard.readinessBadgeText == "INDICE DE FORME EXAMEN · 84 % (PRÊT ✓)")
+        #expect(dashboard.thresholdSurplusHeadline == "Seuil officiel Pearson VUE (700/1000) dépassé de +85 pts")
+
+        #expect(dashboard.radarAxes.count == 5)
+        #expect(dashboard.radarAxes.map(\.formattedLabel) == [
+            "Identité 92 %",
+            "Stockage 84 %",
+            "Calcul 78 %",
+            "Réseau 58 %",
+            "Supervision 76 %",
+        ])
+        #expect(dashboard.radarAxes.filter(\.isPriorityWeakness).map(\.axisTitle) == ["Réseau"])
+
+        #expect(dashboard.telemetryCounters.count == 3)
+        #expect(dashboard.telemetryCounters.map(\.valueLabel) == [
+            "18s / quest.",
+            "88 % 1er essai",
+            "24h 40m cumulées",
+        ])
+
+        #expect(dashboard.heatmapCells.count == 56)
+        #expect(Set(dashboard.heatmapCells.map(\.weekIndex)).count == 8)
+        #expect(dashboard.activeHeatmapDaysCount > 0)
+
+        // Volet Bas (08B-2): 3 Anneaux Fitness, Courbe Examen Blanc /1000, Points Forts vs À Travailler avec action 1 tap
+        #expect(dashboard.performanceRings.count == 3)
+        #expect(dashboard.performanceRings.map(\.formattedSummary) == [
+            "Objectif Quotidien : 15/15 min",
+            "Précision QCM : 88 %",
+            "Labs & Oral IA : 6/5 séances",
+        ])
+        #expect(dashboard.performanceRings.allSatisfy { $0.isGoalReached })
+
+        #expect(dashboard.mockScoreProgression.count == 4)
+        #expect(dashboard.mockScoreProgression.map(\.formattedPointLabel) == [
+            "Sem. 1 : 540",
+            "Sem. 2 : 640",
+            "Sem. 3 : 730",
+            "Sem. 4 : 810 / 1000 ✓",
+        ])
+        #expect(dashboard.mockScoreProgression.map(\.isAbovePassingThreshold) == [false, false, true, true])
+
+        #expect(dashboard.strengthCard.headerTitle == "💪 Points Forts")
+        #expect(dashboard.focusTargetCard.headerTitle == "🎯 À Travailler")
+
+        dashboard.selectPane(.bottomPane08B2)
+        #expect(dashboard.selectedPane == .bottomPane08B2)
+
+        dashboard.selectRadarAxis(id: "axis-network")
+        #expect(dashboard.selectedRadarAxis?.axisTitle == "Réseau")
+
+        dashboard.selectHeatmapDay(dayIndex: 14)
+        #expect(dashboard.selectedHeatmapDayIndex == 14)
+
+        let focusConcept = dashboard.triggerOneTapFocusAction()
+        #expect(focusConcept == "az104-pe-dns")
+        #expect(dashboard.triggeredOneTapActionCount == 1)
+        #expect(dashboard.lastTriggeredConceptId == "az104-pe-dns")
+
+        let strengthConcept = dashboard.triggerOneTapStrengthAction()
+        #expect(strengthConcept == "az104-entra-rbac")
+        #expect(dashboard.triggeredOneTapActionCount == 2)
+    }
 }
