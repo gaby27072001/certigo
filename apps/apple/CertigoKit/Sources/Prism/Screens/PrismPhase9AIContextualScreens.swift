@@ -1905,7 +1905,9 @@ public struct CertiGoAIHubCompleteView: View {
                 TextField(
                     text: $stateMachine.historySearchQuery,
                     prompt: Text(verbatim: "Rechercher une conversation…")
-                )
+                ) {
+                    Text(verbatim: "Rechercher une conversation…")
+                }
                 .prismTextStyle(.subheadline)
                 .padding(PrismSpacing.s)
                 .background(
