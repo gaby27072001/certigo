@@ -1,3 +1,4 @@
+import BrandAssets
 import Foundation
 import Testing
 
@@ -424,6 +425,55 @@ import Testing
       #expect(coordinator.resolvedMotion(for: preset, reduceMotion: true).opacityOnly)
       #expect(coordinator.resolvedMotion(for: preset, reduceMotion: true).duration <= 0.3)
     }
+  }
+
+  @Test func dailySituationStateMachineExposesCanSubmitAndFeedbackResolution() {
+    let optA = PrismChoiceOption(
+      id: "a",
+      badge: "A",
+      text: "Activer Soft Delete + Purge Protection",
+      explanation: "Protège contre la purge immédiate.",
+      isCorrect: true
+    )
+    let optB = PrismChoiceOption(
+      id: "b",
+      badge: "B",
+      text: "Désactiver le pare-feu Key Vault",
+      explanation: "Expose le coffre publiquement.",
+      isCorrect: false
+    )
+    var machine = DailySituationStateMachine(
+      situationId: "sit-141",
+      dateLabel: "28 oct.",
+      title: "Protection Key Vault",
+      product: .microsoftAzure,
+      region: .security,
+      contextNarrative: "Protection contre la suppression.",
+      artifact: PrismArtifactDocument(
+        title: "kv.bicep",
+        language: "bicep",
+        lines: [PrismArtifactLine(lineNumber: 1, text: "enablePurgeProtection: true")]
+      ),
+      options: [optA, optB],
+      serverDistributionBuckets: []
+    )
+
+    #expect(!machine.canSubmit)
+    #expect(machine.feedbackResolution == nil)
+
+    machine.selectedOptionId = "a"
+    #expect(machine.canSubmit)
+    #expect(machine.feedbackResolution == nil)
+
+    let submitted = machine.submitAnswer(
+      correctOptionId: "a",
+      authorExplanation: "Explication auteur.",
+      takeaway: "Toujours activer Purge Protection."
+    )
+    #expect(submitted)
+    #expect(!machine.canSubmit)
+    #expect(machine.feedbackResolution == machine.feedback)
+    #expect(machine.feedbackResolution?.isCorrect == true)
   }
 }
 
