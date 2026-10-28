@@ -2168,6 +2168,58 @@ public struct CertiGoFigmaSceneNode: Codable, Equatable, Hashable, Sendable, Ide
         }
         return false
     }
+
+    public static let linearFlowRootNodeIds: Set<String> = [
+        "132:182", "132:264", "132:339", "132:438", "132:519",
+        "132:581", "132:651", "132:759", "132:877", "132:945", "132:1009",
+        "73:332", "26:807", "26:826", "26:863", "26:890", "26:912",
+        "73:393", "73:442", "73:509", "73:575", "73:743",
+        "73:818", "73:898", "73:958", "73:1019", "73:1070",
+        "142:478", "142:540",
+        "161:93", "161:134", "162:93", "162:120"
+    ]
+
+    public var shouldAttachRootTapGesture: Bool {
+        guard d != nil else { return false }
+        let visibleDescendants = (c ?? [])
+            .filter { !$0.isFilteredMockupChrome(parentWidth: w, parentHeight: h) }
+            .flatMap(\.allNodes)
+        if !visibleDescendants.contains(where: { $0.d != nil }) {
+            return true
+        }
+        return Self.linearFlowRootNodeIds.contains(i)
+    }
+
+    public func filteringDirectChildren(
+        _ isIncluded: (CertiGoFigmaSceneNode) -> Bool
+    ) -> CertiGoFigmaSceneNode {
+        CertiGoFigmaSceneNode(
+            i: i,
+            n: n,
+            t: t,
+            x: x,
+            y: y,
+            w: w,
+            h: h,
+            f: f,
+            s: s,
+            sh: sh,
+            r: r,
+            cl: cl,
+            op: op,
+            rot: rot,
+            d: d,
+            tx: tx,
+            fs: fs,
+            fw: fw,
+            mo: mo,
+            al: al,
+            va: va,
+            vp: vp,
+            eo: eo,
+            c: (c ?? []).filter(isIncluded)
+        )
+    }
 }
 
 public enum CertiGoFigmaSVGCommand: Equatable, Hashable, Sendable {
@@ -2235,7 +2287,7 @@ public final class CertiGoFigmaSceneGraphStore: Sendable {
     public static let expectedScreenCount: Int = 53
     public static let expectedTotalNodeCount: Int = 4712
     public static let expectedVectorCount: Int = 1429
-    public static let expectedHotspotCount: Int = 274
+    public static let expectedHotspotCount: Int = 311
 
     public let screensByNodeId: [String: CertiGoFigmaSceneNode]
 
@@ -2299,6 +2351,24 @@ public final class CertiGoFigmaSceneGraphStore: Sendable {
 
     public var totalHotspotCount: Int {
         screensByNodeId.values.reduce(0) { $0 + $1.hotspotNodes.count }
+    }
+
+    public func mergedStatistiquesProNodes() -> (
+        top: CertiGoFigmaSceneNode,
+        bottom: CertiGoFigmaSceneNode
+    )? {
+        guard let rawTop = nodeTree(forScreenNodeId: "97:498"),
+              let rawBottom = nodeTree(forScreenNodeId: "97:636")
+        else {
+            return nil
+        }
+        let top = rawTop.filteringDirectChildren { child in
+            child.i != "97:609" && child.y < 740.0
+        }
+        let bottom = rawBottom.filteringDirectChildren { child in
+            child.y >= 92.0 && !["97:640", "97:642", "97:643"].contains(child.i)
+        }
+        return (top: top, bottom: bottom)
     }
 
     public static func recommendedAnimationPreset(
@@ -2421,17 +2491,20 @@ public struct CertiGoFigmaSceneNodeView: View {
     public let node: CertiGoFigmaSceneNode
     public let scaleX: CGFloat
     public let scaleY: CGFloat
+    public let isRootScreen: Bool
     public let onNavigateToNodeId: (String) -> Void
 
     public init(
         node: CertiGoFigmaSceneNode,
         scaleX: CGFloat = 1.0,
         scaleY: CGFloat = 1.0,
+        isRootScreen: Bool = false,
         onNavigateToNodeId: @escaping (String) -> Void = { _ in }
     ) {
         self.node = node
         self.scaleX = scaleX
         self.scaleY = scaleY
+        self.isRootScreen = isRootScreen
         self.onNavigateToNodeId = onNavigateToNodeId
     }
 
@@ -2448,13 +2521,19 @@ public struct CertiGoFigmaSceneNodeView: View {
     }
 
     private var scaledCornerRadius: CGFloat {
-        CGFloat(node.r ?? 0) * uniformScale
+        isRootScreen ? 0 : CGFloat(node.r ?? 0) * uniformScale
     }
 
     private var visibleChildren: [CertiGoFigmaSceneNode] {
         (node.c ?? []).filter { child in
             !child.isFilteredMockupChrome(parentWidth: node.w, parentHeight: node.h)
         }
+    }
+
+    private var shouldAttachTapGesture: Bool {
+        guard node.d != nil else { return false }
+        guard isRootScreen else { return true }
+        return node.shouldAttachRootTapGesture
     }
 
     public var body: some View {
@@ -2476,7 +2555,7 @@ public struct CertiGoFigmaSceneNodeView: View {
             return AnyView(baseContent)
         }()
 
-        if let destinationNodeId = node.d {
+        if let destinationNodeId = node.d, shouldAttachTapGesture {
             shadowedContent
                 .contentShape(Rectangle())
                 .onTapGesture {
@@ -2557,6 +2636,9 @@ public struct CertiGoFigmaSceneNodeView: View {
         let isSingleLine = !rawText.contains("\n") && node.h < rawFontSize * 1.65
         let expandedTextW = scaledWidth + 6.0 * scaleX
         let heightVal = scaledHeight
+        let effectiveTextH = isSingleLine
+            ? max(heightVal, scaledFS * 1.25)
+            : max(heightVal * 1.15, scaledFS * 2.2)
         let textAlignment: TextAlignment = {
             switch node.al {
             case "C": return .center
@@ -2564,11 +2646,12 @@ public struct CertiGoFigmaSceneNodeView: View {
             default: return .leading
             }
         }()
+        let isVerticallyCentered = isSingleLine || node.va == "C"
         let frameAlignment: Alignment = {
             switch node.al {
-            case "C": return .center
-            case "R": return .trailing
-            default: return .leading
+            case "C": return isVerticallyCentered ? .center : .top
+            case "R": return isVerticallyCentered ? .trailing : .topTrailing
+            default: return isVerticallyCentered ? .leading : .topLeading
             }
         }()
 
@@ -2585,7 +2668,7 @@ public struct CertiGoFigmaSceneNodeView: View {
             .minimumScaleFactor(0.72)
             .allowsTightening(true)
             .lineLimit(isSingleLine ? 1 : nil)
-            .frame(width: expandedTextW, height: heightVal, alignment: frameAlignment)
+            .frame(width: expandedTextW, height: effectiveTextH, alignment: frameAlignment)
     }
 
     @ViewBuilder
@@ -2628,6 +2711,13 @@ public struct CertiGoFigmaSceneNodeView: View {
                 let childH = max(CGFloat(child.h) * scaleY, PrismBorder.hairline)
                 let childCenterX = (CGFloat(child.x) + CGFloat(child.w) * 0.5) * scaleX
                 let childCenterY = (CGFloat(child.y) + CGFloat(child.h) * 0.5) * scaleY
+                let childIsTopAlignedMultilineText: Bool = {
+                    guard child.t == "T", child.va != "C" else { return false }
+                    let childText = child.tx ?? ""
+                    let childFS = child.fs ?? 14.0
+                    let singleLine = !childText.contains("\n") && child.h < childFS * 1.65
+                    return !singleLine
+                }()
 
                 CertiGoFigmaSceneNodeView(
                     node: child,
@@ -2635,14 +2725,18 @@ public struct CertiGoFigmaSceneNodeView: View {
                     scaleY: scaleY,
                     onNavigateToNodeId: onNavigateToNodeId
                 )
-                .frame(width: childW, height: childH)
+                .frame(
+                    width: childW,
+                    height: childH,
+                    alignment: childIsTopAlignedMultilineText ? .top : .center
+                )
                 .position(x: childCenterX, y: childCenterY)
             }
         }
         .frame(width: widthVal, height: heightVal)
 
         let clippedStack: AnyView = {
-            if node.cl == 1 {
+            if !isRootScreen, node.cl == 1 {
                 return AnyView(
                     stack.clipShape(
                         RoundedRectangle(cornerRadius: radiusVal, style: .continuous)
@@ -2652,7 +2746,7 @@ public struct CertiGoFigmaSceneNodeView: View {
             return AnyView(stack)
         }()
 
-        if let strokeSpec = node.s {
+        if !isRootScreen, let strokeSpec = node.s {
             let lineWidth = PrismColor.figmaStrokeWidth(strokeSpec) * uniformScale
             let isDashed = PrismColor.figmaStrokeIsDashed(strokeSpec)
             let dashUnit = PrismSpacing.xs * uniformScale
@@ -2704,9 +2798,10 @@ public struct CertiGoFigmaExactScreenView: View {
             let availableH = max(proxy.size.height, PrismSize.brandXL)
 
             if content.nodeId == "97:498",
-               let topNode = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenNodeId: "97:498"),
-               let bottomNode = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenNodeId: "97:636")
+               let merged = CertiGoFigmaSceneGraphStore.shared.mergedStatistiquesProNodes()
             {
+                let topNode = merged.top
+                let bottomNode = merged.bottom
                 let baseW = CGFloat(max(topNode.w, 1.0))
                 let baseH = CGFloat(max(topNode.h, 1.0))
                 let scaleX = availableW / baseW
@@ -2719,6 +2814,7 @@ public struct CertiGoFigmaExactScreenView: View {
                             node: topNode,
                             scaleX: scaleX,
                             scaleY: scaleY,
+                            isRootScreen: true,
                             onNavigateToNodeId: onNavigateToNodeId
                         )
                         .frame(width: availableW, height: pageH)
@@ -2727,9 +2823,11 @@ public struct CertiGoFigmaExactScreenView: View {
                             node: bottomNode,
                             scaleX: scaleX,
                             scaleY: scaleY,
+                            isRootScreen: true,
                             onNavigateToNodeId: onNavigateToNodeId
                         )
                         .frame(width: availableW, height: pageH)
+                        .padding(.top, -200.0 * scaleY)
                     }
                 }
                 .frame(width: availableW, height: availableH)
@@ -2744,6 +2842,7 @@ public struct CertiGoFigmaExactScreenView: View {
                     node: rootNode,
                     scaleX: scaleX,
                     scaleY: scaleY,
+                    isRootScreen: true,
                     onNavigateToNodeId: onNavigateToNodeId
                 )
                 .frame(width: availableW, height: availableH)
@@ -2845,7 +2944,7 @@ public struct CertiGoFigmaInteractiveAppView: View {
     }
 
     public var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .bottom) {
             CertiGoFigmaExactScreenView(
                 content: currentScreenContent,
                 onNavigateToNodeId: { targetNodeId in
@@ -2857,7 +2956,7 @@ public struct CertiGoFigmaInteractiveAppView: View {
 
             floatingChapterNavigatorOverlay
                 .padding(.horizontal, PrismSpacing.m)
-                .padding(.top, PrismSpacing.xs)
+                .padding(.bottom, PrismSpacing.xxs)
         }
         .fontDesign(.rounded)
         .preferredColorScheme(.light)
@@ -2874,7 +2973,11 @@ public struct CertiGoFigmaInteractiveAppView: View {
 
     @ViewBuilder
     private var floatingChapterNavigatorOverlay: some View {
-        VStack(alignment: .trailing, spacing: PrismSpacing.xs) {
+        VStack(alignment: .center, spacing: PrismSpacing.xs) {
+            if isPickerExpanded {
+                chapterPickerCard
+            }
+
             HStack(spacing: PrismSpacing.xxs) {
                 Button {
                     stepScreen(by: -1)
@@ -2927,10 +3030,6 @@ public struct CertiGoFigmaInteractiveAppView: View {
                 RoundedRectangle(cornerRadius: PrismRadius.pill, style: .continuous)
                     .strokeBorder(PrismColor.figmaHex("#ffffff:24"), lineWidth: PrismBorder.hairline)
             )
-
-            if isPickerExpanded {
-                chapterPickerCard
-            }
         }
     }
 
