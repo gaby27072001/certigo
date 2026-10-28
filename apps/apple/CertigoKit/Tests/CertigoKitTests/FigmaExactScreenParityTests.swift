@@ -1139,4 +1139,43 @@ struct FigmaExactScreenParityTests {
         let liveQ1 = live.applyingLiveState(to: screenQ1)
         #expect(liveQ1.node(withId: "73:404")?.tx == "4")
     }
+
+    @Test("SVG command cache pre-parses all distinct vector paths in O(1), preserves vector subtrees in applyingLiveState, and identifies pure vector illustration frames")
+    func svgCommandCacheAndStaticVectorSubtreeShortCircuit() throws {
+        let store = CertiGoFigmaSceneGraphStore.shared
+        #expect(store.totalVectorCount == CertiGoFigmaSceneGraphStore.expectedVectorCount)
+        #expect(store.parsedSVGCommandsByPath.count == 489)
+
+        var distinctVectorPaths = Set<String>()
+        var pureVectorFrameCount = 0
+        for root in store.screensByNodeId.values {
+            for node in root.allNodes {
+                if node.isPureVectorIllustrationFrame {
+                    pureVectorFrameCount += 1
+                }
+                if let vp = node.vp, !vp.isEmpty {
+                    distinctVectorPaths.insert(vp)
+                    let cached = CertiGoFigmaSVGCommand.cachedParse(vp)
+                    #expect(!cached.isEmpty)
+                    #expect(store.parsedSVGCommandsByPath[vp] == cached)
+                }
+            }
+        }
+        #expect(store.parsedSVGCommandsByPath.count == distinctVectorPaths.count)
+        #expect(pureVectorFrameCount >= 20)
+
+        var live = CertiGoFigmaLiveRuntimeState()
+        live.activeRouteCode = "SAA-C03"
+        let screen01 = try #require(store.nodeTree(forScreenNodeId: "37:375"))
+        let transformed01 = live.applyingLiveState(to: screen01)
+        #expect(transformed01.vectorNodes == screen01.vectorNodes)
+
+        // Verify UTF-8 fast hex parser parity across #rrggbb and #rrggbb:alphaPercent
+        let solid = PrismRGBA.figmaHex("  #2563eb ")
+        #expect(solid == PrismRGBA(hex: 0x2563EB, alpha: 1.0))
+        let translucent = PrismRGBA.figmaHex("#0f172a:58")
+        #expect(translucent == PrismRGBA(hex: 0x0F172A, alpha: 0.58))
+        let fractional = PrismRGBA.figmaHex("#ffffff:0.24")
+        #expect(fractional == PrismRGBA(hex: 0xFFFFFF, alpha: 0.24))
+    }
 }

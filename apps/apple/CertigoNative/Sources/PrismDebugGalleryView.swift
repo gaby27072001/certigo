@@ -13,27 +13,11 @@
       .withPersistedPreferencesLoaded(from: .shared)
     private let preferenceStore = CertigoParallelTracksPreferenceStore.shared
 
-    private var liveCoordinator: PrismAppShellCoordinatorModel {
-      let persisted = CertigoParallelTracksPreferenceStore.shared.loadOrDefault()
-      return coordinator
-        .withPersistedPreferencesLoaded(from: preferenceStore)
-        .synchronized(
-          profile: model.profile,
-          tracks: model.tracks.isEmpty ? nil : model.tracks,
-          learningPath: model.path,
-          lesson: model.lesson,
-          mockExam: model.examSnapshot?.exam,
-          tutorExplanation: model.tutorExplanation,
-          parallelTracksPreference: persisted,
-          preferenceStore: preferenceStore
-        )
-    }
-
     func body(content: Content) -> some View {
       Group {
         if showPrismShell || flags.isEnabled(.prism) {
           PrismAppShellView(
-            coordinator: liveCoordinator,
+            coordinator: coordinator,
             flags: flags,
             preferenceStore: preferenceStore
           )
