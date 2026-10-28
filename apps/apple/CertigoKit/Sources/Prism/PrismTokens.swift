@@ -225,3 +225,38 @@ extension PrismRadius {
   public static let mascotBubble: CGFloat = 20
   public static let crestPedestal: CGFloat = 28
 }
+
+#if canImport(SwiftUI)
+  import SwiftUI
+
+  public enum PrismTypography {
+    public static func figmaFont(
+      size: CGFloat,
+      style: String?,
+      monospaced: Bool = false
+    ) -> Font {
+      let normalized = (style ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+      let weight: Font.Weight
+      switch normalized {
+      case "black", "heavy":
+        weight = .black
+      case "extra bold", "extrabold":
+        weight = .heavy
+      case "bold":
+        weight = .bold
+      case "semi bold", "semibold":
+        weight = .semibold
+      case "medium":
+        weight = .medium
+      case "light":
+        weight = .light
+      default:
+        weight = .regular
+      }
+      let design: Font.Design = monospaced ? .monospaced : .rounded
+      return Font.system(size: size, weight: weight, design: design)
+    }
+  }
+#endif
