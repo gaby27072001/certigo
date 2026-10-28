@@ -1,4 +1,6 @@
 import BrandAssets
+import CertigoCortex
+import CertigoData
 import CertigoDomain
 import Foundation
 import Prism
@@ -1023,5 +1025,118 @@ struct FigmaExactScreenParityTests {
         #expect(liveSettings28.node(withId: "145:153")?.tx == "Temps majoré ×1,5  ›")
         #expect(liveSettings28.node(withId: "145:164")?.tx == "Nova (1,2×)  ›")
         #expect(live.handleTap(onNodeId: "145:157", inScreenNodeId: "145:122", coordinator: &coordinator) == "162:93")
+    }
+
+    @Test("Switching activeRouteCode dynamically adapts path steps on 01/02/03, Memo 14, Exams 21, Apple Pay Sheet 22, and Report 24 across SAA-C03, GH-300, ACE, and CKA")
+    func switchingActiveRouteCodeDynamicallyAdaptsPathMemoAndExamsAcrossCertifications() throws {
+        let store = CertiGoFigmaSceneGraphStore.shared
+        let screen01 = try #require(store.nodeTree(forScreenNodeId: "37:375"))
+        let screen03 = try #require(store.nodeTree(forScreenNodeId: "49:368"))
+        let screen14 = try #require(store.nodeTree(forScreenNodeId: "58:705"))
+        let screen21 = try #require(store.nodeTree(forScreenNodeId: "142:385"))
+        let screen22 = try #require(store.nodeTree(forScreenNodeId: "26:1009"))
+        let screen24 = try #require(store.nodeTree(forScreenNodeId: "142:540"))
+
+        let routeCodes = ["SAA-C03", "GH-300", "ACE", "CKA"]
+        for routeCode in routeCodes {
+            var live = CertiGoFigmaLiveRuntimeState()
+            live.activeRouteCode = routeCode
+            let expectedCurriculum = CertiGoLiveTrackCurriculum.curriculum(forRouteCode: routeCode)
+            #expect(live.currentCurriculum == expectedCurriculum)
+            #expect(expectedCurriculum.stepTitles.count == 5)
+            #expect(expectedCurriculum.examDomains.count == 5)
+
+            // Screen 01 (37:375): 5 path steps, unit banner, and percentage
+            let live01 = live.applyingLiveState(to: screen01)
+            #expect(live01.node(withId: "37:457")?.tx == expectedCurriculum.unitBannerTitle)
+            #expect(live01.node(withId: "37:456")?.tx == expectedCurriculum.unitProgressPercentText)
+            #expect(live01.node(withId: "37:394")?.tx == expectedCurriculum.stepTitles[0])
+            #expect(live01.node(withId: "37:405")?.tx == expectedCurriculum.stepTitles[1])
+            #expect(live01.node(withId: "37:419")?.tx == expectedCurriculum.stepTitles[2])
+            #expect(live01.node(withId: "37:425")?.tx == expectedCurriculum.stepTitles[3])
+            #expect(live01.node(withId: "37:439")?.tx == expectedCurriculum.stepTitles[4])
+
+            // Screen 03 (49:368): active step title and preview subtitle
+            let live03 = live.applyingLiveState(to: screen03)
+            #expect(live03.node(withId: "49:450")?.tx == expectedCurriculum.unitBannerTitle)
+            #expect(live03.node(withId: "49:487")?.tx == expectedCurriculum.stepTitles[2])
+            #expect(live03.node(withId: "49:488")?.tx == expectedCurriculum.stepPreviewSubtitle)
+
+            // Screen 14 (58:705): Memo activity, key topics, and golden rule
+            let live14 = live.applyingLiveState(to: screen14)
+            #expect(live14.node(withId: "58:787")?.tx == expectedCurriculum.unitBannerTitle)
+            #expect(live14.node(withId: "58:836")?.tx == expectedCurriculum.stepTitles[2])
+            #expect(live14.node(withId: "58:839")?.tx == expectedCurriculum.memoActivity)
+            #expect(live14.node(withId: "58:843")?.tx == expectedCurriculum.memoKeyTopics.0)
+            #expect(live14.node(withId: "58:845")?.tx == expectedCurriculum.memoKeyTopics.1)
+            #expect(live14.node(withId: "58:847")?.tx == expectedCurriculum.memoKeyTopics.2)
+            #expect(live14.node(withId: "58:850")?.tx == expectedCurriculum.memoGoldenRule)
+
+            // Screen 21 (142:385): 5 official weighted exam domains
+            let live21 = live.applyingLiveState(to: screen21)
+            #expect(live21.node(withId: "142:416")?.tx == "Examens · \(routeCode)")
+            #expect(live21.node(withId: "142:442")?.tx == "S'ENTRAÎNER PAR DOMAINE OFFICIEL \(routeCode)")
+            #expect(live21.node(withId: "142:446")?.tx == expectedCurriculum.examDomains[0].title)
+            #expect(live21.node(withId: "142:447")?.tx == expectedCurriculum.examDomains[0].weightText)
+            #expect(live21.node(withId: "142:449")?.tx == expectedCurriculum.examDomains[0].scorePercent)
+            #expect(live21.node(withId: "142:474")?.tx == expectedCurriculum.examDomains[4].title)
+
+            // Screen 22 (26:1009): Apple Pay exam launch sheet header and domains
+            let live22 = live.applyingLiveState(to: screen22)
+            #expect(live22.node(withId: "151:218")?.tx == "\(routeCode) ★")
+            #expect(live22.node(withId: "151:221")?.tx == "Examen Blanc \(routeCode)")
+            #expect(live22.node(withId: "151:222")?.tx == expectedCurriculum.examOfficialTitle)
+            #expect(live22.node(withId: "151:168")?.tx == expectedCurriculum.examDomains[0].title)
+            #expect(live22.node(withId: "151:196")?.tx == expectedCurriculum.examDomains[4].title)
+
+            // Screen 24 (142:540): Report /1000 domain breakdown
+            let live24 = live.applyingLiveState(to: screen24)
+            #expect(live24.node(withId: "142:591")?.tx == "SCORE PAR DOMAINE OFFICIEL \(routeCode)")
+            #expect(live24.node(withId: "142:592")?.tx == expectedCurriculum.examDomains[0].title)
+            #expect(live24.node(withId: "142:604")?.tx == expectedCurriculum.examDomains[3].title)
+        }
+    }
+
+    @Test("recordExerciseStepCompletion updates CertigoCortex FSRS ConceptMastery, increments live counters (💎/étapes), and transforms nodes 37:450 and 97:317")
+    func recordExerciseStepCompletionUpdatesCortexMasteryAndLiveCounterNodes() throws {
+        let store = CertiGoFigmaSceneGraphStore.shared
+        let screen01 = try #require(store.nodeTree(forScreenNodeId: "37:375"))
+        let screen08 = try #require(store.nodeTree(forScreenNodeId: "97:287"))
+        let screenQ1 = try #require(store.nodeTree(forScreenNodeId: "73:393"))
+
+        var live = CertiGoFigmaLiveRuntimeState()
+        #expect(live.liveStreakDays == 14)
+        #expect(live.liveGemsCount == 480)
+        #expect(live.liveHeartsCount == 5)
+        #expect(live.completedStepsCount == 42)
+        #expect(live.cortexMasteryByConceptId.isEmpty)
+
+        let now = Date(timeIntervalSince1970: 1_776_700_000)
+        live.recordExerciseStepCompletion(correct: true, latencyMs: 2_800, now: now)
+
+        #expect(live.completedExerciseCountInSession == 1)
+        #expect(live.liveGemsCount == 495)
+        #expect(live.completedStepsCount == 43)
+
+        let mastery = try #require(live.cortexMasteryByConceptId["az-104:unit-1-step-3"])
+        #expect(mastery.trackId == "AZ-104")
+        #expect(mastery.reps == 1)
+        #expect(mastery.lapses == 0)
+        #expect(mastery.stability > 1.0)
+        #expect(mastery.masteryScore > 0.0)
+
+        live.liveStreakDays = 15
+        live.liveHeartsCount = 4
+        let live01 = live.applyingLiveState(to: screen01)
+        #expect(live01.node(withId: "37:449")?.tx == "🔥 15")
+        #expect(live01.node(withId: "37:450")?.tx == "💎 495")
+        #expect(live01.node(withId: "37:451")?.tx == "❤️ 4")
+
+        let live08 = live.applyingLiveState(to: screen08)
+        #expect(live08.node(withId: "97:309")?.tx == "15 jours")
+        #expect(live08.node(withId: "97:317")?.tx == "43 étapes")
+
+        let liveQ1 = live.applyingLiveState(to: screenQ1)
+        #expect(liveQ1.node(withId: "73:404")?.tx == "4")
     }
 }
