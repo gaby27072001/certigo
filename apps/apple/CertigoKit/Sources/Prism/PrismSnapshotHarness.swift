@@ -862,6 +862,8 @@ public enum CertiGoMasterScreenCatalog {
             PrismText(text: pose.displayName, style: .subheadline)
           }
         }
+
+        CertiGoFigmaExactScreenView(screenId: descriptor.screenCode)
       }
       .padding(PrismSpacing.l)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

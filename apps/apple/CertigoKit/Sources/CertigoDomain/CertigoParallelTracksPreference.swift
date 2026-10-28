@@ -1,6 +1,7 @@
 import Foundation
 
 public struct CertigoParallelTracksPreference: Codable, Equatable, Hashable, Sendable {
+    private static let defaultsLock = NSLock()
     public static let storageKey = "certigo.parallel-tracks.v1"
     public static let defaultParallelTrackCodes = ["AZ-104", "SAA-C03", "GH-300"]
     public static let defaultActiveTrackCode = "AZ-104"
@@ -169,6 +170,8 @@ public struct CertigoParallelTracksPreference: Codable, Equatable, Hashable, Sen
         from defaults: UserDefaults = .standard,
         key: String = storageKey
     ) throws -> Self? {
+        defaultsLock.lock()
+        defer { defaultsLock.unlock() }
         guard !key.isEmpty else { throw ContractError.malformed("parallel tracks key") }
         guard let data = defaults.data(forKey: key) else {
             guard defaults.object(forKey: key) == nil else {
@@ -191,6 +194,8 @@ public struct CertigoParallelTracksPreference: Codable, Equatable, Hashable, Sen
         to defaults: UserDefaults = .standard,
         key: String = storageKey
     ) throws {
+        Self.defaultsLock.lock()
+        defer { Self.defaultsLock.unlock() }
         guard !key.isEmpty else { throw ContractError.malformed("parallel tracks key") }
         let valid = try validated()
         defaults.set(try JSONEncoder().encode(valid), forKey: key)
@@ -200,6 +205,8 @@ public struct CertigoParallelTracksPreference: Codable, Equatable, Hashable, Sen
         in defaults: UserDefaults = .standard,
         key: String = storageKey
     ) {
+        defaultsLock.lock()
+        defer { defaultsLock.unlock() }
         guard !key.isEmpty else { return }
         defaults.removeObject(forKey: key)
     }
