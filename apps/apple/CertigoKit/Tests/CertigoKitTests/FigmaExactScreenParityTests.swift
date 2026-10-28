@@ -662,7 +662,7 @@ struct FigmaExactScreenParityTests {
         }
     }
 
-    @Test("CertiGoFigmaSceneGraphStore loads all 53 screens (4,712 nodes, 1,429 valid SVG vectors, and 274 interactive hotspots)")
+    @Test("CertiGoFigmaSceneGraphStore loads all 53 screens (4,712 nodes, 1,429 valid SVG vectors, and 311 interactive hotspots)")
     func sceneGraphStoreLoadsAll53ScreensWithExactNodesVectorsAndHotspots() throws {
         let store = CertiGoFigmaSceneGraphStore.shared
         #expect(store.totalScreenCount == CertiGoFigmaSceneGraphStore.expectedScreenCount)
@@ -672,7 +672,7 @@ struct FigmaExactScreenParityTests {
         #expect(store.totalVectorCount == CertiGoFigmaSceneGraphStore.expectedVectorCount)
         #expect(store.totalVectorCount == 1429)
         #expect(store.totalHotspotCount == CertiGoFigmaSceneGraphStore.expectedHotspotCount)
-        #expect(store.totalHotspotCount == 274)
+        #expect(store.totalHotspotCount == 311)
 
         for screen in CertiGoFigmaExactScreenParity.allScreens {
             let treeByNode = try #require(
@@ -702,6 +702,72 @@ struct FigmaExactScreenParityTests {
                 )
             }
         }
+
+        // Verify enriched sub-button hotspots across screens 02, 03, 14, 05, 20, 21, 22, 23, 24, 26, and 08B-2
+        let expectedSubHotspotsByScreen: [String: [String: String]] = [
+            "42:375": [
+                "42:479": "37:375", "42:490": "37:375", "42:522": "37:375",
+                "42:532": "37:375", "42:540": "37:375", "42:548": "132:339"
+            ],
+            "49:368": [
+                "49:471": "37:375", "58:360": "58:705",
+                "49:493": "73:332", "49:497": "79:332"
+            ],
+            "58:705": [
+                "58:820": "37:375", "58:851": "49:368",
+                "58:857": "73:332", "58:861": "79:332"
+            ],
+            "62:346": [
+                "62:350": "37:375", "62:409": "73:332", "62:417": "73:332",
+                "62:439": "26:939", "62:447": "26:807"
+            ],
+            "26:939": ["26:942": "26:890"],
+            "142:385": [
+                "142:417": "142:540", "142:424": "26:1009", "142:438": "26:1009",
+                "142:443": "73:332", "142:450": "73:332", "142:457": "73:332",
+                "142:464": "73:332", "142:471": "73:332"
+            ],
+            "26:1009": [
+                "151:200": "142:385", "151:206": "142:385",
+                "151:236": "142:478", "151:240": "142:385"
+            ],
+            "142:478": [
+                "142:483": "142:385", "142:532": "142:385", "142:536": "142:540"
+            ],
+            "142:540": ["142:608": "79:332", "142:616": "142:385"],
+            "97:417": ["97:421": "97:287", "97:467": "142:385"],
+            "97:636": ["97:640": "97:287"]
+        ]
+        for (screenId, subHotspots) in expectedSubHotspotsByScreen {
+            let tree = try #require(store.nodeTree(forScreenNodeId: screenId))
+            let nodesById = Dictionary(uniqueKeysWithValues: tree.allNodes.map { ($0.i, $0) })
+            for (nodeId, expectedDest) in subHotspots {
+                let node = try #require(nodesById[nodeId], "Missing node \(nodeId) in \(screenId)")
+                #expect(node.d == expectedDest, "Expected \(nodeId) in \(screenId) to point to \(expectedDest)")
+            }
+        }
+
+        // Verify root tap gesture is suppressed on hub/popover screens (01, 02, 03, 14, 05, 06, 07, 08, 21, etc.)
+        for hubScreenId in ["37:375", "42:375", "49:368", "58:705", "62:346", "79:332", "88:317", "97:287", "142:385", "97:498", "97:636"] {
+            let root = try #require(store.nodeTree(forScreenNodeId: hubScreenId))
+            #expect(root.shouldAttachRootTapGesture == false, "Expected root tap disabled on \(hubScreenId)")
+        }
+        for linearScreenId in ["132:182", "73:332", "73:393", "26:807", "142:478", "142:540", "161:93", "162:93"] {
+            let root = try #require(store.nodeTree(forScreenNodeId: linearScreenId))
+            #expect(root.shouldAttachRootTapGesture == true, "Expected root tap enabled on \(linearScreenId)")
+        }
+
+        // Verify deduplicated merge of 08B-1 (97:498) + 08B-2 (97:636)
+        let merged = try #require(store.mergedStatistiquesProNodes())
+        let topChildIds = Set((merged.top.c ?? []).map(\.i))
+        let bottomChildIds = Set((merged.bottom.c ?? []).map(\.i))
+        #expect(!topChildIds.contains("97:609"))
+        #expect((merged.top.c ?? []).allSatisfy { $0.y < 740.0 })
+        #expect(!bottomChildIds.contains("97:640"))
+        #expect(!bottomChildIds.contains("97:642"))
+        #expect(!bottomChildIds.contains("97:643"))
+        #expect((merged.bottom.c ?? []).allSatisfy { $0.y >= 92.0 })
+        #expect(bottomChildIds.contains("97:683"))
 
         // Verify chapter quick-picker groups cover all 53 screens in exact order
         #expect(CertiGoQuickChapterGroup.allCases.count == 9)
