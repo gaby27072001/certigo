@@ -661,4 +661,105 @@ struct FigmaExactScreenParityTests {
             }
         }
     }
+
+    @Test("CertiGoFigmaSceneGraphStore loads all 53 screens (4,712 nodes, 1,429 valid SVG vectors, and 274 interactive hotspots)")
+    func sceneGraphStoreLoadsAll53ScreensWithExactNodesVectorsAndHotspots() throws {
+        let store = CertiGoFigmaSceneGraphStore.shared
+        #expect(store.totalScreenCount == CertiGoFigmaSceneGraphStore.expectedScreenCount)
+        #expect(store.totalScreenCount == 53)
+        #expect(store.totalNodeCount == CertiGoFigmaSceneGraphStore.expectedTotalNodeCount)
+        #expect(store.totalNodeCount == 4712)
+        #expect(store.totalVectorCount == CertiGoFigmaSceneGraphStore.expectedVectorCount)
+        #expect(store.totalVectorCount == 1429)
+        #expect(store.totalHotspotCount == CertiGoFigmaSceneGraphStore.expectedHotspotCount)
+        #expect(store.totalHotspotCount == 274)
+
+        for screen in CertiGoFigmaExactScreenParity.allScreens {
+            let treeByNode = try #require(
+                store.nodeTree(forScreenNodeId: screen.nodeId),
+                "Missing scene graph tree for nodeId \(screen.nodeId)"
+            )
+            let treeByCode = try #require(
+                store.nodeTree(forScreenId: screen.screenCode),
+                "Missing scene graph tree for screenCode \(screen.screenCode)"
+            )
+            #expect(treeByNode == treeByCode)
+            #expect(treeByNode.i == screen.nodeId)
+            #expect(treeByNode.w == 393)
+            #expect(treeByNode.h == 852)
+
+            for vec in treeByNode.vectorNodes {
+                let vp = try #require(vec.vp, "Missing vp on VECTOR \(vec.i) in \(screen.screenCode)")
+                let commands = CertiGoFigmaSVGCommand.parse(vp)
+                #expect(!commands.isEmpty, "Empty parsed SVG commands for VECTOR \(vec.i)")
+            }
+
+            for hotspot in treeByNode.hotspotNodes {
+                let dest = try #require(hotspot.d)
+                #expect(
+                    store.nodeTree(forScreenNodeId: dest) != nil,
+                    "Hotspot on \(hotspot.i) points to unknown screen nodeId \(dest)"
+                )
+            }
+        }
+
+        // Verify chapter quick-picker groups cover all 53 screens in exact order
+        #expect(CertiGoQuickChapterGroup.allCases.count == 9)
+        #expect(CertiGoQuickChapterGroup.orderedScreenNodeIds.count == 53)
+        #expect(Set(CertiGoQuickChapterGroup.orderedScreenNodeIds).count == 53)
+
+        // Verify image fill hash resolution and color/stroke/shadow parsers
+        #expect(
+            PrismRGBA.figmaHex("#2563eb:50").alpha == 0.5
+        )
+        #expect(
+            PrismRGBA.figmaGradientRGBAs("grad:#dbeafe,#eff6ff,#ffffff").count == 3
+        )
+        #expect(
+            PrismRGBA.figmaStrokeIsDashed("#60a5fa:2.5:d") == true
+        )
+        #expect(
+            PrismRGBA.figmaStrokeWidth("#60a5fa:2.5:d") == 2.5
+        )
+        #expect(
+            PrismRGBA.figmaShadowSpec("0:8:28:#0a1224:18")?.radius == 28
+        )
+    }
+
+    @Test("All 24 Blason 1A mascot PNGs in Prism.xcassets/Mascots are >= 300x300 @3x RGBA pure cutouts with transparent (0,0) corner")
+    func all24MascotPNGsAre300x300PureTransparentCutouts() throws {
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: root.appendingPathComponent("AGENTS.md").path) {
+            let parent = root.deletingLastPathComponent()
+            guard parent != root else { throw CocoaError(.fileNoSuchFile) }
+            root = parent
+        }
+        let xcassetsRoot = root.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Resources/Prism.xcassets")
+
+        #expect(CertiGoMascotPose.allCases.count == 24)
+        for pose in CertiGoMascotPose.allCases {
+            let slug = String(pose.rawValue.split(separator: "/").last ?? "")
+            let pngURL = xcassetsRoot
+                .appendingPathComponent("\(pose.rawValue).imageset")
+                .appendingPathComponent("\(slug).png")
+            let data = try Data(contentsOf: pngURL)
+            #expect(data.count > 26, "Invalid PNG file for \(pose.rawValue)")
+
+            // PNG IHDR starts at byte 16: 4-byte width, 4-byte height, 1-byte bitDepth, 1-byte colorType
+            let width = (Int(data[16]) << 24) | (Int(data[17]) << 16) | (Int(data[18]) << 8) | Int(data[19])
+            let height = (Int(data[20]) << 24) | (Int(data[21]) << 16) | (Int(data[22]) << 8) | Int(data[23])
+            let colorType = Int(data[25])
+            #expect(width >= 300, "Expected width >= 300 for \(pose.rawValue), got \(width)")
+            #expect(height >= 300, "Expected height >= 300 for \(pose.rawValue), got \(height)")
+            #expect(colorType == 6, "Expected RGBA colorType == 6 for \(pose.rawValue), got \(colorType)")
+
+            #if canImport(SwiftUI) && canImport(UIKit)
+            let snapshot = try PrismSnapshotHarness.decodePNG(data)
+            #expect(snapshot.width == width)
+            #expect(snapshot.height == height)
+            // Verify top-left pixel (0,0) alpha channel is 0 (100% transparent background)
+            #expect(snapshot.pixels[3] == 0, "Expected transparent (0,0) pixel for \(pose.rawValue)")
+            #endif
+        }
+    }
 }

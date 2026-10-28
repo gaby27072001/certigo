@@ -570,6 +570,15 @@ public enum CertiGoMotionSpecCatalog {
   import SwiftUI
   import UIKit
 
+  public enum CertiGoMotion {
+    public static func spring(
+      for preset: CertiGoAnimationPresetID = .anim01Tactile3DPress,
+      reduceMotion: Bool = false
+    ) -> Animation {
+      PrismMotion.resolve(preset, reduceMotion: reduceMotion).animation
+    }
+  }
+
   /// `ANIM_01` — Pression tactile 3D Duolingo : compression de la lèvre 3D (`PrismSize.lipDepth` ➔ `PrismBorder.hairline`) + retour haptique `PrismHapticToken.selection`.
   public struct CertiGo3DPressButtonModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

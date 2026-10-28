@@ -185,3 +185,145 @@ extension PrismRegion {
     }
   }
 }
+
+// MARK: - Exact Figma Scene-Graph Color, Gradient, Stroke & Shadow Parsers
+
+extension PrismRGBA {
+  /// Parses `#rrggbb` or `#rrggbb:alphaPercent` (e.g., `#2563eb` or `#0f172a:58`).
+  public static func figmaHex(_ spec: String) -> PrismRGBA {
+    let trimmed = spec.trimmingCharacters(in: .whitespacesAndNewlines)
+    let parts = trimmed.split(separator: ":")
+    let rawHex = String(parts.first ?? "#0f172a")
+      .trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+    let hexValue = UInt32(rawHex, radix: 16) ?? 0x0F172A
+    let alpha: Double
+    if parts.count >= 2, let pct = Double(parts[1]) {
+      alpha = min(max(pct > 1.0 ? pct / 100.0 : pct, 0.0), 1.0)
+    } else {
+      alpha = 1.0
+    }
+    return PrismRGBA(hex: hexValue, alpha: alpha)
+  }
+
+  /// Parses `grad:#c1,#c2,...` into `[PrismRGBA]`.
+  public static func figmaGradientRGBAs(_ spec: String) -> [PrismRGBA] {
+    let trimmed = spec.trimmingCharacters(in: .whitespacesAndNewlines)
+    let body = trimmed.hasPrefix("grad:") ? String(trimmed.dropFirst(5)) : trimmed
+    let stops = body.split(separator: ",").map { figmaHex(String($0)) }
+    return stops.isEmpty ? [figmaHex("#2563eb"), figmaHex("#4f46e5")] : stops
+  }
+
+  /// Parses `#rrggbb:weight`, `#rrggbb:weight:d`, `#rrggbb:alpha:weight`, or `#rrggbb:alpha:weight:d`.
+  public static func figmaStrokeRGBA(_ spec: String) -> PrismRGBA {
+    let parts = spec.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
+    guard !parts.isEmpty else { return figmaHex("#cbd5e1") }
+    let nonDashParts = parts.last == "d" ? Array(parts.dropLast()) : Array(parts)
+    if nonDashParts.count >= 3 {
+      return figmaHex("\(nonDashParts[0]):\(nonDashParts[1])")
+    }
+    return figmaHex(String(nonDashParts[0]))
+  }
+
+  public static func figmaStrokeWidth(_ spec: String) -> CGFloat {
+    let parts = spec.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
+    let nonDashParts = parts.last == "d" ? Array(parts.dropLast()) : Array(parts)
+    if let last = nonDashParts.last, nonDashParts.count >= 2, let width = Double(last) {
+      return CGFloat(max(0.5, width))
+    }
+    return 1.0
+  }
+
+  public static func figmaStrokeIsDashed(_ spec: String) -> Bool {
+    let parts = spec.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
+    return parts.last == "d"
+  }
+
+  /// Parses `dx:dy:r:#rrggbb:alpha` or `dx:dy:r:#rrggbb`.
+  public static func figmaShadowSpec(
+    _ spec: String
+  ) -> (dx: CGFloat, dy: CGFloat, radius: CGFloat, rgba: PrismRGBA)? {
+    let parts = spec.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
+    guard parts.count >= 4,
+      let dx = Double(parts[0]),
+      let dy = Double(parts[1]),
+      let radius = Double(parts[2])
+    else {
+      return nil
+    }
+    let colorSpec = parts.count >= 5 ? "\(parts[3]):\(parts[4])" : String(parts[3])
+    return (
+      dx: CGFloat(dx),
+      dy: CGFloat(dy),
+      radius: CGFloat(max(0, radius)),
+      rgba: figmaHex(colorSpec)
+    )
+  }
+}
+
+#if canImport(SwiftUI) && canImport(UIKit)
+  import SwiftUI
+
+  extension PrismColor {
+    /// Parses `#rrggbb` or `#rrggbb:alphaPercent` (e.g., `#2563eb` or `#0f172a:58`).
+    public static func figmaHex(_ spec: String) -> Color {
+      let rgba = PrismRGBA.figmaHex(spec)
+      return Color(
+        red: rgba.red,
+        green: rgba.green,
+        blue: rgba.blue,
+        opacity: rgba.alpha
+      )
+    }
+
+    /// Parses `grad:#c1,#c2,...` into `[Color]`.
+    public static func figmaGradientColors(_ spec: String) -> [Color] {
+      PrismRGBA.figmaGradientRGBAs(spec).map { rgba in
+        Color(
+          red: rgba.red,
+          green: rgba.green,
+          blue: rgba.blue,
+          opacity: rgba.alpha
+        )
+      }
+    }
+
+    /// Parses stroke color from `#rrggbb:weight` or `#rrggbb:alpha:weight:d`.
+    public static func figmaStrokeColor(_ spec: String) -> Color {
+      let rgba = PrismRGBA.figmaStrokeRGBA(spec)
+      return Color(
+        red: rgba.red,
+        green: rgba.green,
+        blue: rgba.blue,
+        opacity: rgba.alpha
+      )
+    }
+
+    /// Parses stroke width from `#rrggbb:weight` or `#rrggbb:alpha:weight:d`.
+    public static func figmaStrokeWidth(_ spec: String) -> CGFloat {
+      PrismRGBA.figmaStrokeWidth(spec)
+    }
+
+    /// Returns true when stroke spec ends with `:d`.
+    public static func figmaStrokeIsDashed(_ spec: String) -> Bool {
+      PrismRGBA.figmaStrokeIsDashed(spec)
+    }
+
+    /// Parses shadow spec `dx:dy:r:#rrggbb:alpha`.
+    public static func figmaShadow(
+      _ spec: String
+    ) -> (dx: CGFloat, dy: CGFloat, radius: CGFloat, color: Color)? {
+      guard let parsed = PrismRGBA.figmaShadowSpec(spec) else { return nil }
+      return (
+        dx: parsed.dx,
+        dy: parsed.dy,
+        radius: parsed.radius,
+        color: Color(
+          red: parsed.rgba.red,
+          green: parsed.rgba.green,
+          blue: parsed.rgba.blue,
+          opacity: parsed.rgba.alpha
+        )
+      )
+    }
+  }
+#endif

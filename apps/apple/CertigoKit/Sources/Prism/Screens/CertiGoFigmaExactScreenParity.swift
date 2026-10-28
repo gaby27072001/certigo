@@ -2037,206 +2037,985 @@ extension CertiGoMasterFigmaScreenDescriptor {
     }
 }
 
-// MARK: - 3. SwiftUI 1-for-1 Figma Pro Screen View (CertiGoFigmaExactScreenView)
+// MARK: - 3. Exact Recursive 53-Screen Scene-Graph Model & Store (`figma-scene-graph-53-screens.json`)
+
+public struct CertiGoFigmaSceneNode: Codable, Equatable, Hashable, Sendable, Identifiable {
+    public let i: String
+    public let n: String
+    public let t: String
+    public let x: Double
+    public let y: Double
+    public let w: Double
+    public let h: Double
+    public let f: String?
+    public let s: String?
+    public let sh: String?
+    public let r: Double?
+    public let cl: Int?
+    public let op: Double?
+    public let rot: Double?
+    public let d: String?
+    public let tx: String?
+    public let fs: Double?
+    public let fw: String?
+    public let mo: Int?
+    public let al: String?
+    public let va: String?
+    public let vp: String?
+    public let eo: Int?
+    public let c: [CertiGoFigmaSceneNode]?
+
+    public var id: String { i }
+
+    public init(
+        i: String,
+        n: String,
+        t: String,
+        x: Double,
+        y: Double,
+        w: Double,
+        h: Double,
+        f: String? = nil,
+        s: String? = nil,
+        sh: String? = nil,
+        r: Double? = nil,
+        cl: Int? = nil,
+        op: Double? = nil,
+        rot: Double? = nil,
+        d: String? = nil,
+        tx: String? = nil,
+        fs: Double? = nil,
+        fw: String? = nil,
+        mo: Int? = nil,
+        al: String? = nil,
+        va: String? = nil,
+        vp: String? = nil,
+        eo: Int? = nil,
+        c: [CertiGoFigmaSceneNode]? = nil
+    ) {
+        self.i = i
+        self.n = n
+        self.t = t
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+        self.f = f
+        self.s = s
+        self.sh = sh
+        self.r = r
+        self.cl = cl
+        self.op = op
+        self.rot = rot
+        self.d = d
+        self.tx = tx
+        self.fs = fs
+        self.fw = fw
+        self.mo = mo
+        self.al = al
+        self.va = va
+        self.vp = vp
+        self.eo = eo
+        self.c = c
+    }
+
+    public var totalDescendantAndSelfCount: Int {
+        1 + (c ?? []).reduce(0) { $0 + $1.totalDescendantAndSelfCount }
+    }
+
+    public var allNodes: [CertiGoFigmaSceneNode] {
+        [self] + (c ?? []).flatMap(\.allNodes)
+    }
+
+    public var vectorNodes: [CertiGoFigmaSceneNode] {
+        allNodes.filter { $0.t == "V" }
+    }
+
+    public var hotspotNodes: [CertiGoFigmaSceneNode] {
+        allNodes.filter { $0.d != nil }
+    }
+
+    public var resolvedImageAssetName: String? {
+        guard let fill = f, fill.hasPrefix("img:") else { return nil }
+        switch fill {
+        case "img:b013ad43b2d3595a186095aadef93d171712e4d6":
+            return "BrandLogos/brand-aws-official"
+        case "img:e3041bf6f6e2b3d0b97ee7a5aba3518aefc60108":
+            return "Certifications/tech-aws-solutions-architect"
+        case "img:7149e104bfe0be393cbd68e92a1dba4c1f0f7936":
+            return "Certifications/tech-github-copilot"
+        default:
+            return nil
+        }
+    }
+
+    public func isFilteredMockupChrome(parentWidth: Double, parentHeight: Double) -> Bool {
+        if n == "Status Bar - iPhone" || n == "Home Indicator" {
+            return true
+        }
+        let isRootScreenFrame = abs(parentWidth - 393.0) < 0.5 && abs(parentHeight - 852.0) < 0.5
+        guard isRootScreenFrame else { return false }
+
+        let statusBarTexts: Set<String> = ["9:41", "5G 100%", "5G  100%", "✈️  100%", "✈️ 100%"]
+        if y < 36.0 && (statusBarTexts.contains(n) || statusBarTexts.contains(tx ?? "")) {
+            return true
+        }
+        if abs(x - 136.0) < 0.5 && abs(y - 11.0) < 0.5 && abs(w - 120.0) < 0.5 && abs(h - 30.0) < 0.5 {
+            return true
+        }
+        if y >= 820.0 && h <= 32.0 && (abs(w - 139.0) < 0.5 || abs(w - 144.0) < 0.5) {
+            return true
+        }
+        return false
+    }
+}
+
+public enum CertiGoFigmaSVGCommand: Equatable, Hashable, Sendable {
+    case moveTo(x: Double, y: Double)
+    case lineTo(x: Double, y: Double)
+    case curveTo(x1: Double, y1: Double, x2: Double, y2: Double, x: Double, y: Double)
+    case closeSubpath
+
+    public static func parse(_ vp: String) -> [CertiGoFigmaSVGCommand] {
+        let tokens = vp.split { $0.isWhitespace || $0 == "," }
+        guard !tokens.isEmpty else { return [] }
+        var commands: [CertiGoFigmaSVGCommand] = []
+        commands.reserveCapacity(tokens.count / 3 + 1)
+        var index = 0
+        while index < tokens.count {
+            let token = tokens[index]
+            switch token {
+            case "M", "m":
+                guard index + 2 < tokens.count,
+                      let x = Double(tokens[index + 1]),
+                      let y = Double(tokens[index + 2])
+                else {
+                    index += 1
+                    continue
+                }
+                commands.append(.moveTo(x: x, y: y))
+                index += 3
+            case "L", "l":
+                guard index + 2 < tokens.count,
+                      let x = Double(tokens[index + 1]),
+                      let y = Double(tokens[index + 2])
+                else {
+                    index += 1
+                    continue
+                }
+                commands.append(.lineTo(x: x, y: y))
+                index += 3
+            case "C", "c":
+                guard index + 6 < tokens.count,
+                      let x1 = Double(tokens[index + 1]),
+                      let y1 = Double(tokens[index + 2]),
+                      let x2 = Double(tokens[index + 3]),
+                      let y2 = Double(tokens[index + 4]),
+                      let x = Double(tokens[index + 5]),
+                      let y = Double(tokens[index + 6])
+                else {
+                    index += 1
+                    continue
+                }
+                commands.append(.curveTo(x1: x1, y1: y1, x2: x2, y2: y2, x: x, y: y))
+                index += 7
+            case "Z", "z":
+                commands.append(.closeSubpath)
+                index += 1
+            default:
+                index += 1
+            }
+        }
+        return commands
+    }
+}
+
+public final class CertiGoFigmaSceneGraphStore: Sendable {
+    public static let shared = CertiGoFigmaSceneGraphStore()
+    public static let expectedScreenCount: Int = 53
+    public static let expectedTotalNodeCount: Int = 4712
+    public static let expectedVectorCount: Int = 1429
+    public static let expectedHotspotCount: Int = 274
+
+    public let screensByNodeId: [String: CertiGoFigmaSceneNode]
+
+    public init(screensByNodeId: [String: CertiGoFigmaSceneNode]? = nil) {
+        if let screensByNodeId {
+            self.screensByNodeId = screensByNodeId
+        } else {
+            self.screensByNodeId = Self.loadFromBundleOrDisk()
+        }
+    }
+
+    private static func loadFromBundleOrDisk() -> [String: CertiGoFigmaSceneNode] {
+        if let url = Bundle.module.url(forResource: "figma-scene-graph-53-screens", withExtension: "json"),
+           let data = try? Data(contentsOf: url),
+           let decoded = try? JSONDecoder().decode([String: CertiGoFigmaSceneNode].self, from: data)
+        {
+            return decoded
+        }
+        let fallbackURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources/figma-scene-graph-53-screens.json")
+        if let data = try? Data(contentsOf: fallbackURL),
+           let decoded = try? JSONDecoder().decode([String: CertiGoFigmaSceneNode].self, from: data)
+        {
+            return decoded
+        }
+        return [:]
+    }
+
+    public func nodeTree(forScreenNodeId nodeId: String) -> CertiGoFigmaSceneNode? {
+        let trimmed = nodeId.trimmingCharacters(in: .whitespacesAndNewlines)
+        return screensByNodeId[trimmed]
+    }
+
+    public func nodeTree(forScreenId screenId: String) -> CertiGoFigmaSceneNode? {
+        let trimmed = screenId.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let direct = screensByNodeId[trimmed] {
+            return direct
+        }
+        if let content = CertiGoFigmaExactScreenParity.content(forScreenId: trimmed) {
+            return screensByNodeId[content.nodeId]
+        }
+        if let descriptor = CertiGoMasterScreenCatalog.descriptor(forScreenCode: trimmed) {
+            return screensByNodeId[descriptor.nodeId]
+        }
+        return nil
+    }
+
+    public var totalScreenCount: Int {
+        screensByNodeId.count
+    }
+
+    public var totalNodeCount: Int {
+        screensByNodeId.values.reduce(0) { $0 + $1.totalDescendantAndSelfCount }
+    }
+
+    public var totalVectorCount: Int {
+        screensByNodeId.values.reduce(0) { $0 + $1.vectorNodes.count }
+    }
+
+    public var totalHotspotCount: Int {
+        screensByNodeId.values.reduce(0) { $0 + $1.hotspotNodes.count }
+    }
+
+    public static func recommendedAnimationPreset(
+        forDestinationNodeId nodeId: String
+    ) -> CertiGoAnimationPresetID {
+        switch nodeId {
+        case "42:375", "49:368", "58:705", "62:346", "26:1009", "132:651", "132:759", "132:1009":
+            return .anim02ApplePayBottomSheet
+        case "85:317":
+            return .anim04Claude85DrawerPush
+        case "81:345":
+            return .anim05NovaLiveVoicePulse
+        case "142:540":
+            return .anim06PearsonBarometerFill
+        case "132:877", "97:498", "97:636":
+            return .anim07DualCurveAndFitnessRings
+        case "26:912":
+            return .anim08CelebrationVictoryJump
+        default:
+            if nodeId.hasPrefix("73:") || nodeId == "26:826" || nodeId == "26:863" || nodeId == "26:890" {
+                return .anim03Mascot34SpeechBubblePop
+            }
+            return .anim01Tactile3DPress
+        }
+    }
+}
+
+public enum CertiGoQuickChapterGroup: String, CaseIterable, Identifiable, Sendable {
+    case onboarding = "Onboarding OB-01..08B"
+    case parcours = "Parcours 01..03/14"
+    case seanceAndQuestions = "Séance & Q_TYPE_01..10"
+    case aiHub = "Hub IA 06..06D"
+    case exams = "Examens 21..24"
+    case social = "Social 07/25"
+    case profileAndStats = "Moi & Stats Pro 08/08B/26/27/28"
+    case widgetsAndIsland = "Widgets & Dynamic Island SYS-01/02"
+    case offlineResilience = "Hors-Ligne RES-01/02"
+
+    public var id: String { rawValue }
+
+    public var screenNodeIds: [String] {
+        switch self {
+        case .onboarding:
+            return [
+                "132:182", "132:264", "132:339", "132:438", "132:519",
+                "132:581", "132:651", "132:759", "132:877", "132:945", "132:1009"
+            ]
+        case .parcours:
+            return ["37:375", "42:375", "49:368", "58:705"]
+        case .seanceAndQuestions:
+            return [
+                "73:332", "62:346", "26:807", "26:826", "26:863", "26:890", "26:912", "26:939",
+                "73:393", "73:442", "73:509", "73:575", "73:743",
+                "73:818", "73:898", "73:958", "73:1019", "73:1070"
+            ]
+        case .aiHub:
+            return ["79:332", "78:332", "81:345", "85:317"]
+        case .exams:
+            return ["142:385", "26:1009", "142:478", "142:540"]
+        case .social:
+            return ["88:317", "89:317"]
+        case .profileAndStats:
+            return ["97:287", "97:498", "97:636", "97:417", "144:137", "145:122"]
+        case .widgetsAndIsland:
+            return ["161:93", "161:134"]
+        case .offlineResilience:
+            return ["162:93", "162:120"]
+        }
+    }
+
+    public static var orderedScreenNodeIds: [String] {
+        allCases.flatMap(\.screenNodeIds)
+    }
+
+    public static func group(containingNodeId nodeId: String) -> CertiGoQuickChapterGroup {
+        allCases.first { $0.screenNodeIds.contains(nodeId) } ?? .parcours
+    }
+}
+
+// MARK: - 4. SwiftUI 1-for-1 Figma Pro Scene-Graph Engine (`CertiGoFigmaSVGPathShape`, `CertiGoFigmaSceneNodeView`, `CertiGoFigmaInteractiveAppView`)
 
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
 
-public struct CertiGoFigmaExactScreenView: View {
-    public let screenId: String
-    public let content: CertiGoFigmaExactScreenContent
+public struct CertiGoFigmaSVGPathShape: Shape {
+    public let vp: String
+    public let scaleX: CGFloat
+    public let scaleY: CGFloat
 
-    public init(screenId: String) {
-        self.screenId = screenId
-        self.content = CertiGoFigmaExactScreenParity.content(forScreenId: screenId)
-            ?? CertiGoFigmaExactScreenParity.page01Screens[0]
+    public init(vp: String, scaleX: CGFloat = 1.0, scaleY: CGFloat = 1.0) {
+        self.vp = vp
+        self.scaleX = scaleX
+        self.scaleY = scaleY
     }
 
-    public init(content: CertiGoFigmaExactScreenContent) {
-        self.screenId = content.screenCode
-        self.content = content
+    public func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let commands = CertiGoFigmaSVGCommand.parse(vp)
+        for command in commands {
+            switch command {
+            case .moveTo(let x, let y):
+                path.move(to: CGPoint(x: CGFloat(x) * scaleX, y: CGFloat(y) * scaleY))
+            case .lineTo(let x, let y):
+                path.addLine(to: CGPoint(x: CGFloat(x) * scaleX, y: CGFloat(y) * scaleY))
+            case .curveTo(let x1, let y1, let x2, let y2, let x, let y):
+                path.addCurve(
+                    to: CGPoint(x: CGFloat(x) * scaleX, y: CGFloat(y) * scaleY),
+                    control1: CGPoint(x: CGFloat(x1) * scaleX, y: CGFloat(y1) * scaleY),
+                    control2: CGPoint(x: CGFloat(x2) * scaleX, y: CGFloat(y2) * scaleY)
+                )
+            case .closeSubpath:
+                path.closeSubpath()
+            }
+        }
+        return path
+    }
+}
+
+public struct CertiGoFigmaSceneNodeView: View {
+    public let node: CertiGoFigmaSceneNode
+    public let scaleX: CGFloat
+    public let scaleY: CGFloat
+    public let onNavigateToNodeId: (String) -> Void
+
+    public init(
+        node: CertiGoFigmaSceneNode,
+        scaleX: CGFloat = 1.0,
+        scaleY: CGFloat = 1.0,
+        onNavigateToNodeId: @escaping (String) -> Void = { _ in }
+    ) {
+        self.node = node
+        self.scaleX = scaleX
+        self.scaleY = scaleY
+        self.onNavigateToNodeId = onNavigateToNodeId
+    }
+
+    private var uniformScale: CGFloat {
+        min(scaleX, scaleY)
+    }
+
+    private var scaledWidth: CGFloat {
+        max(CGFloat(node.w) * scaleX, PrismBorder.hairline)
+    }
+
+    private var scaledHeight: CGFloat {
+        max(CGFloat(node.h) * scaleY, PrismBorder.hairline)
+    }
+
+    private var scaledCornerRadius: CGFloat {
+        CGFloat(node.r ?? 0) * uniformScale
+    }
+
+    private var visibleChildren: [CertiGoFigmaSceneNode] {
+        (node.c ?? []).filter { child in
+            !child.isFilteredMockupChrome(parentWidth: node.w, parentHeight: node.h)
+        }
     }
 
     public var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: PrismSpacing.m) {
-                headerIdentityBanner
-                visualAssetsStrip
-                badgesAndCountersRow
-                primaryHeroSection
-                exactFigmaTextLinesSection
-                actionButtonsFooter
+        let baseContent = coreNodeContent
+            .opacity(node.op ?? 1.0)
+            .rotationEffect(.degrees(-(node.rot ?? 0)))
+
+        let shadowedContent: AnyView = {
+            if let shSpec = node.sh, let shadow = PrismColor.figmaShadow(shSpec) {
+                return AnyView(
+                    baseContent.shadow(
+                        color: shadow.color,
+                        radius: shadow.radius * uniformScale,
+                        x: shadow.dx * scaleX,
+                        y: shadow.dy * scaleY
+                    )
+                )
             }
-            .padding(PrismSpacing.l)
+            return AnyView(baseContent)
+        }()
+
+        if let destinationNodeId = node.d {
+            shadowedContent
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onNavigateToNodeId(destinationNodeId)
+                }
+        } else {
+            shadowedContent
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(PrismColor.canvas)
+    }
+
+    @ViewBuilder
+    private var coreNodeContent: some View {
+        let widthVal = scaledWidth
+        let heightVal = scaledHeight
+
+        if node.t == "V" {
+            vectorContent
+                .frame(width: widthVal, height: heightVal)
+        } else if node.t == "T" {
+            textContent
+        } else {
+            containerOrShapeContent
+                .frame(width: widthVal, height: heightVal)
+        }
+    }
+
+    @ViewBuilder
+    private var vectorContent: some View {
+        let shape = CertiGoFigmaSVGPathShape(
+            vp: node.vp ?? "",
+            scaleX: scaleX,
+            scaleY: scaleY
+        )
+        let fillStyle = FillStyle(eoFill: node.eo == 1)
+
+        ZStack {
+            if let fillSpec = node.f {
+                if fillSpec.hasPrefix("grad:") {
+                    shape.fill(
+                        LinearGradient(
+                            colors: PrismColor.figmaGradientColors(fillSpec),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        style: fillStyle
+                    )
+                } else {
+                    shape.fill(
+                        PrismColor.figmaHex(fillSpec),
+                        style: fillStyle
+                    )
+                }
+            }
+
+            if let strokeSpec = node.s {
+                let lineWidth = PrismColor.figmaStrokeWidth(strokeSpec) * uniformScale
+                let isDashed = PrismColor.figmaStrokeIsDashed(strokeSpec)
+                let dashUnit = PrismSpacing.xs * uniformScale
+                let strokeStyle = StrokeStyle(
+                    lineWidth: lineWidth,
+                    lineCap: .round,
+                    lineJoin: .round,
+                    dash: isDashed ? [dashUnit, dashUnit] : []
+                )
+                shape.stroke(
+                    PrismColor.figmaStrokeColor(strokeSpec),
+                    style: strokeStyle
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var textContent: some View {
+        let rawText = node.tx ?? ""
+        let rawFontSize = node.fs ?? 14.0
+        let scaledFS = CGFloat(rawFontSize) * uniformScale
+        let isSingleLine = !rawText.contains("\n") && node.h < rawFontSize * 1.65
+        let expandedTextW = scaledWidth + 6.0 * scaleX
+        let heightVal = scaledHeight
+        let textAlignment: TextAlignment = {
+            switch node.al {
+            case "C": return .center
+            case "R": return .trailing
+            default: return .leading
+            }
+        }()
+        let frameAlignment: Alignment = {
+            switch node.al {
+            case "C": return .center
+            case "R": return .trailing
+            default: return .leading
+            }
+        }()
+
+        Text(verbatim: rawText)
+            .font(
+                PrismTypography.figmaFont(
+                    size: scaledFS,
+                    style: node.fw,
+                    monospaced: node.mo == 1
+                )
+            )
+            .foregroundStyle(PrismColor.figmaHex(node.f ?? "#0f172a"))
+            .multilineTextAlignment(textAlignment)
+            .minimumScaleFactor(0.72)
+            .allowsTightening(true)
+            .lineLimit(isSingleLine ? 1 : nil)
+            .frame(width: expandedTextW, height: heightVal, alignment: frameAlignment)
+    }
+
+    @ViewBuilder
+    private var containerOrShapeContent: some View {
+        let widthVal = scaledWidth
+        let heightVal = scaledHeight
+        let radiusVal = scaledCornerRadius
+        let children = visibleChildren
+
+        let stack = ZStack(alignment: .topLeading) {
+            Color.clear
+                .frame(width: widthVal, height: heightVal)
+
+            if let assetName = node.resolvedImageAssetName {
+                Image(assetName, bundle: .module)
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: widthVal, height: heightVal)
+            } else if let fillSpec = node.f {
+                if fillSpec.hasPrefix("grad:") {
+                    RoundedRectangle(cornerRadius: radiusVal, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: PrismColor.figmaGradientColors(fillSpec),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: widthVal, height: heightVal)
+                } else {
+                    RoundedRectangle(cornerRadius: radiusVal, style: .continuous)
+                        .fill(PrismColor.figmaHex(fillSpec))
+                        .frame(width: widthVal, height: heightVal)
+                }
+            }
+
+            ForEach(Array(children.enumerated()), id: \.offset) { _, child in
+                let childW = max(CGFloat(child.w) * scaleX, PrismBorder.hairline)
+                let childH = max(CGFloat(child.h) * scaleY, PrismBorder.hairline)
+                let childCenterX = (CGFloat(child.x) + CGFloat(child.w) * 0.5) * scaleX
+                let childCenterY = (CGFloat(child.y) + CGFloat(child.h) * 0.5) * scaleY
+
+                CertiGoFigmaSceneNodeView(
+                    node: child,
+                    scaleX: scaleX,
+                    scaleY: scaleY,
+                    onNavigateToNodeId: onNavigateToNodeId
+                )
+                .frame(width: childW, height: childH)
+                .position(x: childCenterX, y: childCenterY)
+            }
+        }
+        .frame(width: widthVal, height: heightVal)
+
+        let clippedStack: AnyView = {
+            if node.cl == 1 {
+                return AnyView(
+                    stack.clipShape(
+                        RoundedRectangle(cornerRadius: radiusVal, style: .continuous)
+                    )
+                )
+            }
+            return AnyView(stack)
+        }()
+
+        if let strokeSpec = node.s {
+            let lineWidth = PrismColor.figmaStrokeWidth(strokeSpec) * uniformScale
+            let isDashed = PrismColor.figmaStrokeIsDashed(strokeSpec)
+            let dashUnit = PrismSpacing.xs * uniformScale
+            clippedStack.overlay(
+                RoundedRectangle(cornerRadius: radiusVal, style: .continuous)
+                    .stroke(
+                        PrismColor.figmaStrokeColor(strokeSpec),
+                        style: StrokeStyle(
+                            lineWidth: lineWidth,
+                            lineCap: .round,
+                            lineJoin: .round,
+                            dash: isDashed ? [dashUnit, dashUnit] : []
+                        )
+                    )
+            )
+        } else {
+            clippedStack
+        }
+    }
+}
+
+public struct CertiGoFigmaExactScreenView: View {
+    public let screenId: String
+    public let content: CertiGoFigmaExactScreenContent
+    public let onNavigateToNodeId: (String) -> Void
+
+    public init(
+        screenId: String,
+        onNavigateToNodeId: @escaping (String) -> Void = { _ in }
+    ) {
+        self.screenId = screenId
+        self.content = CertiGoFigmaExactScreenParity.content(forScreenId: screenId)
+            ?? CertiGoFigmaExactScreenParity.page01Screens[0]
+        self.onNavigateToNodeId = onNavigateToNodeId
+    }
+
+    public init(
+        content: CertiGoFigmaExactScreenContent,
+        onNavigateToNodeId: @escaping (String) -> Void = { _ in }
+    ) {
+        self.screenId = content.screenCode
+        self.content = content
+        self.onNavigateToNodeId = onNavigateToNodeId
+    }
+
+    public var body: some View {
+        GeometryReader { proxy in
+            let availableW = max(proxy.size.width, PrismSize.brandXL)
+            let availableH = max(proxy.size.height, PrismSize.brandXL)
+
+            if content.nodeId == "97:498",
+               let topNode = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenNodeId: "97:498"),
+               let bottomNode = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenNodeId: "97:636")
+            {
+                let baseW = CGFloat(max(topNode.w, 1.0))
+                let baseH = CGFloat(max(topNode.h, 1.0))
+                let scaleX = availableW / baseW
+                let scaleY = availableH / baseH
+                let pageH = baseH * scaleY
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: .zero) {
+                        CertiGoFigmaSceneNodeView(
+                            node: topNode,
+                            scaleX: scaleX,
+                            scaleY: scaleY,
+                            onNavigateToNodeId: onNavigateToNodeId
+                        )
+                        .frame(width: availableW, height: pageH)
+
+                        CertiGoFigmaSceneNodeView(
+                            node: bottomNode,
+                            scaleX: scaleX,
+                            scaleY: scaleY,
+                            onNavigateToNodeId: onNavigateToNodeId
+                        )
+                        .frame(width: availableW, height: pageH)
+                    }
+                }
+                .frame(width: availableW, height: availableH)
+                .background(PrismColor.figmaHex(topNode.f ?? "#f8fafc"))
+            } else if let rootNode = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenNodeId: content.nodeId) {
+                let baseW = CGFloat(max(rootNode.w, 1.0))
+                let baseH = CGFloat(max(rootNode.h, 1.0))
+                let scaleX = availableW / baseW
+                let scaleY = availableH / baseH
+
+                CertiGoFigmaSceneNodeView(
+                    node: rootNode,
+                    scaleX: scaleX,
+                    scaleY: scaleY,
+                    onNavigateToNodeId: onNavigateToNodeId
+                )
+                .frame(width: availableW, height: availableH)
+                .background(PrismColor.figmaHex(rootNode.f ?? "#f8fafc"))
+            } else {
+                Text(verbatim: content.title)
+                    .prismTextStyle(.headline)
+                    .foregroundStyle(PrismColor.textPrimary)
+                    .frame(width: availableW, height: availableH)
+                    .background(PrismColor.canvas)
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("figma-exact-screen-\(content.screenCode)")
     }
+}
+
+public struct CertiGoFigmaInteractiveAppView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Binding public var coordinator: PrismAppShellCoordinatorModel
+    @Binding public var router: AppRouterState
+    public let flags: FeatureFlags
+    public let preferenceStore: CertigoParallelTracksPreferenceStore
+
+    @State private var currentScreenNodeId: String
+    @State private var isPickerExpanded: Bool = false
+    @State private var selectedChapterGroup: CertiGoQuickChapterGroup
+
+    public init(
+        initialScreenNodeId: String = "37:375",
+        coordinator: Binding<PrismAppShellCoordinatorModel>,
+        router: Binding<AppRouterState>,
+        flags: FeatureFlags = FeatureFlags(),
+        preferenceStore: CertigoParallelTracksPreferenceStore = .shared
+    ) {
+        self._coordinator = coordinator
+        self._router = router
+        self.flags = flags
+        self.preferenceStore = preferenceStore
+        let resolvedInitial = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenId: initialScreenNodeId)?.i
+            ?? "37:375"
+        self._currentScreenNodeId = State(initialValue: resolvedInitial)
+        self._selectedChapterGroup = State(
+            initialValue: CertiGoQuickChapterGroup.group(containingNodeId: resolvedInitial)
+        )
+    }
+
+    private var currentScreenContent: CertiGoFigmaExactScreenContent {
+        CertiGoFigmaExactScreenParity.content(forNodeId: currentScreenNodeId)
+            ?? CertiGoFigmaExactScreenParity.content(forScreenId: "01")
+            ?? CertiGoFigmaExactScreenParity.page01Screens[0]
+    }
+
+    private var orderedNodeIds: [String] {
+        CertiGoQuickChapterGroup.orderedScreenNodeIds
+    }
+
+    private var currentScreenIndex: Int {
+        orderedNodeIds.firstIndex(of: currentScreenNodeId) ?? 0
+    }
+
+    private func navigate(to destinationId: String) {
+        guard let targetNode = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenId: destinationId) else {
+            return
+        }
+        let targetNodeId = targetNode.i
+        let preset = CertiGoFigmaSceneGraphStore.recommendedAnimationPreset(
+            forDestinationNodeId: targetNodeId
+        )
+        withAnimation(CertiGoMotion.spring(for: preset, reduceMotion: reduceMotion)) {
+            currentScreenNodeId = targetNodeId
+            selectedChapterGroup = CertiGoQuickChapterGroup.group(containingNodeId: targetNodeId)
+        }
+        synchronizeRouterState(for: targetNodeId)
+    }
+
+    private func stepScreen(by delta: Int) {
+        let list = orderedNodeIds
+        guard !list.isEmpty else { return }
+        let nextIndex = (currentScreenIndex + delta + list.count) % list.count
+        navigate(to: list[nextIndex])
+    }
+
+    private func synchronizeRouterState(for nodeId: String) {
+        switch nodeId {
+        case "37:375":
+            router.selectedTab = .today
+        case "142:385":
+            router.selectedTab = .atlas
+        case "79:332":
+            router.selectedTab = .search
+        case "88:317", "89:317":
+            router.selectedTab = .ensemble
+        case "97:287":
+            router.selectedTab = .profile
+        default:
+            break
+        }
+    }
+
+    public var body: some View {
+        ZStack(alignment: .topTrailing) {
+            CertiGoFigmaExactScreenView(
+                content: currentScreenContent,
+                onNavigateToNodeId: { targetNodeId in
+                    navigate(to: targetNodeId)
+                }
+            )
+            .id(currentScreenNodeId)
+            .ignoresSafeArea()
+
+            floatingChapterNavigatorOverlay
+                .padding(.horizontal, PrismSpacing.m)
+                .padding(.top, PrismSpacing.xs)
+        }
+        .fontDesign(.rounded)
+        .preferredColorScheme(.light)
+        .task {
+            let persisted = preferenceStore.loadOrDefault()
+            if coordinator.parallelTracksPreference != persisted {
+                coordinator.applyPersistedPreferences(persisted)
+            }
+        }
+        .onChange(of: coordinator.parallelTracksPreference) { _, updated in
+            try? preferenceStore.save(updated)
+        }
+    }
 
     @ViewBuilder
-    private var headerIdentityBanner: some View {
-        PrismCard(variant: .standard) {
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                HStack(spacing: PrismSpacing.s) {
-                    PrismBadge(
-                        configuration: PrismBadgeConfiguration(
-                            text: content.figmaScreenKey,
-                            semantics: .accent
-                        )
-                    )
-                    PrismBadge(
-                        configuration: PrismBadgeConfiguration(
-                            text: content.nodeId,
-                            semantics: .region(content.region)
-                        )
-                    )
-                    Spacer(minLength: PrismSpacing.xs)
+    private var floatingChapterNavigatorOverlay: some View {
+        VStack(alignment: .trailing, spacing: PrismSpacing.xs) {
+            HStack(spacing: PrismSpacing.xxs) {
+                Button {
+                    stepScreen(by: -1)
+                } label: {
+                    Text(verbatim: "‹")
+                        .prismTextStyle(.subheadline)
+                        .foregroundStyle(PrismColor.onAccent)
+                        .padding(.horizontal, PrismSpacing.s)
+                        .padding(.vertical, PrismSpacing.xxs)
                 }
-                PrismText(text: content.figmaFrameName, style: .footnote, role: .textSecondary)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("figma-Floating-Prev-Button")
+
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                        isPickerExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: PrismSpacing.xxs) {
+                        Text(verbatim: "✦ \(currentScreenContent.screenCode)")
+                            .prismTextStyle(.caption)
+                            .foregroundStyle(PrismColor.onAccent)
+                        Text(verbatim: "\(currentScreenIndex + 1)/\(orderedNodeIds.count) ▾")
+                            .prismTextStyle(.caption)
+                            .foregroundStyle(PrismColor.onAccent.opacity(0.85))
+                    }
+                    .padding(.horizontal, PrismSpacing.s)
+                    .padding(.vertical, PrismSpacing.xxs)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("figma-Floating-Picker-Toggle")
+
+                Button {
+                    stepScreen(by: 1)
+                } label: {
+                    Text(verbatim: "›")
+                        .prismTextStyle(.subheadline)
+                        .foregroundStyle(PrismColor.onAccent)
+                        .padding(.horizontal, PrismSpacing.s)
+                        .padding(.vertical, PrismSpacing.xxs)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("figma-Floating-Next-Button")
+            }
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.pill, style: .continuous)
+                    .fill(PrismColor.figmaHex("#0f172a:82"))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: PrismRadius.pill, style: .continuous)
+                    .strokeBorder(PrismColor.figmaHex("#ffffff:24"), lineWidth: PrismBorder.hairline)
+            )
+
+            if isPickerExpanded {
+                chapterPickerCard
             }
         }
     }
 
     @ViewBuilder
-    private var visualAssetsStrip: some View {
-        if content.mascotPose != nil
-            || !content.officialCrestRouteCodes.isEmpty
-            || !content.brandVendorIds.isEmpty
-            || !content.serviceAssetNames.isEmpty
-        {
-            PrismCard(variant: .standard) {
-                VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                    if let pose = content.mascotPose {
-                        if pose.isRight34QuizPose {
-                            CertiGoSpeechBubbleHeaderView(
-                                region: content.region,
-                                badgeText: content.badges.first ?? content.figmaScreenKey,
-                                questionText: content.title,
-                                poseOverride: pose
-                            )
-                        } else {
-                            HStack(spacing: PrismSpacing.m) {
-                                CertiGoMascotView(pose: pose, size: PrismSize.mascotQuiz)
-                                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                                    PrismText(text: content.title, style: .headline)
-                                    if let subtitle = content.subtitle {
-                                        PrismText(text: subtitle, style: .footnote, role: .textSecondary)
-                                    }
-                                }
-                            }
-                        }
+    private var chapterPickerCard: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+            HStack {
+                Text(verbatim: "53 ÉCRANS FIGMA PRO (1:1 SCENE-GRAPH)")
+                    .prismTextStyle(.caption)
+                    .foregroundStyle(PrismColor.textSecondary)
+                Spacer(minLength: PrismSpacing.xs)
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        isPickerExpanded = false
                     }
-
-                    if !content.officialCrestRouteCodes.isEmpty || !content.brandVendorIds.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: PrismSpacing.m) {
-                                ForEach(content.officialCrestRouteCodes, id: \.self) { routeCode in
-                                    CertiGoOfficialCrestView(routeCode: routeCode, size: PrismSize.crestCard)
-                                }
-                                ForEach(content.brandVendorIds, id: \.self) { vendorId in
-                                    CertiGoBrandLogoView(vendorId: vendorId, size: PrismSize.brandM)
-                                }
-                            }
-                        }
-                    }
-
-                    if !content.serviceAssetNames.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: PrismSpacing.m) {
-                                ForEach(content.serviceAssetNames, id: \.self) { serviceAsset in
-                                    Image(serviceAsset, bundle: .module)
-                                        .renderingMode(.original)
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: PrismSize.brandM, height: PrismSize.brandM)
-                                        .accessibilityLabel(Text(verbatim: serviceAsset))
-                                }
-                            }
-                        }
-                    }
+                } label: {
+                    Text(verbatim: "✕")
+                        .prismTextStyle(.caption)
+                        .foregroundStyle(PrismColor.textSecondary)
+                        .padding(.horizontal, PrismSpacing.xs)
                 }
+                .buttonStyle(.plain)
             }
-        }
-    }
 
-    @ViewBuilder
-    private var badgesAndCountersRow: some View {
-        if !content.badges.isEmpty || !content.counters.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: PrismSpacing.xs) {
-                    ForEach(Array(content.badges.enumerated()), id: \.offset) { _, badge in
-                        PrismBadge(
-                            configuration: PrismBadgeConfiguration(
-                                text: badge,
-                                semantics: .region(content.region)
-                            )
-                        )
-                    }
-                    ForEach(Array(content.counters.enumerated()), id: \.offset) { _, counter in
-                        PrismBadge(
-                            configuration: PrismBadgeConfiguration(
-                                text: counter,
-                                semantics: .positive
-                            )
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var primaryHeroSection: some View {
-        PrismCard(variant: .hero) {
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                PrismText(text: content.title, style: .title3)
-                if let subtitle = content.subtitle {
-                    PrismText(text: subtitle, style: .subheadline, role: .textSecondary)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var exactFigmaTextLinesSection: some View {
-        PrismSection(title: "Textes Exacts Figma Pro (\(content.exactTexts.count))") {
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                ForEach(Array(content.exactTexts.enumerated()), id: \.offset) { index, line in
-                    PrismCard(variant: .standard) {
-                        HStack(alignment: .top, spacing: PrismSpacing.s) {
-                            PrismBadge(
-                                configuration: PrismBadgeConfiguration(
-                                    text: "#\(index + 1)",
-                                    semantics: .neutral
+                    ForEach(CertiGoQuickChapterGroup.allCases) { group in
+                        let isSelected = selectedChapterGroup == group
+                        Button {
+                            selectedChapterGroup = group
+                        } label: {
+                            Text(verbatim: group.rawValue)
+                                .prismTextStyle(.caption)
+                                .foregroundStyle(isSelected ? PrismColor.onAccent : PrismColor.textPrimary)
+                                .padding(.horizontal, PrismSpacing.s)
+                                .padding(.vertical, PrismSpacing.xs)
+                                .background(
+                                    RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                        .fill(isSelected ? PrismColor.accent : PrismColor.canvas)
                                 )
-                            )
-                            Text(verbatim: line)
-                                .prismTextStyle(line.contains("az ") || line.contains("\"Actions\"") ? .codeSmall : .subheadline)
-                                .foregroundStyle(PrismColor.textPrimary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: PrismSpacing.xxs)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
-        }
-    }
 
-    @ViewBuilder
-    private var actionButtonsFooter: some View {
-        if !content.buttonLabels.isEmpty {
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                ForEach(Array(content.buttonLabels.enumerated()), id: \.offset) { index, label in
-                    Button {} label: {
-                        Text(verbatim: label)
-                            .frame(maxWidth: .infinity)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: PrismSpacing.xs) {
+                    ForEach(selectedChapterGroup.screenNodeIds, id: \.self) { nodeId in
+                        let screen = CertiGoFigmaExactScreenParity.content(forNodeId: nodeId)
+                        let isCurrent = nodeId == currentScreenNodeId
+                        Button {
+                            navigate(to: nodeId)
+                            isPickerExpanded = false
+                        } label: {
+                            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                Text(verbatim: screen?.screenCode ?? nodeId)
+                                    .prismTextStyle(.caption)
+                                    .foregroundStyle(isCurrent ? PrismColor.onAccent : PrismColor.accent)
+                                Text(verbatim: screen?.figmaFrameName ?? nodeId)
+                                    .prismTextStyle(.footnote)
+                                    .foregroundStyle(isCurrent ? PrismColor.onAccent : PrismColor.textPrimary)
+                                    .lineLimit(1)
+                            }
+                            .padding(.horizontal, PrismSpacing.m)
+                            .padding(.vertical, PrismSpacing.s)
+                            .background(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .fill(isCurrent ? PrismColor.accent : PrismColor.canvas)
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(PrismButtonStyle(variant: index == 0 ? .primary : .secondary))
                 }
             }
         }
+        .padding(PrismSpacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .fill(PrismColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .strokeBorder(PrismColor.separator, lineWidth: PrismBorder.standard)
+        )
     }
 }
 #endif
