@@ -1,4 +1,6 @@
 import BrandAssets
+import CertigoCortex
+import CertigoData
 import CertigoDomain
 import Foundation
 
@@ -2511,9 +2513,455 @@ public enum CertiGoQuickChapterGroup: String, CaseIterable, Identifiable, Sendab
     }
 }
 
-// MARK: - 3B. Live Interactive Runtime State for the 53 Figma Pro Screens (`CertiGoFigmaLiveRuntimeState`)
+// MARK: - 3B. Live Multi-Certification Curriculum & Interactive Runtime State (`CertiGoLiveTrackCurriculum`, `CertiGoFigmaLiveRuntimeState`)
+
+public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
+    public let vendorId: String
+    public let unitBannerTitle: String
+    public let unitProgressPercentText: String
+    public let stepTitles: [String]
+    public let stepPreviewSubtitle: String
+    public let memoActivity: String
+    public let memoKeyTopics: (String, String, String)
+    public let memoGoldenRule: String
+    public let examOfficialTitle: String
+    public let examDomains: [(title: String, weightText: String, scorePercent: String, colorHex: String)]
+
+    public init(
+        vendorId: String,
+        unitBannerTitle: String,
+        unitProgressPercentText: String,
+        stepTitles: [String],
+        stepPreviewSubtitle: String,
+        memoActivity: String,
+        memoKeyTopics: (String, String, String),
+        memoGoldenRule: String,
+        examOfficialTitle: String,
+        examDomains: [(title: String, weightText: String, scorePercent: String, colorHex: String)]
+    ) {
+        self.vendorId = vendorId
+        self.unitBannerTitle = unitBannerTitle
+        self.unitProgressPercentText = unitProgressPercentText
+        self.stepTitles = stepTitles
+        self.stepPreviewSubtitle = stepPreviewSubtitle
+        self.memoActivity = memoActivity
+        self.memoKeyTopics = memoKeyTopics
+        self.memoGoldenRule = memoGoldenRule
+        self.examOfficialTitle = examOfficialTitle
+        self.examDomains = examDomains
+    }
+
+    public static func == (lhs: CertiGoLiveTrackCurriculum, rhs: CertiGoLiveTrackCurriculum) -> Bool {
+        lhs.vendorId == rhs.vendorId
+            && lhs.unitBannerTitle == rhs.unitBannerTitle
+            && lhs.unitProgressPercentText == rhs.unitProgressPercentText
+            && lhs.stepTitles == rhs.stepTitles
+            && lhs.stepPreviewSubtitle == rhs.stepPreviewSubtitle
+            && lhs.memoActivity == rhs.memoActivity
+            && lhs.memoKeyTopics == rhs.memoKeyTopics
+            && lhs.memoGoldenRule == rhs.memoGoldenRule
+            && lhs.examOfficialTitle == rhs.examOfficialTitle
+            && lhs.examDomains.count == rhs.examDomains.count
+            && zip(lhs.examDomains, rhs.examDomains).allSatisfy {
+                $0.title == $1.title
+                    && $0.weightText == $1.weightText
+                    && $0.scorePercent == $1.scorePercent
+                    && $0.colorHex == $1.colorHex
+            }
+    }
+
+    public static func curriculum(forRouteCode routeCode: String) -> CertiGoLiveTrackCurriculum {
+        switch routeCode.uppercased() {
+        case "AZ-900":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Concepts Cloud & Sécurité Azure",
+                unitProgressPercentText: "85%",
+                stepTitles: [
+                    "Modèles IaaS, PaaS & SaaS",
+                    "Régions & Zones de Disponibilité",
+                    "Responsabilité Partagée & Entra",
+                    "Calculer un TCO & SLA Composite",
+                    "Gouvernance Policy & Verrous"
+                ],
+                stepPreviewSubtitle: "Haute disponibilité, CapEx vs OpEx & sécurité de base Azure",
+                memoActivity: "Valider 3 scénarios SLA & Responsabilité partagée",
+                memoKeyTopics: ("IaaS / PaaS / SaaS", "Zones AZ", "SLA Composite"),
+                memoGoldenRule: "Le client reste toujours responsable de ses données, comptes et identités dans le Cloud.",
+                examOfficialTitle: "Microsoft Certified: Azure Fundamentals",
+                examDomains: [
+                    ("1. Concepts Cloud & Haute Disponibilité", "Poids officiel : 25–30 %", "94 %", "#15803d"),
+                    ("2. Architecture & Services Azure (Calcul/Data)", "Poids officiel : 35–40 %", "90 %", "#15803d"),
+                    ("3. Sécurité, Gouvernance & Conformité", "Poids officiel : 20–25 %", "88 %", "#1d4ed8"),
+                    ("4. Tarification, TCO & Cycle de vie SLA", "Poids officiel : 10–15 %", "85 %", "#1d4ed8"),
+                    ("5. Outils de gestion Portail, CLI & Advisor", "Poids officiel : 10–15 %", "82 %", "#15803d")
+                ]
+            )
+        case "AI-102":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Azure AI Foundry & Agents RAG",
+                unitProgressPercentText: "60%",
+                stepTitles: [
+                    "Gouvernance Azure AI Services",
+                    "Déploiement Modèles OpenAI & Quark",
+                    "Index Vectoriel AI Search & RAG",
+                    "Brancher un Agent RAG Hybride",
+                    "Filtres Content Safety & Guardrails"
+                ],
+                stepPreviewSubtitle: "Recherche hybride BM25 + HNSW et classement sémantique L2",
+                memoActivity: "Configurer l'indexation vectorielle et les guardrails IA",
+                memoKeyTopics: ("AI Foundry", "RAG Hybride", "Content Safety"),
+                memoGoldenRule: "Active toujours la recherche hybride (vecteurs + mots-clés) avec Semantic Ranker en production.",
+                examOfficialTitle: "Microsoft Certified: Azure AI Engineer Associate",
+                examDomains: [
+                    ("1. Planifier & Gérer les services Azure AI", "Poids officiel : 15–20 %", "86 %", "#15803d"),
+                    ("2. Solutions IA Générative & Azure AI Foundry", "Poids officiel : 20–25 %", "84 %", "#15803d"),
+                    ("3. Recherche Vectorielle RAG & Agents IA", "Poids officiel : 20–25 %", "79 %", "#1d4ed8"),
+                    ("4. Vision par Ordinateur & Document Intelligence", "Poids officiel : 15–20 %", "72 %", "#1d4ed8"),
+                    ("5. Traitement du Langage (NLP) & Speech", "Poids officiel : 15–20 % · À cibler", "64 %", "#b45309")
+                ]
+            )
+        case "SAA-C03":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "aws",
+                unitBannerTitle: "UNITÉ 1 · Architecture VPC & IAM",
+                unitProgressPercentText: "45%",
+                stepTitles: [
+                    "Fondations IAM & STS AssumeRole",
+                    "Architecture VPC Multi-AZ & Subnets",
+                    " passerelles NAT, IGW & VPC Endpoints",
+                    "Isoler un RDS Privé via Security Group",
+                    "Transit Gateway & Direct Connect"
+                ],
+                stepPreviewSubtitle: "Isolation Multi-AZ, Security Groups stateful & passerelles VPC",
+                memoActivity: "Architecturer un VPC Multi-AZ sans exposition Internet",
+                memoKeyTopics: ("IAM STS", "Security Group", "Gateway Endpoint"),
+                memoGoldenRule: "Utilise un Gateway VPC Endpoint gratuit pour S3 et DynamoDB plutôt qu'une NAT Gateway coûteuse.",
+                examOfficialTitle: "AWS Certified Solutions Architect – Associate",
+                examDomains: [
+                    ("1. Conception d'architectures sécurisées (IAM)", "Poids officiel : 30 %", "84 %", "#15803d"),
+                    ("2. Conception d'architectures résilientes (Multi-AZ)", "Poids officiel : 26 %", "78 %", "#15803d"),
+                    ("3. Architectures haute performance (S3/CloudFront)", "Poids officiel : 24 %", "72 %", "#1d4ed8"),
+                    ("4. Architectures optimisées en coûts (Savings)", "Poids officiel : 20 %", "68 %", "#1d4ed8"),
+                    ("5. Réseaux hybrides VPC, PrivateLink & Route 53", "Poids officiel : Transversal · À cibler", "61 %", "#b45309")
+                ]
+            )
+        case "CLF-C02":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "aws",
+                unitBannerTitle: "UNITÉ 1 · Concepts Cloud AWS & Facturation",
+                unitProgressPercentText: "70%",
+                stepTitles: [
+                    "Infrastructure Globale AWS (Régions/AZ)",
+                    "Modèle de Responsabilité Partagée AWS",
+                    "IAM, MFA & AWS Organizations",
+                    "Optimiser une facture avec Savings Plans",
+                    "AWS Well-Architected Framework (6 Piliers)"
+                ],
+                stepPreviewSubtitle: "6 piliers Well-Architected, AWS Organizations & Savings Plans",
+                memoActivity: "Comparer Reserved Instances, Savings Plans et Spot",
+                memoKeyTopics: ("Responsabilité AWS", "Organizations SCP", "Savings Plans"),
+                memoGoldenRule: "AWS sécurise le Cloud (matériel, locaux, hyperviseur) ; le client sécurise ce qu'il met DANS le Cloud.",
+                examOfficialTitle: "AWS Certified Cloud Practitioner",
+                examDomains: [
+                    ("1. Concepts du Cloud & Well-Architected", "Poids officiel : 24 %", "90 %", "#15803d"),
+                    ("2. Sécurité, IAM & Conformité AWS", "Poids officiel : 30 %", "86 %", "#15803d"),
+                    ("3. Technologie & Services Cloud AWS", "Poids officiel : 34 %", "80 %", "#1d4ed8"),
+                    ("4. Facturation, Tarification & Support AWS", "Poids officiel : 12 %", "76 %", "#1d4ed8"),
+                    ("5. Migration CAF & Adoption Cloud", "Poids officiel : Transversal", "74 %", "#1d4ed8")
+                ]
+            )
+        case "AIF-C01":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "aws",
+                unitBannerTitle: "UNITÉ 1 · Amazon Bedrock & GenAI Security",
+                unitProgressPercentText: "55%",
+                stepTitles: [
+                    "Fondamentaux ML & Foundation Models",
+                    "Amazon Bedrock & Knowledge Bases RAG",
+                    "Guardrails for Bedrock & Sécurité PII",
+                    "Calibrer Temperature & Top-P sur Claude",
+                    "SageMaker Clarify & IA Responsable"
+                ],
+                stepPreviewSubtitle: "Orchestration RAG sur Amazon Bedrock & filtrage Guardrails",
+                memoActivity: "Sécuriser un agent Bedrock avec Knowledge Bases & Guardrails",
+                memoKeyTopics: ("Amazon Bedrock", "Knowledge Bases", "Bedrock Guardrails"),
+                memoGoldenRule: "Privilégie toujours RAG avec Knowledge Bases avant d'envisager un Fine-Tuning coûteux.",
+                examOfficialTitle: "AWS Certified AI Practitioner",
+                examDomains: [
+                    ("1. Fondamentaux de l'IA et du Machine Learning", "Poids officiel : 20 %", "85 %", "#15803d"),
+                    ("2. Fondamentaux de l'IA Générative & Bedrock", "Poids officiel : 24 %", "82 %", "#15803d"),
+                    ("3. Applications des modèles de fondation (RAG)", "Poids officiel : 28 %", "76 %", "#1d4ed8"),
+                    ("4. Guides pour une IA Responsable & Clarify", "Poids officiel : 14 %", "74 %", "#1d4ed8"),
+                    ("5. Sécurité, Conformité & Gouvernance IA AWS", "Poids officiel : 14 % · À cibler", "66 %", "#b45309")
+                ]
+            )
+        case "ACE":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "google",
+                unitBannerTitle: "UNITÉ 1 · IAM, GKE & VPC Google Cloud",
+                unitProgressPercentText: "50%",
+                stepTitles: [
+                    "Hiérarchie Organisation, Dossiers & Projets",
+                    "Service Accounts & Workload Identity",
+                    "Clusters GKE Autopilot & Standard",
+                    "Attacher un Service Account sans clé JSON",
+                    "VPC Global, Cloud NAT & Cloud Armor"
+                ],
+                stepPreviewSubtitle: "Hiérarchie GCP, fédération Workload Identity & GKE Autopilot",
+                memoActivity: "Configurer Workload Identity Federation entre GKE et Cloud SQL",
+                memoKeyTopics: ("Workload Identity", "GKE Autopilot", "VPC Global"),
+                memoGoldenRule: "N'exporte jamais de clé JSON de Service Account : utilise toujours l'emprunt d'identité (Impersonation) ou Workload Identity.",
+                examOfficialTitle: "Google Cloud Certified: Associate Cloud Engineer",
+                examDomains: [
+                    ("1. Configuration d'un environnement Cloud GCP", "Poids officiel : 20 %", "84 %", "#15803d"),
+                    ("2. Planification & Configuration d'une solution", "Poids officiel : 17,5 %", "80 %", "#15803d"),
+                    ("3. Déploiement & Implémentation (GCE / GKE)", "Poids officiel : 25 %", "75 %", "#1d4ed8"),
+                    ("4. Exploitation opérationnelle & Cloud Monitoring", "Poids officiel : 20 %", "70 %", "#1d4ed8"),
+                    ("5. Configuration des accès IAM & de la sécurité", "Poids officiel : 17,5 % · À cibler", "64 %", "#b45309")
+                ]
+            )
+        case "PCA":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "google",
+                unitBannerTitle: "UNITÉ 1 · Architecture Cloud & Anthos",
+                unitProgressPercentText: "40%",
+                stepTitles: [
+                    "Shared VPC & VPC Service Controls",
+                    "Haute Disponibilité Cloud Spanner & BigQuery",
+                    "Architecture Hybride Cloud Interconnect",
+                    "Confiner des données sensibles avec VPC-SC",
+                    "Études de cas EHR Healthcare & Mountkirk"
+                ],
+                stepPreviewSubtitle: "Périmètres VPC Service Controls, Spanner Multi-Région & SRE",
+                memoActivity: "Résoudre l'étude de cas d'architecture EHR Healthcare",
+                memoKeyTopics: ("Shared VPC", "VPC-SC", "Cloud Spanner"),
+                memoGoldenRule: "Pour une base relationnelle globale avec cohérence forte et SLA 99,999 %, choisis Cloud Spanner.",
+                examOfficialTitle: "Google Cloud Certified: Professional Cloud Architect",
+                examDomains: [
+                    ("1. Conception et planification d'architecture Cloud", "Poids officiel : 24 %", "82 %", "#15803d"),
+                    ("2. Gestion et provisionnement de l'infrastructure", "Poids officiel : 20 %", "78 %", "#15803d"),
+                    ("3. Conception pour la sécurité et la conformité", "Poids officiel : 18 %", "75 %", "#1d4ed8"),
+                    ("4. Analyse et optimisation des processus métier", "Poids officiel : 18 %", "71 %", "#1d4ed8"),
+                    ("5. Fiabilité SRE, Migration & Études de cas", "Poids officiel : 20 % · À cibler", "63 %", "#b45309")
+                ]
+            )
+        case "PDE":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "google",
+                unitBannerTitle: "UNITÉ 1 · BigQuery, Dataflow & Vertex AI",
+                unitProgressPercentText: "55%",
+                stepTitles: [
+                    "Ingestion Temps Réel Cloud Pub/Sub",
+                    "Pipelines Apache Beam & Cloud Dataflow",
+                    "Partitionnement & Clustering BigQuery",
+                    "Optimiser une requête BigQuery multi-To",
+                    "Vertex AI Feature Store & BigLake"
+                ],
+                stepPreviewSubtitle: "Streaming Pub/Sub ➔ Dataflow ➔ BigQuery partitionné & chiffré CMEK",
+                memoActivity: "Partitionner et clusteriser une table BigQuery de 50 To",
+                memoKeyTopics: ("Pub/Sub + Dataflow", "BigQuery Partition", "Vertex AI"),
+                memoGoldenRule: "Combine toujours le partitionnement par date d'ingestion et le clustering sur les colonnes de filtre fréquentes dans BigQuery.",
+                examOfficialTitle: "Google Cloud Certified: Professional Data Engineer",
+                examDomains: [
+                    ("1. Conception de systèmes de traitement de données", "Poids officiel : 22 %", "84 %", "#15803d"),
+                    ("2. Ingestion et traitement des données (Dataflow)", "Poids officiel : 25 %", "80 %", "#15803d"),
+                    ("3. Stockage et optimisation BigQuery / Bigtable", "Poids officiel : 20 %", "77 %", "#1d4ed8"),
+                    ("4. Préparation et utilisation de modèles Vertex AI", "Poids officiel : 18 %", "72 %", "#1d4ed8"),
+                    ("5. Fiabilité, Gouvernance Dataplex & Sécurité IAM", "Poids officiel : 15 % · À cibler", "65 %", "#b45309")
+                ]
+            )
+        case "GH-300":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "github",
+                unitBannerTitle: "UNITÉ 1 · Ingénierie de Contexte Copilot",
+                unitProgressPercentText: "75%",
+                stepTitles: [
+                    "IA Responsable & Filtrage de Duplication",
+                    "Contexte IDE : Onglets Ouverts & @workspace",
+                    "Instructions Personnalisées & Agents MCP",
+                    "Générer des tests unitaires sans fuite de secret",
+                    "Gouvernance Copilot Enterprise & Content Exclusion"
+                ],
+                stepPreviewSubtitle: "Prompt Engineering IDE, exclusions de contenu & sécurité du code",
+                memoActivity: "Configurer Content Exclusion et rédiger un prompt @workspace",
+                memoKeyTopics: ("@workspace", "Content Exclusion", "Filtre Duplication"),
+                memoGoldenRule: "GitHub Copilot Business et Enterprise n'utilisent jamais ton code privé pour entraîner les modèles de fondation.",
+                examOfficialTitle: "GitHub Certified: GitHub Copilot (GH-300)",
+                examDomains: [
+                    ("1. IA Responsable & Éthique Générative", "Poids officiel : 7 %", "92 %", "#15803d"),
+                    ("2. Plans, Fonctionnalités & Architecture Copilot", "Poids officiel : 31 %", "88 %", "#15803d"),
+                    ("3. Fonctionnement & Gestion du Contexte Prompt", "Poids officiel : 15 %", "84 %", "#1d4ed8"),
+                    ("4. Conception de Prompts & Cas d'Usage Développeur", "Poids officiel : 38 %", "81 %", "#1d4ed8"),
+                    ("5. Confidentialité, Exclusions & Gouvernance", "Poids officiel : 9 % · À cibler", "74 %", "#b45309")
+                ]
+            )
+        case "GH-900":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "github",
+                unitBannerTitle: "UNITÉ 1 · Git, Pull Requests & GitHub Actions",
+                unitProgressPercentText: "80%",
+                stepTitles: [
+                    "Branches Git, Commits & Pull Requests",
+                    "Issues, Discussions & GitHub Projects",
+                    "PROTECTION DE BRANCHE & CODEOWNERS",
+                    "Déclencher un workflow CI GitHub Actions",
+                    "GitHub Codespaces & GitHub Packages"
+                ],
+                stepPreviewSubtitle: "Flux GitHub Flow, règles CODEOWNERS & automatisation Actions",
+                memoActivity: "Verrouiller la branche main avec CODEOWNERS et checks CI",
+                memoKeyTopics: ("Pull Requests", "CODEOWNERS", "GitHub Actions"),
+                memoGoldenRule: "Un fichier .github/CODEOWNERS impose automatiquement la revue des propriétaires désignés sur chaque Pull Request.",
+                examOfficialTitle: "GitHub Certified: GitHub Foundations (GH-900)",
+                examDomains: [
+                    ("1. Introduction à Git et à la plateforme GitHub", "Poids officiel : 22 %", "92 %", "#15803d"),
+                    ("2. Utilisation des dépôts GitHub & Branches", "Poids officiel : 18 %", "88 %", "#15803d"),
+                    ("3. Fonctionnalités de collaboration (PRs & Issues)", "Poids officiel : 30 %", "85 %", "#15803d"),
+                    ("4. Développement moderne (Actions & Codespaces)", "Poids officiel : 15 %", "80 %", "#1d4ed8"),
+                    ("5. Gestion de projet, Sécurité & Communauté", "Poids officiel : 15 %", "78 %", "#1d4ed8")
+                ]
+            )
+        case "GH-AS":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "github",
+                unitBannerTitle: "UNITÉ 1 · CodeQL, Secret Scanning & Dependabot",
+                unitProgressPercentText: "65%",
+                stepTitles: [
+                    "Secret Scanning & Push Protection",
+                    "Dépendances, SBOM & Dependabot Alerts",
+                    "Analyse SAST avec CodeQL & SARIF",
+                    "Bloquer un secret avant le git push",
+                    "Security Overview & Custom Patterns"
+                ],
+                stepPreviewSubtitle: "Protection proactive Push Protection, requêtes CodeQL & SARIF",
+                memoActivity: "Configurer CodeQL et Push Protection sur une organisation",
+                memoKeyTopics: ("Push Protection", "CodeQL SARIF", "Dependabot"),
+                memoGoldenRule: "Active toujours Push Protection sur Secret Scanning pour bloquer les jetons avant même qu'ils n'entrent dans l'historique Git.",
+                examOfficialTitle: "GitHub Certified: GitHub Advanced Security (GH-AS)",
+                examDomains: [
+                    ("1. Identification et prévention des fuites de secrets", "Poids officiel : 20 %", "88 %", "#15803d"),
+                    ("2. Gestion des vulnérabilités de dépendances (SCA)", "Poids officiel : 25 %", "84 %", "#15803d"),
+                    ("3. Analyse statique du code avec CodeQL (SAST)", "Poids officiel : 35 %", "78 %", "#1d4ed8"),
+                    ("4. Intégration SARIF & Pipelines GitHub Actions", "Poids officiel : 10 %", "74 %", "#1d4ed8"),
+                    ("5. Gouvernance Security Overview à l'échelle", "Poids officiel : 10 % · À cibler", "68 %", "#b45309")
+                ]
+            )
+        case "CCNA":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "cisco",
+                unitBannerTitle: "UNITÉ 1 · Routage OSPF, VLAN & ACL Cisco",
+                unitProgressPercentText: "50%",
+                stepTitles: [
+                    "Sous-réseaux IPv4/IPv6 & CIDR",
+                    "Commutation VLAN, Trunk 802.1Q & Rapid-PVST+",
+                    "Routage Dynamique OSPF Multi-Aires",
+                    "Réparer une adjacence OSPF bloquée en EXSTART",
+                    "Listes de Contrôle d'Accès (ACL) & NAT"
+                ],
+                stepPreviewSubtitle: "Sélection de la route la plus spécifique (/28 vs /24) & OSPF",
+                memoActivity: "Diagnostiquer le routage OSPF et les trunks 802.1Q",
+                memoKeyTopics: ("Longest Prefix", "OSPF Cost", "Trunk 802.1Q"),
+                memoGoldenRule: "Un routeur Cisco choisit toujours le masque le plus long (Longest Prefix Match) avant de comparer la distance administrative.",
+                examOfficialTitle: "Cisco Certified Network Associate (CCNA 200-301)",
+                examDomains: [
+                    ("1. Fondamentaux des réseaux (OSI, TCP/UDP, IPv6)", "Poids officiel : 20 %", "84 %", "#15803d"),
+                    ("2. Accès réseau (VLAN, Trunk 802.1Q, STP, Wi-Fi)", "Poids officiel : 20 %", "80 %", "#15803d"),
+                    ("3. Connectivité IP & Routage OSPF", "Poids officiel : 25 %", "76 %", "#1d4ed8"),
+                    ("4. Services IP (DHCP, DNS, NAT, NTP, SNMP)", "Poids officiel : 10 %", "74 %", "#1d4ed8"),
+                    ("5. Fondamentaux de sécurité & Automatisation REST", "Poids officiel : 25 % · À cibler", "64 %", "#b45309")
+                ]
+            )
+        case "CKA":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "cncf",
+                unitBannerTitle: "UNITÉ 1 · Control Plane, RBAC & CoreDNS",
+                unitProgressPercentText: "60%",
+                stepTitles: [
+                    "Architecture Control Plane, etcd & kube-apiserver",
+                    "RBAC : Role, ClusterRole & ServiceAccount",
+                    "Réseau CNI, Services, Ingress & NetworkPolicy",
+                    "Restaurer un snapshot etcd corrompu en CLI",
+                    "Dépannage Kubelet, CoreDNS & Pods CrashLoop"
+                ],
+                stepPreviewSubtitle: "Sauvegarde etcdctl snapshot, NetworkPolicy & RBAC Kubernetes",
+                memoActivity: "Isoler un namespace avec NetworkPolicy et RBAC",
+                memoKeyTopics: ("etcd snapshot", "ClusterRoleBinding", "NetworkPolicy"),
+                memoGoldenRule: "Dès qu'une NetworkPolicy sélectionne un Pod, tout le trafic non explicitement autorisé dans cette direction est rejeté.",
+                examOfficialTitle: "CNCF Certified Kubernetes Administrator (CKA)",
+                examDomains: [
+                    ("1. Dépannage (Troubleshooting Pods, Nodes & Réseau)", "Poids officiel : 30 %", "84 %", "#15803d"),
+                    ("2. Architecture du Cluster, Installation & etcd", "Poids officiel : 25 %", "80 %", "#15803d"),
+                    ("3. Services, Ingress, CoreDNS & NetworkPolicies", "Poids officiel : 20 %", "76 %", "#1d4ed8"),
+                    ("4. Workloads, Scheduling, Taints & Affinités", "Poids officiel : 15 %", "74 %", "#1d4ed8"),
+                    ("5. Stockage Persistant (PV, PVC & StorageClass)", "Poids officiel : 10 % · À cibler", "66 %", "#b45309")
+                ]
+            )
+        case "TF-003":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "terraform",
+                unitBannerTitle: "UNITÉ 1 · State Remote, Modules & HCL",
+                unitProgressPercentText: "70%",
+                stepTitles: [
+                    "Cycle de vie init / plan / apply & Providers",
+                    "Variables, Outputs, Locals & Fonctions HCL",
+                    "Remote State Chiffré & State Locking",
+                    "Importer une ressource Cloud sans destruction",
+                    "Modules Réutilisables & HCP Terraform"
+                ],
+                stepPreviewSubtitle: "Verrouillage du State distant, blocs import & modules versionnés",
+                memoActivity: "Configurer un backend distant chiffré avec State Locking",
+                memoKeyTopics: ("Remote State", "State Locking", "terraform import"),
+                memoGoldenRule: "Ne commite jamais terraform.tfstate dans Git : stocke-le toujours dans un backend distant chiffré avec verrouillage.",
+                examOfficialTitle: "HashiCorp Certified: Terraform Associate (003)",
+                examDomains: [
+                    ("1. Comprendre les concepts d'Infrastructure as Code", "Poids officiel : 16 %", "90 %", "#15803d"),
+                    ("2. Workflow principal Terraform (init/plan/apply)", "Poids officiel : 22 %", "86 %", "#15803d"),
+                    ("3. Gestion et sécurisation du Terraform State", "Poids officiel : 24 %", "82 %", "#15803d"),
+                    ("4. Création et utilisation de Modules Terraform", "Poids officiel : 20 %", "78 %", "#1d4ed8"),
+                    ("5. HCP Terraform, Sentinel & Gouvernance Cloud", "Poids officiel : 18 % · À cibler", "70 %", "#1d4ed8")
+                ]
+            )
+        default:
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Identité Entra ID",
+                unitProgressPercentText: "65%",
+                stepTitles: [
+                    "Concepts Cloud Azure",
+                    "Identité Entra ID",
+                    "Rôles RBAC & PIM",
+                    "Réparer un accès RBAC refusé",
+                    "Accès Conditionnel"
+                ],
+                stepPreviewSubtitle: "Moindre privilège Azure & élévation juste-à-temps",
+                memoActivity: "Résoudre 3 cas d'accès RBAC & PIM",
+                memoKeyTopics: ("Moindre privilège", "Héritage Scope", "Entra ID PIM"),
+                memoGoldenRule: "Un rôle accordé sur l'Abonnement s'hérite sur toutes ses ressources.",
+                examOfficialTitle: "Microsoft Certified: Azure Administrator Associate",
+                examDomains: [
+                    ("1. Identité & Gouvernance Entra ID", "Poids officiel : 20–25 %", "88 %", "#15803d"),
+                    ("2. Stockage & Sécurité des données", "Poids officiel : 15–20 %", "82 %", "#15803d"),
+                    ("3. Déploiement Calcul, VM & AKS", "Poids officiel : 20–25 %", "78 %", "#1d4ed8"),
+                    ("4. Réseaux virtuels VNet & DNS", "Poids officiel : 15–20 %", "74 %", "#1d4ed8"),
+                    ("5. Supervision Monitor & Backup", "Poids officiel : 10–15 % · À cibler", "58 %", "#b45309")
+                ]
+            )
+        }
+    }
+}
 
 public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
+    public typealias LiveTrackCurriculum = CertiGoLiveTrackCurriculum
+
+    public static func curriculum(forRouteCode routeCode: String) -> CertiGoLiveTrackCurriculum {
+        CertiGoLiveTrackCurriculum.curriculum(forRouteCode: routeCode)
+    }
+
+    public var currentCurriculum: CertiGoLiveTrackCurriculum {
+        Self.curriculum(forRouteCode: activeRouteCode)
+    }
+
     public struct PopoverCertificationCardItem: Equatable, Sendable {
         public let code: String
         public let title: String
@@ -2658,6 +3106,14 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
     public var onboardingSelectedNodeIdsByScreen: [String: Set<String>]
     public var onboardingReminderTimeIndex: Int
 
+    // MARK: Live Counters & CertigoCortex FSRS Cognitive Loop
+    public var liveStreakDays: Int = 14
+    public var liveGemsCount: Int = 480
+    public var liveHeartsCount: Int = 5
+    public var completedStepsCount: Int = 42
+    public var cortexMasteryByConceptId: [String: ConceptMastery] = [:]
+    public var completedExerciseCountInSession: Int = 0
+
     public init(
         selectedVendorInPopover: String = "microsoft",
         activeRouteCode: String = "AZ-104",
@@ -2699,7 +3155,13 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
         settingsCoachVoiceIndex: Int = 0,
         settingsExplanationStyleIndex: Int = 0,
         onboardingSelectedNodeIdsByScreen: [String: Set<String>] = Self.defaultOnboardingSelectionsByScreen,
-        onboardingReminderTimeIndex: Int = 0
+        onboardingReminderTimeIndex: Int = 0,
+        liveStreakDays: Int = 14,
+        liveGemsCount: Int = 480,
+        liveHeartsCount: Int = 5,
+        completedStepsCount: Int = 42,
+        cortexMasteryByConceptId: [String: ConceptMastery] = [:],
+        completedExerciseCountInSession: Int = 0
     ) {
         self.selectedVendorInPopover = selectedVendorInPopover
         self.activeRouteCode = activeRouteCode
@@ -2730,6 +3192,58 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
         self.settingsExplanationStyleIndex = settingsExplanationStyleIndex
         self.onboardingSelectedNodeIdsByScreen = onboardingSelectedNodeIdsByScreen
         self.onboardingReminderTimeIndex = onboardingReminderTimeIndex
+        self.liveStreakDays = liveStreakDays
+        self.liveGemsCount = liveGemsCount
+        self.liveHeartsCount = liveHeartsCount
+        self.completedStepsCount = completedStepsCount
+        self.cortexMasteryByConceptId = cortexMasteryByConceptId
+        self.completedExerciseCountInSession = completedExerciseCountInSession
+    }
+
+    public mutating func recordExerciseStepCompletion(
+        correct: Bool = true,
+        latencyMs: Int = 3500,
+        now: Date = Date(),
+        isCelebrationScreen: Bool = false
+    ) {
+        let conceptId = "\(activeRouteCode.lowercased()):unit-1-step-3"
+        let baseMastery = cortexMasteryByConceptId[conceptId]
+            ?? (try? ConceptMastery.fresh(conceptId: conceptId, trackId: activeRouteCode, now: now))
+        if let baseMastery,
+           let updatedMastery = try? ReviewScheduler.apply(
+               baseMastery,
+               grade: ReviewGrade.from(correct: correct, latencyMs: latencyMs),
+               now: now
+           )
+        {
+            cortexMasteryByConceptId[conceptId] = updatedMastery
+        }
+        completedExerciseCountInSession += 1
+        completedStepsCount += 1
+        liveGemsCount += (correct ? 15 : 5) + (isCelebrationScreen ? 25 : 0)
+
+        let curriculum = currentCurriculum
+        let studyDay = CertigoWidgetSnapshot.studyDayKey(at: now, utcOffsetMinutes: 0) ?? "2026-04-20"
+        if let snapshot = try? CertigoWidgetSnapshot(
+            updatedAt: now,
+            validUntil: now.addingTimeInterval(24 * 60 * 60),
+            studyDay: studyDay,
+            studyDayUtcOffsetMinutes: 0,
+            totalXP: max(0, liveGemsCount),
+            streakDays: max(0, liveStreakDays),
+            dailyGoalXP: 50,
+            dailyXPEarned: min(500, completedExerciseCountInSession * 15),
+            activeTrackCode: activeRouteCode,
+            activeTrackTitle: curriculum.examOfficialTitle,
+            serverStreakRisk: false,
+            studyPlanDailyMinutes: 10,
+            targetExamDate: nil,
+            language: .french,
+            parallelTracksSummary: "\(activeRouteCode) + 2",
+            aiRadarHeadline: curriculum.unitBannerTitle
+        ) {
+            try? CertigoWidgetStore().write(snapshot, now: now)
+        }
     }
 
     public static let defaultSelectedOptionsByScreen: [String: Set<String>] = [
@@ -3600,16 +4114,124 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
         inScreenId screenId: String,
         additionalParallelTracksCount: Int
     ) -> CertiGoFigmaSceneNode {
-        // 1. Global Route Code Badges & Headers
+        let curriculum = currentCurriculum
+
+        // 1. Global Route Code Badges, Live Counters (🔥/💎/❤️/étapes), Path Steps & Exam Domains
         switch node.i {
-        case "37:447", "42:447", "142:423", "151:205":
+        case "37:447", "42:447", "49:440", "58:777", "142:423", "151:145":
             return node.updating(w: max(node.w, 72.0), tx: .some("\(activeRouteCode) ▾"))
         case "42:486":
             return node.updating(w: max(node.w, 72.0), tx: .some("\(activeRouteCode) ▴"))
-        case "142:416", "151:198":
+        case "142:416", "151:138":
             return node.updating(w: max(node.w, 225.0), tx: .some("Examens · \(activeRouteCode)"))
-        case "142:442", "151:217":
+        case "142:442", "151:164":
             return node.updating(w: max(node.w, 280.0), tx: .some("S'ENTRAÎNER PAR DOMAINE OFFICIEL \(activeRouteCode)"))
+
+        // Live Counters: 🔥 Streak, 💎 Gems, ❤️ Hearts & Validated Steps
+        case "37:449", "42:449", "49:442", "58:779":
+            return node.updating(w: max(node.w, 42.0), tx: .some("🔥 \(liveStreakDays)"))
+        case "97:309":
+            return node.updating(tx: .some("\(liveStreakDays) jours"))
+        case "37:450", "42:450", "49:443", "58:780":
+            return node.updating(w: max(node.w, 52.0), tx: .some("💎 \(liveGemsCount)"))
+        case "37:451", "42:451", "49:444", "58:781":
+            return node.updating(w: max(node.w, 34.0), tx: .some("❤️ \(liveHeartsCount)"))
+        case "26:815", "26:834", "26:871", "26:898",
+             "73:404", "73:453", "73:520", "73:586",
+             "73:754", "73:829", "73:909", "73:969",
+             "73:1030", "73:1081":
+            return node.updating(w: max(node.w, 14.0), tx: .some("\(liveHeartsCount)"))
+        case "97:317":
+            return node.updating(tx: .some("\(completedStepsCount) étapes"))
+
+        // Screens 01 (37:375), 02 (42:375), 03 (49:368), 14 (58:705) Dynamic Curriculum
+        case "37:394", "42:394", "49:387", "58:724":
+            return node.updating(w: max(node.w, 222.0), tx: .some(curriculum.stepTitles[0]))
+        case "37:405", "42:405", "49:398", "58:735":
+            return node.updating(w: max(node.w, 222.0), tx: .some(curriculum.stepTitles[1]))
+        case "37:419", "42:419", "49:412", "58:749", "49:487", "58:836":
+            return node.updating(w: max(node.w, 222.0), tx: .some(curriculum.stepTitles[2]))
+        case "37:425", "42:425", "49:418", "58:755":
+            return node.updating(w: max(node.w, 235.0), tx: .some(curriculum.stepTitles[3]))
+        case "37:439", "42:439", "49:432", "58:769":
+            return node.updating(w: max(node.w, 222.0), tx: .some(curriculum.stepTitles[4]))
+        case "37:457", "42:457", "49:450", "58:787":
+            return node.updating(w: max(node.w, 235.0), tx: .some(curriculum.unitBannerTitle))
+        case "37:456", "42:456", "49:449", "58:786":
+            return node.updating(w: max(node.w, 32.0), tx: .some(curriculum.unitProgressPercentText))
+        case "49:488":
+            return node.updating(w: max(node.w, 317.0), tx: .some(curriculum.stepPreviewSubtitle))
+        case "58:839":
+            return node.updating(w: max(node.w, 205.0), tx: .some(curriculum.memoActivity))
+        case "58:843":
+            return node.updating(w: max(node.w, 104.0), tx: .some(curriculum.memoKeyTopics.0))
+        case "58:845":
+            return node.updating(w: max(node.w, 96.0), tx: .some(curriculum.memoKeyTopics.1))
+        case "58:847":
+            return node.updating(w: max(node.w, 92.0), tx: .some(curriculum.memoKeyTopics.2))
+        case "58:850":
+            return node.updating(w: max(node.w, 205.0), tx: .some(curriculum.memoGoldenRule))
+
+        // Screens 21 (142:385) & 22 (26:1009) Official Weighted Exam Domains
+        case "142:446", "151:168":
+            return node.updating(w: max(node.w, 245.0), tx: .some(curriculum.examDomains[0].title))
+        case "142:447", "151:169":
+            return node.updating(w: max(node.w, 185.0), tx: .some(curriculum.examDomains[0].weightText))
+        case "142:449", "151:171":
+            return node.updating(f: .some(curriculum.examDomains[0].colorHex), tx: .some(curriculum.examDomains[0].scorePercent))
+        case "142:453", "151:175":
+            return node.updating(w: max(node.w, 245.0), tx: .some(curriculum.examDomains[1].title))
+        case "142:454", "151:176":
+            return node.updating(w: max(node.w, 185.0), tx: .some(curriculum.examDomains[1].weightText))
+        case "142:456", "151:178":
+            return node.updating(f: .some(curriculum.examDomains[1].colorHex), tx: .some(curriculum.examDomains[1].scorePercent))
+        case "142:460", "151:182":
+            return node.updating(w: max(node.w, 245.0), tx: .some(curriculum.examDomains[2].title))
+        case "142:461", "151:183":
+            return node.updating(w: max(node.w, 185.0), tx: .some(curriculum.examDomains[2].weightText))
+        case "142:463", "151:185":
+            return node.updating(f: .some(curriculum.examDomains[2].colorHex), tx: .some(curriculum.examDomains[2].scorePercent))
+        case "142:467", "151:189":
+            return node.updating(w: max(node.w, 245.0), tx: .some(curriculum.examDomains[3].title))
+        case "142:468", "151:190":
+            return node.updating(w: max(node.w, 185.0), tx: .some(curriculum.examDomains[3].weightText))
+        case "142:470", "151:192":
+            return node.updating(f: .some(curriculum.examDomains[3].colorHex), tx: .some(curriculum.examDomains[3].scorePercent))
+        case "142:474", "151:196":
+            return node.updating(w: max(node.w, 245.0), tx: .some(curriculum.examDomains[4].title))
+        case "142:475", "151:197":
+            return node.updating(w: max(node.w, 185.0), tx: .some(curriculum.examDomains[4].weightText))
+        case "142:477", "151:199":
+            return node.updating(f: .some(curriculum.examDomains[4].colorHex), tx: .some(curriculum.examDomains[4].scorePercent))
+
+        // Screen 22 (26:1009) Apple Pay Exam Launch Sheet Header
+        case "151:218":
+            return node.updating(w: max(node.w, 84.0), tx: .some("\(activeRouteCode) ★"))
+        case "151:221":
+            return node.updating(w: max(node.w, 341.0), tx: .some("Examen Blanc \(activeRouteCode)"))
+        case "151:222":
+            return node.updating(w: max(node.w, 341.0), tx: .some(curriculum.examOfficialTitle))
+
+        // Screen 24 (142:540) Official Report Domain Breakdown
+        case "142:591":
+            return node.updating(w: max(node.w, 260.0), tx: .some("SCORE PAR DOMAINE OFFICIEL \(activeRouteCode)"))
+        case "142:592":
+            return node.updating(w: max(node.w, 250.0), tx: .some(curriculum.examDomains[0].title))
+        case "142:593":
+            return node.updating(tx: .some(curriculum.examDomains[0].scorePercent))
+        case "142:596":
+            return node.updating(w: max(node.w, 250.0), tx: .some(curriculum.examDomains[1].title))
+        case "142:597":
+            return node.updating(tx: .some(curriculum.examDomains[1].scorePercent))
+        case "142:600":
+            return node.updating(w: max(node.w, 250.0), tx: .some(curriculum.examDomains[2].title))
+        case "142:601":
+            return node.updating(tx: .some(curriculum.examDomains[2].scorePercent))
+        case "142:604":
+            return node.updating(w: max(node.w, 250.0), tx: .some(curriculum.examDomains[3].title))
+        case "142:605":
+            return node.updating(tx: .some(curriculum.examDomains[3].scorePercent))
+
         default:
             break
         }
@@ -5176,15 +5798,26 @@ public struct CertiGoFigmaInteractiveAppView: View {
         navigate(to: destinationOrAction)
     }
 
+    private static let exerciseScreenNodeIds: Set<String> = [
+        "73:393", "73:442", "73:509", "73:575", "73:743",
+        "73:818", "73:898", "73:958", "73:1019", "73:1070",
+        "26:826", "26:863", "26:890"
+    ]
+
     private func navigate(to destinationId: String) {
         guard let targetNode = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenId: destinationId) else {
             return
         }
         let targetNodeId = targetNode.i
+        let shouldRecordExerciseCompletion =
+            Self.exerciseScreenNodeIds.contains(currentScreenNodeId) || targetNodeId == "26:912"
         let preset = CertiGoFigmaSceneGraphStore.recommendedAnimationPreset(
             forDestinationNodeId: targetNodeId
         )
         withAnimation(CertiGoMotion.spring(for: preset, reduceMotion: reduceMotion)) {
+            if shouldRecordExerciseCompletion {
+                liveState.recordExerciseStepCompletion(isCelebrationScreen: targetNodeId == "26:912")
+            }
             currentScreenNodeId = targetNodeId
             selectedChapterGroup = CertiGoQuickChapterGroup.group(containingNodeId: targetNodeId)
         }

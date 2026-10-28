@@ -25,7 +25,7 @@ let package = Package(
         ),
         .target(
             name: "Prism",
-            dependencies: ["BrandAssets", "CertigoDomain", "CertigoData"],
+            dependencies: ["BrandAssets", "CertigoCortex", "CertigoDomain", "CertigoData"],
             resources: [.process("Resources")]
         ),
         .target(name: "CertigoAppleFileIO"),
