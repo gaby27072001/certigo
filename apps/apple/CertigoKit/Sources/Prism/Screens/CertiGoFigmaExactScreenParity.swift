@@ -2137,6 +2137,17 @@ public struct CertiGoFigmaSceneNode: Codable, Equatable, Hashable, Sendable, Ide
         allNodes.filter { $0.d != nil }
     }
 
+    public var isPureVectorIllustrationFrame: Bool {
+        guard t == "F", let children = c, children.count >= 6 else { return false }
+        return children.allSatisfy { $0.t == "V" }
+    }
+
+    private var containsHotspotInSubtree: Bool {
+        if d != nil { return true }
+        guard let children = c else { return false }
+        return children.contains { $0.containsHotspotInSubtree }
+    }
+
     public var resolvedImageAssetName: String? {
         guard let fill = f, fill.hasPrefix("img:") else { return nil }
         switch fill {
@@ -2183,13 +2194,14 @@ public struct CertiGoFigmaSceneNode: Codable, Equatable, Hashable, Sendable, Ide
 
     public var shouldAttachRootTapGesture: Bool {
         guard d != nil else { return false }
-        let visibleDescendants = (c ?? [])
-            .filter { !$0.isFilteredMockupChrome(parentWidth: w, parentHeight: h) }
-            .flatMap(\.allNodes)
-        if !visibleDescendants.contains(where: { $0.d != nil }) {
+        if Self.linearFlowRootNodeIds.contains(i) {
             return true
         }
-        return Self.linearFlowRootNodeIds.contains(i)
+        let hasVisibleHotspotDescendant = (c ?? []).contains { child in
+            !child.isFilteredMockupChrome(parentWidth: w, parentHeight: h)
+                && child.containsHotspotInSubtree
+        }
+        return !hasVisibleHotspotDescendant
     }
 
     public func filteringDirectChildren(
@@ -2268,8 +2280,26 @@ public struct CertiGoFigmaSceneNode: Codable, Equatable, Hashable, Sendable, Ide
     public func mapAllNodes(
         _ transform: (CertiGoFigmaSceneNode) -> CertiGoFigmaSceneNode
     ) -> CertiGoFigmaSceneNode {
-        let mappedChildren = c?.map { $0.mapAllNodes(transform) }
-        return transform(updating(c: .some(mappedChildren)))
+        if t == "V" {
+            return self
+        }
+        guard let children = c, !children.isEmpty else {
+            return transform(self)
+        }
+        var mappedChildren: [CertiGoFigmaSceneNode]?
+        for (index, child) in children.enumerated() {
+            let mappedChild = child.mapAllNodes(transform)
+            if mappedChildren != nil {
+                mappedChildren?.append(mappedChild)
+            } else if mappedChild != child {
+                var copy = Array(children.prefix(index))
+                copy.reserveCapacity(children.count)
+                copy.append(mappedChild)
+                mappedChildren = copy
+            }
+        }
+        let base = mappedChildren.map { updating(c: .some($0)) } ?? self
+        return transform(base)
     }
 
     public func clearingDescendantDestinations() -> CertiGoFigmaSceneNode {
@@ -2292,6 +2322,11 @@ public enum CertiGoFigmaSVGCommand: Equatable, Hashable, Sendable {
     case lineTo(x: Double, y: Double)
     case curveTo(x1: Double, y1: Double, x2: Double, y2: Double, x: Double, y: Double)
     case closeSubpath
+
+    public static func cachedParse(_ vp: String) -> [CertiGoFigmaSVGCommand] {
+        guard !vp.isEmpty else { return [] }
+        return CertiGoFigmaSceneGraphStore.shared.parsedSVGCommandsByPath[vp] ?? parse(vp)
+    }
 
     public static func parse(_ vp: String) -> [CertiGoFigmaSVGCommand] {
         let tokens = vp.split { $0.isWhitespace || $0 == "," }
@@ -2355,13 +2390,38 @@ public final class CertiGoFigmaSceneGraphStore: Sendable {
     public static let expectedHotspotCount: Int = 407
 
     public let screensByNodeId: [String: CertiGoFigmaSceneNode]
+    public let parsedSVGCommandsByPath: [String: [CertiGoFigmaSVGCommand]]
 
     public init(screensByNodeId: [String: CertiGoFigmaSceneNode]? = nil) {
+        let loadedScreens: [String: CertiGoFigmaSceneNode]
         if let screensByNodeId {
-            self.screensByNodeId = screensByNodeId
+            loadedScreens = screensByNodeId
         } else {
-            self.screensByNodeId = Self.loadFromBundleOrDisk()
+            loadedScreens = Self.loadFromBundleOrDisk()
         }
+        self.screensByNodeId = loadedScreens
+        self.parsedSVGCommandsByPath = Self.buildSVGCommandCache(from: loadedScreens)
+    }
+
+    private static func buildSVGCommandCache(
+        from screens: [String: CertiGoFigmaSceneNode]
+    ) -> [String: [CertiGoFigmaSVGCommand]] {
+        var cache: [String: [CertiGoFigmaSVGCommand]] = [:]
+        cache.reserveCapacity(600)
+        func visit(_ node: CertiGoFigmaSceneNode) {
+            if let vp = node.vp, !vp.isEmpty, cache[vp] == nil {
+                cache[vp] = CertiGoFigmaSVGCommand.parse(vp)
+            }
+            if let children = node.c {
+                for child in children {
+                    visit(child)
+                }
+            }
+        }
+        for root in screens.values {
+            visit(root)
+        }
+        return cache
     }
 
     private static func loadFromBundleOrDisk() -> [String: CertiGoFigmaSceneNode] {
@@ -4084,10 +4144,12 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
         additionalParallelTracksCount: Int = 2
     ) -> CertiGoFigmaSceneNode {
         let screenId = rootNode.i
+        let curriculum = currentCurriculum
         var transformed = rootNode.mapAllNodes { node in
             transformNode(
                 node,
                 inScreenId: screenId,
+                curriculum: curriculum,
                 additionalParallelTracksCount: additionalParallelTracksCount
             )
         }
@@ -4112,10 +4174,9 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
     private func transformNode(
         _ node: CertiGoFigmaSceneNode,
         inScreenId screenId: String,
+        curriculum: CertiGoLiveTrackCurriculum,
         additionalParallelTracksCount: Int
     ) -> CertiGoFigmaSceneNode {
-        let curriculum = currentCurriculum
-
         // 1. Global Route Code Badges, Live Counters (🔥/💎/❤️/étapes), Path Steps & Exam Domains
         switch node.i {
         case "37:447", "42:447", "49:440", "58:777", "142:423", "151:145":
@@ -5217,7 +5278,7 @@ public struct CertiGoFigmaSVGPathShape: Shape {
 
     public func path(in rect: CGRect) -> Path {
         var path = Path()
-        let commands = CertiGoFigmaSVGCommand.parse(vp)
+        let commands = CertiGoFigmaSVGCommand.cachedParse(vp)
         for command in commands {
             switch command {
             case .moveTo(let x, let y):
@@ -5235,6 +5296,41 @@ public struct CertiGoFigmaSVGPathShape: Shape {
             }
         }
         return path
+    }
+}
+
+private struct CertiGoOptionalShadowModifier: ViewModifier {
+    let shadowSpec: String?
+    let scaleX: CGFloat
+    let scaleY: CGFloat
+    let uniformScale: CGFloat
+
+    func body(content: Content) -> some View {
+        if let shadowSpec, let shadow = PrismColor.figmaShadow(shadowSpec) {
+            content.shadow(
+                color: shadow.color,
+                radius: shadow.radius * uniformScale,
+                x: shadow.dx * scaleX,
+                y: shadow.dy * scaleY
+            )
+        } else {
+            content
+        }
+    }
+}
+
+private struct CertiGoOptionalClipModifier: ViewModifier {
+    let isClipped: Bool
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        if isClipped {
+            content.clipShape(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+        } else {
+            content
+        }
     }
 }
 
@@ -5287,7 +5383,7 @@ public struct CertiGoFigmaSceneNodeView: View {
     private var shouldAttachTapGesture: Bool {
         guard node.d != nil else { return false }
         guard isRootScreen else { return true }
-        return !visibleChildren.flatMap(\.allNodes).contains(where: { $0.d != nil })
+        return node.shouldAttachRootTapGesture
     }
 
     private var isDiagnosticLongPressNode: Bool {
@@ -5295,23 +5391,17 @@ public struct CertiGoFigmaSceneNodeView: View {
     }
 
     public var body: some View {
-        let baseContent = coreNodeContent
+        let shadowedContent = coreNodeContent
             .opacity(node.op ?? 1.0)
             .rotationEffect(.degrees(-(node.rot ?? 0)))
-
-        let shadowedContent: AnyView = {
-            if let shSpec = node.sh, let shadow = PrismColor.figmaShadow(shSpec) {
-                return AnyView(
-                    baseContent.shadow(
-                        color: shadow.color,
-                        radius: shadow.radius * uniformScale,
-                        x: shadow.dx * scaleX,
-                        y: shadow.dy * scaleY
-                    )
+            .modifier(
+                CertiGoOptionalShadowModifier(
+                    shadowSpec: node.sh,
+                    scaleX: scaleX,
+                    scaleY: scaleY,
+                    uniformScale: uniformScale
                 )
-            }
-            return AnyView(baseContent)
-        }()
+            )
 
         if let destinationNodeId = node.d, shouldAttachTapGesture {
             if isDiagnosticLongPressNode, let onLongPressDiagnosticTrigger {
@@ -5483,7 +5573,7 @@ public struct CertiGoFigmaSceneNodeView: View {
                 }
             }
 
-            ForEach(Array(children.enumerated()), id: \.offset) { _, child in
+            ForEach(children) { child in
                 let childW = max(CGFloat(child.w) * scaleX, PrismBorder.hairline)
                 let childH = max(CGFloat(child.h) * scaleY, PrismBorder.hairline)
                 let childCenterX = (CGFloat(child.x) + CGFloat(child.w) * 0.5) * scaleX
@@ -5513,16 +5603,19 @@ public struct CertiGoFigmaSceneNodeView: View {
         }
         .frame(width: widthVal, height: heightVal)
 
-        let clippedStack: AnyView = {
-            if !isRootScreen, node.cl == 1 {
-                return AnyView(
-                    stack.clipShape(
-                        RoundedRectangle(cornerRadius: radiusVal, style: .continuous)
-                    )
-                )
+        let clippedStack = Group {
+            if node.isPureVectorIllustrationFrame {
+                stack.drawingGroup()
+            } else {
+                stack
             }
-            return AnyView(stack)
-        }()
+        }
+        .modifier(
+            CertiGoOptionalClipModifier(
+                isClipped: !isRootScreen && node.cl == 1,
+                cornerRadius: radiusVal
+            )
+        )
 
         if !isRootScreen, let strokeSpec = node.s {
             let lineWidth = PrismColor.figmaStrokeWidth(strokeSpec) * uniformScale
@@ -5674,7 +5767,7 @@ public struct CertiGoFigmaExactScreenView: View {
                     }
                     .frame(width: availableW, height: availableH)
 
-                    ForEach(Array(pinnedChildren.enumerated()), id: \.offset) { _, child in
+                    ForEach(pinnedChildren) { child in
                         let childW = max(CGFloat(child.w) * scaleX, PrismBorder.hairline)
                         let childH = max(CGFloat(child.h) * scaleY, PrismBorder.hairline)
                         let childCenterX = (CGFloat(child.x) + CGFloat(child.w) * 0.5) * scaleX

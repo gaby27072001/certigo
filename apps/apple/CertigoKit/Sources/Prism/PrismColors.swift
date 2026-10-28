@@ -191,18 +191,98 @@ extension PrismRegion {
 extension PrismRGBA {
   /// Parses `#rrggbb` or `#rrggbb:alphaPercent` (e.g., `#2563eb` or `#0f172a:58`).
   public static func figmaHex(_ spec: String) -> PrismRGBA {
-    let trimmed = spec.trimmingCharacters(in: .whitespacesAndNewlines)
-    let parts = trimmed.split(separator: ":")
-    let rawHex = String(parts.first ?? "#0f172a")
-      .trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-    let hexValue = UInt32(rawHex, radix: 16) ?? 0x0F172A
-    let alpha: Double
-    if parts.count >= 2, let pct = Double(parts[1]) {
-      alpha = min(max(pct > 1.0 ? pct / 100.0 : pct, 0.0), 1.0)
-    } else {
-      alpha = 1.0
+    let utf8 = spec.utf8
+    var start = utf8.startIndex
+    var end = utf8.endIndex
+
+    while start < end, Self.isASCIIWhitespace(utf8[start]) {
+      utf8.formIndex(after: &start)
     }
+    while end > start {
+      let prev = utf8.index(before: end)
+      if Self.isASCIIWhitespace(utf8[prev]) {
+        end = prev
+      } else {
+        break
+      }
+    }
+
+    guard start < end else {
+      return PrismRGBA(hex: 0x0F172A, alpha: 1.0)
+    }
+
+    var colonIndex: String.UTF8View.Index?
+    var cursor = start
+    while cursor < end {
+      if utf8[cursor] == 0x3A {
+        colonIndex = cursor
+        break
+      }
+      utf8.formIndex(after: &cursor)
+    }
+
+    var hexStart = start
+    var hexEnd = colonIndex ?? end
+    while hexStart < hexEnd, utf8[hexStart] == 0x23 {
+      utf8.formIndex(after: &hexStart)
+    }
+    while hexEnd > hexStart {
+      let prev = utf8.index(before: hexEnd)
+      if utf8[prev] == 0x23 {
+        hexEnd = prev
+      } else {
+        break
+      }
+    }
+
+    var hexValue: UInt32 = 0
+    var hexCount = 0
+    var hexValid = hexStart < hexEnd
+    var hexCursor = hexStart
+    while hexCursor < hexEnd {
+      guard let nibble = Self.hexNibble(utf8[hexCursor]), hexCount < 8 else {
+        hexValid = false
+        break
+      }
+      hexValue = (hexValue << 4) | nibble
+      hexCount += 1
+      utf8.formIndex(after: &hexCursor)
+    }
+    if !hexValid {
+      hexValue = 0x0F172A
+    }
+
+    var alpha = 1.0
+    if let colon = colonIndex {
+      var alphaStart = utf8.index(after: colon)
+      while alphaStart < end, utf8[alphaStart] == 0x3A {
+        utf8.formIndex(after: &alphaStart)
+      }
+      var alphaEnd = alphaStart
+      while alphaEnd < end, utf8[alphaEnd] != 0x3A {
+        utf8.formIndex(after: &alphaEnd)
+      }
+      if alphaStart < alphaEnd, let pct = Double(spec[alphaStart..<alphaEnd]) {
+        alpha = min(max(pct > 1.0 ? pct / 100.0 : pct, 0.0), 1.0)
+      }
+    }
+
     return PrismRGBA(hex: hexValue, alpha: alpha)
+  }
+
+  @inline(__always)
+  private static func isASCIIWhitespace(_ byte: UInt8) -> Bool {
+    byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0D
+  }
+
+  @inline(__always)
+  private static func hexNibble(_ byte: UInt8) -> UInt32? {
+    switch byte {
+    case 0x30...0x39: return UInt32(byte - 0x30)
+    case 0x41...0x46: return UInt32(byte - 0x41 + 10)
+    case 0x61...0x66: return UInt32(byte - 0x61 + 10)
+    default: return nil
+    }
   }
 
   /// Parses `grad:#c1,#c2,...` into `[PrismRGBA]`.
