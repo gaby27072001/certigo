@@ -2220,6 +2220,69 @@ public struct CertiGoFigmaSceneNode: Codable, Equatable, Hashable, Sendable, Ide
             c: (c ?? []).filter(isIncluded)
         )
     }
+
+    public func updating(
+        x: Double? = nil,
+        y: Double? = nil,
+        w: Double? = nil,
+        h: Double? = nil,
+        f: String?? = nil,
+        s: String?? = nil,
+        sh: String?? = nil,
+        r: Double?? = nil,
+        op: Double?? = nil,
+        d: String?? = nil,
+        tx: String?? = nil,
+        c: [CertiGoFigmaSceneNode]?? = nil
+    ) -> CertiGoFigmaSceneNode {
+        CertiGoFigmaSceneNode(
+            i: i,
+            n: n,
+            t: t,
+            x: x ?? self.x,
+            y: y ?? self.y,
+            w: w ?? self.w,
+            h: h ?? self.h,
+            f: f ?? self.f,
+            s: s ?? self.s,
+            sh: sh ?? self.sh,
+            r: r ?? self.r,
+            cl: cl,
+            op: op ?? self.op,
+            rot: rot,
+            d: d ?? self.d,
+            tx: tx ?? self.tx,
+            fs: fs,
+            fw: fw,
+            mo: mo,
+            al: al,
+            va: va,
+            vp: vp,
+            eo: eo,
+            c: c ?? self.c
+        )
+    }
+
+    public func mapAllNodes(
+        _ transform: (CertiGoFigmaSceneNode) -> CertiGoFigmaSceneNode
+    ) -> CertiGoFigmaSceneNode {
+        let mappedChildren = c?.map { $0.mapAllNodes(transform) }
+        return transform(updating(c: .some(mappedChildren)))
+    }
+
+    public func clearingDescendantDestinations() -> CertiGoFigmaSceneNode {
+        guard let children = c else { return self }
+        let cleared = children.map { child in
+            child.mapAllNodes { node in
+                node.d == nil ? node : node.updating(d: .some(nil))
+            }
+        }
+        return updating(c: .some(cleared))
+    }
+
+    public func node(withId targetId: String) -> CertiGoFigmaSceneNode? {
+        allNodes.first { $0.i == targetId }
+    }
 }
 
 public enum CertiGoFigmaSVGCommand: Equatable, Hashable, Sendable {
@@ -2287,7 +2350,7 @@ public final class CertiGoFigmaSceneGraphStore: Sendable {
     public static let expectedScreenCount: Int = 53
     public static let expectedTotalNodeCount: Int = 4712
     public static let expectedVectorCount: Int = 1429
-    public static let expectedHotspotCount: Int = 311
+    public static let expectedHotspotCount: Int = 407
 
     public let screensByNodeId: [String: CertiGoFigmaSceneNode]
 
@@ -2448,6 +2511,2060 @@ public enum CertiGoQuickChapterGroup: String, CaseIterable, Identifiable, Sendab
     }
 }
 
+// MARK: - 3B. Live Interactive Runtime State for the 53 Figma Pro Screens (`CertiGoFigmaLiveRuntimeState`)
+
+public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
+    public struct PopoverCertificationCardItem: Equatable, Sendable {
+        public let code: String
+        public let title: String
+
+        public init(code: String, title: String) {
+            self.code = code
+            self.title = title
+        }
+    }
+
+    public struct AITopicPayload: Equatable, Sendable {
+        public let id: String
+        public let question: String
+        public let intro: String
+        public let bullet1: String
+        public let bullet2: String
+        public let examHeader: String
+        public let examRule1: String
+        public let examRule2: String
+        public let closing: String
+
+        public init(
+            id: String,
+            question: String,
+            intro: String,
+            bullet1: String,
+            bullet2: String,
+            examHeader: String = "💡  À retenir pour l'examen AZ-104 :",
+            examRule1: String,
+            examRule2: String,
+            closing: String
+        ) {
+            self.id = id
+            self.question = question
+            self.intro = intro
+            self.bullet1 = bullet1
+            self.bullet2 = bullet2
+            self.examHeader = examHeader
+            self.examRule1 = examRule1
+            self.examRule2 = examRule2
+            self.closing = closing
+        }
+    }
+
+    public struct MockExamQuestionPayload: Equatable, Sendable {
+        public let number: Int
+        public let badge: String
+        public let stem: String
+        public let optionA: String
+        public let optionB: String
+        public let optionC: String
+        public let optionD: String
+
+        public init(
+            number: Int,
+            badge: String,
+            stem: String,
+            optionA: String,
+            optionB: String,
+            optionC: String,
+            optionD: String
+        ) {
+            self.number = number
+            self.badge = badge
+            self.stem = stem
+            self.optionA = optionA
+            self.optionB = optionB
+            self.optionC = optionC
+            self.optionD = optionD
+        }
+    }
+
+    public struct ProfileCertificationDetailPayload: Equatable, Sendable {
+        public let code: String
+        public let badge: String
+        public let title: String
+        public let progression: String
+        public let lastMockExam: String
+        public let crestImageFill: String?
+        public let domains: [(title: String, percentText: String, barWidth: Double, colorHex: String)]
+
+        public static func == (
+            lhs: ProfileCertificationDetailPayload,
+            rhs: ProfileCertificationDetailPayload
+        ) -> Bool {
+            lhs.code == rhs.code
+                && lhs.badge == rhs.badge
+                && lhs.title == rhs.title
+                && lhs.progression == rhs.progression
+                && lhs.lastMockExam == rhs.lastMockExam
+                && lhs.crestImageFill == rhs.crestImageFill
+                && lhs.domains.count == rhs.domains.count
+                && zip(lhs.domains, rhs.domains).allSatisfy {
+                    $0.title == $1.title
+                        && $0.percentText == $1.percentText
+                        && $0.barWidth == $1.barWidth
+                        && $0.colorHex == $1.colorHex
+                }
+        }
+    }
+
+    // MARK: Popover 02 & Active Route
+    public var selectedVendorInPopover: String
+    public var activeRouteCode: String
+
+    // MARK: Interactive Exercises (04, 16, 17, Q_TYPE_01..10)
+    public var selectedOptionNodeIdsByScreen: [String: Set<String>]
+    public var qType04InputText: String
+    public var qType06PendingLeftNodeId: String?
+    public var qType06PairedRightByLeftNodeId: [String: String]
+    public var qType08OrderedRowNodeIds: [String]
+    public var qType08SelectedRowNodeId: String?
+
+    // MARK: Live AI Hub (06, 06B, 06C, 06D)
+    public var aiActiveTopicId: String
+    public var aiCustomPromptText: String
+    public var aiHistorySearchText: String
+    public var isAIResponseCopied: Bool
+    public var isVoiceLiveListening: Bool
+
+    // MARK: Mock Exam 23 & Report Carousel 24
+    public var examCurrentQuestionNumber: Int
+    public var examSelectedOptionByQuestion: [Int: String]
+    public var examFlaggedQuestions: Set<Int>
+    public var examReportCarouselIndex: Int
+
+    // MARK: Social 25
+    public var salutedFriendNodeIds: Set<String>
+    public var isFriendInviteCopied: Bool
+
+    // MARK: Profile 08, Detail 26, PRO 27 & Settings 28
+    public var selectedProfileCertificationCode: String
+    public var selectedProPlanNodeId: String
+    public var isProTrialActivated: Bool
+    public var settingsToggleStates: [String: Bool]
+    public var settingsLanguageIndex: Int
+    public var settingsExamModeIndex: Int
+    public var settingsCoachVoiceIndex: Int
+    public var settingsExplanationStyleIndex: Int
+
+    // MARK: Onboarding (OB_02, OB_03A, OB_03B, OB_04, OB_06A)
+    public var onboardingSelectedNodeIdsByScreen: [String: Set<String>]
+    public var onboardingReminderTimeIndex: Int
+
+    public init(
+        selectedVendorInPopover: String = "microsoft",
+        activeRouteCode: String = "AZ-104",
+        selectedOptionNodeIdsByScreen: [String: Set<String>] = Self.defaultSelectedOptionsByScreen,
+        qType04InputText: String = "lock",
+        qType06PendingLeftNodeId: String? = "73:851",
+        qType06PairedRightByLeftNodeId: [String: String] = ["73:842": "73:881", "73:851": "73:877"],
+        qType08OrderedRowNodeIds: [String] = ["73:982", "73:990", "73:998", "73:1006"],
+        qType08SelectedRowNodeId: String? = "73:990",
+        aiActiveTopicId: String = "rbac-vs-policy",
+        aiCustomPromptText: String = "",
+        aiHistorySearchText: String = "",
+        isAIResponseCopied: Bool = false,
+        isVoiceLiveListening: Bool = true,
+        examCurrentQuestionNumber: Int = 14,
+        examSelectedOptionByQuestion: [Int: String] = [
+            12: "142:508",
+            13: "142:520",
+            14: "142:514",
+            15: "142:514",
+            16: "142:526",
+            17: "142:508"
+        ],
+        examFlaggedQuestions: Set<Int> = [13],
+        examReportCarouselIndex: Int = 0,
+        salutedFriendNodeIds: Set<String> = [],
+        isFriendInviteCopied: Bool = false,
+        selectedProfileCertificationCode: String = "AZ-104",
+        selectedProPlanNodeId: String = "144:179",
+        isProTrialActivated: Bool = false,
+        settingsToggleStates: [String: Bool] = [
+            "145:174": true,
+            "145:181": true,
+            "145:187": true,
+            "145:193": true
+        ],
+        settingsLanguageIndex: Int = 0,
+        settingsExamModeIndex: Int = 0,
+        settingsCoachVoiceIndex: Int = 0,
+        settingsExplanationStyleIndex: Int = 0,
+        onboardingSelectedNodeIdsByScreen: [String: Set<String>] = Self.defaultOnboardingSelectionsByScreen,
+        onboardingReminderTimeIndex: Int = 0
+    ) {
+        self.selectedVendorInPopover = selectedVendorInPopover
+        self.activeRouteCode = activeRouteCode
+        self.selectedOptionNodeIdsByScreen = selectedOptionNodeIdsByScreen
+        self.qType04InputText = qType04InputText
+        self.qType06PendingLeftNodeId = qType06PendingLeftNodeId
+        self.qType06PairedRightByLeftNodeId = qType06PairedRightByLeftNodeId
+        self.qType08OrderedRowNodeIds = qType08OrderedRowNodeIds
+        self.qType08SelectedRowNodeId = qType08SelectedRowNodeId
+        self.aiActiveTopicId = aiActiveTopicId
+        self.aiCustomPromptText = aiCustomPromptText
+        self.aiHistorySearchText = aiHistorySearchText
+        self.isAIResponseCopied = isAIResponseCopied
+        self.isVoiceLiveListening = isVoiceLiveListening
+        self.examCurrentQuestionNumber = examCurrentQuestionNumber
+        self.examSelectedOptionByQuestion = examSelectedOptionByQuestion
+        self.examFlaggedQuestions = examFlaggedQuestions
+        self.examReportCarouselIndex = examReportCarouselIndex
+        self.salutedFriendNodeIds = salutedFriendNodeIds
+        self.isFriendInviteCopied = isFriendInviteCopied
+        self.selectedProfileCertificationCode = selectedProfileCertificationCode
+        self.selectedProPlanNodeId = selectedProPlanNodeId
+        self.isProTrialActivated = isProTrialActivated
+        self.settingsToggleStates = settingsToggleStates
+        self.settingsLanguageIndex = settingsLanguageIndex
+        self.settingsExamModeIndex = settingsExamModeIndex
+        self.settingsCoachVoiceIndex = settingsCoachVoiceIndex
+        self.settingsExplanationStyleIndex = settingsExplanationStyleIndex
+        self.onboardingSelectedNodeIdsByScreen = onboardingSelectedNodeIdsByScreen
+        self.onboardingReminderTimeIndex = onboardingReminderTimeIndex
+    }
+
+    public static let defaultSelectedOptionsByScreen: [String: Set<String>] = [
+        "73:332": ["73:364"],
+        "26:826": ["26:837"],
+        "26:863": ["26:876", "26:879"],
+        "73:393": ["73:425"],
+        "73:442": ["73:467"],
+        "73:509": ["73:554"],
+        "73:743": ["73:767", "73:771", "73:775", "73:779", "73:784", "73:788"],
+        "73:818": ["73:851", "73:877"],
+        "73:898": ["73:941"],
+        "73:1019": ["73:1058"],
+        "73:1070": ["73:1095", "73:1101"]
+    ]
+
+    public static let defaultOnboardingSelectionsByScreen: [String: Set<String>] = [
+        "132:264": ["132:301", "132:310"],
+        "132:339": ["132:379", "132:396", "132:406"],
+        "132:438": ["132:452", "132:463", "132:474"],
+        "132:519": ["132:539", "132:562"],
+        "132:581": ["132:600"]
+    ]
+
+    public static let singleSelectOptionGroupsByScreen: [String: [String]] = [
+        "73:332": ["73:360", "73:364", "73:368", "73:372"],
+        "26:826": ["26:837", "26:843", "26:849", "26:855"],
+        "73:393": ["73:421", "73:425", "73:429", "73:433"],
+        "73:442": ["73:467", "73:476", "73:485", "73:493"],
+        "73:509": ["73:554", "73:558", "73:562", "73:566"],
+        "73:898": ["73:923", "73:929", "73:935", "73:941", "73:947"],
+        "73:1019": ["73:1051", "73:1058"]
+    ]
+
+    public static let multiSelectOptionGroupsByScreen: [String: [String]] = [
+        "73:1070": ["73:1095", "73:1101", "73:1107", "73:1112"],
+        "73:743": [
+            "73:767", "73:771", "73:775", "73:779", "73:784",
+            "73:788", "73:795", "73:800", "73:804", "73:809"
+        ],
+        "26:863": ["26:876", "26:879", "26:882", "26:885"]
+    ]
+
+    public static let vendorByTileNodeId: [String: String] = [
+        "42:491": "microsoft",
+        "42:498": "aws",
+        "42:505": "google",
+        "42:511": "github",
+        "42:514": "cisco"
+    ]
+
+    public static let vendorDisplayNames: [String: String] = [
+        "microsoft": "Microsoft",
+        "aws": "AWS",
+        "google": "Google",
+        "github": "GitHub",
+        "cisco": "Cisco"
+    ]
+
+    public static func popoverCards(forVendor vendor: String) -> [PopoverCertificationCardItem] {
+        switch vendor.lowercased() {
+        case "aws":
+            return [
+                PopoverCertificationCardItem(code: "SAA-C03", title: "Solutions Architect"),
+                PopoverCertificationCardItem(code: "CLF-C02", title: "Cloud Practitioner"),
+                PopoverCertificationCardItem(code: "AIF-C01", title: "AI Practitioner")
+            ]
+        case "google", "gcp":
+            return [
+                PopoverCertificationCardItem(code: "ACE", title: "Cloud Engineer"),
+                PopoverCertificationCardItem(code: "PCA", title: "Cloud Architect"),
+                PopoverCertificationCardItem(code: "PDE", title: "Data Engineer")
+            ]
+        case "github":
+            return [
+                PopoverCertificationCardItem(code: "GH-300", title: "GitHub Copilot"),
+                PopoverCertificationCardItem(code: "GH-900", title: "Foundations"),
+                PopoverCertificationCardItem(code: "GH-AS", title: "Advanced Security")
+            ]
+        case "cisco", "cncf":
+            return [
+                PopoverCertificationCardItem(code: "CCNA", title: "Network Associate"),
+                PopoverCertificationCardItem(code: "CKA", title: "Kubernetes Admin"),
+                PopoverCertificationCardItem(code: "TF-003", title: "Terraform")
+            ]
+        default:
+            return [
+                PopoverCertificationCardItem(code: "AZ-104", title: "Azure Administrator"),
+                PopoverCertificationCardItem(code: "AZ-900", title: "Azure Fundamentals"),
+                PopoverCertificationCardItem(code: "AI-102", title: "Azure AI Engineer")
+            ]
+        }
+    }
+
+    public var currentPopoverCards: [PopoverCertificationCardItem] {
+        Self.popoverCards(forVendor: selectedVendorInPopover)
+    }
+
+    public static let settingsLanguageOptions: [String] = [
+        "FR + Termes EN  ›",
+        "Français intégral  ›",
+        "English (US)  ›"
+    ]
+
+    public static let settingsExamModeOptions: [String] = [
+        "Chrono 90m  ›",
+        "Temps majoré ×1,5  ›",
+        "Sans limite  ›"
+    ]
+
+    public static let settingsCoachVoiceOptions: [String] = [
+        "Nova (1,0×)  ›",
+        "Nova (1,2×)  ›",
+        "Alloy (1,0×)  ›"
+    ]
+
+    public static let settingsExplanationStyleOptions: [String] = [
+        "Détaillé + CLI  ›",
+        "Synthèse Flash  ›",
+        "Socrate (Guidé)  ›"
+    ]
+
+    public static let onboardingReminderTimeOptions: [String] = [
+        "19 : 30",
+        "08 : 30",
+        "12 : 30",
+        "20 : 30"
+    ]
+
+    public var currentSettingsLanguageLabel: String {
+        Self.settingsLanguageOptions[settingsLanguageIndex % Self.settingsLanguageOptions.count]
+    }
+
+    public var currentSettingsExamModeLabel: String {
+        Self.settingsExamModeOptions[settingsExamModeIndex % Self.settingsExamModeOptions.count]
+    }
+
+    public var currentSettingsCoachVoiceLabel: String {
+        Self.settingsCoachVoiceOptions[settingsCoachVoiceIndex % Self.settingsCoachVoiceOptions.count]
+    }
+
+    public var currentSettingsExplanationStyleLabel: String {
+        Self.settingsExplanationStyleOptions[settingsExplanationStyleIndex % Self.settingsExplanationStyleOptions.count]
+    }
+
+    public var isCurrentExamQuestionFlagged: Bool {
+        examFlaggedQuestions.contains(examCurrentQuestionNumber)
+    }
+
+    public var currentExamSelectedOptionNodeId: String {
+        examSelectedOptionByQuestion[examCurrentQuestionNumber] ?? "142:514"
+    }
+
+    public func isOptionSelected(_ nodeId: String, inScreen screenNodeId: String) -> Bool {
+        selectedOptionNodeIdsByScreen[screenNodeId]?.contains(nodeId) ?? false
+    }
+
+    public func isSettingsToggleOn(_ nodeId: String) -> Bool {
+        settingsToggleStates[nodeId] ?? true
+    }
+
+    public func isFriendSaluted(_ nodeId: String) -> Bool {
+        salutedFriendNodeIds.contains(nodeId)
+    }
+
+    // MARK: AI Topics Catalog
+
+    public static let aiTopicsById: [String: AITopicPayload] = [
+        "rbac-vs-policy": AITopicPayload(
+            id: "rbac-vs-policy",
+            question: "Quelle est la différence entre RBAC et Azure Policy ?",
+            intro: "Ces deux services assurent la gouvernance Azure, mais ils agissent sur deux dimensions différentes :",
+            bullet1: "•  Azure RBAC (Qui fait quoi) : Gère les accès des utilisateurs et groupes en attribuant des rôles (Lecteur, Contributeur, Propriétaire).",
+            bullet2: "•  Azure Policy (Sous quelles règles) : Vérifie la conformité des ressources elles-mêmes (ex. imposer une région ou un tag obligatoire).",
+            examRule1: "•  Priorité des règles : Même un utilisateur Propriétaire (Owner) est bloqué si une Azure Policy interdit la région choisie.",
+            examRule2: "•  Cumul : Un utilisateur doit être autorisé à la fois par son rôle RBAC et par les stratégies Azure Policy actives.",
+            closing: "Si tu veux, je peux te montrer un exemple JSON ou te poser une question type examen sur ce sujet."
+        ),
+        "oral-interview": AITopicPayload(
+            id: "oral-interview",
+            question: "Simuler un entretien oral : Architecture & Gouvernance Azure",
+            intro: "Voici le scénario d'entretien oral AZ-104 sur lequel je t'interroge en direct :",
+            bullet1: "•  Cas Contoso : 50 VMs dans un VNet-Spoke doivent accéder à Key Vault sans exposition Internet et sans secret stocké dans le code.",
+            bullet2: "•  Réponse attendue à l'oral : Managed Identity (Identité managée) + Rôle RBAC Key Vault Secrets User + Private Endpoint avec zone DNS privatelink.",
+            examRule1: "•  Question de relance : Que se passe-t-il si un verrou CanNotDelete est posé sur le groupe de ressources ?",
+            examRule2: "•  Verdict : Même un Propriétaire (Owner) doit retirer le verrou avant toute suppression.",
+            closing: "Touche le bouton vocal bleu pour continuer l'entretien oral à voix haute !"
+        ),
+        "last-3-errors": AITopicPayload(
+            id: "last-3-errors",
+            question: "Analyse mes 3 dernières erreurs et mes points faibles",
+            intro: "J'ai analysé tes 3 dernières erreurs sur AZ-104. Voici ton diagnostic ciblé :",
+            bullet1: "•  1. Private Endpoint & DNS (58 %) : Créer le Private Endpoint ne désactive pas publicNetworkAccess et requiert un Virtual Network Link sur privatelink.*.",
+            bullet2: "•  2. Rôles JSON personnalisés : Mettre \"*\" dans NotActions soustrait toutes les permissions d'Actions — le rôle ne peut plus rien faire.",
+            examRule1: "•  3. Verrous Azure : Un verrou CanNotDelete prime toujours sur le rôle Propriétaire (Owner) tant qu'il n'est pas retiré.",
+            examRule2: "•  Action recommandée : Lance le quiz ciblé de 5 questions pour transformer ces 3 pièges en points forts (+65 pts Pearson VUE).",
+            closing: "Touche « 🎯 Quiz » ci-dessous pour t'entraîner immédiatement sur ces 3 sujets !"
+        ),
+        "cli-example": AITopicPayload(
+            id: "cli-example",
+            question: "Génère un exemple Azure CLI commenté pour le lab pratique",
+            intro: "Voici les 3 commandes Azure CLI indispensables pour isoler un service PaaS avec Private Link :",
+            bullet1: "•  1. Créer le VNet & Subnet : az network vnet create -g RG-Prod -n VNet-Core --address-prefix 10.0.0.0/16 --subnet-name snet-pe",
+            bullet2: "•  2. Lier la zone DNS privée : az network private-dns link vnet create -g RG-Prod -z privatelink.blob.core.windows.net -v VNet-Core -e false",
+            examRule1: "•  Piège CLI à l'examen : Le paramètre -e false (--registration-enabled false) est obligatoire sur une zone privatelink PaaS.",
+            examRule2: "•  Verrouillage CLI : az group lock create --lock-type CanNotDelete -n Lock-Prod -g RG-Prod.",
+            closing: "Sauvegarde cet extrait dans tes Fiches Mémo avec le bouton « 📖 Sauver en Mémo » !"
+        ),
+        "vnet-peering-cli": AITopicPayload(
+            id: "vnet-peering-cli",
+            question: "Commandes CLI pour VNet Peering bidirectionnel",
+            intro: "Le VNet Peering n'est ni transitif par défaut ni unidirectionnel : il faut créer les 2 liens :",
+            bullet1: "•  Lien Hub ➔ Spoke : az network vnet peering create -g RG-Net -n HubToSpoke --vnet-name VNet-Hub --remote-vnet VNet-Spoke --allow-vnet-access",
+            bullet2: "•  Lien Spoke ➔ Hub : az network vnet peering create -g RG-Net -n SpokeToHub --vnet-name VNet-Spoke --remote-vnet VNet-Hub --allow-forwarded-traffic",
+            examRule1: "•  Transit VPN / ExpressRoute : Associe --allow-gateway-transit sur le Hub et --use-remote-gateways sur le Spoke.",
+            examRule2: "•  Non-chevauchement CIDR : Deux VNets dont les plages IP se chevauchent ne peuvent jamais être appairés.",
+            closing: "Tu peux lancer un exercice d'architecture VNet en touchant « 🎯 Quiz »."
+        ),
+        "entra-pim-oral": AITopicPayload(
+            id: "entra-pim-oral",
+            question: "Simulation orale : Entra ID Privileged Identity Management (PIM)",
+            intro: "Entra ID PIM remplace les rôles permanents par une élévation Just-In-Time (JIT) :",
+            bullet1: "•  Attribution Éligible (Eligible) : L'administrateur doit activer son rôle temporairement (ex. 4 heures) pour agir.",
+            bullet2: "•  Contrôles d'activation : Tu peux exiger MFA, une justification métier, un numéro de ticket et une approbation.",
+            examRule1: "•  Licence requise : Entra ID P2 (ou Microsoft Entra ID Governance) pour chaque utilisateur géré par PIM.",
+            examRule2: "•  Revue d'accès (Access Reviews) : Permet de révoquer automatiquement les accès des invités inactifs.",
+            closing: "Touche « 🎯 Quiz » pour vérifier ce point sur la question Q_TYPE_10 !"
+        ),
+        "cannotdelete-lock": AITopicPayload(
+            id: "cannotdelete-lock",
+            question: "Explication erreur : Verrou CanNotDelete vs Rôle Propriétaire",
+            intro: "Pourquoi Alice (Propriétaire / Owner de l'abonnement) ne peut-elle pas supprimer sql-prod-db ?",
+            bullet1: "•  Héritage du verrou : Un verrou CanNotDelete posé sur RG-Prod s'applique automatiquement à toutes les ressources enfants.",
+            bullet2: "•  Évaluation ARM : Azure Resource Manager vérifie les verrous AVANT d'exécuter l'opération DELETE, quel que soit le rôle RBAC.",
+            examRule1: "•  ReadOnly vs CanNotDelete : Un verrou ReadOnly bloque même le listKeys d'un Storage Account ou Key Vault !",
+            examRule2: "•  Solution : Comme Alice est Owner, elle a le droit de supprimer le verrou d'abord, puis de supprimer la base SQL.",
+            closing: "Retiens cette règle : Verrou ARM > Rôle RBAC Owner tant que le verrou est actif."
+        ),
+        "appgw-vs-lb": AITopicPayload(
+            id: "appgw-vs-lb",
+            question: "Application Gateway (Couche 7) vs Azure Load Balancer (Couche 4)",
+            intro: "Choisis ton répartiteur de charge Azure selon la couche OSI et le besoin de sécurité :",
+            bullet1: "•  Azure Application Gateway (L7 HTTP/HTTPS) : Routage par URL (/images, /api), déchiffrement TLS, affinité par cookie et pare-feu WAF.",
+            bullet2: "•  Azure Load Balancer (L4 TCP/UDP) : Ultra-faible latence pour le trafic non-HTTP (SQL, RDP, SSH, microservices TCP).",
+            examRule1: "•  Portée régionale vs globale : Application Gateway et Load Balancer sont régionaux ; Front Door et Traffic Manager sont globaux.",
+            examRule2: "•  Règle d'or AZ-104 : Dès que l'énoncé mentionne « WAF OWASP » ou « routage par chemin d'URL », choisis Application Gateway.",
+            closing: "Tu peux retrouver ce schéma interactif dans l'exercice Q_TYPE_03."
+        ),
+        "nsg-priority": AITopicPayload(
+            id: "nsg-priority",
+            question: "Règles NSG (Network Security Group) et priorités de trafic",
+            intro: "Un NSG filtre le trafic à l'entrée et à la sortie d'un sous-réseau ou d'une carte réseau (NIC) :",
+            bullet1: "•  Priorité de 100 à 4096 : La règle avec le numéro le plus petit (ex. 100) est évaluée en premier et arrête l'évaluation dès qu'elle correspond.",
+            bullet2: "•  Stateful (avec état) : Si un flux entrant HTTPS (443) est autorisé, la réponse sortante est automatiquement autorisée.",
+            examRule1: "•  Double NSG (Subnet + NIC) : En trafic entrant, le NSG du Subnet est évalué d'abord, puis celui de la NIC (les deux doivent autoriser).",
+            examRule2: "•  ASG (Application Security Group) : Regroupe des VMs par rôle métier (Web, App, DB) sans gérer d'adresses IP en dur.",
+            closing: "Pense toujours à vérifier à la fois le NSG du sous-réseau et celui de la NIC !"
+        ),
+        "azure-backup": AITopicPayload(
+            id: "azure-backup",
+            question: "Sauvegarde Azure Backup vs Azure Site Recovery (ASR)",
+            intro: "Distingue clairement la restauration granulaire de données (Backup) et la reprise après sinistre (ASR) :",
+            bullet1: "•  Azure Backup (Recovery Services Vault) : Protège contre la corruption ou suppression accidentelle (rétention longue durée, Soft Delete 14 jours).",
+            bullet2: "•  Azure Site Recovery (ASR) : Réplique en continu les VMs vers une région secondaire pour un basculement (Failover) avec RTO en minutes.",
+            examRule1: "•  Règle de région : Un Recovery Services Vault de sauvegarde VM doit être dans la même région que la VM source.",
+            examRule2: "•  Cross-Region Restore (CRR) : Nécessite une redondance GRS (Geo-Redundant Storage) activée sur le coffre.",
+            closing: "C'est l'un des sujets favoris du domaine 5 (Supervision & Sauvegarde) d'AZ-104."
+        ),
+        "iam-vs-s3-policy": AITopicPayload(
+            id: "iam-vs-s3-policy",
+            question: "Rôles AWS IAM vs Bucket Policy S3 (Multi-Parcours SAA-C03)",
+            intro: "Sur AWS SAA-C03, IAM et les Bucket Policies S3 combinent politiques basées sur l'identité et sur la ressource :",
+            bullet1: "•  IAM Role / Policy (Identity-based) : Attaché à un utilisateur, groupe ou service EC2/Lambda (Qui a le droit de faire quoi).",
+            bullet2: "•  S3 Bucket Policy (Resource-based) : Attachée directement au bucket S3 (idéal pour l'accès inter-comptes AWS ou CloudFront OAC).",
+            examRule1: "•  Explicit Deny : Comme dans Azure, un Deny explicite dans une Bucket Policy ou SCP l'emporte toujours sur n'importe quel Allow.",
+            examRule2: "•  S3 Block Public Access : Verrouille l'exposition publique au niveau du bucket ou du compte AWS entier.",
+            closing: "Bascule sur le parcours SAA-C03 depuis l'accueil pour pratiquer les labs AWS !"
+        )
+    ]
+
+    public var currentAITopicPayload: AITopicPayload {
+        if aiActiveTopicId == "custom", !aiCustomPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let trimmed = aiCustomPromptText.trimmingCharacters(in: .whitespacesAndNewlines)
+            return AITopicPayload(
+                id: "custom",
+                question: trimmed,
+                intro: "Voici la synthèse structurée CertiGo IA pour ta question sur \(activeRouteCode) :",
+                bullet1: "•  Principe architectural : Sépare toujours le plan d'identité (RBAC / IAM) du plan réseau (Private Link / VNet) et de la gouvernance (Policy / Verrous).",
+                bullet2: "•  Mise en œuvre : Privilégie les identités managées (Managed Identities) et l'isolation PaaS privée avec résolution DNS dédiée.",
+                examRule1: "•  Réflexe d'examen : Repère dans l'énoncé les contraintes « sans exposition Internet », « moindre privilège » et « SLA 99,99 % ».",
+                examRule2: "•  Commande clé : Vérifie systématiquement la portée (Scope) et les verrous actifs avant toute action de modification.",
+                closing: "Touche « 📖 Sauver en Mémo » pour conserver cette fiche ou « 🎯 Quiz » pour tester ce concept !"
+            )
+        }
+        return Self.aiTopicsById[aiActiveTopicId] ?? Self.aiTopicsById["rbac-vs-policy"]!
+    }
+
+    // MARK: Mock Exam Questions Catalog (Screen 23)
+
+    public static let mockExamQuestionsByNumber: [Int: MockExamQuestionPayload] = [
+        12: MockExamQuestionPayload(
+            number: 12,
+            badge: "ÉTUDE DE CAS CONTOSO · IDENTITÉ ENTRA ID",
+            stem: "Un administrateur doit activer le rôle Global Reader uniquement pendant 4 heures avec approbation obligatoire et MFA.\nQuelle fonctionnalité déployez-vous ?",
+            optionA: "Attributions RBAC permanentes avec groupe de sécurité dynamique",
+            optionB: "Microsoft Entra ID Privileged Identity Management (PIM) — rôle éligible",
+            optionC: "Stratégie Azure Policy AuditIfNotExists sur l'abonnement",
+            optionD: "Verrou Resource Manager ReadOnly sur le groupe d'administration"
+        ),
+        13: MockExamQuestionPayload(
+            number: 13,
+            badge: "ÉTUDE DE CAS CONTOSO · RÉSEAUX HYBRIDES",
+            stem: "Deux VNets (10.1.0.0/16 et 10.2.0.0/16) appairés en VNet Peering doivent partager la passerelle ExpressRoute du VNet-Hub.\nQuels paramètres activez-vous ?",
+            optionA: "Autoriser le transit de passerelle sur le Hub + Utiliser les passerelles distantes sur le Spoke",
+            optionB: "Créer deux passerelles VPN redondantes avec BGP actif-actif dans chaque Spoke",
+            optionC: "Déployer un Azure Load Balancer Standard Interne entre les deux VNets",
+            optionD: "Activer Service Endpoint Microsoft.Network sur tous les sous-réseaux"
+        ),
+        14: MockExamQuestionPayload(
+            number: 14,
+            badge: "ÉTUDE DE CAS CONTOSO · SÉCURITÉ",
+            stem: "50 VMs dans VNet-Spoke doivent lire les secrets d'un coffre Azure Key Vault sans exposition Internet et avec contrôle RBAC unifié.\nQuelle architecture déployez-vous ?",
+            optionA: "Service Endpoint + Stratégie d'accès Key Vault classique sur le sous-réseau",
+            optionB: "Private Endpoint + Zone DNS privatelink + Rôle RBAC Key Vault Secrets User",
+            optionC: "Azure NAT Gateway + Pare-feu public Key Vault limité à l'IP sortante",
+            optionD: "Appeler Key Vault via une adresse IP publique avec jeton SAS temporaire"
+        ),
+        15: MockExamQuestionPayload(
+            number: 15,
+            badge: "ÉTUDE DE CAS CONTOSO · STOCKAGE & RÉSILIENCE",
+            stem: "Un compte de stockage contenant des archives légales doit rester lisible dans une région secondaire même en cas de panne régionale complète.\nQuelle redondance choisissez-vous ?",
+            optionA: "LRS (Locally Redundant Storage) avec Soft Delete 14 jours",
+            optionB: "RA-GRS (Read-Access Geo-Redundant Storage)",
+            optionC: "ZRS (Zone-Redundant Storage) sur 3 zones de disponibilité",
+            optionD: " Stockage Blob Premium avec réplication locale synchrone"
+        ),
+        16: MockExamQuestionPayload(
+            number: 16,
+            badge: "ÉTUDE DE CAS CONTOSO · CALCUL & AKS",
+            stem: "Votre cluster AKS de production doit mettre à l'échelle automatiquement le nombre de nœuds VM lorsque les pods sont en état Pending par manque de CPU.\nQuel composant activez-vous ?",
+            optionA: "Horizontal Pod Autoscaler (HPA) uniquement sur le déploiement Kubernetes",
+            optionB: "Azure Traffic Manager en mode Performance",
+            optionC: "AzureUpdate Manager avec maintenance planifiée",
+            optionD: "Cluster Autoscaler sur le pool de nœuds AKS (Virtual Machine Scale Sets)"
+        ),
+        17: MockExamQuestionPayload(
+            number: 17,
+            badge: "ÉTUDE DE CAS CONTOSO · SUPERVISION & BACKUP",
+            stem: "Vous devez sauvegarder 12 VMs Azure situées dans West Europe vers un coffre Recovery Services Vault avec restauration inter-régions.\nQuelle configuration est requise ?",
+            optionA: "Coffre dans West Europe en stockage GRS avec Cross-Region Restore (CRR) activé",
+            optionB: "Coffre dans North Europe en stockage LRS sans agent",
+            optionC: "Instantanés (Snapshots) manuels stockés dans le même groupe de ressources",
+            optionD: "Règle d'alerte Azure Monitor Log Analytics sans coffre de sauvegarde"
+        )
+    ]
+
+    public var currentMockExamQuestionPayload: MockExamQuestionPayload {
+        Self.mockExamQuestionsByNumber[examCurrentQuestionNumber]
+            ?? Self.mockExamQuestionsByNumber[14]!
+    }
+
+    // MARK: Profile Certification Detail Catalog (Screen 26)
+
+    public static func profileCertificationDetail(
+        forCode code: String
+    ) -> ProfileCertificationDetailPayload {
+        switch code.uppercased() {
+        case "AZ-900":
+            return ProfileCertificationDetailPayload(
+                code: "AZ-900",
+                badge: "MICROSOFT CERTIFIED FUNDAMENTALS",
+                title: "Azure Fundamentals (AZ-900)",
+                progression: "100 % (10/10)",
+                lastMockExam: "890 / 1000 ✓",
+                crestImageFill: nil,
+                domains: [
+                    ("1. Concepts Cloud & Haute Disponibilité", "94%", 295.0, "#58cc02"),
+                    ("2. Architecture & Services Azure (Calcul/Data)", "90%", 280.0, "#58cc02"),
+                    ("3. Sécurité, Gouvernance & Conformité", "88%", 270.0, "#0078d4"),
+                    ("4. Tarification, TCO & Cycle de vie SLA", "85%", 260.0, "#0078d4")
+                ]
+            )
+        case "SAA-C03":
+            return ProfileCertificationDetailPayload(
+                code: "SAA-C03",
+                badge: "AWS CERTIFIED ASSOCIATE",
+                title: "Solutions Architect (SAA-C03)",
+                progression: "25 % (4/16)",
+                lastMockExam: "715 / 1000 ✓",
+                crestImageFill: "img:e3041bf6f6e2b3d0b97ee7a5aba3518aefc60108",
+                domains: [
+                    ("1. Conception d'architectures sécurisées (IAM)", "78%", 240.0, "#58cc02"),
+                    ("2. Architectures résilientes (Multi-AZ / VPC)", "68%", 210.0, "#0078d4"),
+                    ("3. Haute performance (S3, CloudFront, Aurora)", "54%", 168.0, "#f59e0b"),
+                    ("4. Optimisation des coûts AWS (Savings Plans)", "48%", 150.0, "#f59e0b")
+                ]
+            )
+        case "GH-300":
+            return ProfileCertificationDetailPayload(
+                code: "GH-300",
+                badge: "GITHUB OFFICIAL CERTIFICATION",
+                title: "GitHub Copilot (GH-300)",
+                progression: "80 % (8/10)",
+                lastMockExam: "840 / 1000 ✓",
+                crestImageFill: "img:7149e104bfe0be393cbd68e92a1dba4c1f0f7936",
+                domains: [
+                    ("1. IA Responsable & Confidentialité du code", "92%", 290.0, "#58cc02"),
+                    ("2. Ingénierie de Prompt & Contexte IDE", "86%", 265.0, "#58cc02"),
+                    ("3. Tests unitaires, Refactoring & Débogage IA", "80%", 248.0, "#0078d4"),
+                    ("4. Gouvernance Enterprise, CLI & Sécurité", "74%", 225.0, "#0078d4")
+                ]
+            )
+        default:
+            return ProfileCertificationDetailPayload(
+                code: "AZ-104",
+                badge: "MICROSOFT CERTIFIED ASSOCIATE",
+                title: "Azure Administrator (AZ-104)",
+                progression: "65 % (12/18)",
+                lastMockExam: "760 / 1000 ✓",
+                crestImageFill: nil,
+                domains: [
+                    ("1. Identité & Gouvernance Entra ID", "85%", 260.0, "#58cc02"),
+                    ("2. Stockage & Comptes Azure", "72%", 220.0, "#0078d4"),
+                    ("3. Calcul & Conteneurs (VMs / AKS)", "64%", 196.0, "#0078d4"),
+                    ("4. Réseaux Virtuels (VNet / DNS)", "45%", 138.0, "#f59e0b")
+                ]
+            )
+        }
+    }
+
+    // MARK: Interactive Tap Handler
+
+    /// Handles an interactive tap on a Figma node or `"act:<nodeId>"` target.
+    /// Returns an optional destination screen `nodeId` if the interaction also navigates to another screen.
+    @discardableResult
+    public mutating func handleTap(
+        onNodeId rawTarget: String,
+        inScreenNodeId screenNodeId: String,
+        coordinator: inout PrismAppShellCoordinatorModel
+    ) -> String? {
+        let nodeId: String = {
+            if rawTarget.hasPrefix("act:") {
+                return String(rawTarget.dropFirst(4))
+            }
+            return rawTarget
+        }()
+
+        // 1. Popover 02 (42:375) vendor tiles & certification cards
+        if let vendor = Self.vendorByTileNodeId[nodeId] {
+            selectedVendorInPopover = vendor
+            return nil
+        }
+        if screenNodeId == "42:375" || ["42:522", "42:532", "42:540"].contains(nodeId) {
+            let cards = currentPopoverCards
+            let selectedIndex: Int? = {
+                switch nodeId {
+                case "42:522": return 0
+                case "42:532": return 1
+                case "42:540": return 2
+                default: return nil
+                }
+            }()
+            if let idx = selectedIndex, idx < cards.count {
+                let code = cards[idx].code
+                activeRouteCode = code
+                coordinator.parallelTracksPreference.setActiveTrack(code)
+                coordinator.todayModel.activeRouteCode = code
+                coordinator.todayModel.activeRouteTitle = cards[idx].title
+                return "37:375"
+            }
+        }
+
+        // 2. Single-choice QCM screens (73:332, 26:826, 73:393, 73:442, 73:509, 73:898, 73:1019)
+        for (qScreenId, options) in Self.singleSelectOptionGroupsByScreen {
+            if (screenNodeId == qScreenId || options.contains(nodeId)), options.contains(nodeId) {
+                selectedOptionNodeIdsByScreen[qScreenId] = [nodeId]
+                return nil
+            }
+        }
+
+        // 3. Multi-select & Word Bank screens (73:1070, 73:743, 26:863)
+        for (mScreenId, options) in Self.multiSelectOptionGroupsByScreen {
+            if (screenNodeId == mScreenId || options.contains(nodeId)), options.contains(nodeId) {
+                var current = selectedOptionNodeIdsByScreen[mScreenId] ?? []
+                if current.contains(nodeId) {
+                    if current.count > 1 {
+                        current.remove(nodeId)
+                    } else {
+                        current.remove(nodeId)
+                    }
+                } else {
+                    current.insert(nodeId)
+                }
+                selectedOptionNodeIdsByScreen[mScreenId] = current
+                return nil
+            }
+        }
+
+        // 4. Q_TYPE_06 Matching Pairs (73:818)
+        let leftPairs = ["73:842", "73:851", "73:860", "73:869"]
+        let rightPairs = ["73:877", "73:881", "73:885", "73:889"]
+        if leftPairs.contains(nodeId) {
+            qType06PendingLeftNodeId = nodeId
+            var set = selectedOptionNodeIdsByScreen["73:818"] ?? []
+            set.insert(nodeId)
+            selectedOptionNodeIdsByScreen["73:818"] = set
+            return nil
+        }
+        if rightPairs.contains(nodeId) {
+            let leftId = qType06PendingLeftNodeId ?? "73:851"
+            qType06PairedRightByLeftNodeId[leftId] = nodeId
+            selectedOptionNodeIdsByScreen["73:818"] = [leftId, nodeId]
+            return nil
+        }
+
+        // 5. Q_TYPE_08 Scope Ordering (73:958)
+        let orderRows = ["73:982", "73:990", "73:998", "73:1006"]
+        if orderRows.contains(nodeId) {
+            if let previous = qType08SelectedRowNodeId,
+               previous != nodeId,
+               let firstIdx = qType08OrderedRowNodeIds.firstIndex(of: previous),
+               let secondIdx = qType08OrderedRowNodeIds.firstIndex(of: nodeId)
+            {
+                qType08OrderedRowNodeIds.swapAt(firstIdx, secondIdx)
+                qType08SelectedRowNodeId = nodeId
+            } else {
+                qType08SelectedRowNodeId = nodeId
+            }
+            selectedOptionNodeIdsByScreen["73:958"] = [nodeId]
+            return nil
+        }
+
+        // 6. Q_TYPE_04 iOS Keyboard & CLI Input (73:575)
+        if nodeId == "73:613" || nodeId == "73:615" {
+            qType04InputText = "lock"
+            return nil
+        }
+        if nodeId == "73:617" {
+            qType04InputText = "list"
+            return nil
+        }
+        if nodeId == "73:726" {
+            if !qType04InputText.isEmpty {
+                qType04InputText.removeLast()
+            }
+            return nil
+        }
+        if nodeId == "73:734" {
+            qType04InputText += " "
+            return nil
+        }
+        if nodeId == "73:738" {
+            return "73:743"
+        }
+        if let keyLetter = Self.keyboardLetterByNodeId[nodeId] {
+            if qType04InputText == "lock" || qType04InputText == "list" {
+                qType04InputText = keyLetter.lowercased()
+            } else if qType04InputText.count < 14 {
+                qType04InputText += keyLetter.lowercased()
+            }
+            return nil
+        }
+
+        // 7. Hub IA (79:332, 78:332, 81:345, 85:317)
+        switch nodeId {
+        case "79:352":
+            aiActiveTopicId = "rbac-vs-policy"
+            isAIResponseCopied = false
+            return "78:332"
+        case "79:356":
+            aiActiveTopicId = "oral-interview"
+            isVoiceLiveListening = true
+            return "81:345"
+        case "79:360":
+            aiActiveTopicId = "last-3-errors"
+            isAIResponseCopied = false
+            return "78:332"
+        case "79:364":
+            aiActiveTopicId = "cli-example"
+            isAIResponseCopied = false
+            return "78:332"
+        case "78:366":
+            isAIResponseCopied = true
+            return nil
+        case "78:371":
+            return "58:705"
+        case "78:373":
+            return "73:393"
+        case "81:365":
+            isVoiceLiveListening.toggle()
+            return nil
+        case "85:378":
+            aiActiveTopicId = "rbac-vs-policy"
+            isAIResponseCopied = false
+            return "78:332"
+        case "85:380":
+            aiActiveTopicId = "vnet-peering-cli"
+            isAIResponseCopied = false
+            return "78:332"
+        case "85:383":
+            aiActiveTopicId = "entra-pim-oral"
+            isAIResponseCopied = false
+            return "78:332"
+        case "85:387":
+            aiActiveTopicId = "cannotdelete-lock"
+            isAIResponseCopied = false
+            return "78:332"
+        case "85:388":
+            aiActiveTopicId = "appgw-vs-lb"
+            isAIResponseCopied = false
+            return "78:332"
+        case "85:392":
+            aiActiveTopicId = "nsg-priority"
+            isAIResponseCopied = false
+            return "78:332"
+        case "85:393":
+            aiActiveTopicId = "azure-backup"
+            isAIResponseCopied = false
+            return "78:332"
+        case "85:394":
+            aiActiveTopicId = "iam-vs-s3-policy"
+            isAIResponseCopied = false
+            return "78:332"
+        case "85:395":
+            aiCustomPromptText = ""
+            return "79:332"
+        default:
+            break
+        }
+
+        // 8. Cockpit Examen Blanc 23 (142:478) & Carrousel Rapport 24 (142:540)
+        if ["142:508", "142:514", "142:520", "142:526"].contains(nodeId) {
+            examSelectedOptionByQuestion[examCurrentQuestionNumber] = nodeId
+            return nil
+        }
+        if nodeId == "142:487" || nodeId == "142:488" {
+            if examFlaggedQuestions.contains(examCurrentQuestionNumber) {
+                examFlaggedQuestions.remove(examCurrentQuestionNumber)
+            } else {
+                examFlaggedQuestions.insert(examCurrentQuestionNumber)
+            }
+            return nil
+        }
+        let examPillToNumber: [String: Int] = [
+            "142:490": 12,
+            "142:492": 13,
+            "142:494": 14,
+            "142:496": 15,
+            "142:498": 16,
+            "142:500": 17
+        ]
+        if let qNum = examPillToNumber[nodeId] {
+            examCurrentQuestionNumber = qNum
+            return nil
+        }
+        if nodeId == "142:532" {
+            if examCurrentQuestionNumber > 12 {
+                examCurrentQuestionNumber -= 1
+                return nil
+            }
+            return "142:385"
+        }
+        if nodeId == "142:536" {
+            if examCurrentQuestionNumber < 17 {
+                examCurrentQuestionNumber += 1
+                return nil
+            }
+            return "142:540"
+        }
+        if nodeId == "142:573" || nodeId == "142:574" || nodeId == "142:584" {
+            examReportCarouselIndex = (examReportCarouselIndex + 1) % 3
+            return nil
+        }
+        if nodeId == "142:585" {
+            examReportCarouselIndex = 0
+            return nil
+        }
+        if nodeId == "142:586" {
+            examReportCarouselIndex = 1
+            return nil
+        }
+        if nodeId == "142:587" {
+            examReportCarouselIndex = 2
+            return nil
+        }
+
+        // 9. Social 25 (89:317)
+        if ["89:493", "89:504", "89:515", "89:526", "89:537"].contains(nodeId) {
+            if salutedFriendNodeIds.contains(nodeId) {
+                salutedFriendNodeIds.remove(nodeId)
+            } else {
+                salutedFriendNodeIds.insert(nodeId)
+            }
+            return nil
+        }
+        if nodeId == "89:480" || nodeId == "89:484" {
+            isFriendInviteCopied = true
+            return nil
+        }
+
+        // 10. Profil 08 (97:287), Détail Certif 26 (97:417), PRO 27 (144:137) & Paramètres 28 (145:122)
+        let profileCardToCode: [String: String] = [
+            "97:336": "AZ-104",
+            "97:338": "AZ-104",
+            "97:355": "AZ-900",
+            "97:374": "SAA-C03",
+            "97:382": "GH-300"
+        ]
+        if let certCode = profileCardToCode[nodeId] {
+            selectedProfileCertificationCode = certCode
+            return "97:417"
+        }
+        if nodeId == "144:179" || nodeId == "144:187" {
+            selectedProPlanNodeId = nodeId
+            return nil
+        }
+        if nodeId == "144:195" {
+            isProTrialActivated = true
+            return "97:287"
+        }
+        if ["145:174", "145:181", "145:187", "145:193"].contains(nodeId) {
+            let current = settingsToggleStates[nodeId] ?? true
+            settingsToggleStates[nodeId] = !current
+            return nil
+        }
+        if nodeId == "145:146" || nodeId == "145:147" {
+            settingsLanguageIndex = (settingsLanguageIndex + 1) % Self.settingsLanguageOptions.count
+            coordinator.parallelTracksPreference.bilingualTechnicalTermsEN = (settingsLanguageIndex == 0)
+            return nil
+        }
+        if nodeId == "145:152" || nodeId == "145:153" {
+            settingsExamModeIndex = (settingsExamModeIndex + 1) % Self.settingsExamModeOptions.count
+            coordinator.parallelTracksPreference.strictTimed90Min = (settingsExamModeIndex == 0)
+            return nil
+        }
+        if nodeId == "145:157" || nodeId == "145:158" {
+            return "162:93"
+        }
+        if nodeId == "145:163" || nodeId == "145:164" {
+            settingsCoachVoiceIndex = (settingsCoachVoiceIndex + 1) % Self.settingsCoachVoiceOptions.count
+            return nil
+        }
+        if nodeId == "145:168" || nodeId == "145:169" {
+            settingsExplanationStyleIndex = (settingsExplanationStyleIndex + 1) % Self.settingsExplanationStyleOptions.count
+            return nil
+        }
+
+        // 11. Onboarding (132:264, 132:339, 132:438, 132:519, 132:581)
+        let ob02Cards = ["132:301", "132:310", "132:319", "132:327"]
+        if ob02Cards.contains(nodeId) {
+            toggleOnboardingMultiCard(nodeId, inScreen: "132:264")
+            return nil
+        }
+        let ob03ACardToTrack: [String: String] = [
+            "132:379": "AZ-104",
+            "132:396": "SAA-C03",
+            "132:406": "GH-300",
+            "132:416": "AZ-900"
+        ]
+        if let trackCode = ob03ACardToTrack[nodeId] {
+            toggleOnboardingMultiCard(nodeId, inScreen: "132:339")
+            coordinator.parallelTracksPreference.toggleParallelTrack(trackCode)
+            activeRouteCode = coordinator.parallelTracksPreference.activeTrackCode
+            return nil
+        }
+        let ob03BCardToAITrack: [String: String] = [
+            "132:452": "AI-CLAUDE",
+            "132:463": "AI-FOUNDRY",
+            "132:474": "AI-OPENAI"
+        ]
+        if let aiCode = ob03BCardToAITrack[nodeId] {
+            toggleOnboardingMultiCard(nodeId, inScreen: "132:438")
+            coordinator.parallelTracksPreference.toggleAIFrontierTrack(aiCode)
+            return nil
+        }
+        let ob04LevelCards = ["132:531", "132:539", "132:548"]
+        if ob04LevelCards.contains(nodeId) {
+            var current = onboardingSelectedNodeIdsByScreen["132:519"] ?? ["132:539", "132:562"]
+            for id in ob04LevelCards { current.remove(id) }
+            current.insert(nodeId)
+            onboardingSelectedNodeIdsByScreen["132:519"] = current
+            return nil
+        }
+        let ob04DeadlineCards = ["132:557", "132:562", "132:567", "132:572"]
+        if ob04DeadlineCards.contains(nodeId) {
+            var current = onboardingSelectedNodeIdsByScreen["132:519"] ?? ["132:539", "132:562"]
+            for id in ob04DeadlineCards { current.remove(id) }
+            current.insert(nodeId)
+            onboardingSelectedNodeIdsByScreen["132:519"] = current
+            return nil
+        }
+        let ob06ARhythmCards = ["132:594", "132:600", "132:606"]
+        if ob06ARhythmCards.contains(nodeId) {
+            onboardingSelectedNodeIdsByScreen["132:581"] = [nodeId]
+            return nil
+        }
+        if nodeId == "132:645" || nodeId == "132:646" {
+            onboardingReminderTimeIndex = (onboardingReminderTimeIndex + 1) % Self.onboardingReminderTimeOptions.count
+            return nil
+        }
+
+        return nil
+    }
+
+    public mutating func submitAIPrompt(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "78:332" }
+        aiCustomPromptText = trimmed
+        aiActiveTopicId = "custom"
+        isAIResponseCopied = false
+        return "78:332"
+    }
+
+    private mutating func toggleOnboardingMultiCard(_ nodeId: String, inScreen screenId: String) {
+        var set = onboardingSelectedNodeIdsByScreen[screenId] ?? []
+        if set.contains(nodeId) {
+            if set.count > 1 {
+                set.remove(nodeId)
+            }
+        } else {
+            set.insert(nodeId)
+        }
+        onboardingSelectedNodeIdsByScreen[screenId] = set
+    }
+
+    public static let keyboardLetterByNodeId: [String: String] = [
+        "73:618": "A", "73:622": "Z", "73:626": "E", "73:630": "R", "73:634": "T",
+        "73:638": "Y", "73:642": "U", "73:646": "I", "73:650": "O", "73:654": "P",
+        "73:658": "Q", "73:662": "S", "73:666": "D", "73:670": "F", "73:674": "G",
+        "73:678": "H", "73:682": "J", "73:686": "K", "73:690": "L", "73:694": "M",
+        "73:702": "W", "73:706": "X", "73:710": "C", "73:714": "V", "73:718": "B", "73:722": "N"
+    ]
+
+    // MARK: Live Scene-Graph Transformation (`applyingLiveState(to:)`)
+
+    public func applyingLiveState(
+        to rootNode: CertiGoFigmaSceneNode,
+        additionalParallelTracksCount: Int = 2
+    ) -> CertiGoFigmaSceneNode {
+        let screenId = rootNode.i
+        var transformed = rootNode.mapAllNodes { node in
+            transformNode(
+                node,
+                inScreenId: screenId,
+                additionalParallelTracksCount: additionalParallelTracksCount
+            )
+        }
+
+        // Screen-level structural adjustments
+        switch screenId {
+        case "26:826":
+            transformed = applyScreen16GridSelection(to: transformed)
+        case "26:863":
+            transformed = applyScreen17CLISelection(to: transformed)
+        case "145:122":
+            transformed = applyScreen28SettingsHitTargets(to: transformed)
+        case "162:93":
+            transformed = applyScreenRES01BackButton(to: transformed)
+        default:
+            break
+        }
+
+        return transformed
+    }
+
+    private func transformNode(
+        _ node: CertiGoFigmaSceneNode,
+        inScreenId screenId: String,
+        additionalParallelTracksCount: Int
+    ) -> CertiGoFigmaSceneNode {
+        // 1. Global Route Code Badges & Headers
+        switch node.i {
+        case "37:447", "42:447", "142:423", "151:205":
+            return node.updating(w: max(node.w, 72.0), tx: .some("\(activeRouteCode) ▾"))
+        case "42:486":
+            return node.updating(w: max(node.w, 72.0), tx: .some("\(activeRouteCode) ▴"))
+        case "142:416", "151:198":
+            return node.updating(w: max(node.w, 225.0), tx: .some("Examens · \(activeRouteCode)"))
+        case "142:442", "151:217":
+            return node.updating(w: max(node.w, 280.0), tx: .some("S'ENTRAÎNER PAR DOMAINE OFFICIEL \(activeRouteCode)"))
+        default:
+            break
+        }
+
+        // 2. Popover 02 (42:375)
+        if screenId == "42:375" {
+            if node.i == "42:490" {
+                return node.updating(d: .some(nil))
+            }
+            if let tileVendor = Self.vendorByTileNodeId[node.i] {
+                let isSelected = (tileVendor == selectedVendorInPopover.lowercased())
+                var updated = node
+                    .clearingDescendantDestinations()
+                    .updating(
+                        f: .some(isSelected ? "#ffffff" : "#f1f5f9"),
+                        s: .some(isSelected ? "#0078d4:1.5" : nil),
+                        d: .some("act:\(node.i)")
+                    )
+                if node.i == "42:491" {
+                    let label = Self.vendorDisplayNames[selectedVendorInPopover.lowercased()] ?? "Microsoft"
+                    let children = (updated.c ?? []).map { child in
+                        child.i == "42:497" ? child.updating(w: 66.0, tx: .some(label)) : child
+                    }
+                    updated = updated.updating(c: .some(children))
+                }
+                return updated
+            }
+            if ["42:522", "42:532", "42:540"].contains(node.i) {
+                let cards = currentPopoverCards
+                let index = (node.i == "42:522") ? 0 : (node.i == "42:532" ? 1 : 2)
+                guard index < cards.count else { return node }
+                let item = cards[index]
+                let matchesAny = cards.contains { $0.code == activeRouteCode }
+                let isSelected = (item.code == activeRouteCode) || (!matchesAny && index == 0)
+
+                var children = (node.c ?? []).filter { $0.i != "42:530" }
+                children = children.map { child in
+                    if ["42:528", "42:538", "42:546"].contains(child.i) {
+                        return child.updating(w: 96.0, tx: .some(item.code))
+                    }
+                    if ["42:529", "42:539", "42:547"].contains(child.i) {
+                        return child.updating(w: 176.0, tx: .some(item.title))
+                    }
+                    return child
+                }
+                if isSelected {
+                    let checkBadge = CertiGoFigmaSceneNode(
+                        i: "42:530",
+                        n: "Frame",
+                        t: "F",
+                        x: 232,
+                        y: 13,
+                        w: 24,
+                        h: 24,
+                        f: "#0078d4",
+                        r: 12,
+                        c: [
+                            CertiGoFigmaSceneNode(
+                                i: "42:531",
+                                n: "✓",
+                                t: "T",
+                                x: 7,
+                                y: 3,
+                                w: 10,
+                                h: 16,
+                                f: "#ffffff",
+                                tx: "✓",
+                                fs: 13,
+                                fw: "Black",
+                                al: "C",
+                                va: "C"
+                            )
+                        ]
+                    )
+                    children.append(checkBadge)
+                }
+                return node
+                    .updating(
+                        f: .some(isSelected ? "#eff6ff" : "#f8fafc"),
+                        s: .some(isSelected ? "#0078d4:2" : "#e2e8f0:1"),
+                        d: .some("act:\(node.i)"),
+                        c: .some(children)
+                    )
+            }
+        }
+
+        // 3. Single-choice QCM Option Cards (73:332, 73:393, 73:442, 73:509, 73:898, 73:1019)
+        if let options = Self.singleSelectOptionGroupsByScreen[screenId],
+           screenId != "26:826",
+           options.contains(node.i)
+        {
+            let isSelected = isOptionSelected(node.i, inScreen: screenId)
+            return Self.style3DCardNode(
+                node,
+                isSelected: isSelected,
+                actionId: "act:\(node.i)"
+            )
+        }
+
+        // 4. Multi-select Checkbox Cards on Q_TYPE_10 (73:1070)
+        if screenId == "73:1070", ["73:1095", "73:1101", "73:1107", "73:1112"].contains(node.i) {
+            let isSelected = isOptionSelected(node.i, inScreen: "73:1070")
+            return Self.styleCheckbox3DCardNode(
+                node,
+                isSelected: isSelected,
+                actionId: "act:\(node.i)"
+            )
+        }
+
+        // 5. Word Bank Bricks on Q_TYPE_05 (73:743)
+        if screenId == "73:743",
+           let bricks = Self.multiSelectOptionGroupsByScreen["73:743"],
+           bricks.contains(node.i)
+        {
+            let isSelected = isOptionSelected(node.i, inScreen: "73:743")
+            return Self.style3DCardNode(
+                node,
+                isSelected: isSelected,
+                actionId: "act:\(node.i)"
+            )
+        }
+
+        // 6. Matching Pairs on Q_TYPE_06 (73:818)
+        if screenId == "73:818",
+           ["73:842", "73:851", "73:860", "73:869", "73:877", "73:881", "73:885", "73:889"].contains(node.i)
+        {
+            let isActive = isOptionSelected(node.i, inScreen: "73:818") || (qType06PendingLeftNodeId == node.i)
+            let isPaired = qType06PairedRightByLeftNodeId.keys.contains(node.i)
+                || qType06PairedRightByLeftNodeId.values.contains(node.i)
+            if isActive {
+                return Self.style3DCardNode(node, isSelected: true, actionId: "act:\(node.i)")
+            } else if isPaired {
+                return Self.style3DCardNode(
+                    node,
+                    isSelected: true,
+                    actionId: "act:\(node.i)",
+                    selectedLipHex: "#22c55e",
+                    selectedFaceHex: "#dcfce7",
+                    selectedStrokeSpec: "#86efac:1.8",
+                    selectedTextHex: "#15803d"
+                )
+            } else {
+                return Self.style3DCardNode(node, isSelected: false, actionId: "act:\(node.i)")
+            }
+        }
+
+        // 7. Scope Ordering on Q_TYPE_08 (73:958)
+        if screenId == "73:958", ["73:982", "73:990", "73:998", "73:1006"].contains(node.i) {
+            let slotIds = ["73:982", "73:990", "73:998", "73:1006"]
+            let slotIndex = slotIds.firstIndex(of: node.i) ?? 0
+            let orderedId = slotIndex < qType08OrderedRowNodeIds.count ? qType08OrderedRowNodeIds[slotIndex] : node.i
+            let itemText = Self.qType08ItemsByOriginalRowId[orderedId] ?? ("Groupe d'administration", "Management Group (Multi-abonnements)")
+            let isSelected = (qType08SelectedRowNodeId == node.i)
+            var styled = Self.style3DCardNode(node, isSelected: isSelected, actionId: "act:\(node.i)")
+            if var children = styled.c, children.count >= 2, var faceChildren = children[1].c {
+                faceChildren = faceChildren.map { child in
+                    if ["73:987", "73:995", "73:1003", "73:1011"].contains(child.i) {
+                        return child.updating(w: 235.0, tx: .some(itemText.title))
+                    }
+                    if ["73:988", "73:996", "73:1004", "73:1012"].contains(child.i) {
+                        return child.updating(w: 235.0, f: .some("#64748b"), tx: .some(itemText.subtitle))
+                    }
+                    if ["73:989", "73:997", "73:1005", "73:1013"].contains(child.i) {
+                        return child.updating(f: .some("#94a3b8"))
+                    }
+                    return child
+                }
+                children[1] = children[1].updating(c: .some(faceChildren))
+                styled = styled.updating(c: .some(children))
+            }
+            return styled
+        }
+
+        // 8. iOS Keyboard & CLI Input on Q_TYPE_04 (73:575)
+        if screenId == "73:575" {
+            if node.i == "73:603" {
+                return node.updating(w: 110.0, tx: .some(qType04InputText))
+            }
+            if node.i == "73:604" {
+                let cursorX = min(118.0, 16.0 + Double(qType04InputText.count) * 9.5)
+                return node.updating(x: cursorX)
+            }
+            if ["73:613", "73:615", "73:617", "73:726", "73:734", "73:738"].contains(node.i)
+                || Self.keyboardLetterByNodeId[node.i] != nil
+            {
+                return node.clearingDescendantDestinations().updating(d: .some("act:\(node.i)"))
+            }
+        }
+
+        // 9. Hub IA Vivant (79:332, 78:332, 81:345, 85:317)
+        if screenId == "79:332", ["79:352", "79:356", "79:360", "79:364"].contains(node.i) {
+            return node.clearingDescendantDestinations().updating(d: .some("act:\(node.i)"))
+        }
+        if screenId == "78:332" {
+            let payload = currentAITopicPayload
+            switch node.i {
+            case "78:348":
+                return node.updating(tx: .some(payload.question))
+            case "78:357":
+                return node.updating(tx: .some(payload.intro))
+            case "78:358":
+                return node.updating(tx: .some(payload.bullet1))
+            case "78:359":
+                return node.updating(tx: .some(payload.bullet2))
+            case "78:361":
+                return node.updating(tx: .some(payload.examHeader))
+            case "78:362":
+                return node.updating(tx: .some(payload.examRule1))
+            case "78:363":
+                return node.updating(tx: .some(payload.examRule2))
+            case "78:365":
+                return node.updating(tx: .some(payload.closing))
+            case "78:366":
+                var updated = node
+                    .clearingDescendantDestinations()
+                    .updating(
+                        f: .some(isAIResponseCopied ? "#dcfce7" : "#f0f4f9"),
+                        s: .some(isAIResponseCopied ? "#22c55e:1.5" : nil),
+                        d: .some("act:78:366")
+                    )
+                if let children = updated.c {
+                    let mapped = children.map { child in
+                        if child.i == "78:370" {
+                            return child.updating(
+                                x: isAIResponseCopied ? 16 : 34,
+                                w: isAIResponseCopied ? 64 : 39,
+                                f: .some(isAIResponseCopied ? "#15803d" : "#1f2937"),
+                                tx: .some(isAIResponseCopied ? "✓ Copié" : "Copier")
+                            )
+                        }
+                        return child
+                    }
+                    updated = updated.updating(c: .some(mapped))
+                }
+                return updated
+            default:
+                break
+            }
+        }
+        if screenId == "81:345" {
+            if node.i == "81:365" {
+                return node
+                    .clearingDescendantDestinations()
+                    .updating(
+                        f: .some(isVoiceLiveListening ? "#eff6ff" : "#fef3c7"),
+                        s: .some(isVoiceLiveListening ? "#93c5fd:1.8" : "#f59e0b:1.8"),
+                        d: .some("act:81:365")
+                    )
+            }
+            if node.i == "81:358", !isVoiceLiveListening {
+                return node.updating(tx: .some("⏸ Écoute vocale en pause — touche le micro central pour reprendre"))
+            }
+        }
+        if screenId == "85:317" {
+            if ["85:378", "85:380", "85:383", "85:387", "85:388", "85:392", "85:393", "85:394", "85:395"].contains(node.i) {
+                return node.clearingDescendantDestinations().updating(d: .some("act:\(node.i)"))
+            }
+        }
+
+        // 10. Cockpit Examen Blanc 23 (142:478)
+        if screenId == "142:478" {
+            let qPayload = currentMockExamQuestionPayload
+            if node.i == "142:487" {
+                let flagged = isCurrentExamQuestionFlagged
+                let children = (node.c ?? []).map { child in
+                    child.i == "142:488"
+                        ? child.updating(
+                            f: .some("#b45309"),
+                            tx: .some(flagged ? "🏳 Marquée ✓" : "🏳 Marquer")
+                        )
+                        : child
+                }
+                return node.updating(
+                    f: .some(flagged ? "#fef3c7" : "#fffbeb"),
+                    s: .some(flagged ? "#f59e0b:2" : "#fcd34d:1.5"),
+                    d: .some("act:142:487"),
+                    c: .some(children)
+                )
+            }
+            let pillNumberMap: [String: (num: Int, textId: String)] = [
+                "142:490": (12, "142:491"),
+                "142:492": (13, "142:493"),
+                "142:494": (14, "142:495"),
+                "142:496": (15, "142:497"),
+                "142:498": (16, "142:499"),
+                "142:500": (17, "142:501")
+            ]
+            if let pillInfo = pillNumberMap[node.i] {
+                let isCurrent = (pillInfo.num == examCurrentQuestionNumber)
+                let isFlagged = examFlaggedQuestions.contains(pillInfo.num)
+                let isAnswered = examSelectedOptionByQuestion[pillInfo.num] != nil
+                let fillHex: String = isCurrent ? "#2563eb" : (isFlagged ? "#fef3c7" : (isAnswered ? "#dcfce7" : "#f1f5f9"))
+                let textHex: String = isCurrent ? "#ffffff" : (isFlagged ? "#b45309" : (isAnswered ? "#15803d" : "#64748b"))
+                let label: String = isCurrent
+                    ? "\(pillInfo.num) / 50"
+                    : (isFlagged ? "\(pillInfo.num) 🏳" : (isAnswered ? "\(pillInfo.num) ✓" : "\(pillInfo.num)"))
+                let children = (node.c ?? []).map { child in
+                    child.i == pillInfo.textId ? child.updating(f: .some(textHex), tx: .some(label)) : child
+                }
+                return node.updating(f: .some(fillHex), d: .some("act:\(node.i)"), c: .some(children))
+            }
+            if node.i == "142:506" {
+                return node.updating(w: 202.0, tx: .some(qPayload.badge))
+            }
+            if node.i == "142:507" {
+                return node.updating(tx: .some(qPayload.stem))
+            }
+            if ["142:508", "142:514", "142:520", "142:526"].contains(node.i) {
+                let isSelected = (currentExamSelectedOptionNodeId == node.i)
+                let optionText: String = {
+                    switch node.i {
+                    case "142:508": return qPayload.optionA
+                    case "142:514": return qPayload.optionB
+                    case "142:520": return qPayload.optionC
+                    default: return qPayload.optionD
+                    }
+                }()
+                return Self.styleExamOptionCardNode(
+                    node,
+                    isSelected: isSelected,
+                    optionText: optionText,
+                    actionId: "act:\(node.i)"
+                )
+            }
+            if node.i == "142:532" || node.i == "142:536" {
+                return node.clearingDescendantDestinations().updating(d: .some("act:\(node.i)"))
+            }
+        }
+
+        // 11. Carrousel Rapport /1000 sur Écran 24 (142:540)
+        if screenId == "142:540" {
+            let idx = examReportCarouselIndex % 3
+            if node.i == "142:573" {
+                return node.clearingDescendantDestinations().updating(d: .some("act:142:573"))
+            }
+            if node.i == "142:585" {
+                return node.updating(
+                    x: 14,
+                    w: idx == 0 ? 16 : 8,
+                    f: .some(idx == 0 ? "#2563eb" : "#cbd5e1"),
+                    d: .some("act:142:585")
+                )
+            }
+            if node.i == "142:586" {
+                return node.updating(
+                    x: idx == 0 ? 36 : 28,
+                    w: idx == 1 ? 16 : 8,
+                    f: .some(idx == 1 ? "#2563eb" : "#cbd5e1"),
+                    d: .some("act:142:586")
+                )
+            }
+            if node.i == "142:587" {
+                return node.updating(
+                    x: idx == 2 ? 42 : 50,
+                    w: idx == 2 ? 16 : 8,
+                    f: .some(idx == 2 ? "#2563eb" : "#cbd5e1"),
+                    d: .some("act:142:587")
+                )
+            }
+            if idx == 1 {
+                switch node.i {
+                case "142:550":
+                    return node.updating(tx: .some("⏱ RYTHME CHRONO & CALIBRATION PEARSON VUE"))
+                case "142:559":
+                    return node.updating(w: 112.0, tx: .some("38m"))
+                case "142:560":
+                    return node.updating(x: 128.0, tx: .some("/ 90m"))
+                case "142:562":
+                    return node.updating(tx: .some("⚡ 45s / question"))
+                case "142:564":
+                    return node.updating(tx: .some("GESTION DU TEMPS PAR BLOC D'EXAMEN (90 MIN)"))
+                case "142:576":
+                    return node.updating(tx: .some("✓ 92 % Calibré"))
+                case "142:579":
+                    return node.updating(tx: .some("🏳 3 Marquées"))
+                case "142:582":
+                    return node.updating(tx: .some("🎯 52m marge"))
+                default:
+                    break
+                }
+            } else if idx == 2 {
+                switch node.i {
+                case "142:550":
+                    return node.updating(tx: .some("🎯 ANALYSE DES 11 ERREURS & RELANCE COACH IA"))
+                case "142:559":
+                    return node.updating(w: 112.0, tx: .some("11"))
+                case "142:560":
+                    return node.updating(x: 84.0, w: 68.0, tx: .some("erreurs"))
+                case "142:562":
+                    return node.updating(tx: .some("✦ Priorité DNS & VNet"))
+                case "142:564":
+                    return node.updating(tx: .some("3 PIÈGES IDENTIFIÉS : PRIVATE DNS · VERROUS · NSG"))
+                case "142:576":
+                    return node.updating(tx: .some("1. Private DNS"))
+                case "142:579":
+                    return node.updating(tx: .some("2. Verrou RG"))
+                case "142:582":
+                    return node.updating(tx: .some("3. NSG L4/L7"))
+                default:
+                    break
+                }
+            }
+        }
+
+        // 12. Social 25 (89:317)
+        if screenId == "89:317" {
+            if ["89:493", "89:504", "89:515", "89:526", "89:537"].contains(node.i) {
+                let isSaluted = isFriendSaluted(node.i)
+                var children = node.c ?? []
+                if children.count >= 2 {
+                    children[0] = children[0].updating(f: .some(isSaluted ? "#16a34a" : "#e5e5e5"))
+                    var faceChildren = children[1].c ?? []
+                    faceChildren = faceChildren.map { child in
+                        if child.t == "T" {
+                            return child.updating(
+                                f: .some(isSaluted ? "#15803d" : "#0078d4"),
+                                tx: .some(isSaluted ? "👏 Salué ✓" : "👋 Salut")
+                            )
+                        }
+                        return child
+                    }
+                    children[1] = children[1].updating(
+                        f: .some(isSaluted ? "#dcfce7" : "#f8fafc"),
+                        s: .some(isSaluted ? "#22c55e:1.8" : "#e5e5e5:1.8"),
+                        c: .some(faceChildren)
+                    )
+                }
+                return node
+                    .clearingDescendantDestinations()
+                    .updating(d: .some("act:\(node.i)"), c: .some(children))
+            }
+            if node.i == "89:480" {
+                return node.clearingDescendantDestinations().updating(d: .some("act:89:480"))
+            }
+            if node.i == "89:484", isFriendInviteCopied {
+                return node.updating(x: 278, w: 58, f: .some("#15803d"), tx: .some("✓ Copié"))
+            }
+        }
+
+        // 13. Profil 08 (97:287), Détail Certif 26 (97:417), PRO 27 (144:137) & Paramètres 28 (145:122)
+        if screenId == "97:287", ["97:336", "97:355", "97:374", "97:382"].contains(node.i) {
+            return node.clearingDescendantDestinations().updating(d: .some("act:\(node.i)"))
+        }
+        if screenId == "97:417" {
+            let detail = Self.profileCertificationDetail(forCode: selectedProfileCertificationCode)
+            switch node.i {
+            case "98:304":
+                if let imgFill = detail.crestImageFill {
+                    return node.updating(f: .some(imgFill), c: .some([]))
+                }
+                return node
+            case "97:438":
+                return node.updating(tx: .some(detail.badge))
+            case "97:439":
+                return node.updating(tx: .some(detail.title))
+            case "97:442":
+                return node.updating(tx: .some(detail.progression))
+            case "97:445":
+                return node.updating(tx: .some(detail.lastMockExam))
+            case "97:448":
+                return node.updating(w: 265.0, tx: .some(detail.domains[0].title))
+            case "97:449":
+                return node.updating(f: .some(detail.domains[0].colorHex), tx: .some(detail.domains[0].percentText))
+            case "97:451":
+                return node.updating(w: detail.domains[0].barWidth, f: .some(detail.domains[0].colorHex))
+            case "97:453":
+                return node.updating(w: 265.0, tx: .some(detail.domains[1].title))
+            case "97:454":
+                return node.updating(f: .some(detail.domains[1].colorHex), tx: .some(detail.domains[1].percentText))
+            case "97:456":
+                return node.updating(w: detail.domains[1].barWidth, f: .some(detail.domains[1].colorHex))
+            case "97:458":
+                return node.updating(w: 265.0, tx: .some(detail.domains[2].title))
+            case "97:459":
+                return node.updating(f: .some(detail.domains[2].colorHex), tx: .some(detail.domains[2].percentText))
+            case "97:461":
+                return node.updating(w: detail.domains[2].barWidth, f: .some(detail.domains[2].colorHex))
+            case "97:463":
+                return node.updating(w: 265.0, tx: .some(detail.domains[3].title))
+            case "97:464":
+                return node.updating(f: .some(detail.domains[3].colorHex), tx: .some(detail.domains[3].percentText))
+            case "97:466":
+                return node.updating(w: detail.domains[3].barWidth, f: .some(detail.domains[3].colorHex))
+            default:
+                break
+            }
+        }
+        if screenId == "144:137" {
+            if node.i == "144:179" || node.i == "144:187" {
+                let isSelected = (selectedProPlanNodeId == node.i)
+                var children = node.c ?? []
+                if children.count >= 2 {
+                    children[0] = children[0].updating(f: .some(isSelected ? "#2563eb" : "#cbd5e1"))
+                    children[1] = children[1].updating(
+                        f: .some(isSelected ? "#eff6ff" : "#ffffff"),
+                        s: .some(isSelected ? "#3b82f6:2" : "#e2e8f0:2")
+                    )
+                }
+                return node.clearingDescendantDestinations().updating(
+                    d: .some("act:\(node.i)"),
+                    c: .some(children)
+                )
+            }
+            if node.i == "144:195" {
+                return node.clearingDescendantDestinations().updating(d: .some("act:144:195"))
+            }
+        }
+        if screenId == "145:122" {
+            switch node.i {
+            case "145:141":
+                let summary = additionalParallelTracksCount > 0
+                    ? "\(activeRouteCode) + \(additionalParallelTracksCount)  ›"
+                    : "\(activeRouteCode)  ›"
+                return node.updating(tx: .some(summary))
+            case "145:147":
+                return node.updating(tx: .some(currentSettingsLanguageLabel))
+            case "145:153":
+                return node.updating(tx: .some(currentSettingsExamModeLabel))
+            case "145:164":
+                return node.updating(tx: .some(currentSettingsCoachVoiceLabel))
+            case "145:169":
+                return node.updating(tx: .some(currentSettingsExplanationStyleLabel))
+            case "145:174", "145:181", "145:187", "145:193":
+                let isOn = isSettingsToggleOn(node.i)
+                let children = (node.c ?? []).map { thumb in
+                    thumb.updating(x: isOn ? 22.0 : 2.0)
+                }
+                return node.updating(
+                    f: .some(isOn ? "#22c55e" : "#cbd5e1"),
+                    d: .some("act:\(node.i)"),
+                    c: .some(children)
+                )
+            default:
+                break
+            }
+        }
+
+        // 14. Onboarding Choice Cards (132:264, 132:339, 132:438, 132:519, 132:581)
+        if screenId == "132:264" {
+            if ["132:301", "132:310", "132:319", "132:327"].contains(node.i) {
+                let isSelected = onboardingSelectedNodeIdsByScreen["132:264"]?.contains(node.i) ?? false
+                return Self.styleOnboardingCardNode(node, isSelected: isSelected, actionId: "act:\(node.i)")
+            }
+            if node.i == "132:338" {
+                let count = max(1, onboardingSelectedNodeIdsByScreen["132:264"]?.count ?? 2)
+                let label = count > 1
+                    ? "CONTINUER (\(count) OBJECTIFS CHOISIS)"
+                    : "CONTINUER (1 OBJECTIF CHOISI)"
+                return node.updating(tx: .some(label))
+            }
+        }
+        if screenId == "132:339" {
+            if ["132:379", "132:396", "132:406", "132:416"].contains(node.i) {
+                let isSelected = onboardingSelectedNodeIdsByScreen["132:339"]?.contains(node.i) ?? false
+                return Self.styleOnboardingCardNode(node, isSelected: isSelected, actionId: "act:\(node.i)")
+            }
+            if node.i == "132:437" {
+                let count = max(1, onboardingSelectedNodeIdsByScreen["132:339"]?.count ?? 3)
+                return node.updating(tx: .some("SUIVRE CES \(count) PARCOURS  →"))
+            }
+        }
+        if screenId == "132:438", ["132:452", "132:463", "132:474"].contains(node.i) {
+            let isSelected = onboardingSelectedNodeIdsByScreen["132:438"]?.contains(node.i) ?? false
+            return Self.styleOnboardingCardNode(
+                node,
+                isSelected: isSelected,
+                actionId: "act:\(node.i)",
+                accentHex: "#7c3aed",
+                faceHex: "#ffffff",
+                strokeSpec: "#c4b5fd:2"
+            )
+        }
+        if screenId == "132:519" {
+            if ["132:531", "132:539", "132:548"].contains(node.i) {
+                let isSelected = onboardingSelectedNodeIdsByScreen["132:519"]?.contains(node.i) ?? false
+                return Self.styleOnboardingCardNode(node, isSelected: isSelected, actionId: "act:\(node.i)")
+            }
+            if ["132:557", "132:562", "132:567", "132:572"].contains(node.i) {
+                let isSelected = onboardingSelectedNodeIdsByScreen["132:519"]?.contains(node.i) ?? false
+                return Self.style3DCardNode(
+                    node,
+                    isSelected: isSelected,
+                    actionId: "act:\(node.i)",
+                    selectedLipHex: "#2563eb",
+                    selectedFaceHex: "#eff6ff",
+                    selectedStrokeSpec: "#3b82f6:2",
+                    selectedTextHex: "#1d4ed8"
+                )
+            }
+        }
+        if screenId == "132:581" {
+            if ["132:594", "132:600", "132:606"].contains(node.i) {
+                let isSelected = onboardingSelectedNodeIdsByScreen["132:581"]?.contains(node.i) ?? false
+                return Self.style3DCardNode(
+                    node,
+                    isSelected: isSelected,
+                    actionId: "act:\(node.i)",
+                    selectedLipHex: "#2563eb",
+                    selectedFaceHex: "#eff6ff",
+                    selectedStrokeSpec: "#3b82f6:2",
+                    selectedTextHex: "#1d4ed8"
+                )
+            }
+            if node.i == "132:645" {
+                return node.updating(d: .some("act:132:645"))
+            }
+            if node.i == "132:646" {
+                let timeLabel = Self.onboardingReminderTimeOptions[
+                    onboardingReminderTimeIndex % Self.onboardingReminderTimeOptions.count
+                ]
+                return node.updating(tx: .some(timeLabel))
+            }
+        }
+
+        return node
+    }
+
+    // MARK: Screen-Level Helpers
+
+    private static let qType08ItemsByOriginalRowId: [String: (title: String, subtitle: String)] = [
+        "73:982": ("Groupe d'administration", "Management Group (Multi-abonnements)"),
+        "73:990": ("Abonnement (Subscription)", "Facturation & limites globales"),
+        "73:998": ("Groupe de ressources", "Conteneur logique de cycle de vie"),
+        "73:1006": ("Ressource individuelle", "Ex. Machine virtuelle, Key Vault, VNet")
+    ]
+
+    private func applyScreen16GridSelection(to root: CertiGoFigmaSceneNode) -> CertiGoFigmaSceneNode {
+        let pairs: [(lipId: String, faceId: String)] = [
+            ("26:836", "26:837"),
+            ("26:842", "26:843"),
+            ("26:848", "26:849"),
+            ("26:854", "26:855")
+        ]
+        let lipToFace = Dictionary(uniqueKeysWithValues: pairs.map { ($0.lipId, $0.faceId) })
+        let faceSet = Set(pairs.map(\.faceId))
+        let children = (root.c ?? []).map { child -> CertiGoFigmaSceneNode in
+            if let faceId = lipToFace[child.i] {
+                let isSelected = isOptionSelected(faceId, inScreen: "26:826")
+                return child.updating(f: .some(isSelected ? "#1cb0f6" : "#e5e5e5"))
+            }
+            if faceSet.contains(child.i) {
+                let isSelected = isOptionSelected(child.i, inScreen: "26:826")
+                let faceChildren = (child.c ?? []).map { sub in
+                    sub.t == "T" ? sub.updating(f: .some(isSelected ? "#1899d6" : "#334155")) : sub
+                }
+                return child.clearingDescendantDestinations().updating(
+                    f: .some(isSelected ? "#ddf4ff" : "#ffffff"),
+                    s: .some(isSelected ? "#84d8ff:1.8" : "#e5e5e5:1.8"),
+                    d: .some("act:\(child.i)"),
+                    c: .some(faceChildren)
+                )
+            }
+            return child
+        }
+        return root.updating(c: .some(children))
+    }
+
+    private func applyScreen17CLISelection(to root: CertiGoFigmaSceneNode) -> CertiGoFigmaSceneNode {
+        let pairs: [(lipId: String, faceId: String)] = [
+            ("26:875", "26:876"),
+            ("26:878", "26:879"),
+            ("26:881", "26:882"),
+            ("26:884", "26:885")
+        ]
+        let lipToFace = Dictionary(uniqueKeysWithValues: pairs.map { ($0.lipId, $0.faceId) })
+        let faceSet = Set(pairs.map(\.faceId))
+        let children = (root.c ?? []).map { child -> CertiGoFigmaSceneNode in
+            if let faceId = lipToFace[child.i] {
+                let isSelected = isOptionSelected(faceId, inScreen: "26:863")
+                return child.updating(f: .some(isSelected ? "#1cb0f6" : "#e5e5e5"))
+            }
+            if faceSet.contains(child.i) {
+                let isSelected = isOptionSelected(child.i, inScreen: "26:863")
+                let faceChildren = (child.c ?? []).map { sub in
+                    sub.t == "T" ? sub.updating(f: .some(isSelected ? "#1899d6" : "#334155")) : sub
+                }
+                return child.clearingDescendantDestinations().updating(
+                    f: .some(isSelected ? "#ddf4ff" : "#ffffff"),
+                    s: .some(isSelected ? "#84d8ff:1.8" : "#e5e5e5:1.8"),
+                    d: .some("act:\(child.i)"),
+                    c: .some(faceChildren)
+                )
+            }
+            return child
+        }
+        return root.updating(c: .some(children))
+    }
+
+    private func applyScreen28SettingsHitTargets(to root: CertiGoFigmaSceneNode) -> CertiGoFigmaSceneNode {
+        let children = (root.c ?? []).map { child -> CertiGoFigmaSceneNode in
+            if child.i == "145:137" {
+                var sub = child.c ?? []
+                sub.append(contentsOf: [
+                    Self.transparentHitRow(id: "145:137-row0", y: 0, h: 50, destination: "132:339"),
+                    Self.transparentHitRow(id: "145:137-row1", y: 50, h: 50, destination: "act:145:146"),
+                    Self.transparentHitRow(id: "145:137-row2", y: 100, h: 50, destination: "act:145:152"),
+                    Self.transparentHitRow(id: "145:137-row3", y: 150, h: 50, destination: "162:93")
+                ])
+                return child.updating(d: .some(nil), c: .some(sub))
+            }
+            if child.i == "145:160" {
+                var sub = child.c ?? []
+                sub.append(contentsOf: [
+                    Self.transparentHitRow(id: "145:160-row0", y: 0, h: 50, destination: "act:145:163"),
+                    Self.transparentHitRow(id: "145:160-row1", y: 50, h: 50, destination: "act:145:168"),
+                    Self.transparentHitRow(id: "145:160-row2", y: 100, h: 50, destination: "act:145:174")
+                ])
+                return child.updating(d: .some(nil), c: .some(sub))
+            }
+            if child.i == "145:177" {
+                var sub = child.c ?? []
+                sub.append(contentsOf: [
+                    Self.transparentHitRow(id: "145:177-row0", y: 0, h: 50, destination: "act:145:181"),
+                    Self.transparentHitRow(id: "145:177-row1", y: 50, h: 50, destination: "act:145:187"),
+                    Self.transparentHitRow(id: "145:177-row2", y: 100, h: 50, destination: "act:145:193")
+                ])
+                return child.updating(d: .some(nil), c: .some(sub))
+            }
+            return child
+        }
+        return root.updating(c: .some(children))
+    }
+
+    private func applyScreenRES01BackButton(to root: CertiGoFigmaSceneNode) -> CertiGoFigmaSceneNode {
+        var children = (root.c ?? []).map { child -> CertiGoFigmaSceneNode in
+            if child.i == "162:99" {
+                let inner = (child.c ?? []).map { sub in
+                    sub.i == "162:102" ? sub.updating(d: .some("73:393")) : sub
+                }
+                return child.updating(c: .some(inner))
+            }
+            return child
+        }
+        let backButton = CertiGoFigmaSceneNode(
+            i: "162:93-back-settings",
+            n: "BackToSettings",
+            t: "F",
+            x: 20,
+            y: 780,
+            w: 353,
+            h: 44,
+            f: "#ffffff",
+            s: "#cbd5e1:1.5",
+            r: 14,
+            d: "145:122",
+            c: [
+                CertiGoFigmaSceneNode(
+                    i: "162:93-back-settings-tx",
+                    n: "← Retour aux Paramètres",
+                    t: "T",
+                    x: 0,
+                    y: 12,
+                    w: 353,
+                    h: 18,
+                    f: "#0f172a",
+                    tx: "←  Retour aux Paramètres",
+                    fs: 14,
+                    fw: "Bold",
+                    al: "C",
+                    va: "C"
+                )
+            ]
+        )
+        children.append(backButton)
+        return root.updating(c: .some(children))
+    }
+
+    private static func transparentHitRow(
+        id: String,
+        y: Double,
+        h: Double,
+        destination: String
+    ) -> CertiGoFigmaSceneNode {
+        CertiGoFigmaSceneNode(
+            i: id,
+            n: "HitRow",
+            t: "F",
+            x: 0,
+            y: y,
+            w: 357,
+            h: h,
+            d: destination
+        )
+    }
+
+    private static func style3DCardNode(
+        _ node: CertiGoFigmaSceneNode,
+        isSelected: Bool,
+        actionId: String,
+        selectedLipHex: String = "#1cb0f6",
+        selectedFaceHex: String = "#ddf4ff",
+        selectedStrokeSpec: String = "#84d8ff:1.8",
+        selectedTextHex: String = "#1899d6"
+    ) -> CertiGoFigmaSceneNode {
+        var children = node.c ?? []
+        if children.count >= 2 {
+            children[0] = children[0].updating(f: .some(isSelected ? selectedLipHex : "#e5e5e5"))
+            let faceChildren = (children[1].c ?? []).map { child -> CertiGoFigmaSceneNode in
+                if child.t == "T" {
+                    return child.updating(f: .some(isSelected ? selectedTextHex : "#334155"))
+                }
+                if ["73:926", "73:932", "73:938", "73:944", "73:950", "73:985", "73:993", "73:1001", "73:1009"].contains(child.i) {
+                    let badgeChildren = (child.c ?? []).map { sub in
+                        sub.t == "T" ? sub.updating(f: .some(isSelected ? "#ffffff" : "#64748b")) : sub
+                    }
+                    return child.updating(
+                        f: .some(isSelected ? selectedLipHex : "#e2e8f0"),
+                        c: .some(badgeChildren)
+                    )
+                }
+                return child
+            }
+            children[1] = children[1].updating(
+                f: .some(isSelected ? selectedFaceHex : "#ffffff"),
+                s: .some(isSelected ? selectedStrokeSpec : "#e5e5e5:1.8"),
+                c: .some(faceChildren)
+            )
+        }
+        return node
+            .clearingDescendantDestinations()
+            .updating(d: .some(actionId), c: .some(children))
+    }
+
+    private static func styleCheckbox3DCardNode(
+        _ node: CertiGoFigmaSceneNode,
+        isSelected: Bool,
+        actionId: String
+    ) -> CertiGoFigmaSceneNode {
+        var styled = style3DCardNode(node, isSelected: isSelected, actionId: actionId)
+        if var children = styled.c, children.count >= 2, var faceChildren = children[1].c {
+            faceChildren = faceChildren.map { child in
+                guard ["73:1099", "73:1105", "73:1111", "73:1116"].contains(child.i) else {
+                    return child
+                }
+                let checkChild: [CertiGoFigmaSceneNode] = isSelected
+                    ? [
+                        CertiGoFigmaSceneNode(
+                            i: "\(child.i)-check",
+                            n: "✓",
+                            t: "T",
+                            x: 0,
+                            y: 4,
+                            w: 28,
+                            h: 19,
+                            f: "#ffffff",
+                            tx: "✓",
+                            fs: 15,
+                            fw: "Black",
+                            al: "C",
+                            va: "C"
+                        )
+                    ]
+                    : []
+                return child.updating(
+                    f: .some(isSelected ? "#1cb0f6" : "#ffffff"),
+                    s: .some(isSelected ? "#1cb0f6:2" : "#e5e5e5:2"),
+                    c: .some(checkChild)
+                )
+            }
+            children[1] = children[1].updating(c: .some(faceChildren))
+            styled = styled.updating(c: .some(children))
+        }
+        return styled
+    }
+
+    private static func styleExamOptionCardNode(
+        _ node: CertiGoFigmaSceneNode,
+        isSelected: Bool,
+        optionText: String,
+        actionId: String
+    ) -> CertiGoFigmaSceneNode {
+        var children = node.c ?? []
+        if children.count >= 2 {
+            children[0] = children[0].updating(f: .some(isSelected ? "#2563eb" : "#cbd5e1"))
+            let faceChildren = (children[1].c ?? []).map { child -> CertiGoFigmaSceneNode in
+                if child.t == "T" {
+                    return child.updating(
+                        f: .some(isSelected ? "#1e40af" : "#0f172a"),
+                        tx: .some(optionText)
+                    )
+                }
+                if ["142:511", "142:517", "142:523", "142:529"].contains(child.i) {
+                    let badgeChildren = (child.c ?? []).map { sub in
+                        sub.t == "T" ? sub.updating(f: .some(isSelected ? "#ffffff" : "#475569")) : sub
+                    }
+                    return child.updating(
+                        f: .some(isSelected ? "#2563eb" : "#f1f5f9"),
+                        c: .some(badgeChildren)
+                    )
+                }
+                return child
+            }
+            children[1] = children[1].updating(
+                f: .some(isSelected ? "#eff6ff" : "#ffffff"),
+                s: .some(isSelected ? "#3b82f6:2" : "#e2e8f0:2"),
+                c: .some(faceChildren)
+            )
+        }
+        return node
+            .clearingDescendantDestinations()
+            .updating(d: .some(actionId), c: .some(children))
+    }
+
+    private static func styleOnboardingCardNode(
+        _ node: CertiGoFigmaSceneNode,
+        isSelected: Bool,
+        actionId: String,
+        accentHex: String = "#2563eb",
+        faceHex: String = "#eff6ff",
+        strokeSpec: String = "#3b82f6:2"
+    ) -> CertiGoFigmaSceneNode {
+        var children = node.c ?? []
+        if children.count >= 2 {
+            children[0] = children[0].updating(f: .some(isSelected ? accentHex : "#cbd5e1"))
+            let faceChildren = (children[1].c ?? []).map { child -> CertiGoFigmaSceneNode in
+                if abs(child.w - 24.0) < 0.5 && abs(child.h - 24.0) < 0.5 && child.x >= 300.0 {
+                    let checkChildren: [CertiGoFigmaSceneNode] = isSelected
+                        ? [
+                            CertiGoFigmaSceneNode(
+                                i: "\(child.i)-check",
+                                n: "✓",
+                                t: "T",
+                                x: 0,
+                                y: 4,
+                                w: 24,
+                                h: 16,
+                                f: "#ffffff",
+                                tx: "✓",
+                                fs: 13,
+                                fw: "Black",
+                                al: "C",
+                                va: "C"
+                            )
+                        ]
+                        : []
+                    return child.updating(
+                        f: .some(isSelected ? accentHex : "#ffffff"),
+                        s: .some(isSelected ? "\(accentHex):2" : "#cbd5e1:2"),
+                        c: .some(checkChildren)
+                    )
+                }
+                return child
+            }
+            children[1] = children[1].updating(
+                f: .some(isSelected ? faceHex : "#ffffff"),
+                s: .some(isSelected ? strokeSpec : "#e2e8f0:2"),
+                c: .some(faceChildren)
+            )
+        }
+        return node
+            .clearingDescendantDestinations()
+            .updating(d: .some(actionId), c: .some(children))
+    }
+}
+
 // MARK: - 4. SwiftUI 1-for-1 Figma Pro Scene-Graph Engine (`CertiGoFigmaSVGPathShape`, `CertiGoFigmaSceneNodeView`, `CertiGoFigmaInteractiveAppView`)
 
 #if canImport(SwiftUI) && canImport(UIKit)
@@ -2493,19 +4610,22 @@ public struct CertiGoFigmaSceneNodeView: View {
     public let scaleY: CGFloat
     public let isRootScreen: Bool
     public let onNavigateToNodeId: (String) -> Void
+    public let onLongPressDiagnosticTrigger: (() -> Void)?
 
     public init(
         node: CertiGoFigmaSceneNode,
         scaleX: CGFloat = 1.0,
         scaleY: CGFloat = 1.0,
         isRootScreen: Bool = false,
-        onNavigateToNodeId: @escaping (String) -> Void = { _ in }
+        onNavigateToNodeId: @escaping (String) -> Void = { _ in },
+        onLongPressDiagnosticTrigger: (() -> Void)? = nil
     ) {
         self.node = node
         self.scaleX = scaleX
         self.scaleY = scaleY
         self.isRootScreen = isRootScreen
         self.onNavigateToNodeId = onNavigateToNodeId
+        self.onLongPressDiagnosticTrigger = onLongPressDiagnosticTrigger
     }
 
     private var uniformScale: CGFloat {
@@ -2533,7 +4653,11 @@ public struct CertiGoFigmaSceneNodeView: View {
     private var shouldAttachTapGesture: Bool {
         guard node.d != nil else { return false }
         guard isRootScreen else { return true }
-        return node.shouldAttachRootTapGesture
+        return !visibleChildren.flatMap(\.allNodes).contains(where: { $0.d != nil })
+    }
+
+    private var isDiagnosticLongPressNode: Bool {
+        ["37:440", "37:441", "42:479", "142:417", "145:127"].contains(node.i)
     }
 
     public var body: some View {
@@ -2556,10 +4680,29 @@ public struct CertiGoFigmaSceneNodeView: View {
         }()
 
         if let destinationNodeId = node.d, shouldAttachTapGesture {
+            if isDiagnosticLongPressNode, let onLongPressDiagnosticTrigger {
+                shadowedContent
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onNavigateToNodeId(destinationNodeId)
+                    }
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                            onLongPressDiagnosticTrigger()
+                        }
+                    )
+            } else {
+                shadowedContent
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onNavigateToNodeId(destinationNodeId)
+                    }
+            }
+        } else if isDiagnosticLongPressNode, let onLongPressDiagnosticTrigger {
             shadowedContent
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    onNavigateToNodeId(destinationNodeId)
+                .onLongPressGesture(minimumDuration: 0.5) {
+                    onLongPressDiagnosticTrigger()
                 }
         } else {
             shadowedContent
@@ -2723,7 +4866,8 @@ public struct CertiGoFigmaSceneNodeView: View {
                     node: child,
                     scaleX: scaleX,
                     scaleY: scaleY,
-                    onNavigateToNodeId: onNavigateToNodeId
+                    onNavigateToNodeId: onNavigateToNodeId,
+                    onLongPressDiagnosticTrigger: onLongPressDiagnosticTrigger
                 )
                 .frame(
                     width: childW,
@@ -2771,25 +4915,40 @@ public struct CertiGoFigmaSceneNodeView: View {
 public struct CertiGoFigmaExactScreenView: View {
     public let screenId: String
     public let content: CertiGoFigmaExactScreenContent
+    public let liveState: CertiGoFigmaLiveRuntimeState
+    public let additionalParallelTracksCount: Int
     public let onNavigateToNodeId: (String) -> Void
+    public let onLongPressDiagnosticTrigger: (() -> Void)?
 
     public init(
         screenId: String,
-        onNavigateToNodeId: @escaping (String) -> Void = { _ in }
+        liveState: CertiGoFigmaLiveRuntimeState = CertiGoFigmaLiveRuntimeState(),
+        additionalParallelTracksCount: Int = 2,
+        onNavigateToNodeId: @escaping (String) -> Void = { _ in },
+        onLongPressDiagnosticTrigger: (() -> Void)? = nil
     ) {
         self.screenId = screenId
         self.content = CertiGoFigmaExactScreenParity.content(forScreenId: screenId)
             ?? CertiGoFigmaExactScreenParity.page01Screens[0]
+        self.liveState = liveState
+        self.additionalParallelTracksCount = additionalParallelTracksCount
         self.onNavigateToNodeId = onNavigateToNodeId
+        self.onLongPressDiagnosticTrigger = onLongPressDiagnosticTrigger
     }
 
     public init(
         content: CertiGoFigmaExactScreenContent,
-        onNavigateToNodeId: @escaping (String) -> Void = { _ in }
+        liveState: CertiGoFigmaLiveRuntimeState = CertiGoFigmaLiveRuntimeState(),
+        additionalParallelTracksCount: Int = 2,
+        onNavigateToNodeId: @escaping (String) -> Void = { _ in },
+        onLongPressDiagnosticTrigger: (() -> Void)? = nil
     ) {
         self.screenId = content.screenCode
         self.content = content
+        self.liveState = liveState
+        self.additionalParallelTracksCount = additionalParallelTracksCount
         self.onNavigateToNodeId = onNavigateToNodeId
+        self.onLongPressDiagnosticTrigger = onLongPressDiagnosticTrigger
     }
 
     public var body: some View {
@@ -2800,8 +4959,14 @@ public struct CertiGoFigmaExactScreenView: View {
             if content.nodeId == "97:498",
                let merged = CertiGoFigmaSceneGraphStore.shared.mergedStatistiquesProNodes()
             {
-                let topNode = merged.top
-                let bottomNode = merged.bottom
+                let topNode = liveState.applyingLiveState(
+                    to: merged.top,
+                    additionalParallelTracksCount: additionalParallelTracksCount
+                )
+                let bottomNode = liveState.applyingLiveState(
+                    to: merged.bottom,
+                    additionalParallelTracksCount: additionalParallelTracksCount
+                )
                 let baseW = CGFloat(max(topNode.w, 1.0))
                 let baseH = CGFloat(max(topNode.h, 1.0))
                 let scaleX = availableW / baseW
@@ -2815,7 +4980,8 @@ public struct CertiGoFigmaExactScreenView: View {
                             scaleX: scaleX,
                             scaleY: scaleY,
                             isRootScreen: true,
-                            onNavigateToNodeId: onNavigateToNodeId
+                            onNavigateToNodeId: onNavigateToNodeId,
+                            onLongPressDiagnosticTrigger: onLongPressDiagnosticTrigger
                         )
                         .frame(width: availableW, height: pageH)
 
@@ -2824,7 +4990,8 @@ public struct CertiGoFigmaExactScreenView: View {
                             scaleX: scaleX,
                             scaleY: scaleY,
                             isRootScreen: true,
-                            onNavigateToNodeId: onNavigateToNodeId
+                            onNavigateToNodeId: onNavigateToNodeId,
+                            onLongPressDiagnosticTrigger: onLongPressDiagnosticTrigger
                         )
                         .frame(width: availableW, height: pageH)
                         .padding(.top, -200.0 * scaleY)
@@ -2832,7 +4999,71 @@ public struct CertiGoFigmaExactScreenView: View {
                 }
                 .frame(width: availableW, height: availableH)
                 .background(PrismColor.figmaHex(topNode.f ?? "#f8fafc"))
-            } else if let rootNode = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenNodeId: content.nodeId) {
+            } else if content.nodeId == "37:375",
+                      let rawRoot = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenNodeId: "37:375")
+            {
+                let liveRoot = liveState.applyingLiveState(
+                    to: rawRoot,
+                    additionalParallelTracksCount: additionalParallelTracksCount
+                )
+                let baseW = CGFloat(max(liveRoot.w, 1.0))
+                let baseH = CGFloat(max(liveRoot.h, 1.0))
+                let scaleX = availableW / baseW
+                let scaleY = availableH / baseH
+                let scrollingChildren = (liveRoot.c ?? []).filter { $0.i == "37:376" }
+                let pinnedChildren = (liveRoot.c ?? []).filter {
+                    ["37:440", "37:448", "37:452", "57:360"].contains($0.i)
+                }
+                let scrollingContainer = liveRoot.updating(
+                    f: .some(nil),
+                    d: .some(nil),
+                    c: .some(scrollingChildren)
+                )
+
+                let extraScrollH = CGFloat(140.0) * scaleY
+
+                ZStack(alignment: .topLeading) {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: .zero) {
+                            CertiGoFigmaSceneNodeView(
+                                node: scrollingContainer,
+                                scaleX: scaleX,
+                                scaleY: scaleY,
+                                isRootScreen: true,
+                                onNavigateToNodeId: onNavigateToNodeId,
+                                onLongPressDiagnosticTrigger: onLongPressDiagnosticTrigger
+                            )
+                            .frame(width: availableW, height: baseH * scaleY)
+                            Color.clear
+                                .frame(width: availableW, height: extraScrollH)
+                        }
+                    }
+                    .frame(width: availableW, height: availableH)
+
+                    ForEach(Array(pinnedChildren.enumerated()), id: \.offset) { _, child in
+                        let childW = max(CGFloat(child.w) * scaleX, PrismBorder.hairline)
+                        let childH = max(CGFloat(child.h) * scaleY, PrismBorder.hairline)
+                        let childCenterX = (CGFloat(child.x) + CGFloat(child.w) * 0.5) * scaleX
+                        let childCenterY = (CGFloat(child.y) + CGFloat(child.h) * 0.5) * scaleY
+
+                        CertiGoFigmaSceneNodeView(
+                            node: child,
+                            scaleX: scaleX,
+                            scaleY: scaleY,
+                            onNavigateToNodeId: onNavigateToNodeId,
+                            onLongPressDiagnosticTrigger: onLongPressDiagnosticTrigger
+                        )
+                        .frame(width: childW, height: childH)
+                        .position(x: childCenterX, y: childCenterY)
+                    }
+                }
+                .frame(width: availableW, height: availableH)
+                .background(PrismColor.figmaHex(liveRoot.f ?? "#f7f9fc"))
+            } else if let rawRootNode = CertiGoFigmaSceneGraphStore.shared.nodeTree(forScreenNodeId: content.nodeId) {
+                let rootNode = liveState.applyingLiveState(
+                    to: rawRootNode,
+                    additionalParallelTracksCount: additionalParallelTracksCount
+                )
                 let baseW = CGFloat(max(rootNode.w, 1.0))
                 let baseH = CGFloat(max(rootNode.h, 1.0))
                 let scaleX = availableW / baseW
@@ -2843,7 +5074,8 @@ public struct CertiGoFigmaExactScreenView: View {
                     scaleX: scaleX,
                     scaleY: scaleY,
                     isRootScreen: true,
-                    onNavigateToNodeId: onNavigateToNodeId
+                    onNavigateToNodeId: onNavigateToNodeId,
+                    onLongPressDiagnosticTrigger: onLongPressDiagnosticTrigger
                 )
                 .frame(width: availableW, height: availableH)
                 .background(PrismColor.figmaHex(rootNode.f ?? "#f8fafc"))
@@ -2870,6 +5102,9 @@ public struct CertiGoFigmaInteractiveAppView: View {
     @State private var currentScreenNodeId: String
     @State private var isPickerExpanded: Bool = false
     @State private var selectedChapterGroup: CertiGoQuickChapterGroup
+    @State private var liveState = CertiGoFigmaLiveRuntimeState()
+    @State private var aiDraftText: String = ""
+    @State private var voicePulsePhase: Bool = false
 
     public init(
         initialScreenNodeId: String = "37:375",
@@ -2902,6 +5137,31 @@ public struct CertiGoFigmaInteractiveAppView: View {
 
     private var currentScreenIndex: Int {
         orderedNodeIds.firstIndex(of: currentScreenNodeId) ?? 0
+    }
+
+    private func handleTargetOrNavigate(_ destinationOrAction: String) {
+        if destinationOrAction.hasPrefix("act:") {
+            let rawNodeId = String(destinationOrAction.dropFirst(4))
+            var nextDestination: String?
+            withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                nextDestination = liveState.handleTap(
+                    onNodeId: rawNodeId,
+                    inScreenNodeId: currentScreenNodeId,
+                    coordinator: &coordinator
+                )
+            }
+            if rawNodeId == "78:366" {
+                let payload = liveState.currentAITopicPayload
+                UIPasteboard.general.string = "\(payload.question)\n\(payload.intro)\n\(payload.bullet1)\n\(payload.bullet2)"
+            } else if rawNodeId == "89:480" {
+                UIPasteboard.general.string = "@gabriel"
+            }
+            if let nextDestination {
+                navigate(to: nextDestination)
+            }
+            return
+        }
+        navigate(to: destinationOrAction)
     }
 
     private func navigate(to destinationId: String) {
@@ -2944,19 +5204,35 @@ public struct CertiGoFigmaInteractiveAppView: View {
     }
 
     public var body: some View {
-        ZStack(alignment: .bottom) {
-            CertiGoFigmaExactScreenView(
-                content: currentScreenContent,
-                onNavigateToNodeId: { targetNodeId in
-                    navigate(to: targetNodeId)
-                }
-            )
-            .id(currentScreenNodeId)
-            .ignoresSafeArea()
+        GeometryReader { proxy in
+            let scaleX = max(proxy.size.width, PrismSize.brandXL) / 393.0
+            let scaleY = max(proxy.size.height, PrismSize.brandXL) / 852.0
 
-            floatingChapterNavigatorOverlay
-                .padding(.horizontal, PrismSpacing.m)
-                .padding(.bottom, PrismSpacing.xxs)
+            ZStack(alignment: .bottom) {
+                CertiGoFigmaExactScreenView(
+                    content: currentScreenContent,
+                    liveState: liveState,
+                    additionalParallelTracksCount: coordinator.parallelTracksPreference.additionalParallelTracksCount,
+                    onNavigateToNodeId: { targetNodeId in
+                        handleTargetOrNavigate(targetNodeId)
+                    },
+                    onLongPressDiagnosticTrigger: {
+                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                            isPickerExpanded.toggle()
+                        }
+                    }
+                )
+                .id(currentScreenNodeId)
+                .ignoresSafeArea()
+
+                liveInteractiveNativeOverlays(scaleX: scaleX, scaleY: scaleY)
+
+                if isPickerExpanded {
+                    floatingChapterNavigatorOverlay
+                        .padding(.horizontal, PrismSpacing.m)
+                        .padding(.bottom, PrismSpacing.xxs)
+                }
+            }
         }
         .fontDesign(.rounded)
         .preferredColorScheme(.light)
@@ -2965,10 +5241,163 @@ public struct CertiGoFigmaInteractiveAppView: View {
             if coordinator.parallelTracksPreference != persisted {
                 coordinator.applyPersistedPreferences(persisted)
             }
+            liveState.activeRouteCode = coordinator.parallelTracksPreference.activeTrackCode
+            liveState.settingsLanguageIndex = coordinator.parallelTracksPreference.bilingualTechnicalTermsEN ? 0 : 1
+            liveState.settingsExamModeIndex = coordinator.parallelTracksPreference.strictTimed90Min ? 0 : 1
         }
         .onChange(of: coordinator.parallelTracksPreference) { _, updated in
+            if liveState.activeRouteCode != updated.activeTrackCode {
+                liveState.activeRouteCode = updated.activeTrackCode
+            }
             try? preferenceStore.save(updated)
         }
+    }
+
+    @ViewBuilder
+    private func liveInteractiveNativeOverlays(scaleX: CGFloat, scaleY: CGFloat) -> some View {
+        let uniformScale = min(scaleX, scaleY)
+        ZStack(alignment: .topLeading) {
+            Color.clear
+
+            // 1. Q_TYPE_04 (73:575) native TextField overlay on CLI box (73:602)
+            if currentScreenNodeId == "73:575" {
+                let cliW = CGFloat(136.0) * scaleX
+                let cliH = CGFloat(44.0) * scaleY
+                TextField("", text: $liveState.qType04InputText)
+                    .font(PrismTypography.figmaFont(size: 16 * uniformScale, style: "Bold", monospaced: true))
+                    .foregroundStyle(Color.clear)
+                    .tint(PrismColor.figmaHex("#1cb0f6"))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .frame(width: cliW, height: cliH)
+                    .position(x: (124 + 68) * scaleX, y: (306 + 22) * scaleY)
+                    .accessibilityIdentifier("figma-qtype04-cli-textfield")
+            }
+
+            // 2. Hub IA 06 (79:332) & 06B (78:332) interactive prompt input bar
+            if currentScreenNodeId == "79:332" || currentScreenNodeId == "78:332" {
+                let barY: CGFloat = currentScreenNodeId == "79:332" ? 678 : 676
+                let sendBtnW = CGFloat(28.0) * scaleX
+                let sendBtnH = CGFloat(28.0) * scaleY
+                let promptW = CGFloat(215.0) * scaleX
+                let promptH = CGFloat(44.0) * scaleY
+                let promptRadius = PrismRadius.m * uniformScale
+                HStack(spacing: PrismSpacing.xs) {
+                    TextField(
+                        currentScreenNodeId == "79:332"
+                            ? "Écrire ou parler à CertiGo IA..."
+                            : "Demander à CertiGo IA...",
+                        text: $aiDraftText
+                    )
+                    .font(PrismTypography.figmaFont(size: 13 * uniformScale, style: "Medium"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .submitLabel(.send)
+                    .onSubmit {
+                        guard !aiDraftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                        let dest = liveState.submitAIPrompt(aiDraftText)
+                        aiDraftText = ""
+                        navigate(to: dest)
+                    }
+                    .accessibilityIdentifier("figma-ai-prompt-textfield")
+
+                    if !aiDraftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Button {
+                            let dest = liveState.submitAIPrompt(aiDraftText)
+                            aiDraftText = ""
+                            navigate(to: dest)
+                        } label: {
+                            Text(verbatim: "↑")
+                                .font(PrismTypography.figmaFont(size: 14 * uniformScale, style: "Black"))
+                                .foregroundStyle(PrismColor.onAccent)
+                                .frame(width: sendBtnW, height: sendBtnH)
+                                .background(Circle().fill(PrismColor.figmaHex("#0078d4")))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("figma-ai-prompt-send")
+                    }
+                }
+                .padding(.horizontal, PrismSpacing.xs)
+                .frame(width: promptW, height: promptH)
+                .background(
+                    RoundedRectangle(cornerRadius: promptRadius, style: .continuous)
+                        .fill(PrismColor.figmaHex("#f0f4f9"))
+                )
+                .position(x: (62 + 107.5) * scaleX, y: (barY + 28) * scaleY)
+            }
+
+            // 3. 06C Vocal Live (81:345) ANIM_05 spring voice halo animation
+            if currentScreenNodeId == "81:345" {
+                let haloW = CGFloat(224.0) * scaleX
+                let haloH = CGFloat(224.0) * scaleY
+                let haloLineW = CGFloat(3.0) * uniformScale
+                Circle()
+                    .strokeBorder(
+                        PrismColor.figmaHex("#38bdf8:45"),
+                        lineWidth: haloLineW
+                    )
+                    .frame(width: haloW, height: haloH)
+                    .scaleEffect(liveState.isVoiceLiveListening ? (voicePulsePhase ? 1.08 : 0.94) : 0.88)
+                    .opacity(liveState.isVoiceLiveListening ? (voicePulsePhase ? 0.85 : 0.35) : 0.15)
+                    .position(x: 196 * scaleX, y: 218 * scaleY)
+                    .allowsHitTesting(false)
+                    .onAppear {
+                        withAnimation(
+                            CertiGoMotion
+                                .spring(for: .anim05NovaLiveVoicePulse, reduceMotion: reduceMotion)
+                                .repeatForever(autoreverses: true)
+                        ) {
+                            voicePulsePhase = true
+                        }
+                    }
+                    .onDisappear {
+                        voicePulsePhase = false
+                    }
+            }
+
+            // 4. 06D Tiroir Historique (85:317) interactive search field
+            if currentScreenNodeId == "85:317" {
+                let searchW = CGFloat(280.0) * scaleX
+                let searchH = CGFloat(38.0) * scaleY
+                let searchRadius = PrismRadius.m * uniformScale
+                TextField("🔍   Rechercher une discussion...", text: $liveState.aiHistorySearchText)
+                    .font(PrismTypography.figmaFont(size: 13 * uniformScale, style: "Medium"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .padding(.horizontal, PrismSpacing.s)
+                    .frame(width: searchW, height: searchH)
+                    .background(
+                        RoundedRectangle(cornerRadius: searchRadius, style: .continuous)
+                            .fill(PrismColor.figmaHex("#ffffff"))
+                    )
+                    .position(x: (22 + 145) * scaleX, y: (106 + 21) * scaleY)
+                    .accessibilityIdentifier("figma-ai-history-search-textfield")
+            }
+
+            // 5. Écran 24 (142:540) horizontal swipe gesture on top Pearson VUE carousel card (142:546)
+            if currentScreenNodeId == "142:540" {
+                let cardSwipeW = CGFloat(315.0) * scaleX
+                let cardSwipeH = CGFloat(240.0) * scaleY
+                Color.clear
+                    .frame(width: cardSwipeW, height: cardSwipeH)
+                    .contentShape(Rectangle())
+                    .position(x: (20 + 157.5) * scaleX, y: (56 + 125) * scaleY)
+                    .gesture(
+                        DragGesture(minimumDistance: 20)
+                            .onEnded { value in
+                                withAnimation(CertiGoMotion.spring(for: .anim06PearsonBarometerFill, reduceMotion: reduceMotion)) {
+                                    if value.translation.width < -20 {
+                                        liveState.examReportCarouselIndex = (liveState.examReportCarouselIndex + 1) % 3
+                                    } else if value.translation.width > 20 {
+                                        liveState.examReportCarouselIndex = (liveState.examReportCarouselIndex + 2) % 3
+                                    }
+                                }
+                            }
+                    )
+                    .onTapGesture {
+                        handleTargetOrNavigate("act:142:573")
+                    }
+            }
+        }
+        .ignoresSafeArea()
     }
 
     @ViewBuilder
