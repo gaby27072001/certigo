@@ -332,6 +332,20 @@
             Text(verbatim: "Figma Pro · 24 Mascots Blason 1A & 900 Official Assets")
           }
           Section {
+            Text(
+              verbatim:
+                "Page 01 Ground-Truth (\(CertiGoFigmaExactScreenParity.page01Screens.count)) + Pages 11/12 (\(CertiGoFigmaExactScreenParity.systemAndResilienceScreens.count)) = \(CertiGoFigmaExactScreenParity.allScreens.count) Screens"
+            )
+            .prismTextStyle(.callout)
+            NavigationLink {
+              CertiGoFigmaExactScreenView(screenId: "01")
+            } label: {
+              Text(verbatim: "CertiGoFigmaExactScreenView · Écran 01 (37:375)")
+            }
+          } header: {
+            Text(verbatim: "Lot O · Parité Chirurgicale 1-pour-1 Figma Pro ↔ SwiftUI")
+          }
+          Section {
             ForEach(FeatureFlag.allCases, id: \.rawValue) { flag in
               Picker(
                 selection: Binding(

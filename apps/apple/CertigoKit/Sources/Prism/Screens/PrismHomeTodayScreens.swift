@@ -120,6 +120,69 @@ public struct TodayScreenModel: Equatable, Sendable {
     public var sessionCardVoiceOverSummary: String {
         "\(primaryActionTitle), durée \(selectedLength.defaultMinutes) minutes, \(composition.compositionSummaryText), sujet \(composition.recommendedConceptTitle)"
     }
+
+    /// Exact Figma Pro Page 01 (`37:375` · `Écran 01`) stepping stones for `AZ-104`.
+    public static let defaultAZ104PathSteps: [PrismPathStepSpec] = [
+        .init(id: "s1", title: "Concepts Cloud Azure", subtitle: nil, state: .done, symbol: "checkmark", alignment: .centerRight),
+        .init(id: "s2", title: "Identité Entra ID", subtitle: nil, state: .done, symbol: "shield.fill", alignment: .leadingRight),
+        .init(id: "s3", title: "Rôles RBAC & PIM", subtitle: "CONTINUER", state: .active, symbol: "point.3.connected.trianglepath.dotted", alignment: .trailingLeft),
+        .init(id: "s4", title: "Accès Conditionnel", subtitle: nil, state: .locked, symbol: "lock.fill", alignment: .farTrailingLeft),
+        .init(id: "s5", title: "Réparer un accès RBAC refusé", subtitle: "🧪 MINI-LAB PRATIQUE", state: .chest, symbol: "shippingbox.fill", alignment: .leadingRight)
+    ]
+
+    public static func pathSteps(forRouteCode routeCode: String) -> [PrismPathStepSpec] {
+        switch routeCode {
+        case "AI-102":
+            return [
+                .init(id: "s1", title: "Déploiement Modèles", subtitle: nil, state: .done, symbol: "checkmark", alignment: .centerRight),
+                .init(id: "s2", title: "Indexation AI Search", subtitle: nil, state: .done, symbol: "shield.fill", alignment: .leadingRight),
+                .init(id: "s3", title: "Orchestration Agents", subtitle: "Étape 3 sur 5", state: .active, symbol: "sparkles", alignment: .trailingLeft),
+                .init(id: "s4", title: "Guardrails & Sécurité", subtitle: nil, state: .locked, symbol: "lock.fill", alignment: .farTrailingLeft),
+                .init(id: "s5", title: "Coffre de l'Unité 2", subtitle: "Défi synthèse", state: .chest, symbol: "shippingbox.fill", alignment: .leadingRight)
+            ]
+        case "SAA-C03":
+            return [
+                .init(id: "s1", title: "Subnets & NACL", subtitle: nil, state: .done, symbol: "checkmark", alignment: .centerRight),
+                .init(id: "s2", title: "VPC Peering", subtitle: nil, state: .done, symbol: "shield.fill", alignment: .leadingRight),
+                .init(id: "s3", title: "AWS PrivateLink", subtitle: "Étape 3 sur 5", state: .active, symbol: "point.3.connected.trianglepath.dotted", alignment: .trailingLeft),
+                .init(id: "s4", title: "Transit Gateway", subtitle: nil, state: .locked, symbol: "lock.fill", alignment: .farTrailingLeft),
+                .init(id: "s5", title: "Coffre de l'Unité 1", subtitle: "Défi synthèse", state: .chest, symbol: "shippingbox.fill", alignment: .leadingRight)
+            ]
+        default:
+            return defaultAZ104PathSteps
+        }
+    }
+}
+
+public struct PrismPathStepSpec: Identifiable, Codable, Equatable, Hashable, Sendable {
+    public enum StepState: String, Codable, Equatable, Hashable, Sendable {
+        case done, active, locked, chest
+    }
+    public enum RowAlignment: String, Codable, Equatable, Hashable, Sendable {
+        case centerRight, leadingRight, trailingLeft, farTrailingLeft
+    }
+    public let id: String
+    public let title: String
+    public let subtitle: String?
+    public let state: StepState
+    public let symbol: String
+    public let alignment: RowAlignment
+
+    public init(
+        id: String,
+        title: String,
+        subtitle: String?,
+        state: StepState,
+        symbol: String,
+        alignment: RowAlignment
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.state = state
+        self.symbol = symbol
+        self.alignment = alignment
+    }
 }
 
 // MARK: - 2. Catalog Explorer Model (S-46, §14, §22A.5)
@@ -324,7 +387,7 @@ public struct TodayRootScreen: View {
         case "SAA-C03": return "UNITÉ 1 · VPC & RÉSEAU AWS"
         case "GH-300": return "UNITÉ 2 · INGÉNIERIE DE CONTEXTE"
         case "CKA": return "UNITÉ 1 · CONTROL PLANE KUBERNETES"
-        default: return "UNITÉ 3 · RÉSEAUX HYBRIDES"
+        default: return "UNITÉ 1 · Identité Entra ID"
         }
     }
 
@@ -335,37 +398,12 @@ public struct TodayRootScreen: View {
         case "SAA-C03": return "VPC Endpoints & AWS PrivateLink"
         case "GH-300": return "Instructions, Agents & Sécurité"
         case "CKA": return "RBAC, NetworkPolicies & CoreDNS"
-        default: return "Isolation VNet & DNS privé"
+        default: return "Rôles RBAC & PIM"
         }
     }
 
     private var pathSteps: [PrismPathStepSpec] {
-        switch model.activeRouteCode ?? "AZ-104" {
-        case "AI-102":
-            return [
-                .init(id: "s1", title: "Déploiement Modèles", subtitle: nil, state: .done, symbol: "checkmark", alignment: .centerRight),
-                .init(id: "s2", title: "Indexation AI Search", subtitle: nil, state: .done, symbol: "shield.fill", alignment: .leadingRight),
-                .init(id: "s3", title: "Orchestration Agents", subtitle: "Étape 3 sur 5", state: .active, symbol: "sparkles", alignment: .trailingLeft),
-                .init(id: "s4", title: "Guardrails & Sécurité", subtitle: nil, state: .locked, symbol: "lock.fill", alignment: .farTrailingLeft),
-                .init(id: "s5", title: "Coffre de l'Unité 2", subtitle: "Défi synthèse", state: .chest, symbol: "shippingbox.fill", alignment: .leadingRight)
-            ]
-        case "SAA-C03":
-            return [
-                .init(id: "s1", title: "Subnets & NACL", subtitle: nil, state: .done, symbol: "checkmark", alignment: .centerRight),
-                .init(id: "s2", title: "VPC Peering", subtitle: nil, state: .done, symbol: "shield.fill", alignment: .leadingRight),
-                .init(id: "s3", title: "AWS PrivateLink", subtitle: "Étape 3 sur 5", state: .active, symbol: "point.3.connected.trianglepath.dotted", alignment: .trailingLeft),
-                .init(id: "s4", title: "Transit Gateway", subtitle: nil, state: .locked, symbol: "lock.fill", alignment: .farTrailingLeft),
-                .init(id: "s5", title: "Coffre de l'Unité 1", subtitle: "Défi synthèse", state: .chest, symbol: "shippingbox.fill", alignment: .leadingRight)
-            ]
-        default:
-            return [
-                .init(id: "s1", title: "Sous-réseaux & NSG", subtitle: nil, state: .done, symbol: "checkmark", alignment: .centerRight),
-                .init(id: "s2", title: "Peering VNet", subtitle: nil, state: .done, symbol: "shield.fill", alignment: .leadingRight),
-                .init(id: "s3", title: "Private Endpoint & DNS", subtitle: "Étape 3 sur 5", state: .active, symbol: "point.3.connected.trianglepath.dotted", alignment: .trailingLeft),
-                .init(id: "s4", title: "Pare-feu Azure & UDR", subtitle: nil, state: .locked, symbol: "lock.fill", alignment: .farTrailingLeft),
-                .init(id: "s5", title: "Coffre de l'Unité 3", subtitle: "Situation du jour", state: .chest, symbol: "shippingbox.fill", alignment: .leadingRight)
-            ]
-        }
+        TodayScreenModel.pathSteps(forRouteCode: model.activeRouteCode ?? "AZ-104")
     }
 
     @ViewBuilder
@@ -441,21 +479,6 @@ public struct TodayRootScreen: View {
         )
         .padding(.top, PrismSpacing.s)
     }
-}
-
-public struct PrismPathStepSpec: Identifiable, Equatable, Sendable {
-    public enum StepState: String, Equatable, Sendable {
-        case done, active, locked, chest
-    }
-    public enum RowAlignment: String, Equatable, Sendable {
-        case centerRight, leadingRight, trailingLeft, farTrailingLeft
-    }
-    public let id: String
-    public let title: String
-    public let subtitle: String?
-    public let state: StepState
-    public let symbol: String
-    public let alignment: RowAlignment
 }
 
 private struct PrismDuolingoWindingPathView: View {
