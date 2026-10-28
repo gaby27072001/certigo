@@ -662,7 +662,7 @@ struct FigmaExactScreenParityTests {
         }
     }
 
-    @Test("CertiGoFigmaSceneGraphStore loads all 53 screens (4,712 nodes, 1,429 valid SVG vectors, and 311 interactive hotspots)")
+    @Test("CertiGoFigmaSceneGraphStore loads all 53 screens (4,712 nodes, 1,429 valid SVG vectors, and 407 conflict-free interactive hotspots)")
     func sceneGraphStoreLoadsAll53ScreensWithExactNodesVectorsAndHotspots() throws {
         let store = CertiGoFigmaSceneGraphStore.shared
         #expect(store.totalScreenCount == CertiGoFigmaSceneGraphStore.expectedScreenCount)
@@ -672,7 +672,7 @@ struct FigmaExactScreenParityTests {
         #expect(store.totalVectorCount == CertiGoFigmaSceneGraphStore.expectedVectorCount)
         #expect(store.totalVectorCount == 1429)
         #expect(store.totalHotspotCount == CertiGoFigmaSceneGraphStore.expectedHotspotCount)
-        #expect(store.totalHotspotCount == 311)
+        #expect(store.totalHotspotCount == 407)
 
         for screen in CertiGoFigmaExactScreenParity.allScreens {
             let treeByNode = try #require(
@@ -700,6 +700,42 @@ struct FigmaExactScreenParityTests {
                     store.nodeTree(forScreenNodeId: dest) != nil,
                     "Hotspot on \(hotspot.i) points to unknown screen nodeId \(dest)"
                 )
+                if hotspot.i != screen.nodeId {
+                    for descendant in hotspot.allNodes where descendant.i != hotspot.i {
+                        if let childDest = descendant.d {
+                            #expect(
+                                childDest == dest,
+                                "Nested destination conflict in \(screen.nodeId): \(hotspot.i) (\(dest)) vs \(descendant.i) (\(childDest))"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Verify Q_TYPE_01..10 VÉRIFIER buttons and Onboarding CONTINUER buttons point to next step and never to 79:332
+        let verifierAndContinuerExpectations: [String: [String: String]] = [
+            "73:393": ["73:437": "73:442", "73:438": "73:442", "73:439": "73:442"],
+            "73:442": ["73:504": "73:509", "73:505": "73:509", "73:506": "73:509"],
+            "73:509": ["73:570": "73:575", "73:571": "73:575", "73:572": "73:575"],
+            "73:575": ["73:607": "73:743"],
+            "73:743": ["73:813": "73:818", "73:814": "73:818", "73:815": "73:818"],
+            "73:818": ["73:893": "73:898", "73:894": "73:898", "73:895": "73:898"],
+            "73:898": ["73:953": "73:958", "73:954": "73:958", "73:955": "73:958"],
+            "73:958": ["73:1014": "73:1019", "73:1015": "73:1019", "73:1016": "73:1019"],
+            "73:1019": ["73:1065": "73:1070", "73:1066": "73:1070", "73:1067": "73:1070"],
+            "73:1070": ["73:1117": "26:890", "73:1118": "26:890", "73:1119": "26:890"],
+            "132:264": ["132:335": "132:339", "132:336": "132:339", "132:337": "132:339"],
+            "132:519": ["132:577": "132:581", "132:578": "132:581", "132:579": "132:581"],
+            "132:581": ["132:647": "132:651", "132:648": "132:651", "132:649": "132:651"]
+        ]
+        for (screenId, expectedButtons) in verifierAndContinuerExpectations {
+            let tree = try #require(store.nodeTree(forScreenNodeId: screenId))
+            let nodesById = Dictionary(uniqueKeysWithValues: tree.allNodes.map { ($0.i, $0) })
+            for (btnId, expectedNext) in expectedButtons {
+                let btn = try #require(nodesById[btnId], "Missing CTA node \(btnId) in \(screenId)")
+                #expect(btn.d == expectedNext, "Expected \(btnId) in \(screenId) to point to \(expectedNext), got \(String(describing: btn.d))")
+                #expect(btn.d != "79:332", "CTA \(btnId) in \(screenId) must never point to AI Hub 79:332")
             }
         }
 
@@ -718,7 +754,7 @@ struct FigmaExactScreenParityTests {
                 "58:857": "73:332", "58:861": "79:332"
             ],
             "62:346": [
-                "62:350": "37:375", "62:409": "73:332", "62:417": "73:332",
+                "62:350": "37:375", "62:409": "37:375", "62:417": "73:332",
                 "62:439": "26:939", "62:447": "26:807"
             ],
             "26:939": ["26:942": "26:890"],
@@ -827,5 +863,157 @@ struct FigmaExactScreenParityTests {
             #expect(snapshot.pixels[3] == 0, "Expected transparent (0,0) pixel for \(pose.rawValue)")
             #endif
         }
+    }
+
+    @Test("CertiGoFigmaLiveRuntimeState drives interactive QCM options, Popover 02 brands, Settings toggles, Social Salut, and Exam 23/24 carousel")
+    func liveRuntimeStateDrivesInteractiveControlsAcrossAllFigmaScreens() throws {
+        let store = CertiGoFigmaSceneGraphStore.shared
+        var coordinator = PrismAppShellCoordinatorModel()
+        var live = CertiGoFigmaLiveRuntimeState()
+
+        // 1. Popover 02 (42:375) vendor switching & active route selection
+        #expect(live.selectedVendorInPopover == "microsoft")
+        #expect(live.activeRouteCode == "AZ-104")
+        let awsTap = live.handleTap(onNodeId: "42:498", inScreenNodeId: "42:375", coordinator: &coordinator)
+        #expect(awsTap == nil)
+        #expect(live.selectedVendorInPopover == "aws")
+        #expect(live.currentPopoverCards.map(\.code) == ["SAA-C03", "CLF-C02", "AIF-C01"])
+
+        let popoverTree = try #require(store.nodeTree(forScreenNodeId: "42:375"))
+        let livePopover = live.applyingLiveState(to: popoverTree)
+        #expect(livePopover.node(withId: "42:528")?.tx == "SAA-C03")
+        #expect(livePopover.node(withId: "42:538")?.tx == "CLF-C02")
+        #expect(livePopover.node(withId: "42:546")?.tx == "AIF-C01")
+
+        let selectSAAC03 = live.handleTap(onNodeId: "42:522", inScreenNodeId: "42:375", coordinator: &coordinator)
+        #expect(selectSAAC03 == "37:375")
+        #expect(live.activeRouteCode == "SAA-C03")
+        #expect(coordinator.parallelTracksPreference.activeTrackCode == "SAA-C03")
+
+        let homeTree = try #require(store.nodeTree(forScreenNodeId: "37:375"))
+        let liveHome = live.applyingLiveState(to: homeTree)
+        #expect(liveHome.node(withId: "37:447")?.tx == "SAA-C03 ▾")
+
+        let examsTree = try #require(store.nodeTree(forScreenNodeId: "142:385"))
+        let liveExams = live.applyingLiveState(to: examsTree)
+        #expect(liveExams.node(withId: "142:416")?.tx == "Examens · SAA-C03")
+        #expect(liveExams.node(withId: "142:423")?.tx == "SAA-C03 ▾")
+
+        // Verify Google, GitHub, and Cisco vendor catalogs in Popover 02
+        live.handleTap(onNodeId: "42:505", inScreenNodeId: "42:375", coordinator: &coordinator)
+        #expect(live.currentPopoverCards.map(\.code) == ["ACE", "PCA", "PDE"])
+        live.handleTap(onNodeId: "42:511", inScreenNodeId: "42:375", coordinator: &coordinator)
+        #expect(live.currentPopoverCards.map(\.code) == ["GH-300", "GH-900", "GH-AS"])
+        live.handleTap(onNodeId: "42:514", inScreenNodeId: "42:375", coordinator: &coordinator)
+        #expect(live.currentPopoverCards.map(\.code) == ["CCNA", "CKA", "TF-003"])
+
+        // 2. QCM single-choice (Q_TYPE_01 73:393) & multi-choice (Q_TYPE_10 73:1070) & CLI (Q_TYPE_04 73:575)
+        #expect(live.isOptionSelected("73:425", inScreen: "73:393") == true)
+        live.handleTap(onNodeId: "73:421", inScreenNodeId: "73:393", coordinator: &coordinator)
+        #expect(live.isOptionSelected("73:421", inScreen: "73:393") == true)
+        #expect(live.isOptionSelected("73:425", inScreen: "73:393") == false)
+        let q1Tree = try #require(store.nodeTree(forScreenNodeId: "73:393"))
+        let liveQ1 = live.applyingLiveState(to: q1Tree)
+        #expect(liveQ1.node(withId: "73:422")?.f == "#1cb0f6")
+        #expect(liveQ1.node(withId: "73:423")?.f == "#ddf4ff")
+        #expect(liveQ1.node(withId: "73:426")?.f == "#e5e5e5")
+        #expect(liveQ1.node(withId: "73:427")?.f == "#ffffff")
+
+        // Multi-choice Q_TYPE_10 (73:1070)
+        #expect(live.isOptionSelected("73:1107", inScreen: "73:1070") == false)
+        live.handleTap(onNodeId: "73:1107", inScreenNodeId: "73:1070", coordinator: &coordinator)
+        #expect(live.isOptionSelected("73:1107", inScreen: "73:1070") == true)
+        let q10Tree = try #require(store.nodeTree(forScreenNodeId: "73:1070"))
+        let liveQ10 = live.applyingLiveState(to: q10Tree)
+        #expect(liveQ10.node(withId: "73:1111")?.f == "#1cb0f6")
+
+        // Q_TYPE_04 (73:575) CLI input & Q_TYPE_08 (73:958) row swap
+        live.handleTap(onNodeId: "73:617", inScreenNodeId: "73:575", coordinator: &coordinator)
+        #expect(live.qType04InputText == "list")
+        live.handleTap(onNodeId: "73:615", inScreenNodeId: "73:575", coordinator: &coordinator)
+        #expect(live.qType04InputText == "lock")
+
+        #expect(live.qType08OrderedRowNodeIds == ["73:982", "73:990", "73:998", "73:1006"])
+        live.handleTap(onNodeId: "73:982", inScreenNodeId: "73:958", coordinator: &coordinator)
+        #expect(live.qType08OrderedRowNodeIds == ["73:990", "73:982", "73:998", "73:1006"])
+
+        // 3. AI Hub (79:332, 78:332, 81:345, 85:317)
+        let aiDest = live.handleTap(onNodeId: "79:360", inScreenNodeId: "79:332", coordinator: &coordinator)
+        #expect(aiDest == "78:332")
+        #expect(live.aiActiveTopicId == "last-3-errors")
+        live.handleTap(onNodeId: "78:366", inScreenNodeId: "78:332", coordinator: &coordinator)
+        #expect(live.isAIResponseCopied == true)
+        let ai06BTree = try #require(store.nodeTree(forScreenNodeId: "78:332"))
+        let liveAI06B = live.applyingLiveState(to: ai06BTree)
+        #expect(liveAI06B.node(withId: "78:370")?.tx == "✓ Copié")
+
+        #expect(live.isVoiceLiveListening == true)
+        live.handleTap(onNodeId: "81:365", inScreenNodeId: "81:345", coordinator: &coordinator)
+        #expect(live.isVoiceLiveListening == false)
+
+        let historyDest = live.handleTap(onNodeId: "85:380", inScreenNodeId: "85:317", coordinator: &coordinator)
+        #expect(historyDest == "78:332")
+        #expect(live.aiActiveTopicId == "vnet-peering-cli")
+
+        // 4. Mock Exam 23 (142:478) & Report Carousel 24 (142:540)
+        #expect(live.isCurrentExamQuestionFlagged == false)
+        live.handleTap(onNodeId: "142:487", inScreenNodeId: "142:478", coordinator: &coordinator)
+        #expect(live.isCurrentExamQuestionFlagged == true)
+        live.handleTap(onNodeId: "142:520", inScreenNodeId: "142:478", coordinator: &coordinator)
+        #expect(live.currentExamSelectedOptionNodeId == "142:520")
+        let exam23Tree = try #require(store.nodeTree(forScreenNodeId: "142:478"))
+        let liveExam23 = live.applyingLiveState(to: exam23Tree)
+        #expect(liveExam23.node(withId: "142:488")?.tx == "🏳 Marquée ✓")
+        #expect(liveExam23.node(withId: "142:521")?.f == "#2563eb")
+
+        #expect(live.examReportCarouselIndex == 0)
+        live.handleTap(onNodeId: "142:573", inScreenNodeId: "142:540", coordinator: &coordinator)
+        #expect(live.examReportCarouselIndex == 1)
+        let exam24Tree = try #require(store.nodeTree(forScreenNodeId: "142:540"))
+        let liveExam24Card1 = live.applyingLiveState(to: exam24Tree)
+        #expect(liveExam24Card1.node(withId: "142:550")?.tx == "⏱ RYTHME CHRONO & CALIBRATION PEARSON VUE")
+        live.handleTap(onNodeId: "142:573", inScreenNodeId: "142:540", coordinator: &coordinator)
+        #expect(live.examReportCarouselIndex == 2)
+        let liveExam24Card2 = live.applyingLiveState(to: exam24Tree)
+        #expect(liveExam24Card2.node(withId: "142:550")?.tx == "🎯 ANALYSE DES 11 ERREURS & RELANCE COACH IA")
+
+        // 5. Social 25 (89:317) 👋 Salut buttons & Copier
+        #expect(live.isFriendSaluted("89:493") == false)
+        live.handleTap(onNodeId: "89:493", inScreenNodeId: "89:317", coordinator: &coordinator)
+        #expect(live.isFriendSaluted("89:493") == true)
+        live.handleTap(onNodeId: "89:480", inScreenNodeId: "89:317", coordinator: &coordinator)
+        #expect(live.isFriendInviteCopied == true)
+        let social25Tree = try #require(store.nodeTree(forScreenNodeId: "89:317"))
+        let liveSocial25 = live.applyingLiveState(to: social25Tree)
+        #expect(liveSocial25.node(withId: "89:495")?.f == "#dcfce7")
+        #expect(liveSocial25.node(withId: "89:496")?.tx == "👏 Salué ✓")
+        #expect(liveSocial25.node(withId: "89:496")?.f == "#15803d")
+        #expect(liveSocial25.node(withId: "89:484")?.tx == "✓ Copié")
+
+        // 6. Profile 08 (97:287) -> Detail 26 (97:417) & Settings 28 (145:122) toggles & cycles
+        let certDetailDest = live.handleTap(onNodeId: "97:374", inScreenNodeId: "97:287", coordinator: &coordinator)
+        #expect(certDetailDest == "97:417")
+        #expect(live.selectedProfileCertificationCode == "SAA-C03")
+        let detail26Tree = try #require(store.nodeTree(forScreenNodeId: "97:417"))
+        let liveDetail26 = live.applyingLiveState(to: detail26Tree)
+        #expect(liveDetail26.node(withId: "97:439")?.tx == "Solutions Architect (SAA-C03)")
+
+        #expect(live.isSettingsToggleOn("145:174") == true)
+        live.handleTap(onNodeId: "145:174", inScreenNodeId: "145:122", coordinator: &coordinator)
+        #expect(live.isSettingsToggleOn("145:174") == false)
+        live.handleTap(onNodeId: "145:146", inScreenNodeId: "145:122", coordinator: &coordinator)
+        #expect(live.currentSettingsLanguageLabel == "Français intégral  ›")
+        live.handleTap(onNodeId: "145:152", inScreenNodeId: "145:122", coordinator: &coordinator)
+        #expect(live.currentSettingsExamModeLabel == "Temps majoré ×1,5  ›")
+        live.handleTap(onNodeId: "145:163", inScreenNodeId: "145:122", coordinator: &coordinator)
+        #expect(live.currentSettingsCoachVoiceLabel == "Nova (1,2×)  ›")
+        let settings28Tree = try #require(store.nodeTree(forScreenNodeId: "145:122"))
+        let liveSettings28 = live.applyingLiveState(to: settings28Tree)
+        #expect(liveSettings28.node(withId: "145:174")?.f == "#cbd5e1")
+        #expect(liveSettings28.node(withId: "145:175")?.x == 2.0)
+        #expect(liveSettings28.node(withId: "145:147")?.tx == "Français intégral  ›")
+        #expect(liveSettings28.node(withId: "145:153")?.tx == "Temps majoré ×1,5  ›")
+        #expect(liveSettings28.node(withId: "145:164")?.tx == "Nova (1,2×)  ›")
+        #expect(live.handleTap(onNodeId: "145:157", inScreenNodeId: "145:122", coordinator: &coordinator) == "162:93")
     }
 }
