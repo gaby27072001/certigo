@@ -1281,8 +1281,7 @@ public struct PrismAppShellView: View {
     }
 
     public var body: some View {
-        CertiGoFigmaInteractiveAppView(
-            initialScreenNodeId: "37:375",
+        CertiGoNativeFigmaAppView(
             coordinator: $coordinator,
             router: $router,
             flags: flags,

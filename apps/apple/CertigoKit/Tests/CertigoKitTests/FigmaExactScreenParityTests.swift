@@ -1178,4 +1178,129 @@ struct FigmaExactScreenParityTests {
         let fractional = PrismRGBA.figmaHex("#ffffff:0.24")
         #expect(fractional == PrismRGBA(hex: 0xFFFFFF, alpha: 0.24))
     }
+
+    @Test("CertiGoNativeLessonSessionEngine and CertiGoNativeAppState drive the 4 Lead-Architect pillars: 15-node 3-unit winding path, real node unlocking, exercise attempt phases (answering -> checked -> explainingError 05 / comparingServices 20 -> celebration 19), timed exam /1000, multi-turn AI chat, and 12-item Social lists")
+    func nativeFigmaAppEngineAndStatePillars() throws {
+        var appState = CertiGoNativeAppState()
+
+        // 1. Verify 3 full units (15 sinusoidal lesson nodes) & 12 leaderboard/friend items
+        #expect(appState.currentUnits.count == 3)
+        let allLessons = appState.currentUnits.flatMap(\.lessons)
+        #expect(allLessons.count == 15)
+        #expect(allLessons[0].state == .completed)
+        #expect(allLessons[1].state == .completed)
+        #expect(allLessons[2].state == .active)
+        #expect(allLessons[3].state == .miniLab)
+        #expect(allLessons[4].state == .locked)
+        #expect(appState.leaderboardMembers.count == 12)
+        #expect(appState.friends.count == 12)
+        #expect(appState.examQuestions.count == 12)
+        #expect(appState.aiThreads.count == 12)
+
+        // 2. Verify Step Sheet 03 -> Unfolded Memo Sheet 14
+        appState.openStepPreviewSheet(forLessonId: allLessons[2].id)
+        #expect(appState.activeStepSheet == .preview03(lessonId: "AZ-104-u1-s3"))
+        appState.toggleStepMemoSheet14()
+        #expect(appState.activeStepSheet == .memo14(lessonId: "AZ-104-u1-s3"))
+
+        // 3. Start lesson session -> Card 15 Declic -> Exercise 1 (Wrong answer -> Red drawer 04 -> AI Explanation Sheet 05)
+        appState.startLessonSession(forLessonId: allLessons[2].id)
+        #expect(appState.isPresentingLessonSession == true)
+        #expect(appState.lessonSession.isShowingDeclicCard15 == true)
+        appState.lessonSession.dismissDeclicCard15()
+        #expect(appState.lessonSession.isShowingDeclicCard15 == false)
+        #expect(appState.lessonSession.attemptPhase == .answering)
+        #expect(appState.lessonSession.canCheckCurrentExercise == false)
+
+        // Select wrong option A (Contributor instead of Reader)
+        appState.lessonSession.selectOption("opt-a")
+        #expect(appState.lessonSession.canCheckCurrentExercise == true)
+        let firstCheck = appState.lessonSession.verifyCurrentAnswer()
+        #expect(firstCheck == false)
+        #expect(appState.lessonSession.attemptPhase == .checked(isCorrect: false))
+        #expect(appState.lessonSession.heartsCount == 4)
+
+        // Open AI Error Explanation Sheet 05 & Comparator 20
+        appState.lessonSession.openErrorExplanationSheet05()
+        #expect(appState.lessonSession.attemptPhase == .explainingError)
+        #expect(appState.lessonSession.selectedOptionSummaryText.contains("Contributeur"))
+        appState.lessonSession.openServiceComparatorSheet20()
+        #expect(appState.lessonSession.attemptPhase == .comparingServices)
+
+        // Advance to Exercise 2 (Q_TYPE_02 2x2 Service Grid) -> Select correct option Key Vault -> Green drawer 18
+        appState.lessonSession.advanceToNextExerciseOrFinish()
+        #expect(appState.lessonSession.currentExercise.formatCode == "Q_TYPE_02")
+        appState.lessonSession.selectOption("grid-kv")
+        let secondCheck = appState.lessonSession.verifyCurrentAnswer()
+        #expect(secondCheck == true)
+        #expect(appState.lessonSession.attemptPhase == .checked(isCorrect: true))
+        #expect(appState.lessonSession.heartsCount == 4)
+
+        // Complete remaining exercises (Q_TYPE_03, Q_TYPE_04 CLI, Q_TYPE_05 Word Bank, Q_TYPE_10 Multi-choice)
+        appState.lessonSession.advanceToNextExerciseOrFinish()
+        #expect(appState.lessonSession.currentExercise.formatCode == "Q_TYPE_03")
+        appState.lessonSession.selectOption("arch-appgw")
+        #expect(appState.lessonSession.verifyCurrentAnswer() == true)
+
+        appState.lessonSession.advanceToNextExerciseOrFinish()
+        #expect(appState.lessonSession.currentExercise.formatCode == "Q_TYPE_04")
+        appState.lessonSession.cliInputText = "lock"
+        #expect(appState.lessonSession.verifyCurrentAnswer() == true)
+
+        appState.lessonSession.advanceToNextExerciseOrFinish()
+        #expect(appState.lessonSession.currentExercise.formatCode == "Q_TYPE_05")
+        for token in ["az", "network", "vnet", "create", "--name ProdVNet", "-g RG-Core"] {
+            appState.lessonSession.toggleWordBankBrick(token)
+        }
+        #expect(appState.lessonSession.verifyCurrentAnswer() == true)
+
+        appState.lessonSession.advanceToNextExerciseOrFinish()
+        #expect(appState.lessonSession.currentExercise.formatCode == "Q_TYPE_10")
+        appState.lessonSession.selectOption("m-1")
+        appState.lessonSession.selectOption("m-2")
+        #expect(appState.lessonSession.verifyCurrentAnswer() == true)
+
+        appState.lessonSession.advanceToNextExerciseOrFinish()
+        #expect(appState.lessonSession.isSessionCompleted == true)
+        #expect(appState.lessonSession.accuracyPercent == 83)
+
+        // 4. Finish celebration 19 -> Verify active node u1-s3 becomes .completed and next node u1-s4 becomes .active!
+        let fixedNow = Date(timeIntervalSince1970: 1_776_800_000)
+        appState.completeActiveLessonSessionAndUnlockNextNode(now: fixedNow)
+        #expect(appState.isPresentingLessonSession == false)
+        #expect(appState.gemsCount == 495)
+        #expect(appState.completedStepsTotal == 43)
+        let updatedLessons = appState.currentUnits.flatMap(\.lessons)
+        #expect(updatedLessons[2].state == .completed)
+        #expect(updatedLessons[3].state == .active)
+        #expect(appState.cortexMasteryByConceptId["az-104:az-104-u1-s3"] != nil)
+
+        // 5. Timed Mock Exam 23 countdown & /1000 score calculation
+        appState.startTimedExam23()
+        #expect(appState.isPresentingTimedExam23 == true)
+        #expect(appState.formattedExamCountdown == "⏱  89 : 59")
+        appState.tickExamTimerOneSecond()
+        #expect(appState.formattedExamCountdown == "⏱  89 : 58")
+        appState.finishTimedExamAndComputeScore()
+        #expect(appState.isPresentingTimedExam23 == false)
+        #expect(appState.isPresentingExamReport24 == true)
+        #expect(appState.lastComputedExamScoreOutOf1000 >= 700)
+
+        // 6. Multi-turn AI Coach conversation & 06D drawer search
+        appState.openAITopic("rbac-vs-policy")
+        #expect(appState.chatTurns.count == 1)
+        appState.sendAIMessage("Explique le verrou CanNotDelete")
+        #expect(appState.chatTurns.count == 2)
+        appState.aiDrawerSearchQuery = "Peering"
+        #expect(appState.filteredAIThreads.count == 1)
+        #expect(appState.filteredAIThreads.first?.topicKey == "vnet-peering-cli")
+
+        // 7. Social friends filter, add friend & salut toggle
+        appState.toggleSalutFriend(id: "fr-1")
+        #expect(appState.friends[0].isSaluted == true)
+        appState.friendSearchQuery = "@devops_alice"
+        appState.addNewFriendFromSearch()
+        #expect(appState.friends.count == 13)
+        #expect(appState.friends[0].handle == "@devops_alice")
+    }
 }
