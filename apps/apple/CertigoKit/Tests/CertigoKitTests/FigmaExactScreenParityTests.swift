@@ -938,6 +938,10 @@ struct FigmaExactScreenParityTests {
         #expect(live.qType08OrderedRowNodeIds == ["73:990", "73:982", "73:998", "73:1006"])
 
         // 3. AI Hub (79:332, 78:332, 81:345, 85:317)
+        let ai06Tree = try #require(store.nodeTree(forScreenNodeId: "79:332"))
+        let liveAI06 = live.applyingLiveState(to: ai06Tree)
+        #expect(liveAI06.node(withId: "79:370")?.tx == "")
+
         let aiDest = live.handleTap(onNodeId: "79:360", inScreenNodeId: "79:332", coordinator: &coordinator)
         #expect(aiDest == "78:332")
         #expect(live.aiActiveTopicId == "last-3-errors")
@@ -946,11 +950,15 @@ struct FigmaExactScreenParityTests {
         let ai06BTree = try #require(store.nodeTree(forScreenNodeId: "78:332"))
         let liveAI06B = live.applyingLiveState(to: ai06BTree)
         #expect(liveAI06B.node(withId: "78:370")?.tx == "✓ Copié")
+        #expect(liveAI06B.node(withId: "78:377")?.tx == "")
 
         #expect(live.isVoiceLiveListening == true)
         live.handleTap(onNodeId: "81:365", inScreenNodeId: "81:345", coordinator: &coordinator)
         #expect(live.isVoiceLiveListening == false)
 
+        let ai06DTree = try #require(store.nodeTree(forScreenNodeId: "85:317"))
+        let liveAI06D = live.applyingLiveState(to: ai06DTree)
+        #expect(liveAI06D.node(withId: "85:376")?.tx == "")
         let historyDest = live.handleTap(onNodeId: "85:380", inScreenNodeId: "85:317", coordinator: &coordinator)
         #expect(historyDest == "78:332")
         #expect(live.aiActiveTopicId == "vnet-peering-cli")

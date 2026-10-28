@@ -3800,10 +3800,18 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
         }
 
         // 9. Hub IA Vivant (79:332, 78:332, 81:345, 85:317)
-        if screenId == "79:332", ["79:352", "79:356", "79:360", "79:364"].contains(node.i) {
-            return node.clearingDescendantDestinations().updating(d: .some("act:\(node.i)"))
+        if screenId == "79:332" {
+            if node.i == "79:370" {
+                return node.updating(tx: .some(""))
+            }
+            if ["79:352", "79:356", "79:360", "79:364"].contains(node.i) {
+                return node.clearingDescendantDestinations().updating(d: .some("act:\(node.i)"))
+            }
         }
         if screenId == "78:332" {
+            if node.i == "78:377" {
+                return node.updating(tx: .some(""))
+            }
             let payload = currentAITopicPayload
             switch node.i {
             case "78:348":
@@ -3864,6 +3872,9 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
             }
         }
         if screenId == "85:317" {
+            if node.i == "85:376" {
+                return node.updating(tx: .some(""))
+            }
             if ["85:378", "85:380", "85:383", "85:387", "85:388", "85:392", "85:393", "85:394", "85:395"].contains(node.i) {
                 return node.clearingDescendantDestinations().updating(d: .some("act:\(node.i)"))
             }
@@ -4569,6 +4580,7 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
 
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
+import UIKit
 
 public struct CertiGoFigmaSVGPathShape: Shape {
     public let vp: String
@@ -5263,15 +5275,20 @@ public struct CertiGoFigmaInteractiveAppView: View {
             if currentScreenNodeId == "73:575" {
                 let cliW = CGFloat(136.0) * scaleX
                 let cliH = CGFloat(44.0) * scaleY
-                TextField("", text: $liveState.qType04InputText)
-                    .font(PrismTypography.figmaFont(size: 16 * uniformScale, style: "Bold", monospaced: true))
-                    .foregroundStyle(Color.clear)
-                    .tint(PrismColor.figmaHex("#1cb0f6"))
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .frame(width: cliW, height: cliH)
-                    .position(x: (124 + 68) * scaleX, y: (306 + 22) * scaleY)
-                    .accessibilityIdentifier("figma-qtype04-cli-textfield")
+                TextField(
+                    text: $liveState.qType04InputText,
+                    prompt: Text(verbatim: "")
+                ) {
+                    Text(verbatim: "")
+                }
+                .font(PrismTypography.figmaFont(size: 16 * uniformScale, style: "Bold", monospaced: true))
+                .foregroundStyle(Color.clear)
+                .tint(PrismColor.figmaHex("#1cb0f6"))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .frame(width: cliW, height: cliH)
+                .position(x: (124 + 68) * scaleX, y: (306 + 22) * scaleY)
+                .accessibilityIdentifier("figma-qtype04-cli-textfield")
             }
 
             // 2. Hub IA 06 (79:332) & 06B (78:332) interactive prompt input bar
@@ -5282,13 +5299,16 @@ public struct CertiGoFigmaInteractiveAppView: View {
                 let promptW = CGFloat(215.0) * scaleX
                 let promptH = CGFloat(44.0) * scaleY
                 let promptRadius = PrismRadius.m * uniformScale
+                let promptPlaceholder = currentScreenNodeId == "79:332"
+                    ? "Écrire ou parler à CertiGo IA..."
+                    : "Demander à CertiGo IA..."
                 HStack(spacing: PrismSpacing.xs) {
                     TextField(
-                        currentScreenNodeId == "79:332"
-                            ? "Écrire ou parler à CertiGo IA..."
-                            : "Demander à CertiGo IA...",
-                        text: $aiDraftText
-                    )
+                        text: $aiDraftText,
+                        prompt: Text(verbatim: promptPlaceholder)
+                    ) {
+                        Text(verbatim: promptPlaceholder)
+                    }
                     .font(PrismTypography.figmaFont(size: 13 * uniformScale, style: "Medium"))
                     .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                     .submitLabel(.send)
@@ -5359,17 +5379,22 @@ public struct CertiGoFigmaInteractiveAppView: View {
                 let searchW = CGFloat(280.0) * scaleX
                 let searchH = CGFloat(38.0) * scaleY
                 let searchRadius = PrismRadius.m * uniformScale
-                TextField("🔍   Rechercher une discussion...", text: $liveState.aiHistorySearchText)
-                    .font(PrismTypography.figmaFont(size: 13 * uniformScale, style: "Medium"))
-                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                    .padding(.horizontal, PrismSpacing.s)
-                    .frame(width: searchW, height: searchH)
-                    .background(
-                        RoundedRectangle(cornerRadius: searchRadius, style: .continuous)
-                            .fill(PrismColor.figmaHex("#ffffff"))
-                    )
-                    .position(x: (22 + 145) * scaleX, y: (106 + 21) * scaleY)
-                    .accessibilityIdentifier("figma-ai-history-search-textfield")
+                TextField(
+                    text: $liveState.aiHistorySearchText,
+                    prompt: Text(verbatim: "🔍   Rechercher une discussion...")
+                ) {
+                    Text(verbatim: "🔍   Rechercher une discussion...")
+                }
+                .font(PrismTypography.figmaFont(size: 13 * uniformScale, style: "Medium"))
+                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                .padding(.horizontal, PrismSpacing.s)
+                .frame(width: searchW, height: searchH)
+                .background(
+                    RoundedRectangle(cornerRadius: searchRadius, style: .continuous)
+                        .fill(PrismColor.figmaHex("#ffffff"))
+                )
+                .position(x: (22 + 145) * scaleX, y: (106 + 21) * scaleY)
+                .accessibilityIdentifier("figma-ai-history-search-textfield")
             }
 
             // 5. Écran 24 (142:540) horizontal swipe gesture on top Pearson VUE carousel card (142:546)
