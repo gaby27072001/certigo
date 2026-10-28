@@ -240,6 +240,14 @@ public struct DailySituationStateMachine: Codable, Equatable, Hashable, Sendable
         )
     }
 
+    public var canSubmit: Bool {
+        selectedOptionId != nil && !hasSubmittedAnswer
+    }
+
+    public var feedbackResolution: SessionFeedbackResolution? {
+        feedback
+    }
+
     public mutating func submitAnswer(
         correctOptionId: String,
         authorExplanation: String,
