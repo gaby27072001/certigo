@@ -1287,6 +1287,7 @@ struct FigmaExactScreenParityTests {
         #expect(appState.lastComputedExamScoreOutOf1000 >= 700)
 
         // 6. Multi-turn AI Coach conversation & 06D drawer search
+        appState.isLiveAIModelConnected = true
         appState.openAITopic("rbac-vs-policy")
         #expect(appState.chatTurns.count == 1)
         appState.sendAIMessage("Explique le verrou CanNotDelete")

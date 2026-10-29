@@ -83,4 +83,125 @@ struct CertiGoNativeFigmaAppTests {
         }
         #expect(Set(customTitles).count == 3)
     }
+
+    @Test("addSuggestedFriend adds the suggested colleague to friends in real time and openFriendProfile populates CertiGoSocialProfilePreview")
+    func socialAddSuggestedFriendAndOpenProfilePreview() {
+        var appState = CertiGoNativeAppState()
+        let initialFriendsCount = appState.friends.count
+        #expect(appState.suggestedFriends.count == 5)
+        #expect(appState.suggestedFriends[0].displayName == "Camille D.")
+        #expect(appState.suggestedFriends[0].isAdded == false)
+
+        appState.addSuggestedFriend("sf-1")
+        #expect(appState.suggestedFriends[0].isAdded == true)
+        #expect(appState.friends.count == initialFriendsCount + 1)
+        #expect(appState.friends[0].displayName == "Camille D.")
+        #expect(appState.friends[0].handle == "@camille_az")
+        #expect(appState.lastAddedFriendConfirmation?.contains("Camille D.") == true)
+
+        appState.openFriendProfile(for: appState.friends[0])
+        #expect(appState.selectedFriendProfile != nil)
+        #expect(appState.selectedFriendProfile?.displayName == "Camille D.")
+        #expect(appState.selectedFriendProfile?.handle == "@camille_az")
+        #expect(appState.selectedFriendProfile?.isSaluted == true)
+
+        appState.toggleSalutSelectedProfile()
+        #expect(appState.selectedFriendProfile?.isSaluted == false)
+        #expect(appState.friends[0].isSaluted == false)
+    }
+
+    @Test("Gamification shop purchases deduct gems and apply streak freeze, heart refill, and double XP boost")
+    func gamificationShopPurchasesWithGems() {
+        var appState = CertiGoNativeAppState()
+        #expect(appState.gemsCount == 480)
+        #expect(appState.streakFreezeCount == 2)
+        #expect(appState.isDoubleXPBoostActive == false)
+
+        appState.heartsCount = 2
+        #expect(appState.purchaseStreakFreezeWithGems() == true)
+        #expect(appState.gemsCount == 280)
+        #expect(appState.streakFreezeCount == 3)
+
+        #expect(appState.refillHeartsWithGems() == true)
+        #expect(appState.gemsCount == 130)
+        #expect(appState.heartsCount == 5)
+
+        #expect(appState.activateDoubleXPWithGems() == true)
+        #expect(appState.gemsCount == 30)
+        #expect(appState.isDoubleXPBoostActive == true)
+
+        // Insufficient gems should fail without mutating state
+        #expect(appState.purchaseStreakFreezeWithGems() == false)
+        #expect(appState.gemsCount == 30)
+    }
+
+    @Test("Saving an AI chat turn appends it to savedAIMemos and marks isSavedToMemo")
+    func saveAIChatTurnToSavedMemos() {
+        var appState = CertiGoNativeAppState()
+        appState.isLiveAIModelConnected = true
+        appState.openAITopic("rbac-vs-policy")
+        #expect(appState.chatTurns.count == 1)
+        #expect(appState.chatTurns[0].isSavedToMemo == false)
+        #expect(appState.savedAIMemos.isEmpty)
+
+        appState.saveChatTurnToMemo(at: 0)
+        #expect(appState.chatTurns[0].isSavedToMemo == true)
+        #expect(appState.savedAIMemos.count == 1)
+        #expect(appState.savedAIMemos[0].id == appState.chatTurns[0].id)
+
+        appState.removeSavedAIMemo(id: appState.chatTurns[0].id)
+        #expect(appState.savedAIMemos.isEmpty)
+        #expect(appState.chatTurns[0].isSavedToMemo == false)
+    }
+
+    @Test("CertiGoErrorCode registry provides 12 numbered CG-ERR-xxxx codes and disconnected AI triggers CG-ERR-1001 without fake answers")
+    func honestDisconnectedAIErrorAndCompleteErrorRegistry() {
+        #expect(CertiGoErrorCode.allCases.count == 12)
+        let uniqueCodes = Set(CertiGoErrorCode.allCases.map(\.code))
+        #expect(uniqueCodes.count == 12)
+
+        for err in CertiGoErrorCode.allCases {
+            #expect(err.code.hasPrefix("CG-ERR-"))
+            #expect(!err.category.isEmpty)
+            #expect(!err.severityLabel.isEmpty)
+            #expect(!err.title.isEmpty)
+            #expect(!err.userMessage.isEmpty)
+            #expect(!err.technicalDetail.isEmpty)
+            #expect(!err.recommendedAction.isEmpty)
+        }
+
+        var appState = CertiGoNativeAppState()
+        #expect(appState.isLiveAIModelConnected == false)
+        appState.activeDiagnosticError = nil
+        appState.sendAIMessage("Test")
+        #expect(appState.chatTurns.isEmpty)
+        #expect(appState.activeDiagnosticError == .aiModelNotConnected1001)
+        #expect(appState.errorLogHistory.contains(.aiModelNotConnected1001))
+
+        appState.openAITopic("last-3-errors")
+        #expect(appState.chatTurns.isEmpty)
+        #expect(appState.activeDiagnosticError == .examReportAIDisconnected1003)
+    }
+
+    @Test("Updating profile name, handle, and target exam date updates initials, leaderboard entry, and closes editor sheet")
+    func updateProfileNameHandleAndTargetExamDate() {
+        var appState = CertiGoNativeAppState()
+        appState.showEditProfileSheet = true
+
+        appState.updateProfile(
+            displayName: "Alexandre Martin",
+            handle: "alex_azure",
+            targetExamDate: "15 Déc. 2026",
+            avatarHex: "#7c3aed"
+        )
+
+        #expect(appState.userDisplayName == "Alexandre Martin")
+        #expect(appState.userHandle == "@alex_azure")
+        #expect(appState.targetExamDateText == "15 Déc. 2026")
+        #expect(appState.userAvatarHex == "#7c3aed")
+        #expect(appState.userInitials == "AM")
+        #expect(appState.showEditProfileSheet == false)
+        #expect(appState.leaderboardMembers[0].displayName == "Toi (Alexandre)")
+        #expect(appState.leaderboardMembers[0].initials == "AM")
+    }
 }
