@@ -1183,28 +1183,28 @@ struct FigmaExactScreenParityTests {
     func nativeFigmaAppEngineAndStatePillars() throws {
         var appState = CertiGoNativeAppState()
 
-        // 1. Verify 3 full units (15 sinusoidal lesson nodes) & 12 leaderboard/friend items
+        // 1. Verify 3 full units (15 sinusoidal lesson nodes) & honest new-user defaults
         #expect(appState.currentUnits.count == 3)
         let allLessons = appState.currentUnits.flatMap(\.lessons)
         #expect(allLessons.count == 15)
-        #expect(allLessons[0].state == .completed)
-        #expect(allLessons[1].state == .completed)
-        #expect(allLessons[2].state == .active)
+        #expect(allLessons[0].state == .active)
+        #expect(allLessons[1].state == .locked)
+        #expect(allLessons[2].state == .locked)
         #expect(allLessons[3].state == .miniLab)
         #expect(allLessons[4].state == .locked)
         #expect(appState.leaderboardMembers.count == 12)
-        #expect(appState.friends.count == 12)
+        #expect(appState.friends.isEmpty)
         #expect(appState.examQuestions.count == 12)
-        #expect(appState.aiThreads.count == 12)
+        #expect(appState.aiThreads.isEmpty)
 
         // 2. Verify Step Sheet 03 -> Unfolded Memo Sheet 14
-        appState.openStepPreviewSheet(forLessonId: allLessons[2].id)
-        #expect(appState.activeStepSheet == .preview03(lessonId: "AZ-104-u1-s3"))
+        appState.openStepPreviewSheet(forLessonId: allLessons[0].id)
+        #expect(appState.activeStepSheet == .preview03(lessonId: "AZ-104-u1-s1"))
         appState.toggleStepMemoSheet14()
-        #expect(appState.activeStepSheet == .memo14(lessonId: "AZ-104-u1-s3"))
+        #expect(appState.activeStepSheet == .memo14(lessonId: "AZ-104-u1-s1"))
 
         // 3. Start lesson session -> Card 15 Declic -> Exercise 1 (Wrong answer -> Red drawer 04 -> AI Explanation Sheet 05)
-        appState.startLessonSession(forLessonId: allLessons[2].id)
+        appState.startLessonSession(forLessonId: allLessons[0].id)
         #expect(appState.isPresentingLessonSession == true)
         #expect(appState.lessonSession.isShowingDeclicCard15 == true)
         appState.lessonSession.dismissDeclicCard15()
@@ -1264,16 +1264,18 @@ struct FigmaExactScreenParityTests {
         #expect(appState.lessonSession.isSessionCompleted == true)
         #expect(appState.lessonSession.accuracyPercent == 83)
 
-        // 4. Finish celebration 19 -> Verify active node u1-s3 becomes .completed and next node u1-s4 becomes .active!
+        // 4. Finish celebration 19 -> Verify active node u1-s1 becomes .completed and next node u1-s2 becomes .active!
         let fixedNow = Date(timeIntervalSince1970: 1_776_800_000)
         appState.completeActiveLessonSessionAndUnlockNextNode(now: fixedNow)
         #expect(appState.isPresentingLessonSession == false)
-        #expect(appState.gemsCount == 495)
-        #expect(appState.completedStepsTotal == 43)
+        #expect(appState.gemsCount == 15)
+        #expect(appState.completedStepsTotal == 1)
+        #expect(appState.streakDays == 1)
+        #expect(appState.userXPPoints == 25)
         let updatedLessons = appState.currentUnits.flatMap(\.lessons)
-        #expect(updatedLessons[2].state == .completed)
-        #expect(updatedLessons[3].state == .active)
-        #expect(appState.cortexMasteryByConceptId["az-104:az-104-u1-s3"] != nil)
+        #expect(updatedLessons[0].state == .completed)
+        #expect(updatedLessons[1].state == .active)
+        #expect(appState.cortexMasteryByConceptId["az-104:az-104-u1-s1"] != nil)
 
         // 5. Timed Mock Exam 23 countdown & /1000 score calculation
         appState.startTimedExam23()
@@ -1281,9 +1283,15 @@ struct FigmaExactScreenParityTests {
         #expect(appState.formattedExamCountdown == "⏱  89 : 59")
         appState.tickExamTimerOneSecond()
         #expect(appState.formattedExamCountdown == "⏱  89 : 58")
+        for q in appState.examQuestions {
+            if let correctChoice = q.choices.first(where: \.isCorrect) {
+                appState.selectedExamChoiceByQuestionNumber[q.number] = correctChoice.id
+            }
+        }
         appState.finishTimedExamAndComputeScore()
         #expect(appState.isPresentingTimedExam23 == false)
         #expect(appState.isPresentingExamReport24 == true)
+        #expect(appState.completedExamsCount == 1)
         #expect(appState.lastComputedExamScoreOutOf1000 >= 700)
 
         // 6. Multi-turn AI Coach conversation & 06D drawer search
@@ -1292,16 +1300,16 @@ struct FigmaExactScreenParityTests {
         #expect(appState.chatTurns.count == 1)
         appState.sendAIMessage("Explique le verrou CanNotDelete")
         #expect(appState.chatTurns.count == 2)
-        appState.aiDrawerSearchQuery = "Peering"
+        appState.aiDrawerSearchQuery = "CanNotDelete"
         #expect(appState.filteredAIThreads.count == 1)
-        #expect(appState.filteredAIThreads.first?.topicKey == "vnet-peering-cli")
+        #expect(appState.filteredAIThreads.first?.topicKey == "cannotdelete-lock")
 
         // 7. Social friends filter, add friend & salut toggle
-        appState.toggleSalutFriend(id: "fr-1")
-        #expect(appState.friends[0].isSaluted == true)
         appState.friendSearchQuery = "@devops_alice"
         appState.addNewFriendFromSearch()
-        #expect(appState.friends.count == 13)
+        #expect(appState.friends.count == 1)
         #expect(appState.friends[0].handle == "@devops_alice")
+        appState.toggleSalutFriend(id: appState.friends[0].id)
+        #expect(appState.friends[0].isSaluted == false)
     }
 }
