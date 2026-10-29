@@ -539,4 +539,29 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.leaderboardMembers[0].displayName == "Toi (Alexandre)")
         #expect(appState.leaderboardMembers[0].initials == "AM")
     }
+
+    @Test("FigMetrics and its static constants are public and no private enum/extension FigMetrics remains for Xcode 27 SwiftEmitModule")
+    func figMetricsPublicVisibilityForXcode27SwiftEmitModule() throws {
+        #expect(FigMetrics.zero == 0)
+        #expect(FigMetrics.eleven == 11)
+        #expect(FigMetrics.thirteen == 13)
+        #expect(FigMetrics.fourteen == 14)
+        #expect(FigMetrics.fifteenOrSixteen == 15)
+        #expect(FigMetrics.radarSize == 190)
+
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: root.appendingPathComponent("AGENTS.md").path) {
+            let parent = root.deletingLastPathComponent()
+            guard parent != root else { throw CocoaError(.fileNoSuchFile) }
+            root = parent
+        }
+        let figmaAppFile = root.appendingPathComponent(
+            "apps/apple/CertigoKit/Sources/Prism/Screens/CertiGoNativeFigmaApp.swift"
+        )
+        let source = try String(contentsOf: figmaAppFile, encoding: .utf8)
+        #expect(!source.contains("private enum FigMetrics"))
+        #expect(!source.contains("private extension FigMetrics"))
+        #expect(source.contains("public enum FigMetrics"))
+        #expect(source.contains("public static let fourteen: CGFloat = 14"))
+    }
 }

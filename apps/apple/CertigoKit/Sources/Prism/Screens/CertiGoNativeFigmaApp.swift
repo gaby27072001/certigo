@@ -6966,68 +6966,71 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
 
 // MARK: - 4. Native SwiftUI Components, 3D Tactile ButtonStyle & Dynamic Views
 
+public enum FigMetrics {
+    public static let zero: CGFloat = 0
+    public static let one: CGFloat = 1
+    public static let two: CGFloat = 2
+    public static let three: CGFloat = 3
+    public static let four: CGFloat = 4
+    public static let five: CGFloat = 5
+    public static let six: CGFloat = 6
+    public static let eight: CGFloat = 8
+    public static let ten: CGFloat = 10
+    public static let eleven: CGFloat = 11
+    public static let twelve: CGFloat = 12
+    public static let thirteen: CGFloat = 13
+    public static let fourteen: CGFloat = 14
+    public static let fifteenOrSixteen: CGFloat = 15
+    public static let sixteen: CGFloat = 16
+    public static let eighteen: CGFloat = 18
+    public static let twenty: CGFloat = 20
+    public static let twentyTwo: CGFloat = 22
+    public static let twentyFour: CGFloat = 24
+    public static let twentyEight: CGFloat = 28
+    public static let thirtyTwo: CGFloat = 32
+    public static let thirtySix: CGFloat = 36
+    public static let forty: CGFloat = 40
+    public static let fortyFour: CGFloat = 44
+    public static let fortyEight: CGFloat = 48
+    public static let fifty: CGFloat = 50
+    public static let fiftyTwo: CGFloat = 52
+    public static let fiftySix: CGFloat = 56
+    public static let sixty: CGFloat = 60
+    public static let sixtyFour: CGFloat = 64
+    public static let sixtyEight: CGFloat = 68
+    public static let seventyTwo: CGFloat = 72
+    public static let seventySix: CGFloat = 76
+    public static let eighty: CGFloat = 80
+    public static let eightyFour: CGFloat = 84
+    public static let eightyEight: CGFloat = 88
+    public static let ninetySix: CGFloat = 96
+    public static let oneHundred: CGFloat = 100
+    public static let oneHundredTen: CGFloat = 110
+    public static let oneHundredTwenty: CGFloat = 120
+    public static let oneHundredForty: CGFloat = 140
+    public static let oneHundredFifty: CGFloat = 150
+    public static let oneHundredSixty: CGFloat = 160
+    public static let oneHundredEighty: CGFloat = 180
+    public static let twoHundred: CGFloat = 200
+    public static let twoHundredTwenty: CGFloat = 220
+    public static let twoHundredForty: CGFloat = 240
+    public static let twoHundredSixty: CGFloat = 260
+    public static let twoHundredEighty: CGFloat = 280
+    public static let threeHundred: CGFloat = 300
+    public static let threeHundredTwenty: CGFloat = 320
+    public static let oneHundredEight: CGFloat = 108
+    public static let pathRowHeight: CGFloat = 136
+    public static let pathMaxHorizontalOffset: CGFloat = 86
+    public static let bottomBarTotalClearance: CGFloat = 110
+    public static let toggleWidth: CGFloat = 48
+    public static let toggleHeight: CGFloat = 28
+    public static let toggleKnob: CGFloat = 24
+    public static let radarSize: CGFloat = 190
+}
+
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
 import UIKit
-
-private enum FigMetrics {
-    static let zero: CGFloat = 0
-    static let one: CGFloat = 1
-    static let two: CGFloat = 2
-    static let three: CGFloat = 3
-    static let four: CGFloat = 4
-    static let five: CGFloat = 5
-    static let six: CGFloat = 6
-    static let eight: CGFloat = 8
-    static let ten: CGFloat = 10
-    static let twelve: CGFloat = 12
-    static let fourteen: CGFloat = 14
-    static let sixteen: CGFloat = 16
-    static let eighteen: CGFloat = 18
-    static let twenty: CGFloat = 20
-    static let twentyTwo: CGFloat = 22
-    static let twentyFour: CGFloat = 24
-    static let twentyEight: CGFloat = 28
-    static let thirtyTwo: CGFloat = 32
-    static let thirtySix: CGFloat = 36
-    static let forty: CGFloat = 40
-    static let fortyFour: CGFloat = 44
-    static let fortyEight: CGFloat = 48
-    static let fifty: CGFloat = 50
-    static let fiftyTwo: CGFloat = 52
-    static let fiftySix: CGFloat = 56
-    static let sixty: CGFloat = 60
-    static let sixtyFour: CGFloat = 64
-    static let sixtyEight: CGFloat = 68
-    static let seventyTwo: CGFloat = 72
-    static let seventySix: CGFloat = 76
-    static let eighty: CGFloat = 80
-    static let eightyFour: CGFloat = 84
-    static let eightyEight: CGFloat = 88
-    static let ninetySix: CGFloat = 96
-    static let oneHundred: CGFloat = 100
-    static let oneHundredTen: CGFloat = 110
-    static let oneHundredTwenty: CGFloat = 120
-    static let oneHundredForty: CGFloat = 140
-    static let oneHundredFifty: CGFloat = 150
-    static let oneHundredSixty: CGFloat = 160
-    static let oneHundredEighty: CGFloat = 180
-    static let twoHundred: CGFloat = 200
-    static let twoHundredTwenty: CGFloat = 220
-    static let twoHundredForty: CGFloat = 240
-    static let twoHundredSixty: CGFloat = 260
-    static let twoHundredEighty: CGFloat = 280
-    static let threeHundred: CGFloat = 300
-    static let threeHundredTwenty: CGFloat = 320
-    static let oneHundredEight: CGFloat = 108
-    static let pathRowHeight: CGFloat = 136
-    static let pathMaxHorizontalOffset: CGFloat = 86
-    static let bottomBarTotalClearance: CGFloat = 110
-    static let toggleWidth: CGFloat = 48
-    static let toggleHeight: CGFloat = 28
-    static let toggleKnob: CGFloat = 24
-    static let radarSize: CGFloat = 190
-}
 
 /// Lead-Architect Rule 3: True 3D Tactile Duolingo/Apple ButtonStyle compressing the bottom 3D lip on press.
 public struct CertiGoTactile3DButtonStyle: ButtonStyle {
@@ -14834,12 +14837,6 @@ public struct CertiGoNativeOnboardingFlowView: View {
             .accessibilityIdentifier("onboarding-complete-with-profile-button")
         }
     }
-}
-
-private extension FigMetrics {
-    static let eleven: CGFloat = 11
-    static let thirteen: CGFloat = 13
-    static let fifteenOrSixteen: CGFloat = 15
 }
 #endif
 
