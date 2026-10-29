@@ -2651,7 +2651,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                     Text(verbatim: card.title)
                                         .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Extra Bold"))
                                         .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                                    Text(verbatim: card.subtitle)
+                                    Text(verbatim: CertiGoLiveTrackCurriculum.curriculum(forRouteCode: card.code).unitBannerTitle)
                                         .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
                                         .foregroundStyle(PrismColor.figmaHex("#64748b"))
                                 }
@@ -3035,7 +3035,8 @@ public struct CertiGoNativeFigmaAppView: View {
                         .padding(.top, PrismSpacing.xs)
 
                     // 5 Official Weighted Exam Domains (Tapping any domain launches a targeted session!)
-                    ForEach(Array(curriculum.examDomains.enumerated()), id: \.offset) { idx, domain in
+                    ForEach(0..<curriculum.examDomains.count, id: \.self) { idx in
+                        let domain = curriculum.examDomains[idx]
                         Button {
                             appState.startLessonSession(skipDeclic15: true)
                         } label: {
@@ -3626,16 +3627,17 @@ public struct CertiGoNativeFigmaAppView: View {
                                 .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
                                 .foregroundStyle(PrismColor.figmaHex("#64748b"))
 
-                            ForEach(Array(detail.domains.enumerated()), id: \.offset) { _, dom in
+                            ForEach(0..<detail.domains.count, id: \.self) { domIdx in
+                                let dom = detail.domains[domIdx]
                                 VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                                     HStack {
                                         Text(verbatim: dom.title)
                                             .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Extra Bold"))
                                             .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                                         Spacer()
-                                        Text(verbatim: dom.pct)
+                                        Text(verbatim: dom.percentText)
                                             .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Black"))
-                                            .foregroundStyle(PrismColor.figmaHex(dom.fillHex))
+                                            .foregroundStyle(PrismColor.figmaHex(dom.colorHex))
                                     }
                                     GeometryReader { barGeo in
                                         let ratio = min(max(CGFloat(dom.barWidth) / 313.0, 0.15), 1.0)
@@ -3643,7 +3645,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                             RoundedRectangle(cornerRadius: PrismRadius.pill, style: .continuous)
                                                 .fill(PrismColor.figmaHex("#e2e8f0"))
                                             RoundedRectangle(cornerRadius: PrismRadius.pill, style: .continuous)
-                                                .fill(PrismColor.figmaHex(dom.fillHex))
+                                                .fill(PrismColor.figmaHex(dom.colorHex))
                                                 .frame(width: barGeo.size.width * ratio)
                                         }
                                     }
@@ -4016,7 +4018,7 @@ public struct CertiGoNativeFigmaAppView: View {
                     ForEach(CertiGoMultiTrackAndAIContentCatalog.parallelCertificationTracks) { track in
                         let isSelected = coordinator.parallelTracksPreference.isTrackingParallelCertification(track.code)
                         Button {
-                            coordinator.parallelTracksPreference.toggleParallelCertification(track.code)
+                            coordinator.parallelTracksPreference.toggleParallelTrack(track.code)
                             appState.selectRoute(track.code)
                             try? preferenceStore.save(coordinator.parallelTracksPreference)
                         } label: {
@@ -4724,7 +4726,7 @@ public struct CertiGoNativeFigmaAppView: View {
             }
         }
         .padding(PrismSpacing.l)
-        .frame(width: width, maxHeight: .infinity)
+        .frame(width: width).frame(maxHeight: .infinity)
         .background(PrismColor.surface)
         .overlay(
             Rectangle()
@@ -6487,7 +6489,8 @@ public struct CertiGoNativeExamReport24View: View {
                         .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
                         .foregroundStyle(PrismColor.figmaHex("#64748b"))
 
-                    ForEach(Array(curriculum.examDomains.enumerated()), id: \.offset) { _, dom in
+                    ForEach(0..<curriculum.examDomains.count, id: \.self) { domIdx in
+                        let dom = curriculum.examDomains[domIdx]
                         HStack {
                             Text(verbatim: dom.title)
                                 .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Extra Bold"))
