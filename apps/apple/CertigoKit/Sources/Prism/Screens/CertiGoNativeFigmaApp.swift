@@ -982,14 +982,17 @@ public enum CertiGoAdaptiveSessionEngine {
     ) -> String {
         let upper = routeCode.uppercased()
         let cleaned = baseEx.prompt
+            .replacingOccurrences(of: "`", with: "")
             .replacingOccurrences(of: "[Variante Pratique] ", with: "")
             .replacingOccurrences(of: "[Cas Complexe] ", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = CertiGoStructuredPromptView.splitScenarioAndQuestion(cleaned)
+        let baseContext = parts.scenario ?? parts.question
         switch variantIndex {
         case 2:
-            return "En conditions réelles sur \(upper) (\(baseEx.domainBadge)) : \(cleaned) Quelle décision d'architecture retiens-tu ?"
+            return "En production sur \(upper) (\(baseEx.domainBadge)) : \(baseContext)\nQuelle décision d'architecture retiens-tu ?"
         default:
-            return "Vérification de maîtrise (\(baseEx.domainBadge)) : \(cleaned) Quel choix respecte la règle officielle \(upper) ?"
+            return "Vérification de maîtrise (\(baseEx.domainBadge)) : \(baseContext)\nQuel choix respecte la règle officielle \(upper) ?"
         }
     }
 
@@ -1499,7 +1502,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         case "PDE", "PCA", "ACE":
             if lowerId.contains("u1-s2") || lowerId.contains("u1-s3") || lessonTitle.lowercased().contains("bigquery") {
                 return (
-                    title: "« Dans BigQuery, combine toujours le Partitionnement (Date/Timestamp) ET le Clustering (jusqu'à 4 colonnes) pour diviser la facture par 10 ! »",
+                    title: "Combine Partitionnement par date et Clustering (jusqu'à 4 colonnes) pour diviser la facture BigQuery par 10.",
                     diagramTop: "✕  SELECT * sans filtre  ➔  Full Scan coûteux (To facturés)",
                     diagramBottom: "✓  WHERE event_date = '2026-10-29' AND user_id = 42  ➔  Partition + Cluster Pruning",
                     step1: "1. Partitionne par date d'ingestion ou colonne TIMESTAMP/DATE",
@@ -1508,7 +1511,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 )
             } else if lowerId.contains("u2") || lowerId.contains("u3") {
                 return (
-                    title: "« VPC Service Controls crée un périmètre étanche autour de BigQuery et Cloud Storage contre toute exfiltration de données ! »",
+                    title: "VPC Service Controls crée un périmètre étanche autour de BigQuery et Cloud Storage contre toute exfiltration.",
                     diagramTop: "✕  Clé IAM compromise hors périmètre  ➔  Accès API bloqué par VPC-SC",
                     diagramBottom: "✓  Projet dans le périmètre VPC-SC + Private Google Access  ➔  Autorisé",
                     step1: "1. Définis un Service Perimeter englobant tes projets sensibles",
@@ -1517,7 +1520,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 )
             } else {
                 return (
-                    title: "« Pour un pipeline streaming temps réel sans serveur sur GCP, associe toujours Cloud Pub/Sub et Cloud Dataflow (Apache Beam) ! »",
+                    title: "En streaming serverless sur GCP, associe toujours Cloud Pub/Sub et Cloud Dataflow (Apache Beam).",
                     diagramTop: "✕  Batch cron toutes les 24h  ➔  Latence élevée & doublons non gérés",
                     diagramBottom: "✓  Pub/Sub (Ordering Key + DLQ)  ➔  Dataflow (Windowing + Watermarks)  ➔  BigQuery",
                     step1: "1. Ingère les événements avec Cloud Pub/Sub et configure un Dead-Letter Topic",
@@ -1528,7 +1531,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         case "AZ-900":
             if lowerId.contains("u1-s2") || lessonTitle.lowercased().contains("région") || lessonTitle.lowercased().contains("sla") {
                 return (
-                    title: "« Ne confonds jamais Zone de Disponibilité (panne d'un datacenter local) et Paire de Régions (catastrophe régionale à 300+ miles) ! »",
+                    title: "Distingue toujours Zone de Disponibilité (panne d'un datacenter local) et Paire de Régions (sinistre régional à 300+ miles).",
                     diagramTop: "🏢  Availability Zones : 3 datacenters indépendants dans 1 même Région (SLA 99,99 %)",
                     diagramBottom: "🌍  Region Pairs : 2 Régions distantes de 300+ miles pour la reprise après sinistre (GRS)",
                     step1: "1. Déploie tes VMs sur 2 ou 3 Availability Zones pour survivre à la panne d'un bâtiment",
@@ -1537,7 +1540,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 )
             } else if lowerId.contains("u1-s3") || lowerId.contains("u2") || lowerId.contains("u3") {
                 return (
-                    title: "« RBAC contrôle QUI a accès, Azure Policy contrôle QUOI déployer, et un verrou CanNotDelete bloque MÊME le Propriétaire ! »",
+                    title: "RBAC contrôle qui agit, Azure Policy contrôle quoi déployer, et CanNotDelete bloque même un Propriétaire.",
                     diagramTop: "✕  Propriétaire (Owner) tente de supprimer RG-Prod avec verrou CanNotDelete  ➔  Refusé",
                     diagramBottom: "✓  Azure Policy (Emplacements autorisés : Europe)  ➔  Bloque toute ressource hors conformité",
                     step1: "1. Utilise le Calculateur TCO pour comparer ton datacenter On-Premises au Cloud Azure",
@@ -1546,7 +1549,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 )
             } else {
                 return (
-                    title: "« CapEx = investissement matériel initial lourd ; OpEx = facturation Cloud à l'usage (Pay-as-you-go) sans frais initiaux ! »",
+                    title: "CapEx correspond à l'achat matériel initial, tandis qu'OpEx facture uniquement l'usage réel dans le Cloud.",
                     diagramTop: "✕  CapEx : Acheter des serveurs physiques immobilisés pendant 5 ans",
                     diagramBottom: "✓  OpEx : Payer uniquement les secondes de CPU et Go consommés dans le Cloud",
                     step1: "1. Distingue IaaS (VMs), PaaS (App Service, SQL Database) et SaaS (Microsoft 365)",
@@ -1556,7 +1559,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
             }
         case "SAA-C03", "CLF-C02", "AIF-C01":
             return (
-                title: "« Ne stocke JAMAIS d'Access Key AWS statique sur une instance EC2 : attache un Rôle IAM (Instance Profile) avec jetons temporaires STS ! »",
+                title: "Ne stocke jamais d'Access Key statique sur EC2 : attache un Rôle IAM fournissant des jetons temporaires AWS STS.",
                 diagramTop: "✕  AWS_SECRET_ACCESS_KEY en dur dans le code ou sur le disque EC2",
                 diagramBottom: "✓  Rôle IAM + AWS STS AssumeRole + Gateway VPC Endpoint S3 gratuit",
                 step1: "1. Utilise un Gateway VPC Endpoint (gratuit) pour accéder à S3 et DynamoDB sans passer par un NAT Gateway",
@@ -1565,7 +1568,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
             )
         case "AI-102":
             return (
-                title: "« Pour un système RAG de niveau production dans Azure AI Search, combine Recherche Hybride (BM25 + Vecteurs) et Semantic Ranker L2 ! »",
+                title: "Pour un RAG de production dans Azure AI Search, combine Recherche Hybride (BM25 + Vecteurs) et Semantic Ranker L2.",
                 diagramTop: "✕  Recherche purement vectorielle  ➔  Rate les références exactes, codes SKU et acronymes",
                 diagramBottom: "✓  BM25 (Mots-clés) + Vecteurs (text-embedding-3-large) + RRF + Semantic Ranker",
                 step1: "1. Active Azure AI Content Safety (Prompt Shields + Groundedness) pour bloquer le jailbreak et les hallucinations",
@@ -1574,7 +1577,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
             )
         case "CKA", "CCNA", "TF-003":
             return (
-                title: "« Par défaut dans Kubernetes, tous les pods peuvent communiquer entre eux : crée une NetworkPolicy pour isoler tes flux ! »",
+                title: "Dans Kubernetes, tous les pods communiquent par défaut : applique une NetworkPolicy pour isoler tes flux.",
                 diagramTop: "✕  Cluster sans NetworkPolicy  ➔  Tout pod compromis atteint la base de données",
                 diagramBottom: "✓  NetworkPolicy (podSelector + ingress from frontend)  ➔  Isolation Zero-Trust",
                 step1: "1. Utilise Role + RoleBinding pour un namespace unique, et ClusterRole + ClusterRoleBinding à l'échelle du cluster",
@@ -1583,7 +1586,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
             )
         case "GH-300", "CCA-F":
             return (
-                title: "« Versionne .github/copilot-instructions.md et active le Prompt Caching (cache_control: ephemeral) pour guider tes agents IA ! »",
+                title: "Versionne .github/copilot-instructions.md et active le Prompt Caching pour guider tes agents IA.",
                 diagramTop: "✕  Répéter manuellement les règles d'architecture à chaque prompt développeur",
                 diagramBottom: "✓  .github/copilot-instructions.md + Serveurs MCP typés (input_schema JSON)",
                 step1: "1. Définis les conventions d'équipe dans .github/copilot-instructions.md et .github/instructions/*.instructions.md",
@@ -1593,7 +1596,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         default:
             if lowerId.contains("u2") {
                 return (
-                    title: "« Attention au piège : créer un Private Endpoint ne désactive PAS l'accès public par défaut ! »",
+                    title: "Créer un Private Endpoint ne désactive pas l'accès public : bloque aussi le pare-feu PaaS.",
                     diagramTop: "✕  Internet Public  ➔  publicNetworkAccess: Disabled",
                     diagramBottom: "✓  VNet (10.0.2.4)  ➔  privatelink.blob.core.windows.net",
                     step1: "1. Passe publicNetworkAccess sur Disabled dans le pare-feu de la ressource PaaS",
@@ -1602,7 +1605,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 )
             } else if lowerId.contains("u3") {
                 return (
-                    title: "« Pour garantir un accès en lecture immédiat dans la région secondaire pendant une panne régionale, choisis RA-GRS ! »",
+                    title: "Pour garantir un accès en lecture immédiat dans la région secondaire pendant une panne, choisis RA-GRS.",
                     diagramTop: "✕  GRS standard  ➔  Pas d'accès lecture sur le secondaire tant que Microsoft ne déclenche pas le failover",
                     diagramBottom: "✓  RA-GRS  ➔  Endpoint secondaire *-secondary.blob.core.windows.net lisible 24/7",
                     step1: "1. Distingue HPA (scale le nombre de pods) et Cluster Autoscaler (scale les nœuds VMSS quand un pod est Pending)",
@@ -1611,7 +1614,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 )
             } else {
                 return (
-                    title: "« Moindre privilège & Gouvernance ARM : un verrou CanNotDelete bloque toute suppression, même pour un Propriétaire (Owner) ! »",
+                    title: "Un verrou ARM CanNotDelete bloque toute suppression de ressource, même pour un Propriétaire (Owner).",
                     diagramTop: "✕  Rôle Contributor ou Owner accordé à un auditeur externe",
                     diagramBottom: "✓  Rôle Reader (Lecture seule) + Entra ID PIM Just-In-Time + Verrou CanNotDelete",
                     step1: "1. Attribue le rôle Reader pour tout besoin d'audit en lecture seule sans accès aux secrets",
@@ -1718,7 +1721,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_02",
                     domainBadge: "🔐 CHIFFREMENT CMEK & SERVICES DATA GCP",
                     subBadge: "GRILLE VISUELLE 2×2 · GOOGLE CLOUD",
-                    prompt: "Quel service Google Cloud permet de gérer tes propres clés cryptographiques (CMEK) pour chiffrer les datasets BigQuery et les buckets Cloud Storage ?",
+                    prompt: "Vos datasets BigQuery et buckets Cloud Storage doivent être chiffrés avec des clés gérées par votre entreprise (CMEK).\nQuel service Google Cloud utilisez-vous ?",
                     mascotPose: .specialistSecurityEntra,
                     options: [
                         .init(
@@ -1765,7 +1768,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_03",
                     domainBadge: "🧠 PIPELINE ANALYTIQUE & ML GCP",
                     subBadge: "SCHÉMA INTERACTIF · [ Cloud Storage ] ➔ [ ? ] ➔ [ Vertex AI ]",
-                    prompt: "Quelle brique placer dans [ ? ] pour entraîner un modèle de détection de fraude directement en SQL standard avant de l'exposer dans Vertex AI Model Registry ?",
+                    prompt: "Vos analystes souhaitent entraîner un modèle de détection de fraude directement en SQL standard avant de l'exposer dans Vertex AI.\nQuelle brique placer dans [ ? ] ?",
                     mascotPose: .emotionAhaIdea,
                     options: [
                         .init(
@@ -1801,9 +1804,9 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 CertiGoNativeExerciseItem(
                     id: "\(routeCode.lowercased())-bq-qtype04",
                     formatCode: "Q_TYPE_04",
-                    domainBadge: "⌨️ CLI BIGQUERY (`bq`)",
+                    domainBadge: "⌨️ CLI BIGQUERY (BQ)",
                     subBadge: "SAISIE CLAVIER CLI · DRY RUN & SQL STANDARD",
-                    prompt: "Complète la sous-commande de l'outil CLI `bq` pour exécuter une requête SQL standard en estimant les octets traités :",
+                    prompt: "Vous devez estimer à l'avance le volume d'octets facturés par une requête SQL standard dans BigQuery.\nQuelle sous-commande de l'outil CLI bq complétez-vous ?",
                     mascotPose: .poseCLICoder,
                     options: [
                         .init(
@@ -1825,7 +1828,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_05",
                     domainBadge: "🧱 CONSTRUCTEUR CLI BIGQUERY",
                     subBadge: "ASSEMBLAGE DE BRIQUES · TABLE PARTITIONNÉE",
-                    prompt: "Assemble dans l'ordre la commande `bq` pour créer une table partitionnée par date dans le dataset `analytics` :",
+                    prompt: "Vous initialisez le dataset analytique analytics en ligne de commande.\nAssemble dans l'ordre la commande bq pour créer une table partitionnée par date :",
                     mascotPose: .specialistCLIContainers,
                     options: [],
                     wordBankTargetTokens: ["bq", "mk", "--table", "--time_partitioning_field=event_date", "analytics.events"],
@@ -1882,7 +1885,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_01",
                     domainBadge: "🛡️ VPC SERVICE CONTROLS & IAM GCP",
                     subBadge: "ANTI-EXFILTRATION · PÉRIMÈTRE DE SÉCURITÉ",
-                    prompt: "Comment empêcher qu'un utilisateur ou un compte de service disposant de droits IAM valides ne copie des tables BigQuery confidentielles vers un bucket Cloud Storage personnel hors de votre organisation ?",
+                    prompt: "Un compte de service disposant de droits IAM valides tente de copier des tables BigQuery confidentielles vers un bucket externe.\nComment bloquer toute exfiltration hors de votre organisation ?",
                     mascotPose: .specialistSecurityEntra,
                     options: [
                         .init(
@@ -1921,7 +1924,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_02",
                     domainBadge: "☁️ CONTENEURS & SÉCURITÉ RÉSEAU GCP",
                     subBadge: "GRILLE VISUELLE 2×2 · SERVICES GOOGLE CLOUD",
-                    prompt: "Quel service gère des clusters Kubernetes où Google provisionne, sécurise et dimensionne automatiquement les nœuds facturés au pod ?",
+                    prompt: "Votre équipe souhaite exécuter des clusters Kubernetes où Google provisionne, sécurise et dimensionne les nœuds facturés au pod.\nQuel service choisissez-vous ?",
                     mascotPose: .specialistCLIContainers,
                     options: [
                         .init(
@@ -1968,7 +1971,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_03",
                     domainBadge: "🌐 PROTECTION WAF & LOAD BALANCING GCP",
                     subBadge: "SCHÉMA INTERACTIF · [ 🌐 Clients ] ➔ [ ? ] ➔ [ Cloud Run / GKE ]",
-                    prompt: "Quelle brique placer en [ ? ] devant votre Global HTTP(S) Load Balancer pour bloquer les attaques SQLi/XSS OWASP et filtrer par pays ?",
+                    prompt: "Vos APIs sont exposées derrière un Global HTTP(S) Load Balancer.\nQuelle brique placer en [ ? ] pour bloquer les attaques SQLi/XSS OWASP et filtrer par pays ?",
                     mascotPose: .specialistNetworkVNet,
                     options: [
                         .init(
@@ -2006,7 +2009,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_04",
                     domainBadge: "⌨️ GCLOUD CLI & GKE",
                     subBadge: "SAISIE CLAVIER CLI · CLUSTER KUBERNETES",
-                    prompt: "Complète la commande `gcloud` pour créer un cluster GKE Autopilot nommé `prod-cluster` :",
+                    prompt: "Vous provisionnez le cluster GKE Autopilot prod-cluster en ligne de commande.\nComplète la sous-commande gcloud container :",
                     mascotPose: .poseCLICoder,
                     options: [
                         .init(
@@ -2028,7 +2031,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_05",
                     domainBadge: "🧱 CONSTRUCTEUR GCLOUD IAM",
                     subBadge: "ASSEMBLAGE DE BRIQUES · MOINDRE PRIVILÈGE",
-                    prompt: "Assemble dans l'ordre la commande `gcloud` pour attribuer un rôle IAM sur le projet ` analytics-prod` :",
+                    prompt: "Un analyste doit consulter les tables du projet analytics-prod en lecture seule.\nAssemble dans l'ordre la commande gcloud IAM :",
                     mascotPose: .specialistCLIContainers,
                     options: [],
                     wordBankTargetTokens: ["gcloud", "projects", "add-iam-policy-binding", "analytics-prod", "--role=roles/bigquery.dataViewer"],
@@ -2136,7 +2139,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_02",
                 domainBadge: "🌊 ARCHITECTURE DATA & IA GOOGLE CLOUD",
                 subBadge: "GRILLE VISUELLE 2×2 · SERVICES OFFICIELS GCP",
-                prompt: "Quel service Google Cloud exécute des pipelines Apache Beam en streaming et en batch de façon 100 % serverless avec rééquilibrage dynamique ?",
+                prompt: "Vous devez exécuter des pipelines Apache Beam en streaming et en batch de façon 100 % serverless avec autoscaling.\nQuel service Google Cloud choisissez-vous ?",
                 mascotPose: .specialistCLIContainers,
                 options: [
                     .init(
@@ -2183,7 +2186,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_03",
                 domainBadge: "🔄 PIPELINE TEMPS RÉEL GOOGLE CLOUD",
                 subBadge: "SCHÉMA INTERACTIF · [ Pub/Sub ] ➔ [ ? ] ➔ [ BigQuery ]",
-                prompt: "Quelle brique placer dans [ ? ] pour agréger des clics utilisateurs par sessions d'inactivité de 30 minutes en gérant les événements arrivés en retard ?",
+                prompt: "Vous devez agréger des clics utilisateurs par sessions d'inactivité de 30 minutes tout en gérant les événements arrivés en retard.\nQuelle brique placer dans [ ? ] ?",
                 mascotPose: .emotionAhaIdea,
                 options: [
                     .init(
@@ -2221,7 +2224,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_04",
                 domainBadge: "⌨️ GCLOUD CLI & PUB/SUB",
                 subBadge: "SAISIE CLAVIER CLI · ABONNEMENT STREAMING",
-                prompt: "Complète la commande `gcloud pubsub` pour créer l'abonnement `sub-orders` rattaché au topic `orders-topic` :",
+                prompt: "Vous raccordez un consommateur au topic Pub/Sub orders-topic.\nComplète la commande gcloud pubsub pour créer l'abonnement sub-orders :",
                 mascotPose: .poseCLICoder,
                 options: [
                     .init(
@@ -2243,7 +2246,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_05",
                 domainBadge: "🧱 CONSTRUCTEUR CLI DATAFLOW",
                 subBadge: "ASSEMBLAGE DE BRIQUES · DÉPLOIEMENT PIPELINE",
-                prompt: "Assemble dans l'ordre les briques `gcloud` pour lancer un job Dataflow à partir d'un template dans `europe-west1` :",
+                prompt: "Vous déployez le pipeline streaming iot-stream dans la région europe-west1.\nAssemble dans l'ordre les briques gcloud :",
                 mascotPose: .specialistCLIContainers,
                 options: [],
                 wordBankTargetTokens: ["gcloud", "dataflow", "jobs", "run", "iot-stream", "--region=europe-west1"],
@@ -2304,7 +2307,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_01",
                     domainBadge: "🌍 ZONES DE DISPONIBILITÉ & HAUTE DISPONIBILITÉ",
                     subBadge: "FONDAMENTAUX AZ-900 · INFRASTRUCTURE MONDIALE",
-                    prompt: "Quelle fonctionnalité Azure protège vos applications contre la panne électrique, réseau ou de refroidissement d'un centre de données physique entier au sein d'une même région ?",
+                    prompt: "Vos applications critiques doivent survivre à la panne électrique ou réseau d'un centre de données physique entier au sein d'une même région.\nQuelle fonctionnalité Azure activez-vous ?",
                     mascotPose: .specialistCloudAzure,
                     options: [
                         .init(
@@ -2343,7 +2346,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_02",
                     domainBadge: "🛡️ RÉSILIENCE & RÉPLICATION AZURE",
                     subBadge: "GRILLE VISUELLE 2×2 · SERVICES AZ-900",
-                    prompt: "Quel service permet de répartir automatiquement le trafic entrant entre plusieurs machines virtuelles saines situées dans différentes Zones de Disponibilité ?",
+                    prompt: "Vous déployez plusieurs machines virtuelles saines dans différentes Zones de Disponibilité.\nQuel service répartit automatiquement le trafic entrant entre elles ?",
                     mascotPose: .specialistNetworkVNet,
                     options: [
                         .init(
@@ -2428,7 +2431,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_04",
                     domainBadge: "⌨️ AZURE CLI · RÉGIONS OFFICIELLES",
                     subBadge: "SAISIE CLAVIER CLI · EXPLORATION GÉOGRAPHIQUE",
-                    prompt: "Complète la commande Azure CLI pour afficher la liste de toutes les régions Azure disponibles pour ton abonnement :",
+                    prompt: "Vous vérifiez les emplacements géographiques disponibles pour votre abonnement.\nComplète la commande Azure CLI :",
                     mascotPose: .poseCLICoder,
                     options: [
                         .init(
@@ -2450,7 +2453,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_05",
                     domainBadge: "🧱 HIÉRARCHIE DE PORTÉE AZURE (SCOPE)",
                     subBadge: "ASSEMBLAGE DE BRIQUES · HÉRITAGE ARM",
-                    prompt: "Assemble dans l'ordre du plus haut niveau au plus bas la hiérarchie de gouvernance Azure :",
+                    prompt: "Les rôles RBAC et règles Azure Policy s'héritent du niveau parent vers l'enfant.\nAssemble dans l'ordre la hiérarchie de gouvernance Azure du plus haut au plus bas :",
                     mascotPose: .specialistCLIContainers,
                     options: [],
                     wordBankTargetTokens: ["Management Group", "➔", "Subscription", "➔", "Resource Group", "➔ Resource"],
@@ -2462,7 +2465,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_10",
                     domainBadge: "☑️ CHOIX MULTIPLES · PAIRES DE RÉGIONS",
                     subBadge: "COCHE LES 2 AVANTAGES OFFICIELS AZ-900",
-                    prompt: "Quels sont les 2 avantages garantis par l'architecture de Paires de Régions (Region Pairs) dans Microsoft Azure ?",
+                    prompt: "Chaque région Azure est jumelée avec une seconde région au sein de la même géographie.\nQuels sont les 2 avantages garantis par les Paires de Régions ?",
                     mascotPose: .emotionAhaIdea,
                     options: [
                         .init(
@@ -2546,7 +2549,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_02",
                     domainBadge: "🏛️ GOUVERNANCE & CONFORMITÉ AZ-900",
                     subBadge: "GRILLE VISUELLE 2×2 · OUTILS OFFICIELS",
-                    prompt: "Quel service évalue automatiquement vos ressources Azure et bloque la création de machines virtuelles dans des régions non autorisées ?",
+                    prompt: "Votre entreprise interdit tout déploiement de ressources hors de l'Union européenne.\nQuel service bloque automatiquement les créations dans des régions non autorisées ?",
                     mascotPose: .specialistSecurityEntra,
                     options: [
                         .init(
@@ -2593,7 +2596,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_03",
                     domainBadge: "🌐 GESTION HYBRIDE & MULTI-CLOUD",
                     subBadge: "SCHÉMA INTERACTIF · [ Serveurs On-Prem / AWS ] ➔ [ ? ] ➔ [ Azure ARM ]",
-                    prompt: "Quelle solution placer dans [ ? ] pour projeter des serveurs Windows/Linux On-Premises ou multicloud dans Azure afin de les gouverner avec Azure Policy et Defender ?",
+                    prompt: "Vous devez gouverner des serveurs Windows/Linux On-Premises et multicloud avec Azure Policy et Defender.\nQuelle solution placer dans [ ? ] ?",
                     mascotPose: .emotionAhaIdea,
                     options: [
                         .init(
@@ -2631,7 +2634,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_04",
                     domainBadge: "⌨️ VERROUS DE RESSOURCES (RESOURCE LOCKS)",
                     subBadge: "SAISIE CLAVIER CLI · PROTECTION CONTRE LA SUPPRESSION",
-                    prompt: "Complète la commande Azure CLI pour poser un verrou `CanNotDelete` sur le groupe de ressources `RG-Compta` :",
+                    prompt: "Vous protégez le groupe de ressources RG-Compta contre toute suppression accidentelle.\nComplète la commande Azure CLI :",
                     mascotPose: .poseCLICoder,
                     options: [
                         .init(
@@ -2653,7 +2656,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_05",
                     domainBadge: "🧱 ÉTIQUETTES FINOPS (RESOURCE TAGS)",
                     subBadge: "ASSEMBLAGE DE BRIQUES · CENTRE DE COÛTS",
-                    prompt: "Assemble dans l'ordre la commande Azure CLI pour ajouter le tag `Env=Prod` sur un groupe de ressources :",
+                    prompt: "L'équipe FinOps affecte le centre de coût Env=Prod au groupe RG-Core.\nAssemble dans l'ordre la commande Azure CLI :",
                     mascotPose: .specialistCLIContainers,
                     options: [],
                     wordBankTargetTokens: ["az", "group", "update", "-n RG-Core", "--set", "tags.Env=Prod"],
@@ -2665,7 +2668,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_10",
                     domainBadge: "☑️ CHOIX MULTIPLES · SURVEILLANCE AZURE",
                     subBadge: "COCHE LES 2 AFFIRMATIONS EXACTES",
-                    prompt: "Quelles sont les 2 affirmations exactes concernant Azure Advisor et Azure Service Health ?",
+                    prompt: "Vous mettez en place le suivi de santé et l'optimisation continue de vos abonnements.\nQuelles sont les 2 affirmations exactes sur Azure Advisor et Azure Service Health ?",
                     mascotPose: .emotionAhaIdea,
                     options: [
                         .init(
@@ -2761,7 +2764,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_02",
                 domainBadge: "🧩 IaaS, PaaS & SaaS · SERVICES AZURE",
                 subBadge: "GRILLE VISUELLE 2×2 · CATÉGORIES DE SERVICES",
-                prompt: "Lequel de ces services est une plateforme PaaS (Platform as a Service) permettant d'héberger une application web sans gérer le système d'exploitation sous-jacent ?",
+                prompt: "Vous souhaitez héberger une application web sans gérer le système d'exploitation sous-jacent.\nQuel service PaaS (Platform as a Service) choisissez-vous ?",
                 mascotPose: .specialistCloudAzure,
                 options: [
                     .init(
@@ -2808,7 +2811,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_03",
                 domainBadge: "🤝 MODÈLE DE RESPONSABILITÉ PARTAGÉE",
                 subBadge: "SCHÉMA INTERACTIF · [ Client ] ➔ [ ? ] ➔ [ Microsoft Azure ]",
-                prompt: "Dans quel modèle Cloud le client conserve-t-il le plus de responsabilités techniques (patching de l'OS Windows/Linux, configuration réseau et disques) ?",
+                prompt: "Votre équipe doit garder le contrôle complet du patching de l'OS Windows/Linux et des disques.\nQuel modèle de service Cloud implique cette responsabilité ?",
                 mascotPose: .specialistSecurityEntra,
                 options: [
                     .init(
@@ -2846,7 +2849,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_04",
                 domainBadge: "⌨️ DÉCOUVERTE AZURE CLI",
                 subBadge: "SAISIE CLAVIER CLI · CONNEXION INTERACTIVE",
-                prompt: "Complète la commande de base Azure CLI permettant de t'authentifier à ton compte Microsoft Azure depuis un terminal :",
+                prompt: "Vous ouvrez un terminal local pour administrer vos ressources Azure.\nComplète la commande de connexion interactive Azure CLI :",
                 mascotPose: .poseCLICoder,
                 options: [
                     .init(
@@ -2868,7 +2871,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_05",
                 domainBadge: "🧱 CRÉATION DE GROUPE DE RESSOURCES",
                 subBadge: "ASSEMBLAGE DE BRIQUES · AZURE CLI",
-                prompt: "Assemble dans l'ordre la commande Azure CLI pour créer le groupe de ressources `RG-Demo` dans `francecentral` :",
+                prompt: "Vous initialisez le conteneur logique RG-Demo dans la région francecentral.\nAssemble dans l'ordre la commande Azure CLI :",
                 mascotPose: .specialistCLIContainers,
                 options: [],
                 wordBankTargetTokens: ["az", "group", "create", "--name RG-Demo", "--location francecentral"],
@@ -2880,7 +2883,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_10",
                 domainBadge: "☑️ CHOIX MULTIPLES · RESPONSABILITÉ DU CLIENT",
                 subBadge: "COCHE LES 2 ÉLÉMENTS TOUJOURS GÉRÉS PAR LE CLIENT",
-                prompt: "Dans le modèle de responsabilité partagée, quels sont les 2 éléments qui restent TOUJOURS sous la responsabilité du client, que l'offre soit IaaS, PaaS ou SaaS ?",
+                prompt: "Dans le modèle de responsabilité partagée, certaines couches ne sont jamais déléguées au fournisseur Cloud.\nQuels sont les 2 éléments toujours gérés par le client (IaaS, PaaS ou SaaS) ?",
                 mascotPose: .emotionAhaIdea,
                 options: [
                     .init(
@@ -2968,7 +2971,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_02",
                     domainBadge: "⚖️ ÉQUILIBRAGE DE CHARGE & HAUTE DISPO AWS",
                     subBadge: "GRILLE VISUELLE 2×2 · SERVICES AWS OFFICIELS",
-                    prompt: "Quel service AWS distribue le trafic HTTP/HTTPS en Couche 7 selon le chemin d'URL (`/api`, `/checkout`) et s'intègre nativement à AWS WAF ?",
+                    prompt: "Vos microservices web nécessitent un routage HTTP/HTTPS par chemin d'URL (/api, /checkout) couplé à AWS WAF.\nQuel service AWS choisissez-vous ?",
                     mascotPose: .specialistNetworkVNet,
                     options: [
                         .init(
@@ -3015,7 +3018,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_03",
                     domainBadge: "🌐 ARCHITECTURE WEB MULTI-AZ AWS",
                     subBadge: "SCHÉMA INTERACTIF · [ Clients ] ➔ [ ? ] ➔ [ Auto Scaling EC2 Privé ]",
-                    prompt: "Quelle brique placer en [ ? ] pour filtrer les attaques d'injection SQL OWASP avant que les requêtes n'atteignent votre Auto Scaling Group ?",
+                    prompt: "Vos instances EC2 dans un Auto Scaling Group subissent des tentatives d'injection SQL OWASP.\nQuelle brique placer en [ ? ] pour filtrer le trafic entrant ?",
                     mascotPose: .specialistNetworkVNet,
                     options: [
                         .init(
@@ -3053,7 +3056,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_04",
                     domainBadge: "⌨️ AWS CLI · HAUTE DISPONIBILITÉ RDS",
                     subBadge: "SAISIE CLAVIER CLI · CONVERSION MULTI-AZ",
-                    prompt: "Complète la sous-commande AWS CLI pour activer le mode Multi-AZ sur l'instance de base de données `prod-postgres` :",
+                    prompt: "Vous activez la haute disponibilité Multi-AZ sur la base prod-postgres en production.\nComplète la sous-commande AWS CLI :",
                     mascotPose: .poseCLICoder,
                     options: [
                         .init(
@@ -3075,7 +3078,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_05",
                     domainBadge: "🧱 CONSTRUCTEUR AWS CLI · AUTO SCALING",
                     subBadge: "ASSEMBLAGE DE BRIQUES · CAPACITÉ DÉSIRÉE",
-                    prompt: "Assemble dans l'ordre la commande AWS CLI pour fixer à 4 instances la capacité désirée du groupe `web-asg` :",
+                    prompt: "Un pic de trafic nécessite de passer immédiatement le groupe web-asg à 4 instances.\nAssemble dans l'ordre la commande AWS CLI :",
                     mascotPose: .specialistCLIContainers,
                     options: [],
                     wordBankTargetTokens: ["aws", "autoscaling", "set-desired-capacity", "--auto-scaling-group-name web-asg", "--desired-capacity 4"],
@@ -3183,7 +3186,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_02",
                 domainBadge: "🔐 SÉCURITÉ & SERVICES CORE AWS",
                 subBadge: "GRILLE VISUELLE 2×2 · SERVICES OFFICIELS AWS",
-                prompt: "Quel service AWS gère les clés de chiffrement Customer Managed Keys (CMK) avec rotation automatique annuelle et contrôle d'accès par Key Policy ?",
+                prompt: "Vous devez gérer des clés de chiffrement Customer Managed Keys (CMK) avec rotation annuelle et audit CloudTrail.\nQuel service AWS choisissez-vous ?",
                 mascotPose: .specialistSecurityEntra,
                 options: [
                     .init(
@@ -3230,7 +3233,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_03",
                 domainBadge: "🌐 ARCHITECTURE VPC & OPTIMISATION NAT",
                 subBadge: "SCHÉMA INTERACTIF · [ Subnet Privé EC2 ] ➔ [ ? ] ➔ [ Amazon S3 ]",
-                prompt: "Vos instances EC2 privées transfèrent 50 To/mois vers Amazon S3 via une NAT Gateway coûteuse. Quelle brique placer dans [ ? ] pour éliminer les frais de traitement NAT et garder le flux sur le réseau privé AWS ?",
+                prompt: "Vos instances EC2 privées transfèrent 50 To/mois vers Amazon S3 via une NAT Gateway coûteuse.\nQuelle brique placer dans [ ? ] pour éliminer les frais NAT ?",
                 mascotPose: .specialistNetworkVNet,
                 options: [
                     .init(
@@ -3268,7 +3271,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_04",
                 domainBadge: "⌨️ AWS CLI & PROTECTION S3",
                 subBadge: "SAISIE CLAVIER CLI · VERSIONING S3",
-                prompt: "Complète la sous-commande AWS CLI pour activer le Versioning sur le bucket `prod-contracts-eu` :",
+                prompt: "Vous protégez le bucket prod-contracts-eu contre les écrasements accidentels.\nComplète la sous-commande AWS CLI pour activer le Versioning :",
                 mascotPose: .poseCLICoder,
                 options: [
                     .init(
@@ -3290,7 +3293,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_05",
                 domainBadge: "🧱 CONSTRUCTEUR AWS CLI · VPC ENDPOINT",
                 subBadge: "ASSEMBLAGE DE BRIQUES · GATEWAY ENDPOINT",
-                prompt: "Assemble dans l'ordre la commande AWS CLI pour créer un Gateway Endpoint vers S3 dans le VPC `vpc-prod` :",
+                prompt: "Vous raccordez le VPC vpc-prod à Amazon S3 en privé.\nAssemble dans l'ordre la commande AWS CLI :",
                 mascotPose: .specialistCLIContainers,
                 options: [],
                 wordBankTargetTokens: ["aws", "ec2", "create-vpc-endpoint", "--vpc-id vpc-prod", "--service-name com.amazonaws.eu-west-1.s3"],
@@ -3302,7 +3305,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_10",
                 domainBadge: "☑️ CHOIX MULTIPLES · ÉVALUATION IAM AWS",
                 subBadge: "COCHE LES 2 RÈGLES FONDAMENTALES IAM",
-                prompt: "Lorsqu'une requête API est évaluée par AWS IAM (entre Service Control Policies d'Organizations, Resource Policies et Identity Policies), quelles sont les 2 règles d'or toujours vraies ?",
+                prompt: "AWS IAM évalue simultanément les Service Control Policies (SCP), les Resource Policies et les Identity Policies.\nQuelles sont les 2 règles d'or toujours vraies ?",
                 mascotPose: .emotionAhaIdea,
                 options: [
                     .init(
@@ -3349,7 +3352,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_01",
                 domainBadge: "✦ AZURE AI SEARCH · ARCHITECTURE RAG HYBRIDE",
                 subBadge: "INGÉNIERIE IA AI-102 · PERTINENCE MAXIMALE",
-                prompt: "Vous construisez un assistant RAG sur Azure AI Foundry interrogeant 50 000 manuels techniques contenant des codes d'erreur exacts (ex: `ERR-4092`) et des questions en langage naturel.\nQuelle configuration d'Azure AI Search maximise la précision ?",
+                prompt: "Vous construisez un assistant RAG interrogeant 50 000 manuels techniques contenant des codes d'erreur exacts (ERR-4092) et des questions en langage naturel.\nQuelle configuration d'Azure AI Search maximise la précision ?",
                 mascotPose: .specialistAICoach,
                 options: [
                     .init(
@@ -3401,7 +3404,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_02",
                 domainBadge: "🛡️ SÉCURITÉ IA & SERVICES AZURE AI FOUNDRY",
                 subBadge: "GRILLE VISUELLE 2×2 · SERVICES AI-102",
-                prompt: "Quel service Azure AI détecte les attaques par injection de prompt directe ou indirecte (`Prompt Shields`) et évalue l'ancrage factuel (`Groundedness Detection`) des réponses générées ?",
+                prompt: "Vous devez bloquer les injections de prompt (Prompt Shields) et vérifier l'ancrage factuel (Groundedness) des réponses générées.\nQuel service Azure AI activez-vous ?",
                 mascotPose: .specialistSecurityEntra,
                 options: [
                     .init(
@@ -3448,7 +3451,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_03",
                 domainBadge: "📄 EXTRACTION DOCUMENTAIRE & PIPELINE RAG",
                 subBadge: "SCHÉMA INTERACTIF · [ PDF Scannés & Tableaux ] ➔ [ ? ] ➔ [ AI Search ]",
-                prompt: "Quelle brique placer dans [ ? ] pour découper intelligemment des PDF complexes en Markdown structuré en préservant les tableaux multi-pages avant vectorisation ?",
+                prompt: "Vos rapports financiers contiennent des tableaux complexes sur plusieurs pages à convertir en Markdown structuré avant vectorisation.\nQuelle brique placer dans [ ? ] ?",
                 mascotPose: .emotionAhaIdea,
                 options: [
                     .init(
@@ -3486,7 +3489,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_04",
                 domainBadge: "⌨️ AZURE CLI · DÉPLOIEMENT MODÈLE OPENAI",
                 subBadge: "SAISIE CLAVIER CLI · AZURE AI FOUNDRY",
-                prompt: "Complète la sous-commande Azure CLI pour déployer le modèle `gpt-4o` sur une ressource Azure OpenAI :",
+                prompt: "Vous déployez le modèle gpt-4o sur votre ressource Azure OpenAI aoai-prod.\nComplète la sous-commande Azure CLI :",
                 mascotPose: .poseCLICoder,
                 options: [
                     .init(
@@ -3508,7 +3511,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_05",
                 domainBadge: "🧱 CONSTRUCTEUR CLI · RESSOURCE AZURE OPENAI",
                 subBadge: "ASSEMBLAGE DE BRIQUES · PROVISIONNEMENT",
-                prompt: "Assemble dans l'ordre la commande Azure CLI pour créer une ressource Azure OpenAI `aoai-prod` dans `RG-AI` :",
+                prompt: "Vous provisionnez la ressource Azure OpenAI aoai-prod dans le groupe RG-AI.\nAssemble dans l'ordre la commande Azure CLI :",
                 mascotPose: .specialistCLIContainers,
                 options: [],
                 wordBankTargetTokens: ["az", "cognitiveservices", "account", "create", "--kind OpenAI", "-n aoai-prod", "-g RG-AI"],
@@ -3520,7 +3523,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_10",
                 domainBadge: "☑️ CHOIX MULTIPLES · AUTHENTIFICATION SANS CLÉ",
                 subBadge: "COCHE LES 2 ACTIONS OBLIGATOIRES (ZERO-TRUST AI)",
-                prompt: "La politique de sécurité interdit l'utilisation de clés API (`api-key`) pour appeler Azure OpenAI depuis une Web App App Service.\nQuelles sont les 2 actions à réaliser ?",
+                prompt: "La politique de sécurité interdit l'utilisation de clés API (api-key) pour appeler Azure OpenAI depuis une Web App App Service.\nQuelles sont les 2 actions à réaliser ?",
                 mascotPose: .emotionAhaIdea,
                 options: [
                     .init(
@@ -3567,7 +3570,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_01",
                 domainBadge: "☸️ KUBERNETES RBAC · ROLE VS CLUSTERROLE",
                 subBadge: "SÉCURITÉ DU CLUSTER · MOINDRE PRIVILÈGE",
-                prompt: "Un microservice exécuté avec le ServiceAccount `payment-sa` dans le namespace `finance` doit uniquement lire les `Secrets` de ce namespace `finance`.\nQuelle combinaison d'objets RBAC déployez-vous ?",
+                prompt: "Un microservice exécuté avec le ServiceAccount payment-sa dans le namespace finance doit uniquement lire les Secrets de ce namespace.\nQuelle combinaison d'objets RBAC déployez-vous ?",
                 mascotPose: .specialistCLIContainers,
                 options: [
                     .init(
@@ -3619,7 +3622,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_02",
                 domainBadge: "🧱 ÉCOSYSTÈME CLOUD NATIVE & CNCF",
                 subBadge: "GRILLE VISUELLE 2×2 · INFRASTRUCTURE & CONTENEURS",
-                prompt: "Quel outil déclaratif Infrastructure-as-Code utilise un fichier d'état (`terraform.tfstate`) avec verrouillage distant pour provisionner des clusters multi-cloud ?",
+                prompt: "Votre équipe provisionne des clusters multi-cloud via un fichier d'état (terraform.tfstate) avec verrouillage distant.\nQuel outil déclaratif Infrastructure-as-Code utilisez-vous ?",
                 mascotPose: .specialistCLIContainers,
                 options: [
                     .init(
@@ -3666,7 +3669,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_03",
                 domainBadge: "🛡️ ISOLATION RÉSEAU POD-À-POD",
                 subBadge: "SCHÉMA INTERACTIF · [ Pod Frontend ] ➔ [ ? ] ➔ [ Pod Postgres :5432 ]",
-                prompt: "Quelle ressource Kubernetes placer dans [ ? ] pour autoriser uniquement les pods portant le label `role=api` à se connecter au port TCP 5432 du pod PostgreSQL ?",
+                prompt: "Seuls les pods portant le label role=api doivent pouvoir joindre le port TCP 5432 du pod PostgreSQL.\nQuelle ressource Kubernetes placer dans [ ? ] ?",
                 mascotPose: .specialistNetworkVNet,
                 options: [
                     .init(
@@ -3704,7 +3707,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_04",
                 domainBadge: "⌨️ SAUVEGARDE ETCD (EXAMEN CKA)",
                 subBadge: "SAISIE CLAVIER CLI · CONTROL PLANE BACKUP",
-                prompt: "Complète la sous-commande `etcdctl` (API v3) pour enregistrer une sauvegarde de la base etcd du cluster dans `/var/lib/backup/etcd.db` :",
+                prompt: "Vous sauvegardez la base etcd du cluster Kubernetes dans /var/lib/backup/etcd.db.\nComplète la sous-commande etcdctl (API v3) :",
                 mascotPose: .poseCLICoder,
                 options: [
                     .init(
@@ -3726,7 +3729,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_05",
                 domainBadge: "🧱 MAINTENANCE DE NŒUD KUBERNETES",
                 subBadge: "ASSEMBLAGE DE BRIQUES · DRAIN SÉCURISÉ",
-                prompt: "Assemble dans l'ordre la commande `kubectl` pour évacuer proprement les pods du nœud `worker-02` avant une mise à jour du noyau Linux :",
+                prompt: "Vous devez évacuer les pods du nœud worker-02 avant une mise à jour du noyau Linux.\nAssemble dans l'ordre la commande kubectl :",
                 mascotPose: .specialistCLIContainers,
                 options: [],
                 wordBankTargetTokens: ["kubectl", "drain", "worker-02", "--ignore-daemonsets", "--delete-emptydir-data"],
@@ -3738,7 +3741,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_10",
                 domainBadge: "☑️ CHOIX MULTIPLES · PROBES & SCHEDULING K8S",
                 subBadge: "COCHE LES 2 AFFIRMATIONS EXACTES",
-                prompt: "Quelles sont les 2 affirmations exactes concernant la gestion des pods dans Kubernetes ?",
+                prompt: "Vous configurez la résilience et le placement des pods critiques sur votre cluster.\nQuelles sont les 2 affirmations exactes dans Kubernetes ?",
                 mascotPose: .emotionAhaIdea,
                 options: [
                     .init(
@@ -3837,7 +3840,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_02",
                 domainBadge: "✦ ARCHITECTURE CLAUDE, COPILOT & MCP",
                 subBadge: "GRILLE VISUELLE 2×2 · PLATEFORMES IA",
-                prompt: "Quel mécanisme permet d'exposer des outils typés (`tools`), des ressources (`resources`) et des templates à un agent IA via un protocole client-serveur standardisé ?",
+                prompt: "Vous souhaitez exposer des outils typés (tools), des ressources (resources) et des templates à un agent IA via un standard ouvert.\nQuel mécanisme utilisez-vous ?",
                 mascotPose: .specialistAICoach,
                 options: [
                     .init(
@@ -3884,7 +3887,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_03",
                 domainBadge: "⚡ OPTIMISATION DU PROMPT CACHING",
                 subBadge: "SCHÉMA INTERACTIF · [ Tools + System ] ➔ [ ? ] ➔ [ Message Utilisateur ]",
-                prompt: "Dans quel ordre devez-vous structurer les blocs d'une requête API multi-tours pour maximiser le taux de succès (Cache Hit) du Prompt Caching ?",
+                prompt: "Votre agent effectue des appels API multi-tours avec un large contexte documentaire.\nComment structurer la requête pour maximiser le taux de Cache Hit ?",
                 mascotPose: .emotionAhaIdea,
                 options: [
                     .init(
@@ -3922,7 +3925,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_04",
                 domainBadge: "⌨️ GITHUB CLI & COPILOT",
                 subBadge: "SAISIE CLAVIER CLI · EXPLICATION DE COMMANDE",
-                prompt: "Complète la sous-commande `gh copilot` permettant d'obtenir l'explication détaillée d'une commande shell complexe :",
+                prompt: "Vous souhaitez analyser une commande Git complexe directement dans votre terminal.\nComplète la sous-commande gh copilot :",
                 mascotPose: .poseCLICoder,
                 options: [
                     .init(
@@ -3944,7 +3947,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_05",
                 domainBadge: "🧱 GOUVERNANCE GITHUB COPILOT ENTERPRISE",
                 subBadge: "ASSEMBLAGE DE BRIQUES · EXCLUSION DE CONTENU",
-                prompt: "Assemble la règle YAML de Content Exclusion pour empêcher Copilot de lire les fichiers `.env` et le dossier `secrets/` :",
+                prompt: "Vous interdisez à Copilot de lire les fichiers .env et le dossier secrets/.\nAssemble la règle YAML de Content Exclusion :",
                 mascotPose: .specialistCLIContainers,
                 options: [],
                 wordBankTargetTokens: ["paths:", "- \"**/.env\"", "- \"/secrets/**\""],
@@ -3956,7 +3959,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_10",
                 domainBadge: "☑️ CHOIX MULTIPLES · SÉCURITÉ & PROPRIÉTÉ INTELLECTUELLE",
                 subBadge: "COCHE LES 2 GARANTIES GITHUB COPILOT BUSINESS",
-                prompt: "Quelles sont les 2 configurations clés de gouvernance et de confidentialité à activer pour un déploiement GitHub Copilot Business en entreprise ?",
+                prompt: "Vous déployez GitHub Copilot Business pour 500 développeurs en entreprise.\nQuelles sont les 2 configurations clés de gouvernance à activer ?",
                 mascotPose: .emotionAhaIdea,
                 options: [
                     .init(
@@ -4006,7 +4009,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_01",
                     domainBadge: "🌐 VNET PEERING & TRANSIT DE PASSERELLE",
                     subBadge: "RÉSEAUX HYBRIDES AZ-104 · HUB & SPOKE",
-                    prompt: "Votre architecture Hub-and-Spoke possède une passerelle ExpressRoute dans `VNet-Hub` et des charges de travail dans `VNet-Spoke1`.\nQuelles options devez-vous cocher sur l'appairage VNet Peering pour que `VNet-Spoke1` utilise la passerelle du Hub ?",
+                    prompt: "Votre architecture Hub-and-Spoke possède une passerelle ExpressRoute dans VNet-Hub et des charges de travail dans VNet-Spoke1.\nQuelles options cochez-vous sur le VNet Peering pour partager la passerelle ?",
                     mascotPose: .specialistNetworkVNet,
                     options: [
                         .init(
@@ -4045,7 +4048,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_02",
                     domainBadge: "🔒 ISOLATION PAAS & DNS PRIVÉ",
                     subBadge: "GRILLE VISUELLE 2×2 · RÉSEAU AZURE",
-                    prompt: "Quel composant est indispensable pour résoudre automatiquement `moncoffre.vault.azure.net` vers l'IP privée `10.1.0.5` d'un Private Endpoint depuis tous vos VNets appairés ?",
+                    prompt: "Vos VNets appairés doivent résoudre moncoffre.vault.azure.net vers l'IP privée 10.1.0.5 d'un Private Endpoint.\nQuel composant Azure est indispensable ?",
                     mascotPose: .specialistNetworkVNet,
                     options: [
                         .init(
@@ -4092,7 +4095,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_03",
                     domainBadge: "🛡️ PARE-FEU APPLICATIF WAF COUCHE 7",
                     subBadge: "SCHÉMA INTERACTIF · [ Clients HTTPS ] ➔ [ ? ] ➔ [ Pool Backend VNet ]",
-                    prompt: "Quelle brique placer dans [ ? ] pour effectuer la terminaison TLS, le routage par chemin d'URL (`/api` vs `/static`) et la protection WAF OWASP dans une région ?",
+                    prompt: "Vous devez assurer la terminaison TLS, le routage par URL (/api vs /static) et la protection WAF OWASP dans une région.\nQuelle brique placer dans [ ? ] ?",
                     mascotPose: .specialistNetworkVNet,
                     options: [
                         .init(
@@ -4130,7 +4133,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_04",
                     domainBadge: "⌨️ AZURE CLI · APPAIRAGE VNET PEERING",
                     subBadge: "SAISIE CLAVIER CLI · CONNECTIVITÉ INTER-VNET",
-                    prompt: "Complète la sous-commande Azure CLI pour créer un appairage entre `VNet-Hub` et `VNet-Spoke` :",
+                    prompt: "Vous interconnectez VNet-Hub et VNet-Spoke en faible latence sur le backbone Azure.\nComplète la sous-commande Azure CLI :",
                     mascotPose: .poseCLICoder,
                     options: [
                         .init(
@@ -4152,7 +4155,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_05",
                     domainBadge: "🧱 CONSTRUCTEUR CLI · ZONE DNS PRIVÉE",
                     subBadge: "ASSEMBLAGE DE BRIQUES · PRIVATELINK",
-                    prompt: "Assemble dans l'ordre la commande Azure CLI pour créer la zone DNS privée Blob Storage dans `RG-Net` :",
+                    prompt: "Vous configurez la résolution DNS interne pour un Private Endpoint Blob Storage.\nAssemble dans l'ordre la commande Azure CLI :",
                     mascotPose: .specialistCLIContainers,
                     options: [],
                     wordBankTargetTokens: ["az", "network", "private-dns", "zone", "create", "-g RG-Net", "-n privatelink.blob.core.windows.net"],
@@ -4164,7 +4167,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_10",
                     domainBadge: "☑️ CHOIX MULTIPLES · ÉVALUATION NSG",
                     subBadge: "COCHE LES 2 RÈGLES EXACTES SUR LES NSG",
-                    prompt: "Une VM possède un NSG attaché à son sous-réseau (`NSG-Subnet`) et un NSG attaché à sa carte réseau (`NSG-NIC`).\nComment Azure évalue-t-il le trafic HTTPS (TCP 443) entrant depuis Internet ?",
+                    prompt: "Une VM possède un NSG attaché à son sous-réseau (NSG-Subnet) et un NSG attaché à sa carte réseau (NSG-NIC).\nComment Azure évalue-t-il le trafic HTTPS (TCP 443) entrant ?",
                     mascotPose: .emotionAhaIdea,
                     options: [
                         .init(
@@ -4248,7 +4251,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_02",
                     domainBadge: "🔄 SAUVEGARDE, AKS & SUPERVISION AZURE",
                     subBadge: "GRILLE VISUELLE 2×2 · RÉSILIENCE AZ-104",
-                    prompt: "Quel service gère à la fois les sauvegardes de machines virtuelles Azure (Azure Backup) et la réplication continue inter-régions (Azure Site Recovery) ?",
+                    prompt: "Vous devez centraliser les sauvegardes de VMs (Azure Backup) et la réplication continue inter-régions (Site Recovery).\nQuel service Azure provisionnez-vous ?",
                     mascotPose: .specialistCloudAzure,
                     options: [
                         .init(
@@ -4295,7 +4298,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_03",
                     domainBadge: "☸️ AUTOSCALING AKS · HPA VS CLUSTER AUTOSCALER",
                     subBadge: "SCHÉMA INTERACTIF · [ HPA crée 10 Pods ] ➔ [ Pods Pending ] ➔ [ ? ]",
-                    prompt: "Le Horizontal Pod Autoscaler (HPA) vient d'ajouter 10 nouveaux pods, mais ils restent bloqués en état `Pending` car les nœuds actuels n'ont plus de CPU disponible.\nQuel composant placer en [ ? ] ?",
+                    prompt: "Le Horizontal Pod Autoscaler (HPA) vient d'ajouter 10 nouveaux pods, mais ils restent bloqués en état Pending par manque de CPU sur les nœuds.\nQuel composant placer en [ ? ] ?",
                     mascotPose: .specialistCLIContainers,
                     options: [
                         .init(
@@ -4333,7 +4336,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_04",
                     domainBadge: "⌨️ AZURE CLI · GESTION DU CYCLE DE VIE BLOB",
                     subBadge: "SAISIE CLAVIER CLI · ARCHIVAGE AUTOMATIQUE",
-                    prompt: "Complète la sous-commande Azure CLI pour appliquer une politique de gestion du cycle de vie JSON (`Hot` -> `Cool` -> `Archive`) sur un Storage Account :",
+                    prompt: "Vous automatisez la transition des blobs Hot vers Cool puis Archive via un fichier JSON.\nComplète la sous-commande Azure CLI :",
                     mascotPose: .poseCLICoder,
                     options: [
                         .init(
@@ -4355,7 +4358,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     formatCode: "Q_TYPE_05",
                     domainBadge: "🧱 CONSTRUCTEUR CLI · CLUSTER AUTOSCALER AKS",
                     subBadge: "ASSEMBLAGE DE BRIQUES · MISE À L'ÉCHELLE",
-                    prompt: "Assemble dans l'ordre la commande Azure CLI pour activer le Cluster Autoscaler (entre 2 et 8 nœuds) sur `aks-prod` :",
+                    prompt: "Vous activez le Cluster Autoscaler (entre 2 et 8 nœuds) sur le cluster aks-prod.\nAssemble dans l'ordre la commande Azure CLI :",
                     mascotPose: .specialistCLIContainers,
                     options: [],
                     wordBankTargetTokens: ["az", "aks", "update", "-g RG-Prod", "-n aks-prod", "--enable-cluster-autoscaler", "--min-count 2", "--max-count 8"],
@@ -4452,7 +4455,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_02",
                 domainBadge: "🔐 SÉCURITÉ & ARCHITECTURE CLOUD",
                 subBadge: "GRILLE VISUELLE 2×2 · SERVICES OFFICIELS",
-                prompt: "Quel service permet de stocker les clés cryptographiques HSM, secrets et certificats TLS dans un coffre matériel sécurisé ?",
+                prompt: "Vous devez protéger des clés cryptographiques HSM, secrets applicatifs et certificats TLS dans un coffre matériel.\nQuel service Azure choisissez-vous ?",
                 mascotPose: .specialistCloudAzure,
                 options: [
                     .init(
@@ -4500,7 +4503,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_03",
                 domainBadge: "🌐 ARCHITECTURE VNET & WAF",
                 subBadge: "SCHÉMA INTERACTIF · [ 🌐 Clients ] ➔ [ ? ] ➔ [ VNet Privé ]",
-                prompt: "Quelle brique placer dans l'emplacement [ ? ] pour filtrer le trafic HTTPS entrant en Couche 7 avec pare-feu WAF OWASP ?",
+                prompt: "Vos applications web régionales doivent filtrer le trafic HTTPS entrant en Couche 7 avec un pare-feu WAF OWASP.\nQuelle brique placer dans [ ? ] ?",
                 mascotPose: .specialistNetworkVNet,
                 options: [
                     .init(
@@ -4539,7 +4542,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_04",
                 domainBadge: "⌨️ AZURE CLI & VERROUS ARM",
                 subBadge: "SAISIE CLAVIER CLI · PROTECTION DE PRODUCTION",
-                prompt: "Complète la sous-commande Azure CLI pour créer un verrou empêchant toute suppression accidentelle du groupe RG-Prod :",
+                prompt: "Vous devez empêcher toute suppression accidentelle du groupe de ressources RG-Prod.\nComplète la sous-commande Azure CLI :",
                 mascotPose: .poseCLICoder,
                 options: [
                     .init(
@@ -4562,7 +4565,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 formatCode: "Q_TYPE_05",
                 domainBadge: "🧱 CONSTRUCTEUR CLI (WORD BANK)",
                 subBadge: "ASSEMBLAGE DE BRIQUES · DNS PRIVÉ",
-                prompt: "Assemble dans l'ordre les briques pour créer le réseau virtuel ProdVNet dans le groupe RG-Core :",
+                prompt: "Vous provisionnez le réseau virtuel ProdVNet dans le groupe RG-Core.\nAssemble dans l'ordre les briques Azure CLI :",
                 mascotPose: .specialistCLIContainers,
                 options: [],
                 wordBankTargetTokens: ["az", "network", "vnet", "create", "--name ProdVNet", "-g RG-Core"],
@@ -7245,7 +7248,9 @@ public enum FigMetrics {
     public static let fourteen: CGFloat = 14
     public static let fifteenOrSixteen: CGFloat = 15
     public static let sixteen: CGFloat = 16
+    public static let seventeen: CGFloat = 17
     public static let eighteen: CGFloat = 18
+    public static let nineteen: CGFloat = 19
     public static let twenty: CGFloat = 20
     public static let twentyTwo: CGFloat = 22
     public static let twentyFour: CGFloat = 24
@@ -7297,9 +7302,102 @@ public enum FigMetrics {
     public static let radarSize: CGFloat = 190
 }
 
+/// Reusable Apple HIG structured prompt helper and view that strips raw backticks and splits a prompt into a calm scenario paragraph (`#334155` Regular) and a bold final question (`#0f172a` Semi Bold) separated by a 10pt paragraph break.
+public struct CertiGoStructuredPromptView: Sendable {
+    public let prompt: String
+
+    public init(prompt: String) {
+        self.prompt = prompt
+    }
+
+    public static func splitScenarioAndQuestion(_ rawPrompt: String) -> (scenario: String?, question: String) {
+        let sanitized = rawPrompt
+            .replacingOccurrences(of: "`", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !sanitized.isEmpty else {
+            return (scenario: nil, question: "")
+        }
+
+        // 1. Explicit newline separation
+        if sanitized.contains("\n") {
+            let lines = sanitized
+                .components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            if lines.count >= 2, let lastLine = lines.last {
+                let scenarioText = lines.dropLast().joined(separator: " ")
+                return (scenario: scenarioText, question: lastLine)
+            } else if let onlyLine = lines.first {
+                return (scenario: nil, question: onlyLine)
+            }
+        }
+
+        // 2. Automatic sentence boundary split before a final question or directive sentence
+        let questionStarters = [
+            "Quel", "Quelle", "Quels", "Quelles",
+            "Comment", "Pourquoi", "Complète", "Assemble",
+            "Associe", "Ordonne", "Que ", "Lequel",
+            "Laquelle", "Dans quel", "Dans quelle", "À quelle"
+        ]
+        let boundaries = [". ", "! ", " : "]
+        var bestSplitIndex: String.Index?
+        var bestQuestionStart: String.Index?
+
+        for boundary in boundaries {
+            var searchRange = sanitized.startIndex..<sanitized.endIndex
+            while let range = sanitized.range(of: boundary, options: .backwards, range: searchRange) {
+                let candidateScenario = String(sanitized[..<range.upperBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let candidateQuestion = String(sanitized[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let startsWithKeyword = questionStarters.contains { candidateQuestion.hasPrefix($0) }
+                let endsWithQuestionMark = candidateQuestion.hasSuffix("?")
+                if !candidateScenario.isEmpty && !candidateQuestion.isEmpty && (startsWithKeyword || endsWithQuestionMark) {
+                    if bestSplitIndex == nil || range.lowerBound > bestSplitIndex! {
+                        bestSplitIndex = range.lowerBound
+                        bestQuestionStart = range.upperBound
+                    }
+                    break
+                }
+                searchRange = sanitized.startIndex..<range.lowerBound
+            }
+        }
+
+        if let splitIdx = bestSplitIndex, let qStart = bestQuestionStart {
+            let punctuationEnd = sanitized.index(after: splitIdx)
+            let scenarioPart = String(sanitized[..<punctuationEnd]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let questionPart = String(sanitized[qStart...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !scenarioPart.isEmpty && !questionPart.isEmpty {
+                return (scenario: scenarioPart, question: questionPart)
+            }
+        }
+
+        return (scenario: nil, question: sanitized)
+    }
+}
+
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
 import UIKit
+
+extension CertiGoStructuredPromptView: View {
+    public var body: some View {
+        let parts = Self.splitScenarioAndQuestion(prompt)
+        VStack(alignment: .leading, spacing: FigMetrics.ten) {
+            if let scenario = parts.scenario, !scenario.isEmpty {
+                Text(verbatim: scenario)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#334155"))
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(verbatim: parts.question)
+                .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Semi Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
 
 /// Lead-Architect Rule 3: True 3D Tactile Duolingo/Apple ButtonStyle compressing the bottom 3D lip on press.
 public struct CertiGoTactile3DButtonStyle: ButtonStyle {
@@ -7643,14 +7741,32 @@ public struct CertiGoNativeFigmaAppView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // Pinned Floating Bottom Tab Bar (5 Tabs: Parcours, Examens, ✦ IA, Social, Moi)
-            if !(appState.selectedTab == .moi && !profileNavPath.isEmpty) && !isAIInputFocused {
+            if !(appState.selectedTab == .moi && !profileNavPath.isEmpty)
+                && !isAIInputFocused
+                && !(appState.selectedTab == .hubIA && appState.isAIDrawerOpen06D)
+            {
                 floatingBottomTabBar
+            }
+
+            // Full-Screen Smooth Backdrop Dimmer (opacity-only, zero bottom edge border)
+            if appState.activeStepSheet != nil || appState.showExamLaunchSheet22 || appState.showCoursePopover02 {
+                Color.black.opacity(0.32)
+                    .ignoresSafeArea(.all)
+                    .onTapGesture {
+                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                            appState.showCoursePopover02 = false
+                            appState.activeStepSheet = nil
+                            appState.showExamLaunchSheet22 = false
+                        }
+                    }
+                    .transition(.opacity)
+                    .zIndex(19)
             }
 
             // OVERLAY 1: Popover 02 (Course & Brand Switcher)
             if appState.showCoursePopover02 {
                 popover02OverlayView
-                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topLeading)))
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(20)
             }
 
@@ -8316,120 +8432,52 @@ public struct CertiGoNativeFigmaAppView: View {
         ]
         let cards = CertiGoFigmaLiveRuntimeState.popoverCards(forVendor: appState.selectedVendorInPopover)
 
-        return ZStack(alignment: .top) {
-            PrismColor.figmaHex("#0f172a:42")
-                .ignoresSafeArea()
-                .onTapGesture {
+        return VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            HStack {
+                Text(verbatim: "CHOISIR UNE MARQUE OFFICIELLE")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                Spacer()
+                Button {
                     withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
                         appState.showCoursePopover02 = false
                     }
-                }
-
-            VStack(alignment: .leading, spacing: PrismSpacing.m) {
-                HStack {
-                    Text(verbatim: "CHOISIR UNE MARQUE OFFICIELLE")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                } label: {
+                    Text(verbatim: "✕")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
                         .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                    Spacer()
-                    Button {
-                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                            appState.showCoursePopover02 = false
-                        }
-                    } label: {
-                        Text(verbatim: "✕")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                    }
-                    .buttonStyle(.plain)
                 }
+                .buttonStyle(.plain)
+            }
 
-                // Vendor Rail with Official Brand Logos (including true AWS cutout)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: PrismSpacing.s) {
-                        ForEach(vendors, id: \.id) { vendor in
-                            let isSelected = appState.selectedVendorInPopover == vendor.id
-                            Button {
-                                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                                    appState.selectedVendorInPopover = vendor.id
-                                }
-                            } label: {
-                                HStack(spacing: PrismSpacing.xs) {
-                                    CertiGoBrandLogoView(vendorId: vendor.id, size: PrismSize.brandS)
-                                    if isSelected {
-                                        Text(verbatim: vendor.name)
-                                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Extra Bold"))
-                                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                                    }
-                                }
-                                .padding(.horizontal, PrismSpacing.m)
-                                .padding(.vertical, PrismSpacing.s)
-                                .background(
-                                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                                        .fill(isSelected ? PrismColor.figmaHex("#eff6ff") : PrismColor.figmaHex("#f8fafc"))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                                        .strokeBorder(
-                                            isSelected ? PrismColor.figmaHex("#0078d4") : PrismColor.figmaHex("#e2e8f0"),
-                                            lineWidth: PrismBorder.standard
-                                        )
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-
-                // Certification Cards for Selected Vendor
-                VStack(spacing: PrismSpacing.s) {
-                    ForEach(cards, id: \.code) { card in
-                        let isActive = card.code.uppercased() == appState.activeRouteCode.uppercased()
+            // Vendor Rail with Official Brand Logos (including true AWS cutout)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: PrismSpacing.s) {
+                    ForEach(vendors, id: \.id) { vendor in
+                        let isSelected = appState.selectedVendorInPopover == vendor.id
                         Button {
-                            withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                                appState.selectRoute(card.code)
-                                coordinator.parallelTracksPreference.setActiveTrack(card.code)
-                                try? preferenceStore.save(coordinator.parallelTracksPreference)
+                            withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                                appState.selectedVendorInPopover = vendor.id
                             }
                         } label: {
-                            HStack(spacing: PrismSpacing.m) {
-                                CertiGoOfficialCrestView(routeCode: card.code, size: FigMetrics.fortyFour)
-
-                                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                                    HStack(spacing: PrismSpacing.xs) {
-                                        Text(verbatim: card.code)
-                                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
-                                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                                        if isActive {
-                                            Text(verbatim: "ACTIF ✓")
-                                                .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
-                                                .foregroundStyle(PrismColor.onAccent)
-                                                .padding(.horizontal, PrismSpacing.xs)
-                                                .padding(.vertical, PrismSpacing.xxs)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: PrismRadius.xs, style: .continuous)
-                                                        .fill(PrismColor.figmaHex("#58cc02"))
-                                                )
-                                        }
-                                    }
-                                    Text(verbatim: card.title)
-                                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Extra Bold"))
-                                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                                    Text(verbatim: CertiGoLiveTrackCurriculum.curriculum(forRouteCode: card.code).unitBannerTitle)
-                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                            HStack(spacing: PrismSpacing.xs) {
+                                CertiGoBrandLogoView(vendorId: vendor.id, size: PrismSize.brandS)
+                                if isSelected {
+                                    Text(verbatim: vendor.name)
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Extra Bold"))
+                                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
                                 }
-                                Spacer(minLength: PrismSpacing.xs)
                             }
-                            .padding(PrismSpacing.m)
+                            .padding(.horizontal, PrismSpacing.m)
+                            .padding(.vertical, PrismSpacing.s)
                             .background(
                                 RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                                    .fill(isActive ? PrismColor.figmaHex("#eff6ff") : PrismColor.figmaHex("#f8fafc"))
+                                    .fill(isSelected ? PrismColor.figmaHex("#eff6ff") : PrismColor.figmaHex("#f8fafc"))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
                                     .strokeBorder(
-                                        isActive ? PrismColor.figmaHex("#0078d4") : PrismColor.figmaHex("#e2e8f0"),
+                                        isSelected ? PrismColor.figmaHex("#0078d4") : PrismColor.figmaHex("#e2e8f0"),
                                         lineWidth: PrismBorder.standard
                                     )
                             )
@@ -8437,41 +8485,100 @@ public struct CertiGoNativeFigmaAppView: View {
                         .buttonStyle(.plain)
                     }
                 }
-
-                // Multi-Track Explorer Button (`➕ Explorer toutes les certifications`)
-                Button {
-                    appState.showCoursePopover02 = false
-                    appState.showMultiTrackSelectorSheet = true
-                } label: {
-                    HStack {
-                        Spacer()
-                        Text(verbatim: "➕ Explorer toutes les certifications & Veille IA")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Extra Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                        Spacer()
-                    }
-                    .padding(.vertical, PrismSpacing.m)
-                    .background(
-                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                            .fill(PrismColor.figmaHex("#f0f9ff"))
-                    )
-                }
-                .buttonStyle(.plain)
             }
-            .padding(PrismSpacing.l)
-            .background(
-                RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
-                    .fill(PrismColor.surface)
-                    .shadow(
-                        color: PrismColor.figmaHex("#0f172a:24"),
-                        radius: FigMetrics.twentyFour,
-                        x: FigMetrics.zero,
-                        y: FigMetrics.ten
-                    )
-            )
-            .padding(.horizontal, PrismSpacing.l)
-            .padding(.top, FigMetrics.sixty)
+            .fixedSize(horizontal: false, vertical: true)
+
+            // Certification Cards for Selected Vendor
+            VStack(spacing: PrismSpacing.s) {
+                ForEach(cards, id: \.code) { card in
+                    let isActive = card.code.uppercased() == appState.activeRouteCode.uppercased()
+                    Button {
+                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                            appState.selectRoute(card.code)
+                            coordinator.parallelTracksPreference.setActiveTrack(card.code)
+                            try? preferenceStore.save(coordinator.parallelTracksPreference)
+                        }
+                    } label: {
+                        HStack(spacing: PrismSpacing.m) {
+                            CertiGoOfficialCrestView(routeCode: card.code, size: FigMetrics.fortyFour)
+
+                            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                HStack(spacing: PrismSpacing.xs) {
+                                    Text(verbatim: card.code)
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
+                                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                                    if isActive {
+                                        Text(verbatim: "ACTIF ✓")
+                                            .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
+                                            .foregroundStyle(PrismColor.onAccent)
+                                            .padding(.horizontal, PrismSpacing.xs)
+                                            .padding(.vertical, PrismSpacing.xxs)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: PrismRadius.xs, style: .continuous)
+                                                    .fill(PrismColor.figmaHex("#58cc02"))
+                                            )
+                                    }
+                                }
+                                Text(verbatim: card.title)
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Extra Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                Text(verbatim: CertiGoLiveTrackCurriculum.curriculum(forRouteCode: card.code).unitBannerTitle)
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                            }
+                            Spacer(minLength: PrismSpacing.xs)
+                        }
+                        .padding(PrismSpacing.m)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                .fill(isActive ? PrismColor.figmaHex("#eff6ff") : PrismColor.figmaHex("#f8fafc"))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                .strokeBorder(
+                                    isActive ? PrismColor.figmaHex("#0078d4") : PrismColor.figmaHex("#e2e8f0"),
+                                    lineWidth: PrismBorder.standard
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Multi-Track Explorer Button (`➕ Explorer toutes les certifications`)
+            Button {
+                appState.showCoursePopover02 = false
+                appState.showMultiTrackSelectorSheet = true
+            } label: {
+                HStack {
+                    Spacer()
+                    Text(verbatim: "➕ Explorer toutes les certifications & Veille IA")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Extra Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                    Spacer()
+                }
+                .padding(.vertical, PrismSpacing.m)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                        .fill(PrismColor.figmaHex("#f0f9ff"))
+                )
+            }
+            .buttonStyle(.plain)
         }
+        .padding(PrismSpacing.l)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                .fill(PrismColor.surface)
+                .shadow(
+                    color: PrismColor.figmaHex("#0f172a:24"),
+                    radius: FigMetrics.twentyFour,
+                    x: FigMetrics.zero,
+                    y: FigMetrics.ten
+                )
+        )
+        .padding(.horizontal, PrismSpacing.l)
+        .padding(.top, FigMetrics.sixty)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: - OVERLAY 2: Floating Step Sheet `03` & Unfolded Memo Sheet `14`
@@ -8484,194 +8591,186 @@ public struct CertiGoNativeFigmaAppView: View {
             return false
         }()
 
-        return ZStack(alignment: .bottom) {
-            PrismColor.figmaHex("#0f172a:45")
-                .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                        appState.activeStepSheet = nil
-                    }
+        return VStack(spacing: PrismSpacing.m) {
+            // Drag Handle
+            RoundedRectangle(cornerRadius: PrismRadius.pill, style: .continuous)
+                .fill(PrismColor.figmaHex("#cbd5e1"))
+                .frame(width: FigMetrics.forty, height: FigMetrics.five)
+                .padding(.top, PrismSpacing.xs)
+
+            // Top Header (Centered Shield 3D + Level Badge + Lesson Title & Subtitle)
+            VStack(spacing: PrismSpacing.s) {
+                HStack(spacing: PrismSpacing.xs) {
+                    Text(verbatim: lesson.levelBadge)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                        .padding(.horizontal, PrismSpacing.s)
+                        .padding(.vertical, PrismSpacing.xxs)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
+                                .fill(PrismColor.figmaHex("#e0f2fe"))
+                        )
+
+                    Text(verbatim: "UNITÉ \(unit.unitNumber) · \(appState.activeRouteCode)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
                 }
 
-            VStack(spacing: PrismSpacing.m) {
-                // Drag Handle
-                RoundedRectangle(cornerRadius: PrismRadius.pill, style: .continuous)
-                    .fill(PrismColor.figmaHex("#cbd5e1"))
-                    .frame(width: FigMetrics.forty, height: FigMetrics.five)
-                    .padding(.top, PrismSpacing.xs)
+                Text(verbatim: lesson.title)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.nineteen, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .multilineTextAlignment(.center)
 
-                // Top Header (Centered Shield 3D + Level Badge + Lesson Title & Subtitle)
-                VStack(spacing: PrismSpacing.xs) {
-                    HStack(spacing: PrismSpacing.xs) {
-                        Text(verbatim: lesson.levelBadge)
+                Text(verbatim: lesson.subtitle)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    .lineSpacing(3)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Unfolded Fiche Mémo `14` Table (Apple Pay style: ACTIVITÉ, SUJETS CLÉS, RÈGLE D'OR)
+            if isMemoExpanded {
+                VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                        Text(verbatim: "🎯 ACTIVITÉ DE L'ÉTAPE")
                             .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
                             .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                            .padding(.horizontal, PrismSpacing.s)
-                            .padding(.vertical, PrismSpacing.xxs)
-                            .background(
-                                RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
-                                    .fill(PrismColor.figmaHex("#e0f2fe"))
-                            )
-
-                        Text(verbatim: "UNITÉ \(unit.unitNumber) · \(appState.activeRouteCode)")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Extra Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                        Text(verbatim: unit.memoActivity)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                     }
 
-                    Text(verbatim: lesson.title)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Black"))
-                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                        .multilineTextAlignment(.center)
-
-                    Text(verbatim: lesson.subtitle)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#475569"))
-                        .multilineTextAlignment(.center)
-                }
-
-                // Unfolded Fiche Mémo `14` Table (Apple Pay style: ACTIVITÉ, SUJETS CLÉS, RÈGLE D'OR)
-                if isMemoExpanded {
-                    VStack(alignment: .leading, spacing: PrismSpacing.m) {
-                        VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                            Text(verbatim: "🎯 ACTIVITÉ DE L'ÉTAPE")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
-                                .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                            Text(verbatim: unit.memoActivity)
-                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
-                                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                        }
-
-                        VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                            Text(verbatim: "🔑 SUJETS CLÉS À MAÎTRISER")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
-                                .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                            HStack(spacing: PrismSpacing.xs) {
-                                ForEach(unit.memoKeyTopics, id: \.self) { topic in
-                                    Text(verbatim: topic)
-                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Extra Bold"))
-                                        .foregroundStyle(PrismColor.figmaHex("#0369a1"))
-                                        .padding(.horizontal, PrismSpacing.s)
-                                        .padding(.vertical, PrismSpacing.xs)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
-                                                .fill(PrismColor.figmaHex("#e0f2fe"))
-                                        )
-                                }
+                    VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                        Text(verbatim: "🔑 SUJETS CLÉS À MAÎTRISER")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                        HStack(spacing: PrismSpacing.xs) {
+                            ForEach(unit.memoKeyTopics, id: \.self) { topic in
+                                Text(verbatim: topic)
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Extra Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#0369a1"))
+                                    .padding(.horizontal, PrismSpacing.s)
+                                    .padding(.vertical, PrismSpacing.xs)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
+                                            .fill(PrismColor.figmaHex("#e0f2fe"))
+                                    )
                             }
                         }
+                    }
 
-                        VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                            Text(verbatim: "💡 RÈGLE D'OR POUR L'EXAMEN")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
-                                .foregroundStyle(PrismColor.figmaHex("#15803d"))
-                            Text(verbatim: unit.memoGoldenRule)
-                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
-                                .foregroundStyle(PrismColor.figmaHex("#166534"))
-                        }
-                        .padding(PrismSpacing.m)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                                .fill(PrismColor.figmaHex("#f0fdf4"))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                                .strokeBorder(PrismColor.figmaHex("#bbf7d0"), lineWidth: PrismBorder.standard)
-                        )
+                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                        Text(verbatim: "💡 RÈGLE D'OR POUR L'EXAMEN")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                            .foregroundStyle(PrismColor.figmaHex("#15803d"))
+                        Text(verbatim: unit.memoGoldenRule)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#166534"))
                     }
                     .padding(PrismSpacing.m)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
-                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                            .fill(PrismColor.figmaHex("#f8fafc"))
+                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                            .fill(PrismColor.figmaHex("#f0fdf4"))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                            .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                            .strokeBorder(PrismColor.figmaHex("#bbf7d0"), lineWidth: PrismBorder.standard)
                     )
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
-
-                // 3 Action Buttons Row: `[ 📖 | COMMENCER (+15 XP) | ✦ ]`
-                HStack(spacing: PrismSpacing.m) {
-                    // 1. Toggle Memo 14 (`📖`)
-                    Button {
-                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                            appState.toggleStepMemoSheet14()
-                        }
-                    } label: {
-                        Text(verbatim: "📖")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Bold"))
-                            .frame(width: FigMetrics.fiftySix, height: PrismSize.primaryButtonHeight)
-                    }
-                    .buttonStyle(
-                        CertiGoTactile3DButtonStyle(
-                            faceHex: isMemoExpanded ? "#dbeafe" : "#f1f5f9",
-                            lipHex: isMemoExpanded ? "#3b82f6" : "#cbd5e1",
-                            strokeHex: isMemoExpanded ? "#3b82f6" : "#cbd5e1",
-                            cornerRadius: PrismRadius.l
-                        )
-                    )
-                    .accessibilityIdentifier("step-sheet-toggle-memo14")
-
-                    // 2. Primary CTA (`COMMENCER`) — Cleanly dismisses Step Sheet 03 before presenting Lesson Session
-                    Button {
-                        appState.activeStepSheet = nil
-                        appState.startLessonSession(forLessonId: lesson.id, enableAdaptiveReplay: true)
-                    } label: {
-                        Text(verbatim: "COMMENCER  +15 💎")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Black"))
-                            .foregroundStyle(PrismColor.onAccent)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: PrismSize.primaryButtonHeight)
-                    }
-                    .buttonStyle(
-                        CertiGoTactile3DButtonStyle(
-                            faceHex: "#58cc02",
-                            lipHex: "#46a302",
-                            cornerRadius: PrismRadius.l
-                        )
-                    )
-                    .accessibilityIdentifier("step-sheet-start-lesson")
-
-                    // 3. AI Coach Shortcut (`✦`)
-                    Button {
-                        appState.activeStepSheet = nil
-                        appState.openAITopic(
-                            "rbac-vs-policy",
-                            customUserQuestion: "Explique-moi l'étape « \(lesson.title) » (\(appState.activeRouteCode))"
-                        )
-                        appState.selectedTab = .hubIA
-                    } label: {
-                        Text(verbatim: "✦")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                            .frame(width: FigMetrics.fiftySix, height: PrismSize.primaryButtonHeight)
-                    }
-                    .buttonStyle(
-                        CertiGoTactile3DButtonStyle(
-                            faceHex: "#eff6ff",
-                            lipHex: "#93c5fd",
-                            strokeHex: "#93c5fd",
-                            cornerRadius: PrismRadius.l
-                        )
-                    )
-                    .accessibilityIdentifier("step-sheet-ask-ai")
-                }
+                .padding(PrismSpacing.m)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                        .fill(PrismColor.figmaHex("#f8fafc"))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                        .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+                )
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
-            .padding(PrismSpacing.xl)
-            .background(
-                RoundedRectangle(cornerRadius: PrismRadius.sheet, style: .continuous)
-                    .fill(PrismColor.surface)
-                    .shadow(
-                        color: PrismColor.figmaHex("#0f172a:26"),
-                        radius: FigMetrics.twentyEight,
-                        x: FigMetrics.zero,
-                        y: -FigMetrics.six
+
+            // 3 Action Buttons Row: `[ 📖 | COMMENCER (+15 XP) | ✦ ]`
+            HStack(spacing: PrismSpacing.m) {
+                // 1. Toggle Memo 14 (`📖`)
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                        appState.toggleStepMemoSheet14()
+                    }
+                } label: {
+                    Text(verbatim: "📖")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Bold"))
+                        .frame(width: FigMetrics.fiftySix, height: PrismSize.primaryButtonHeight)
+                }
+                .buttonStyle(
+                    CertiGoTactile3DButtonStyle(
+                        faceHex: isMemoExpanded ? "#dbeafe" : "#f1f5f9",
+                        lipHex: isMemoExpanded ? "#3b82f6" : "#cbd5e1",
+                        strokeHex: isMemoExpanded ? "#3b82f6" : "#cbd5e1",
+                        cornerRadius: PrismRadius.l
                     )
-            )
-            .padding(.horizontal, PrismSpacing.m)
-            .padding(.bottom, PrismSpacing.l)
+                )
+                .accessibilityIdentifier("step-sheet-toggle-memo14")
+
+                // 2. Primary CTA (`COMMENCER`) — Cleanly dismisses Step Sheet 03 before presenting Lesson Session
+                Button {
+                    appState.activeStepSheet = nil
+                    appState.startLessonSession(forLessonId: lesson.id, enableAdaptiveReplay: true)
+                } label: {
+                    Text(verbatim: "COMMENCER  +15 💎")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Black"))
+                        .foregroundStyle(PrismColor.onAccent)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: PrismSize.primaryButtonHeight)
+                }
+                .buttonStyle(
+                    CertiGoTactile3DButtonStyle(
+                        faceHex: "#58cc02",
+                        lipHex: "#46a302",
+                        cornerRadius: PrismRadius.l
+                    )
+                )
+                .accessibilityIdentifier("step-sheet-start-lesson")
+
+                // 3. AI Coach Shortcut (`✦`)
+                Button {
+                    appState.activeStepSheet = nil
+                    appState.openAITopic(
+                        "rbac-vs-policy",
+                        customUserQuestion: "Explique-moi l'étape « \(lesson.title) » (\(appState.activeRouteCode))"
+                    )
+                    appState.selectedTab = .hubIA
+                } label: {
+                    Text(verbatim: "✦")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Black"))
+                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                        .frame(width: FigMetrics.fiftySix, height: PrismSize.primaryButtonHeight)
+                }
+                .buttonStyle(
+                    CertiGoTactile3DButtonStyle(
+                        faceHex: "#eff6ff",
+                        lipHex: "#93c5fd",
+                        strokeHex: "#93c5fd",
+                        cornerRadius: PrismRadius.l
+                    )
+                )
+                .accessibilityIdentifier("step-sheet-ask-ai")
+            }
         }
+        .padding(PrismSpacing.xl)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.sheet, style: .continuous)
+                .fill(PrismColor.surface)
+                .shadow(
+                    color: PrismColor.figmaHex("#0f172a:26"),
+                    radius: FigMetrics.twentyEight,
+                    x: FigMetrics.zero,
+                    y: -FigMetrics.six
+                )
+        )
+        .padding(.horizontal, PrismSpacing.m)
+        .padding(.bottom, PrismSpacing.l)
     }
 
     // MARK: - OVERLAY 4: 5-Step Interactive Guided App Tour (`isPresentingGuidedAppTour`)
@@ -11412,86 +11511,76 @@ public struct CertiGoNativeFigmaAppView: View {
     private var examApplePaySheet22Overlay: some View {
         let curriculum = CertiGoLiveTrackCurriculum.curriculum(forRouteCode: appState.activeRouteCode)
         let providerMeta = CertiGoNativeRichCatalog.examProviderMetadata(forRouteCode: appState.activeRouteCode)
-        return ZStack(alignment: .bottom) {
-            PrismColor.figmaHex("#0f172a:58")
-                .ignoresSafeArea()
-                .onTapGesture {
+        return VStack(spacing: PrismSpacing.l) {
+            HStack {
+                Text(verbatim: providerMeta.providerBadge)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                Spacer()
+                Button {
                     withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
                         appState.showExamLaunchSheet22 = false
                     }
-                }
-
-            VStack(spacing: PrismSpacing.l) {
-                HStack {
-                    Text(verbatim: providerMeta.providerBadge)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                    Spacer()
-                    Button {
-                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                            appState.showExamLaunchSheet22 = false
-                        }
-                    } label: {
-                        Text(verbatim: "✕")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                // Official Crest Pedestal
-                VStack(spacing: PrismSpacing.s) {
-                    CertiGoOfficialCrestView(routeCode: appState.activeRouteCode, size: PrismSize.crestHero)
-                    Text(verbatim: "Examen Blanc \(appState.activeRouteCode)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                    Text(verbatim: curriculum.examOfficialTitle)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
+                } label: {
+                    Text(verbatim: "✕")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Black"))
                         .foregroundStyle(PrismColor.figmaHex("#64748b"))
                 }
-
-                // Apple-Pay Style Summary Rows
-                VStack(spacing: PrismSpacing.s) {
-                    applePayInfoRow(label: "ORGANISME OFFICIEL", value: providerMeta.providerName)
-                    applePayInfoRow(label: "CHRONOMÈTRE", value: "\(providerMeta.durationText) (Temps réel)")
-                    applePayInfoRow(label: "SEUIL D'ADMISSION", value: "\(providerMeta.passingThresholdText) points")
-                }
-                .padding(PrismSpacing.m)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                        .fill(PrismColor.figmaHex("#f8fafc"))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                        .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
-                )
-
-                Button {
-                    appState.startTimedExam23()
-                } label: {
-                    Text(verbatim: "🚀 DÉMARRER L'EXAMEN BLANC")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Black"))
-                        .foregroundStyle(PrismColor.onAccent)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: PrismSize.primaryButtonHeight)
-                }
-                .buttonStyle(
-                    CertiGoTactile3DButtonStyle(
-                        faceHex: "#0078d4",
-                        lipHex: "#005a9e",
-                        cornerRadius: PrismRadius.l
-                    )
-                )
-                .accessibilityIdentifier("sheet22-launch-exam23")
+                .buttonStyle(.plain)
             }
-            .padding(PrismSpacing.xl)
+
+            // Official Crest Pedestal
+            VStack(spacing: PrismSpacing.s) {
+                CertiGoOfficialCrestView(routeCode: appState.activeRouteCode, size: PrismSize.crestHero)
+                Text(verbatim: "Examen Blanc \(appState.activeRouteCode)")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                Text(verbatim: curriculum.examOfficialTitle)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
+                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
+            }
+
+            // Apple-Pay Style Summary Rows
+            VStack(spacing: PrismSpacing.s) {
+                applePayInfoRow(label: "ORGANISME OFFICIEL", value: providerMeta.providerName)
+                applePayInfoRow(label: "CHRONOMÈTRE", value: "\(providerMeta.durationText) (Temps réel)")
+                applePayInfoRow(label: "SEUIL D'ADMISSION", value: "\(providerMeta.passingThresholdText) points")
+            }
+            .padding(PrismSpacing.m)
             .background(
-                RoundedRectangle(cornerRadius: PrismRadius.sheet, style: .continuous)
-                    .fill(PrismColor.surface)
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .fill(PrismColor.figmaHex("#f8fafc"))
             )
-            .padding(.horizontal, PrismSpacing.m)
-            .padding(.bottom, PrismSpacing.l)
+            .overlay(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+            )
+
+            Button {
+                appState.startTimedExam23()
+            } label: {
+                Text(verbatim: "🚀 DÉMARRER L'EXAMEN BLANC")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Black"))
+                    .foregroundStyle(PrismColor.onAccent)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: PrismSize.primaryButtonHeight)
+            }
+            .buttonStyle(
+                CertiGoTactile3DButtonStyle(
+                    faceHex: "#0078d4",
+                    lipHex: "#005a9e",
+                    cornerRadius: PrismRadius.l
+                )
+            )
+            .accessibilityIdentifier("sheet22-launch-exam23")
         }
+        .padding(PrismSpacing.xl)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.sheet, style: .continuous)
+                .fill(PrismColor.surface)
+        )
+        .padding(.horizontal, PrismSpacing.m)
+        .padding(.bottom, PrismSpacing.l)
     }
 
     private func applePayInfoRow(label: String, value: String) -> some View {
@@ -11512,14 +11601,13 @@ public struct CertiGoNativeFigmaAppView: View {
         GeometryReader { geo in
             let safeGeoWidth = geo.size.width.isFinite ? max(FigMetrics.twoHundredEighty, geo.size.width) : PrismSize.drawerWidth
             let drawerWidth = min(safeGeoWidth * 0.85, PrismSize.drawerWidth)
-            let pushOffset = appState.isAIDrawerOpen06D ? drawerWidth : FigMetrics.zero
 
             ZStack(alignment: .leading) {
                 if appState.isShowingVoiceLive06C {
                     voiceLive06CView
                         .transition(.opacity)
                 } else {
-                    // Main Chat View (`06` Welcome or `06B` Multi-Turn Conversation) pushed right when Drawer `06D` opens!
+                    // Main Chat View (`06` Welcome or `06B` Multi-Turn Conversation) stays fixed underneath when Drawer `06D` opens
                     VStack(spacing: .zero) {
                         // Top Navigation Header (1 single line guaranteed — no wrapping on `+ Nouvelle`)
                         HStack(spacing: PrismSpacing.s) {
@@ -11636,27 +11724,27 @@ public struct CertiGoNativeFigmaAppView: View {
                             .padding(.bottom, isAIInputFocused ? PrismSpacing.s : FigMetrics.eightyEight)
                     }
                     .frame(width: safeGeoWidth)
-                    .offset(x: pushOffset)
                     .disabled(appState.isAIDrawerOpen06D)
 
-                    // Full-screen translucent backdrop dimmer over the right 15% when 06D Drawer is open
+                    // Full-screen uniform backdrop dimmer when 06D Drawer is open
                     if appState.isAIDrawerOpen06D {
-                        PrismColor.figmaHex("#0f172a:45")
-                            .ignoresSafeArea()
+                        Color.black.opacity(0.30)
+                            .ignoresSafeArea(.all)
                             .onTapGesture {
                                 withAnimation(CertiGoMotion.spring(for: .anim04Claude85DrawerPush, reduceMotion: reduceMotion)) {
                                     appState.isAIDrawerOpen06D = false
                                 }
                             }
                             .transition(.opacity)
+                            .zIndex(10)
                     }
 
-                    // 85% Width Claude-Style Drawer (`06D`)
+                    // Full-height 85% Width Drawer (`06D`)
                     if appState.isAIDrawerOpen06D {
                         aiDrawer06DView(width: drawerWidth)
                             .frame(width: drawerWidth)
                             .transition(.move(edge: .leading))
-                            .zIndex(2)
+                            .zIndex(11)
                     }
                 }
             }
@@ -11839,29 +11927,39 @@ public struct CertiGoNativeFigmaAppView: View {
                         }
 
                         Text(verbatim: turn.aiHeadline)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Extra Bold"))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                        VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
                             Text(verbatim: turn.aiBullet1)
-                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
                                 .foregroundStyle(PrismColor.figmaHex("#334155"))
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
                             Text(verbatim: turn.aiBullet2)
-                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
                                 .foregroundStyle(PrismColor.figmaHex("#334155"))
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
 
                         // Highlighted Exam Takeaway Box (`💡 À retenir pour l'examen`)
                         VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                             Text(verbatim: "💡 À RETENIR POUR L'EXAMEN")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                                 .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
                             Text(verbatim: turn.examKeyRule1)
-                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
                                 .foregroundStyle(PrismColor.figmaHex("#1e3a8a"))
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
                             Text(verbatim: turn.examKeyRule2)
-                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
                                 .foregroundStyle(PrismColor.figmaHex("#1e3a8a"))
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(PrismSpacing.m)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -12257,12 +12355,15 @@ public struct CertiGoNativeFigmaAppView: View {
             }
         }
         .padding(PrismSpacing.l)
-        .frame(width: width).frame(maxHeight: .infinity)
-        .background(PrismColor.surface)
+        .frame(width: width)
+        .frame(maxHeight: .infinity)
+        .background(PrismColor.surface.ignoresSafeArea(.all, edges: .vertical))
+        .shadow(color: Color.black.opacity(0.14), radius: 20, x: 8, y: 0)
         .overlay(
             Rectangle()
                 .fill(PrismColor.figmaHex("#e2e8f0"))
-                .frame(width: PrismBorder.hairline),
+                .frame(width: PrismBorder.hairline)
+                .ignoresSafeArea(.all, edges: .vertical),
             alignment: .trailing
         )
     }
@@ -12879,6 +12980,27 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 && !appState.lessonSession.isSessionCompleted
                 && !appState.lessonSession.isShowingDeclicCard15
             {
+                let isShowingBottomModalSheet: Bool = {
+                    switch appState.lessonSession.attemptPhase {
+                    case .explainingError, .comparingServices:
+                        return true
+                    case .answering, .checked:
+                        return false
+                    }
+                }()
+
+                if isShowingBottomModalSheet {
+                    Color.black.opacity(0.35)
+                        .ignoresSafeArea(.all)
+                        .onTapGesture {
+                            withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                                appState.lessonSession.closeOverlaySheetToCheckedState()
+                            }
+                        }
+                        .transition(.opacity)
+                        .zIndex(10)
+                }
+
                 switch appState.lessonSession.attemptPhase {
                 case .answering:
                     verifierBottomBar
@@ -12888,9 +13010,11 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 case .explainingError:
                     explanationSheet05Overlay
                         .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .zIndex(11)
                 case .comparingServices:
                     comparatorSheet20Overlay
                         .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .zIndex(11)
                 }
             }
         }
@@ -13240,21 +13364,19 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     Spacer(minLength: .zero)
                 }
 
-                // Mascot + Clean Speech Bubble with left pointer `◀` and ONLY `ex.prompt` in 16pt Medium
-                HStack(alignment: .center, spacing: PrismSpacing.s) {
-                    CertiGoMascotView(pose: ex.mascotPose, size: PrismSize.mascotQuiz)
+                // Mascot (68pt top-aligned) + Clean Speech Bubble with top-aligned left pointer `◀` and structured scenario/question
+                HStack(alignment: .top, spacing: PrismSpacing.s) {
+                    CertiGoMascotView(pose: ex.mascotPose, size: FigMetrics.sixtyEight)
+                        .padding(.top, FigMetrics.four)
 
-                    HStack(alignment: .center, spacing: .zero) {
+                    HStack(alignment: .top, spacing: .zero) {
                         Text(verbatim: "◀")
                             .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#cbd5e1"))
+                            .padding(.top, FigMetrics.eighteen)
                             .offset(x: FigMetrics.two)
 
-                        Text(verbatim: ex.prompt)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Medium"))
-                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                            .lineSpacing(4)
-                            .fixedSize(horizontal: false, vertical: true)
+                        CertiGoStructuredPromptView(prompt: ex.prompt)
                             .padding(PrismSpacing.m)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
@@ -13332,7 +13454,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 appState.lessonSession.selectOption(opt.id)
             }
         } label: {
-            HStack(spacing: PrismSpacing.m) {
+            HStack(alignment: .top, spacing: PrismSpacing.m) {
                 Text(verbatim: isMultiChoice && isSelected ? "✓" : opt.badge)
                     .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                     .foregroundStyle(
@@ -13350,7 +13472,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     Text(verbatim: opt.title)
                         .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Medium"))
                         .foregroundStyle(PrismColor.figmaHex(palette.text))
-                        .lineSpacing(2)
+                        .lineSpacing(3)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     if let sub = opt.subtitle {
@@ -13363,7 +13485,8 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 }
                 Spacer(minLength: PrismSpacing.xs)
             }
-            .padding(PrismSpacing.l)
+            .padding(.horizontal, PrismSpacing.l)
+            .padding(.vertical, PrismSpacing.m)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(
@@ -13681,18 +13804,25 @@ public struct CertiGoNativeLessonSessionModalView: View {
         let titleHex = isCorrect ? "#3f7d00" : "#ea2b2b"
         let primaryFaceHex = isCorrect ? "#58cc02" : "#ff4b4b"
         let primaryLipHex = isCorrect ? "#46a302" : "#d93838"
-        let headline = isCorrect
-            ? "✓  Excellent ! Bonne réponse"
-            : "✕  Incorrect · Bonne réponse : \(appState.lessonSession.currentExercise.primaryCorrectOptionTitle)"
 
         return VStack(alignment: .leading, spacing: PrismSpacing.m) {
-            Text(verbatim: headline)
-                .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Black"))
-                .foregroundStyle(PrismColor.figmaHex(titleHex))
+            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                Text(verbatim: isCorrect ? "✓  Excellent !" : "✕  Incorrect")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex(titleHex))
 
-            Text(verbatim: appState.lessonSession.currentExercise.examTip)
-                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
-                .foregroundStyle(PrismColor.figmaHex("#1e293b"))
+                if isCorrect {
+                    Text(verbatim: "+15 XP · Concept validé du premier coup")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
+                        .foregroundStyle(PrismColor.figmaHex("#3f7d00"))
+                } else {
+                    Text(verbatim: "Bonne réponse : \(appState.lessonSession.currentExercise.primaryCorrectOptionTitle)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Medium"))
+                        .foregroundStyle(PrismColor.figmaHex("#991b1b"))
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
             HStack(spacing: PrismSpacing.m) {
                 Button {
@@ -13752,215 +13882,94 @@ public struct CertiGoNativeLessonSessionModalView: View {
 
     private var explanationSheet05Overlay: some View {
         let ex = appState.lessonSession.currentExercise
-        return ZStack(alignment: .bottom) {
-            PrismColor.figmaHex("#0f172a:62")
-                .ignoresSafeArea()
-                .onTapGesture {
+        return VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            HStack {
+                Text(verbatim: "✦ Explication de ta réponse")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                Spacer()
+                Button {
                     withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
                         appState.lessonSession.closeOverlaySheetToCheckedState()
                     }
-                }
-
-            VStack(alignment: .leading, spacing: PrismSpacing.m) {
-                HStack {
-                    Text(verbatim: "✦ Explication de ta réponse")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Black"))
-                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                    Spacer()
-                    Button {
-                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                            appState.lessonSession.closeOverlaySheetToCheckedState()
-                        }
-                    } label: {
-                        Text(verbatim: "✕")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                    Text(verbatim: "✕ TA RÉPONSE : \(appState.lessonSession.selectedOptionSummaryText)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#e11d48"))
-                    Text(verbatim: appState.lessonSession.selectedWhyWrongExplanation)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                        .foregroundStyle(PrismColor.figmaHex("#881337"))
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(PrismSpacing.m)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                        .fill(PrismColor.figmaHex("#fff1f2"))
-                )
-
-                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                    Text(verbatim: "✓ BONNE RÉPONSE : \(ex.primaryCorrectOptionTitle)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#15803d"))
-                    Text(verbatim: appState.lessonSession.correctWhyRightExplanation)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                        .foregroundStyle(PrismColor.figmaHex("#14532d"))
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(PrismSpacing.m)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                        .fill(PrismColor.figmaHex("#f0fdf4"))
-                )
-
-                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                    Text(verbatim: "💡 ASTUCE D'EXAMEN")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                    Text(verbatim: ex.examTip)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                        .foregroundStyle(PrismColor.figmaHex("#1e3a8a"))
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(PrismSpacing.m)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                        .fill(PrismColor.figmaHex("#eff6ff"))
-                )
-
-                HStack(spacing: PrismSpacing.m) {
-                    Button {
-                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                            appState.lessonSession.openServiceComparatorSheet20()
-                        }
-                    } label: {
-                        Text(verbatim: "✦ Comparer (20)")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: FigMetrics.fortyEight)
-                    }
-                    .buttonStyle(
-                        CertiGoTactile3DButtonStyle(
-                            faceHex: "#eff6ff",
-                            lipHex: "#93c5fd",
-                            cornerRadius: PrismRadius.l,
-                            lipDepth: FigMetrics.four
-                        )
-                    )
-
-                    Button {
-                        withAnimation(CertiGoMotion.spring(for: .anim03Mascot34SpeechBubblePop, reduceMotion: reduceMotion)) {
-                            appState.lessonSession.advanceToNextExerciseOrFinish()
-                        }
-                    } label: {
-                        Text(verbatim: "CONTINUER")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
-                            .foregroundStyle(PrismColor.onAccent)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: FigMetrics.fortyEight)
-                    }
-                    .buttonStyle(
-                        CertiGoTactile3DButtonStyle(
-                            faceHex: "#58cc02",
-                            lipHex: "#46a302",
-                            cornerRadius: PrismRadius.l,
-                            lipDepth: FigMetrics.four
-                        )
-                    )
-                    .accessibilityIdentifier("sheet05-continue-button")
-                }
-            }
-            .padding(PrismSpacing.xl)
-            .background(
-                RoundedRectangle(cornerRadius: PrismRadius.sheet, style: .continuous)
-                    .fill(PrismColor.surface)
-            )
-            .padding(.horizontal, PrismSpacing.m)
-            .padding(.bottom, PrismSpacing.m)
-        }
-    }
-
-    private var comparatorSheet20Overlay: some View {
-        let ex = appState.lessonSession.currentExercise
-        return ZStack(alignment: .bottom) {
-            PrismColor.figmaHex("#0f172a:62")
-                .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                        appState.lessonSession.closeOverlaySheetToCheckedState()
-                    }
-                }
-
-            VStack(alignment: .leading, spacing: PrismSpacing.m) {
-                HStack {
-                    Text(verbatim: "←   Comparer 2 services \(appState.activeRouteCode)")
+                } label: {
+                    Text(verbatim: "✕")
                         .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Black"))
-                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                    Spacer()
-                    Button {
-                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                            appState.lessonSession.closeOverlaySheetToCheckedState()
-                        }
-                    } label: {
-                        Text(verbatim: "✕")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                    }
-                    .buttonStyle(.plain)
+                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
                 }
+                .buttonStyle(.plain)
+            }
 
-                HStack(alignment: .top, spacing: PrismSpacing.s) {
-                    VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                        Text(verbatim: ex.comparisonLeftTitle)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#0284c7"))
-                        ForEach(ex.comparisonLeftBullets, id: \.self) { bullet in
-                            Text(verbatim: "• \(bullet)")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                                .foregroundStyle(PrismColor.figmaHex("#334155"))
-                        }
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                Text(verbatim: "✕ TA RÉPONSE : \(appState.lessonSession.selectedOptionSummaryText)")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#e11d48"))
+                Text(verbatim: appState.lessonSession.selectedWhyWrongExplanation)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#881337"))
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(PrismSpacing.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .fill(PrismColor.figmaHex("#fff1f2"))
+            )
+
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                Text(verbatim: "✓ BONNE RÉPONSE : \(ex.primaryCorrectOptionTitle)")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#15803d"))
+                Text(verbatim: appState.lessonSession.correctWhyRightExplanation)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#14532d"))
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(PrismSpacing.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .fill(PrismColor.figmaHex("#f0fdf4"))
+            )
+
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                Text(verbatim: "💡 ASTUCE D'EXAMEN")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                Text(verbatim: ex.examTip)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#1e3a8a"))
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(PrismSpacing.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .fill(PrismColor.figmaHex("#eff6ff"))
+            )
+
+            HStack(spacing: PrismSpacing.m) {
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                        appState.lessonSession.openServiceComparatorSheet20()
                     }
-                    .padding(PrismSpacing.m)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                            .fill(PrismColor.figmaHex("#f8fafc"))
+                } label: {
+                    Text(verbatim: "✦ Comparer (20)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Black"))
+                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: FigMetrics.fortyEight)
+                }
+                .buttonStyle(
+                    CertiGoTactile3DButtonStyle(
+                        faceHex: "#eff6ff",
+                        lipHex: "#93c5fd",
+                        cornerRadius: PrismRadius.l,
+                        lipDepth: FigMetrics.four
                     )
-
-                    VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                        Text(verbatim: ex.comparisonRightTitle)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#15803d"))
-                        ForEach(ex.comparisonRightBullets, id: \.self) { bullet in
-                            Text(verbatim: "• \(bullet)")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                                .foregroundStyle(PrismColor.figmaHex("#166534"))
-                        }
-                    }
-                    .padding(PrismSpacing.m)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                            .fill(PrismColor.figmaHex("#f0fdf4"))
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                    Text(verbatim: "✓ RÈGLE D'OR POUR L'EXAMEN \(appState.activeRouteCode)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
-                        .foregroundStyle(PrismColor.figmaHex("#15803d"))
-                    Text(verbatim: ex.comparisonGoldenRule)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#14532d"))
-                }
-                .padding(PrismSpacing.m)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                        .fill(PrismColor.figmaHex("#dcfce7"))
                 )
 
                 Button {
@@ -13968,7 +13977,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
                         appState.lessonSession.advanceToNextExerciseOrFinish()
                     }
                 } label: {
-                    Text(verbatim: "CONTINUER LA SÉANCE")
+                    Text(verbatim: "CONTINUER")
                         .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
                         .foregroundStyle(PrismColor.onAccent)
                         .frame(maxWidth: .infinity)
@@ -13978,18 +13987,119 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     CertiGoTactile3DButtonStyle(
                         faceHex: "#58cc02",
                         lipHex: "#46a302",
-                        cornerRadius: PrismRadius.l
+                        cornerRadius: PrismRadius.l,
+                        lipDepth: FigMetrics.four
                     )
                 )
+                .accessibilityIdentifier("sheet05-continue-button")
             }
-            .padding(PrismSpacing.xl)
-            .background(
-                RoundedRectangle(cornerRadius: PrismRadius.sheet, style: .continuous)
-                    .fill(PrismColor.surface)
-            )
-            .padding(.horizontal, PrismSpacing.m)
-            .padding(.bottom, PrismSpacing.m)
         }
+        .padding(PrismSpacing.xl)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.sheet, style: .continuous)
+                .fill(PrismColor.surface)
+        )
+        .padding(.horizontal, PrismSpacing.m)
+        .padding(.bottom, PrismSpacing.m)
+    }
+
+    private var comparatorSheet20Overlay: some View {
+        let ex = appState.lessonSession.currentExercise
+        return VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            HStack {
+                Text(verbatim: "←   Comparer 2 services \(appState.activeRouteCode)")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                Spacer()
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                        appState.lessonSession.closeOverlaySheetToCheckedState()
+                    }
+                } label: {
+                    Text(verbatim: "✕")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Black"))
+                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(alignment: .top, spacing: PrismSpacing.s) {
+                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                    Text(verbatim: ex.comparisonLeftTitle)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
+                        .foregroundStyle(PrismColor.figmaHex("#0284c7"))
+                    ForEach(ex.comparisonLeftBullets, id: \.self) { bullet in
+                        Text(verbatim: "• \(bullet)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#334155"))
+                    }
+                }
+                .padding(PrismSpacing.m)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                        .fill(PrismColor.figmaHex("#f8fafc"))
+                )
+
+                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                    Text(verbatim: ex.comparisonRightTitle)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
+                        .foregroundStyle(PrismColor.figmaHex("#15803d"))
+                    ForEach(ex.comparisonRightBullets, id: \.self) { bullet in
+                        Text(verbatim: "• \(bullet)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#166534"))
+                    }
+                }
+                .padding(PrismSpacing.m)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                        .fill(PrismColor.figmaHex("#f0fdf4"))
+                )
+            }
+
+            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                Text(verbatim: "✓ RÈGLE D'OR POUR L'EXAMEN \(appState.activeRouteCode)")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#15803d"))
+                Text(verbatim: ex.comparisonGoldenRule)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#14532d"))
+            }
+            .padding(PrismSpacing.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .fill(PrismColor.figmaHex("#dcfce7"))
+            )
+
+            Button {
+                withAnimation(CertiGoMotion.spring(for: .anim03Mascot34SpeechBubblePop, reduceMotion: reduceMotion)) {
+                    appState.lessonSession.advanceToNextExerciseOrFinish()
+                }
+            } label: {
+                Text(verbatim: "CONTINUER LA SÉANCE")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
+                    .foregroundStyle(PrismColor.onAccent)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: FigMetrics.fortyEight)
+            }
+            .buttonStyle(
+                CertiGoTactile3DButtonStyle(
+                    faceHex: "#58cc02",
+                    lipHex: "#46a302",
+                    cornerRadius: PrismRadius.l
+                )
+            )
+        }
+        .padding(PrismSpacing.xl)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.sheet, style: .continuous)
+                .fill(PrismColor.surface)
+        )
+        .padding(.horizontal, PrismSpacing.m)
+        .padding(.bottom, PrismSpacing.m)
     }
 
     /// Duolingo Flow `971343d0` ("Run out of hearts") screen shown when the user makes 5 errors (`heartsCount == 0`), blocking step completion!
@@ -14307,11 +14417,7 @@ public struct CertiGoNativeTimedExamCockpit23View: View {
                         Text(verbatim: q.caseStudyBadge)
                             .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#2563eb"))
-                        Text(verbatim: q.stem)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Medium"))
-                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                            .lineSpacing(4)
-                            .fixedSize(horizontal: false, vertical: true)
+                        CertiGoStructuredPromptView(prompt: q.stem)
                     }
                     .padding(PrismSpacing.l)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -14327,7 +14433,7 @@ public struct CertiGoNativeTimedExamCockpit23View: View {
                                 appState.selectExamChoice(choice.id)
                             }
                         } label: {
-                            HStack(spacing: PrismSpacing.m) {
+                            HStack(alignment: .top, spacing: PrismSpacing.m) {
                                 Text(verbatim: choice.badge)
                                     .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                                     .foregroundStyle(isSelected ? PrismColor.onAccent : PrismColor.figmaHex("#475569"))
@@ -14340,13 +14446,14 @@ public struct CertiGoNativeTimedExamCockpit23View: View {
                                 Text(verbatim: choice.text)
                                     .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Medium"))
                                     .foregroundStyle(isSelected ? PrismColor.figmaHex("#1e40af") : PrismColor.figmaHex("#0f172a"))
-                                    .lineSpacing(2)
+                                    .lineSpacing(3)
                                     .multilineTextAlignment(.leading)
                                     .fixedSize(horizontal: false, vertical: true)
 
                                 Spacer(minLength: PrismSpacing.xs)
                             }
-                            .padding(PrismSpacing.l)
+                            .padding(.horizontal, PrismSpacing.l)
+                            .padding(.vertical, PrismSpacing.m)
                             .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(

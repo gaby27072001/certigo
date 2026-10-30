@@ -716,4 +716,57 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.returnTabAfterLessonSession == .examens)
         #expect(appState.lessonSession.exercises.count == 5)
     }
+
+    @Test("CertiGoStructuredPromptView.splitScenarioAndQuestion separates scenario and final question cleanly and strips raw backticks")
+    func structuredPromptViewSplitsScenarioAndQuestionAndStripsBackticks() {
+        // 1. Explicit newline separation + backtick stripping
+        let newlineSplit = CertiGoStructuredPromptView.splitScenarioAndQuestion(
+            "Un microservice exécuté avec le ServiceAccount `payment-sa` dans le namespace `finance` doit lire les `Secrets`.\nQuelle combinaison d'objets RBAC déployez-vous ?"
+        )
+        #expect(
+            newlineSplit.scenario
+                == "Un microservice exécuté avec le ServiceAccount payment-sa dans le namespace finance doit lire les Secrets."
+        )
+        #expect(newlineSplit.question == "Quelle combinaison d'objets RBAC déployez-vous ?")
+        #expect(newlineSplit.scenario?.contains("`") == false)
+        #expect(!newlineSplit.question.contains("`"))
+
+        // 2. Automatic multi-sentence boundary split before final interrogative/directive sentence
+        let autoSplit = CertiGoStructuredPromptView.splitScenarioAndQuestion(
+            "Vous désactivez les clés API (`disableLocalAuth = true`) sur Azure OpenAI. Quel rôle RBAC minimal attribuez-vous à la Managed Identity de votre application ?"
+        )
+        #expect(autoSplit.scenario == "Vous désactivez les clés API (disableLocalAuth = true) sur Azure OpenAI.")
+        #expect(
+            autoSplit.question
+                == "Quel rôle RBAC minimal attribuez-vous à la Managed Identity de votre application ?"
+        )
+
+        // 3. Single-sentence question without scenario
+        let singleQuestion = CertiGoStructuredPromptView.splitScenarioAndQuestion(
+            "Quelle sonde retire temporairement un pod des Endpoints d'un Service Kubernetes sans redémarrer le conteneur ?"
+        )
+        #expect(singleQuestion.scenario == nil)
+        #expect(
+            singleQuestion.question
+                == "Quelle sonde retire temporairement un pod des Endpoints d'un Service Kubernetes sans redémarrer le conteneur ?"
+        )
+
+        // 4. Verify all exercise prompts across all tracks split cleanly and contain no raw backticks
+        let tracks = ["AZ-104", "AZ-900", "SAA-C03", "PDE", "AI-102", "CKA", "GH-300"]
+        for track in tracks {
+            let exercises = CertiGoNativeLessonSessionEngine.defaultExercises(
+                forRouteCode: track,
+                lessonId: "\(track)-u1-s1"
+            )
+            for ex in exercises {
+                #expect(!ex.prompt.contains("`"), "Found raw backtick in \(ex.id) prompt")
+                let parts = CertiGoStructuredPromptView.splitScenarioAndQuestion(ex.prompt)
+                #expect(parts.scenario != nil && !(parts.scenario ?? "").isEmpty, "Expected scenario in \(ex.id)")
+                #expect(!parts.question.isEmpty, "Expected final question in \(ex.id)")
+                for opt in ex.options {
+                    #expect(!opt.title.contains("`"), "Found raw backtick in option \(opt.id) of \(ex.id)")
+                }
+            }
+        }
+    }
 }
