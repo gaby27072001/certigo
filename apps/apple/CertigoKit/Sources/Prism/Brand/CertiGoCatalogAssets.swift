@@ -265,7 +265,7 @@ public struct CertiGoBrandLogoView: View {
     }
 }
 
-/// Renders the 100% validated Duolingo-style 3/4 Right Specialist Mascot + stacked speech bubble (`◀`) with clear 15pt Bold question text.
+/// Renders the 100% validated Duolingo-style 3/4 Right Specialist Mascot + centered chapter pill above + clean speech bubble (`◀`) with 16pt Medium question text.
 public struct CertiGoSpeechBubbleHeaderView: View {
     public let region: PrismRegion
     public let badgeText: String
@@ -286,46 +286,57 @@ public struct CertiGoSpeechBubbleHeaderView: View {
 
     public var body: some View {
         let pose = poseOverride ?? CertiGoMascotPose.specialist(for: region)
-        HStack(alignment: .center, spacing: PrismSpacing.s) {
-            CertiGoMascotView(pose: pose, size: PrismSize.mascotQuiz)
-
-            HStack(alignment: .center, spacing: .zero) {
-                Image(systemName: "arrowtriangle.left.fill")
-                    .prismTextStyle(.caption)
-                    .foregroundStyle(PrismColor.surface)
-                    .frame(width: PrismSize.speechPointerWidth, height: PrismSize.speechPointerHeight)
-
-                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                    Text(verbatim: badgeText.uppercased())
-                        .prismTextStyle(.caption)
-                        .foregroundStyle(region.color)
-                        .padding(.horizontal, PrismSpacing.s)
-                        .padding(.vertical, PrismSpacing.xxs)
+        VStack(spacing: PrismSpacing.m) {
+            if !badgeText.isEmpty {
+                HStack {
+                    Spacer(minLength: .zero)
+                    Text(verbatim: badgeText.hasPrefix("⚡") ? badgeText : "⚡ \(badgeText)")
+                        .font(PrismTypography.figmaFont(size: 12, style: "Semi Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                        .padding(.horizontal, PrismSpacing.m)
+                        .padding(.vertical, PrismSpacing.xs)
                         .background(
-                            RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
-                                .fill(PrismColor.canvas)
+                            Capsule()
+                                .fill(PrismColor.figmaHex("#eff6ff"))
                         )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(PrismColor.figmaHex("#bfdbfe"), lineWidth: PrismBorder.thin)
+                        )
+                    Spacer(minLength: .zero)
+                }
+            }
+
+            HStack(alignment: .center, spacing: PrismSpacing.s) {
+                CertiGoMascotView(pose: pose, size: PrismSize.mascotQuiz)
+
+                HStack(alignment: .center, spacing: .zero) {
+                    Image(systemName: "arrowtriangle.left.fill")
+                        .prismTextStyle(.caption)
+                        .foregroundStyle(PrismColor.surface)
+                        .frame(width: PrismSize.speechPointerWidth, height: PrismSize.speechPointerHeight)
 
                     Text(verbatim: questionText)
-                        .prismTextStyle(.callout)
-                        .foregroundStyle(PrismColor.textPrimary)
+                        .font(PrismTypography.figmaFont(size: 16, style: "Medium"))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                        .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(PrismSpacing.m)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
-                            .fill(PrismColor.separator)
-                            .offset(y: PrismSpacing.xs)
-                        RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
-                            .fill(PrismColor.surface)
-                            .overlay(
+                        .padding(PrismSpacing.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            ZStack {
                                 RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
-                                    .strokeBorder(PrismColor.separator, lineWidth: PrismBorder.standard)
-                            )
-                    }
-                )
+                                    .fill(PrismColor.separator)
+                                    .offset(y: PrismSpacing.xs)
+                                RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
+                                    .fill(PrismColor.surface)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
+                                            .strokeBorder(PrismColor.separator, lineWidth: PrismBorder.standard)
+                                    )
+                            }
+                        )
+                }
             }
         }
         .accessibilityElement(children: .combine)

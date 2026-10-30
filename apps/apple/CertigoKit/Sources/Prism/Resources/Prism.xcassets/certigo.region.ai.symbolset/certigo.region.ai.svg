@@ -20,10 +20,10 @@
     <line id="right-margin-Regular-M" x1="1425" y1="1030" x2="1425" y2="1152" />
   </g>
   <g id="Symbols">
-    <g id="Ultralight-S"><path d="M555 626 L595 661 L555 696 L515 661 Z"/></g>
-    <g id="Regular-S"><path d="M1380 626 L1420 661 L1380 696 L1340 661 Z"/></g>
-    <g id="Black-S"><path d="M2855 626 L2895 661 L2855 696 L2815 661 Z"/></g>
-    <g id="Regular-M"><path d="M1380 1056 L1425 1091 L1380 1126 L1335 1091 Z"/></g>
-    <g id="Regular-L"><path d="M1380 1486 L1430 1521 L1380 1556 L1330 1521 Z"/></g>
+    <g id="Ultralight-S"><path d="M 555 626 L 595 661 L 555 696 L 515 661 Z"/></g>
+    <g id="Regular-S"><path d="M 1380 626 L 1420 661 L 1380 696 L 1340 661 Z"/></g>
+    <g id="Black-S"><path d="M 2855 626 L 2895 661 L 2855 696 L 2815 661 Z"/></g>
+    <g id="Regular-M"><path d="M 1380 1056 L 1425 1091 L 1380 1126 L 1335 1091 Z"/></g>
+    <g id="Regular-L"><path d="M 1380 1486 L 1430 1521 L 1380 1556 L 1330 1521 Z"/></g>
   </g>
 </svg>

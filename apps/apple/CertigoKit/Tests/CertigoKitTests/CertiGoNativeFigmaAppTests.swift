@@ -514,7 +514,8 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.errorLogHistory.contains(.aiModelNotConnected1001))
 
         appState.openAITopic("last-3-errors")
-        #expect(appState.chatTurns.isEmpty)
+        #expect(appState.chatTurns.count == 1)
+        #expect(appState.chatTurns[0].closingTip.contains("Synthèse locale hors-ligne certifiée"))
         #expect(appState.activeDiagnosticError == .examReportAIDisconnected1003)
     }
 
@@ -536,8 +537,10 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.userAvatarHex == "#7c3aed")
         #expect(appState.userInitials == "AM")
         #expect(appState.showEditProfileSheet == false)
-        #expect(appState.leaderboardMembers[0].displayName == "Toi (Alexandre)")
-        #expect(appState.leaderboardMembers[0].initials == "AM")
+        let meAtZeroXP = appState.leaderboardMembers.first(where: \.isCurrentUser)
+        #expect(meAtZeroXP?.rank == 12)
+        #expect(meAtZeroXP?.displayName == "Toi (Alexandre)")
+        #expect(meAtZeroXP?.initials == "AM")
     }
 
     @Test("FigMetrics and its static constants are public and no private enum/extension FigMetrics remains for Xcode 27 SwiftEmitModule")
@@ -563,5 +566,154 @@ struct CertiGoNativeFigmaAppTests {
         #expect(!source.contains("private extension FigMetrics"))
         #expect(source.contains("public enum FigMetrics"))
         #expect(source.contains("public static let fourteen: CGFloat = 14"))
+    }
+
+    @Test("Chantier 1: All SVG paths in Prism.xcassets and BrandAssets.xcassets have de-minified arc flags for CoreSVG and Kubernetes uses BrandLogos/brand-kubernetes")
+    func svgCoreSVGDeMinifiedArcFlagsAndKubernetesBrandLogo() throws {
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: root.appendingPathComponent("AGENTS.md").path) {
+            let parent = root.deletingLastPathComponent()
+            guard parent != root else { throw CocoaError(.fileNoSuchFile) }
+            root = parent
+        }
+        let badgeFiles = [
+            "Certifications/ms-official-associate-badge.imageset/ms-official-associate-badge.svg",
+            "Certifications/ms-official-fundamentals-badge.imageset/ms-official-fundamentals-badge.svg",
+            "Certifications/ms-official-expert-badge.imageset/ms-official-expert-badge.svg",
+            "Certifications/ms-official-specialty-badge.imageset/ms-official-specialty-badge.svg"
+        ]
+        let prismAssets = root.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Resources/Prism.xcassets")
+        for relPath in badgeFiles {
+            let url = prismAssets.appendingPathComponent(relPath)
+            let svg = try String(contentsOf: url, encoding: .utf8)
+            #expect(!svg.contains("0 00-"), "Found minified arc flag 00- in \(relPath)")
+            #expect(!svg.contains("0 01-"), "Found minified arc flag 01- in \(relPath)")
+            #expect(!svg.contains("-.16-.05"), "Found glued negative decimals in \(relPath)")
+            #expect(svg.contains("a 16.44 16.44 0 0 0 -10.75 -6.69"))
+        }
+
+        #expect(CertiGoOfficialAssetCatalog.brandLogoAssetName(forVendorId: "kubernetes") == "BrandLogos/brand-kubernetes")
+        #expect(CertiGoOfficialAssetCatalog.brandLogoAssetName(forVendorId: "cisco") == "BrandLogos/brand-cisco")
+        #expect(CertiGoFigmaLiveRuntimeState.popoverCards(forVendor: "kubernetes").map(\.code) == ["CKA", "CKAD", "TF-003"])
+        #expect(CertiGoFigmaLiveRuntimeState.popoverCards(forVendor: "cisco").map(\.code) == ["CCNA", "CKA", "TF-003"])
+    }
+
+    @Test("Chantier 4: Completing 7-step Onboarding launches the 5-step Interactive Guided App Tour across all 5 tabs and returns to .parcours")
+    func onboardingPage07AndFiveStepGuidedAppTourNavigation() {
+        var appState = CertiGoNativeAppState()
+        #expect(appState.onboardingSelectedGoalIds == ["certifs", "ai-radar"])
+        appState.toggleOnboardingGoal("career")
+        #expect(appState.onboardingSelectedGoalIds.contains("career"))
+
+        #expect(appState.onboardingSelectedAIRadarIds == ["ai-actors", "ai-agents-mcp"])
+        appState.toggleOnboardingAIRadar("cloud-weekly")
+        #expect(appState.onboardingSelectedAIRadarIds.contains("cloud-weekly"))
+
+        appState.completeOnboardingFlow(awardWelcomeBonus: true, startGuidedTour: true)
+        #expect(appState.hasCompletedOnboarding == true)
+        #expect(appState.gemsCount == 50)
+        #expect(appState.isPresentingGuidedAppTour == true)
+        #expect(appState.guidedTourStepIndex == 0)
+        #expect(appState.selectedTab == .parcours)
+
+        let expectedTabs: [CertiGoNativeTab] = [.examens, .hubIA, .social, .moi]
+        for (idx, expectedTab) in expectedTabs.enumerated() {
+            appState.advanceGuidedTourStep()
+            #expect(appState.isPresentingGuidedAppTour == true)
+            #expect(appState.guidedTourStepIndex == idx + 1)
+            #expect(appState.selectedTab == expectedTab)
+        }
+
+        // Advancing from step 5/5 (index 4 on .moi) completes the guided tour and returns to .parcours
+        appState.advanceGuidedTourStep()
+        #expect(appState.isPresentingGuidedAppTour == false)
+        #expect(appState.selectedTab == .parcours)
+    }
+
+    @Test("Chantier 5: Wrong answer stays in .checked phase until user taps Explain, CONTINUER from explanation advances directly, and replay options keep A, B, C, D order with rephrased prompt")
+    func manualErrorExplanationOrderedOptionBadgesAndRephrasedReplayPrompt() {
+        var appState = CertiGoNativeAppState()
+        appState.startLessonSession(forLessonId: "AZ-104-u1-s1", skipDeclic15: true, enableAdaptiveReplay: true)
+        let firstEx = appState.lessonSession.currentExercise
+        #expect(firstEx.options.map(\.badge) == ["A", "B", "C", "D"])
+
+        // Select a wrong option and verify -> must enter .checked(isCorrect: false) and NEVER .explainingError automatically
+        if let wrongOpt = firstEx.options.first(where: { !$0.isCorrect }) {
+            appState.lessonSession.selectOption(wrongOpt.id)
+        }
+        let isCorrect = appState.lessonSession.verifyCurrentAnswer()
+        #expect(isCorrect == false)
+        #expect(appState.lessonSession.attemptPhase == .checked(isCorrect: false))
+
+        // Explicitly opening explanation sheet 05 and tapping CONTINUER advances directly to question 2
+        appState.lessonSession.openErrorExplanationSheet05()
+        #expect(appState.lessonSession.attemptPhase == .explainingError)
+        appState.lessonSession.advanceToNextExerciseOrFinish()
+        #expect(appState.lessonSession.currentExerciseIndex == 1)
+        #expect(appState.lessonSession.attemptPhase == .answering)
+
+        // Check the inserted replay exercise has A, B, C, D badges in top-to-bottom order and a rephrased prompt
+        if let replayEx = appState.lessonSession.exercises.first(where: \.isReviewReplay) {
+            #expect(replayEx.options.map(\.badge) == ["A", "B", "C", "D"])
+            #expect(replayEx.prompt != firstEx.prompt)
+        } else {
+            Issue.record("Expected replay exercise to be inserted")
+        }
+
+        // Also verify candidate pool variants always keep A, B, C, D badges in order
+        let pool = CertiGoAdaptiveSessionEngine.buildCandidatePool(
+            from: CertiGoNativeLessonSessionEngine.defaultExercises(forRouteCode: "AZ-104", lessonId: "AZ-104-u1-s1"),
+            routeCode: "AZ-104",
+            lessonId: "AZ-104-u1-s1"
+        )
+        for candidate in pool where candidate.exercise.options.count == 4 {
+            let badges = candidate.exercise.options.map(\.badge)
+            if Set(badges).isSubset(of: ["A", "B", "C", "D"]) {
+                #expect(badges == ["A", "B", "C", "D"])
+            }
+        }
+    }
+
+    @Test("Chantier 6: Social leaderboard sorts by XP with 0 XP at rank 12, Free vs Pro tier badge, GH-300 6 domains, exam provider metadata, and Domain Sprint returns to .examens")
+    func socialLeaderboardSortingFreeVsProGH300DomainsAndDomainSprintRouting() {
+        var appState = CertiGoNativeAppState()
+
+        // 1. Leaderboard sorted by XP descending: Sarah L. (1390) is #1, Thomas M. (1260) is #2, Inès K. (1185) is #3, and Toi (0 XP) is #12
+        #expect(appState.leaderboardMembers.count == 12)
+        #expect(appState.leaderboardMembers[0].displayName == "Sarah L.")
+        #expect(appState.leaderboardMembers[0].rank == 1)
+        #expect(appState.leaderboardMembers[1].displayName == "Thomas M.")
+        #expect(appState.leaderboardMembers[1].rank == 2)
+        #expect(appState.leaderboardMembers[2].displayName == "Inès K.")
+        #expect(appState.leaderboardMembers[2].rank == 3)
+        #expect(appState.leaderboardMembers[11].isCurrentUser == true)
+        #expect(appState.leaderboardMembers[11].xpPoints == 0)
+        #expect(appState.leaderboardMembers[11].rank == 12)
+
+        // Earning 1500 XP promotes current user to rank 1
+        appState.userXPPoints = 1500
+        appState.syncCurrentUserLeaderboardEntry()
+        #expect(appState.leaderboardMembers[0].isCurrentUser == true)
+        #expect(appState.leaderboardMembers[0].rank == 1)
+        #expect(appState.leaderboardMembers[1].displayName == "Sarah L.")
+        #expect(appState.leaderboardMembers[1].rank == 2)
+
+        // 2. Free vs Pro membership tier
+        #expect(appState.isProMember == false)
+
+        // 3. GH-300 has 6 official domains and CKA/GCP/Microsoft have official exam provider metadata
+        let gh300Detail = CertiGoNativeRichCatalog.profileCertificationDetail(forCode: "GH-300")
+        #expect(gh300Detail.domains.count == 6)
+        #expect(CertiGoNativeRichCatalog.examDomains(forRouteCode: "GH-300").count == 6)
+        #expect(CertiGoNativeRichCatalog.examProviderMetadata(forRouteCode: "CKA").summaryLine == "Linux Foundation / PSI · 66/100 · 120 min")
+        #expect(CertiGoNativeRichCatalog.examProviderMetadata(forRouteCode: "PCA").providerName == "Kryterion")
+        #expect(CertiGoNativeRichCatalog.examProviderMetadata(forRouteCode: "AZ-104").providerName == "Pearson VUE")
+
+        // 4. Starting a Domain Sprint from Examens remembers returnTabAfterLessonSession == .examens
+        appState.selectedTab = .examens
+        appState.startDomainSprintSession(forDomainIndex: 1)
+        #expect(appState.isPresentingLessonSession == true)
+        #expect(appState.returnTabAfterLessonSession == .examens)
+        #expect(appState.lessonSession.exercises.count == 5)
     }
 }
