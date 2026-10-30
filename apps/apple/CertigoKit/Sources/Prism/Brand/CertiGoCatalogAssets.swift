@@ -307,20 +307,18 @@ public struct CertiGoSpeechBubbleHeaderView: View {
                 }
             }
 
-            HStack(alignment: .center, spacing: PrismSpacing.s) {
-                CertiGoMascotView(pose: pose, size: PrismSize.mascotQuiz)
+            HStack(alignment: .top, spacing: PrismSpacing.s) {
+                CertiGoMascotView(pose: pose, size: FigMetrics.sixtyEight)
+                    .padding(.top, FigMetrics.four)
 
-                HStack(alignment: .center, spacing: .zero) {
+                HStack(alignment: .top, spacing: .zero) {
                     Image(systemName: "arrowtriangle.left.fill")
                         .prismTextStyle(.caption)
                         .foregroundStyle(PrismColor.surface)
                         .frame(width: PrismSize.speechPointerWidth, height: PrismSize.speechPointerHeight)
+                        .padding(.top, FigMetrics.eighteen)
 
-                    Text(verbatim: questionText)
-                        .font(PrismTypography.figmaFont(size: 16, style: "Medium"))
-                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                        .lineSpacing(4)
-                        .fixedSize(horizontal: false, vertical: true)
+                    CertiGoStructuredPromptView(prompt: questionText)
                         .padding(PrismSpacing.m)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
