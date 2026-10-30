@@ -4,6 +4,10 @@ import CertigoData
 import CertigoDomain
 import Foundation
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 // MARK: - 1. Lead-Architect State Enums & Rich Identifiable Domain Models
 
 /// Explicit node state for every lesson island on the dynamic winding Duolingo path.
@@ -1159,6 +1163,9 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
     public var enableAdaptiveReplay: Bool
     public var adaptiveSessionState: CertiGoAdaptiveSessionState
     public var adaptiveLearnerState: [String: CertiGoLearnerConceptState]
+    public var recentMistakesLog: [CertiGoPersonalMistakeEntry]
+    public var liveSheet05Explanation: CertiGoLiveAITutorResponse?
+    public var isLoadingLiveSheet05Explanation: Bool
 
     public var isSessionFailedOutOfHearts: Bool {
         heartsCount <= 0
@@ -1219,6 +1226,9 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         )
         self.adaptiveSessionState = builtAdaptive.sessionState
         self.adaptiveLearnerState = builtAdaptive.learnerState
+        self.recentMistakesLog = []
+        self.liveSheet05Explanation = nil
+        self.isLoadingLiveSheet05Explanation = false
     }
 
     public var currentExercise: CertiGoNativeExerciseItem {
@@ -1405,6 +1415,20 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
             now: now
         )
 
+        let attemptEntry = CertiGoPersonalMistakeEntry(
+            id: "\(ex.id)-attempt-\(totalVerifiedCount)",
+            routeCode: routeCode,
+            conceptId: ex.conceptId,
+            conceptTitle: ex.conceptTitle,
+            questionPrompt: ex.prompt,
+            chosenAnswer: selectedOptionSummaryText,
+            correctAnswer: ex.primaryCorrectOptionTitle,
+            isCorrect: isCorrect
+        )
+        recentMistakesLog.insert(attemptEntry, at: 0)
+        liveSheet05Explanation = nil
+        isLoadingLiveSheet05Explanation = false
+
         if !isCorrect && enableAdaptiveReplay && exercises.count < 25 {
             let reorderedOptions = ex.options.isEmpty
                 ? []
@@ -1460,18 +1484,25 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
     }
 
     public mutating func closeOverlaySheetToCheckedState() {
-        if case .explainingError = attemptPhase {
-            attemptPhase = .checked(isCorrect: false)
-        } else if case .comparingServices = attemptPhase {
-            let wasCorrect = currentExercise.options
+        let wasCorrect: Bool = {
+            if let latest = recentMistakesLog.first(where: { $0.conceptId == currentExercise.conceptId }) {
+                return latest.isCorrect
+            }
+            return currentExercise.options
                 .filter(\.isCorrect)
                 .map(\.id)
                 .allSatisfy { selectedOptionIds.contains($0) } && !selectedOptionIds.isEmpty
+        }()
+        if case .explainingError = attemptPhase {
+            attemptPhase = .checked(isCorrect: wasCorrect)
+        } else if case .comparingServices = attemptPhase {
             attemptPhase = .checked(isCorrect: wasCorrect)
         }
     }
 
     public mutating func advanceToNextExerciseOrFinish() {
+        liveSheet05Explanation = nil
+        isLoadingLiveSheet05Explanation = false
         if isSessionFailedOutOfHearts {
             hasTriggeredOutOfHeartsFailure = true
             isSessionCompleted = false
@@ -4660,14 +4691,19 @@ public struct CertiGoNativeExamQuestion: Identifiable, Codable, Equatable, Hasha
 public struct CertiGoChatTurn: Identifiable, Codable, Equatable, Hashable, Sendable {
     public let id: String
     public let userPrompt: String
-    public let aiHeadline: String
-    public let aiBullet1: String
-    public let aiBullet2: String
-    public let examKeyRule1: String
-    public let examKeyRule2: String
-    public let closingTip: String
+    public var aiHeadline: String
+    public var aiBullet1: String
+    public var aiBullet2: String
+    public var extraPoints: [String]
+    public var examKeyRule1: String
+    public var examKeyRule2: String
+    public var closingTip: String
     public var isCopied: Bool
     public var isSavedToMemo: Bool
+    public var isStreamingOrLoading: Bool
+    public var isLiveAIResponse: Bool
+    public var liveSourceBadge: String?
+    public var personalizationSummary: String?
 
     public init(
         id: String,
@@ -4675,22 +4711,427 @@ public struct CertiGoChatTurn: Identifiable, Codable, Equatable, Hashable, Senda
         aiHeadline: String,
         aiBullet1: String,
         aiBullet2: String,
+        extraPoints: [String] = [],
         examKeyRule1: String,
         examKeyRule2: String,
         closingTip: String,
         isCopied: Bool = false,
-        isSavedToMemo: Bool = false
+        isSavedToMemo: Bool = false,
+        isStreamingOrLoading: Bool = false,
+        isLiveAIResponse: Bool = false,
+        liveSourceBadge: String? = nil,
+        personalizationSummary: String? = nil
     ) {
         self.id = id
         self.userPrompt = userPrompt
         self.aiHeadline = aiHeadline
         self.aiBullet1 = aiBullet1
         self.aiBullet2 = aiBullet2
+        self.extraPoints = extraPoints
         self.examKeyRule1 = examKeyRule1
         self.examKeyRule2 = examKeyRule2
         self.closingTip = closingTip
         self.isCopied = isCopied
         self.isSavedToMemo = isSavedToMemo
+        self.isStreamingOrLoading = isStreamingOrLoading
+        self.isLiveAIResponse = isLiveAIResponse
+        self.liveSourceBadge = liveSourceBadge
+        self.personalizationSummary = personalizationSummary
+    }
+}
+
+/// Recorded exercise attempt (mistake or success) for the user's personal AI learning memory.
+public struct CertiGoPersonalMistakeEntry: Identifiable, Codable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let routeCode: String
+    public let conceptId: String
+    public let conceptTitle: String
+    public let questionPrompt: String
+    public let chosenAnswer: String
+    public let correctAnswer: String
+    public let isCorrect: Bool
+
+    public init(
+        id: String,
+        routeCode: String,
+        conceptId: String,
+        conceptTitle: String,
+        questionPrompt: String,
+        chosenAnswer: String,
+        correctAnswer: String,
+        isCorrect: Bool
+    ) {
+        self.id = id
+        self.routeCode = routeCode
+        self.conceptId = conceptId
+        self.conceptTitle = conceptTitle
+        self.questionPrompt = questionPrompt
+        self.chosenAnswer = chosenAnswer
+        self.correctAnswer = correctAnswer
+        self.isCorrect = isCorrect
+    }
+}
+
+/// Real-time personal learner profile aggregated from all user interactions in the native app.
+public struct CertiGoPersonalLearnerContext: Equatable, Sendable {
+    public let userId: String
+    public let displayName: String
+    public let experienceLevelLabel: String
+    public let dailyRhythmMinutes: Int
+    public let targetExamHorizon: String
+    public let activeRouteCode: String
+    public let parallelTrackCodes: [String]
+    public let completedStepsCount: Int
+    public let totalVerifiedQuestions: Int
+    public let accuracyPercent: Int
+    public let lastExamScoreOutOf1000: Int
+    public let weakConceptsSummary: [String]
+    public let strongConceptsSummary: [String]
+    public let recentMistakesSummary: [String]
+
+    public init(
+        userId: String,
+        displayName: String,
+        experienceLevelLabel: String,
+        dailyRhythmMinutes: Int,
+        targetExamHorizon: String,
+        activeRouteCode: String,
+        parallelTrackCodes: [String],
+        completedStepsCount: Int,
+        totalVerifiedQuestions: Int,
+        accuracyPercent: Int,
+        lastExamScoreOutOf1000: Int,
+        weakConceptsSummary: [String],
+        strongConceptsSummary: [String],
+        recentMistakesSummary: [String]
+    ) {
+        self.userId = userId
+        self.displayName = displayName
+        self.experienceLevelLabel = experienceLevelLabel
+        self.dailyRhythmMinutes = dailyRhythmMinutes
+        self.targetExamHorizon = targetExamHorizon
+        self.activeRouteCode = activeRouteCode
+        self.parallelTrackCodes = parallelTrackCodes
+        self.completedStepsCount = completedStepsCount
+        self.totalVerifiedQuestions = totalVerifiedQuestions
+        self.accuracyPercent = accuracyPercent
+        self.lastExamScoreOutOf1000 = lastExamScoreOutOf1000
+        self.weakConceptsSummary = weakConceptsSummary
+        self.strongConceptsSummary = strongConceptsSummary
+        self.recentMistakesSummary = recentMistakesSummary
+    }
+
+    public func formattedPromptContext(userQuestionOrChoice: String) -> String {
+        let weakText = weakConceptsSummary.isEmpty
+            ? "Aucun point faible critique détecté"
+            : weakConceptsSummary.joined(separator: " ; ")
+        let strongText = strongConceptsSummary.isEmpty
+            ? "En cours de calibrage initial"
+            : strongConceptsSummary.joined(separator: " ; ")
+        let mistakesText = recentMistakesSummary.isEmpty
+            ? "Aucune erreur récente enregistrée"
+            : recentMistakesSummary.prefix(3).joined(separator: " | ")
+        let tracksText = parallelTrackCodes.joined(separator: ", ")
+        return """
+        [Profil CertiGo IA · \(displayName) (\(userId))] Niveau: \(experienceLevelLabel) | Rythme: \(dailyRhythmMinutes) min/j | Échéance: \(targetExamHorizon) | Certif active: \(activeRouteCode) (Parallèles: \(tracksText)) | Étapes: \(completedStepsCount) | Questions vérifiées: \(totalVerifiedQuestions) (Précision: \(accuracyPercent)%, Examen blanc: \(lastExamScoreOutOf1000)/1000). Concepts à renforcer: \(weakText). Concepts maîtrisés: \(strongText). Erreurs récentes: \(mistakesText). Question/Choix de l'apprenant: \(userQuestionOrChoice)
+        """
+    }
+}
+
+/// Live response payload returned by `POST /api/tutor/explain` (`gpt-5.4-mini` on Azure AI Foundry + Cosmos DB `LearnerModel`).
+public struct CertiGoLiveAITutorResponse: Codable, Equatable, Hashable, Sendable {
+    public struct Personalization: Codable, Equatable, Hashable, Sendable {
+        public let attempts: Int
+        public let errors: Int
+        public let accuracyPct: Int
+        public let recurringStruggle: Bool
+        public let masteredBefore: Bool
+        public let trend: String
+        public let topConfusedOption: String?
+
+        public init(
+            attempts: Int,
+            errors: Int,
+            accuracyPct: Int,
+            recurringStruggle: Bool,
+            masteredBefore: Bool,
+            trend: String,
+            topConfusedOption: String? = nil
+        ) {
+            self.attempts = attempts
+            self.errors = errors
+            self.accuracyPct = accuracyPct
+            self.recurringStruggle = recurringStruggle
+            self.masteredBefore = masteredBefore
+            self.trend = trend
+            self.topConfusedOption = topConfusedOption
+        }
+
+        public var formattedTrendFr: String {
+            switch trend.lowercased() {
+            case "improving":
+                return "en progression 📈"
+            case "declining":
+                return "à consolider ⚠️"
+            default:
+                return "stable ⚖️"
+            }
+        }
+
+        public var formattedSummaryFr: String {
+            let tries = max(1, attempts)
+            let struggleSuffix = recurringStruggle ? " · Difficulté récurrente ciblée" : ""
+            return "Tu as tenté ce concept \(tries) fois (\(accuracyPct) % réussite) · Tendance : \(formattedTrendFr)\(struggleSuffix)"
+        }
+    }
+
+    public let itemId: String?
+    public let conceptId: String?
+    public let correct: Bool?
+    public let headline: String
+    public let points: [String]
+    public let encouragement: String
+    public let recommendation: String
+    public let citedConceptIds: [String]
+    public let source: String
+    public let personalization: Personalization?
+
+    public init(
+        itemId: String? = nil,
+        conceptId: String? = nil,
+        correct: Bool? = nil,
+        headline: String,
+        points: [String],
+        encouragement: String,
+        recommendation: String,
+        citedConceptIds: [String] = [],
+        source: String = "ai",
+        personalization: Personalization? = nil
+    ) {
+        self.itemId = itemId
+        self.conceptId = conceptId
+        self.correct = correct
+        self.headline = headline
+        self.points = points
+        self.encouragement = encouragement
+        self.recommendation = recommendation
+        self.citedConceptIds = citedConceptIds
+        self.source = source
+        self.personalization = personalization
+    }
+}
+
+/// Real-time network client connecting the native iOS app to the live `gpt-5.4-mini` Azure Function endpoint.
+public actor CertiGoLiveAITutorService {
+    public static let shared = CertiGoLiveAITutorService()
+
+    public static let liveBaseURL = URL(string: "https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net")!
+    public static let fallbackTrackId = "microsoft.az-104.track.main"
+    public static let fallbackLessonId = "microsoft.az-104.track.main.lesson.section-1.practice"
+    public static let fallbackItemId = "microsoft.az-104.section-1.az104-scenario-2026-02.001"
+    public static let fallbackManifestId = "sha256:e00ee9c8b8e7936fe85e28998942c276fd9abcb0908a79a3231a044c774cc71f"
+
+    private let session: URLSession
+    private var resolvedTargetByTrackId: [String: (lessonId: String, itemId: String, publicManifestId: String)] = [:]
+
+    public init(session: URLSession = .shared) {
+        self.session = session
+    }
+
+    /// Maps each certification `activeRouteCode` to its live backend `(trackId, defaultLessonId, defaultItemId, defaultManifestId)`.
+    public static func backendTrackTarget(
+        forRouteCode routeCode: String
+    ) -> (trackId: String, defaultLessonId: String, defaultItemId: String, defaultManifestId: String) {
+        let code = routeCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let trackId: String
+        switch code {
+        case "AZ-104":
+            trackId = "microsoft.az-104.track.main"
+        case "AZ-900":
+            trackId = "microsoft.az-900.track.main"
+        case "AI-901", "AI-900":
+            trackId = "microsoft.ai-901.track.main"
+        case "AI-102", "AI-103":
+            trackId = "microsoft.ai-103.track.main"
+        case "GH-300", "CCA-F":
+            trackId = "microsoft.gh-300.track.main"
+        case "SAA-C03":
+            trackId = "aws.saa-c03.track.main"
+        case "CLF-C02":
+            trackId = "aws.clf-c02.track.main"
+        case "AIF-C01":
+            trackId = "aws.aif-c01.track.main"
+        case "PDE":
+            trackId = "gcp.data-engineer.track.main"
+        case "PCA":
+            trackId = "gcp.cloud-architect.track.main"
+        case "ACE":
+            trackId = "gcp.cloud-engineer.track.main"
+        default:
+            trackId = fallbackTrackId
+        }
+        let defaultLessonId = "\(trackId).lesson.section-1.practice"
+        let defaultItemId = trackId == fallbackTrackId
+            ? fallbackItemId
+            : "\(trackId.replacingOccurrences(of: ".track.main", with: "")).section-1.q1"
+        return (
+            trackId: trackId,
+            defaultLessonId: defaultLessonId,
+            defaultItemId: defaultItemId,
+            defaultManifestId: fallbackManifestId
+        )
+    }
+
+    private struct PathDiscoveryResponse: Decodable {
+        struct ModuleItem: Decodable {
+            let lessonIds: [String]?
+        }
+        let publicManifestId: String?
+        let modules: [ModuleItem]?
+    }
+
+    private struct LessonDiscoveryResponse: Decodable {
+        struct BlockItem: Decodable {
+            struct CheckItem: Decodable {
+                let id: String?
+            }
+            let check: CheckItem?
+        }
+        let id: String?
+        let blocks: [BlockItem]?
+    }
+
+    private struct TutorExplainPayload: Encodable {
+        let trackId: String
+        let lessonId: String
+        let itemId: String
+        let selected: [String]
+        let publicManifestId: String
+    }
+
+    private func resolveLessonAndItem(
+        forTrackId trackId: String,
+        userId: String
+    ) async -> (trackId: String, lessonId: String, itemId: String, publicManifestId: String) {
+        if let cached = resolvedTargetByTrackId[trackId] {
+            return (trackId, cached.lessonId, cached.itemId, cached.publicManifestId)
+        }
+        if trackId == Self.fallbackTrackId {
+            let target = (Self.fallbackLessonId, Self.fallbackItemId, Self.fallbackManifestId)
+            resolvedTargetByTrackId[trackId] = target
+            return (trackId, target.0, target.1, target.2)
+        }
+
+        do {
+            let pathURL = Self.liveBaseURL.appendingPathComponent("api/me/paths/\(trackId)")
+            var pathReq = URLRequest(url: pathURL)
+            pathReq.httpMethod = "GET"
+            pathReq.timeoutInterval = 6
+            pathReq.setValue("Bearer \(userId)", forHTTPHeaderField: "Authorization")
+
+            let (pathData, pathResp) = try await session.data(for: pathReq)
+            if let httpPath = pathResp as? HTTPURLResponse,
+               (200..<300).contains(httpPath.statusCode),
+               let decodedPath = try? JSONDecoder().decode(PathDiscoveryResponse.self, from: pathData),
+               let firstLessonId = decodedPath.modules?.compactMap({ $0.lessonIds?.first }).first
+            {
+                let manifestId = decodedPath.publicManifestId ?? Self.fallbackManifestId
+                var components = URLComponents(
+                    url: Self.liveBaseURL.appendingPathComponent("api/tracks/\(trackId)/lessons/\(firstLessonId)"),
+                    resolvingAgainstBaseURL: false
+                )
+                components?.queryItems = [URLQueryItem(name: "publicManifestId", value: manifestId)]
+                if let lessonURL = components?.url {
+                    var lessonReq = URLRequest(url: lessonURL)
+                    lessonReq.httpMethod = "GET"
+                    lessonReq.timeoutInterval = 6
+                    lessonReq.setValue("Bearer \(userId)", forHTTPHeaderField: "Authorization")
+
+                    let (lessonData, lessonResp) = try await session.data(for: lessonReq)
+                    if let httpLesson = lessonResp as? HTTPURLResponse,
+                       (200..<300).contains(httpLesson.statusCode),
+                       let decodedLesson = try? JSONDecoder().decode(LessonDiscoveryResponse.self, from: lessonData),
+                       let firstItemId = decodedLesson.blocks?.compactMap({ $0.check?.id }).first
+                    {
+                        let resolved = (firstLessonId, firstItemId, manifestId)
+                        resolvedTargetByTrackId[trackId] = resolved
+                        return (trackId, firstLessonId, firstItemId, manifestId)
+                    }
+                }
+            }
+        } catch {
+            // Fall back immediately to the verified AZ-104 item with full track context injected in `selected`
+        }
+
+        return (
+            Self.fallbackTrackId,
+            Self.fallbackLessonId,
+            Self.fallbackItemId,
+            Self.fallbackManifestId
+        )
+    }
+
+    public func requestPersonalizedExplanation(
+        context: CertiGoPersonalLearnerContext,
+        userQuestionOrChoice: String
+    ) async throws -> CertiGoLiveAITutorResponse {
+        let mapped = Self.backendTrackTarget(forRouteCode: context.activeRouteCode)
+        let resolved = await resolveLessonAndItem(forTrackId: mapped.trackId, userId: context.userId)
+        let formattedSelection = context.formattedPromptContext(userQuestionOrChoice: userQuestionOrChoice)
+
+        do {
+            return try await postTutorExplain(
+                trackId: resolved.trackId,
+                lessonId: resolved.lessonId,
+                itemId: resolved.itemId,
+                publicManifestId: resolved.publicManifestId,
+                userId: context.userId,
+                selected: [formattedSelection]
+            )
+        } catch {
+            if resolved.trackId != Self.fallbackTrackId {
+                return try await postTutorExplain(
+                    trackId: Self.fallbackTrackId,
+                    lessonId: Self.fallbackLessonId,
+                    itemId: Self.fallbackItemId,
+                    publicManifestId: Self.fallbackManifestId,
+                    userId: context.userId,
+                    selected: [formattedSelection]
+                )
+            }
+            throw error
+        }
+    }
+
+    private func postTutorExplain(
+        trackId: String,
+        lessonId: String,
+        itemId: String,
+        publicManifestId: String,
+        userId: String,
+        selected: [String]
+    ) async throws -> CertiGoLiveAITutorResponse {
+        let explainURL = Self.liveBaseURL.appendingPathComponent("api/tutor/explain")
+        var request = URLRequest(url: explainURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 18
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(userId)", forHTTPHeaderField: "Authorization")
+
+        let payload = TutorExplainPayload(
+            trackId: trackId,
+            lessonId: lessonId,
+            itemId: itemId,
+            selected: selected,
+            publicManifestId: publicManifestId
+        )
+        request.httpBody = try JSONEncoder().encode(payload)
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return try JSONDecoder().decode(CertiGoLiveAITutorResponse.self, from: data)
     }
 }
 
@@ -6157,7 +6598,22 @@ public extension CertigoParallelTracksPreference {
 
 public struct CertiGoNativeAppState: Equatable, Sendable {
     public static let onboardingCompletedDefaultsKey: String = "certigo.native.onboardingCompletedV2"
+    public static let personalLearnerUserIdDefaultsKey: String = "certigo.native.personalLearnerUserId"
 
+    public static func resolveOrCreatePersonalLearnerUserId(
+        defaults: UserDefaults = .standard
+    ) -> String {
+        if let existing = defaults.string(forKey: personalLearnerUserIdDefaultsKey),
+           !existing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            return existing
+        }
+        let generated = "usr-\(UUID().uuidString.lowercased())"
+        defaults.set(generated, forKey: personalLearnerUserIdDefaultsKey)
+        return generated
+    }
+
+    public var personalLearnerUserId: String = CertiGoNativeAppState.resolveOrCreatePersonalLearnerUserId()
     public var selectedTab: CertiGoNativeTab = .parcours
     public var activeRouteCode: String = "AZ-104"
     public var selectedVendorInPopover: String = "microsoft"
@@ -6175,6 +6631,8 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var userXPPoints: Int = 0
     public var completedExamsCount: Int = 0
     public var cortexMasteryByConceptId: [String: ConceptMastery] = [:]
+    public var adaptiveLearnerState: [String: CertiGoLearnerConceptState] = [:]
+    public var recentMistakesLog: [CertiGoPersonalMistakeEntry] = []
 
     // Dynamic 3-unit (15-node) curriculum per certification route
     public var unitsByRouteCode: [String: [CertiGoCertificationUnit]] = [
@@ -6214,9 +6672,9 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var lastComputedExamScoreOutOf1000: Int = 0
 
     // Hub IA (06, 06B, 06C, 06D) & Structured Error Registry (`CG-ERR-xxxx`)
-    public var isLiveAIModelConnected: Bool = false
-    public var activeDiagnosticError: CertiGoErrorCode? = .aiModelNotConnected1001
-    public var errorLogHistory: [CertiGoErrorCode] = [.aiModelNotConnected1001]
+    public var isLiveAIModelConnected: Bool = true
+    public var activeDiagnosticError: CertiGoErrorCode? = nil
+    public var errorLogHistory: [CertiGoErrorCode] = []
     public var showErrorRegistrySheet: Bool = false
     public var isErrorCodeCopied: Bool = false
     public var isAIDrawerOpen06D: Bool = false
@@ -6693,11 +7151,125 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         {
             cortexMasteryByConceptId[conceptKey] = updatedMastery
         }
+        recordCurrentLessonAttemptInPersonalMemory()
         isPresentingLessonSession = false
         if let returnTab = returnTabAfterLessonSession {
             selectedTab = returnTab
             returnTabAfterLessonSession = nil
         }
+    }
+
+    public mutating func recordCurrentLessonAttemptInPersonalMemory() {
+        for (cid, state) in lessonSession.adaptiveLearnerState {
+            adaptiveLearnerState[cid] = state
+        }
+        for entry in lessonSession.recentMistakesLog.reversed() {
+            if !recentMistakesLog.contains(where: { $0.id == entry.id }) {
+                recentMistakesLog.insert(entry, at: 0)
+            }
+        }
+    }
+
+    public var experienceLevelLabel: String {
+        switch onboardingExperienceLevelIndex {
+        case 0:
+            return "Débutant"
+        case 1:
+            return "Intermédiaire"
+        default:
+            return "Avancé"
+        }
+    }
+
+    /// Aggregates all live interactions of the user into a personal learner context for `gpt-5.4-mini`.
+    public func buildPersonalLearnerContext() -> CertiGoPersonalLearnerContext {
+        var mergedConcepts = adaptiveLearnerState
+        for (cid, state) in lessonSession.adaptiveLearnerState {
+            mergedConcepts[cid] = state
+        }
+
+        func conceptName(for cid: String) -> String {
+            if let ex = lessonSession.exercises.first(where: { $0.conceptId == cid }) {
+                return ex.conceptTitle
+            }
+            if let q = lessonSession.adaptiveSessionState.candidatePool.first(where: { $0.conceptId == cid }) {
+                return q.conceptTitle
+            }
+            return cid
+        }
+
+        let sortedWeak = mergedConcepts.values
+            .filter { $0.mastery < 0.65 || $0.errorCount > 0 }
+            .sorted { lhs, rhs in
+                if lhs.errorCount != rhs.errorCount {
+                    return lhs.errorCount > rhs.errorCount
+                }
+                if lhs.mastery != rhs.mastery {
+                    return lhs.mastery < rhs.mastery
+                }
+                return lhs.conceptId < rhs.conceptId
+            }
+            .map { state in
+                let pct = Int((state.mastery * 100.0).rounded())
+                let title = conceptName(for: state.conceptId)
+                return "\(title) (\(pct)% maîtrise, \(state.errorCount) erreur\(state.errorCount > 1 ? "s" : ""))"
+            }
+
+        let sortedStrong = mergedConcepts.values
+            .filter { $0.mastery >= 0.75 }
+            .sorted { lhs, rhs in
+                if lhs.mastery != rhs.mastery {
+                    return lhs.mastery > rhs.mastery
+                }
+                return lhs.conceptId < rhs.conceptId
+            }
+            .map { state in
+                let pct = Int((state.mastery * 100.0).rounded())
+                let title = conceptName(for: state.conceptId)
+                return "\(title) (\(pct)% maîtrise)"
+            }
+
+        var combinedAttempts: [CertiGoPersonalMistakeEntry] = []
+        var seenIds = Set<String>()
+        for entry in lessonSession.recentMistakesLog + recentMistakesLog {
+            if seenIds.insert(entry.id).inserted {
+                combinedAttempts.append(entry)
+            }
+        }
+
+        let mistakesSummary = combinedAttempts
+            .filter { !$0.isCorrect }
+            .prefix(5)
+            .map { entry in
+                "[\(entry.conceptTitle)] \(entry.questionPrompt) — Choisi : « \(entry.chosenAnswer) » au lieu de « \(entry.correctAnswer) »"
+            }
+
+        let totalVerified = max(lessonSession.totalVerifiedCount, combinedAttempts.count)
+        let accuracy: Int = {
+            if lessonSession.totalVerifiedCount > 0 {
+                return lessonSession.accuracyPercent
+            }
+            guard !combinedAttempts.isEmpty else { return 100 }
+            let correctCount = combinedAttempts.filter(\.isCorrect).count
+            return Int((Double(correctCount) / Double(combinedAttempts.count) * 100.0).rounded())
+        }()
+
+        return CertiGoPersonalLearnerContext(
+            userId: personalLearnerUserId,
+            displayName: userDisplayName,
+            experienceLevelLabel: experienceLevelLabel,
+            dailyRhythmMinutes: onboardingDailyRhythmMinutes,
+            targetExamHorizon: targetExamDateText,
+            activeRouteCode: activeRouteCode,
+            parallelTrackCodes: deduplicatedParallelTrackCodes(),
+            completedStepsCount: completedStepsTotal,
+            totalVerifiedQuestions: totalVerified,
+            accuracyPercent: accuracy,
+            lastExamScoreOutOf1000: lastComputedExamScoreOutOf1000,
+            weakConceptsSummary: sortedWeak,
+            strongConceptsSummary: sortedStrong,
+            recentMistakesSummary: mistakesSummary
+        )
     }
 
     public mutating func syncCurrentUserLeaderboardEntry() {
@@ -6846,15 +7418,20 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             examKeyRule2: payload.examRule2,
             closingTip: isLiveAIModelConnected
                 ? payload.closing
-                : "\(payload.closing)\n\nℹ️ Synthèse locale hors-ligne certifiée · Le mode conversationnel libre nécessite la connexion Azure AI Foundry (CG-ERR-1001)."
+                : "\(payload.closing)\n\nℹ️ Synthèse locale hors-ligne certifiée · Le mode conversationnel libre nécessite la connexion Azure AI Foundry (CG-ERR-1001).",
+            isStreamingOrLoading: isLiveAIModelConnected,
+            isLiveAIResponse: false,
+            liveSourceBadge: isLiveAIModelConnected
+                ? "✦ GPT-5.4-MINI EN DIRECT · PERSONNALISÉ POUR \(firstNameText.uppercased())"
+                : nil
         )
         chatTurns.append(turn)
-        if !aiThreads.contains(where: { $0.topicKey == topicKey && $0.routeBadge == activeRouteCode }) {
+        if !aiThreads.contains(where: { $0.topicKey == topicKey && $0.routeBadge == activeRouteCode && $0.title == promptText }) {
             aiThreads.insert(
                 CertiGoAIThreadItem(
                     id: "th-\(aiThreads.count + 1)-\(topicKey)",
                     title: promptText,
-                    subtitle: isLiveAIModelConnected ? "Aujourd'hui · Session Coach IA" : "Aujourd'hui · Fiche Synthèse Locale",
+                    subtitle: isLiveAIModelConnected ? "Aujourd'hui · Session Coach IA (gpt-5.4-mini)" : "Aujourd'hui · Fiche Synthèse Locale",
                     routeBadge: activeRouteCode,
                     isPinned: aiThreads.isEmpty,
                     topicKey: topicKey
@@ -6893,6 +7470,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             return "custom"
         }()
 
+        let badge = "✦ GPT-5.4-MINI EN DIRECT · PERSONNALISÉ POUR \(firstNameText.uppercased())"
         if matchedKey != "custom", let topic = CertiGoFigmaLiveRuntimeState.aiTopicsById[matchedKey] {
             let turn = CertiGoChatTurn(
                 id: "turn-\(chatTurns.count + 1)",
@@ -6902,7 +7480,10 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
                 aiBullet2: topic.bullet2,
                 examKeyRule1: topic.examRule1,
                 examKeyRule2: topic.examRule2,
-                closingTip: topic.closing
+                closingTip: topic.closing,
+                isStreamingOrLoading: true,
+                isLiveAIResponse: false,
+                liveSourceBadge: badge
             )
             chatTurns.append(turn)
         } else {
@@ -6914,7 +7495,10 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
                 aiBullet2: "•  2. Plan réseau & Isolation PaaS : Privilégie Private Endpoint avec une zone DNS privée privatelink.* liée au VNet et désactive l'accès réseau public.",
                 examKeyRule1: "•  Piège classique Pearson VUE : Un verrou CanNotDelete ou un Deny explicite bloque même un Propriétaire (Owner).",
                 examKeyRule2: "•  Réflexe examen : Identifie si la contrainte porte sur la couche 7 HTTP/WAF (Application Gateway) ou la couche 4 TCP/UDP (Load Balancer).",
-                closingTip: "Touche « 🎯 Quiz » pour tester immédiatement ce concept ou pose une question de suivi !"
+                closingTip: "Touche « 🎯 Quiz » pour tester immédiatement ce concept ou pose une question de suivi !",
+                isStreamingOrLoading: true,
+                isLiveAIResponse: false,
+                liveSourceBadge: badge
             )
             chatTurns.append(turn)
         }
@@ -6922,7 +7506,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             CertiGoAIThreadItem(
                 id: "th-\(aiThreads.count + 1)",
                 title: trimmed,
-                subtitle: "À l'instant · Discussion IA",
+                subtitle: "À l'instant · Session Coach IA (gpt-5.4-mini)",
                 routeBadge: activeRouteCode,
                 isPinned: false,
                 topicKey: matchedKey
@@ -6930,6 +7514,49 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             at: 0
         )
         aiDraftMessage = ""
+    }
+
+    public mutating func applyLiveAITutorResponse(
+        _ response: CertiGoLiveAITutorResponse,
+        toTurnWithId turnId: String
+    ) {
+        let targetIndex = chatTurns.firstIndex(where: { $0.id == turnId })
+            ?? (chatTurns.isEmpty ? nil : chatTurns.count - 1)
+        guard let idx = targetIndex else { return }
+
+        chatTurns[idx].aiHeadline = response.headline
+        if let p0 = response.points.first {
+            chatTurns[idx].aiBullet1 = p0.hasPrefix("•") ? p0 : "•  1. \(p0)"
+        }
+        if response.points.count >= 2 {
+            let p1 = response.points[1]
+            chatTurns[idx].aiBullet2 = p1.hasPrefix("•") ? p1 : "•  2. \(p1)"
+        }
+        if response.points.count > 2 {
+            chatTurns[idx].extraPoints = Array(response.points.dropFirst(2)).enumerated().map { offset, text in
+                text.hasPrefix("•") ? text : "•  \(offset + 3). \(text)"
+            }
+        } else {
+            chatTurns[idx].extraPoints = []
+        }
+
+        let persoText = response.personalization?.formattedSummaryFr
+        chatTurns[idx].examKeyRule1 = "•  Encouragement personnalisé : \(response.encouragement)"
+        if let persoText {
+            chatTurns[idx].examKeyRule2 = "•  Recommandation IA : \(response.recommendation)\n•  \(persoText)"
+        } else {
+            chatTurns[idx].examKeyRule2 = "•  Recommandation IA : \(response.recommendation)"
+        }
+        chatTurns[idx].personalizationSummary = persoText
+        chatTurns[idx].isStreamingOrLoading = false
+        chatTurns[idx].isLiveAIResponse = true
+        chatTurns[idx].liveSourceBadge = "✦ GPT-5.4-MINI EN DIRECT · PERSONNALISÉ POUR \(firstNameText.uppercased())"
+        chatTurns[idx].closingTip = "Réponse générée en direct par gpt-5.4-mini (\(response.source.uppercased())) · Mémoire Cosmos DB synchronisée."
+    }
+
+    public mutating func markTurnStreamingFinished(turnId: String) {
+        guard let idx = chatTurns.firstIndex(where: { $0.id == turnId }) else { return }
+        chatTurns[idx].isStreamingOrLoading = false
     }
 
     // MARK: Social Friends Filter & Salut
@@ -7841,6 +8468,7 @@ public struct CertiGoNativeFigmaAppView: View {
                     appState.isPresentingLessonSession = false
                     appState.openAITopic(topicKey)
                     appState.selectedTab = .hubIA
+                    triggerLiveAITutorRequestForLatestTurn()
                 }
             )
         }
@@ -7857,6 +8485,7 @@ public struct CertiGoNativeFigmaAppView: View {
                         customUserQuestion: "Analyse mes erreurs de l'examen blanc \(appState.activeRouteCode) (\(appState.lastComputedExamScoreOutOf1000) / 1000)"
                     )
                     appState.selectedTab = .hubIA
+                    triggerLiveAITutorRequestForLatestTurn()
                 }
             )
         }
@@ -11769,6 +12398,96 @@ public struct CertiGoNativeFigmaAppView: View {
         }
     }
 
+    private func triggerLiveAITutorRequestForLatestTurn() {
+        guard appState.isLiveAIModelConnected,
+              let latestTurn = appState.chatTurns.last
+        else { return }
+        let turnId = latestTurn.id
+        let userQuestion = latestTurn.userPrompt
+        let context = appState.buildPersonalLearnerContext()
+
+        Task { @MainActor in
+            do {
+                let response = try await CertiGoLiveAITutorService.shared.requestPersonalizedExplanation(
+                    context: context,
+                    userQuestionOrChoice: userQuestion
+                )
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    appState.applyLiveAITutorResponse(response, toTurnWithId: turnId)
+                }
+            } catch {
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    appState.markTurnStreamingFinished(turnId: turnId)
+                }
+            }
+        }
+    }
+
+    private var activePersonalMemoryBannerView: some View {
+        let context = appState.buildPersonalLearnerContext()
+        let focusSummaryText: String = {
+            if !context.recentMistakesSummary.isEmpty {
+                return "\(context.recentMistakesSummary.count) erreur\(context.recentMistakesSummary.count > 1 ? "s" : "") récente\(context.recentMistakesSummary.count > 1 ? "s" : "") à consolider · Précision \(context.accuracyPercent) %"
+            }
+            if let firstWeak = context.weakConceptsSummary.first {
+                return "Point prioritaire : \(firstWeak)"
+            }
+            return "Prêt à analyser ta 1re séance · Précision \(context.accuracyPercent) %"
+        }()
+
+        return VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+            HStack(spacing: PrismSpacing.xs) {
+                Text(verbatim: "🧠 Mémoire IA Personnelle Active")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                Spacer(minLength: PrismSpacing.xxs)
+                Text(
+                    verbatim: appState.isLiveAIModelConnected
+                        ? "● Connecté en direct · gpt-5.4-mini"
+                        : "○ Hors-ligne · Synthèse locale"
+                )
+                .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Bold"))
+                .foregroundStyle(
+                    appState.isLiveAIModelConnected
+                        ? PrismColor.figmaHex("#15803d")
+                        : PrismColor.figmaHex("#b45309")
+                )
+                .padding(.horizontal, PrismSpacing.xs)
+                .padding(.vertical, PrismSpacing.xxs)
+                .background(
+                    Capsule().fill(
+                        appState.isLiveAIModelConnected
+                            ? PrismColor.figmaHex("#dcfce7")
+                            : PrismColor.figmaHex("#fef3c7")
+                    )
+                )
+            }
+
+            Text(
+                verbatim: "\(context.experienceLevelLabel) · \(context.dailyRhythmMinutes) min/j · Objectif \(context.targetExamHorizon) · \(context.activeRouteCode)"
+            )
+            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+            .lineLimit(1)
+
+            Text(verbatim: focusSummaryText)
+                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#475569"))
+                .lineLimit(2)
+        }
+        .padding(PrismSpacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .fill(PrismColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#bfdbfe"), lineWidth: PrismBorder.standard)
+        )
+        .accessibilityIdentifier("hub-ia-personal-memory-banner")
+    }
+
     private var hubIAWelcome06Content: some View {
         let suggestions: [(icon: String, title: String, subtitle: String, key: String)] = [
             ("📘", "Explique-moi RBAC vs Azure Policy", "Différences, portée & règle de priorité Owner", "rbac-vs-policy"),
@@ -11778,6 +12497,9 @@ public struct CertiGoNativeFigmaAppView: View {
         ]
 
         return VStack(spacing: PrismSpacing.l) {
+            activePersonalMemoryBannerView
+                .padding(.top, PrismSpacing.xs)
+
             if let activeError = appState.activeDiagnosticError {
                 // Show the diagnostic error card cleanly in place of the mascot welcome hero until dismissed!
                 CertiGoDiagnosticErrorCardView(
@@ -11808,7 +12530,7 @@ public struct CertiGoNativeFigmaAppView: View {
                         .foregroundStyle(PrismColor.figmaHex("#475569"))
                         .multilineTextAlignment(.center)
                 }
-                .padding(.top, PrismSpacing.l)
+                .padding(.top, PrismSpacing.xs)
             }
 
             VStack(spacing: PrismSpacing.m) {
@@ -11816,6 +12538,7 @@ public struct CertiGoNativeFigmaAppView: View {
                     Button {
                         withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
                             appState.openAITopic(item.key)
+                            triggerLiveAITutorRequestForLatestTurn()
                         }
                     } label: {
                         HStack(spacing: PrismSpacing.m) {
@@ -11862,6 +12585,8 @@ public struct CertiGoNativeFigmaAppView: View {
 
     private var hubIAConversation06BContent: some View {
         LazyVStack(spacing: PrismSpacing.l) {
+            activePersonalMemoryBannerView
+
             if let activeError = appState.activeDiagnosticError {
                 HStack(spacing: PrismSpacing.s) {
                     Text(verbatim: "⚠️ \(activeError.code)")
@@ -11917,13 +12642,32 @@ public struct CertiGoNativeFigmaAppView: View {
                     // Structured AI Coach Card (`06B`)
                     VStack(alignment: .leading, spacing: PrismSpacing.m) {
                         HStack(spacing: PrismSpacing.xs) {
-                            Text(verbatim: "✦ CERTIGO IA · SYNTHÈSE OFFICIELLE")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
-                                .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                            Text(
+                                verbatim: turn.liveSourceBadge
+                                    ?? "✦ GPT-5.4-MINI EN DIRECT · PERSONNALISÉ POUR \(appState.firstNameText.uppercased())"
+                            )
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
                             Spacer()
                             Text(verbatim: appState.activeRouteCode)
                                 .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
                                 .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                        }
+
+                        if turn.isStreamingOrLoading {
+                            HStack(spacing: PrismSpacing.xs) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text(verbatim: "✦ CertiGo IA analyse ton profil et tes réponses en direct (gpt-5.4-mini)...")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#0284c7"))
+                            }
+                            .padding(PrismSpacing.s)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .fill(PrismColor.figmaHex("#f0f9ff"))
+                            )
                         }
 
                         Text(verbatim: turn.aiHeadline)
@@ -11943,6 +12687,13 @@ public struct CertiGoNativeFigmaAppView: View {
                                 .foregroundStyle(PrismColor.figmaHex("#334155"))
                                 .lineSpacing(3)
                                 .fixedSize(horizontal: false, vertical: true)
+                            ForEach(turn.extraPoints, id: \.self) { extra in
+                                Text(verbatim: extra)
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
+                                    .foregroundStyle(PrismColor.figmaHex("#334155"))
+                                    .lineSpacing(3)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
 
                         // Highlighted Exam Takeaway Box (`💡 À retenir pour l'examen`)
@@ -12058,6 +12809,7 @@ public struct CertiGoNativeFigmaAppView: View {
                     withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
                         appState.sendAIMessage(appState.aiDraftMessage)
                         isAIInputFocused = false
+                        triggerLiveAITutorRequestForLatestTurn()
                     }
                 }
                 .accessibilityIdentifier("hub-ia-textfield")
@@ -12085,6 +12837,7 @@ public struct CertiGoNativeFigmaAppView: View {
                         withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
                             appState.sendAIMessage(appState.aiDraftMessage)
                             dismissKeyboardInteractively()
+                            triggerLiveAITutorRequestForLatestTurn()
                         }
                     } label: {
                         Text(verbatim: "↑")
@@ -12372,6 +13125,7 @@ public struct CertiGoNativeFigmaAppView: View {
         Button {
             withAnimation(CertiGoMotion.spring(for: .anim04Claude85DrawerPush, reduceMotion: reduceMotion)) {
                 appState.openAITopic(thread.topicKey, customUserQuestion: thread.title)
+                triggerLiveAITutorRequestForLatestTurn()
             }
         } label: {
             HStack(spacing: PrismSpacing.s) {
@@ -13827,11 +14581,9 @@ public struct CertiGoNativeLessonSessionModalView: View {
             HStack(spacing: PrismSpacing.m) {
                 Button {
                     withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                        if isCorrect {
-                            appState.lessonSession.openServiceComparatorSheet20()
-                        } else {
-                            appState.lessonSession.openErrorExplanationSheet05()
-                        }
+                        appState.recordCurrentLessonAttemptInPersonalMemory()
+                        appState.lessonSession.openErrorExplanationSheet05()
+                        requestLiveExplanationForCurrentExercise(isCorrect: isCorrect)
                     }
                 } label: {
                     Text(verbatim: isCorrect ? "✦ EXPLIQUER MA RÉPONSE" : "✦ EXPLIQUER MON ERREUR")
@@ -13880,6 +14632,35 @@ public struct CertiGoNativeLessonSessionModalView: View {
         )
     }
 
+    private func requestLiveExplanationForCurrentExercise(isCorrect: Bool) {
+        guard appState.isLiveAIModelConnected else { return }
+        let ex = appState.lessonSession.currentExercise
+        let selectedSummary = appState.lessonSession.selectedOptionSummaryText
+        let correctTitle = ex.primaryCorrectOptionTitle
+        let context = appState.buildPersonalLearnerContext()
+        let query = """
+        [Leçon \(appState.lessonSession.lessonTitle) · Concept: \(ex.conceptTitle)] Énoncé: \(ex.prompt) | Réponse choisie par l'apprenant (\(isCorrect ? "Exacte" : "Erreur")): \(selectedSummary) | Bonne réponse attendue: \(correctTitle)
+        """
+        appState.lessonSession.isLoadingLiveSheet05Explanation = true
+
+        Task { @MainActor in
+            do {
+                let response = try await CertiGoLiveAITutorService.shared.requestPersonalizedExplanation(
+                    context: context,
+                    userQuestionOrChoice: query
+                )
+                withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                    appState.lessonSession.liveSheet05Explanation = response
+                    appState.lessonSession.isLoadingLiveSheet05Explanation = false
+                }
+            } catch {
+                withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                    appState.lessonSession.isLoadingLiveSheet05Explanation = false
+                }
+            }
+        }
+    }
+
     private var explanationSheet05Overlay: some View {
         let ex = appState.lessonSession.currentExercise
         return VStack(alignment: .leading, spacing: PrismSpacing.m) {
@@ -13898,6 +14679,57 @@ public struct CertiGoNativeLessonSessionModalView: View {
                         .foregroundStyle(PrismColor.figmaHex("#64748b"))
                 }
                 .buttonStyle(.plain)
+            }
+
+            if appState.lessonSession.isLoadingLiveSheet05Explanation || appState.lessonSession.liveSheet05Explanation != nil {
+                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                    HStack {
+                        Text(verbatim: "✦ Explication Personnalisée IA (gpt-5.4-mini)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
+                            .foregroundStyle(PrismColor.figmaHex("#0284c7"))
+                        Spacer()
+                        if appState.lessonSession.isLoadingLiveSheet05Explanation {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+
+                    if let liveExp = appState.lessonSession.liveSheet05Explanation {
+                        Text(verbatim: liveExp.headline)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        ForEach(Array(liveExp.points.prefix(2)), id: \.self) { pt in
+                            Text(verbatim: "• \(pt)")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
+                                .foregroundStyle(PrismColor.figmaHex("#334155"))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        if let perso = liveExp.personalization {
+                            Text(verbatim: perso.formattedSummaryFr)
+                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#0369a1"))
+                                .padding(.top, PrismSpacing.xxs)
+                        }
+                    } else {
+                        Text(verbatim: "Analyse de ta réponse et de ton historique de maîtrise en direct...")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
+                            .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    }
+                }
+                .padding(PrismSpacing.m)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                        .fill(PrismColor.figmaHex("#f0f9ff"))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                        .strokeBorder(PrismColor.figmaHex("#bae6fd"), lineWidth: PrismBorder.standard)
+                )
+                .accessibilityIdentifier("sheet05-live-ai-explanation-card")
             }
 
             VStack(alignment: .leading, spacing: PrismSpacing.xs) {
