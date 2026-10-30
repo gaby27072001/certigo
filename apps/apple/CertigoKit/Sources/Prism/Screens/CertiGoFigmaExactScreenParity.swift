@@ -3360,6 +3360,8 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
         "aws": "AWS",
         "google": "Google",
         "github": "GitHub",
+        "kubernetes": "Kubernetes",
+        "cncf": "Kubernetes & CNCF",
         "cisco": "Cisco"
     ]
 
@@ -3383,7 +3385,13 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
                 PopoverCertificationCardItem(code: "GH-900", title: "Foundations"),
                 PopoverCertificationCardItem(code: "GH-AS", title: "Advanced Security")
             ]
-        case "cisco", "cncf":
+        case "kubernetes", "cncf", "k8s":
+            return [
+                PopoverCertificationCardItem(code: "CKA", title: "Kubernetes Admin"),
+                PopoverCertificationCardItem(code: "CKAD", title: "Kubernetes App Dev"),
+                PopoverCertificationCardItem(code: "TF-003", title: "Terraform Associate")
+            ]
+        case "cisco":
             return [
                 PopoverCertificationCardItem(code: "CCNA", title: "Network Associate"),
                 PopoverCertificationCardItem(code: "CKA", title: "Kubernetes Admin"),
