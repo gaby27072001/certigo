@@ -506,8 +506,11 @@ struct CertiGoNativeFigmaAppTests {
         }
 
         var appState = CertiGoNativeAppState()
-        #expect(appState.isLiveAIModelConnected == false)
-        appState.activeDiagnosticError = nil
+        #expect(appState.isLiveAIModelConnected == true)
+        #expect(appState.activeDiagnosticError == nil)
+
+        // Explicitly switch to offline mode to test honest disconnected error handling
+        appState.isLiveAIModelConnected = false
         appState.sendAIMessage("Test")
         #expect(appState.chatTurns.isEmpty)
         #expect(appState.activeDiagnosticError == .aiModelNotConnected1001)
@@ -768,5 +771,124 @@ struct CertiGoNativeFigmaAppTests {
                 }
             }
         }
+    }
+
+    @Test("Live AI Tutor: isLiveAIModelConnected is true by default, activeDiagnosticError is nil, and buildPersonalLearnerContext updates dynamically on right/wrong answers")
+    func liveAIPersonalLearnerContextAndTrackMappings() {
+        var appState = CertiGoNativeAppState()
+        #expect(appState.isLiveAIModelConnected == true)
+        #expect(appState.activeDiagnosticError == nil)
+        #expect(appState.errorLogHistory.isEmpty)
+        #expect(appState.personalLearnerUserId.hasPrefix("usr-"))
+
+        // Configure user onboarding profile
+        appState.userDisplayName = "Gabriel Chambaud"
+        appState.onboardingExperienceLevelIndex = 2 // Avancé
+        appState.onboardingDailyRhythmMinutes = 20
+        appState.targetExamDateText = "Dans 30 jours"
+        appState.selectRoute("SAA-C03")
+
+        let initialContext = appState.buildPersonalLearnerContext()
+        #expect(initialContext.userId == appState.personalLearnerUserId)
+        #expect(initialContext.displayName == "Gabriel Chambaud")
+        #expect(initialContext.experienceLevelLabel == "Avancé")
+        #expect(initialContext.dailyRhythmMinutes == 20)
+        #expect(initialContext.targetExamHorizon == "Dans 30 jours")
+        #expect(initialContext.activeRouteCode == "SAA-C03")
+        #expect(initialContext.totalVerifiedQuestions == 0)
+        #expect(initialContext.recentMistakesSummary.isEmpty)
+
+        // Start a lesson session and make a wrong answer on Exercise 1
+        appState.startLessonSession(forLessonId: "SAA-C03-u1-s1", skipDeclic15: true, enableAdaptiveReplay: true)
+        let ex1 = appState.lessonSession.currentExercise
+        if let wrongOption = ex1.options.first(where: { !$0.isCorrect }) {
+            appState.lessonSession.selectOption(wrongOption.id)
+        }
+        #expect(appState.lessonSession.verifyCurrentAnswer() == false)
+
+        let afterMistakeContext = appState.buildPersonalLearnerContext()
+        #expect(afterMistakeContext.totalVerifiedQuestions == 1)
+        #expect(afterMistakeContext.accuracyPercent == 0)
+        #expect(afterMistakeContext.recentMistakesSummary.count == 1)
+        #expect(afterMistakeContext.recentMistakesSummary[0].contains(ex1.conceptTitle))
+        #expect(afterMistakeContext.weakConceptsSummary.contains(where: { $0.contains("1 erreur") }))
+
+        let promptPayload = afterMistakeContext.formattedPromptContext(
+            userQuestionOrChoice: "Pourquoi mon groupe Auto Scaling recrée-t-il l'instance EC2 ?"
+        )
+        #expect(promptPayload.contains("Gabriel Chambaud"))
+        #expect(promptPayload.contains("Avancé"))
+        #expect(promptPayload.contains("20 min/j"))
+        #expect(promptPayload.contains("SAA-C03"))
+        #expect(promptPayload.contains("Pourquoi mon groupe Auto Scaling"))
+
+        // Advance and answer Exercise 2 correctly with pre-boosted mastery so concept crosses >= 0.75
+        appState.lessonSession.advanceToNextExerciseOrFinish()
+        let ex2 = appState.lessonSession.currentExercise
+        if let currentConceptId = appState.lessonSession.adaptiveSessionState.queue.first?.conceptId {
+            appState.lessonSession.adaptiveLearnerState[currentConceptId]?.mastery = 0.60
+        }
+        if let rightOption = ex2.options.first(where: \.isCorrect) {
+            appState.lessonSession.selectOption(rightOption.id)
+        }
+        #expect(appState.lessonSession.verifyCurrentAnswer(latencyMs: 1_800) == true)
+
+        let afterCorrectContext = appState.buildPersonalLearnerContext()
+        #expect(afterCorrectContext.totalVerifiedQuestions == 2)
+        #expect(afterCorrectContext.accuracyPercent == 50)
+        #expect(!afterCorrectContext.strongConceptsSummary.isEmpty)
+
+        // Verify live backend track mapping across all supported certifications
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "AZ-104").trackId == "microsoft.az-104.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "AZ-900").trackId == "microsoft.az-900.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "AI-102").trackId == "microsoft.ai-103.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "AI-901").trackId == "microsoft.ai-901.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "GH-300").trackId == "microsoft.gh-300.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "CCA-F").trackId == "microsoft.gh-300.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "SAA-C03").trackId == "aws.saa-c03.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "CLF-C02").trackId == "aws.clf-c02.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "AIF-C01").trackId == "aws.aif-c01.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "PDE").trackId == "gcp.data-engineer.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "PCA").trackId == "gcp.cloud-architect.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "ACE").trackId == "gcp.cloud-engineer.track.main")
+        #expect(CertiGoLiveAITutorService.backendTrackTarget(forRouteCode: "CKA").trackId == "microsoft.az-104.track.main")
+
+        // Verify applying a live gpt-5.4-mini response updates the chat turn and personalization summary
+        appState.sendAIMessage("Explique la différence entre RBAC et Azure Policy")
+        #expect(appState.chatTurns.count == 1)
+        let turnId = appState.chatTurns[0].id
+        #expect(appState.chatTurns[0].isStreamingOrLoading == true)
+
+        let simulatedLiveResponse = CertiGoLiveAITutorResponse(
+            itemId: "microsoft.az-104.section-1.az104-scenario-2026-02.001",
+            conceptId: "microsoft.az-104.concept.az104-scenario-2026-02",
+            correct: false,
+            headline: "Azure Policy contrôle la conformité des ressources tandis que RBAC gère les identités",
+            points: [
+                "Azure RBAC attribue des permissions aux utilisateurs, groupes et Managed Identities.",
+                "Azure Policy applique des garde-fous sur les propriétés des ressources ARM même pour un Owner.",
+                "Une affectation Policy au Management Group est héritée par tous les abonnements enfants."
+            ],
+            encouragement: "Excellente progression sur la gouvernance Azure !",
+            recommendation: "Révise le lab sur les verrous CanNotDelete et l'effet Deny.",
+            citedConceptIds: ["microsoft.az-104.concept.az104-scenario-2026-02"],
+            source: "ai",
+            personalization: .init(
+                attempts: 3,
+                errors: 1,
+                accuracyPct: 67,
+                recurringStruggle: false,
+                masteredBefore: true,
+                trend: "improving",
+                topConfusedOption: nil
+            )
+        )
+        appState.applyLiveAITutorResponse(simulatedLiveResponse, toTurnWithId: turnId)
+        #expect(appState.chatTurns[0].isStreamingOrLoading == false)
+        #expect(appState.chatTurns[0].isLiveAIResponse == true)
+        #expect(appState.chatTurns[0].aiHeadline == simulatedLiveResponse.headline)
+        #expect(appState.chatTurns[0].extraPoints.count == 1)
+        #expect(appState.chatTurns[0].liveSourceBadge?.contains("GABRIEL") == true)
+        #expect(appState.chatTurns[0].personalizationSummary?.contains("en progression") == true)
     }
 }
