@@ -186,4 +186,43 @@ public sealed class TutorServiceTests
         comeback.Personalization.Trend.Should().Be("improving");
         comeback.Headline.Should().Be("Big improvement — you turned this one around!");
     }
+
+    [Fact]
+    public async Task ChatAsync_returns_llm_reply_and_suggestions_when_available()
+    {
+        var reply = """
+        {
+          "reply": "À Paris aujourd'hui, le temps est doux (16 °C).\n\nBon courage pour ton parcours AZ-104 !",
+          "followUpSuggestions": ["Lancer un quiz AZ-104", "Revoir Entra ID"]
+        }
+        """;
+        var h = new TutorServiceHarness();
+        var service = h.Build(reply);
+
+        var dto = await service.ChatAsync(new TutorChatRequest(
+            "Quel temps fait-il à Paris ?",
+            TestContent.TrackId,
+            "Utilisateur: Gabriel · Parcours: AZ-104"));
+
+        dto.Source.Should().Be("ai");
+        dto.Model.Should().Be("gpt-5.4-mini");
+        dto.Reply.Should().Contain("Paris");
+        dto.FollowUpSuggestions.Should().Contain("Lancer un quiz AZ-104");
+    }
+
+    [Fact]
+    public async Task ChatAsync_falls_back_gracefully_when_llm_unavailable()
+    {
+        var h = new TutorServiceHarness();
+        var service = h.Build();
+
+        var dto = await service.ChatAsync(new TutorChatRequest(
+            "Quel temps fait-il à Paris ?",
+            "AZ-104"));
+
+        dto.Source.Should().Be("grounded");
+        dto.Model.Should().Be("gpt-5.4-mini");
+        dto.Reply.Should().Contain("Paris");
+        dto.FollowUpSuggestions.Should().NotBeEmpty();
+    }
 }

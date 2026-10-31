@@ -53,4 +53,20 @@ public sealed class TutorFunctionsTests
         await Assert.ThrowsAsync<BadRequestException>(act);
         service.CallCount.Should().Be(0);
     }
+
+    [Fact]
+    public async Task ChatWithTutor_Returns200_AndForwardsBody_WhenAuthenticated()
+    {
+        var service = new FakeTutorService();
+        var function = new TutorFunctions(service);
+        var context = TestFunctionContext.Authenticated();
+        var body = new TutorChatRequest("Quel temps fait-il à Paris ?", "AZ-104");
+        var request = new TestHttpRequestData(context, "POST", "https://localhost/api/tutor/chat", body);
+
+        var response = await function.ChatWithTutor(request, context);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        service.ChatCallCount.Should().Be(1);
+        service.LastChatRequest!.Message.Should().Be("Quel temps fait-il à Paris ?");
+    }
 }

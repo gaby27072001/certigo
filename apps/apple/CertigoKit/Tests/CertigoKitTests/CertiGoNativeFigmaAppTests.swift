@@ -891,4 +891,120 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.chatTurns[0].liveSourceBadge?.contains("GABRIEL") == true)
         #expect(appState.chatTurns[0].personalizationSummary?.contains("en progression") == true)
     }
+
+    @Test("All 15 path lesson nodes across certifications resolve official vector service assets in Prism.xcassets, progressive 3-slide micro-lessons vs Express Quiz, freeform AI chat, and persistent local database")
+    func officialServiceLogosThreeSlideLessonsFreeformAIChatAndLocalDatabasePersistence() throws {
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: root.appendingPathComponent("AGENTS.md").path) {
+            let parent = root.deletingLastPathComponent()
+            guard parent != root else { throw CocoaError(.fileNoSuchFile) }
+            root = parent
+        }
+        let prismAssets = root.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Resources/Prism.xcassets")
+
+        // 1. Verify all 15 steps across every certification have valid official service vector assets in Prism.xcassets
+        let certifications = ["AZ-104", "AZ-900", "AI-102", "SAA-C03", "CLF-C02", "AIF-C01", "PDE", "PCA", "ACE", "CKA", "CCNA", "TF-003", "GH-300", "CCA-F"]
+        for code in certifications {
+            let units = CertiGoNativeRichCatalog.buildThreeUnits(forRouteCode: code)
+            let lessons = units.flatMap(\.lessons)
+            #expect(lessons.count == 15)
+            for lesson in lessons {
+                #expect(!lesson.serviceAssetName.isEmpty)
+                let assetDir = prismAssets.appendingPathComponent("\(lesson.serviceAssetName).imageset")
+                #expect(
+                    FileManager.default.fileExists(atPath: assetDir.path),
+                    "Missing service imageset \(lesson.serviceAssetName) for \(lesson.id)"
+                )
+            }
+            // Verify step 0..2 are progressive lessons (isQuizOnlyChapter == false) and step 4 is Express Quiz (isQuizOnlyChapter == true)
+            #expect(lessons[0].isQuizOnlyChapter == false)
+            #expect(lessons[1].isQuizOnlyChapter == false)
+            #expect(lessons[2].isQuizOnlyChapter == false)
+            #expect(lessons[3].isQuizOnlyChapter == true)
+            #expect(lessons[4].isQuizOnlyChapter == true)
+            #expect(lessons[4].chapterFormatBadgeText.contains("Quiz Express"))
+        }
+
+        // 2. Verify progressive 3-slide micro-lesson navigation (1/3 -> 2/3 -> 3/3 -> questions) vs Express Quiz starting directly on questions
+        var appState = CertiGoNativeAppState()
+        appState.startLessonSession(forLessonId: "AZ-104-u1-s1")
+        #expect(appState.lessonSession.isShowingDeclicCard15 == true)
+        #expect(appState.lessonSession.lessonSlides.count == 3)
+        #expect(appState.lessonSession.lessonSlideIndex == 0)
+
+        appState.lessonSession.advanceLessonSlideOrStartExercises()
+        #expect(appState.lessonSession.lessonSlideIndex == 1)
+        #expect(appState.lessonSession.isShowingDeclicCard15 == true)
+
+        appState.lessonSession.previousLessonSlide()
+        #expect(appState.lessonSession.lessonSlideIndex == 0)
+
+        appState.lessonSession.advanceLessonSlideOrStartExercises()
+        appState.lessonSession.advanceLessonSlideOrStartExercises()
+        #expect(appState.lessonSession.lessonSlideIndex == 2)
+        #expect(appState.lessonSession.isShowingDeclicCard15 == true)
+
+        appState.lessonSession.advanceLessonSlideOrStartExercises()
+        #expect(appState.lessonSession.isShowingDeclicCard15 == false)
+
+        // Starting an Express Quiz chapter (stepIndexInUnit == 4) skips slides automatically
+        appState.startLessonSession(forLessonId: "AZ-104-u1-s5")
+        #expect(appState.lessonSession.isShowingDeclicCard15 == false)
+
+        // 3. Freeform CertiGo AI chat answers general questions (e.g. Paris weather) and updates naturalReplyText
+        let context = appState.buildPersonalLearnerContext()
+        let weatherFallback = CertiGoLiveAITutorService.composeSmartFreeformFallback(
+            context: context,
+            message: "Quel temps fait-il à Paris aujourd'hui ?"
+        )
+        #expect(weatherFallback.reply.contains("Paris"))
+        #expect(!weatherFallback.suggestions.isEmpty)
+
+        appState.sendAIMessage("Quel temps fait-il à Paris ?")
+        let weatherTurnId = appState.chatTurns.last!.id
+        appState.applyFreeformAIChatResponse(
+            reply: weatherFallback.reply,
+            suggestions: weatherFallback.suggestions,
+            toTurnWithId: weatherTurnId
+        )
+        #expect(appState.chatTurns.last?.isStreamingOrLoading == false)
+        #expect(appState.chatTurns.last?.naturalReplyText.contains("Paris") == true)
+        #expect(appState.chatTurns.last?.followUpSuggestions == weatherFallback.suggestions)
+
+        // 4. Persistent Local Database (CertiGoLocalDatabaseStore) saves & restores user progress and completed lessons
+        let tempFileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("certigo-test-db-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: tempFileURL) }
+        let customStore = CertiGoLocalDatabaseStore(fileURL: tempFileURL)
+        customStore.clear()
+
+        appState.userDisplayName = "Gabriel Chambaud"
+        appState.userHandle = "@gabriel"
+        appState.isProMember = true
+        appState.streakDays = 7
+        appState.gemsCount = 240
+        appState.userXPPoints = 450
+        appState.completedStepsTotal = 2
+        appState.startLessonSession(forLessonId: "AZ-104-u1-s1", skipDeclic15: true)
+        appState.completeActiveLessonSessionAndUnlockNextNode()
+        appState.saveToLocalDatabase(store: customStore)
+
+        let restoredState = CertiGoNativeAppState(restoreFromDisk: true, databaseStore: customStore)
+        #expect(restoredState.userDisplayName == "Gabriel Chambaud")
+        #expect(restoredState.userHandle == "@gabriel")
+        #expect(restoredState.isProMember == true)
+        #expect(restoredState.streakDays == 7)
+        #expect(restoredState.gemsCount == 255)
+        #expect(restoredState.routeCompletedLessonsCount(forRouteCode: "AZ-104") == 1)
+        #expect(restoredState.currentUnits[0].lessons[0].state == .completed)
+        #expect(restoredState.currentUnits[0].lessons[1].state == .active)
+
+        // Resetting clears the persisted database and re-opens OB_01
+        var mutableRestored = restoredState
+        mutableRestored.resetToFreshNewUser(store: customStore)
+        #expect(customStore.load() == nil)
+        #expect(mutableRestored.streakDays == 0)
+        #expect(mutableRestored.gemsCount == 0)
+        #expect(mutableRestored.isPresentingOnboardingFlow == true)
+    }
 }

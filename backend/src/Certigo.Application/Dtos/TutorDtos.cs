@@ -33,3 +33,18 @@ public sealed record TutorExplanationDto(
     IReadOnlyList<string> CitedConceptIds,
     string Source,
     TutorPersonalizationDto Personalization);
+
+public sealed record TutorChatHistoryTurnDto(string Role, string Content);
+
+public sealed record TutorChatRequest(
+    string Message,
+    string? TrackId = null,
+    string? LearnerContextSummary = null,
+    IReadOnlyList<TutorChatHistoryTurnDto>? History = null);
+
+public sealed record TutorChatResponseDto(
+    string Reply,
+    IReadOnlyList<string> FollowUpSuggestions,
+    string Source,
+    string Model);
+

@@ -89,6 +89,10 @@
       "reason": "Tuteur LLM. Surface dependante d'un fournisseur externe ; contrat a ecrire avec la porte live (backend/run-tutor-llm-live-gate.ps1)."
     },
     {
+      "operation": "POST /tutor/chat",
+      "reason": "Chat libre CertiGo AI personnalise avec contexte apprenant ; complementaire de POST /tutor/explain."
+    },
+    {
       "operation": "GET /content/admin/releases/pointer",
       "reason": "Administration de contenu, pas une surface applicative. Complementaire de runtime-content/v1."
     },

@@ -47,15 +47,28 @@ internal sealed class FakeTutorService : ITutorService
 {
     public TutorExplanationDto Result { get; set; } = DefaultResult();
 
+    public TutorChatResponseDto ChatResult { get; set; } = DefaultChatResult();
+
     public TutorExplainRequest? LastRequest { get; private set; }
 
+    public TutorChatRequest? LastChatRequest { get; private set; }
+
     public int CallCount { get; private set; }
+
+    public int ChatCallCount { get; private set; }
 
     public Task<TutorExplanationDto> ExplainAsync(TutorExplainRequest request, CancellationToken cancellationToken = default)
     {
         LastRequest = request;
         CallCount++;
         return Task.FromResult(Result);
+    }
+
+    public Task<TutorChatResponseDto> ChatAsync(TutorChatRequest request, CancellationToken cancellationToken = default)
+    {
+        LastChatRequest = request;
+        ChatCallCount++;
+        return Task.FromResult(ChatResult);
     }
 
     private static TutorExplanationDto DefaultResult() =>
@@ -70,6 +83,13 @@ internal sealed class FakeTutorService : ITutorService
             new List<string> { "concept-1" },
             "ai",
             new TutorPersonalizationDto(1, 0, 100, false, false, "flat", null));
+
+    private static TutorChatResponseDto DefaultChatResult() =>
+        new(
+            "Bonjour ! Voici la réponse.",
+            new List<string> { "Question 1", "Question 2" },
+            "ai",
+            "gpt-5.4-mini");
 }
 
 /// <summary>Double for <see cref="IStreakRepairService"/>.</summary>
