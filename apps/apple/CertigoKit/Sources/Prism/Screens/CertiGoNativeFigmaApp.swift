@@ -1147,12 +1147,46 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
 
 // MARK: - 1B. Duolingo-Inspired Deterministic Adaptive Session Engine (`CertiGoAdaptiveSessionEngine`)
 
+/// 4-Tier Cognitive Scaffolding Progression (`Palier 1 Intuition ~95% ➔ Palier 2 Association ➔ Palier 3 Scénario ➔ Palier 4 Examen/CLI`).
+public enum CertiGoScaffoldingTier: Int, CaseIterable, Codable, Equatable, Sendable {
+    case tier1Intuition = 1
+    case tier2Association = 2
+    case tier3Scenario = 3
+    case tier4ExamAndCLI = 4
+
+    public var label: String {
+        switch self {
+        case .tier1Intuition:
+            return "Palier 1 · Intuition (~95 % réussite)"
+        case .tier2Association:
+            return "Palier 2 · Association visuelle"
+        case .tier3Scenario:
+            return "Palier 3 · Scénario guidé"
+        case .tier4ExamAndCLI:
+            return "Palier 4 · Style Examen & CLI"
+        }
+    }
+
+    public static func tier(forMastery mastery: Double, difficulty: Double) -> CertiGoScaffoldingTier {
+        if mastery < 0.40 || difficulty < 0.42 {
+            return .tier1Intuition
+        } else if mastery < 0.60 || difficulty < 0.56 {
+            return .tier2Association
+        } else if mastery < 0.78 || difficulty < 0.75 {
+            return .tier3Scenario
+        } else {
+            return .tier4ExamAndCLI
+        }
+    }
+}
+
 /// Question metadata for the deterministic adaptive session engine (zero LLM for question selection).
 public struct CertiGoAdaptiveQuestion: Identifiable, Equatable, Sendable {
     public let id: String
     public let conceptId: String
     public let conceptTitle: String
     public let difficulty: Double
+    public let scaffoldingTier: CertiGoScaffoldingTier
     public let formatCode: String
     public let variantGroupId: String
     public var isReviewReplay: Bool
@@ -1163,22 +1197,25 @@ public struct CertiGoAdaptiveQuestion: Identifiable, Equatable, Sendable {
         conceptId: String,
         conceptTitle: String,
         difficulty: Double,
+        scaffoldingTier: CertiGoScaffoldingTier? = nil,
         formatCode: String,
         variantGroupId: String,
         isReviewReplay: Bool = false,
         exercise: CertiGoNativeExerciseItem
     ) {
+        let clampedDiff = min(max(difficulty, 0.0), 1.0)
         self.id = id
         self.conceptId = conceptId
         self.conceptTitle = conceptTitle
-        self.difficulty = min(max(difficulty, 0.0), 1.0)
+        self.difficulty = clampedDiff
+        self.scaffoldingTier = scaffoldingTier ?? CertiGoScaffoldingTier.tier(forMastery: clampedDiff, difficulty: clampedDiff)
         self.formatCode = formatCode
         self.variantGroupId = variantGroupId
         self.isReviewReplay = isReviewReplay
         var enriched = exercise
         enriched.conceptId = conceptId
         enriched.conceptTitle = conceptTitle
-        enriched.difficulty = min(max(difficulty, 0.0), 1.0)
+        enriched.difficulty = clampedDiff
         enriched.variantGroupId = variantGroupId
         enriched.isReviewReplay = isReviewReplay
         self.exercise = enriched
@@ -1499,14 +1536,15 @@ public enum CertiGoAdaptiveSessionEngine {
             let remainingBudget = sessionState.retryBudgetByConcept[cid, default: 2]
             if remainingBudget > 0 && (sessionState.questionsAsked + sessionState.queue.count) < sessionState.maxQuestions {
                 sessionState.retryBudgetByConcept[cid] = remainingBudget - 1
+                let recentThreeIds = Set([current.id] + sessionState.history.suffix(2).map(\.questionId) + sessionState.queue.prefix(3).map(\.id))
                 if let variant = selectBestVariant(
                     forConceptId: cid,
-                    excludingQuestionIds: [current.id],
+                    excludingQuestionIds: recentThreeIds,
                     targetDifficulty: max(0.30, current.difficulty - 0.10),
                     candidatePool: sessionState.candidatePool,
                     markAsReviewReplay: true
                 ) {
-                    // Insert 3 to 5 positions later (clamped to queue.count if fewer items remain)
+                    // Enforce >= 3 questions spacing before re-showing the missed concept (clamped if fewer items remain)
                     let desiredOffset = min(4, max(3, sessionState.queue.count))
                     let insertIndex = min(sessionState.queue.count, desiredOffset)
                     sessionState.queue.insert(variant, at: insertIndex)
@@ -1569,6 +1607,61 @@ public enum CertiGoAdaptiveSessionEngine {
         let totalPlanned = max(1, sessionState.questionsAsked + sessionState.queue.count)
         let queueRatio = Double(sessionState.questionsAsked) / Double(totalPlanned)
         return min(max(avgMasteryRatio * 0.65 + queueRatio * 0.35, 0.12), 0.96)
+    }
+
+    /// Builds an interleaved discrimination card ("Duel de notions proches") contrasting two frequently confused concepts for the active track.
+    public static func buildInterleavedConfusablePairCard(
+        forRouteCode routeCode: String
+    ) -> (title: String, leftConcept: String, rightConcept: String, discriminationRule: String, exercise: CertiGoNativeExerciseItem) {
+        let upper = routeCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        switch upper {
+        case "SAA-C03", "CLF-C02", "AIF-C01":
+            let ex = CertiGoNativeExerciseItem(
+                id: "\(upper.lowercased())-interleaved-duel",
+                formatCode: "Q_TYPE_01",
+                domainBadge: "⚔️ DUEL DE NOTIONS PROCHES · \(upper)",
+                subBadge: "ENTRELACEMENT COGNITIF · DISCRIMINATION",
+                prompt: "Une instance EC2 doit lire un bucket S3 du même compte sans clé statique, tandis qu'un second compte AWS partenaire doit accéder à ce même bucket.\nComment distinguez-vous Rôle IAM et S3 Bucket Policy ?",
+                mascotPose: .emotionAhaIdea,
+                options: [
+                    .init(id: "opt-a", badge: "A", title: "Rôle IAM (Identity-based) pour l'instance EC2 locale + S3 Bucket Policy (Resource-based) pour l'accès Cross-Account", isCorrect: true, whyWrongOrRight: "Un rôle IAM s'attache à l'identité/EC2 tandis qu'une Bucket Policy s'attache directement au bucket S3 pour autoriser un autre compte."),
+                    .init(id: "opt-b", badge: "B", title: "Clés AWS_SECRET_ACCESS_KEY codées en dur dans l'instance EC2", isCorrect: false, whyWrongOrRight: "Ne jamais stocker de clés statiques sur EC2."),
+                    .init(id: "opt-c", badge: "C", title: "Désactiver IAM et ouvrir le bucket S3 en accès public anonyme", isCorrect: false, whyWrongOrRight: "Ouvrir le bucket au public viole la sécurité."),
+                    .init(id: "opt-d", badge: "D", title: "Utiliser Route 53 comme pare-feu d'authentification S3", isCorrect: false, whyWrongOrRight: "Route 53 est un service DNS.")
+                ],
+                examTip: "Rôle IAM = attaché à QUI agit (EC2/Utilisateur) ; Bucket Policy = attachée à QUOI on protège (le bucket S3, idéal en Cross-Account)."
+            )
+            return (
+                title: "Duel de notions proches : Rôle IAM vs S3 Bucket Policy",
+                leftConcept: "Rôle IAM (Attaché à l'identité / EC2)",
+                rightConcept: "S3 Bucket Policy (Attachée au bucket / Cross-Account)",
+                discriminationRule: "Qui agit dans ton compte = Rôle IAM ; Quel autre compte accède à ton bucket = Bucket Policy.",
+                exercise: ex
+            )
+        default:
+            let ex = CertiGoNativeExerciseItem(
+                id: "\(upper.lowercased())-interleaved-duel",
+                formatCode: "Q_TYPE_01",
+                domainBadge: "⚔️ DUEL DE NOTIONS PROCHES · \(upper)",
+                subBadge: "ENTRELACEMENT COGNITIF · RBAC VS AZURE POLICY",
+                prompt: "Vous devez donner à un ingénieur le droit de créer des VMs, tout en interdisant à tout le monde (même aux Propriétaires) de créer des VMs hors d'Europe.\nComment combinez-vous Azure RBAC et Azure Policy ?",
+                mascotPose: .emotionAhaIdea,
+                options: [
+                    .init(id: "opt-a", badge: "A", title: "Azure RBAC pour autoriser QUI peut agir + Azure Policy pour définir QUOI est conforme (Emplacements autorisés : Europe)", isCorrect: true, whyWrongOrRight: "RBAC gère les permissions des utilisateurs tandis qu'Azure Policy vérifie les propriétés des ressources créées."),
+                    .init(id: "opt-b", badge: "B", title: "Utiliser uniquement un verrou ReadOnly sur l'abonnement", isCorrect: false, whyWrongOrRight: "ReadOnly bloquerait toute création de VM, même en Europe."),
+                    .init(id: "opt-c", badge: "C", title: "Donner le rôle Global Administrator à tous les développeurs", isCorrect: false, whyWrongOrRight: "Viole le moindre privilège et n'impose aucune région."),
+                    .init(id: "opt-d", badge: "D", title: "Créer une zone DNS publique pour bloquer les régions hors Europe", isCorrect: false, whyWrongOrRight: "Le DNS ne contrôle pas le déploiement ARM.")
+                ],
+                examTip: "RBAC = QUI a le droit d'agir ; Azure Policy = QUOI est autorisé à exister (conformité) ; Verrou ARM = INTERDICTION de supprimer/modifier."
+            )
+            return (
+                title: "Duel de notions proches : Azure RBAC vs Azure Policy",
+                leftConcept: "Azure RBAC (Qui a le droit d'agir)",
+                rightConcept: "Azure Policy (Quelles ressources sont conformes)",
+                discriminationRule: "RBAC filtre l'utilisateur ; Azure Policy filtre la ressource déployée (même pour un Owner).",
+                exercise: ex
+            )
+        }
     }
 
     private static func selectBestVariant(
@@ -8849,6 +8942,7 @@ public struct CertiGoPersistedUserDatabase: Codable, Equatable, Sendable {
     public var onboardingExperienceLevelIndex: Int
     public var onboardingDailyRhythmMinutes: Int
     public var onboardingTargetHorizonIndex: Int
+    public var onboardingRoutineAnchorIndex: Int
     public var completedLessonIdsByRoute: [String: [String]]
     public var savedAIMemos: [CertiGoChatTurn]
     public var aiThreads: [CertiGoAIThreadItem]
@@ -8874,6 +8968,7 @@ public struct CertiGoPersistedUserDatabase: Codable, Equatable, Sendable {
         onboardingExperienceLevelIndex: Int = 1,
         onboardingDailyRhythmMinutes: Int = 10,
         onboardingTargetHorizonIndex: Int = 1,
+        onboardingRoutineAnchorIndex: Int = 0,
         completedLessonIdsByRoute: [String: [String]] = [:],
         savedAIMemos: [CertiGoChatTurn] = [],
         aiThreads: [CertiGoAIThreadItem] = [],
@@ -8898,6 +8993,7 @@ public struct CertiGoPersistedUserDatabase: Codable, Equatable, Sendable {
         self.onboardingExperienceLevelIndex = onboardingExperienceLevelIndex
         self.onboardingDailyRhythmMinutes = onboardingDailyRhythmMinutes
         self.onboardingTargetHorizonIndex = onboardingTargetHorizonIndex
+        self.onboardingRoutineAnchorIndex = onboardingRoutineAnchorIndex
         self.completedLessonIdsByRoute = completedLessonIdsByRoute
         self.savedAIMemos = savedAIMemos
         self.aiThreads = aiThreads
@@ -9119,7 +9215,60 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     }
     public var onboardingDailyRhythmMinutes: Int = 10
     public var onboardingReminderTimeText: String = "19:30"
+    public var onboardingRoutineAnchorIndex: Int = 0
     public var onboardingCalibrationChoiceId: String = "B"
+    public var selectedSessionChallengeMode: Int = 0 {
+        didSet {
+            hasExplicitlySelectedSessionChallengeMode = true
+            isPlainLanguageModeEnabled = (selectedSessionChallengeMode == 0)
+        }
+    }
+    public var hasExplicitlySelectedSessionChallengeMode: Bool = false
+    public var hasClaimedKindComebackBonus: Bool = false
+
+    public static let certifiedCandidatesWeeklyBenchmarkText: String = "Repère des certifiés : 4 sessions de 10 min par semaine en moyenne"
+
+    public static let onboardingRoutineAnchors: [(icon: String, title: String, ifClause: String, defaultTime: String)] = [
+        ("☕", "Après mon café du matin", "après mon café du matin", "08:30"),
+        ("🚇", "Dans les transports", "dans les transports", "08:30"),
+        ("🍽️", "Pause déjeuner", "pendant ma pause déjeuner", "12:30"),
+        ("🌙", "Le soir au calme", "le soir au calme", "19:30")
+    ]
+
+    public var onboardingIfThenCommitmentText: String {
+        let clamped = min(max(onboardingRoutineAnchorIndex, 0), Self.onboardingRoutineAnchors.count - 1)
+        let anchor = Self.onboardingRoutineAnchors[clamped]
+        return "Si je suis \(anchor.ifClause), alors je fais ma session de \(onboardingDailyRhythmMinutes) min sur CertiGo."
+    }
+
+    public mutating func triggerKindComebackSession() {
+        if !hasClaimedKindComebackBonus {
+            hasClaimedKindComebackBonus = true
+            userXPPoints += 20
+            streakDays = max(1, streakDays)
+            syncCurrentUserLeaderboardEntry()
+        }
+        activeGamificationSheet = nil
+        startLessonSession(enableAdaptiveReplay: true)
+    }
+
+    /// Recommendation 3 (CertiGo PRO only): Allows a paying PRO member (`isProMember == true`) to repair hearts and continue at the current exercise index without losing lesson progress. Free users (`isProMember == false`) are rejected and must restart or refill with gems.
+    @discardableResult
+    public mutating func repairHeartsWithProShieldAndContinue() -> Bool {
+        guard isProMember else {
+            return false
+        }
+        heartsCount = 5
+        lastLostHeartIndex = nil
+        lessonSession.heartsCount = 5
+        lessonSession.lastLostHeartIndex = nil
+        lessonSession.hasTriggeredOutOfHeartsFailure = false
+        lessonSession.attemptPhase = .answering
+        lessonSession.selectedOptionIds = []
+        lessonSession.cliInputText = ""
+        lessonSession.assembledWordBankTokens = []
+        return true
+    }
     public static let guidedTourStepCount: Int = 5
     public var isPresentingGuidedAppTour: Bool = false
     public var guidedTourStepIndex: Int = 0
@@ -9165,6 +9314,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             onboardingExperienceLevelIndex: onboardingExperienceLevelIndex,
             onboardingDailyRhythmMinutes: onboardingDailyRhythmMinutes,
             onboardingTargetHorizonIndex: onboardingExamDeadlineIndex,
+            onboardingRoutineAnchorIndex: onboardingRoutineAnchorIndex,
             completedLessonIdsByRoute: completedByRoute,
             savedAIMemos: savedAIMemos,
             aiThreads: aiThreads,
@@ -9195,6 +9345,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         onboardingExperienceLevelIndex = db.onboardingExperienceLevelIndex
         onboardingDailyRhythmMinutes = db.onboardingDailyRhythmMinutes
         onboardingExamDeadlineIndex = db.onboardingTargetHorizonIndex
+        onboardingRoutineAnchorIndex = db.onboardingRoutineAnchorIndex
         savedAIMemos = db.savedAIMemos
         aiThreads = db.aiThreads
         recentMistakesLog = db.recentMistakesLog
@@ -9644,9 +9795,19 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             heartsCount = 5
         }
         let shouldShowSlides = !skipDeclic15 && !resolvedNode.isQuizOnlyChapter
-        if onboardingExperienceLevelIndex == 0 {
-            isPlainLanguageModeEnabled = true
-        }
+        let effectiveExperienceLevel: Int = {
+            if hasExplicitlySelectedSessionChallengeMode {
+                return selectedSessionChallengeMode == 0 ? 0 : 2
+            }
+            return onboardingExperienceLevelIndex
+        }()
+        let shouldStartInPlainLanguage: Bool = {
+            if hasExplicitlySelectedSessionChallengeMode {
+                return selectedSessionChallengeMode == 0
+            }
+            return onboardingExperienceLevelIndex == 0 ? true : isPlainLanguageModeEnabled
+        }()
+        isPlainLanguageModeEnabled = shouldStartInPlainLanguage
         lessonSession = CertiGoNativeLessonSessionEngine(
             routeCode: activeRouteCode,
             lessonId: resolvedNode.id,
@@ -9654,8 +9815,8 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             isShowingDeclicCard15: shouldShowSlides,
             heartsCount: heartsCount,
             enableAdaptiveReplay: enableAdaptiveReplay,
-            isPlainLanguageModeEnabled: onboardingExperienceLevelIndex == 0 ? true : isPlainLanguageModeEnabled,
-            experienceLevelIndex: onboardingExperienceLevelIndex
+            isPlainLanguageModeEnabled: shouldStartInPlainLanguage,
+            experienceLevelIndex: effectiveExperienceLevel
         )
         isPlainLanguageModeEnabled = lessonSession.isPlainLanguageModeEnabled
         isPresentingLessonSession = true
@@ -12309,6 +12470,66 @@ public struct CertiGoNativeFigmaAppView: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
+            // Recommendation 7: Compact 2-Option Session Mode Selector (`🌱 Découverte` vs `⚡ Défi Examen`) right above COMMENCER
+            HStack(spacing: PrismSpacing.xs) {
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        appState.selectedSessionChallengeMode = 0
+                    }
+                } label: {
+                    Text(verbatim: "🌱 Découverte (Simple)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                        .foregroundStyle(
+                            appState.selectedSessionChallengeMode == 0
+                                ? PrismColor.figmaHex("#065f46")
+                                : PrismColor.figmaHex("#64748b")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: FigMetrics.thirtySix)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                .fill(
+                                    appState.selectedSessionChallengeMode == 0
+                                        ? PrismColor.figmaHex("#ecfdf5")
+                                        : PrismColor.clear
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("step-sheet-mode-discovery")
+
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        appState.selectedSessionChallengeMode = 1
+                    }
+                } label: {
+                    Text(verbatim: "⚡ Défi Examen (+ CLI)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                        .foregroundStyle(
+                            appState.selectedSessionChallengeMode == 1
+                                ? PrismColor.figmaHex("#1d4ed8")
+                                : PrismColor.figmaHex("#64748b")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: FigMetrics.thirtySix)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                .fill(
+                                    appState.selectedSessionChallengeMode == 1
+                                        ? PrismColor.figmaHex("#eff6ff")
+                                        : PrismColor.clear
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("step-sheet-mode-exam-challenge")
+            }
+            .padding(PrismSpacing.xxs)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .fill(PrismColor.figmaHex("#f1f5f9"))
+            )
+
             // 3 Action Buttons Row: `[ 📖 | COMMENCER (+15 XP) | ✦ ]`
             HStack(spacing: PrismSpacing.m) {
                 // 1. Toggle Memo 14 (`📖`)
@@ -12333,6 +12554,7 @@ public struct CertiGoNativeFigmaAppView: View {
 
                 // 2. Primary CTA (`COMMENCER`) — Cleanly dismisses Step Sheet 03 before presenting Lesson Session
                 Button {
+                    appState.selectedSessionChallengeMode = appState.selectedSessionChallengeMode
                     appState.activeStepSheet = nil
                     appState.startLessonSession(forLessonId: lesson.id, enableAdaptiveReplay: true)
                 } label: {
@@ -14500,6 +14722,27 @@ public struct CertiGoNativeFigmaAppView: View {
                         .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                         .multilineTextAlignment(.center)
 
+                    // Recommendation 5: Cumulative Mastered Steps + Automatic Streak Freeze Pill
+                    HStack(spacing: PrismSpacing.s) {
+                        Text(verbatim: "⚡ \(appState.completedStepsTotal) étapes maîtrisées au total")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0369a1"))
+                            .padding(.horizontal, PrismSpacing.m)
+                            .padding(.vertical, PrismSpacing.xs)
+                            .background(
+                                Capsule().fill(PrismColor.figmaHex("#e0f2fe"))
+                            )
+
+                        Text(verbatim: "🧊 \(max(1, appState.streakFreezeCount)) Gel de série actif")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#065f46"))
+                            .padding(.horizontal, PrismSpacing.m)
+                            .padding(.vertical, PrismSpacing.xs)
+                            .background(
+                                Capsule().fill(PrismColor.figmaHex("#ecfdf5"))
+                            )
+                    }
+
                     HStack(spacing: PrismSpacing.s) {
                         ForEach(0..<weekDays.count, id: \.self) { idx in
                             VStack(spacing: PrismSpacing.xs) {
@@ -14526,10 +14769,10 @@ public struct CertiGoNativeFigmaAppView: View {
                         Text(verbatim: "🧊")
                             .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Black"))
                         VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                            Text(verbatim: "Bouclier Gel de Série")
+                            Text(verbatim: "Bouclier Gel de Série automatique")
                                 .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Extra Bold"))
                                 .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                            Text(verbatim: "🧊 \(appState.streakFreezeCount) Boucliers équipés · Protège ta série en cas d'oubli")
+                            Text(verbatim: "🧊 \(appState.streakFreezeCount) Boucliers équipés · Tes acquis ne retombent jamais à zéro")
                                 .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
                                 .foregroundStyle(PrismColor.figmaHex("#0284c7"))
                         }
@@ -14540,6 +14783,45 @@ public struct CertiGoNativeFigmaAppView: View {
                         RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
                             .fill(PrismColor.figmaHex("#eff6ff"))
                     )
+
+                    // Recommendation 5: Guilt-free Kind Comeback Card (`🌱 Reprise bienveillante (+20 XP)`)
+                    Button {
+                        appState.triggerKindComebackSession()
+                    } label: {
+                        HStack(spacing: PrismSpacing.m) {
+                            Text(verbatim: "🌱")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Bold"))
+                            VStack(alignment: .leading, spacing: FigMetrics.two) {
+                                Text(verbatim: "🌱 Reprise bienveillante (+20 XP)")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#065f46"))
+                                Text(verbatim: "Reprends en douceur avec une session courte sans pression")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
+                                    .foregroundStyle(PrismColor.figmaHex("#047857"))
+                            }
+                            Spacer()
+                            Text(verbatim: "+20 XP →")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#065f46"))
+                        }
+                        .padding(PrismSpacing.m)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                .fill(PrismColor.figmaHex("#ecfdf5"))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                .strokeBorder(PrismColor.figmaHex("#a7f3d0"), lineWidth: PrismBorder.standard)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("streak-kind-comeback-button")
+
+                    Text(verbatim: "💡 \(CertiGoNativeAppState.certifiedCandidatesWeeklyBenchmarkText)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
+                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                        .multilineTextAlignment(.center)
 
                     Button {
                         appState.activeGamificationSheet = nil
@@ -16705,7 +16987,7 @@ public struct CertiGoNativeFigmaAppView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("social-friends-quest-clap-button")
 
-            Text(verbatim: "💡 En moyenne, les candidats certifiés font 4 sessions de 10 min par semaine")
+            Text(verbatim: "💡 \(CertiGoNativeAppState.certifiedCandidatesWeeklyBenchmarkText)")
                 .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
                 .foregroundStyle(PrismColor.figmaHex("#64748b"))
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -18950,6 +19232,47 @@ public struct CertiGoNativeLessonSessionModalView: View {
             }
 
             VStack(spacing: PrismSpacing.m) {
+                // Recommendation 3: CertiGo PRO Shield (Instant repair without losing lesson progress for paying PRO members)
+                if appState.isProMember {
+                    Button {
+                        withAnimation(CertiGoMotion.spring(for: .anim03Mascot34SpeechBubblePop, reduceMotion: reduceMotion)) {
+                            _ = appState.repairHeartsWithProShieldAndContinue()
+                        }
+                    } label: {
+                        Text(verbatim: "👑 Bouclier CertiGo PRO · Continuer sans perdre mon avancement (Vies ∞)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.onAccent)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: PrismSize.primaryButtonHeight)
+                    }
+                    .buttonStyle(
+                        CertiGoTactile3DButtonStyle(
+                            faceHex: "#7c3aed",
+                            lipHex: "#5b21b6",
+                            cornerRadius: PrismRadius.l
+                        )
+                    )
+                    .accessibilityIdentifier("failed-hearts-pro-shield-continue-button")
+                } else {
+                    Button {
+                        appState.showProPaywallSheet27 = true
+                    } label: {
+                        Text(verbatim: "👑 CertiGo PRO : Continuer sans recommencer (Vies ∞)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#6d28d9"))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: FigMetrics.fortyFour)
+                    }
+                    .buttonStyle(
+                        CertiGoTactile3DButtonStyle(
+                            faceHex: "#f3e8ff",
+                            lipHex: "#c4b5fd",
+                            cornerRadius: PrismRadius.l
+                        )
+                    )
+                    .accessibilityIdentifier("failed-hearts-pro-upsell-button")
+                }
+
                 Button {
                     withAnimation(CertiGoMotion.spring(for: .anim03Mascot34SpeechBubblePop, reduceMotion: reduceMotion)) {
                         appState.restartFailedLessonSessionWithFullHearts()
@@ -20906,7 +21229,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
         }
     }
 
-    // Step 6 (`6/7`): Daily Rhythm + Smart Reminder `19:30` (Clean without top badge)
+    // Step 6 (`6/7`): Daily Rhythm + Implementation Intention ("Si – Alors") Routine Anchor + Smart Reminder
     private var onboardingStep6RhythmReminderAndWidgetView: some View {
         let rhythms: [(minutes: Int, title: String, subtitle: String)] = [
             (5, "5 min / jour", "Régulier · 1 étape / jour"),
@@ -20914,6 +21237,10 @@ public struct CertiGoNativeOnboardingFlowView: View {
             (20, "20 min / jour", "Intensif · Sprint rapide")
         ]
         let times = ["19:30", "08:30", "12:30", "21:00"]
+        let twoCols = [
+            GridItem(.flexible(), spacing: PrismSpacing.s),
+            GridItem(.flexible(), spacing: PrismSpacing.s)
+        ]
 
         return VStack(alignment: .leading, spacing: PrismSpacing.m) {
             Text(verbatim: "Fixe ton rythme quotidien")
@@ -20952,6 +21279,72 @@ public struct CertiGoNativeOnboardingFlowView: View {
                     )
                 )
             }
+
+            // Recommendation 1: Implementation Intention ("Plan Si – Alors") 2×2 Routine Anchor Grid
+            VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                Text(verbatim: "⚓ ANCRE TA ROUTINE (« PLAN SI – ALORS »)")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#065f46"))
+
+                LazyVGrid(columns: twoCols, spacing: PrismSpacing.s) {
+                    ForEach(0..<CertiGoNativeAppState.onboardingRoutineAnchors.count, id: \.self) { idx in
+                        let anchor = CertiGoNativeAppState.onboardingRoutineAnchors[idx]
+                        let isSelected = appState.onboardingRoutineAnchorIndex == idx
+                        Button {
+                            withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                                appState.onboardingRoutineAnchorIndex = idx
+                                appState.onboardingReminderTimeText = anchor.defaultTime
+                            }
+                        } label: {
+                            HStack(spacing: PrismSpacing.xs) {
+                                Text(verbatim: anchor.icon)
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Regular"))
+                                Text(verbatim: anchor.title)
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                Spacer(minLength: .zero)
+                            }
+                            .padding(PrismSpacing.s)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .fill(isSelected ? PrismColor.figmaHex("#ecfdf5") : PrismColor.figmaHex("#f8fafc"))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .strokeBorder(
+                                        isSelected ? PrismColor.figmaHex("#10b981") : PrismColor.figmaHex("#e2e8f0"),
+                                        lineWidth: PrismBorder.standard
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("onboarding-routine-anchor-\(idx)")
+                    }
+                }
+
+                Text(verbatim: "💬 « \(appState.onboardingIfThenCommitmentText) »")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#065f46"))
+                    .padding(PrismSpacing.s)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                            .fill(PrismColor.figmaHex("#ecfdf5"))
+                    )
+                    .accessibilityIdentifier("onboarding-if-then-commitment-text")
+            }
+            .padding(PrismSpacing.m)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .fill(PrismColor.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+            )
 
             // Smart Daily Reminder Card (`19:30`) + iOS Notification Preview
             VStack(alignment: .leading, spacing: PrismSpacing.s) {
