@@ -682,11 +682,302 @@ public struct CertiGoCertificationUnit: Identifiable, Codable, Equatable, Hashab
 }
 
 /// Rich interactive exercise item supporting all 10 Figma Pro question formats (`Q_TYPE_01..10`).
+/// Single glossary bridge mapping a technical exam term to its everyday plain-language meaning.
+public struct CertiGoJargonBridgeItem: Equatable, Hashable, Codable, Sendable {
+    public let term: String
+    public let simpleMeaning: String
+
+    public init(term: String, simpleMeaning: String) {
+        self.term = term
+        self.simpleMeaning = simpleMeaning
+    }
+}
+
+/// Deterministic pedagogical translator that converts technical certification questions & options into everyday plain French without jargon, and builds the exam terminology bridge (`💡 Version Simple ⇄ 🎯 Style Examen`).
+public enum CertiGoPlainLanguageTranslator {
+
+    public static func simplifyPrompt(
+        _ prompt: String,
+        forExerciseId exerciseId: String = "",
+        conceptTitle: String = ""
+    ) -> String {
+        let lowerId = exerciseId.lowercased()
+        let lowerPrompt = prompt.lowercased()
+
+        // Direct tailored translations for core exercises & exam scenarios
+        if lowerId.contains("az-104-u1-s1-qtype03") || lowerPrompt.contains("ranger dans un même groupe de ressources") {
+            return "Tu crées un site web avec son serveur et sa base de données pour un même projet.\nÀ quoi sert le fait de tout ranger dans un même « dossier de projet » (Groupe de ressources) ?"
+        }
+        if lowerId.contains("az-104-u1-s1-qtype04") || (lowerPrompt.contains("stagiaire") && lowerPrompt.contains("rg-prod")) {
+            return "Tu veux éviter qu'un collègue fatigué n'efface par erreur le dossier qui contient toute la production de l'entreprise.\nQuelle sécurité toute simple actives-tu sur ce dossier ?"
+        }
+        if lowerPrompt.contains("auditeur externe") && lowerPrompt.contains("lecture seule") {
+            return "Un contrôleur externe vient vérifier que tout est en ordre dans le Cloud de ton entreprise, mais il a interdiction absolue de toucher ou modifier quoi que ce soit.\nQuel badge d'accès (« regarder sans toucher ») lui donnes-tu ?"
+        }
+        if lowerPrompt.contains("clés cryptographiques hsm") || (lowerPrompt.contains("coffre") && lowerPrompt.contains("key vault")) || lowerPrompt.contains("coffre-fort pour les mots de passe") {
+            return "Ton application utilise des mots de passe secrets et des clés de sécurité qui ne doivent jamais traîner en clair dans le code.\nDans quelle brique officielle les ranges-tu comme dans un coffre-fort blindé ?"
+        }
+        if lowerPrompt.contains("couche 7") && lowerPrompt.contains("waf") {
+            return "Des visiteurs se connectent à ton site web depuis Internet. Tu veux trier les visites selon l'adresse de la page (/api ou /images) et bloquer automatiquement les pirates.\nQuel vigile intelligent places-tu à l'entrée ?"
+        }
+        if lowerPrompt.contains("suppression accidentelle") && lowerPrompt.contains("rg-prod") {
+            return "Tu veux poser un cadenas anti-suppression sur le dossier de production RG-Prod pour que personne ne puisse l'effacer par erreur.\nQuel mot-clé ajoutes-tu dans la commande pour créer ce cadenas ?"
+        }
+        if lowerPrompt.contains("provisionnez le réseau virtuel prodvnet") {
+            return "Tu crées le réseau privé interne « ProdVNet » à l'intérieur du dossier « RG-Core ».\nRemets dans le bon ordre les mots de la commande pour créer ce réseau :"
+        }
+        if lowerPrompt.contains("ip privée 10.0.2.4") && lowerPrompt.contains("blob storage") {
+            return "Un serveur interne doit lire des fichiers dans ton espace de stockage Azure en passant uniquement par un couloir privé interne, sans jamais sortir sur Internet.\nQuelles sont les 2 actions obligatoires ?"
+        }
+        if lowerPrompt.contains("passerelle expressroute dans vnet-hub") {
+            return "Ton réseau central (Hub) possède déjà une ligne directe vers les bureaux de l'entreprise, et ton réseau secondaire (Spoke) veut l'emprunter pour économiser un second abonnement.\nQuelles cases coches-tu pour partager cette ligne ?"
+        }
+        if lowerPrompt.contains("moncoffre.vault.azure.net vers l'ip privée 10.1.0.5") {
+            return "Tes serveurs internes cherchent l'adresse de ton coffre-fort privé et doivent trouver son numéro interne (10.1.0.5) plutôt que son adresse publique Internet.\nQuel annuaire interne est indispensable ?"
+        }
+        if lowerPrompt.contains("nsg-subnet") && lowerPrompt.contains("nsg-nic") {
+            return "Un visiteur arrive depuis Internet vers ton serveur protégé par deux portails de sécurité successifs : celui du quartier (Sous-réseau) puis celui de la porte d'entrée (Carte réseau).\nComment Azure vérifie-t-il son passage ?"
+        }
+        if lowerPrompt.contains("lire immédiatement les blobs depuis un point de terminaison secondaire") || (lowerPrompt.contains("archives légales") && lowerPrompt.contains("région secondaire")) {
+            return "Si toute la région principale tombe en panne, ton application doit pouvoir lire immédiatement la copie de secours située dans une autre ville, sans attendre que Microsoft répare.\nQuelle formule de copie choisis-tu ?"
+        }
+        if lowerPrompt.contains("centraliser les sauvegardes de vms") {
+            return "Tu veux sauvegarder tes ordinateurs virtuels chaque nuit et pouvoir les rallumer dans une autre région en cas de sinistre.\nDans quel coffre de sauvegarde centralises-tu tout cela ?"
+        }
+        if lowerPrompt.contains("horizontal pod autoscaler") || (lowerPrompt.contains("pods") && lowerPrompt.contains("pending") && lowerPrompt.contains("cpu")) {
+            return "Ton application a créé 10 nouvelles mini-boîtes (Pods) pour gérer l'affluence, mais elles attendent à la porte car les serveurs actuels n'ont plus de place libre.\nQuel mécanisme ajoute automatiquement de nouveaux serveurs ?"
+        }
+        if lowerPrompt.contains("cpu d'une vm dépasse 85 %") {
+            return "Tu veux recevoir automatiquement un SMS dès qu'un serveur chauffe à plus de 85 % pendant 5 minutes.\nQuels sont les 2 réglages à combiner (le détecteur + la liste des personnes à prévenir) ?"
+        }
+        if lowerPrompt.contains("pay-as-you-go") && lowerPrompt.contains("200 000") {
+            return "Une jeune entreprise préfère payer ses serveurs Cloud chaque mois selon sa consommation réelle (comme une facture d'électricité) plutôt que d'acheter des machines très chères d'avance.\nComment appelle-t-on ce mode de dépense souple ?"
+        }
+        if lowerPrompt.contains("héberger une application web sans gérer le système d'exploitation") {
+            return "Tu veux mettre ton site web en ligne tout de suite sans avoir à installer Windows/Linux ni faire les mises à jour des machines.\nQuel service « prêt à l'emploi » choisis-tu ?"
+        }
+        if lowerPrompt.contains("patching de l'os windows/linux") {
+            return "Ton équipe veut louer des serveurs chez Microsoft mais souhaite garder la main à 100 % sur le système d'exploitation et ses mises à jour.\nQuelle formule de location correspond à ce besoin ?"
+        }
+        if lowerPrompt.contains("modèle de responsabilité partagée") && lowerPrompt.contains("toujours gérés par le client") {
+            return "Même quand tu loues le Cloud le plus clé en main chez Microsoft, il reste des éléments qui t'appartiennent et que Microsoft ne gérera jamais à ta place.\nLesquels sont toujours sous ta responsabilité ?"
+        }
+        if lowerPrompt.contains("transactions financières via cloud pub/sub") {
+            return "Ton système reçoit des paiements clients en continu : il faut traiter les opérations de chaque client dans le bon ordre et mettre de côté les messages abîmés qui bloquent.\nQue règles-tu sur ta boîte aux lettres Cloud Pub/Sub ?"
+        }
+        if lowerPrompt.contains("table bigquery de 180 to") {
+            return "Tu as un immense tableau de 180 To. Chaque jour, ton équipe cherche uniquement les lignes d'une date précise, puis filtre par client et par pays.\nComment ranges-tu ce tableau pour éviter de tout relire (et diviser la facture par 10) ?"
+        }
+        if lowerPrompt.contains("amazon ec2") || (lowerPrompt.contains("s3") && lowerPrompt.contains("aws")) {
+            return "Un serveur Amazon EC2 doit lire des fichiers dans un coffre S3 de façon sécurisée, sans jamais écrire de mot de passe permanent dans le code.\nQuelle méthode de sécurité temporaire et propre utilises-tu ?"
+        }
+        if lowerPrompt.contains("azure ai search") && lowerPrompt.contains("50 000 manuels") {
+            return "Tu crées un assistant IA qui cherche dans 50 000 manuels techniques contenant à la fois des numéros de panne exacts (ERR-4092) et des questions formulées avec des mots de tous les jours.\nQuelle méthode de recherche combine le meilleur des deux mondes ?"
+        }
+        if lowerPrompt.contains("serviceaccount") && lowerPrompt.contains("payment-sa") {
+            return "Une petite application (payment-sa) rangée dans le dossier « finance » de Kubernetes a juste besoin de lire les mots de passe de son propre dossier, sans toucher au reste.\nQuelle permission locale lui donnes-tu ?"
+        }
+        if lowerPrompt.contains("github copilot") {
+            return "Ton entreprise active GitHub Copilot pour aider les développeurs à coder plus vite tout en protégeant le code privé de la société.\nQuel réglage garantit que vos fichiers sensibles restent protégés et conformes ?"
+        }
+
+        // Intelligent plain-language fallback translator for any question or variant
+        let parts = CertiGoStructuredPromptView.splitScenarioAndQuestion(prompt)
+        let rawScenario = parts.scenario ?? "Dans une situation réelle en entreprise, tu dois choisir la solution la plus simple, fiable et sécurisée."
+        let rawQuestion = parts.question
+
+        let simplifiedScenario = replaceTechnicalJargonWithEverydayFrench(rawScenario)
+        let simplifiedQuestion = replaceTechnicalJargonWithEverydayFrench(rawQuestion)
+        let candidate = "Version concrète sans jargon : \(simplifiedScenario)\nEn clair, \(lowercaseFirstLetter(simplifiedQuestion))"
+        return candidate
+    }
+
+    public static func simplifyOptionTitle(_ title: String, subtitle: String? = nil) -> String {
+        let cleaned = title.replacingOccurrences(of: "`", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = cleaned.lowercased()
+
+        // High-frequency exact/keyword mappings in simple everyday French
+        if lower == "lecteur (reader)" || lower == "reader" {
+            return "Droit de regarder uniquement (sans rien modifier ni supprimer)"
+        }
+        if lower == "contributeur (contributor)" || lower == "contributor" {
+            return "Droit de créer et modifier (sans gérer les accès des autres)"
+        }
+        if lower == "propriétaire (owner)" || lower == "owner" {
+            return "Contrôle total sur tout (y compris donner des accès aux autres)"
+        }
+        if lower.contains("administrateur de l'accès utilisateur") {
+            return "Gérer uniquement qui a accès à quoi (sans toucher aux serveurs)"
+        }
+        if lower == "key vault" || lower == "azure key vault" {
+            return "Coffre-fort numérique pour mots de passe et clés secrètes"
+        }
+        if lower == "entra id" || lower == "microsoft entra id" {
+            return "Carnet d'identités et connexions des utilisateurs (SSO & double validation)"
+        }
+        if lower == "azure firewall" {
+            return "Vigile réseau central qui filtre les entrées et sorties"
+        }
+        if lower == "blob storage" {
+            return "Grand disque dur Cloud pour stocker fichiers, images et sauvegardes"
+        }
+        if lower == "app service" {
+            return "Hébergement de site web clé en main (sans gérer le serveur)"
+        }
+        if lower == "virtual network" {
+            return "Réseau privé virtuel pour relier tes machines entre elles"
+        }
+        if lower == "azure dns" || lower == "private dns zone" {
+            return "Annuaire qui traduit un nom de site en adresse IP"
+        }
+        if lower == "load balancer" {
+            return "Aiguilleur de trafic rapide (répartit la charge entre plusieurs serveurs)"
+        }
+        if lower == "nat gateway" {
+            return "Porte de sortie unique pour aller sur Internet depuis un réseau privé"
+        }
+        if lower == "recovery services vault" {
+            return "Coffre central des sauvegardes automatiques et copies de secours"
+        }
+        if lower == "kubernetes service" || lower == "kubernetes" {
+            return "Chef d'orchestre qui gère automatiquement tes conteneurs d'application"
+        }
+        if lower == "azure monitor" {
+            return "Tableau de bord qui surveille la santé et envoie des alertes"
+        }
+        if lower == "application gateway" || lower.contains("application gateway") {
+            return "Guichet d'accueil web intelligent avec bouclier anti-pirates (WAF)"
+        }
+
+        let simplified = replaceTechnicalJargonWithEverydayFrench(cleaned)
+        if simplified != cleaned {
+            return simplified
+        }
+        if let subtitle, !subtitle.isEmpty {
+            return "\(cleaned) — en clair : \(replaceTechnicalJargonWithEverydayFrench(subtitle))"
+        }
+        return "En clair : \(cleaned)"
+    }
+
+    public static func buildJargonGlossaryBridge(
+        prompt: String,
+        options: [CertiGoNativeExerciseItem.OptionItem],
+        exerciseId: String = "",
+        conceptTitle: String = ""
+    ) -> [(term: String, simpleMeaning: String)] {
+        let combined = ([prompt, conceptTitle, exerciseId] + options.map(\.title) + options.compactMap(\.subtitle))
+            .joined(separator: " ")
+            .lowercased()
+
+        var matches: [(term: String, simpleMeaning: String)] = []
+        let catalog: [(keywords: [String], term: String, simpleMeaning: String)] = [
+            (["rbac", "rôle", "lecteur", "reader", "owner", "contributeur"], "RBAC / Rôles d'accès", "Qui a le droit de faire quoi (regarder, modifier ou tout gérer)"),
+            (["lecteur", "reader", "lecture seule"], "Lecteur (Reader)", "Regarder tout sans rien pouvoir modifier ni supprimer"),
+            (["groupe de ressources", "resource group", "rg-"], "Groupe de ressources (RG)", "Le dossier qui rassemble toutes les briques d'un même projet"),
+            (["abonnement", "subscription"], "Abonnement (Subscription)", "Le contrat et dossier de facturation Cloud de l'entreprise"),
+            (["cannotdelete", "verrou", "lock", "readonly"], "Verrou CanNotDelete", "Cadenas anti-suppression qui bloque même un administrateur"),
+            (["key vault", "hsm", "secret", "certificat"], "Azure Key Vault / HSM", "Coffre-fort blindé pour mots de passe, clés et certificats"),
+            (["waf", "couche 7", "application gateway", "owasp"], "Application Gateway + WAF", "Aiguilleur web intelligent avec bouclier contre les attaques"),
+            (["private endpoint", "privatelink", "ip privée"], "Private Endpoint & DNS privé", "Couloir privé interne pour accéder à un service sans passer par Internet"),
+            (["vnet", "peering", "subnet", "sous-réseau", "expressroute"], "VNet & Peering", "Réseau privé Cloud et pont direct entre deux réseaux"),
+            (["nsg", "inbound", "priorité"], "NSG (Pare-feu de sous-réseau)", "Liste de règles qui autorise ou bloque les portes réseau (ports)"),
+            (["ra-grs", "grs", "zrs", "lrs", "redondance"], "LRS / ZRS / RA-GRS", "Nombre de copies de secours (dans 1 bâtiment, 3 bâtiments ou 2 régions)"),
+            (["aks", "pod", "hpa", "autoscaler", "kubernetes", "namespace", "serviceaccount"], "Pods & Autoscaler (Kubernetes)", "Boîtes applicatives et ajout automatique de serveurs selon le trafic"),
+            (["capex", "opex", "pay-as-you-go"], "CapEx vs OpEx", "Acheter des machines d'avance (CapEx) vs payer à l'usage mensuel (OpEx)"),
+            (["iaas", "paas", "saas", "responsabilité partagée"], "IaaS / PaaS / SaaS", "Louer la machine brute (IaaS), la plateforme prête (PaaS) ou le logiciel fini (SaaS)"),
+            (["pub/sub", "dataflow", "watermarks", "streaming"], "Pub/Sub & Dataflow", "Boîte aux lettres temps réel et tapis roulant qui traite les données en continu"),
+            (["bigquery", "partition", "clustering"], "Partitionnement & Clustering", "Ranger un grand tableau par date et par catégorie pour chercher 10× plus vite"),
+            (["ec2", "iam", "sts", "s3", "rds", "multi-az"], "Rôle IAM & Multi-AZ (AWS)", "Badge d'accès temporaire sans mot de passe et double serveur anti-panne"),
+            (["ai search", "rag", "bm25", "vecteur", "semantic ranker", "prompt shields"], "RAG Hybride & Sécurité IA", "Chercher par mots exacts + par sens dans tes documents avant que l'IA réponde"),
+            (["copilot", "instructions", "mcp"], "Instructions Copilot & MCP", "Règles d'équipe données à l'IA et connecteurs d'outils sécurisés")
+        ]
+
+        for entry in catalog {
+            if entry.keywords.contains(where: { combined.contains($0) }) {
+                if !matches.contains(where: { $0.term == entry.term }) {
+                    matches.append((term: entry.term, simpleMeaning: entry.simpleMeaning))
+                }
+            }
+            if matches.count >= 3 {
+                break
+            }
+        }
+
+        let defaultFallbacks: [(term: String, simpleMeaning: String)] = [
+            ("Moindre privilège", "Donner uniquement le minimum de droits nécessaires pour travailler"),
+            ("Haute disponibilité", "Garder le service allumé même si un serveur ou un bâtiment tombe en panne"),
+            ("Gouvernance Cloud", "Les règles automatiques qui protègent le budget et la sécurité")
+        ]
+        for fallback in defaultFallbacks where matches.count < 3 {
+            if !matches.contains(where: { $0.term == fallback.term }) {
+                matches.append(fallback)
+            }
+        }
+        return matches
+    }
+
+    private static func replaceTechnicalJargonWithEverydayFrench(_ text: String) -> String {
+        var out = text.replacingOccurrences(of: "`", with: "")
+        let replacements: [(String, String)] = [
+            ("Un auditeur externe", "Un contrôleur externe"),
+            ("en lecture seule", "uniquement pour regarder (sans rien modifier)"),
+            ("rôle intégré", "badge d'accès standard"),
+            ("Rôle RBAC", "Badge de permission (RBAC)"),
+            ("attributions RBAC", "droits d'accès"),
+            ("RBAC", "gestion des droits d'accès"),
+            ("Contributeur (Contributor)", "Droit de modifier sans gérer les accès (Contributeur)"),
+            ("Lecteur (Reader)", "Droit de regarder uniquement (Lecteur)"),
+            ("Propriétaire (Owner)", "Contrôle total (Propriétaire)"),
+            ("CanNotDelete", "anti-suppression (CanNotDelete)"),
+            ("ReadOnly", "lecture seule (ReadOnly)"),
+            ("groupe de ressources", "dossier de projet (Groupe de ressources)"),
+            ("Groupe de ressources", "Dossier de projet (Groupe de ressources)"),
+            ("Groupes de Ressources (Resource Groups)", "Dossiers de projets (Groupes de ressources)"),
+            ("Private Endpoint", "accès privé interne (Private Endpoint)"),
+            ("Service Endpoint", "accès direct réseau (Service Endpoint)"),
+            ("VNet Peering", "pont privé entre deux réseaux (VNet Peering)"),
+            ("passerelle ExpressRoute", "ligne privée directe d'entreprise (ExpressRoute)"),
+            ("Couche 7", "niveau site web (HTTP/HTTPS)"),
+            ("Couche 4", "niveau transport réseau (TCP/UDP)"),
+            ("pare-feu WAF OWASP", "bouclier anti-pirates web (WAF)"),
+            ("WAF activé", "bouclier anti-pirates web activé"),
+            ("clés cryptographiques HSM", "clés de sécurité ultra-protégées"),
+            ("Recovery Services Vault", "coffre central de sauvegarde (Recovery Services Vault)"),
+            ("RA-GRS (Read-Access Geo-Redundant Storage)", "copie de secours dans une 2e région lisible immédiatement (RA-GRS)"),
+            ("ZRS (Zone-Redundant Storage)", "copie sur 3 bâtiments d'une même ville (ZRS)"),
+            ("LRS (Locally Redundant Storage)", "copie dans un seul bâtiment (LRS)"),
+            ("Zones de Disponibilité", "bâtiments indépendants (Zones de disponibilité)"),
+            ("Availability Zones", "bâtiments indépendants"),
+            ("Horizontal Pod Autoscaler (HPA)", "ajout automatique de mini-boîtes applicatives (HPA)"),
+            ("Cluster Autoscaler", "ajout automatique de nouveaux serveurs (Cluster Autoscaler)"),
+            ("en état Pending", "en attente de place libre"),
+            ("CapEx", "achat matériel payé d'avance (CapEx)"),
+            ("OpEx", "paiement mensuel à la consommation (OpEx)"),
+            ("IaaS", "location de serveurs bruts (IaaS)"),
+            ("PaaS", "plateforme clé en main pour ton code (PaaS)"),
+            ("SaaS", "logiciel prêt à l'emploi (SaaS)"),
+            ("Privileged Identity Management (PIM)", "activation temporaire des droits admin (PIM)"),
+            ("Lifecycle Management", "rangement automatique des anciens fichiers"),
+            ("Azure Site Recovery (ASR)", "copie continue des serveurs vers une région de secours (ASR)")
+        ]
+        for (tech, simple) in replacements {
+            out = out.replacingOccurrences(of: tech, with: simple)
+        }
+        return out
+    }
+
+    private static func lowercaseFirstLetter(_ text: String) -> String {
+        guard let first = text.first else { return text }
+        return String(first).lowercased() + text.dropFirst()
+    }
+}
+
 public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
     public struct OptionItem: Identifiable, Equatable, Sendable {
         public let id: String
         public let badge: String
         public let title: String
+        public var plainLanguageTitle: String
         public let subtitle: String?
         public let assetName: String?
         public let isCorrect: Bool
@@ -696,6 +987,7 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
             id: String,
             badge: String,
             title: String,
+            plainLanguageTitle: String? = nil,
             subtitle: String? = nil,
             assetName: String? = nil,
             isCorrect: Bool,
@@ -704,6 +996,8 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
             self.id = id
             self.badge = badge
             self.title = title
+            self.plainLanguageTitle = plainLanguageTitle
+                ?? CertiGoPlainLanguageTranslator.simplifyOptionTitle(title, subtitle: subtitle)
             self.subtitle = subtitle
             self.assetName = assetName
             self.isCorrect = isCorrect
@@ -716,6 +1010,18 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
     public let domainBadge: String
     public let subBadge: String
     public let prompt: String
+    public var plainLanguagePrompt: String
+    private var storedJargonGlossaryBridge: [CertiGoJargonBridgeItem]
+    public var jargonGlossaryBridge: [(term: String, simpleMeaning: String)] {
+        get {
+            storedJargonGlossaryBridge.map { (term: $0.term, simpleMeaning: $0.simpleMeaning) }
+        }
+        set {
+            storedJargonGlossaryBridge = newValue.map {
+                CertiGoJargonBridgeItem(term: $0.term, simpleMeaning: $0.simpleMeaning)
+            }
+        }
+    }
     public let mascotPose: CertiGoMascotPose
     public let options: [OptionItem]
     public let cliPrefix: String?
@@ -745,6 +1051,8 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
         domainBadge: String,
         subBadge: String = "SCÉNARIO ARCHITECTURE",
         prompt: String,
+        plainLanguagePrompt: String? = nil,
+        jargonGlossaryBridge: [(term: String, simpleMeaning: String)]? = nil,
         mascotPose: CertiGoMascotPose = .specialistCloudAzure,
         options: [OptionItem],
         cliPrefix: String? = nil,
@@ -776,11 +1084,28 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
         variantGroupId: String = "",
         isReviewReplay: Bool = false
     ) {
+        let resolvedConceptTitle = conceptTitle.isEmpty ? domainBadge : conceptTitle
         self.id = id
         self.formatCode = formatCode
         self.domainBadge = domainBadge
         self.subBadge = subBadge
         self.prompt = prompt
+        self.plainLanguagePrompt = plainLanguagePrompt
+            ?? CertiGoPlainLanguageTranslator.simplifyPrompt(
+                prompt,
+                forExerciseId: id,
+                conceptTitle: resolvedConceptTitle
+            )
+        let resolvedBridge = jargonGlossaryBridge
+            ?? CertiGoPlainLanguageTranslator.buildJargonGlossaryBridge(
+                prompt: prompt,
+                options: options,
+                exerciseId: id,
+                conceptTitle: resolvedConceptTitle
+            )
+        self.storedJargonGlossaryBridge = resolvedBridge.map {
+            CertiGoJargonBridgeItem(term: $0.term, simpleMeaning: $0.simpleMeaning)
+        }
         self.mascotPose = mascotPose
         self.options = options
         self.cliPrefix = cliPrefix
@@ -799,7 +1124,7 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
         self.comparisonRightBullets = comparisonRightBullets
         self.comparisonGoldenRule = comparisonGoldenRule
         self.conceptId = conceptId.isEmpty ? id : conceptId
-        self.conceptTitle = conceptTitle.isEmpty ? domainBadge : conceptTitle
+        self.conceptTitle = resolvedConceptTitle
         self.difficulty = min(max(difficulty, 0.0), 1.0)
         self.variantGroupId = variantGroupId.isEmpty ? (conceptId.isEmpty ? id : conceptId) : variantGroupId
         self.isReviewReplay = isReviewReplay
@@ -1281,6 +1606,7 @@ public enum CertiGoAdaptiveSessionEngine {
                 id: opt.id,
                 badge: positionalLetters[min(index, positionalLetters.count - 1)],
                 title: opt.title,
+                plainLanguageTitle: opt.plainLanguageTitle,
                 subtitle: opt.subtitle,
                 assetName: opt.assetName,
                 isCorrect: opt.isCorrect,
@@ -1478,6 +1804,8 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
     public var recentMistakesLog: [CertiGoPersonalMistakeEntry]
     public var liveSheet05Explanation: CertiGoLiveAITutorResponse?
     public var isLoadingLiveSheet05Explanation: Bool
+    public var isPlainLanguageModeEnabled: Bool
+    public var experienceLevelIndex: Int
 
     public var isSessionFailedOutOfHearts: Bool {
         heartsCount <= 0
@@ -1491,13 +1819,17 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         exercises: [CertiGoNativeExerciseItem]? = nil,
         heartsCount: Int = 5,
         enableAdaptiveReplay: Bool = false,
-        sessionSeed: UInt64 = 1
+        sessionSeed: UInt64 = 1,
+        isPlainLanguageModeEnabled: Bool = false,
+        experienceLevelIndex: Int = 1
     ) {
         self.routeCode = routeCode
         self.lessonId = lessonId
         self.lessonTitle = lessonTitle
         self.isShowingDeclicCard15 = isShowingDeclicCard15
         self.lessonSlideIndex = 0
+        self.isPlainLanguageModeEnabled = isPlainLanguageModeEnabled || (experienceLevelIndex == 0)
+        self.experienceLevelIndex = experienceLevelIndex
         let declic = Self.defaultDeclicCard(
             forRouteCode: routeCode,
             lessonId: lessonId,
@@ -1515,33 +1847,23 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
             stepIndexInUnit: lessonId.hasSuffix("-s2") ? 1 : (lessonId.hasSuffix("-s3") ? 2 : (lessonId.hasSuffix("-s4") ? 3 : (lessonId.hasSuffix("-s5") ? 4 : 0))),
             globalIndex: 0
         )
-        self.lessonSlides = [
-            CertiGoLessonMicroSlide(
-                stepBadge: "NOTION 1/3 · L'ESSENTIEL",
-                title: lessonTitle,
-                bodyParagraph: declic.title,
-                keyTakeawayPill: declic.step1,
-                serviceAssetName: serviceAsset
-            ),
-            CertiGoLessonMicroSlide(
-                stepBadge: "NOTION 2/3 · COMMENT ÇA MARCHE",
-                title: "Architecture & Mécanisme",
-                bodyParagraph: declic.step2,
-                keyTakeawayPill: "Avant : \(declic.diagramTop)\nAprès : \(declic.diagramBottom)",
-                serviceAssetName: serviceAsset
-            ),
-            CertiGoLessonMicroSlide(
-                stepBadge: "NOTION 3/3 · RÉFLEXE D'EXAMEN",
-                title: "La règle d'or à retenir",
-                bodyParagraph: declic.rule,
-                keyTakeawayPill: "Maintenant, vérifions avec quelques cas pratiques si tout est clair !",
-                serviceAssetName: serviceAsset
-            )
-        ]
-        let resolvedExercises = exercises ?? Self.defaultExercises(
+        self.lessonSlides = Self.buildLessonMicroSlides(
+            forRouteCode: routeCode,
+            lessonId: lessonId,
+            lessonTitle: lessonTitle,
+            declic: declic,
+            serviceAssetName: serviceAsset
+        )
+        let baseExercises = exercises ?? Self.defaultExercises(
             forRouteCode: routeCode,
             lessonId: lessonId,
             lessonTitle: lessonTitle
+        )
+        let resolvedExercises = Self.adaptExercisesForExperienceLevel(
+            baseExercises,
+            routeCode: routeCode,
+            lessonId: lessonId,
+            experienceLevelIndex: experienceLevelIndex
         )
         self.exercises = resolvedExercises
         self.currentExerciseIndex = 0
@@ -1670,6 +1992,347 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
 
     public mutating func dismissDeclicCard15() {
         isShowingDeclicCard15 = false
+    }
+
+    public mutating func togglePlainLanguageMode() {
+        isPlainLanguageModeEnabled.toggle()
+    }
+
+    public static func buildLessonMicroSlides(
+        forRouteCode routeCode: String,
+        lessonId: String,
+        lessonTitle: String,
+        declic: (title: String, diagramTop: String, diagramBottom: String, step1: String, step2: String, rule: String),
+        serviceAssetName: String
+    ) -> [CertiGoLessonMicroSlide] {
+        let upper = routeCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let lowerId = lessonId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let isChapterOneOverview = lowerId.isEmpty || lowerId.contains("u1-s1")
+
+        if isChapterOneOverview {
+            switch upper {
+            case "AZ-900":
+                return [
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "VUE D'ENSEMBLE · TA MISSION",
+                        title: "Vue globale : pourquoi passer AZ-900 ?",
+                        bodyParagraph: "Pourquoi passer AZ-900 ? C'est la porte d'entrée officielle du Cloud Microsoft Azure : elle montre que tu comprends comment fonctionne le Cloud, comment il se facture au quotidien et qui est responsable de quoi, sans aucun prérequis technique.",
+                        keyTakeawayPill: "Tes 3 grands thèmes : 1. L'économie du Cloud (payer à l'usage) · 2. Les grandes briques (Serveurs, Stockage, Réseau) · 3. La sécurité et le suivi du budget.",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LA GRANDE IMAGE · COMMENT TOUT S'ORGANISE",
+                        title: "Comment tout s'organise (en 3 briques simples)",
+                        bodyParagraph: "Imagine le Cloud Azure comme la location d'un appartement meublé plutôt que l'achat d'un immeuble :\n1. Tu paies uniquement ce que tu consommes chaque mois (facture souple) · 2. Tu choisis ton niveau de confort (machine brute, plateforme prête ou logiciel fini) · 3. Microsoft gère les bâtiments physiques pendant que tu gardes la clé de tes données.",
+                        keyTakeawayPill: "Avant : Acheter des serveurs coûteux 5 ans d'avance\nAprès : Louer à la minute et éteindre quand on n'en a plus besoin",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LE PONT VERS L'EXAMEN · MOTS SIMPLES ⇄ MOTS OFFICIELS",
+                        title: "Tes 3 premiers mots-clés & le bouton 💡 Version simple",
+                        bodyParagraph: "Dans les questions qui suivent, tu vas croiser 3 mots officiels très simples :\n• « OpEx / Pay-as-you-go » = Payer chaque mois selon sa consommation réelle.\n• « PaaS (App Service) » = Mettre son site en ligne sans gérer Windows ou Linux.\n• « Responsabilité partagée » = Tes données et tes comptes restent toujours sous ton contrôle.",
+                        keyTakeawayPill: "Astuce : active à tout moment le bouton « 💡 Version simple (sans jargon) » en haut d'une question pour la lire avec des mots de tous les jours !",
+                        serviceAssetName: serviceAssetName
+                    )
+                ]
+            case "SAA-C03", "CLF-C02", "AIF-C01":
+                return [
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "VUE D'ENSEMBLE · TA MISSION",
+                        title: "Vue globale : pourquoi passer \(upper) ?",
+                        bodyParagraph: "Pourquoi passer \(upper) ? C'est la certification qui montre que tu sais concevoir une architecture solide, sécurisée et économique sur Amazon Web Services (AWS), comme l'architecte d'une ville numérique.",
+                        keyTakeawayPill: "Tes 3 grands thèmes : 1. Faire tourner des serveurs (EC2) en sécurité · 2. Stocker des fichiers et bases de données (S3, RDS) · 3. Résister aux pannes automatiquement.",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LA GRANDE IMAGE · COMMENT TOUT S'ORGANISE",
+                        title: "Comment tout s'organise (en 3 briques simples)",
+                        bodyParagraph: "Tout l'écosystème AWS repose sur 3 réflexes très concrets :\n1. Le Réseau privé (VPC) qui entoure tes machines · 2. Les Badges d'accès temporaires (Rôles IAM) pour éviter les mots de passe écrits en dur · 3. Le Stockage illimité (Amazon S3) relié par un couloir privé gratuit.",
+                        keyTakeawayPill: "Avant : Clés secrètes copiées dans le code source\nAprès : Badge temporaire automatique (Rôle IAM) + couloir privé S3",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LE PONT VERS L'EXAMEN · MOTS SIMPLES ⇄ MOTS OFFICIELS",
+                        title: "Tes 3 premiers mots-clés & le bouton 💡 Version simple",
+                        bodyParagraph: "Voici les 3 mots d'examen que tu vas croiser tout de suite :\n• « Amazon EC2 » = Un ordinateur virtuel loué dans le Cloud AWS.\n• « Rôle IAM (STS) » = Un badge temporaire automatique sans mot de passe.\n• « Gateway VPC Endpoint » = Une porte privée gratuite vers ton stockage S3.",
+                        keyTakeawayPill: "Un mot technique te semble flou ? Bascule le switch « 💡 Version simple » juste au-dessus de la question !",
+                        serviceAssetName: serviceAssetName
+                    )
+                ]
+            case "PDE", "PCA", "ACE":
+                return [
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "VUE D'ENSEMBLE · TA MISSION",
+                        title: "Vue globale : pourquoi passer \(upper) ?",
+                        bodyParagraph: "Pourquoi passer \(upper) ? Cette certification Google Cloud montre que tu sais faire circuler, nettoyer et analyser d'immenses volumes de données en temps réel sans jamais perdre un seul événement.",
+                        keyTakeawayPill: "Tes 3 grands thèmes : 1. Recevoir les événements en direct (Pub/Sub) · 2. Les transformer en continu (Dataflow) · 3. Les analyser en quelques secondes (BigQuery).",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LA GRANDE IMAGE · COMMENT TOUT S'ORGANISE",
+                        title: "Comment tout s'organise (en 3 briques simples)",
+                        bodyParagraph: "Visualise Google Cloud Data comme une chaîne de tri postal ultra-moderne :\n1. La Boîte aux lettres géante (Cloud Pub/Sub) qui reçoit tous les colis en direct · 2. Le Tapis roulant intelligent (Cloud Dataflow) qui trie et regroupe les colis · 3. La Grande Bibliothèque (BigQuery) où tout est rangé pour répondre aux questions.",
+                        keyTakeawayPill: "1. Pub/Sub reçoit en direct ➔ 2. Dataflow nettoie et trie ➔ 3. BigQuery analyse instantanément",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LE PONT VERS L'EXAMEN · MOTS SIMPLES ⇄ MOTS OFFICIELS",
+                        title: "Tes 3 premiers mots-clés & le bouton 💡 Version simple",
+                        bodyParagraph: "Les 3 expressions d'examen à reconnaître d'un coup d'œil :\n• « Ordering Key (Pub/Sub) » = Garder les messages d'un même client dans le bon ordre.\n• « Dead-Letter Topic » = Une voie de garage pour isoler un message abîmé qui bloque.\n• « Cloud Dataflow » = Le moteur sans serveur qui traite le temps réel et l'historique.",
+                        keyTakeawayPill: "Utilise le switch « 💡 Version simple ⇄ 🎯 Style Examen » sur chaque question pour t'entraîner à ton rythme !",
+                        serviceAssetName: serviceAssetName
+                    )
+                ]
+            case "AI-102":
+                return [
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "VUE D'ENSEMBLE · TA MISSION",
+                        title: "Vue globale : pourquoi passer AI-102 ?",
+                        bodyParagraph: "Pourquoi passer AI-102 ? C'est la certification qui montre que tu sais brancher l'intelligence artificielle générative (Azure OpenAI) sur les vrais documents d'une entreprise, en toute sécurité et sans qu'elle n'invente de fausses réponses.",
+                        keyTakeawayPill: "Tes 3 grands thèmes : 1. Lire et découper les documents (Document Intelligence) · 2. Retrouver le bon passage (AI Search) · 3. Générer et protéger la réponse (OpenAI + Content Safety).",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LA GRANDE IMAGE · COMMENT TOUT S'ORGANISE",
+                        title: "Comment tout s'organise (en 3 briques simples)",
+                        bodyParagraph: "Un assistant IA d'entreprise (appelé RAG) fonctionne en 3 étapes très simples :\n1. Le Bibliothécaire (Azure AI Search) cherche les pages exactes dans les manuels de l'entreprise · 2. Le Rédacteur (Azure OpenAI) rédige la réponse à partir de ces pages · 3. Le Garde du corps (Content Safety) bloque les manipulations.",
+                        keyTakeawayPill: "1. Chercher par mots exacts + par sens ➔ 2. Classer les meilleurs extraits ➔ 3. Répondre sans inventer",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LE PONT VERS L'EXAMEN · MOTS SIMPLES ⇄ MOTS OFFICIELS",
+                        title: "Tes 3 premiers mots-clés & le bouton 💡 Version simple",
+                        bodyParagraph: "Retiens ces 3 traductions simples pour l'examen :\n• « Recherche Hybride (BM25 + Vecteurs) » = Chercher à la fois les codes exacts ET le sens de la phrase.\n• « Semantic Ranker » = Remettre les extraits les plus pertinents tout en haut.\n• « Prompt Shields & Groundedness » = Bloquer les pirates et vérifier que l'IA dit vrai.",
+                        keyTakeawayPill: "Active le bouton « 💡 Version simple » sur n'importe quelle question pour traduire instantanément le jargon !",
+                        serviceAssetName: serviceAssetName
+                    )
+                ]
+            case "CKA", "CCNA", "TF-003":
+                return [
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "VUE D'ENSEMBLE · TA MISSION",
+                        title: "Vue globale : pourquoi passer \(upper) ?",
+                        bodyParagraph: "Pourquoi passer \(upper) ? Cette certification montre que tu sais orchestrer, isoler et maintenir en vie des applications conteneurisées en production sur Kubernetes et le Cloud Native.",
+                        keyTakeawayPill: "Tes 3 grands thèmes : 1. Donner le minimum de droits à chaque application · 2. Isoler le réseau entre les conteneurs · 3. Garder le cluster toujours disponible.",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LA GRANDE IMAGE · COMMENT TOUT S'ORGANISE",
+                        title: "Comment tout s'organise (en 3 briques simples)",
+                        bodyParagraph: "Imagine un cluster Kubernetes comme un grand navire porte-conteneurs :\n1. Les Quartiers (Namespaces) séparent chaque équipe (ex: finance, web) · 2. Les Badges locaux (Role + RoleBinding) donnent accès à un seul quartier · 3. Les Cloisons réseau (NetworkPolicy) empêchent un conteneur d'aller fouiller dans la base de données.",
+                        keyTakeawayPill: "1. Un quartier (Namespace) ➔ 2. Un badge local (RoleBinding) ➔ 3. Une cloison réseau (NetworkPolicy)",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LE PONT VERS L'EXAMEN · MOTS SIMPLES ⇄ MOTS OFFICIELS",
+                        title: "Tes 3 premiers mots-clés & le bouton 💡 Version simple",
+                        bodyParagraph: "Les 3 termes officiels à décoder facilement :\n• « ServiceAccount » = L'identité d'une application qui tourne dans un Pod.\n• « Role + RoleBinding » = Une permission valable dans un seul dossier (Namespace).\n• « ClusterRole » = Une permission globale sur tout le cluster.",
+                        keyTakeawayPill: "Bascule entre « 💡 Version simple » et « 🎯 Style Examen » en haut de chaque question pour progresser sans stress !",
+                        serviceAssetName: serviceAssetName
+                    )
+                ]
+            case "GH-300", "CCA-F":
+                return [
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "VUE D'ENSEMBLE · TA MISSION",
+                        title: "Vue globale : pourquoi passer \(upper) ?",
+                        bodyParagraph: "Pourquoi passer \(upper) ? C'est la certification qui montre que tu sais piloter des assistants et agents IA de développement (GitHub Copilot & Claude) avec sécurité, précision et qualité industrielle.",
+                        keyTakeawayPill: "Tes 3 grands thèmes : 1. Protéger le code privé de l'entreprise · 2. Guider l'IA avec des instructions claires · 3. Vérifier chaque code généré par des tests.",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LA GRANDE IMAGE · COMMENT TOUT S'ORGANISE",
+                        title: "Comment tout s'organise (en 3 briques simples)",
+                        bodyParagraph: "Travailler avec un agent IA professionnel repose sur 3 garde-fous :\n1. Les Règles d'équipe (.github/copilot-instructions.md) pour que l'IA suive vos conventions · 2. Le Filtre de confidentialité qui bloque la copie de code public · 3. Les Outils typés (MCP) et les tests automatiques.",
+                        keyTakeawayPill: "1. Instructions d'équipe partagées · 2. Zéro fuite de code privé · 3. Validation systématique par les tests",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LE PONT VERS L'EXAMEN · MOTS SIMPLES ⇄ MOTS OFFICIELS",
+                        title: "Tes 3 premiers mots-clés & le bouton 💡 Version simple",
+                        bodyParagraph: "Voici les 3 termes que tu vas retrouver dès ce premier chapitre :\n• « Content Exclusion » = Interdire à Copilot de lire certains fichiers secrets.\n• « Suggestions matching public code = Blocked » = Empêcher la copie mot pour mot de code public.\n• « copilot-instructions.md » = Le fichier de consignes partagé avec toute l'équipe.",
+                        keyTakeawayPill: "Utilise le switch « 💡 Version simple » en haut de chaque question pour décoder instantanément le vocabulaire !",
+                        serviceAssetName: serviceAssetName
+                    )
+                ]
+            default:
+                return [
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "VUE D'ENSEMBLE · TA MISSION",
+                        title: "Vue globale : pourquoi passer \(upper) ?",
+                        bodyParagraph: "Pourquoi passer \(upper) ? C'est la certification de référence qui montre que tu sais organiser, sécuriser et faire tourner le Cloud d'une entreprise sur Microsoft Azure, comme le chef d'orchestre d'un immeuble numérique.",
+                        keyTakeawayPill: "Ce que tu vas apprendre pas à pas : 1. Organiser les projets · 2. Donner les bons droits d'accès · 3. Protéger les mots de passe, le réseau et les sauvegardes.",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LA GRANDE IMAGE · COMMENT TOUT S'ORGANISE",
+                        title: "Comment tout s'organise (en 3 briques simples)",
+                        bodyParagraph: "Avant de parler technique, retiens comment Azure range tout comme dans une maison bien ordonnée :\n1. Le Compte (Abonnement / Subscription) qui reçoit et paie la facture · 2. Les Dossiers (Groupes de ressources) pour rassembler chaque projet · 3. Les Serveurs, Stockages et Coffres-forts rangés à l'intérieur.",
+                        keyTakeawayPill: "1. Abonnement (la facture) ➔ 2. Groupe de ressources (le dossier du projet) ➔ 3. Ressources Cloud (serveurs, stockage, sécurité)",
+                        serviceAssetName: serviceAssetName
+                    ),
+                    CertiGoLessonMicroSlide(
+                        stepBadge: "LE PONT VERS L'EXAMEN · MOTS SIMPLES ⇄ MOTS OFFICIELS",
+                        title: "Tes 3 premiers mots-clés & le bouton 💡 Version simple",
+                        bodyParagraph: "Dans les questions qui suivent, tu vas découvrir 3 réflexes tout simples :\n• « Groupe de ressources (Resource Group) » = Le dossier qui regroupe toutes les briques d'un même projet.\n• « Rôle Lecteur (Reader) » = Le droit de tout regarder sans rien pouvoir modifier.\n• « Verrou CanNotDelete » = Le cadenas qui empêche d'effacer un dossier important par erreur.",
+                        keyTakeawayPill: "Astuce : en haut de chaque question, utilise le bouton « 💡 Version simple (sans jargon) ⇄ 🎯 Style Examen » pour passer des mots de tous les jours au vrai format d'examen !",
+                        serviceAssetName: serviceAssetName
+                    )
+                ]
+            }
+        }
+
+        return [
+            CertiGoLessonMicroSlide(
+                stepBadge: "NOTION 1/3 · L'ESSENTIEL",
+                title: lessonTitle,
+                bodyParagraph: declic.title,
+                keyTakeawayPill: declic.step1,
+                serviceAssetName: serviceAssetName
+            ),
+            CertiGoLessonMicroSlide(
+                stepBadge: "NOTION 2/3 · COMMENT ÇA MARCHE",
+                title: "Architecture & Mécanisme",
+                bodyParagraph: declic.step2,
+                keyTakeawayPill: "Avant : \(declic.diagramTop)\nAprès : \(declic.diagramBottom)",
+                serviceAssetName: serviceAssetName
+            ),
+            CertiGoLessonMicroSlide(
+                stepBadge: "NOTION 3/3 · RÉFLEXE D'EXAMEN",
+                title: "La règle d'or à retenir",
+                bodyParagraph: declic.rule,
+                keyTakeawayPill: "Maintenant, vérifions avec quelques cas pratiques si tout est clair !",
+                serviceAssetName: serviceAssetName
+            )
+        ]
+    }
+
+    /// Eliminates the raw CLI keyboard/word-bank wall (`Q_TYPE_04` / `Q_TYPE_05`) when the learner chose Beginner (`experienceLevelIndex == 0`), converting CLI items into progressive multiple-choice comprehension questions on Resource Groups & Locks.
+    public static func adaptExercisesForExperienceLevel(
+        _ exercises: [CertiGoNativeExerciseItem],
+        routeCode: String,
+        lessonId: String,
+        experienceLevelIndex: Int
+    ) -> [CertiGoNativeExerciseItem] {
+        let shouldAvoidRawCLIWall = (experienceLevelIndex == 0)
+
+        guard shouldAvoidRawCLIWall else {
+            return exercises
+        }
+
+        return exercises.map { ex in
+            guard ex.formatCode == "Q_TYPE_04" || ex.formatCode == "Q_TYPE_05" else {
+                return ex
+            }
+            if ex.formatCode == "Q_TYPE_04" {
+                return CertiGoNativeExerciseItem(
+                    id: ex.id,
+                    formatCode: "Q_TYPE_01",
+                    domainBadge: "🛡️ PROTECTION · ÉVITER L'ERREUR HUMAINE",
+                    subBadge: "VUE GLOBALE · SÉCURISER UN DOSSIER CRITIQUE",
+                    prompt: "Un stagiaire ou un administrateur fatigué risque de supprimer par erreur le dossier contenant toute la production de l'entreprise (RG-Prod).\nQuelle protection simple activez-vous sur ce Groupe de ressources pour bloquer toute suppression ?",
+                    plainLanguagePrompt: "Tu veux éviter qu'un collègue fatigué n'efface par mégarde le dossier qui fait tourner toute l'entreprise.\nQuelle sécurité toute simple poses-tu sur ce dossier ?",
+                    jargonGlossaryBridge: [
+                        (term: "Verrou CanNotDelete (Delete Lock)", simpleMeaning: "Cadenas anti-suppression : on peut utiliser et modifier, mais impossible d'effacer"),
+                        (term: "Verrou ReadOnly", simpleMeaning: "Cadenas total : plus personne ne peut rien modifier ni supprimer")
+                    ],
+                    mascotPose: .emotionAhaIdea,
+                    options: [
+                        .init(
+                            id: "opt-a",
+                            badge: "A",
+                            title: "Un verrou Resource Manager anti-suppression (CanNotDelete)",
+                            plainLanguageTitle: "Poser un cadenas « Interdiction d'effacer » (Verrou CanNotDelete) sur le dossier",
+                            isCorrect: true,
+                            whyWrongOrRight: "Le verrou CanNotDelete autorise le fonctionnement normal et les mises à jour, mais bloque toute tentative de suppression, même par un Propriétaire (Owner)."
+                        ),
+                        .init(
+                            id: "opt-b",
+                            badge: "B",
+                            title: "Un redémarrage automatique des serveurs toutes les heures",
+                            plainLanguageTitle: "Éteindre et rallumer les serveurs toutes les heures",
+                            isCorrect: false,
+                            whyWrongOrRight: "Redémarrer les machines coupe le service sans empêcher la suppression du dossier."
+                        ),
+                        .init(
+                            id: "opt-c",
+                            badge: "C",
+                            title: "Une suppression de tous les comptes administrateurs de l'entreprise",
+                            plainLanguageTitle: "Supprimer les comptes de toute l'équipe informatique",
+                            isCorrect: false,
+                            whyWrongOrRight: "L'équipe a besoin de ses comptes pour travailler ; le verrou suffit à empêcher les suppressions accidentelles."
+                        ),
+                        .init(
+                            id: "opt-d",
+                            badge: "D",
+                            title: "Un changement de langue du portail web Azure",
+                            plainLanguageTitle: "Changer la langue d'affichage de l'écran",
+                            isCorrect: false,
+                            whyWrongOrRight: "Les préférences d'affichage du portail ne protègent aucune ressource Cloud."
+                        )
+                    ],
+                    examTip: "Un verrou CanNotDelete protège contre la suppression accidentelle et s'applique même aux Propriétaires (Owners) !",
+                    conceptId: ex.conceptId,
+                    conceptTitle: ex.conceptTitle,
+                    difficulty: 0.32,
+                    variantGroupId: ex.variantGroupId,
+                    isReviewReplay: ex.isReviewReplay
+                )
+            }
+            return CertiGoNativeExerciseItem(
+                id: ex.id,
+                formatCode: "Q_TYPE_01",
+                domainBadge: "📦 ORGANISATION · DOSSIERS DE PROJETS",
+                subBadge: "VUE GLOBALE · COMMENT RANGER SON CLOUD",
+                prompt: "Vous lancez un nouveau site web composé d'un serveur, d'une base de données et d'un espace de stockage pour un même projet.\nÀ quoi sert de les rassembler dans un même Groupe de ressources (Resource Group) ?",
+                plainLanguagePrompt: "Tu crées un site web avec son serveur et sa base de données pour un même projet.\nPourquoi est-ce super pratique de tout ranger dans le même « dossier de projet » (Groupe de ressources) ?",
+                jargonGlossaryBridge: [
+                    (term: "Groupe de ressources (Resource Group)", simpleMeaning: "Un dossier logique qui rassemble toutes les briques d'un même projet"),
+                    (term: "Cycle de vie commun", simpleMeaning: "Pouvoir créer, surveiller ou tout supprimer d'un seul coup quand le projet est fini")
+                ],
+                mascotPose: .specialistCloudAzure,
+                options: [
+                    .init(
+                        id: "opt-a",
+                        badge: "A",
+                        title: "Regrouper toutes les briques d'un même projet pour suivre leur budget, appliquer les mêmes accès et les gérer d'un seul coup",
+                        plainLanguageTitle: "Ranger tout le projet au même endroit pour le gérer, le sécuriser ou le nettoyer d'un seul coup",
+                        isCorrect: true,
+                        whyWrongOrRight: "Un Groupe de ressources (Resource Group) agit comme un dossier de projet : toutes les ressources qui partagent la même vie sont gérées ensemble."
+                    ),
+                    .init(
+                        id: "opt-b",
+                        badge: "B",
+                        title: "Doubler automatiquement la puissance du processeur de chaque serveur",
+                        plainLanguageTitle: "Rendre les ordinateurs deux fois plus rapides par magie",
+                        isCorrect: false,
+                        whyWrongOrRight: "Un Groupe de ressources est un dossier d'organisation logique et ne modifie pas la vitesse des machines."
+                    ),
+                    .init(
+                        id: "opt-c",
+                        badge: "C",
+                        title: "Rendre toutes les bases de données publiques sur Internet sans mot de passe",
+                        plainLanguageTitle: "Ouvrir toutes les données au grand public sans sécurité",
+                        isCorrect: false,
+                        whyWrongOrRight: "Ranger des ressources dans un groupe n'ouvre jamais d'accès public sur Internet."
+                    ),
+                    .init(
+                        id: "opt-d",
+                        badge: "D",
+                        title: "Remplacer le besoin d'avoir un compte ou un abonnement Azure",
+                        plainLanguageTitle: "Utiliser Azure gratuitement sans avoir de compte",
+                        isCorrect: false,
+                        whyWrongOrRight: "Chaque Groupe de ressources est toujours créé à l'intérieur d'un Abonnement Azure."
+                    )
+                ],
+                examTip: "Chaque ressource Azure appartient obligatoirement à un et un seul Groupe de ressources (Resource Group).",
+                conceptId: ex.conceptId,
+                conceptTitle: ex.conceptTitle,
+                difficulty: 0.30,
+                variantGroupId: ex.variantGroupId,
+                isReviewReplay: ex.isReviewReplay
+            )
+        }
     }
 
     public var currentLessonSlide: CertiGoLessonMicroSlide {
@@ -4799,109 +5462,338 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
             ]
         }
 
-        // Default / Unit 1 (`AZ-104`): Identity, RBAC, Key Vault, WAF, CLI Lock, Word Bank VNet & Private Endpoint
+        // Unit 1 — Steps 2 & 3 (`u1-s2`, `u1-s3`): Deep-dive Identity, Key Vault HSM, WAF L7, CLI Lock & Word Bank
+        if lowerLessonId.contains("u1-s2") || lowerLessonId.contains("u1-s3") {
+            return [
+                CertiGoNativeExerciseItem(
+                    id: "\(routeCode.lowercased())-u1-s2-qtype01",
+                    formatCode: "Q_TYPE_01",
+                    domainBadge: "⚡ RÔLES RBAC & GOUVERNANCE",
+                    subBadge: "MOINDRE PRIVILÈGE · AUDIT EXTERNE",
+                    prompt: "Un auditeur externe doit vérifier toutes les ressources d'un abonnement \(routeCode) en lecture seule sans pouvoir les modifier.\nQuel rôle intégré lui attribuer ?",
+                    mascotPose: .specialistSecurityEntra,
+                    options: [
+                        .init(
+                            id: "opt-a",
+                            badge: "A",
+                            title: "Contributeur (Contributor)",
+                            isCorrect: false,
+                            whyWrongOrRight: "Le rôle Contributeur permet de créer, modifier et supprimer des ressources, ce qui viole le principe du moindre privilège pour un audit."
+                        ),
+                        .init(
+                            id: "opt-b",
+                            badge: "B",
+                            title: "Lecteur (Reader)",
+                            isCorrect: true,
+                            whyWrongOrRight: "Le rôle Lecteur accorde uniquement les permissions */read sur toute la portée sans aucune modification ni lecture des secrets."
+                        ),
+                        .init(
+                            id: "opt-c",
+                            badge: "C",
+                            title: "Propriétaire (Owner)",
+                            isCorrect: false,
+                            whyWrongOrRight: "Le rôle Propriétaire donne un contrôle total sur les ressources ET sur les attributions RBAC (Microsoft.Authorization/*)."
+                        ),
+                        .init(
+                            id: "opt-d",
+                            badge: "D",
+                            title: "Administrateur de l'accès utilisateur",
+                            isCorrect: false,
+                            whyWrongOrRight: "Ce rôle permet d'attribuer des rôles aux utilisateurs mais n'est pas conçu pour un audit en lecture seule."
+                        )
+                    ],
+                    examTip: "À l'examen, associe toujours « Auditeur externe / Consultation seule » au rôle Lecteur (Reader)."
+                ),
+                CertiGoNativeExerciseItem(
+                    id: "\(routeCode.lowercased())-u1-s2-qtype02",
+                    formatCode: "Q_TYPE_02",
+                    domainBadge: "🔐 SÉCURITÉ & ARCHITECTURE CLOUD",
+                    subBadge: "GRILLE VISUELLE 2×2 · SERVICES OFFICIELS",
+                    prompt: "Vous devez protéger des clés cryptographiques HSM, secrets applicatifs et certificats TLS dans un coffre matériel.\nQuel service Azure choisissez-vous ?",
+                    mascotPose: .specialistCloudAzure,
+                    options: [
+                        .init(
+                            id: "grid-kv",
+                            badge: "A",
+                            title: "Key Vault",
+                            subtitle: "HSM, Secrets & Certificats",
+                            assetName: "AzureServices/Key-Vaults",
+                            isCorrect: true,
+                            whyWrongOrRight: "Azure Key Vault centralise la gestion des secrets, clés HSM FIPS 140-2/3 et certificats TLS avec contrôle RBAC."
+                        ),
+                        .init(
+                            id: "grid-entra",
+                            badge: "B",
+                            title: "Entra ID",
+                            subtitle: "Identité, SSO & MFA",
+                            assetName: "AzureServices/Azure-Active-Directory",
+                            isCorrect: false,
+                            whyWrongOrRight: "Entra ID gère les identités, tokens OIDC/SAML et l'accès conditionnel, pas le stockage de clés HSM."
+                        ),
+                        .init(
+                            id: "grid-fw",
+                            badge: "C",
+                            title: "Azure Firewall",
+                            subtitle: "Filtrage L3–L7 & FQDN",
+                            assetName: "AzureServices/Firewalls",
+                            isCorrect: false,
+                            whyWrongOrRight: "Azure Firewall filtre les flux réseau entrants/sortants du VNet mais ne stocke pas les secrets applicatifs."
+                        ),
+                        .init(
+                            id: "grid-blob",
+                            badge: "D",
+                            title: "Blob Storage",
+                            subtitle: "Stockage objet massif",
+                            assetName: "AzureServices/Storage-Accounts",
+                            isCorrect: false,
+                            whyWrongOrRight: "Blob Storage stocke des fichiers et objets mais n'offre pas de gestion native de secrets ni de rotation automatique de certificats."
+                        )
+                    ],
+                    examTip: "Key Vault Premium prend en charge les clés protégées par HSM matériel dédié."
+                ),
+                CertiGoNativeExerciseItem(
+                    id: "\(routeCode.lowercased())-u1-s2-qtype03",
+                    formatCode: "Q_TYPE_03",
+                    domainBadge: "🌐 ARCHITECTURE VNET & WAF",
+                    subBadge: "SCHÉMA INTERACTIF · [ 🌐 Clients ] ➔ [ ? ] ➔ [ VNet Privé ]",
+                    prompt: "Vos applications web régionales doivent filtrer le trafic HTTPS entrant en Couche 7 avec un pare-feu WAF OWASP.\nQuelle brique placer dans [ ? ] ?",
+                    mascotPose: .specialistNetworkVNet,
+                    options: [
+                        .init(
+                            id: "arch-appgw",
+                            badge: "A",
+                            title: "Azure Application Gateway (WAF v2)",
+                            subtitle: "Répartiteur HTTP/HTTPS Couche 7 + Inspection OWASP",
+                            assetName: "AzureServices/Application-Gateways",
+                            isCorrect: true,
+                            whyWrongOrRight: "Application Gateway v2 opère en couche 7 (HTTP/HTTPS), gère le routage par URL, la terminaison TLS et le pare-feu WAF."
+                        ),
+                        .init(
+                            id: "arch-lb",
+                            badge: "B",
+                            title: "Azure Load Balancer (Couche 4 TCP/UDP)",
+                            subtitle: "Répartition transport L4 sans inspection HTTP",
+                            assetName: "AzureServices/Load-Balancers",
+                            isCorrect: false,
+                            whyWrongOrRight: "Azure Load Balancer opère en couche 4 (TCP/UDP) et ne peut ni inspecter les en-têtes HTTP ni embarquer de WAF."
+                        ),
+                        .init(
+                            id: "arch-nat",
+                            badge: "C",
+                            title: "Azure NAT Gateway",
+                            subtitle: "Connectivité sortante SNAT uniquement",
+                            assetName: "AzureServices/NAT",
+                            isCorrect: false,
+                            whyWrongOrRight: "NAT Gateway sert uniquement au trafic sortant (Egress SNAT) depuis un sous-réseau privé vers Internet."
+                        )
+                    ],
+                    examTip: "Trafic HTTP/HTTPS régional + WAF = Application Gateway. Trafic HTTP/HTTPS global multi-régions + WAF = Azure Front Door."
+                ),
+                CertiGoNativeExerciseItem(
+                    id: "\(routeCode.lowercased())-u1-s2-qtype04",
+                    formatCode: "Q_TYPE_04",
+                    domainBadge: "⌨️ AZURE CLI & VERROUS ARM",
+                    subBadge: "SAISIE CLAVIER CLI · PROTECTION DE PRODUCTION",
+                    prompt: "Vous devez empêcher toute suppression accidentelle du groupe de ressources RG-Prod.\nComplète la sous-commande Azure CLI :",
+                    mascotPose: .poseCLICoder,
+                    options: [
+                        .init(
+                            id: "cli-lock",
+                            badge: "CLI",
+                            title: "lock",
+                            isCorrect: true,
+                            whyWrongOrRight: "La commande exacte est « az group lock create --lock-type CanNotDelete -n Lock-Prod -g RG-Prod »."
+                        )
+                    ],
+                    cliPrefix: "az group",
+                    cliSuffix: "create --lock-type CanNotDelete -g RG-Prod",
+                    expectedCLIInput: "lock",
+                    cliSuggestionBricks: ["lock", "list", "policy", "role"],
+                    examTip: "Un verrou CanNotDelete s'applique même aux utilisateurs ayant le rôle Propriétaire (Owner) !"
+                ),
+                CertiGoNativeExerciseItem(
+                    id: "\(routeCode.lowercased())-u1-s2-qtype05",
+                    formatCode: "Q_TYPE_05",
+                    domainBadge: "🧱 CONSTRUCTEUR CLI (WORD BANK)",
+                    subBadge: "ASSEMBLAGE DE BRIQUES · DNS PRIVÉ",
+                    prompt: "Vous provisionnez le réseau virtuel ProdVNet dans le groupe RG-Core.\nAssemble dans l'ordre les briques Azure CLI :",
+                    mascotPose: .specialistCLIContainers,
+                    options: [],
+                    wordBankTargetTokens: ["az", "network", "vnet", "create", "--name ProdVNet", "-g RG-Core"],
+                    wordBankAllBricks: ["az", "network", "vnet", "create", "--name ProdVNet", "-g RG-Core", "delete", "--sku Basic"],
+                    examTip: "Dans Azure CLI, la structure suit toujours « az <service> <sous-service> <verbe> »."
+                ),
+                CertiGoNativeExerciseItem(
+                    id: "\(routeCode.lowercased())-u1-s2-qtype10",
+                    formatCode: "Q_TYPE_10",
+                    domainBadge: "☑️ CHOIX MULTIPLES · ISOLATION PRIVATE LINK",
+                    subBadge: "COCHE LES 2 ACTIONS OBLIGATOIRES",
+                    prompt: "Une VM dans VNet-Prod doit accéder à un compte Blob Storage exclusivement via une IP privée 10.0.2.4.\nQuelles sont les 2 actions indispensables ?",
+                    mascotPose: .emotionAhaIdea,
+                    options: [
+                        .init(
+                            id: "m-1",
+                            badge: "1",
+                            title: "Créer un Private Endpoint + lier la zone DNS privatelink.blob.core.windows.net au VNet",
+                            isCorrect: true,
+                            whyWrongOrRight: "Le Private Endpoint projette la NIC 10.0.2.4 et le Virtual Network Link permet la résolution DNS privée."
+                        ),
+                        .init(
+                            id: "m-2",
+                            badge: "2",
+                            title: "Passer publicNetworkAccess sur Disabled dans le pare-feu du Storage Account",
+                            isCorrect: true,
+                            whyWrongOrRight: "Créer un Private Endpoint ne coupe pas l'accès public par défaut : il faut désactiver publicNetworkAccess."
+                        ),
+                        .init(
+                            id: "m-3",
+                            badge: "3",
+                            title: "Ouvrir le port TCP 445 sur Internet via une IP publique Standard",
+                            isCorrect: false,
+                            whyWrongOrRight: "Exposer le port 445 sur une IP publique ouvre la ressource sur Internet au lieu de l'isoler."
+                        ),
+                        .init(
+                            id: "m-4",
+                            badge: "4",
+                            title: "Supprimer toutes les règles RBAC de l'abonnement",
+                            isCorrect: false,
+                            whyWrongOrRight: "La suppression des rôles RBAC bloquerait la gestion sans isoler le plan réseau."
+                        )
+                    ],
+                    examTip: "Private Endpoint + Zone DNS privatelink + publicNetworkAccess: Disabled = isolation PaaS 100 % verrouillée."
+                )
+            ]
+        }
+
+        // Default / Chapter 1 (`u1-s1` — Vue Globale & Fondations Simples sans jargon brutal)
         return [
-            // 1. Q_TYPE_01 — QCM Scénario RBAC & PIM (Écran 04 / Q_TYPE_01)
+            // 1. Q_TYPE_01 — Comprendre le principe de base des permissions (regarder vs modifier)
             CertiGoNativeExerciseItem(
                 id: "\(routeCode.lowercased())-qtype01",
                 formatCode: "Q_TYPE_01",
-                domainBadge: "⚡ RÔLES RBAC & GOUVERNANCE",
-                subBadge: "MOINDRE PRIVILÈGE · AUDIT EXTERNE",
+                domainBadge: "⚡ FONDATIONS · PERMISSIONS & CONSULTATION",
+                subBadge: "VUE GLOBALE \(routeCode) · DROITS D'ACCÈS SIMPLES",
                 prompt: "Un auditeur externe doit vérifier toutes les ressources d'un abonnement \(routeCode) en lecture seule sans pouvoir les modifier.\nQuel rôle intégré lui attribuer ?",
+                plainLanguagePrompt: "Un contrôleur externe vient observer l'organisation Cloud de ton entreprise : il doit pouvoir tout regarder, mais sans rien toucher ni modifier.\nQuel badge d'accès lui donnes-tu ?",
+                jargonGlossaryBridge: [
+                    (term: "RBAC (Contrôle d'accès)", simpleMeaning: "Qui a le droit de faire quoi dans le Cloud"),
+                    (term: "Lecteur (Reader)", simpleMeaning: "Regarder uniquement, sans rien modifier ni supprimer"),
+                    (term: "Abonnement (Subscription)", simpleMeaning: "Le dossier de facturation Cloud de l'entreprise")
+                ],
                 mascotPose: .specialistSecurityEntra,
                 options: [
                     .init(
                         id: "opt-a",
                         badge: "A",
                         title: "Contributeur (Contributor)",
+                        plainLanguageTitle: "Droit de tout créer et modifier (sauf gérer les accès des autres)",
                         isCorrect: false,
-                        whyWrongOrRight: "Le rôle Contributeur permet de créer, modifier et supprimer des ressources, ce qui viole le principe du moindre privilège pour un audit."
+                        whyWrongOrRight: "Le rôle Contributeur permet de créer, modifier et supprimer des ressources, ce qui dépasse un simple besoin de consultation."
                     ),
                     .init(
                         id: "opt-b",
                         badge: "B",
                         title: "Lecteur (Reader)",
+                        plainLanguageTitle: "Droit de regarder uniquement, sans rien modifier ni supprimer",
                         isCorrect: true,
-                        whyWrongOrRight: "Le rôle Lecteur accorde uniquement les permissions */read sur toute la portée sans aucune modification ni lecture des secrets."
+                        whyWrongOrRight: "Le rôle Lecteur permet de visualiser toutes les ressources du projet sans pouvoir les modifier ni lire les mots de passe."
                     ),
                     .init(
                         id: "opt-c",
                         badge: "C",
                         title: "Propriétaire (Owner)",
+                        plainLanguageTitle: "Contrôle absolu sur tout, y compris donner des accès aux autres",
                         isCorrect: false,
-                        whyWrongOrRight: "Le rôle Propriétaire donne un contrôle total sur les ressources ET sur les attributions RBAC (Microsoft.Authorization/*)."
+                        whyWrongOrRight: "Le rôle Propriétaire donne tous les pouvoirs sur les ressources et les permissions."
                     ),
                     .init(
                         id: "opt-d",
                         badge: "D",
                         title: "Administrateur de l'accès utilisateur",
+                        plainLanguageTitle: "Gérer uniquement les badges d'accès des collègues",
                         isCorrect: false,
-                        whyWrongOrRight: "Ce rôle permet d'attribuer des rôles aux utilisateurs mais n'est pas conçu pour un audit en lecture seule."
+                        whyWrongOrRight: "Ce rôle sert à distribuer des accès aux utilisateurs et non à observer l'architecture en lecture seule."
                     )
                 ],
-                examTip: "À l'examen, associe toujours « Auditeur externe / Consultation seule » au rôle Lecteur (Reader)."
+                examTip: "Retiens ce réflexe simple : « Regarder sans rien toucher » = rôle Lecteur (Reader)."
             ),
-            // 2. Q_TYPE_02 / Écran 16 — Grille 2×2 Visuelle de Services Cloud
+            // 2. Q_TYPE_02 — Comprendre les 4 grands piliers visuels du Cloud au quotidien
             CertiGoNativeExerciseItem(
                 id: "\(routeCode.lowercased())-qtype02",
                 formatCode: "Q_TYPE_02",
-                domainBadge: "🔐 SÉCURITÉ & ARCHITECTURE CLOUD",
-                subBadge: "GRILLE VISUELLE 2×2 · SERVICES OFFICIELS",
-                prompt: "Vous devez protéger des clés cryptographiques HSM, secrets applicatifs et certificats TLS dans un coffre matériel.\nQuel service Azure choisissez-vous ?",
+                domainBadge: "🧩 VUE GLOBALE · LES 4 BRIQUES ESSENTIELLES",
+                subBadge: "GRILLE VISUELLE 2×2 · REPÉRER LES SERVICES DE BASE",
+                prompt: "Pour faire tourner un projet dans le Cloud Azure, on utilise 4 briques de base : les comptes utilisateurs, le stockage de fichiers, le pare-feu réseau et un coffre-fort pour les mots de passe.\nQuelle brique sert de coffre-fort numérique pour protéger les mots de passe et clés secrètes ?",
+                plainLanguagePrompt: "Dans ton projet Cloud, ton site web a besoin de garder ses mots de passe et codes secrets à l'abri des regards.\nQuelle boîte officielle sert de coffre-fort sécurisé pour ranger les mots de passe ?",
+                jargonGlossaryBridge: [
+                    (term: "Key Vault", simpleMeaning: "Coffre-fort numérique pour mots de passe et clés"),
+                    (term: "Entra ID", simpleMeaning: "Carnet d'identités et connexions des employés"),
+                    (term: "Blob Storage", simpleMeaning: "Grand disque dur Cloud pour stocker des fichiers")
+                ],
                 mascotPose: .specialistCloudAzure,
                 options: [
                     .init(
                         id: "grid-kv",
                         badge: "A",
                         title: "Key Vault",
-                        subtitle: "HSM, Secrets & Certificats",
+                        plainLanguageTitle: "Coffre-fort pour mots de passe & clés",
+                        subtitle: "Coffre-fort des mots de passe & clés",
                         assetName: "AzureServices/Key-Vaults",
                         isCorrect: true,
-                        whyWrongOrRight: "Azure Key Vault centralise la gestion des secrets, clés HSM FIPS 140-2/3 et certificats TLS avec contrôle RBAC."
+                        whyWrongOrRight: "Azure Key Vault est le coffre-fort numérique qui garde au chaud les mots de passe, clés et certificats d'une application."
                     ),
                     .init(
                         id: "grid-entra",
                         badge: "B",
                         title: "Entra ID",
-                        subtitle: "Identité, SSO & MFA",
+                        plainLanguageTitle: "Comptes utilisateurs & connexions",
+                        subtitle: "Comptes utilisateurs & connexion",
                         assetName: "AzureServices/Azure-Active-Directory",
                         isCorrect: false,
-                        whyWrongOrRight: "Entra ID gère les identités, tokens OIDC/SAML et l'accès conditionnel, pas le stockage de clés HSM."
+                        whyWrongOrRight: "Entra ID vérifie l'identité des utilisateurs qui se connectent (login / double validation)."
                     ),
                     .init(
                         id: "grid-fw",
                         badge: "C",
                         title: "Azure Firewall",
-                        subtitle: "Filtrage L3–L7 & FQDN",
+                        plainLanguageTitle: "Vigile réseau qui filtre le trafic",
+                        subtitle: "Pare-feu qui filtre le réseau",
                         assetName: "AzureServices/Firewalls",
                         isCorrect: false,
-                        whyWrongOrRight: "Azure Firewall filtre les flux réseau entrants/sortants du VNet mais ne stocke pas les secrets applicatifs."
+                        whyWrongOrRight: "Azure Firewall contrôle le trafic réseau entrant et sortant mais ne stocke pas de mots de passe."
                     ),
                     .init(
                         id: "grid-blob",
                         badge: "D",
                         title: "Blob Storage",
-                        subtitle: "Stockage objet massif",
+                        plainLanguageTitle: "Disque dur pour fichiers & images",
+                        subtitle: "Stockage de fichiers & images",
                         assetName: "AzureServices/Storage-Accounts",
                         isCorrect: false,
-                        whyWrongOrRight: "Blob Storage stocke des fichiers et objets mais n'offre pas de gestion native de secrets ni de rotation automatique de certificats."
+                        whyWrongOrRight: "Blob Storage sert à stocker de grands volumes de fichiers, photos, vidéos et sauvegardes."
                     )
                 ],
-                examTip: "Key Vault Premium prend en charge les clés protégées par HSM matériel dédié."
+                examTip: "Les 4 repères de base : Entra ID (Qui se connecte), Blob Storage (Fichiers), Firewall (Réseau), Key Vault (Mots de passe & Secrets)."
             ),
-            // 3. Q_TYPE_03 — Schéma d'Architecture Interactif (WAF Couche 7)
+            // 3. Q_TYPE_03 — Comprendre comment accueillir et protéger les visiteurs d'un site web
             CertiGoNativeExerciseItem(
                 id: "\(routeCode.lowercased())-qtype03",
                 formatCode: "Q_TYPE_03",
-                domainBadge: "🌐 ARCHITECTURE VNET & WAF",
+                domainBadge: "🌐 ARCHITECTURE WEB & BOUCLIER WAF",
                 subBadge: "SCHÉMA INTERACTIF · [ 🌐 Clients ] ➔ [ ? ] ➔ [ VNet Privé ]",
                 prompt: "Vos applications web régionales doivent filtrer le trafic HTTPS entrant en Couche 7 avec un pare-feu WAF OWASP.\nQuelle brique placer dans [ ? ] ?",
+                plainLanguagePrompt: "Des visiteurs se connectent à ton site web depuis Internet : tu veux orienter chaque page (/api ou /images) vers le bon serveur et bloquer automatiquement les pirates.\nQuel guichet d'accueil intelligent places-tu dans [ ? ] ?",
+                jargonGlossaryBridge: [
+                    (term: "Application Gateway (Couche 7)", simpleMeaning: "Guichet d'accueil intelligent qui lit l'adresse web (/api, /images)"),
+                    (term: "WAF (Web Application Firewall)", simpleMeaning: "Bouclier qui bloque les attaques de pirates sur ton site web")
+                ],
                 mascotPose: .specialistNetworkVNet,
                 options: [
                     .init(
                         id: "arch-appgw",
                         badge: "A",
                         title: "Azure Application Gateway (WAF v2)",
+                        plainLanguageTitle: "Guichet web intelligent avec bouclier anti-pirates (Application Gateway + WAF)",
                         subtitle: "Répartiteur HTTP/HTTPS Couche 7 + Inspection OWASP",
                         assetName: "AzureServices/Application-Gateways",
                         isCorrect: true,
@@ -4911,6 +5803,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                         id: "arch-lb",
                         badge: "B",
                         title: "Azure Load Balancer (Couche 4 TCP/UDP)",
+                        plainLanguageTitle: "Aiguilleur réseau basique qui ne lit pas les adresses de pages web",
                         subtitle: "Répartition transport L4 sans inspection HTTP",
                         assetName: "AzureServices/Load-Balancers",
                         isCorrect: false,
@@ -4920,6 +5813,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                         id: "arch-nat",
                         badge: "C",
                         title: "Azure NAT Gateway",
+                        plainLanguageTitle: "Porte de sortie vers Internet (ne reçoit aucun visiteur entrant)",
                         subtitle: "Connectivité sortante SNAT uniquement",
                         assetName: "AzureServices/NAT",
                         isCorrect: false,
@@ -4928,19 +5822,25 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 ],
                 examTip: "Trafic HTTP/HTTPS régional + WAF = Application Gateway. Trafic HTTP/HTTPS global multi-régions + WAF = Azure Front Door."
             ),
-            // 4. Q_TYPE_04 — Saisie au Clavier CLI
+            // 4. Q_TYPE_04 — Éviter l'erreur humaine avec un verrou anti-suppression (converti en QCM en mode Débutant)
             CertiGoNativeExerciseItem(
                 id: "\(routeCode.lowercased())-qtype04",
                 formatCode: "Q_TYPE_04",
-                domainBadge: "⌨️ AZURE CLI & VERROUS ARM",
+                domainBadge: "🛡️ PROTECTION & VERROUS ANTI-SUPPRESSION",
                 subBadge: "SAISIE CLAVIER CLI · PROTECTION DE PRODUCTION",
                 prompt: "Vous devez empêcher toute suppression accidentelle du groupe de ressources RG-Prod.\nComplète la sous-commande Azure CLI :",
+                plainLanguagePrompt: "Tu veux poser un cadenas anti-suppression sur le dossier de production RG-Prod pour éviter qu'un collègue ne l'efface par erreur.\nQuel mot-clé indique qu'on pose un verrou (lock) ?",
+                jargonGlossaryBridge: [
+                    (term: "Verrou CanNotDelete (lock)", simpleMeaning: "Cadenas qui interdit d'effacer un dossier important, même par erreur"),
+                    (term: "Groupe de ressources (RG-Prod)", simpleMeaning: "Le dossier contenant toutes les machines de production")
+                ],
                 mascotPose: .poseCLICoder,
                 options: [
                     .init(
                         id: "cli-lock",
                         badge: "CLI",
                         title: "lock",
+                        plainLanguageTitle: "lock (poser un cadenas anti-suppression)",
                         isCorrect: true,
                         whyWrongOrRight: "La commande exacte est « az group lock create --lock-type CanNotDelete -n Lock-Prod -g RG-Prod »."
                     )
@@ -4951,58 +5851,72 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 cliSuggestionBricks: ["lock", "list", "policy", "role"],
                 examTip: "Un verrou CanNotDelete s'applique même aux utilisateurs ayant le rôle Propriétaire (Owner) !"
             ),
-            // 5. Q_TYPE_05 / Écran 17 — Assemblage de Briques CLI (Word Bank)
+            // 5. Q_TYPE_05 — Créer un réseau dans un dossier de projet (converti en QCM en mode Débutant)
             CertiGoNativeExerciseItem(
                 id: "\(routeCode.lowercased())-qtype05",
                 formatCode: "Q_TYPE_05",
-                domainBadge: "🧱 CONSTRUCTEUR CLI (WORD BANK)",
-                subBadge: "ASSEMBLAGE DE BRIQUES · DNS PRIVÉ",
+                domainBadge: "📦 ORGANISATION & RÉSEAU PRIVÉ",
+                subBadge: "ASSEMBLAGE DE BRIQUES · DOSSIER RG-CORE",
                 prompt: "Vous provisionnez le réseau virtuel ProdVNet dans le groupe RG-Core.\nAssemble dans l'ordre les briques Azure CLI :",
+                plainLanguagePrompt: "Tu crées le réseau privé interne « ProdVNet » en le rangeant dans le dossier de projet « RG-Core ».\nRemets dans l'ordre les briques pour créer ce réseau :",
+                jargonGlossaryBridge: [
+                    (term: "Virtual Network (vnet)", simpleMeaning: "Le réseau privé qui relie tes machines entre elles"),
+                    (term: "Groupe de ressources (-g RG-Core)", simpleMeaning: "Le dossier de projet dans lequel on range le réseau")
+                ],
                 mascotPose: .specialistCLIContainers,
                 options: [],
                 wordBankTargetTokens: ["az", "network", "vnet", "create", "--name ProdVNet", "-g RG-Core"],
                 wordBankAllBricks: ["az", "network", "vnet", "create", "--name ProdVNet", "-g RG-Core", "delete", "--sku Basic"],
                 examTip: "Dans Azure CLI, la structure suit toujours « az <service> <sous-service> <verbe> »."
             ),
-            // 6. Q_TYPE_09 & Q_TYPE_10 — Verdict d'Architecture & Cases Multiples
+            // 6. Q_TYPE_10 — Comprendre les 2 réflexes de sécurité d'un stockage privé
             CertiGoNativeExerciseItem(
                 id: "\(routeCode.lowercased())-qtype10",
                 formatCode: "Q_TYPE_10",
-                domainBadge: "☑️ CHOIX MULTIPLES · ISOLATION PRIVATE LINK",
-                subBadge: "COCHE LES 2 ACTIONS OBLIGATOIRES",
+                domainBadge: "☑️ CHOIX MULTIPLES · ACCÈS PRIVÉ SÉCURISÉ",
+                subBadge: "COCHE LES 2 BONNES PRATIQUES",
                 prompt: "Une VM dans VNet-Prod doit accéder à un compte Blob Storage exclusivement via une IP privée 10.0.2.4.\nQuelles sont les 2 actions indispensables ?",
+                plainLanguagePrompt: "Un ordinateur de ton entreprise doit lire des fichiers dans ton espace de stockage Cloud en passant uniquement par un couloir privé interne, et en fermant la porte donnant sur Internet.\nQuelles sont les 2 actions à cocher ?",
+                jargonGlossaryBridge: [
+                    (term: "Private Endpoint", simpleMeaning: "Couloir privé interne avec une adresse locale (10.x)"),
+                    (term: "publicNetworkAccess: Disabled", simpleMeaning: "Fermer à clé la porte publique qui donne sur Internet")
+                ],
                 mascotPose: .emotionAhaIdea,
                 options: [
                     .init(
                         id: "m-1",
                         badge: "1",
                         title: "Créer un Private Endpoint + lier la zone DNS privatelink.blob.core.windows.net au VNet",
+                        plainLanguageTitle: "Créer un couloir privé interne (Private Endpoint) et son annuaire local",
                         isCorrect: true,
-                        whyWrongOrRight: "Le Private Endpoint projette la NIC 10.0.2.4 et le Virtual Network Link permet la résolution DNS privée."
+                        whyWrongOrRight: "Le Private Endpoint crée un accès privé interne 10.0.2.4 dans le réseau de l'entreprise."
                     ),
                     .init(
                         id: "m-2",
                         badge: "2",
                         title: "Passer publicNetworkAccess sur Disabled dans le pare-feu du Storage Account",
+                        plainLanguageTitle: "Couper l'accès public Internet dans les réglages du stockage",
                         isCorrect: true,
-                        whyWrongOrRight: "Créer un Private Endpoint ne coupe pas l'accès public par défaut : il faut désactiver publicNetworkAccess."
+                        whyWrongOrRight: "Fermer l'accès public garantit que plus personne ne peut entrer depuis Internet."
                     ),
                     .init(
                         id: "m-3",
                         badge: "3",
                         title: "Ouvrir le port TCP 445 sur Internet via une IP publique Standard",
+                        plainLanguageTitle: "Ouvrir grand l'accès sur Internet public pour tout le monde",
                         isCorrect: false,
-                        whyWrongOrRight: "Exposer le port 445 sur une IP publique ouvre la ressource sur Internet au lieu de l'isoler."
+                        whyWrongOrRight: "Exposer le stockage sur Internet public va à l'encontre de la sécurité demandée."
                     ),
                     .init(
                         id: "m-4",
                         badge: "4",
                         title: "Supprimer toutes les règles RBAC de l'abonnement",
+                        plainLanguageTitle: "Effacer tous les droits d'accès de tous les employés",
                         isCorrect: false,
-                        whyWrongOrRight: "La suppression des rôles RBAC bloquerait la gestion sans isoler le plan réseau."
+                        whyWrongOrRight: "Effacer les permissions bloquerait l'équipe sans fermer l'accès réseau public."
                     )
                 ],
-                examTip: "Private Endpoint + Zone DNS privatelink + publicNetworkAccess: Disabled = isolation PaaS 100 % verrouillée."
+                examTip: "Private Endpoint (couloir privé) + publicNetworkAccess: Disabled (porte publique fermée) = stockage 100 % privé."
             )
         ]
     }
@@ -5014,22 +5928,53 @@ public struct CertiGoNativeExamQuestion: Identifiable, Codable, Equatable, Hasha
         public let id: String
         public let badge: String
         public let text: String
+        public var plainLanguageText: String
         public let isCorrect: Bool
 
-        public init(id: String, badge: String, text: String, isCorrect: Bool) {
+        public init(
+            id: String,
+            badge: String,
+            text: String,
+            isCorrect: Bool,
+            plainLanguageText: String? = nil
+        ) {
             self.id = id
             self.badge = badge
             self.text = text
+            self.plainLanguageText = plainLanguageText
+                ?? CertiGoPlainLanguageTranslator.simplifyOptionTitle(text, subtitle: nil)
             self.isCorrect = isCorrect
         }
     }
+
+    public typealias ChoiceItem = Choice
 
     public let id: String
     public let number: Int
     public let domainTitle: String
     public let caseStudyBadge: String
     public let stem: String
+    public var plainLanguageStem: String
     public let choices: [Choice]
+
+    public var jargonGlossaryBridge: [(term: String, simpleMeaning: String)] {
+        let syntheticOptions = choices.map {
+            CertiGoNativeExerciseItem.OptionItem(
+                id: $0.id,
+                badge: $0.badge,
+                title: $0.text,
+                plainLanguageTitle: $0.plainLanguageText,
+                isCorrect: $0.isCorrect,
+                whyWrongOrRight: ""
+            )
+        }
+        return CertiGoPlainLanguageTranslator.buildJargonGlossaryBridge(
+            prompt: stem,
+            options: syntheticOptions,
+            exerciseId: id,
+            conceptTitle: domainTitle
+        )
+    }
 
     public init(
         id: String,
@@ -5037,6 +5982,7 @@ public struct CertiGoNativeExamQuestion: Identifiable, Codable, Equatable, Hasha
         domainTitle: String,
         caseStudyBadge: String,
         stem: String,
+        plainLanguageStem: String? = nil,
         choices: [Choice]
     ) {
         self.id = id
@@ -5044,6 +5990,12 @@ public struct CertiGoNativeExamQuestion: Identifiable, Codable, Equatable, Hasha
         self.domainTitle = domainTitle
         self.caseStudyBadge = caseStudyBadge
         self.stem = stem
+        self.plainLanguageStem = plainLanguageStem
+            ?? CertiGoPlainLanguageTranslator.simplifyPrompt(
+                stem,
+                forExerciseId: id,
+                conceptTitle: domainTitle
+            )
         self.choices = choices
     }
 }
@@ -8076,8 +9028,14 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var authStatusMessage: String? = nil
     public var authOriginIsExistingAccountButton: Bool = false
 
-    // Active lesson session engine
+    // Active lesson session engine & plain-language switch (`💡 Version Simple ⇄ 🎯 Style Examen`)
     public var lessonSession: CertiGoNativeLessonSessionEngine = CertiGoNativeLessonSessionEngine()
+    public var isPlainLanguageModeEnabled: Bool = false
+
+    public mutating func togglePlainLanguageMode() {
+        lessonSession.togglePlainLanguageMode()
+        isPlainLanguageModeEnabled = lessonSession.isPlainLanguageModeEnabled
+    }
 
     // Timed Mock Exam (Screen 23 & Report 24) — starts clean at Q1 with 0 pre-selected answers and 0 pre-flagged questions!
     public var examQuestions: [CertiGoNativeExamQuestion] = CertiGoNativeRichCatalog.buildExamQuestions(forRouteCode: "AZ-104")
@@ -8104,9 +9062,18 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var savedAIMemos: [CertiGoChatTurn] = []
     public var aiThreads: [CertiGoAIThreadItem] = []
 
-    // Social (07 & 25) — Smart Stack of 3 Swipable Widgets + CNContactStore Phone Contacts Sync
-    public var selectedSocialSubTab: Int = 0 // 0 = Podium Semaine (07), 1 = Mes Amis (25)
-    public var socialWidgetIndex: Int = 0 // 0 = Objectif Podium, 1 = Duel Express, 2 = Pouls Squad
+    // Social (07 & 25) — Cooperative Friends Quest Ring + Mes Amis & Ligue Or + CNContactStore Phone Contacts Sync
+    public var selectedSocialSubTab: Int = 1 // 1 = Mes Amis (25, default first tab), 0 = Classement Ligue Or (07)
+    public var socialWidgetIndex: Int = 0
+    public var hasClappedQuestPartner: Bool = false
+
+    public mutating func clapQuestPartnerSarah() {
+        if !hasClappedQuestPartner {
+            hasClappedQuestPartner = true
+            gemsCount += 5
+            lastAddedFriendConfirmation = "✓ Clap envoyé à Sarah !"
+        }
+    }
     public var hasSyncedPhoneContacts: Bool = false
     public var phoneContactsMatchedOnApp: [CertiGoPhoneContactItem] = []
     public var phoneContactsToInvite: [CertiGoPhoneContactItem] = []
@@ -8677,14 +9644,20 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             heartsCount = 5
         }
         let shouldShowSlides = !skipDeclic15 && !resolvedNode.isQuizOnlyChapter
+        if onboardingExperienceLevelIndex == 0 {
+            isPlainLanguageModeEnabled = true
+        }
         lessonSession = CertiGoNativeLessonSessionEngine(
             routeCode: activeRouteCode,
             lessonId: resolvedNode.id,
             lessonTitle: resolvedNode.title,
             isShowingDeclicCard15: shouldShowSlides,
             heartsCount: heartsCount,
-            enableAdaptiveReplay: enableAdaptiveReplay
+            enableAdaptiveReplay: enableAdaptiveReplay,
+            isPlainLanguageModeEnabled: onboardingExperienceLevelIndex == 0 ? true : isPlainLanguageModeEnabled,
+            experienceLevelIndex: onboardingExperienceLevelIndex
         )
+        isPlainLanguageModeEnabled = lessonSession.isPlainLanguageModeEnabled
         isPresentingLessonSession = true
     }
 
@@ -8705,6 +9678,9 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         if heartsCount <= 0 {
             heartsCount = 5
         }
+        if onboardingExperienceLevelIndex == 0 {
+            isPlainLanguageModeEnabled = true
+        }
         lessonSession = CertiGoNativeLessonSessionEngine(
             routeCode: activeRouteCode,
             lessonId: targetLessonId,
@@ -8712,8 +9688,11 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             isShowingDeclicCard15: false,
             exercises: Array(domainExercises.prefix(5)),
             heartsCount: heartsCount,
-            enableAdaptiveReplay: true
+            enableAdaptiveReplay: true,
+            isPlainLanguageModeEnabled: onboardingExperienceLevelIndex == 0 ? true : isPlainLanguageModeEnabled,
+            experienceLevelIndex: onboardingExperienceLevelIndex
         )
+        isPlainLanguageModeEnabled = lessonSession.isPlainLanguageModeEnabled
         isPresentingLessonSession = true
     }
 
@@ -8726,8 +9705,11 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             lessonTitle: lessonSession.lessonTitle,
             isShowingDeclicCard15: false,
             heartsCount: 5,
-            enableAdaptiveReplay: lessonSession.enableAdaptiveReplay
+            enableAdaptiveReplay: lessonSession.enableAdaptiveReplay,
+            isPlainLanguageModeEnabled: lessonSession.isPlainLanguageModeEnabled,
+            experienceLevelIndex: onboardingExperienceLevelIndex
         )
+        isPlainLanguageModeEnabled = lessonSession.isPlainLanguageModeEnabled
     }
 
     public mutating func abandonFailedLessonSession() {
@@ -9012,6 +9994,10 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         examQuestions = CertiGoNativeRichCatalog.buildExamQuestions(forRouteCode: activeRouteCode)
         currentExamQuestionIndex = 0
         remainingExamSeconds = 5399 // 89:59
+        if onboardingExperienceLevelIndex == 0 {
+            isPlainLanguageModeEnabled = true
+            lessonSession.isPlainLanguageModeEnabled = true
+        }
         isPresentingTimedExam23 = true
     }
 
@@ -10621,7 +11607,7 @@ public struct CertiGoNativeFigmaAppView: View {
     private var parcoursTab01View: some View {
         let curriculum = CertiGoLiveTrackCurriculum.curriculum(forRouteCode: appState.activeRouteCode)
         return ZStack(alignment: .top) {
-            // Back Layer: Full-Screen Scrolling Path passing directly underneath the levitating top pills & bottom Tab Bar
+            // Back Layer: Full-Screen Scrolling Path starting cleanly below the two levitating pills (no horizontal white band cutting UNITÉ 1!)
             GeometryReader { geo in
                 let safeWidth = geo.size.width.isFinite ? geo.size.width : FigMetrics.twoHundredEighty
                 let stageWidth = max(safeWidth - PrismSpacing.l * 2, FigMetrics.twoHundredEighty)
@@ -10632,26 +11618,12 @@ public struct CertiGoNativeFigmaAppView: View {
                         }
                     }
                     .padding(.horizontal, PrismSpacing.l)
-                    .padding(.top, FigMetrics.seventyTwo)
+                    .padding(.top, FigMetrics.sixtyEight)
                     .padding(.bottom, FigMetrics.bottomBarTotalClearance)
                 }
-                .scrollClipDisabled()
                 .ignoresSafeArea(edges: .bottom)
             }
             .background(PrismColor.figmaHex("#f8fafc").ignoresSafeArea())
-
-            // Soft Top Fade Gradient under the 2 floating pills (`LinearGradient` `#f8fafc` -> `#f8fafc.opacity(0)` over 68pt)
-            LinearGradient(
-                colors: [
-                    PrismColor.figmaHex("#f8fafc"),
-                    PrismColor.figmaHex("#f8fafc").opacity(0.85),
-                    PrismColor.figmaHex("#f8fafc").opacity(0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: FigMetrics.sixtyEight)
-            .allowsHitTesting(false)
 
             // Front Layer: Levitating Top Pills (`[Logo | AZ-104 ▾]` + `[🔥 0  💎 0  ❤️ 5]`) — Exact same 44pt height on 1 single line!
             HStack(spacing: PrismSpacing.s) {
@@ -15567,22 +16539,22 @@ public struct CertiGoNativeFigmaAppView: View {
         )
     }
 
-    // MARK: - TAB 4: Social (`07` Podium 3D Semaine & `25` Mes Amis + 3-Widget Smart Stack + CNContactStore Sync)
+    // MARK: - TAB 4: Social (`25` Mes Amis & `07` Classement Ligue Or + Anneau Coopératif Quête d'Amis)
 
     private var socialTab07And25View: some View {
         VStack(spacing: .zero) {
-            // Top Header + 3-Widget iOS Smart Stack + Segmented Picker (`🏆 Podium Semaine` | `👥 Mes Amis`)
-            VStack(spacing: PrismSpacing.s) {
+            VStack(spacing: PrismSpacing.m) {
+                // Simple 1-line Header (`Social` 24pt Bold on left + `➕ Ajouter` on right)
                 HStack {
-                    Text(verbatim: "Ligue Or · Semaine 42")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Black"))
+                    Text(verbatim: "Social")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                     Spacer()
                     Button {
                         appState.showAddFriendSheet = true
                     } label: {
                         Text(verbatim: "➕ Ajouter")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#0078d4"))
                             .padding(.horizontal, PrismSpacing.m)
                             .padding(.vertical, PrismSpacing.xs)
@@ -15595,29 +16567,30 @@ public struct CertiGoNativeFigmaAppView: View {
                     .accessibilityIdentifier("social-open-add-friend-sheet")
                 }
 
-                // Swipable 3-Widget iOS Smart Stack (118 pt height, horizontal & vertical swipe + right-side 3 dots)
-                socialSmartStackWidgetView
+                // Single Cooperative Card: « 🤝 Quête d'Amis & Anneau d'Équipe » (Option A + Duolingo Friends Quest)
+                socialCooperativeFriendsQuestCardView
 
-                HStack(spacing: PrismSpacing.xs) {
-                    socialSegmentButton(index: 0, title: "🏆 Podium Semaine")
-                    socialSegmentButton(index: 1, title: "👥 Mes Amis (\(appState.friends.count))")
+                // Clean 2-tab Underlined Selector (`MES AMIS` first on left | `CLASSEMENT LIGUE OR` on right)
+                HStack(spacing: .zero) {
+                    socialUnderlinedTabButton(index: 1, title: "MES AMIS (\(appState.friends.count))")
+                    socialUnderlinedTabButton(index: 0, title: "CLASSEMENT LIGUE OR")
                 }
-                .padding(PrismSpacing.xxs)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
                         .fill(PrismColor.figmaHex("#e2e8f0"))
-                )
+                        .frame(height: PrismBorder.thin)
+                }
             }
             .padding(.horizontal, PrismSpacing.l)
-            .padding(.vertical, PrismSpacing.s)
+            .padding(.top, PrismSpacing.xs)
             .background(PrismColor.figmaHex("#f8fafc"))
 
-            // 1C. Horizontal Swipe Gesture between `🏆 Podium Semaine (07)` and `👥 Mes Amis (25)`
+            // Horizontal Swipe Gesture between `MES AMIS (25)` (tag 1) and `CLASSEMENT LIGUE OR (07)` (tag 0)
             TabView(selection: $appState.selectedSocialSubTab) {
-                socialPodium07ScrollView
-                    .tag(0)
                 socialFriends25ScrollView
                     .tag(1)
+                socialPodium07ScrollView
+                    .tag(0)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
         }
@@ -15626,6 +16599,154 @@ public struct CertiGoNativeFigmaAppView: View {
                 appState.syncPhoneContacts()
             }
         }
+    }
+
+    private var socialCooperativeFriendsQuestCardView: some View {
+        let mySteps = appState.completedStepsTotal
+        let partnerSteps = 9
+        let totalSteps = min(15, partnerSteps + mySteps)
+        let partnerFraction = min(1.0, Double(partnerSteps) / 15.0)
+        let myFraction = min(max(0.0, 1.0 - partnerFraction), Double(mySteps) / 15.0)
+
+        return VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            HStack(alignment: .center, spacing: PrismSpacing.m) {
+                // Cooperative 76×76 pt Two-Color Ring (Blue `#0078d4` for Sarah L. + Green `#58cc02` for Toi)
+                ZStack {
+                    Circle()
+                        .stroke(PrismColor.figmaHex("#e2e8f0"), lineWidth: FigMetrics.eight)
+
+                    Circle()
+                        .trim(from: 0, to: partnerFraction)
+                        .stroke(
+                            PrismColor.figmaHex("#0078d4"),
+                            style: StrokeStyle(lineWidth: FigMetrics.eight, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+
+                    if myFraction > 0 {
+                        Circle()
+                            .trim(from: partnerFraction, to: min(1.0, partnerFraction + myFraction))
+                            .stroke(
+                                PrismColor.figmaHex("#58cc02"),
+                                style: StrokeStyle(lineWidth: FigMetrics.eight, lineCap: .round)
+                            )
+                            .rotationEffect(.degrees(-90))
+                    }
+
+                    VStack(spacing: .zero) {
+                        Text(verbatim: "\(totalSteps)/15")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                        Text(verbatim: "étapes")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Semi Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                    }
+                }
+                .frame(width: FigMetrics.seventySix, height: FigMetrics.seventySix)
+
+                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                    Text(verbatim: "QUÊTE D'ÉQUIPE · ⏱ 4 JOURS")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+
+                    Text(verbatim: "Terminer 15 étapes à deux")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+
+                    HStack {
+                        Text(verbatim: "● Toi (\(appState.firstNameText))")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
+                            .foregroundStyle(PrismColor.figmaHex("#334155"))
+                        Spacer()
+                        Text(verbatim: "\(mySteps) étape\(mySteps > 1 ? "s" : "")")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#15803d"))
+                    }
+
+                    HStack {
+                        Text(verbatim: "● Sarah L. (Binôme)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
+                            .foregroundStyle(PrismColor.figmaHex("#334155"))
+                        Spacer()
+                        Text(verbatim: "9 étapes")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                    }
+                }
+            }
+
+            Button {
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    appState.clapQuestPartnerSarah()
+                }
+            } label: {
+                Text(
+                    verbatim: appState.hasClappedQuestPartner
+                        ? "✓ Clap envoyé à Sarah !"
+                        : "👏 Féliciter Sarah (+5 💎)"
+                )
+                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                .foregroundStyle(
+                    appState.hasClappedQuestPartner
+                        ? PrismColor.figmaHex("#15803d")
+                        : PrismColor.figmaHex("#0078d4")
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: FigMetrics.thirtySix)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                        .fill(
+                            appState.hasClappedQuestPartner
+                                ? PrismColor.figmaHex("#dcfce7")
+                                : PrismColor.figmaHex("#eff6ff")
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("social-friends-quest-clap-button")
+
+            Text(verbatim: "💡 En moyenne, les candidats certifiés font 4 sessions de 10 min par semaine")
+                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
+                .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .padding(PrismSpacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                .fill(PrismColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+        )
+        .accessibilityIdentifier("social-cooperative-quest-card")
+    }
+
+    private func socialUnderlinedTabButton(index: Int, title: String) -> some View {
+        let isSelected = appState.selectedSocialSubTab == index
+        return Button {
+            withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                appState.selectedSocialSubTab = index
+            }
+        } label: {
+            VStack(spacing: PrismSpacing.xs) {
+                Text(verbatim: title)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(
+                        isSelected
+                            ? PrismColor.figmaHex("#0078d4")
+                            : PrismColor.figmaHex("#64748b")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, PrismSpacing.xs)
+
+                Rectangle()
+                    .fill(isSelected ? PrismColor.figmaHex("#0078d4") : Color.clear)
+                    .frame(height: FigMetrics.three)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("social-segment-\(index)")
     }
 
     private var socialSmartStackWidgetView: some View {
@@ -15941,18 +17062,6 @@ public struct CertiGoNativeFigmaAppView: View {
     private var socialPodium07ScrollView: some View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: PrismSpacing.m) {
-                if appState.userXPPoints == 0 {
-                    CertiGoEmptyStateCardView(
-                        mascotPose: .celebratingTrophy,
-                        title: "🏆 Classement hebdomadaire — Tu es à 0 XP",
-                        subtitle: "Termine ta première leçon (+25 XP) aujourd'hui pour entrer dans le classement actif de la semaine !",
-                        actionTitle: "🚀 Gagner mes premiers +25 XP"
-                    ) {
-                        appState.selectedTab = .parcours
-                        appState.startLessonSession(enableAdaptiveReplay: true)
-                    }
-                }
-
                 // 3D Podium Stage (`2e Sarah L.`, `1er Toi 👑`, `3e Thomas M.`)
                 HStack(alignment: .bottom, spacing: PrismSpacing.m) {
                     podiumColumnView(member: appState.leaderboardMembers[1], height: PrismSize.podiumSecondHeight, medal: "🥈 2e", pedestalHex: "#cbd5e1")
@@ -16832,6 +17941,9 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     Spacer(minLength: .zero)
                 }
 
+                // iOS On/Off Switch Bar (`💡 Version Simple (Sans jargon)` ⇄ `🎯 Style Examen`)
+                plainLanguageSwitchBar
+
                 // Mascot (68pt top-aligned) + Clean Speech Bubble with top-aligned left pointer `◀` and structured scenario/question
                 HStack(alignment: .top, spacing: PrismSpacing.s) {
                     CertiGoMascotView(pose: ex.mascotPose, size: FigMetrics.sixtyEight)
@@ -16844,22 +17956,37 @@ public struct CertiGoNativeLessonSessionModalView: View {
                             .padding(.top, FigMetrics.eighteen)
                             .offset(x: FigMetrics.two)
 
-                        CertiGoStructuredPromptView(prompt: ex.prompt)
-                            .padding(PrismSpacing.m)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
-                                        .fill(PrismColor.figmaHex("#e2e8f0"))
-                                        .offset(y: FigMetrics.four)
-                                    RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
-                                        .fill(PrismColor.surface)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
-                                                .strokeBorder(PrismColor.figmaHex("#cbd5e1"), lineWidth: PrismBorder.standard)
-                                        )
-                                }
+                        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                            CertiGoStructuredPromptView(
+                                prompt: appState.lessonSession.isPlainLanguageModeEnabled
+                                    ? ex.plainLanguagePrompt
+                                    : ex.prompt
                             )
+
+                            if appState.lessonSession.isPlainLanguageModeEnabled && !ex.jargonGlossaryBridge.isEmpty {
+                                jargonGlossaryBridgeCard(items: ex.jargonGlossaryBridge)
+                            }
+                        }
+                        .padding(PrismSpacing.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
+                                    .fill(PrismColor.figmaHex("#e2e8f0"))
+                                    .offset(y: FigMetrics.four)
+                                RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
+                                    .fill(PrismColor.surface)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: PrismRadius.mascotBubble, style: .continuous)
+                                            .strokeBorder(
+                                                appState.lessonSession.isPlainLanguageModeEnabled
+                                                    ? PrismColor.figmaHex("#34d399")
+                                                    : PrismColor.figmaHex("#cbd5e1"),
+                                                lineWidth: PrismBorder.standard
+                                            )
+                                    )
+                            }
+                        )
                     }
                 }
 
@@ -16894,6 +18021,129 @@ public struct CertiGoNativeLessonSessionModalView: View {
         }
     }
 
+    private var plainLanguageSwitchBar: some View {
+        let isSimple = appState.lessonSession.isPlainLanguageModeEnabled
+        return HStack(spacing: PrismSpacing.s) {
+            VStack(alignment: .leading, spacing: FigMetrics.two) {
+                Text(
+                    verbatim: isSimple
+                        ? "💡 Version simple (sans jargon)"
+                        : "🎯 Question style examen"
+                )
+                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                .foregroundStyle(
+                    isSimple
+                        ? PrismColor.figmaHex("#065f46")
+                        : PrismColor.figmaHex("#1e3a8a")
+                )
+
+                Text(
+                    verbatim: isSimple
+                        ? "Mots de tous les jours + pont vers les termes officiels"
+                        : "Vocabulaire officiel de la certification"
+                )
+                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
+                .foregroundStyle(PrismColor.figmaHex("#475569"))
+            }
+
+            Spacer(minLength: PrismSpacing.xs)
+
+            Button {
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    appState.togglePlainLanguageMode()
+                }
+            } label: {
+                HStack(spacing: FigMetrics.six) {
+                    Text(verbatim: isSimple ? "💡 Simple" : "🎯 Examen")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                        .foregroundStyle(
+                            isSimple
+                                ? PrismColor.figmaHex("#065f46")
+                                : PrismColor.figmaHex("#1d4ed8")
+                        )
+
+                    ZStack(alignment: isSimple ? .trailing : .leading) {
+                        Capsule()
+                            .fill(
+                                isSimple
+                                    ? PrismColor.figmaHex("#10b981")
+                                    : PrismColor.figmaHex("#cbd5e1")
+                            )
+                            .frame(width: FigMetrics.fortyFour, height: FigMetrics.twentyFour)
+
+                        Circle()
+                            .fill(PrismColor.surface)
+                            .frame(width: FigMetrics.twenty, height: FigMetrics.twenty)
+                            .padding(.horizontal, FigMetrics.two)
+                    }
+                }
+                .padding(.horizontal, PrismSpacing.s)
+                .padding(.vertical, FigMetrics.six)
+                .background(
+                    Capsule()
+                        .fill(PrismColor.surface)
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            isSimple
+                                ? PrismColor.figmaHex("#34d399")
+                                : PrismColor.figmaHex("#bfdbfe"),
+                            lineWidth: PrismBorder.standard
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("session-plain-language-toggle")
+        }
+        .padding(.horizontal, PrismSpacing.m)
+        .padding(.vertical, PrismSpacing.s)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .fill(
+                    isSimple
+                        ? PrismColor.figmaHex("#ecfdf5")
+                        : PrismColor.figmaHex("#f8fafc")
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .strokeBorder(
+                    isSimple
+                        ? PrismColor.figmaHex("#a7f3d0")
+                        : PrismColor.figmaHex("#e2e8f0"),
+                    lineWidth: PrismBorder.standard
+                )
+        )
+    }
+
+    private func jargonGlossaryBridgeCard(items: [(term: String, simpleMeaning: String)]) -> some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+            Text(verbatim: "🔍 Décodage des termes d'examen · 🔗 Pont vers l'examen")
+                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#065f46"))
+
+            ForEach(Array(items.prefix(3).enumerated()), id: \.offset) { _, pair in
+                Text(verbatim: "💡 À l'examen : « \(pair.simpleMeaning) » s'appelle « \(pair.term) »")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#047857"))
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(PrismSpacing.s)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                .fill(PrismColor.figmaHex("#ecfdf5"))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#a7f3d0"), lineWidth: PrismBorder.thin)
+        )
+        .accessibilityIdentifier("session-jargon-bridge-card")
+    }
+
     private func optionVisualPalette(for opt: CertiGoNativeExerciseItem.OptionItem) -> (face: String, lip: String, text: String, badgeBg: String) {
         let isSelected = appState.lessonSession.selectedOptionIds.contains(opt.id)
         switch appState.lessonSession.attemptPhase {
@@ -16916,6 +18166,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
     private func standard3DOptionCard(_ opt: CertiGoNativeExerciseItem.OptionItem, isMultiChoice: Bool) -> some View {
         let palette = optionVisualPalette(for: opt)
         let isSelected = appState.lessonSession.selectedOptionIds.contains(opt.id)
+        let isSimple = appState.lessonSession.isPlainLanguageModeEnabled
 
         return Button {
             withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
@@ -16937,13 +18188,19 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     )
 
                 VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                    Text(verbatim: opt.title)
+                    Text(verbatim: isSimple ? opt.plainLanguageTitle : opt.title)
                         .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Medium"))
                         .foregroundStyle(PrismColor.figmaHex(palette.text))
                         .lineSpacing(3)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
-                    if let sub = opt.subtitle {
+                    if isSimple {
+                        Text(verbatim: "🎯 Terme d'examen : \(opt.title)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
+                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                            .lineSpacing(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if let sub = opt.subtitle {
                         Text(verbatim: sub)
                             .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
                             .foregroundStyle(PrismColor.figmaHex("#64748b"))
@@ -16971,6 +18228,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
 
     private func serviceGridOptionCard(_ opt: CertiGoNativeExerciseItem.OptionItem) -> some View {
         let palette = optionVisualPalette(for: opt)
+        let isSimple = appState.lessonSession.isPlainLanguageModeEnabled
         return Button {
             withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
                 appState.lessonSession.selectOption(opt.id)
@@ -16984,12 +18242,18 @@ public struct CertiGoNativeLessonSessionModalView: View {
                         .scaledToFit()
                         .frame(width: FigMetrics.fortyEight, height: FigMetrics.fortyEight)
                 }
-                Text(verbatim: opt.title)
+                Text(verbatim: isSimple ? opt.plainLanguageTitle : opt.title)
                     .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Medium"))
                     .foregroundStyle(PrismColor.figmaHex(palette.text))
                     .lineSpacing(2)
                     .multilineTextAlignment(.center)
-                if let sub = opt.subtitle {
+                if isSimple {
+                    Text(verbatim: "🎯 \(opt.title)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
+                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                        .lineSpacing(2)
+                        .multilineTextAlignment(.center)
+                } else if let sub = opt.subtitle {
                     Text(verbatim: sub)
                         .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
                         .foregroundStyle(PrismColor.figmaHex("#64748b"))
@@ -17968,11 +19232,103 @@ public struct CertiGoNativeTimedExamCockpit23View: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                    // iOS On/Off Switch (`💡 Version Simple ⇄ 🎯 Style Examen`) inside Mock Exam Cockpit
+                    HStack(spacing: PrismSpacing.s) {
+                        Text(
+                            verbatim: appState.isPlainLanguageModeEnabled
+                                ? "💡 Version simple (sans jargon)"
+                                : "🎯 Question style examen"
+                        )
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                        .foregroundStyle(
+                            appState.isPlainLanguageModeEnabled
+                                ? PrismColor.figmaHex("#065f46")
+                                : PrismColor.figmaHex("#1e3a8a")
+                        )
+
+                        Spacer()
+
+                        Button {
+                            withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                                appState.togglePlainLanguageMode()
+                            }
+                        } label: {
+                            HStack(spacing: FigMetrics.six) {
+                                Text(verbatim: appState.isPlainLanguageModeEnabled ? "💡 Simple" : "🎯 Examen")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                                    .foregroundStyle(
+                                        appState.isPlainLanguageModeEnabled
+                                            ? PrismColor.figmaHex("#065f46")
+                                            : PrismColor.figmaHex("#1d4ed8")
+                                    )
+
+                                ZStack(alignment: appState.isPlainLanguageModeEnabled ? .trailing : .leading) {
+                                    Capsule()
+                                        .fill(
+                                            appState.isPlainLanguageModeEnabled
+                                                ? PrismColor.figmaHex("#10b981")
+                                                : PrismColor.figmaHex("#cbd5e1")
+                                        )
+                                        .frame(width: FigMetrics.fortyFour, height: FigMetrics.twentyFour)
+
+                                    Circle()
+                                        .fill(PrismColor.surface)
+                                        .frame(width: FigMetrics.twenty, height: FigMetrics.twenty)
+                                        .padding(.horizontal, FigMetrics.two)
+                                }
+                            }
+                            .padding(.horizontal, PrismSpacing.s)
+                            .padding(.vertical, FigMetrics.six)
+                            .background(Capsule().fill(PrismColor.surface))
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(
+                                        appState.isPlainLanguageModeEnabled
+                                            ? PrismColor.figmaHex("#34d399")
+                                            : PrismColor.figmaHex("#bfdbfe"),
+                                        lineWidth: PrismBorder.standard
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("session-plain-language-toggle")
+                    }
+                    .padding(.horizontal, PrismSpacing.m)
+                    .padding(.vertical, PrismSpacing.xs)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                            .fill(
+                                appState.isPlainLanguageModeEnabled
+                                    ? PrismColor.figmaHex("#ecfdf5")
+                                    : PrismColor.surface
+                            )
+                    )
+
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
                         Text(verbatim: q.caseStudyBadge)
                             .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#2563eb"))
-                        CertiGoStructuredPromptView(prompt: q.stem)
+                        CertiGoStructuredPromptView(
+                            prompt: appState.isPlainLanguageModeEnabled ? q.plainLanguageStem : q.stem
+                        )
+                        if appState.isPlainLanguageModeEnabled && !q.jargonGlossaryBridge.isEmpty {
+                            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                Text(verbatim: "🔍 Décodage des termes d'examen · 🔗 Pont vers l'examen")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#065f46"))
+                                ForEach(Array(q.jargonGlossaryBridge.prefix(3).enumerated()), id: \.offset) { _, pair in
+                                    Text(verbatim: "💡 À l'examen : « \(pair.simpleMeaning) » s'appelle « \(pair.term) »")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
+                                        .foregroundStyle(PrismColor.figmaHex("#047857"))
+                                }
+                            }
+                            .padding(PrismSpacing.s)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .fill(PrismColor.figmaHex("#ecfdf5"))
+                            )
+                        }
                     }
                     .padding(PrismSpacing.l)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -17998,12 +19354,26 @@ public struct CertiGoNativeTimedExamCockpit23View: View {
                                             .fill(isSelected ? PrismColor.figmaHex("#2563eb") : PrismColor.figmaHex("#f1f5f9"))
                                     )
 
-                                Text(verbatim: choice.text)
+                                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                    Text(
+                                        verbatim: appState.isPlainLanguageModeEnabled
+                                            ? choice.plainLanguageText
+                                            : choice.text
+                                    )
                                     .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Medium"))
                                     .foregroundStyle(isSelected ? PrismColor.figmaHex("#1e40af") : PrismColor.figmaHex("#0f172a"))
                                     .lineSpacing(3)
                                     .multilineTextAlignment(.leading)
                                     .fixedSize(horizontal: false, vertical: true)
+
+                                    if appState.isPlainLanguageModeEnabled {
+                                        Text(verbatim: "🎯 Terme d'examen : \(choice.text)")
+                                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
+                                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                                            .lineSpacing(2)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
 
                                 Spacer(minLength: PrismSpacing.xs)
                             }

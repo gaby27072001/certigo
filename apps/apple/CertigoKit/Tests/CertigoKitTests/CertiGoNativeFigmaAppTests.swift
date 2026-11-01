@@ -1200,4 +1200,88 @@ struct CertiGoNativeFigmaAppTests {
         appState.openInteractiveAuthSheet(for: .email)
         #expect(appState.activeAuthProviderSheet == .email)
     }
+
+    @Test("Chapter 1 (u1-s1) Global Overview, Beginner mode adaptation (no CLI wall + auto plain language), and iOS On/Off Plain-Language Switch across exercises and exams")
+    func chapter1GlobalOverviewBeginnerModeAndPlainLanguageToggle() {
+        // 1. Verify togglePlainLanguageMode() on CertiGoNativeLessonSessionEngine and CertiGoNativeAppState
+        var engine = CertiGoNativeLessonSessionEngine(routeCode: "AZ-104", lessonId: "AZ-104-u1-s1")
+        #expect(engine.isPlainLanguageModeEnabled == false)
+        engine.togglePlainLanguageMode()
+        #expect(engine.isPlainLanguageModeEnabled == true)
+        engine.togglePlainLanguageMode()
+        #expect(engine.isPlainLanguageModeEnabled == false)
+
+        // 2. Verify all exercises across tracks have non-empty plainLanguagePrompt != prompt, plainLanguageTitle on options, and non-empty jargonGlossaryBridge
+        let routesAndLessons: [(String, String)] = [
+            ("AZ-104", "AZ-104-u1-s1"), ("AZ-104", "AZ-104-u1-s2"), ("AZ-104", "AZ-104-u2-s1"), ("AZ-104", "AZ-104-u3-s1"),
+            ("AZ-900", "AZ-900-u1-s1"), ("AZ-900", "AZ-900-u1-s2"),
+            ("SAA-C03", "SAA-C03-u1-s1"), ("SAA-C03", "SAA-C03-u2-s1"),
+            ("PDE", "PDE-u1-s1"), ("PDE", "PDE-u1-s2"),
+            ("AI-102", "AI-102-u1-s1"), ("CKA", "CKA-u1-s1"), ("GH-300", "GH-300-u1-s1")
+        ]
+        for (route, lessonId) in routesAndLessons {
+            let exercises = CertiGoNativeLessonSessionEngine.defaultExercises(forRouteCode: route, lessonId: lessonId)
+            #expect(!exercises.isEmpty)
+            for ex in exercises {
+                #expect(!ex.plainLanguagePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Empty plainLanguagePrompt in \(ex.id)")
+                #expect(ex.plainLanguagePrompt != ex.prompt, "Expected distinct plainLanguagePrompt in \(ex.id)")
+                #expect(!ex.jargonGlossaryBridge.isEmpty, "Expected non-empty jargonGlossaryBridge in \(ex.id)")
+                for bridgeItem in ex.jargonGlossaryBridge {
+                    #expect(!bridgeItem.term.isEmpty)
+                    #expect(!bridgeItem.simpleMeaning.isEmpty)
+                }
+                for opt in ex.options {
+                    #expect(!opt.plainLanguageTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Empty plainLanguageTitle in \(ex.id) \(opt.id)")
+                }
+            }
+        }
+
+        // 3. Verify mock exam questions also provide plainLanguageStem, plainLanguageText on each choice, and jargonGlossaryBridge
+        for route in ["AZ-104", "AZ-900", "SAA-C03", "PDE", "AI-102", "CKA", "GH-300"] {
+            let examQuestions = CertiGoNativeRichCatalog.buildExamQuestions(forRouteCode: route)
+            for q in examQuestions {
+                #expect(!q.plainLanguageStem.isEmpty)
+                #expect(q.plainLanguageStem != q.stem)
+                #expect(!q.jargonGlossaryBridge.isEmpty)
+                for choice in q.choices {
+                    #expect(!choice.plainLanguageText.isEmpty)
+                }
+            }
+        }
+
+        // 4. Verify Beginner mode (onboardingExperienceLevelIndex == 0) starts Chapter 1 (u1-s1) with Global Overview slides, plain-language mode enabled, and no raw CLI exercises
+        var appState = CertiGoNativeAppState()
+        appState.onboardingExperienceLevelIndex = 0 // Débutant
+        appState.selectRoute("AZ-104")
+        appState.startLessonSession(forLessonId: "AZ-104-u1-s1")
+
+        #expect(appState.lessonSession.isPlainLanguageModeEnabled == true)
+        #expect(appState.isPlainLanguageModeEnabled == true)
+        #expect(appState.lessonSession.lessonSlides.count == 3)
+        #expect(appState.lessonSession.lessonSlides[0].stepBadge.contains("VUE D'ENSEMBLE"))
+        #expect(appState.lessonSession.lessonSlides[1].stepBadge.contains("LA GRANDE IMAGE"))
+        #expect(appState.lessonSession.lessonSlides[2].stepBadge.contains("LE PONT VERS L'EXAMEN"))
+        #expect(appState.lessonSession.exercises.allSatisfy { $0.formatCode != "Q_TYPE_04" && $0.formatCode != "Q_TYPE_05" })
+
+        // User can toggle between Plain Language and Exam Style at any time
+        appState.togglePlainLanguageMode()
+        #expect(appState.lessonSession.isPlainLanguageModeEnabled == false)
+        #expect(appState.isPlainLanguageModeEnabled == false)
+        appState.togglePlainLanguageMode()
+        #expect(appState.lessonSession.isPlainLanguageModeEnabled == true)
+        #expect(appState.isPlainLanguageModeEnabled == true)
+
+        // 5. Verify Social defaults to Mes Amis (selectedSocialSubTab == 1) and Cooperative Friends Quest clap awards +5 gems once
+        let freshSocialState = CertiGoNativeAppState()
+        #expect(freshSocialState.selectedSocialSubTab == 1)
+        #expect(freshSocialState.hasClappedQuestPartner == false)
+        var mutableSocial = freshSocialState
+        let initialGems = mutableSocial.gemsCount
+        mutableSocial.clapQuestPartnerSarah()
+        #expect(mutableSocial.hasClappedQuestPartner == true)
+        #expect(mutableSocial.gemsCount == initialGems + 5)
+        #expect(mutableSocial.lastAddedFriendConfirmation == "✓ Clap envoyé à Sarah !")
+        mutableSocial.clapQuestPartnerSarah()
+        #expect(mutableSocial.gemsCount == initialGems + 5)
+    }
 }
