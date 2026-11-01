@@ -120,7 +120,7 @@ class AppEnv {
   );
   static const String googleDomainHint = String.fromEnvironment(
     'ENTRA_DOMAIN_HINT_GOOGLE',
-    defaultValue: 'google',
+    defaultValue: 'Google',
   );
   static const String appleDomainHint = String.fromEnvironment(
     'ENTRA_DOMAIN_HINT_APPLE',
