@@ -1007,4 +1007,133 @@ struct CertiGoNativeFigmaAppTests {
         #expect(mutableRestored.gemsCount == 0)
         #expect(mutableRestored.isPresentingOnboardingFlow == true)
     }
+
+    @Test("Onboarding v3 starts with zero pre-selected certifications, places Auth at step 1/7 before questionnaire, and filters certifications by vendor, category, and difficulty rank")
+    func onboardingAuthFirstZeroPreselectedCertsAndCatalogFiltering() {
+        #expect(CertiGoNativeAppState.onboardingCompletedDefaultsKey == "certigo.native.hasCompletedOnboarding.v3")
+
+        var appState = CertiGoNativeAppState()
+        #expect(appState.onboardingSelectedCertifications.isEmpty)
+        #expect(appState.trackedCertificationCodes.isEmpty)
+        #expect(appState.onboardingVendorFilter == "all")
+        #expect(appState.onboardingCategoryFilter == "all")
+
+        // Step 0 (OB_01) -> Step 1 (1/7 Auth) -> interactive auth advances to Step 2 (2/7 Goals)
+        appState.startOnboardingFlow()
+        #expect(appState.onboardingStepIndex == 0)
+        appState.advanceOnboardingStep()
+        #expect(appState.onboardingStepIndex == 1)
+
+        appState.openInteractiveAuthSheet(for: .microsoft, fromExistingAccountButton: false)
+        #expect(appState.activeAuthProviderSheet == .microsoft)
+        appState.applyAuthenticatedSession(
+            displayName: "Gabriel Chambaud",
+            email: "gabriel.chambaud@microsoft.com",
+            provider: .microsoft,
+            accessToken: "jwt.test.token",
+            userId: "usr-gabriel-ms"
+        )
+        #expect(appState.isAccountConnected == true)
+        #expect(appState.connectedAuthProvider == "Microsoft Entra ID")
+        #expect(appState.activeAuthProviderSheet == nil)
+        #expect(appState.onboardingStepIndex == 2)
+
+        // Row 1 vendor tabs start with 'Tout' ("all") on the far left
+        #expect(CertiGoNativeAppState.onboardingVendorFilterTabs.first?.id == "all")
+        #expect(CertiGoNativeAppState.onboardingVendorFilterTabs.first?.name == "Tout")
+        #expect(CertiGoNativeAppState.onboardingCategoryFilterTabs.map(\.id) == ["all", "cloud", "security", "data", "ai", "infra"])
+
+        // Filter by Microsoft -> only Microsoft certifications, sorted by difficulty (AZ-900 before AZ-104 before AZ-305)
+        appState.onboardingVendorFilter = "microsoft"
+        appState.onboardingCategoryFilter = "all"
+        let msItems = appState.filteredOnboardingCatalogItems
+        #expect(!msItems.isEmpty)
+        #expect(msItems.allSatisfy { $0.vendorId == "microsoft" })
+        let az900Idx = msItems.firstIndex(where: { $0.code == "AZ-900" })
+        let az104Idx = msItems.firstIndex(where: { $0.code == "AZ-104" })
+        let az305Idx = msItems.firstIndex(where: { $0.code == "AZ-305" })
+        #expect(az900Idx != nil && az104Idx != nil && az305Idx != nil)
+        if let i1 = az900Idx, let i2 = az104Idx, let i3 = az305Idx {
+            #expect(i1 < i2)
+            #expect(i2 < i3)
+        }
+
+        // Combine Microsoft + Cloud -> AZ-900, AZ-104, AZ-305
+        appState.onboardingCategoryFilter = "cloud"
+        let msCloudCodes = appState.filteredOnboardingCatalogItems.map(\.code)
+        #expect(msCloudCodes == ["AZ-900", "AZ-104", "AZ-305"])
+
+        // Combine Microsoft + IA -> AI-900, AI-102
+        appState.onboardingCategoryFilter = "ai"
+        let msAICodes = appState.filteredOnboardingCatalogItems.map(\.code)
+        #expect(msAICodes == ["AI-900", "AI-102"])
+
+        // Filter by AWS, Google, GitHub, Kubernetes, Cisco
+        appState.onboardingCategoryFilter = "all"
+        for vendor in ["aws", "google", "github", "kubernetes", "cisco"] {
+            appState.onboardingVendorFilter = vendor
+            let items = appState.filteredOnboardingCatalogItems
+            #expect(!items.isEmpty)
+            #expect(items.allSatisfy { $0.vendorId == vendor })
+        }
+
+        // Filter by each category across all vendors
+        appState.onboardingVendorFilter = "all"
+        for category in ["cloud", "security", "data", "ai", "infra"] {
+            appState.onboardingCategoryFilter = category
+            let items = appState.filteredOnboardingCatalogItems
+            #expect(!items.isEmpty)
+            #expect(items.allSatisfy { $0.categoryId == category })
+        }
+    }
+
+    @Test("Coach IA sanitizeAIMarkdown strips all #, ###, **, ****, backticks and aiDrawer06D supports individual and full thread deletion with persistence")
+    func coachIASanitizeMarkdownAndThreadDeletion() {
+        let rawMarkdown = """
+        ### Architecture Zero-Trust Azure
+        #### 1. Points critiques
+        ****Attention**** : un verrou **CanNotDelete** bloque même un ***Owner*** sur `Microsoft.KeyVault/vaults`.
+        - Activer Private Endpoint
+        * Lier la zone DNS privée
+        """
+        let sanitized = CertiGoNativeAppState.sanitizeAIMarkdown(rawMarkdown)
+        #expect(!sanitized.contains("#"))
+        #expect(!sanitized.contains("**"))
+        #expect(!sanitized.contains("****"))
+        #expect(!sanitized.contains("`"))
+        #expect(sanitized.contains("Architecture Zero-Trust Azure"))
+        #expect(sanitized.contains("Attention : un verrou CanNotDelete bloque même un Owner sur Microsoft.KeyVault/vaults."))
+        #expect(sanitized.contains("• Activer Private Endpoint"))
+        #expect(sanitized.contains("• Lier la zone DNS privée"))
+
+        let tempFileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("certigo-test-threads-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: tempFileURL) }
+        let customStore = CertiGoLocalDatabaseStore(fileURL: tempFileURL)
+        customStore.clear()
+
+        var appState = CertiGoNativeAppState(restoreFromDisk: false, databaseStore: customStore)
+        appState.sendAIMessage("Première discussion sur RBAC")
+        appState.sendAIMessage("Deuxième discussion sur Private Endpoint")
+        #expect(appState.aiThreads.count == 2)
+
+        let firstThreadId = appState.aiThreads[0].id
+        appState.deleteAIThread(id: firstThreadId)
+        #expect(appState.aiThreads.count == 1)
+        #expect(!appState.aiThreads.contains(where: { $0.id == firstThreadId }))
+
+        appState.clearAllAIThreads()
+        #expect(appState.aiThreads.isEmpty)
+        #expect(appState.chatTurns.isEmpty)
+
+        // Verify phone contacts sync & 1-tap friend addition
+        appState.syncPhoneContacts()
+        #expect(appState.hasSyncedPhoneContacts == true)
+        #expect(!appState.phoneContactsMatchedOnApp.isEmpty)
+        #expect(!appState.phoneContactsToInvite.isEmpty)
+        let firstContactId = appState.phoneContactsMatchedOnApp[0].id
+        appState.addMatchedPhoneContact(firstContactId)
+        #expect(appState.phoneContactsMatchedOnApp[0].isAddedOrInvited == true)
+        #expect(appState.friends.count == 1)
+    }
 }
