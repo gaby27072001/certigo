@@ -36,7 +36,7 @@ dependencies:
 
   # Offline-first persistence & connectivity (iOS + Android)
   shared_preferences: ^2.3.0
-  connectivity_plus: ^6.0.0
+  connectivity_plus: ^7.3.1
   path_provider: ^2.1.5
 
   # Error-only crash reporting; native iOS capture is provided by Sentry Cocoa.
