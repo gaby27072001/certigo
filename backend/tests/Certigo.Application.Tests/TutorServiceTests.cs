@@ -225,4 +225,28 @@ public sealed class TutorServiceTests
         dto.Reply.Should().Contain("Paris");
         dto.FollowUpSuggestions.Should().NotBeEmpty();
     }
+
+    [Fact]
+    public async Task ChatAsync_strips_markdown_headings_and_bold_asterisks_from_llm_reply()
+    {
+        var reply = """
+        {
+          "reply": "### Résumé de l'architecture\n\n****Point critique**** : utilise **Azure Policy** avec `Deny`.\n- Contrôle la région\n- Bloque les tailles non autorisées",
+          "followUpSuggestions": ["Voir un exemple JSON"]
+        }
+        """;
+        var h = new TutorServiceHarness();
+        var service = h.Build(reply);
+
+        var dto = await service.ChatAsync(new TutorChatRequest(
+            "Explique Azure Policy",
+            TestContent.TrackId));
+
+        dto.Reply.Should().NotContain("#");
+        dto.Reply.Should().NotContain("**");
+        dto.Reply.Should().NotContain("`");
+        dto.Reply.Should().Contain("Résumé de l'architecture");
+        dto.Reply.Should().Contain("Point critique : utilise Azure Policy avec Deny.");
+        dto.Reply.Should().Contain("• Contrôle la région");
+    }
 }

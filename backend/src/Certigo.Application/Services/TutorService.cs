@@ -216,6 +216,7 @@ public sealed class TutorService(
             "(qu'il s'agisse d'une question générale comme la météo à Paris, la vie quotidienne, la programmation, l'architecture Cloud/IA ou ses révisions). " +
             "Tu disposes également en contexte des données personnelles d'utilisation de l'app de l'utilisateur (son niveau, ses certifications, sa progression et ses erreurs récentes) : " +
             "utilise-les naturellement lorsque c'est pertinent pour personnaliser tes conseils, sans jamais réciter ce contexte de manière robotique. " +
+            "INTERDICTION STRICTE d'utiliser du Markdown brut comme #, ##, ###, ** ou ****. Écris en texte français pur, fluide et aéré, en utilisant uniquement des sauts de ligne et des puces simples (• ou 1.). " +
             "Réponds uniquement avec un objet JSON valide de la forme : " +
             "{\"reply\": \"ta réponse claire et bien aérée en français (avec sauts de ligne \\n\\n si utile)\", \"followUpSuggestions\": [\"suggestion courte 1\", \"suggestion courte 2\"]}";
 
@@ -280,10 +281,51 @@ public sealed class TutorService(
         var parsed = TutorChatPayloadParser.TryParse(raw!);
         telemetry.TrackSuccess(latency.Elapsed);
         return new TutorChatResponseDto(
-            parsed.Reply,
+            StripMarkdownNoise(parsed.Reply),
             parsed.FollowUpSuggestions,
             "ai",
             "gpt-5.4-mini");
+    }
+
+    public static string StripMarkdownNoise(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var cleaned = text
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("****", string.Empty, StringComparison.Ordinal)
+            .Replace("***", string.Empty, StringComparison.Ordinal)
+            .Replace("**", string.Empty, StringComparison.Ordinal)
+            .Replace("__", string.Empty, StringComparison.Ordinal)
+            .Replace("`", string.Empty, StringComparison.Ordinal);
+
+        var lines = cleaned.Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i].TrimStart();
+            while (line.StartsWith('#'))
+            {
+                line = line[1..].TrimStart();
+            }
+
+            if (line.StartsWith("- ", StringComparison.Ordinal) || line.StartsWith("* ", StringComparison.Ordinal))
+            {
+                line = "• " + line[2..].TrimStart();
+            }
+
+            lines[i] = line.TrimEnd();
+        }
+
+        var joined = string.Join("\n", lines);
+        while (joined.Contains("\n\n\n", StringComparison.Ordinal))
+        {
+            joined = joined.Replace("\n\n\n", "\n\n", StringComparison.Ordinal);
+        }
+
+        return joined.Trim();
     }
 
     private static TutorChatResponseDto ComposeGroundedChatFallback(
@@ -356,7 +398,7 @@ internal static class TutorChatPayloadParser
                             suggestions.Add("Faire une question d'entraînement");
                         }
 
-                        return (replyText!, suggestions);
+                        return (TutorService.StripMarkdownNoise(replyText!), suggestions);
                     }
                 }
             }
@@ -367,7 +409,7 @@ internal static class TutorChatPayloadParser
         }
 
         return (
-            trimmed,
+            TutorService.StripMarkdownNoise(trimmed),
             new[] { "Approfondir avec un exemple concret", "Faire une question d'entraînement" });
     }
 }
