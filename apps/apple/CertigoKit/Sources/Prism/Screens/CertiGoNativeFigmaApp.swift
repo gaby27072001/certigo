@@ -16,6 +16,10 @@ import Contacts
 import AuthenticationServices
 #endif
 
+#if canImport(CryptoKit)
+import CryptoKit
+#endif
+
 // MARK: - 1. Lead-Architect State Enums & Rich Identifiable Domain Models
 
 /// Explicit OAuth / Email provider kind for the interactive native authentication sheet.
@@ -7263,6 +7267,602 @@ public actor CertiGoLiveAuthService {
     }
 }
 
+/// Decoded JWT payload claims extracted from OAuth 2.0 `id_token` / `access_token` or Apple `identityToken`.
+public struct CertiGoDecodedJWTClaims: Equatable, Sendable {
+    public let name: String?
+    public let givenName: String?
+    public let familyName: String?
+    public let email: String?
+    public let oid: String?
+    public let sub: String?
+    public let rawStringClaims: [String: String]
+
+    public init(
+        name: String? = nil,
+        givenName: String? = nil,
+        familyName: String? = nil,
+        email: String? = nil,
+        oid: String? = nil,
+        sub: String? = nil,
+        rawStringClaims: [String: String] = [:]
+    ) {
+        self.name = name
+        self.givenName = givenName
+        self.familyName = familyName
+        self.email = email
+        self.oid = oid
+        self.sub = sub
+        self.rawStringClaims = rawStringClaims
+    }
+
+    public var displayName: String? {
+        if let name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return name.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let parts = [givenName, familyName]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    public var userId: String? {
+        if let oid, !oid.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return oid.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let sub, !sub.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return sub.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return nil
+    }
+
+    public subscript(key: String) -> String? {
+        rawStringClaims[key]
+    }
+}
+
+public enum CertiGoSystemOAuthError: Error, LocalizedError, Equatable, Sendable {
+    case canceled
+    case invalidAuthorizeURL
+    case missingAuthorizationCode
+    case tokenExchangeFailed(String)
+    case unsupportedPlatform
+
+    public var errorDescription: String? {
+        switch self {
+        case .canceled:
+            return "Connexion annulée."
+        case .invalidAuthorizeURL:
+            return "URL d'autorisation OAuth 2.0 invalide."
+        case .missingAuthorizationCode:
+            return "Code d'autorisation OAuth 2.0 manquant dans la redirection."
+        case .tokenExchangeFailed(let detail):
+            return "Échec de l'échange du code OAuth 2.0 : \(detail)"
+        case .unsupportedPlatform:
+            return "Les popups système iOS nécessitent AuthenticationServices sur iOS."
+        }
+    }
+}
+
+/// Native iOS System OAuth 2.0 + PKCE & Apple ID Coordinator (`ASAuthorizationAppleIDProvider` + `ASWebAuthenticationSession`).
+@MainActor
+public final class CertiGoNativeSystemOAuthCoordinator: NSObject {
+    public static let shared = CertiGoNativeSystemOAuthCoordinator()
+
+    nonisolated public static let tenantId = "af721be8-5901-422a-b299-b9c57847b968"
+    nonisolated public static let clientId = "4d1f1075-7bc5-4764-947b-701435a85f8c"
+    nonisolated public static let redirectURI = "certigo://auth"
+    nonisolated public static let callbackURLScheme = "certigo"
+    nonisolated public static let authorizeEndpoint = "https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/oauth2/v2.0/authorize"
+    nonisolated public static let tokenEndpoint = "https://certigoapp.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/oauth2/v2.0/token"
+    nonisolated public static let scopes = "openid profile email offline_access api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation"
+
+    /// Uses `false` by default so iOS presents the native system sheet sharing the device's Apple/Google/Microsoft browser session for 1-tap sign-in.
+    public var prefersEphemeralWebBrowserSession: Bool = false
+
+    #if canImport(AuthenticationServices) && canImport(UIKit)
+    private var activeWebAuthSession: ASWebAuthenticationSession?
+    private var activeAppleAuthController: ASAuthorizationController?
+    private var appleAuthContinuation: CheckedContinuation<(displayName: String, email: String, accessToken: String, userId: String), any Error>?
+    #endif
+
+    public override init() {
+        super.init()
+    }
+
+    /// Exact `domain_hint` values verified live against `certigoapp.ciamlogin.com`:
+    /// - `.apple` -> `"apple"` (HTTP 302 to `https://appleid.apple.com/auth/authorize`)
+    /// - `.google` -> `"Google"` with uppercase `G` (HTTP 302 to `https://accounts.google.com/v3/signin/identifier`)
+    /// - `.microsoft` -> `"live.com"` (HTTP 302 to `https://login.live.com/oauth20_authorize.srf`)
+    nonisolated public static func domainHint(for provider: CertiGoAuthProviderKind) -> String {
+        switch provider {
+        case .apple:
+            return "apple"
+        case .google:
+            return "Google"
+        case .microsoft:
+            return "live.com"
+        case .email:
+            return ""
+        }
+    }
+
+    nonisolated public static func generateCodeVerifier(length: Int = 64) -> String {
+        let clampedLength = min(64, max(43, length))
+        let charset = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        var result = String()
+        result.reserveCapacity(clampedLength)
+        for _ in 0..<clampedLength {
+            let randomIndex = Int.random(in: 0..<charset.count)
+            result.append(charset[randomIndex])
+        }
+        return result
+    }
+
+    nonisolated public static func generateCodeChallenge(for verifier: String) -> String {
+        let data = Data(verifier.utf8)
+        #if canImport(CryptoKit)
+        let digest = Array(SHA256.hash(data: data))
+        #else
+        let digest = sha256FallbackBytes(Array(data))
+        #endif
+        return base64URLEncode(Data(digest))
+    }
+
+    nonisolated public static func buildAuthorizeURL(
+        for provider: CertiGoAuthProviderKind,
+        codeChallenge: String
+    ) -> URL? {
+        guard var components = URLComponents(string: authorizeEndpoint) else {
+            return nil
+        }
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "client_id", value: clientId),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
+            URLQueryItem(name: "response_mode", value: "query"),
+            URLQueryItem(name: "scope", value: scopes),
+            URLQueryItem(name: "code_challenge", value: codeChallenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
+            URLQueryItem(name: "prompt", value: "login")
+        ]
+        let hint = domainHint(for: provider)
+        if !hint.isEmpty {
+            items.append(URLQueryItem(name: "domain_hint", value: hint))
+        }
+        components.queryItems = items
+        return components.url
+    }
+
+    nonisolated public static func decodeJWTClaims(_ jwt: String) -> CertiGoDecodedJWTClaims {
+        let segments = jwt.split(separator: ".", omittingEmptySubsequences: false)
+        guard segments.count >= 2 else {
+            return CertiGoDecodedJWTClaims()
+        }
+        guard let payloadData = base64URLDecode(String(segments[1])),
+              let jsonObject = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
+        else {
+            return CertiGoDecodedJWTClaims()
+        }
+
+        var stringClaims: [String: String] = [:]
+        for (key, value) in jsonObject {
+            if let str = value as? String {
+                stringClaims[key] = str
+            } else if let emails = value as? [String], let first = emails.first {
+                stringClaims[key] = first
+            }
+        }
+
+        let givenName = stringClaims["given_name"]
+        let familyName = stringClaims["family_name"]
+        let rawName = stringClaims["name"]
+        let combinedName: String? = {
+            if let rawName, !rawName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            let parts = [givenName, familyName]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            return parts.isEmpty ? nil : parts.joined(separator: " ")
+        }()
+        let resolvedEmail = stringClaims["email"]
+            ?? stringClaims["preferred_username"]
+            ?? stringClaims["upn"]
+            ?? stringClaims["emails"]
+        let oid = stringClaims["oid"]
+        let sub = stringClaims["sub"]
+        if let combinedName {
+            stringClaims["name"] = combinedName
+        }
+        if let resolvedEmail {
+            stringClaims["email"] = resolvedEmail
+        }
+
+        return CertiGoDecodedJWTClaims(
+            name: combinedName,
+            givenName: givenName,
+            familyName: familyName,
+            email: resolvedEmail,
+            oid: oid,
+            sub: sub,
+            rawStringClaims: stringClaims
+        )
+    }
+
+    public func signInWithProvider(
+        _ provider: CertiGoAuthProviderKind
+    ) async throws -> (displayName: String, email: String, accessToken: String, userId: String) {
+        #if canImport(AuthenticationServices) && canImport(UIKit)
+        if provider == .apple {
+            do {
+                return try await performNativeAppleIDAuthorization()
+            } catch let error as CertiGoSystemOAuthError where error == .canceled {
+                throw error
+            } catch let nsError as NSError where nsError.domain == ASAuthorizationError.errorDomain
+                && nsError.code == ASAuthorizationError.canceled.rawValue
+            {
+                throw CertiGoSystemOAuthError.canceled
+            } catch {
+                // Automatic same-second fallback when free/personal Xcode provisioning profile lacks Sign In with Apple entitlement (code 1000 / -7026)
+                return try await startWebAuthenticationSession(for: .apple)
+            }
+        }
+        return try await startWebAuthenticationSession(for: provider)
+        #else
+        throw CertiGoSystemOAuthError.unsupportedPlatform
+        #endif
+    }
+
+    public func startWebAuthenticationSession(
+        for provider: CertiGoAuthProviderKind
+    ) async throws -> (displayName: String, email: String, accessToken: String, userId: String) {
+        #if canImport(AuthenticationServices) && canImport(UIKit)
+        let codeVerifier = Self.generateCodeVerifier()
+        let codeChallenge = Self.generateCodeChallenge(for: codeVerifier)
+        guard let authURL = Self.buildAuthorizeURL(for: provider, codeChallenge: codeChallenge) else {
+            throw CertiGoSystemOAuthError.invalidAuthorizeURL
+        }
+
+        let callbackURL: URL = try await withCheckedThrowingContinuation { continuation in
+            let session = ASWebAuthenticationSession(
+                url: authURL,
+                callbackURLScheme: Self.callbackURLScheme
+            ) { [weak self] callbackURL, error in
+                Task { @MainActor in
+                    self?.activeWebAuthSession = nil
+                    if let error {
+                        let nsError = error as NSError
+                        if nsError.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                            continuation.resume(throwing: CertiGoSystemOAuthError.canceled)
+                        } else {
+                            continuation.resume(throwing: error)
+                        }
+                        return
+                    }
+                    guard let callbackURL else {
+                        continuation.resume(throwing: CertiGoSystemOAuthError.missingAuthorizationCode)
+                        return
+                    }
+                    continuation.resume(returning: callbackURL)
+                }
+            }
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = self.prefersEphemeralWebBrowserSession
+            self.activeWebAuthSession = session
+            if !session.start() {
+                self.activeWebAuthSession = nil
+                continuation.resume(throwing: CertiGoSystemOAuthError.invalidAuthorizeURL)
+            }
+        }
+
+        guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              let code = components.queryItems?.first(where: { $0.name == "code" })?.value,
+              !code.isEmpty
+        else {
+            throw CertiGoSystemOAuthError.missingAuthorizationCode
+        }
+
+        return try await exchangeAuthorizationCodeForTokens(
+            code: code,
+            codeVerifier: codeVerifier,
+            provider: provider
+        )
+        #else
+        throw CertiGoSystemOAuthError.unsupportedPlatform
+        #endif
+    }
+
+    private struct OAuthTokenResponsePayload: Decodable {
+        let access_token: String?
+        let id_token: String?
+        let error: String?
+        let error_description: String?
+    }
+
+    public func exchangeAuthorizationCodeForTokens(
+        code: String,
+        codeVerifier: String,
+        provider: CertiGoAuthProviderKind,
+        urlSession: URLSession = .shared
+    ) async throws -> (displayName: String, email: String, accessToken: String, userId: String) {
+        guard let tokenURL = URL(string: Self.tokenEndpoint) else {
+            throw CertiGoSystemOAuthError.invalidAuthorizeURL
+        }
+
+        var request = URLRequest(url: tokenURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        var bodyComponents = URLComponents()
+        bodyComponents.queryItems = [
+            URLQueryItem(name: "client_id", value: Self.clientId),
+            URLQueryItem(name: "grant_type", value: "authorization_code"),
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "redirect_uri", value: Self.redirectURI),
+            URLQueryItem(name: "code_verifier", value: codeVerifier),
+            URLQueryItem(name: "scope", value: Self.scopes)
+        ]
+        request.httpBody = bodyComponents.percentEncodedQuery?.data(using: .utf8)
+
+        let (data, response) = try await urlSession.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw CertiGoSystemOAuthError.tokenExchangeFailed("Réponse HTTP invalide")
+        }
+
+        let decoded = try? JSONDecoder().decode(OAuthTokenResponsePayload.self, from: data)
+        guard (200..<300).contains(httpResponse.statusCode),
+              let tokenPayload = decoded,
+              let resolvedToken = tokenPayload.access_token ?? tokenPayload.id_token,
+              !resolvedToken.isEmpty
+        else {
+            let errDetail = decoded?.error_description ?? decoded?.error ?? "HTTP \(httpResponse.statusCode)"
+            throw CertiGoSystemOAuthError.tokenExchangeFailed(errDetail)
+        }
+
+        let idClaims = tokenPayload.id_token.map(Self.decodeJWTClaims) ?? CertiGoDecodedJWTClaims()
+        let accessClaims = tokenPayload.access_token.map(Self.decodeJWTClaims) ?? CertiGoDecodedJWTClaims()
+
+        let rawEmail = idClaims.email ?? accessClaims.email ?? provider.defaultSuggestedEmail
+        let rawName = idClaims.displayName
+            ?? accessClaims.displayName
+            ?? Self.fallbackDisplayName(fromEmail: rawEmail)
+        let rawUserId = idClaims.userId
+            ?? accessClaims.userId
+            ?? "usr-\(provider.rawValue)-\(UUID().uuidString.lowercased())"
+
+        let synced = await CertiGoLiveAuthService.shared.authenticateOrRegister(
+            email: rawEmail,
+            password: "OAuth!\(rawUserId)",
+            displayName: rawName,
+            provider: provider
+        )
+
+        return (
+            displayName: rawName.isEmpty ? synced.displayName : rawName,
+            email: rawEmail.isEmpty ? synced.email : rawEmail,
+            accessToken: resolvedToken,
+            userId: rawUserId.isEmpty ? synced.userId : rawUserId
+        )
+    }
+
+    nonisolated private static func fallbackDisplayName(fromEmail email: String) -> String {
+        let localPart = email.split(separator: "@").first.map(String.init) ?? "Gabriel Chambaud"
+        let formatted = localPart
+            .replacingOccurrences(of: ".", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
+        return formatted.isEmpty ? "Gabriel Chambaud" : formatted
+    }
+
+    nonisolated private static func base64URLEncode(_ data: Data) -> String {
+        data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    nonisolated private static func base64URLDecode(_ value: String) -> Data? {
+        var base64 = value
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let remainder = base64.count % 4
+        if remainder > 0 {
+            base64.append(String(repeating: "=", count: 4 - remainder))
+        }
+        return Data(base64Encoded: base64)
+    }
+
+    #if !canImport(CryptoKit)
+    nonisolated private static func sha256FallbackBytes(_ message: [UInt8]) -> [UInt8] {
+        let k: [UInt32] = [
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        ]
+        var h: [UInt32] = [
+            0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+            0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+        ]
+        var padded = message
+        let bitLen = UInt64(message.count) * 8
+        padded.append(0x80)
+        while (padded.count % 64) != 56 {
+            padded.append(0x00)
+        }
+        for shift in stride(from: 56, through: 0, by: -8) {
+            padded.append(UInt8((bitLen >> UInt64(shift)) & 0xff))
+        }
+        func rotr(_ x: UInt32, _ n: UInt32) -> UInt32 { (x >> n) | (x << (32 - n)) }
+        for chunkStart in stride(from: 0, to: padded.count, by: 64) {
+            var w = [UInt32](repeating: 0, count: 64)
+            for i in 0..<16 {
+                let b = chunkStart + i * 4
+                w[i] = (UInt32(padded[b]) << 24)
+                    | (UInt32(padded[b + 1]) << 16)
+                    | (UInt32(padded[b + 2]) << 8)
+                    | UInt32(padded[b + 3])
+            }
+            for i in 16..<64 {
+                let s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3)
+                let s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >> 10)
+                w[i] = w[i - 16] &+ s0 &+ w[i - 7] &+ s1
+            }
+            var a = h[0], b = h[1], c = h[2], d = h[3]
+            var e = h[4], f = h[5], g = h[6], hh = h[7]
+            for i in 0..<64 {
+                let s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)
+                let ch = (e & f) ^ ((~e) & g)
+                let temp1 = hh &+ s1 &+ ch &+ k[i] &+ w[i]
+                let s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)
+                let maj = (a & b) ^ (a & c) ^ (b & c)
+                let temp2 = s0 &+ maj
+                hh = g; g = f; f = e; e = d &+ temp1
+                d = c; c = b; b = a; a = temp1 &+ temp2
+            }
+            h[0] = h[0] &+ a; h[1] = h[1] &+ b; h[2] = h[2] &+ c; h[3] = h[3] &+ d
+            h[4] = h[4] &+ e; h[5] = h[5] &+ f; h[6] = h[6] &+ g; h[7] = h[7] &+ hh
+        }
+        var out: [UInt8] = []
+        out.reserveCapacity(32)
+        for word in h {
+            out.append(UInt8((word >> 24) & 0xff))
+            out.append(UInt8((word >> 16) & 0xff))
+            out.append(UInt8((word >> 8) & 0xff))
+            out.append(UInt8(word & 0xff))
+        }
+        return out
+    }
+    #endif
+}
+
+#if canImport(AuthenticationServices) && canImport(UIKit)
+import UIKit
+
+extension CertiGoNativeSystemOAuthCoordinator:
+    ASWebAuthenticationPresentationContextProviding,
+    ASAuthorizationControllerDelegate,
+    ASAuthorizationControllerPresentationContextProviding
+{
+    private func performNativeAppleIDAuthorization() async throws -> (displayName: String, email: String, accessToken: String, userId: String) {
+        try await withCheckedThrowingContinuation { continuation in
+            self.appleAuthContinuation = continuation
+            let appleIDProvider = ASAuthorizationAppleIDProvider()
+            let request = appleIDProvider.createRequest()
+            request.requestedScopes = [.fullName, .email]
+
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = self
+            controller.presentationContextProvider = self
+            self.activeAppleAuthController = controller
+            controller.performRequests()
+        }
+    }
+
+    public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        resolveActivePresentationAnchor()
+    }
+
+    public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        resolveActivePresentationAnchor()
+    }
+
+    private func resolveActivePresentationAnchor() -> ASPresentationAnchor {
+        let windowScenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        if let activeScene = windowScenes.first(where: { $0.activationState == .foregroundActive }) ?? windowScenes.first {
+            if let keyWindow = activeScene.windows.first(where: \.isKeyWindow) ?? activeScene.windows.first {
+                return keyWindow
+            }
+            return ASPresentationAnchor(windowScene: activeScene)
+        }
+        return ASPresentationAnchor()
+    }
+
+    public func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithAuthorization authorization: ASAuthorization
+    ) {
+        activeAppleAuthController = nil
+        guard let continuation = appleAuthContinuation else { return }
+        appleAuthContinuation = nil
+
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+            continuation.resume(throwing: CertiGoSystemOAuthError.tokenExchangeFailed("Identifiant Apple invalide"))
+            return
+        }
+
+        let appleUserId = credential.user
+        let fullNameKey = "certigo.appleid.fullName.\(appleUserId)"
+        let emailKey = "certigo.appleid.email.\(appleUserId)"
+
+        let identityTokenString = credential.identityToken.flatMap { String(data: $0, encoding: .utf8) }
+        let tokenClaims = identityTokenString.map(Self.decodeJWTClaims) ?? CertiGoDecodedJWTClaims()
+
+        let formattedFullName: String? = {
+            guard let fullName = credential.fullName else { return nil }
+            let parts = [fullName.givenName, fullName.familyName]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            return parts.isEmpty ? nil : parts.joined(separator: " ")
+        }()
+        if let formattedFullName {
+            UserDefaults.standard.set(formattedFullName, forKey: fullNameKey)
+        }
+        let persistedName = UserDefaults.standard.string(forKey: fullNameKey)
+
+        let directEmail = credential.email?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let directEmail, !directEmail.isEmpty {
+            UserDefaults.standard.set(directEmail, forKey: emailKey)
+        }
+        let persistedEmail = UserDefaults.standard.string(forKey: emailKey)
+
+        let resolvedEmail = (directEmail?.isEmpty == false ? directEmail : nil)
+            ?? tokenClaims.email
+            ?? persistedEmail
+            ?? CertiGoAuthProviderKind.apple.defaultSuggestedEmail
+        let resolvedName = formattedFullName
+            ?? tokenClaims.displayName
+            ?? persistedName
+            ?? Self.fallbackDisplayName(fromEmail: resolvedEmail)
+        let resolvedUserId = !appleUserId.isEmpty
+            ? appleUserId
+            : (tokenClaims.userId ?? "usr-apple-\(UUID().uuidString.lowercased())")
+
+        Task { @MainActor in
+            let synced = await CertiGoLiveAuthService.shared.authenticateOrRegister(
+                email: resolvedEmail,
+                password: "AppleID!\(resolvedUserId)",
+                displayName: resolvedName,
+                provider: .apple
+            )
+            continuation.resume(
+                returning: (
+                    displayName: resolvedName.isEmpty ? synced.displayName : resolvedName,
+                    email: resolvedEmail.isEmpty ? synced.email : resolvedEmail,
+                    accessToken: identityTokenString ?? synced.accessToken,
+                    userId: resolvedUserId
+                )
+            )
+        }
+    }
+
+    public func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithError error: any Error
+    ) {
+        activeAppleAuthController = nil
+        guard let continuation = appleAuthContinuation else { return }
+        appleAuthContinuation = nil
+        continuation.resume(throwing: error)
+    }
+}
+#endif
+
 public extension CertiGoMascotPose {
     static let onboardingWelcome: Self = .emotionStarryEyes
     static let celebratingTrophy: Self = .emotionBossCrown
@@ -12480,6 +13080,49 @@ public struct CertiGoNativeFigmaAppView: View {
             .padding(.vertical, PrismSpacing.s)
         }
 
+        @MainActor
+        private func triggerProviderSignIn(
+            _ provider: CertiGoAuthProviderKind,
+            fromExistingAccountButton: Bool
+        ) {
+            let wasPresentingPortalSheet = appState.isPresentingSignInPortalSheet
+            appState.isPresentingSignInPortalSheet = false
+            appState.authOriginIsExistingAccountButton = fromExistingAccountButton
+
+            if provider == .email {
+                appState.openInteractiveAuthSheet(
+                    for: .email,
+                    fromExistingAccountButton: fromExistingAccountButton
+                )
+                return
+            }
+
+            appState.activeAuthProviderSheet = nil
+            appState.isAuthRequestInFlight = true
+            appState.authStatusMessage = nil
+
+            Task { @MainActor in
+                if wasPresentingPortalSheet {
+                    try? await Task.sleep(nanoseconds: 150_000_000)
+                }
+                do {
+                    let result = try await CertiGoNativeSystemOAuthCoordinator.shared.signInWithProvider(provider)
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        appState.applyAuthenticatedSession(
+                            displayName: result.displayName,
+                            email: result.email,
+                            provider: provider,
+                            accessToken: result.accessToken,
+                            userId: result.userId
+                        )
+                    }
+                } catch {
+                    appState.isAuthRequestInFlight = false
+                    appState.authStatusMessage = error.localizedDescription
+                }
+            }
+        }
+
         private var signInPortalSheetView: some View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: PrismSpacing.l) {
@@ -12518,8 +13161,7 @@ public struct CertiGoNativeFigmaAppView: View {
                     VStack(spacing: PrismSpacing.s) {
                         Button {
                             withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                                appState.isPresentingSignInPortalSheet = false
-                                appState.openInteractiveAuthSheet(for: .apple, fromExistingAccountButton: true)
+                                triggerProviderSignIn(.apple, fromExistingAccountButton: true)
                             }
                         } label: {
                             HStack(spacing: PrismSpacing.s) {
@@ -12544,8 +13186,7 @@ public struct CertiGoNativeFigmaAppView: View {
 
                         Button {
                             withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                                appState.isPresentingSignInPortalSheet = false
-                                appState.openInteractiveAuthSheet(for: .microsoft, fromExistingAccountButton: true)
+                                triggerProviderSignIn(.microsoft, fromExistingAccountButton: true)
                             }
                         } label: {
                             HStack(spacing: PrismSpacing.s) {
@@ -12570,8 +13211,7 @@ public struct CertiGoNativeFigmaAppView: View {
 
                         Button {
                             withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                                appState.isPresentingSignInPortalSheet = false
-                                appState.openInteractiveAuthSheet(for: .google, fromExistingAccountButton: true)
+                                triggerProviderSignIn(.google, fromExistingAccountButton: true)
                             }
                         } label: {
                             HStack(spacing: PrismSpacing.s) {
@@ -12596,8 +13236,7 @@ public struct CertiGoNativeFigmaAppView: View {
 
                         Button {
                             withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                                appState.isPresentingSignInPortalSheet = false
-                                appState.openInteractiveAuthSheet(for: .email, fromExistingAccountButton: true)
+                                triggerProviderSignIn(.email, fromExistingAccountButton: true)
                             }
                         } label: {
                             HStack(spacing: PrismSpacing.s) {
@@ -18172,6 +18811,49 @@ public struct CertiGoNativeOnboardingFlowView: View {
         }
     }
 
+    @MainActor
+    private func triggerProviderSignIn(
+        _ provider: CertiGoAuthProviderKind,
+        fromExistingAccountButton: Bool
+    ) {
+        let wasPresentingPortalSheet = appState.isPresentingSignInPortalSheet
+        appState.isPresentingSignInPortalSheet = false
+        appState.authOriginIsExistingAccountButton = fromExistingAccountButton
+
+        if provider == .email {
+            appState.openInteractiveAuthSheet(
+                for: .email,
+                fromExistingAccountButton: fromExistingAccountButton
+            )
+            return
+        }
+
+        appState.activeAuthProviderSheet = nil
+        appState.isAuthRequestInFlight = true
+        appState.authStatusMessage = nil
+
+        Task { @MainActor in
+            if wasPresentingPortalSheet {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
+            do {
+                let result = try await CertiGoNativeSystemOAuthCoordinator.shared.signInWithProvider(provider)
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    appState.applyAuthenticatedSession(
+                        displayName: result.displayName,
+                        email: result.email,
+                        provider: provider,
+                        accessToken: result.accessToken,
+                        userId: result.userId
+                    )
+                }
+            } catch {
+                appState.isAuthRequestInFlight = false
+                appState.authStatusMessage = error.localizedDescription
+            }
+        }
+    }
+
     private var onboardingSignInPortalSheetView: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: PrismSpacing.l) {
@@ -18210,8 +18892,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
                 VStack(spacing: PrismSpacing.s) {
                     Button {
                         withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                            appState.isPresentingSignInPortalSheet = false
-                            appState.openInteractiveAuthSheet(for: .apple, fromExistingAccountButton: true)
+                            triggerProviderSignIn(.apple, fromExistingAccountButton: true)
                         }
                     } label: {
                         HStack(spacing: PrismSpacing.s) {
@@ -18235,8 +18916,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
 
                     Button {
                         withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                            appState.isPresentingSignInPortalSheet = false
-                            appState.openInteractiveAuthSheet(for: .microsoft, fromExistingAccountButton: true)
+                            triggerProviderSignIn(.microsoft, fromExistingAccountButton: true)
                         }
                     } label: {
                         HStack(spacing: PrismSpacing.s) {
@@ -18260,8 +18940,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
 
                     Button {
                         withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                            appState.isPresentingSignInPortalSheet = false
-                            appState.openInteractiveAuthSheet(for: .google, fromExistingAccountButton: true)
+                            triggerProviderSignIn(.google, fromExistingAccountButton: true)
                         }
                     } label: {
                         HStack(spacing: PrismSpacing.s) {
@@ -18285,8 +18964,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
 
                     Button {
                         withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                            appState.isPresentingSignInPortalSheet = false
-                            appState.openInteractiveAuthSheet(for: .email, fromExistingAccountButton: true)
+                            triggerProviderSignIn(.email, fromExistingAccountButton: true)
                         }
                     } label: {
                         HStack(spacing: PrismSpacing.s) {
@@ -18351,7 +19029,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
                 // 1. Apple Sign-In
                 Button {
                     withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                        appState.openInteractiveAuthSheet(for: .apple, fromExistingAccountButton: false)
+                        triggerProviderSignIn(.apple, fromExistingAccountButton: false)
                     }
                 } label: {
                     HStack(spacing: PrismSpacing.s) {
@@ -18377,7 +19055,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
                 // 2. Microsoft Sign-In
                 Button {
                     withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                        appState.openInteractiveAuthSheet(for: .microsoft, fromExistingAccountButton: false)
+                        triggerProviderSignIn(.microsoft, fromExistingAccountButton: false)
                     }
                 } label: {
                     HStack(spacing: PrismSpacing.s) {
@@ -18403,7 +19081,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
                 // 3. Google Sign-In
                 Button {
                     withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                        appState.openInteractiveAuthSheet(for: .google, fromExistingAccountButton: false)
+                        triggerProviderSignIn(.google, fromExistingAccountButton: false)
                     }
                 } label: {
                     HStack(spacing: PrismSpacing.s) {
@@ -18429,7 +19107,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
                 // 4. Email Sign-In
                 Button {
                     withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                        appState.openInteractiveAuthSheet(for: .email, fromExistingAccountButton: false)
+                        triggerProviderSignIn(.email, fromExistingAccountButton: false)
                     }
                 } label: {
                     HStack(spacing: PrismSpacing.s) {

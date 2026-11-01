@@ -86,11 +86,11 @@ void main() {
       expect(request.additionalParameters, <String, String>{'domain_hint': 'live.com'});
     });
 
-    test('Google : prompt=login et domain_hint=google (valeur documentée)', () async {
+    test('Google : prompt=login et domain_hint=Google (avec G majuscule)', () async {
       final AuthorizationRequest request = await authorizeFor(AuthProvider.google);
 
       expect(request.promptValues, <String>['login']);
-      expect(request.additionalParameters, <String, String>{'domain_hint': 'google'});
+      expect(request.additionalParameters, <String, String>{'domain_hint': 'Google'});
     });
 
     test('ré-authentification avant suppression : login, max_age=0 et domain_hint=apple', () async {

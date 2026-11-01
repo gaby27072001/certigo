@@ -1136,4 +1136,68 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.phoneContactsMatchedOnApp[0].isAddedOrInvited == true)
         #expect(appState.friends.count == 1)
     }
+
+    @Test("CertiGoNativeSystemOAuthCoordinator builds live CIAM OAuth 2.0 + PKCE URLs with exact domain_hint (apple, Google, live.com), decodes JWT claims, and opens email auth sheet")
+    func systemOAuthCoordinatorAuthorizeURLsJWTDecodingAndEmailSheet() throws {
+        let verifier = CertiGoNativeSystemOAuthCoordinator.generateCodeVerifier()
+        #expect(verifier.count >= 43 && verifier.count <= 64)
+        let challenge = CertiGoNativeSystemOAuthCoordinator.generateCodeChallenge(for: verifier)
+        #expect(!challenge.isEmpty)
+        #expect(!challenge.contains("="))
+
+        // RFC 7636 Appendix B test vector for S256
+        let rfcVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+        let rfcChallenge = CertiGoNativeSystemOAuthCoordinator.generateCodeChallenge(for: rfcVerifier)
+        #expect(rfcChallenge == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+
+        // 1. Apple OAuth 2.0 + PKCE URL (`domain_hint=apple`)
+        let appleURL = try #require(
+            CertiGoNativeSystemOAuthCoordinator.buildAuthorizeURL(for: .apple, codeChallenge: challenge)
+        )
+        #expect(appleURL.absoluteString.contains("certigoapp.ciamlogin.com"))
+        #expect(appleURL.absoluteString.contains("domain_hint=apple"))
+        #expect(appleURL.absoluteString.contains("code_challenge_method=S256"))
+        #expect(appleURL.absoluteString.contains("prompt=login"))
+
+        // 2. Google OAuth 2.0 + PKCE URL (`domain_hint=Google` with uppercase G)
+        let googleURL = try #require(
+            CertiGoNativeSystemOAuthCoordinator.buildAuthorizeURL(for: .google, codeChallenge: challenge)
+        )
+        #expect(googleURL.absoluteString.contains("certigoapp.ciamlogin.com"))
+        #expect(googleURL.absoluteString.contains("domain_hint=Google"))
+
+        // 3. Microsoft OAuth 2.0 + PKCE URL (`domain_hint=live.com`)
+        let microsoftURL = try #require(
+            CertiGoNativeSystemOAuthCoordinator.buildAuthorizeURL(for: .microsoft, codeChallenge: challenge)
+        )
+        #expect(microsoftURL.absoluteString.contains("certigoapp.ciamlogin.com"))
+        #expect(microsoftURL.absoluteString.contains("domain_hint=live.com"))
+
+        // 4. JWT claims decoding (`name`, `email`, `oid` / `sub`)
+        let headerJSON = #"{"alg":"RS256","typ":"JWT"}"#
+        let payloadJSON = #"{"name":"Gabriel Chambaud","email":"gabriel.chambaud@gmail.com","oid":"oid-789-gabriel","sub":"sub-123-gabriel"}"#
+        let encodeSegment: (String) -> String = { raw in
+            Data(raw.utf8).base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+        }
+        let sampleJWT = "\(encodeSegment(headerJSON)).\(encodeSegment(payloadJSON)).sig"
+        let claims = CertiGoNativeSystemOAuthCoordinator.decodeJWTClaims(sampleJWT)
+        #expect(claims.name == "Gabriel Chambaud")
+        #expect(claims.displayName == "Gabriel Chambaud")
+        #expect(claims.email == "gabriel.chambaud@gmail.com")
+        #expect(claims.oid == "oid-789-gabriel")
+        #expect(claims.sub == "sub-123-gabriel")
+        #expect(claims.userId == "oid-789-gabriel")
+        #expect(claims["name"] == "Gabriel Chambaud")
+        #expect(claims["email"] == "gabriel.chambaud@gmail.com")
+        #expect(claims["oid"] == "oid-789-gabriel")
+        #expect(claims["sub"] == "sub-123-gabriel")
+
+        // 5. `openInteractiveAuthSheet(for: .email)` opens the sheet for `.email`
+        var appState = CertiGoNativeAppState()
+        appState.openInteractiveAuthSheet(for: .email)
+        #expect(appState.activeAuthProviderSheet == .email)
+    }
 }
