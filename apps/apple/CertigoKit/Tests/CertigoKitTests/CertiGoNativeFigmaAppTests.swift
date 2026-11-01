@@ -1283,5 +1283,60 @@ struct CertiGoNativeFigmaAppTests {
         #expect(mutableSocial.lastAddedFriendConfirmation == "✓ Clap envoyé à Sarah !")
         mutableSocial.clapQuestPartnerSarah()
         #expect(mutableSocial.gemsCount == initialGems + 5)
+
+        // 6. Verify Recommendations 1, 3 (PRO-only), 4, 5, 6, and 7:
+        // Rec 1: Implementation Intention ("Plan Si – Alors") with 4 routine anchors
+        #expect(CertiGoNativeAppState.onboardingRoutineAnchors.count == 4)
+        var recState = CertiGoNativeAppState()
+        recState.onboardingRoutineAnchorIndex = 0
+        recState.onboardingDailyRhythmMinutes = 10
+        #expect(recState.onboardingIfThenCommitmentText == "Si je suis après mon café du matin, alors je fais ma session de 10 min sur CertiGo.")
+        recState.onboardingRoutineAnchorIndex = 3
+        recState.onboardingDailyRhythmMinutes = 20
+        #expect(recState.onboardingIfThenCommitmentText == "Si je suis le soir au calme, alors je fais ma session de 20 min sur CertiGo.")
+
+        // Rec 3: PRO-only Shield repair (rejected for free users, restores hearts & preserves lesson index for PRO members)
+        recState.isProMember = false
+        recState.startLessonSession(forLessonId: "AZ-104-u1-s1", skipDeclic15: true)
+        recState.lessonSession.currentExerciseIndex = 2
+        recState.lessonSession.heartsCount = 0
+        recState.lessonSession.hasTriggeredOutOfHeartsFailure = true
+        #expect(recState.repairHeartsWithProShieldAndContinue() == false)
+        #expect(recState.lessonSession.heartsCount == 0)
+
+        recState.isProMember = true
+        #expect(recState.repairHeartsWithProShieldAndContinue() == true)
+        #expect(recState.lessonSession.heartsCount == 5)
+        #expect(recState.lessonSession.hasTriggeredOutOfHeartsFailure == false)
+        #expect(recState.lessonSession.currentExerciseIndex == 2)
+
+        // Rec 4: 4-tier cognitive scaffolding & interleaved confusable pair card
+        #expect(CertiGoScaffoldingTier.allCases.count == 4)
+        #expect(CertiGoScaffoldingTier.tier(forMastery: 0.30, difficulty: 0.35) == .tier1Intuition)
+        #expect(CertiGoScaffoldingTier.tier(forMastery: 0.50, difficulty: 0.50) == .tier2Association)
+        #expect(CertiGoScaffoldingTier.tier(forMastery: 0.68, difficulty: 0.65) == .tier3Scenario)
+        #expect(CertiGoScaffoldingTier.tier(forMastery: 0.85, difficulty: 0.82) == .tier4ExamAndCLI)
+        let duelAZ = CertiGoAdaptiveSessionEngine.buildInterleavedConfusablePairCard(forRouteCode: "AZ-104")
+        #expect(duelAZ.title.contains("RBAC"))
+        #expect(!duelAZ.exercise.options.isEmpty)
+
+        // Rec 5 & 6: Kind comeback (+20 XP) & attainable weekly benchmark
+        #expect(CertiGoNativeAppState.certifiedCandidatesWeeklyBenchmarkText.contains("4 sessions de 10 min par semaine"))
+        let xpBefore = recState.userXPPoints
+        recState.triggerKindComebackSession()
+        #expect(recState.hasClaimedKindComebackBonus == true)
+        #expect(recState.userXPPoints == xpBefore + 20)
+        #expect(recState.streakDays >= 1)
+
+        // Rec 7: Session Challenge Mode Selector (0 = Découverte simple sans CLI, 1 = Défi Examen + CLI)
+        recState.selectedSessionChallengeMode = 0
+        recState.startLessonSession(forLessonId: "AZ-104-u1-s1", skipDeclic15: true)
+        #expect(recState.lessonSession.isPlainLanguageModeEnabled == true)
+        #expect(recState.lessonSession.exercises.allSatisfy { $0.formatCode != "Q_TYPE_04" && $0.formatCode != "Q_TYPE_05" })
+
+        recState.selectedSessionChallengeMode = 1
+        recState.startLessonSession(forLessonId: "AZ-104-u1-s1", skipDeclic15: true)
+        #expect(recState.lessonSession.isPlainLanguageModeEnabled == false)
+        #expect(recState.lessonSession.exercises.contains(where: { $0.formatCode == "Q_TYPE_04" }))
     }
 }
