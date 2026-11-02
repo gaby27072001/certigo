@@ -201,31 +201,61 @@ export function writeManifestSeal(manifestPath, outputPath) {
     throw new Error('evidence manifest must be named manifest.json');
   }
   requireTrustedDirectory(path.dirname(seal), 'evidence manifest seal directory');
-  const content = `${sha256File(manifest)}  manifest.json\n`;
+  let inspected;
+  try {
+    inspected = fs.lstatSync(seal);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+  if (inspected?.isSymbolicLink()) {
+    throw new Error('evidence manifest seal must not be a symbolic link');
+  }
+  if (inspected && !inspected.isFile()) {
+    throw new Error('evidence manifest seal must be a regular file');
+  }
+  const contents = `${sha256File(manifest)}  manifest.json\n`;
+  // Never truncate a pathname before inspecting its opened object. NOFOLLOW
+  // supplements, but does not replace, the legacy trusted-directory boundary.
   let descriptor;
   try {
     descriptor = fs.openSync(
       seal,
-      fs.constants.O_WRONLY | fs.constants.O_CREAT
-        | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK,
+      fs.constants.O_WRONLY
+        | (inspected ? 0 : fs.constants.O_CREAT | fs.constants.O_EXCL)
+        | (fs.constants.O_NOFOLLOW ?? 0)
+        | (fs.constants.O_NONBLOCK ?? 0),
       0o600,
     );
+  } catch (error) {
+    requireTrustedDirectory(path.dirname(seal), 'evidence manifest seal directory');
+    throw error;
+  }
+  try {
     const opened = fs.fstatSync(descriptor);
     const current = fs.lstatSync(seal);
     requireTrustedDirectory(path.dirname(seal), 'evidence manifest seal directory');
     if (
-      !opened.isFile() || current.isSymbolicLink() || opened.nlink !== 1
-      || opened.dev !== current.dev || opened.ino !== current.ino
+      opened.nlink !== 1
       || (typeof process.geteuid === 'function' && opened.uid !== process.geteuid())
     ) {
       throw new Error('evidence manifest seal must be an owned regular non-symlink file');
     }
-    fs.ftruncateSync(descriptor, 0);
-    fs.writeFileSync(descriptor, content);
-  } finally {
-    if (descriptor !== undefined) {
-      fs.closeSync(descriptor);
+    if (
+      !opened.isFile()
+      || !current.isFile()
+      || current.isSymbolicLink()
+      || opened.dev !== current.dev
+      || opened.ino !== current.ino
+      || (inspected && (opened.dev !== inspected.dev || opened.ino !== inspected.ino))
+    ) {
+      throw new Error('evidence manifest seal changed before writing');
     }
+    fs.ftruncateSync(descriptor, 0);
+    fs.writeFileSync(descriptor, contents);
+  } finally {
+    fs.closeSync(descriptor);
   }
 }
 
