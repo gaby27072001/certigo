@@ -15,31 +15,31 @@
 # au plus spécifique).
 
 # Défaut — tout le dépôt
-*                       @gchambaud_microsoft
+*                       @gaby27072001
 
 # Gouvernance CI/CD, workflows, sécurité de la chaîne d'approvisionnement
-/.github/               @gchambaud_microsoft
+/.github/               @gaby27072001
 
 # Backend .NET (Azure Functions)
-/backend/               @gchambaud_microsoft
+/backend/               @gaby27072001
 
 # Application mobile Flutter
-/apps/mobile/           @gchambaud_microsoft
+/apps/mobile/           @gaby27072001
 
 # Paquets partagés
-/packages/              @gchambaud_microsoft
+/packages/              @gaby27072001
 
 # Infrastructure as Code (Bicep / Azure)
-/infra/                 @gchambaud_microsoft
+/infra/                 @gaby27072001
 
 # Outils & scripts
-/tools/                 @gchambaud_microsoft
+/tools/                 @gaby27072001
 
 # Contenu (pages statiques, privacy policy, etc.)
-/content/               @gchambaud_microsoft
+/content/               @gaby27072001
 
 # Documentation
-/docs/                  @gchambaud_microsoft
+/docs/                  @gaby27072001
 
 # Registre de migration — source de vérité de l'orchestration
-/docs/migration/        @gchambaud_microsoft
+/docs/migration/        @gaby27072001
