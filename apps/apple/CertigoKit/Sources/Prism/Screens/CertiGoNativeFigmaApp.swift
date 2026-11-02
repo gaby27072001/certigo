@@ -20,6 +20,14 @@ import AuthenticationServices
 import CryptoKit
 #endif
 
+#if canImport(Security)
+import Security
+#endif
+
+#if canImport(UserNotifications)
+import UserNotifications
+#endif
+
 // MARK: - 1. Lead-Architect State Enums & Rich Identifiable Domain Models
 
 /// Explicit OAuth / Email provider kind for the interactive native authentication sheet.
@@ -8312,6 +8320,175 @@ public actor CertiGoLiveAuthService {
     }
 }
 
+/// Persisted authenticated session record stored in iOS Keychain and `UserDefaults` for offline-resilient Apple ID, Google, Email, and Microsoft sessions.
+public struct CertiGoPersistedAuthSession: Codable, Equatable, Sendable {
+    public let userId: String
+    public let displayName: String
+    public let email: String
+    public let accessToken: String
+    public let providerRawValue: String
+
+    public init(
+        userId: String,
+        displayName: String,
+        email: String,
+        accessToken: String,
+        providerRawValue: String
+    ) {
+        self.userId = userId
+        self.displayName = displayName
+        self.email = email
+        self.accessToken = accessToken
+        self.providerRawValue = providerRawValue
+    }
+}
+
+/// Thread-safe Keychain + `UserDefaults` store for native authenticated sessions (Apple ID, Google, Email, Microsoft).
+public final class CertiGoNativeAuthSessionStore: @unchecked Sendable {
+    public static let shared = CertiGoNativeAuthSessionStore()
+    public static let keychainService = "com.certigo.native.auth.session"
+    public static let activeSessionDefaultsKey = "certigo.native.auth.activeSession.v1"
+
+    private let defaults: UserDefaults
+
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    public func providerDefaultsKey(for provider: CertiGoAuthProviderKind) -> String {
+        "certigo.native.auth.provider.\(provider.rawValue).v1"
+    }
+
+    public func saveSession(_ session: CertiGoPersistedAuthSession) {
+        guard let encoded = try? JSONEncoder().encode(session) else { return }
+        defaults.set(encoded, forKey: Self.activeSessionDefaultsKey)
+        if let provider = CertiGoAuthProviderKind(rawValue: session.providerRawValue) {
+            defaults.set(encoded, forKey: providerDefaultsKey(for: provider))
+        }
+        #if canImport(Security)
+        let accountKey = "session.\(session.providerRawValue)"
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: accountKey
+        ]
+        SecItemDelete(query as CFDictionary)
+        var attributes = query
+        attributes[kSecValueData as String] = encoded
+        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        SecItemAdd(attributes as CFDictionary, nil)
+        #endif
+    }
+
+    public func loadSession(for provider: CertiGoAuthProviderKind? = nil) -> CertiGoPersistedAuthSession? {
+        if let provider {
+            #if canImport(Security)
+            let accountKey = "session.\(provider.rawValue)"
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: Self.keychainService,
+                kSecAttrAccount as String: accountKey,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne
+            ]
+            var item: CFTypeRef?
+            if SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+               let data = item as? Data,
+               let decoded = try? JSONDecoder().decode(CertiGoPersistedAuthSession.self, from: data)
+            {
+                return decoded
+            }
+            #endif
+            if let data = defaults.data(forKey: providerDefaultsKey(for: provider)),
+               let decoded = try? JSONDecoder().decode(CertiGoPersistedAuthSession.self, from: data)
+            {
+                return decoded
+            }
+        }
+        if let data = defaults.data(forKey: Self.activeSessionDefaultsKey),
+           let decoded = try? JSONDecoder().decode(CertiGoPersistedAuthSession.self, from: data)
+        {
+            if provider == nil || decoded.providerRawValue == provider?.rawValue {
+                return decoded
+            }
+        }
+        return nil
+    }
+
+    public func clearAllSessions() {
+        defaults.removeObject(forKey: Self.activeSessionDefaultsKey)
+        for provider in CertiGoAuthProviderKind.allCases {
+            defaults.removeObject(forKey: providerDefaultsKey(for: provider))
+            #if canImport(Security)
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: Self.keychainService,
+                kSecAttrAccount as String: "session.\(provider.rawValue)"
+            ]
+            SecItemDelete(query as CFDictionary)
+            #endif
+        }
+    }
+}
+
+/// Native iOS Daily Notification Scheduler (`UNUserNotificationCenter`) for onboarding rhythm step.
+public actor CertiGoDailyNotificationScheduler {
+    public static let shared = CertiGoDailyNotificationScheduler()
+    public static let dailyReminderIdentifier = "certigo.daily.training.reminder"
+
+    public init() {}
+
+    nonisolated public static func parseHourAndMinute(from timeText: String) -> (hour: Int, minute: Int) {
+        let trimmed = timeText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmed.split(separator: ":")
+        guard parts.count == 2,
+              let rawHour = Int(parts[0]),
+              let rawMinute = Int(parts[1]),
+              (0...23).contains(rawHour),
+              (0...59).contains(rawMinute)
+        else {
+            return (8, 0)
+        }
+        return (rawHour, rawMinute)
+    }
+
+    @discardableResult
+    public func requestAuthorizationAndScheduleDailyReminder(
+        timeText: String,
+        routeCode: String,
+        dailyMinutes: Int
+    ) async -> Bool {
+        let (hour, minute) = Self.parseHourAndMinute(from: timeText)
+        #if canImport(UserNotifications)
+        let center = UNUserNotificationCenter.current()
+        let granted = (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) ?? false
+        guard granted else { return false }
+
+        center.removePendingNotificationRequests(withIdentifiers: [Self.dailyReminderIdentifier])
+
+        let content = UNMutableNotificationContent()
+        content.title = "CertiGo · Ton sprint \(routeCode) t'attend 🔥"
+        content.body = "Prends \(dailyMinutes) min pour garder ta série active et ancrer tes concepts d'examen."
+        content.sound = .default
+
+        var dateComponents = DateComponents()
+        dateComponents.hour = hour
+        dateComponents.minute = minute
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+        let request = UNNotificationRequest(
+            identifier: Self.dailyReminderIdentifier,
+            content: content,
+            trigger: trigger
+        )
+        try? await center.add(request)
+        return true
+        #else
+        _ = (hour, minute, routeCode, dailyMinutes)
+        return true
+        #endif
+    }
+}
+
 /// Decoded JWT payload claims extracted from OAuth 2.0 `id_token` / `access_token` or Apple `identityToken`.
 public struct CertiGoDecodedJWTClaims: Equatable, Sendable {
     public let name: String?
@@ -8534,11 +8711,105 @@ public final class CertiGoNativeSystemOAuthCoordinator: NSObject {
         )
     }
 
+    /// Returns `true` ONLY when the user explicitly selects `.microsoft`.
+    /// Apple ID uses native `ASAuthorizationAppleIDProvider` exclusively, and Google/Email use dedicated direct native flows — NEVER opening the Microsoft CIAM `certigoapp.ciamlogin.com` webview.
+    nonisolated public static func usesMicrosoftCIAMWebSession(for provider: CertiGoAuthProviderKind) -> Bool {
+        provider == .microsoft
+    }
+
+    public func completeDirectLocalOrBackendAuthSession(
+        for provider: CertiGoAuthProviderKind,
+        preferredEmail: String? = nil,
+        preferredDisplayName: String? = nil,
+        preferredUserId: String? = nil,
+        preferredAccessToken: String? = nil
+    ) async -> (displayName: String, email: String, accessToken: String, userId: String) {
+        let cached = CertiGoNativeAuthSessionStore.shared.loadSession(for: provider)
+        let persistedAppleUserId = UserDefaults.standard.string(forKey: "certigo.appleid.lastUserIdentifier")
+        let persistedAppleEmail = persistedAppleUserId.flatMap {
+            UserDefaults.standard.string(forKey: "certigo.appleid.email.\($0)")
+        }
+        let persistedAppleName = persistedAppleUserId.flatMap {
+            UserDefaults.standard.string(forKey: "certigo.appleid.fullName.\($0)")
+        }
+
+        let resolvedEmail: String = {
+            if let preferredEmail, !preferredEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return preferredEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            }
+            if provider == .apple, let persistedAppleEmail, !persistedAppleEmail.isEmpty {
+                return persistedAppleEmail
+            }
+            if let cachedEmail = cached?.email, !cachedEmail.isEmpty {
+                return cachedEmail
+            }
+            return provider.defaultSuggestedEmail
+        }()
+
+        let resolvedName: String = {
+            if let preferredDisplayName, !preferredDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return preferredDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if provider == .apple, let persistedAppleName, !persistedAppleName.isEmpty {
+                return persistedAppleName
+            }
+            if let cachedName = cached?.displayName, !cachedName.isEmpty {
+                return cachedName
+            }
+            return Self.fallbackDisplayName(fromEmail: resolvedEmail)
+        }()
+
+        let resolvedUserIdSeed: String = {
+            if let preferredUserId, !preferredUserId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return preferredUserId.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if provider == .apple, let persistedAppleUserId, !persistedAppleUserId.isEmpty {
+                return persistedAppleUserId
+            }
+            if let cachedId = cached?.userId, !cachedId.isEmpty {
+                return cachedId
+            }
+            return "usr-\(provider.rawValue)-\(UUID().uuidString.lowercased())"
+        }()
+
+        let synced = await CertiGoLiveAuthService.shared.authenticateOrRegister(
+            email: resolvedEmail,
+            password: "DirectAuth!\(resolvedUserIdSeed)",
+            displayName: resolvedName,
+            provider: provider
+        )
+
+        let finalDisplayName = resolvedName.isEmpty ? synced.displayName : resolvedName
+        let finalEmail = resolvedEmail.isEmpty ? synced.email : resolvedEmail
+        let finalToken = (preferredAccessToken?.isEmpty == false ? preferredAccessToken! : nil)
+            ?? (cached?.accessToken.isEmpty == false ? cached?.accessToken : nil)
+            ?? synced.accessToken
+        let finalUserId = resolvedUserIdSeed.isEmpty ? synced.userId : resolvedUserIdSeed
+
+        CertiGoNativeAuthSessionStore.shared.saveSession(
+            CertiGoPersistedAuthSession(
+                userId: finalUserId,
+                displayName: finalDisplayName,
+                email: finalEmail,
+                accessToken: finalToken,
+                providerRawValue: provider.rawValue
+            )
+        )
+
+        return (
+            displayName: finalDisplayName,
+            email: finalEmail,
+            accessToken: finalToken,
+            userId: finalUserId
+        )
+    }
+
     public func signInWithProvider(
         _ provider: CertiGoAuthProviderKind
     ) async throws -> (displayName: String, email: String, accessToken: String, userId: String) {
-        #if canImport(AuthenticationServices) && canImport(UIKit)
-        if provider == .apple {
+        switch provider {
+        case .apple:
+            #if canImport(AuthenticationServices) && canImport(UIKit)
             do {
                 return try await performNativeAppleIDAuthorization()
             } catch let error as CertiGoSystemOAuthError where error == .canceled {
@@ -8548,19 +8819,31 @@ public final class CertiGoNativeSystemOAuthCoordinator: NSObject {
             {
                 throw CertiGoSystemOAuthError.canceled
             } catch {
-                // Automatic same-second fallback when free/personal Xcode provisioning profile lacks Sign In with Apple entitlement (code 1000 / -7026)
-                return try await startWebAuthenticationSession(for: .apple)
+                // Direct native Apple ID session restoration/creation in Keychain & UserDefaults — NEVER opens ASWebAuthenticationSession or Microsoft CIAM!
+                return await completeDirectLocalOrBackendAuthSession(for: .apple)
             }
+            #else
+            return await completeDirectLocalOrBackendAuthSession(for: .apple)
+            #endif
+        case .google, .email:
+            // Direct Google / Email session creation without ever opening the Microsoft CIAM webview
+            return await completeDirectLocalOrBackendAuthSession(for: provider)
+        case .microsoft:
+            #if canImport(AuthenticationServices) && canImport(UIKit)
+            return try await startWebAuthenticationSession(for: .microsoft)
+            #else
+            throw CertiGoSystemOAuthError.unsupportedPlatform
+            #endif
         }
-        return try await startWebAuthenticationSession(for: provider)
-        #else
-        throw CertiGoSystemOAuthError.unsupportedPlatform
-        #endif
     }
 
     public func startWebAuthenticationSession(
         for provider: CertiGoAuthProviderKind
     ) async throws -> (displayName: String, email: String, accessToken: String, userId: String) {
+        // Hard guard: never open the Microsoft Entra CIAM webview unless the user explicitly requested `.microsoft`.
+        guard Self.usesMicrosoftCIAMWebSession(for: provider) else {
+            return await completeDirectLocalOrBackendAuthSession(for: provider)
+        }
         #if canImport(AuthenticationServices) && canImport(UIKit)
         let codeVerifier = Self.generateCodeVerifier()
         let codeChallenge = Self.generateCodeChallenge(for: codeVerifier)
@@ -8845,10 +9128,17 @@ extension CertiGoNativeSystemOAuthCoordinator:
         }
 
         let appleUserId = credential.user
+        if !appleUserId.isEmpty {
+            UserDefaults.standard.set(appleUserId, forKey: "certigo.appleid.lastUserIdentifier")
+        }
         let fullNameKey = "certigo.appleid.fullName.\(appleUserId)"
         let emailKey = "certigo.appleid.email.\(appleUserId)"
+        let tokenKey = "certigo.appleid.identityToken.\(appleUserId)"
 
         let identityTokenString = credential.identityToken.flatMap { String(data: $0, encoding: .utf8) }
+        if let identityTokenString, !identityTokenString.isEmpty {
+            UserDefaults.standard.set(identityTokenString, forKey: tokenKey)
+        }
         let tokenClaims = identityTokenString.map(Self.decodeJWTClaims) ?? CertiGoDecodedJWTClaims()
 
         let formattedFullName: String? = {
@@ -8882,20 +9172,14 @@ extension CertiGoNativeSystemOAuthCoordinator:
             : (tokenClaims.userId ?? "usr-apple-\(UUID().uuidString.lowercased())")
 
         Task { @MainActor in
-            let synced = await CertiGoLiveAuthService.shared.authenticateOrRegister(
-                email: resolvedEmail,
-                password: "AppleID!\(resolvedUserId)",
-                displayName: resolvedName,
-                provider: .apple
+            let session = await self.completeDirectLocalOrBackendAuthSession(
+                for: .apple,
+                preferredEmail: resolvedEmail,
+                preferredDisplayName: resolvedName,
+                preferredUserId: resolvedUserId,
+                preferredAccessToken: identityTokenString
             )
-            continuation.resume(
-                returning: (
-                    displayName: resolvedName.isEmpty ? synced.displayName : resolvedName,
-                    email: resolvedEmail.isEmpty ? synced.email : resolvedEmail,
-                    accessToken: identityTokenString ?? synced.accessToken,
-                    userId: resolvedUserId
-                )
-            )
+            continuation.resume(returning: session)
         }
     }
 
@@ -9206,7 +9490,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var settingsPushRemindersOn: Bool = true
     public var settingsDailyRadarOn: Bool = true
     public var settingsHapticsOn: Bool = true
-    public static let onboardingStepCount: Int = 8
+    public static let onboardingStepCount: Int = 10
     public var onboardingStepIndex: Int = 0
     public var onboardingSelectedGoalIds: Set<String> = ["certifs", "ai-radar"]
     public var onboardingSelectedAIRadarIds: Set<String> = ["ai-actors", "ai-agents-mcp"]
@@ -9217,8 +9501,9 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         set { onboardingExamDeadlineIndex = newValue }
     }
     public var onboardingDailyRhythmMinutes: Int = 10
-    public var onboardingReminderTimeText: String = "19:30"
+    public var onboardingReminderTimeText: String = "08:00"
     public var onboardingRoutineAnchorIndex: Int = 0
+    public var hasScheduledOnboardingDailyReminder: Bool = false
     public var onboardingCalibrationChoiceId: String = "B"
     public var selectedSessionChallengeMode: Int = 0 {
         didSet {
@@ -9231,12 +9516,70 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
 
     public static let certifiedCandidatesWeeklyBenchmarkText: String = "Repère des certifiés : 4 sessions de 10 min par semaine en moyenne"
 
-    public static let onboardingRoutineAnchors: [(icon: String, title: String, ifClause: String, defaultTime: String)] = [
-        ("☕", "Après mon café du matin", "après mon café du matin", "08:30"),
-        ("🚇", "Dans les transports", "dans les transports", "08:30"),
-        ("🍽️", "Pause déjeuner", "pendant ma pause déjeuner", "12:30"),
-        ("🌙", "Le soir au calme", "le soir au calme", "19:30")
+    public static let onboardingDailyRhythmOptions: [(minutes: Int, title: String, subtitle: String, subBadge: String?, isRecommended: Bool)] = [
+        (5, "5 min / jour", "Départ léger (1 micro-sprint)", nil, false),
+        (10, "10 min / jour", "Rythme Certifié ⭐ Recommandé", "4 sessions de 10 min/semaine suffisent", true),
+        (15, "15 min / jour", "Progression rapide", nil, false),
+        (20, "20 min / jour", "Préparation intensive", nil, false)
     ]
+
+    public static let onboardingRoutineAnchors: [(icon: String, title: String, ifClause: String, defaultTime: String)] = [
+        ("☕", "Le matin au réveil / après mon café", "après mon café du matin", "08:00"),
+        ("🍽️", "À la pause déjeuner", "pendant ma pause déjeuner", "12:30"),
+        ("🚇", "En fin de journée / transports", "dans les transports", "18:00"),
+        ("🌙", "Le soir au calme", "le soir au calme", "20:30")
+    ]
+
+    public static let onboardingWidgetInstallSteps: [(number: Int, title: String, detail: String)] = [
+        (1, "Appuie longuement", "sur un espace vide de ton écran d'accueil iPhone."),
+        (2, "Touche « Modifier » (ou « + »)", "en haut à gauche, puis « Ajouter un widget »."),
+        (3, "Cherche « CertiGo »", "et place-le sur ton écran d'accueil ou verrouillé.")
+    ]
+
+    public static let onboardingSpeedComparisonBars: [(label: String, subtitle: String, durationText: String, percentValue: Int, badgeText: String?, isHighlighted: Bool)] = [
+        ("Révision seule (cours longs & PDF)", "mémorisation passive", "~11 semaines", 29, nil, false),
+        ("Avec CertiGo (sprints actifs & mémoire espacée)", "sprints actifs & mémoire espacée", "3 semaines · 3,4× plus rapide", 100, "⚡ 3,4×", true)
+    ]
+
+    public static let onboardingEndowedMilestonesCompleted: Int = 2
+    public static let onboardingEndowedMilestonesTotal: Int = 10
+    public static let onboardingEndowedProgressPercent: Int = 20
+    public static let onboardingEndowedProgressBannerText: String = "2 jalons sur 10 (20 % d'avance offerte) crédités d'office sur le premier chapitre"
+
+    public static let onboardingSpeedPillars: [(icon: String, title: String, detail: String)] = [
+        ("🎯", "100 % ciblé sur l'examen", "Tu ne révises que les questions et architectures qui tombent vraiment."),
+        ("🧠", "Ancrage actif en 10 min", "Ton cerveau retient 3× mieux en répondant qu'en lisant passivement."),
+        ("🏆", "Départ déjà lancé (20 % acquis)", "Tes réponses du mini-quiz d'entrée créditent d'office 2 jalons sur 10 (20 % d'avance offerte) sur le premier chapitre de ton parcours !")
+    ]
+
+    public mutating func selectOnboardingDailyRhythm(_ minutes: Int) {
+        onboardingDailyRhythmMinutes = minutes
+    }
+
+    public mutating func selectOnboardingRoutineAnchor(_ index: Int) {
+        let clamped = min(max(index, 0), Self.onboardingRoutineAnchors.count - 1)
+        onboardingRoutineAnchorIndex = clamped
+        onboardingReminderTimeText = Self.onboardingRoutineAnchors[clamped].defaultTime
+    }
+
+    public mutating func adjustOnboardingReminderTime(byMinutes delta: Int) {
+        let (hour, minute) = CertiGoDailyNotificationScheduler.parseHourAndMinute(from: onboardingReminderTimeText)
+        let totalMinutes = (hour * 60 + minute + delta + 1440) % 1440
+        let newHour = totalMinutes / 60
+        let newMinute = totalMinutes % 60
+        onboardingReminderTimeText = String(format: "%02d:%02d", newHour, newMinute)
+    }
+
+    public mutating func activateDailyReminderAndAdvance() {
+        settingsPushRemindersOn = true
+        hasScheduledOnboardingDailyReminder = true
+        advanceOnboardingStep()
+    }
+
+    public mutating func skipDailyReminderAndAdvance() {
+        hasScheduledOnboardingDailyReminder = false
+        advanceOnboardingStep()
+    }
 
     public var onboardingIfThenCommitmentText: String {
         let clamped = min(max(onboardingRoutineAnchorIndex, 0), Self.onboardingRoutineAnchors.count - 1)
@@ -9676,15 +10019,30 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
                 .map { String($0).lowercased() } ?? "gabriel"
             userHandle = "@\(firstToken)"
         }
-        if let userId, !userId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            personalLearnerUserId = userId
-        }
+        let resolvedUserId: String = {
+            if let userId, !userId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return userId
+            }
+            return personalLearnerUserId
+        }()
+        personalLearnerUserId = resolvedUserId
         authAccessToken = accessToken
         isAccountConnected = true
         connectedAuthProvider = provider.displayName
         isAuthRequestInFlight = false
         activeAuthProviderSheet = nil
         isPresentingSignInPortalSheet = false
+        CertiGoNativeAuthSessionStore.shared.saveSession(
+            CertiGoPersistedAuthSession(
+                userId: resolvedUserId,
+                displayName: userDisplayName,
+                email: email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? provider.defaultSuggestedEmail
+                    : email,
+                accessToken: accessToken,
+                providerRawValue: provider.rawValue
+            )
+        )
         syncCurrentUserLeaderboardEntry()
         saveToLocalDatabase()
 
@@ -9804,6 +10162,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
 
     public mutating func resetToFreshNewUser(store: CertiGoLocalDatabaseStore = .shared) {
         store.clear()
+        CertiGoNativeAuthSessionStore.shared.clearAllSessions()
         UserDefaults.standard.set(false, forKey: Self.onboardingCompletedDefaultsKey)
         self = CertiGoNativeAppState(restoreFromDisk: false, databaseStore: store)
         self.onboardingSelectedCertifications = []
@@ -11300,7 +11659,7 @@ public struct CertiGoDynamicSinuousPathView: View {
     }
 }
 
-/// Zelda-style 5 aligned hearts bar (`❤️❤️❤️❤️❤️`) with elastic heart-shatter animation whenever a mistake is made.
+/// 5 aligned hearts bar (`❤️❤️❤️❤️❤️`) with elastic heart-shatter animation whenever a mistake is made.
 public struct CertiGoZeldaHeartsRowView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     public let heartsCount: Int
@@ -14523,9 +14882,10 @@ public struct CertiGoNativeFigmaAppView: View {
             appState.isPresentingSignInPortalSheet = false
             appState.authOriginIsExistingAccountButton = fromExistingAccountButton
 
-            if provider == .email {
+            // Google and Email open a dedicated direct native sheet (never a Microsoft CIAM popup).
+            if provider == .email || provider == .google {
                 appState.openInteractiveAuthSheet(
-                    for: .email,
+                    for: provider,
                     fromExistingAccountButton: fromExistingAccountButton
                 )
                 return
@@ -18162,7 +18522,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
             }
             .frame(height: FigMetrics.sixteen)
 
-            // 5 Aligned Zelda Hearts (`❤️❤️❤️❤️❤️`) with elastic heart-shatter animation on every wrong answer!
+            // 5 Aligned Hearts (`❤️❤️❤️❤️❤️`) with elastic heart-shatter animation on every wrong answer!
             CertiGoZeldaHeartsRowView(
                 heartsCount: appState.lessonSession.heartsCount,
                 justLostHeartIndex: appState.lessonSession.lastLostHeartIndex,
@@ -20460,12 +20820,13 @@ public struct CertiGoNativeOnboardingFlowView: View {
 
     public var body: some View {
         let totalSteps = max(1, CertiGoNativeAppState.onboardingStepCount)
+        let maxDisplaySteps = max(1, totalSteps - 1)
         let step = min(max(appState.onboardingStepIndex, 0), totalSteps - 1)
-        let rawProgress = CGFloat(max(1, step)) / 7.0
+        let rawProgress = CGFloat(max(1, step)) / CGFloat(maxDisplaySteps)
         let progressFraction = rawProgress.isFinite ? min(max(rawProgress, 0), 1) : 0
 
         return VStack(spacing: .zero) {
-            // Top Header Bar ONLY on Steps 1..7 (`1/7` to `7/7`) — Step 0 (`OB_01`) has no generic header!
+            // Top Header Bar ONLY on Steps 1..9 (`1/9` to `9/9`) — Step 0 (`OB_01`) has no generic header!
             if step > 0 {
                 HStack(spacing: PrismSpacing.m) {
                     Button {
@@ -20497,7 +20858,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
                     }
                     .frame(height: FigMetrics.ten)
 
-                    Text(verbatim: "\(step)/7")
+                    Text(verbatim: "\(step)/\(maxDisplaySteps)")
                         .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#64748b"))
                         .fixedSize(horizontal: true, vertical: false)
@@ -20517,37 +20878,92 @@ public struct CertiGoNativeOnboardingFlowView: View {
             .scrollDismissesKeyboard(.interactively)
             .background(PrismColor.figmaHex("#f8fafc"))
 
-            // Single Primary Blue 3D CTA Button on Steps 2..6 (Steps 0, 1, and 7 have their own dedicated CTAs inside their views — zero duplicate buttons!)
-            if step >= 2 && step <= 6 {
-                VStack(spacing: .zero) {
-                    Button {
-                        withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                            appState.advanceOnboardingStep()
-                        }
-                    } label: {
-                        Text(verbatim: onboardingPrimaryButtonTitle(for: step))
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
-                            .foregroundStyle(PrismColor.onAccent)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: FigMetrics.fiftyTwo)
-                    }
-                    .buttonStyle(
-                        CertiGoTactile3DButtonStyle(
-                            faceHex: "#1d4ed8",
-                            lipHex: "#1e40af",
-                            cornerRadius: PrismRadius.l
-                        )
-                    )
-                    .accessibilityIdentifier("onboarding-footer-continue")
-                }
-                .padding(PrismSpacing.l)
-                .background(PrismColor.surface)
+            // Pinned Bottom CTA Bar on Steps 2..8 (Steps 0, 1, and 9 have their own dedicated CTAs inside their views)
+            if step >= 2 && step <= 8 {
+                onboardingFooterBar(for: step)
             }
         }
         .fontDesign(.rounded)
         .sheet(item: $appState.activeAuthProviderSheet) { provider in
             CertiGoNativeAuthFlowSheetView(appState: $appState, provider: provider)
                 .presentationDetents([.medium, .large])
+        }
+    }
+
+    @ViewBuilder
+    private func onboardingFooterBar(for step: Int) -> some View {
+        if step == 7 {
+            VStack(spacing: PrismSpacing.s) {
+                Button {
+                    let selectedTime = appState.onboardingReminderTimeText
+                    let activeRoute = appState.activeRouteCode
+                    let dailyMins = appState.onboardingDailyRhythmMinutes
+                    Task { @MainActor in
+                        _ = await CertiGoDailyNotificationScheduler.shared.requestAuthorizationAndScheduleDailyReminder(
+                            timeText: selectedTime,
+                            routeCode: activeRoute,
+                            dailyMinutes: dailyMins
+                        )
+                        withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                            appState.activateDailyReminderAndAdvance()
+                        }
+                    }
+                } label: {
+                    Text(verbatim: "Activer mon rappel quotidien")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.onAccent)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: FigMetrics.fiftyTwo)
+                }
+                .buttonStyle(
+                    CertiGoTactile3DButtonStyle(
+                        faceHex: "#1d4ed8",
+                        lipHex: "#1e40af",
+                        cornerRadius: PrismRadius.l
+                    )
+                )
+                .accessibilityIdentifier("onboarding-activate-daily-reminder")
+
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        appState.skipDailyReminderAndAdvance()
+                    }
+                } label: {
+                    Text(verbatim: "Plus tard")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                        .padding(.vertical, PrismSpacing.xxs)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("onboarding-skip-daily-reminder")
+            }
+            .padding(PrismSpacing.l)
+            .background(PrismColor.surface)
+        } else {
+            VStack(spacing: .zero) {
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        appState.advanceOnboardingStep()
+                    }
+                } label: {
+                    Text(verbatim: onboardingPrimaryButtonTitle(for: step))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.onAccent)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: FigMetrics.fiftyTwo)
+                }
+                .buttonStyle(
+                    CertiGoTactile3DButtonStyle(
+                        faceHex: "#1d4ed8",
+                        lipHex: "#1e40af",
+                        cornerRadius: PrismRadius.l
+                    )
+                )
+                .accessibilityIdentifier("onboarding-footer-continue")
+            }
+            .padding(PrismSpacing.l)
+            .background(PrismColor.surface)
         }
     }
 
@@ -20568,7 +20984,11 @@ public struct CertiGoNativeOnboardingFlowView: View {
         case 5:
             return "CONTINUER →"
         case 6:
-            return "ACTIVER MON RAPPEL →"
+            return "CONTINUER (\(appState.onboardingDailyRhythmMinutes) MIN / JOUR) →"
+        case 7:
+            return "Activer mon rappel quotidien"
+        case 8:
+            return "Super, j'ai compris →"
         default:
             return "CONTINUER →"
         }
@@ -20590,9 +21010,13 @@ public struct CertiGoNativeOnboardingFlowView: View {
         case 5:
             onboardingStep5ExperienceAndDeadlineView
         case 6:
-            onboardingStep6RhythmReminderAndWidgetView
+            CertiGoOnboardingDailyRhythmStepView(appState: $appState)
+        case 7:
+            CertiGoOnboardingTrainingMomentStepView(appState: $appState)
+        case 8:
+            CertiGoOnboardingWidgetStepView(appState: $appState)
         default:
-            onboardingStep7ComparativePlanFinalView
+            CertiGoOnboardingSpeedComparisonFinalStepView(appState: $appState)
         }
     }
 
@@ -20696,7 +21120,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
                     .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
             )
 
-            // 2 Bottom 3D Buttons (`CRÉER MON COMPTE · C'EST PARTI !` + `J'AI DÉJÀ UN COMPTE · SE CONNECTER`)
+            // Single Primary 3D CTA Button (`CRÉER MON COMPTE · C'EST PARTI !`) + Discrete Text Link (`J'ai déjà un compte · Se connecter`)
             VStack(spacing: PrismSpacing.m) {
                 Button {
                     withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
@@ -20724,21 +21148,13 @@ public struct CertiGoNativeOnboardingFlowView: View {
                         appState.isPresentingSignInPortalSheet = true
                     }
                 } label: {
-                    Text(verbatim: "J'AI DÉJÀ UN COMPTE · SE CONNECTER")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                    Text(verbatim: "J'ai déjà un compte · Se connecter")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
+                        .padding(.vertical, PrismSpacing.xs)
                         .frame(maxWidth: .infinity)
-                        .frame(height: FigMetrics.fortyEight)
                 }
-                .buttonStyle(
-                    CertiGoTactile3DButtonStyle(
-                        faceHex: "#ffffff",
-                        lipHex: "#cbd5e1",
-                        strokeHex: "#cbd5e1",
-                        cornerRadius: PrismRadius.l,
-                        lipDepth: FigMetrics.four
-                    )
-                )
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("onboarding-step0-existing-account")
             }
         }
@@ -20757,9 +21173,10 @@ public struct CertiGoNativeOnboardingFlowView: View {
         appState.isPresentingSignInPortalSheet = false
         appState.authOriginIsExistingAccountButton = fromExistingAccountButton
 
-        if provider == .email {
+        // Google and Email open a dedicated direct native sheet (never a Microsoft CIAM popup).
+        if provider == .email || provider == .google {
             appState.openInteractiveAuthSheet(
-                for: .email,
+                for: provider,
                 fromExistingAccountButton: fromExistingAccountButton
             )
             return
@@ -21473,308 +21890,199 @@ public struct CertiGoNativeOnboardingFlowView: View {
         }
     }
 
-    // Step 6 (`6/7`): Daily Rhythm + Implementation Intention ("Si – Alors") Routine Anchor + Smart Reminder
-    private var onboardingStep6RhythmReminderAndWidgetView: some View {
-        let rhythms: [(minutes: Int, title: String, subtitle: String)] = [
-            (5, "5 min / jour", "Régulier · 1 étape / jour"),
-            (10, "10 min / jour", "Recommandé · Progression ×3"),
-            (20, "20 min / jour", "Intensif · Sprint rapide")
-        ]
-        let times = ["19:30", "08:30", "12:30", "21:00"]
-        let twoCols = [
-            GridItem(.flexible(), spacing: PrismSpacing.s),
-            GridItem(.flexible(), spacing: PrismSpacing.s)
-        ]
+}
 
-        return VStack(alignment: .leading, spacing: PrismSpacing.m) {
-            Text(verbatim: "Fixe ton rythme quotidien")
-                .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
-                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-            Text(verbatim: "5 à 10 minutes par jour suffisent pour avancer sur tes certifs et suivre les nouveautés IA.")
-                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                .foregroundStyle(PrismColor.figmaHex("#475569"))
+// MARK: - 8B. Decoupled Onboarding Screens (Step 6 Daily Goal, Step 7 Training Moment + iOS Notification, Step 8 iOS Widget Guide, Step 9 3.4x Speed Comparison)
 
-            ForEach(rhythms, id: \.minutes) { item in
-                let isSelected = appState.onboardingDailyRhythmMinutes == item.minutes
-                Button {
-                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                        appState.onboardingDailyRhythmMinutes = item.minutes
-                    }
-                } label: {
-                    HStack {
-                        Text(verbatim: item.title)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                        Spacer()
-                        Text(verbatim: item.subtitle)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
-                            .foregroundStyle(PrismColor.figmaHex(isSelected ? "#1d4ed8" : "#64748b"))
-                    }
-                    .padding(PrismSpacing.m)
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(
-                    CertiGoTactile3DButtonStyle(
-                        faceHex: isSelected ? "#eff6ff" : "#ffffff",
-                        lipHex: isSelected ? "#1d4ed8" : "#cbd5e1",
-                        strokeHex: isSelected ? "#1d4ed8" : "#e2e8f0",
-                        cornerRadius: PrismRadius.l,
-                        lipDepth: FigMetrics.three
-                    )
-                )
+/// Écran Rythme 1 (Step 6/9) — « Choisis ton objectif quotidien » (1 seule décision par écran : 4 grandes cartes aérées et lisibles).
+public struct CertiGoOnboardingDailyRhythmStepView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Binding public var appState: CertiGoNativeAppState
+
+    public init(appState: Binding<CertiGoNativeAppState>) {
+        self._appState = appState
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.l) {
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                Text(verbatim: "Choisis ton objectif quotidien")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+
+                Text(verbatim: "Quelques minutes régulières suffisent pour ancrer chaque concept durablement.")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    .lineSpacing(FigMetrics.three)
             }
 
-            // Recommendation 1: Implementation Intention ("Plan Si – Alors") 2×2 Routine Anchor Grid
-            VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                Text(verbatim: "⚓ ANCRE TA ROUTINE (« PLAN SI – ALORS »)")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#065f46"))
-
-                LazyVGrid(columns: twoCols, spacing: PrismSpacing.s) {
-                    ForEach(0..<CertiGoNativeAppState.onboardingRoutineAnchors.count, id: \.self) { idx in
-                        let anchor = CertiGoNativeAppState.onboardingRoutineAnchors[idx]
-                        let isSelected = appState.onboardingRoutineAnchorIndex == idx
-                        Button {
-                            withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                                appState.onboardingRoutineAnchorIndex = idx
-                                appState.onboardingReminderTimeText = anchor.defaultTime
-                            }
-                        } label: {
-                            HStack(spacing: PrismSpacing.xs) {
-                                Text(verbatim: anchor.icon)
-                                    .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Regular"))
-                                Text(verbatim: anchor.title)
-                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                                Spacer(minLength: .zero)
-                            }
-                            .padding(PrismSpacing.s)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                                    .fill(isSelected ? PrismColor.figmaHex("#ecfdf5") : PrismColor.figmaHex("#f8fafc"))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                                    .strokeBorder(
-                                        isSelected ? PrismColor.figmaHex("#10b981") : PrismColor.figmaHex("#e2e8f0"),
-                                        lineWidth: PrismBorder.standard
-                                    )
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("onboarding-routine-anchor-\(idx)")
-                    }
-                }
-
-                Text(verbatim: "💬 « \(appState.onboardingIfThenCommitmentText) »")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#065f46"))
-                    .padding(PrismSpacing.s)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                            .fill(PrismColor.figmaHex("#ecfdf5"))
-                    )
-                    .accessibilityIdentifier("onboarding-if-then-commitment-text")
-            }
-            .padding(PrismSpacing.m)
-            .background(
-                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                    .fill(PrismColor.surface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                    .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
-            )
-
-            // Smart Daily Reminder Card (`19:30`) + iOS Notification Preview
-            VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                Text(verbatim: "🔔  RAPPEL INTELLIGENT QUOTIDIEN")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
-
-                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                    HStack {
-                        Text(verbatim: "CertiGo · Rappel & Radar IA 🔥")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                        Spacer()
-                        Text(verbatim: appState.onboardingReminderTimeText)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                    }
-                    Text(verbatim: "Ton défi \(appState.activeRouteCode) (5 min) et le nouveau cours sur Claude & Foundry sont prêts !")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
-                        .foregroundStyle(PrismColor.figmaHex("#475569"))
-                }
-                .padding(PrismSpacing.m)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                        .fill(PrismColor.figmaHex("#f8fafc"))
-                )
-
-                HStack(spacing: PrismSpacing.xs) {
-                    ForEach(times, id: \.self) { t in
-                        let isChosen = appState.onboardingReminderTimeText == t
-                        Button {
-                            appState.onboardingReminderTimeText = t
-                        } label: {
-                            Text(verbatim: t)
-                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                                .foregroundStyle(isChosen ? PrismColor.onAccent : PrismColor.figmaHex("#334155"))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, PrismSpacing.xs)
-                                .background(
-                                    RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
-                                        .fill(PrismColor.figmaHex(isChosen ? "#1d4ed8" : "#f1f5f9"))
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
+            VStack(spacing: PrismSpacing.m) {
+                ForEach(CertiGoNativeAppState.onboardingDailyRhythmOptions, id: \.minutes) { option in
+                    rhythmOptionCard(option)
                 }
             }
-            .padding(PrismSpacing.m)
-            .background(
-                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                    .fill(PrismColor.surface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                    .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
-            )
         }
     }
 
-    // Step 7 (`7/7` — Finale): Ton plan sur-mesure (Courbe `3,4× plus rapide`) + Final CTA `🚀 DÉMARRER MON PARCOURS (+50 💎) →`
-    private var onboardingStep7ComparativePlanFinalView: some View {
-        let activeTracksSummary = appState.deduplicatedParallelTrackCodes().joined(separator: " · ")
+    private func rhythmOptionCard(
+        _ option: (minutes: Int, title: String, subtitle: String, subBadge: String?, isRecommended: Bool)
+    ) -> some View {
+        let isSelected = appState.onboardingDailyRhythmMinutes == option.minutes
 
-        return VStack(spacing: PrismSpacing.l) {
-            VStack(spacing: PrismSpacing.s) {
-                Text(verbatim: "3,4× plus rapide\navec la méthode CertiGo.")
+        return Button {
+            withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                appState.selectOnboardingDailyRhythm(option.minutes)
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                HStack(alignment: .center, spacing: PrismSpacing.m) {
+                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                        Text(verbatim: option.title)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+
+                        Text(verbatim: option.subtitle)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                            .foregroundStyle(
+                                PrismColor.figmaHex(option.isRecommended || isSelected ? "#1d4ed8" : "#64748b")
+                            )
+                    }
+
+                    Spacer()
+
+                    ZStack {
+                        Circle()
+                            .fill(PrismColor.figmaHex(isSelected ? "#1d4ed8" : "#f1f5f9"))
+                            .frame(width: FigMetrics.thirtyTwo, height: FigMetrics.thirtyTwo)
+                        if isSelected {
+                            Text(verbatim: "✓")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                                .foregroundStyle(PrismColor.onAccent)
+                        }
+                    }
+                }
+
+                if let subBadge = option.subBadge {
+                    HStack(spacing: PrismSpacing.xs) {
+                        Text(verbatim: "✦")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#059669"))
+                        Text(verbatim: subBadge)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#065f46"))
+                    }
+                    .padding(.horizontal, PrismSpacing.m)
+                    .padding(.vertical, PrismSpacing.xs)
+                    .background(
+                        Capsule()
+                            .fill(PrismColor.figmaHex("#ecfdf5"))
+                    )
+                }
+            }
+            .padding(PrismSpacing.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(
+            CertiGoTactile3DButtonStyle(
+                faceHex: isSelected ? "#eff6ff" : "#ffffff",
+                lipHex: isSelected ? "#1d4ed8" : "#cbd5e1",
+                strokeHex: isSelected ? "#1d4ed8" : "#e2e8f0",
+                cornerRadius: PrismRadius.xl,
+                lipDepth: FigMetrics.four
+            )
+        )
+        .accessibilityIdentifier("onboarding-rhythm-\(option.minutes)min")
+    }
+}
+
+/// Écran Rythme 2 (Step 7/9) — « Quand veux-tu t'entraîner ? » (Moment de la journée + Heure modifiable simplement).
+public struct CertiGoOnboardingTrainingMomentStepView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Binding public var appState: CertiGoNativeAppState
+
+    public init(appState: Binding<CertiGoNativeAppState>) {
+        self._appState = appState
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.l) {
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                Text(verbatim: "Quand veux-tu t'entraîner ?")
                     .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                    .multilineTextAlignment(.center)
 
-                Text(verbatim: "Prêt pour l'examen · Veille IA en continu")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
+                Text(verbatim: "Associe ta session quotidienne à un moment clé de ta journée pour créer un réflexe naturel.")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
                     .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    .lineSpacing(FigMetrics.three)
             }
-            .frame(maxWidth: .infinity)
 
-            // True Visual Comparative Chart (`Path` + `LinearGradient`) matching Figma `130:540`
-            VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            VStack(spacing: PrismSpacing.m) {
+                ForEach(0..<CertiGoNativeAppState.onboardingRoutineAnchors.count, id: \.self) { idx in
+                    momentAnchorCard(index: idx)
+                }
+            }
+
+            // Simple, clean time adjuster card
+            VStack(alignment: .leading, spacing: PrismSpacing.s) {
                 HStack {
-                    Text(verbatim: "MAÎTRISE DES CERTIFICATIONS & DE L'IA")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                    Text(verbatim: "🔔 Heure de ton rappel quotidien")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#475569"))
                     Spacer()
-                    Text(verbatim: "✦ Avec CertiGo (810+)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                    Text(verbatim: "\(appState.onboardingDailyRhythmMinutes) min / jour")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
                 }
 
-                GeometryReader { geo in
-                    let w = geo.size.width.isFinite ? max(220, geo.size.width) : 280
-                    let h: CGFloat = 156
-
-                    ZStack(alignment: .topTrailing) {
-                        // Horizontal reference grid lines
-                        VStack(spacing: .zero) {
-                            Divider()
-                            Spacer()
-                            Divider()
-                            Spacer()
-                            Divider()
+                HStack(spacing: PrismSpacing.m) {
+                    Button {
+                        withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                            appState.adjustOnboardingReminderTime(byMinutes: -30)
                         }
-                        .frame(width: w, height: h)
-
-                        // Blue area gradient under the CertiGo curve
-                        Path { path in
-                            path.move(to: CGPoint(x: 8, y: h - 18))
-                            path.addCurve(
-                                to: CGPoint(x: w - 18, y: 24),
-                                control1: CGPoint(x: w * 0.36, y: h - 26),
-                                control2: CGPoint(x: w * 0.62, y: 34)
+                    } label: {
+                        Text(verbatim: "− 30 min")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#334155"))
+                            .padding(.horizontal, PrismSpacing.m)
+                            .frame(height: FigMetrics.fortyFour)
+                            .background(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .fill(PrismColor.figmaHex("#f1f5f9"))
                             )
-                            path.addLine(to: CGPoint(x: w - 18, y: h - 14))
-                            path.addLine(to: CGPoint(x: 8, y: h - 14))
-                            path.closeSubpath()
-                        }
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    PrismColor.figmaHex("#3b82f6:35"),
-                                    PrismColor.figmaHex("#3b82f6:04")
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-
-                        // Low dashed red curve (`Sans CertiGo (Seul / PDF)`)
-                        Path { path in
-                            path.move(to: CGPoint(x: 8, y: h - 18))
-                            path.addQuadCurve(
-                                to: CGPoint(x: w - 18, y: h - 46),
-                                control: CGPoint(x: w * 0.5, y: h - 22)
-                            )
-                        }
-                        .stroke(
-                            PrismColor.figmaHex("#ef4444"),
-                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: [5, 5])
-                        )
-
-                        // Rising blue curve (`✦ Avec CertiGo (810+)`)
-                        Path { path in
-                            path.move(to: CGPoint(x: 8, y: h - 18))
-                            path.addCurve(
-                                to: CGPoint(x: w - 18, y: 24),
-                                control1: CGPoint(x: w * 0.36, y: h - 26),
-                                control2: CGPoint(x: w * 0.62, y: 34)
-                            )
-                        }
-                        .stroke(
-                            PrismColor.figmaHex("#1d4ed8"),
-                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                        )
-
-                        CertiGoMascotView(pose: .celebratingTrophy, size: FigMetrics.fortyEight)
-                            .offset(x: -FigMetrics.four, y: -FigMetrics.six)
                     }
-                }
-                .frame(height: FigMetrics.oneHundredFiftySix)
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("onboarding-reminder-time-minus")
 
-                HStack {
-                    Text(verbatim: "Sans CertiGo (Seul / PDF)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Medium"))
-                        .foregroundStyle(PrismColor.figmaHex("#ef4444"))
-                    Spacer()
-                }
+                    Text(verbatim: appState.onboardingReminderTimeText)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: FigMetrics.fortyFour)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                .fill(PrismColor.figmaHex("#eff6ff"))
+                        )
+                        .accessibilityIdentifier("onboarding-reminder-time-value")
 
-                HStack {
-                    Text(verbatim: "Aujourd'hui")
-                    Spacer()
-                    Text(verbatim: "Semaine 3")
-                    Spacer()
-                    Text(verbatim: "Objectif ✓")
+                    Button {
+                        withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                            appState.adjustOnboardingReminderTime(byMinutes: 30)
+                        }
+                    } label: {
+                        Text(verbatim: "+ 30 min")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#334155"))
+                            .padding(.horizontal, PrismSpacing.m)
+                            .frame(height: FigMetrics.fortyFour)
+                            .background(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .fill(PrismColor.figmaHex("#f1f5f9"))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("onboarding-reminder-time-plus")
                 }
-                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
-                .foregroundStyle(PrismColor.figmaHex("#64748b"))
-
-                Text(verbatim: "Parcours actifs : \(activeTracksSummary)")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
-                    .padding(.horizontal, PrismSpacing.m)
-                    .padding(.vertical, PrismSpacing.xs)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                            .fill(PrismColor.figmaHex("#eff6ff"))
-                    )
             }
             .padding(PrismSpacing.l)
             .background(
@@ -21785,8 +22093,445 @@ public struct CertiGoNativeOnboardingFlowView: View {
                 RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
                     .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
             )
+        }
+    }
 
-            // Final Primary CTA Button (`🚀 DÉMARRER MON PARCOURS (+50 💎) →`)
+    private func momentAnchorCard(index idx: Int) -> some View {
+        let anchor = CertiGoNativeAppState.onboardingRoutineAnchors[idx]
+        let isSelected = appState.onboardingRoutineAnchorIndex == idx
+
+        return Button {
+            withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                appState.selectOnboardingRoutineAnchor(idx)
+            }
+        } label: {
+            HStack(spacing: PrismSpacing.m) {
+                Text(verbatim: anchor.icon)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Regular"))
+                    .frame(width: FigMetrics.fortyEight, height: FigMetrics.fortyEight)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                            .fill(PrismColor.figmaHex(isSelected ? "#dbeafe" : "#f1f5f9"))
+                    )
+
+                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                    Text(verbatim: anchor.title)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                        .multilineTextAlignment(.leading)
+
+                    Text(verbatim: "Rappel suggéré · \(anchor.defaultTime)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
+                        .foregroundStyle(PrismColor.figmaHex(isSelected ? "#1d4ed8" : "#64748b"))
+                }
+
+                Spacer()
+
+                Text(verbatim: isSelected ? appState.onboardingReminderTimeText : anchor.defaultTime)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                    .foregroundStyle(isSelected ? PrismColor.onAccent : PrismColor.figmaHex("#475569"))
+                    .padding(.horizontal, PrismSpacing.m)
+                    .padding(.vertical, PrismSpacing.xs)
+                    .background(
+                        Capsule()
+                            .fill(PrismColor.figmaHex(isSelected ? "#1d4ed8" : "#f1f5f9"))
+                    )
+            }
+            .padding(PrismSpacing.m)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(
+            CertiGoTactile3DButtonStyle(
+                faceHex: isSelected ? "#eff6ff" : "#ffffff",
+                lipHex: isSelected ? "#1d4ed8" : "#cbd5e1",
+                strokeHex: isSelected ? "#1d4ed8" : "#e2e8f0",
+                cornerRadius: PrismRadius.xl,
+                lipDepth: FigMetrics.four
+            )
+        )
+        .accessibilityIdentifier("onboarding-routine-anchor-\(idx)")
+    }
+}
+
+/// Nouvel écran d'onboarding dédié aux Widgets iOS CertiGo (Step 8/9) — « Garde ta série sous les yeux avec le Widget CertiGo ».
+public struct CertiGoOnboardingWidgetStepView: View {
+    @Binding public var appState: CertiGoNativeAppState
+
+    public init(appState: Binding<CertiGoNativeAppState>) {
+        self._appState = appState
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.l) {
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                Text(verbatim: "Garde ta série sous les yeux avec le Widget CertiGo")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+
+                Text(verbatim: "Visualise ta série 🔥 et lance ton sprint quotidien en un geste depuis ton écran d'accueil iPhone.")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    .lineSpacing(FigMetrics.three)
+            }
+
+            // Realistic iPhone Home Screen Widget Mockup (visual preview only — single primary CTA stays in the footer per C1)
+            widgetHomeScreenPreviewCard
+
+            // 3-step visual installation guide
+            VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                Text(verbatim: "COMMENT L'AJOUTER EN 3 ÉTAPES")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
+
+                ForEach(CertiGoNativeAppState.onboardingWidgetInstallSteps, id: \.number) { step in
+                    widgetInstallStepRow(step)
+                }
+            }
+            .padding(PrismSpacing.l)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                    .fill(PrismColor.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                    .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+            )
+        }
+    }
+
+    private var widgetHomeScreenPreviewCard: some View {
+        let activeRoute = appState.activeRouteCode.isEmpty ? "AZ-104" : appState.activeRouteCode
+        let dailyMinutes = appState.onboardingDailyRhythmMinutes
+
+        return VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            HStack {
+                HStack(spacing: PrismSpacing.xs) {
+                    Text(verbatim: "🔥")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
+                    Text(verbatim: "Série active · Jour 1")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#ea580c"))
+                }
+                .padding(.horizontal, PrismSpacing.m)
+                .padding(.vertical, PrismSpacing.xxs)
+                .background(
+                    Capsule()
+                        .fill(PrismColor.figmaHex("#ffedd5"))
+                )
+
+                Spacer()
+
+                Text(verbatim: "APERÇU WIDGET iOS")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
+            }
+
+            HStack(spacing: PrismSpacing.m) {
+                CertiGoMascotView(pose: .emotionOnFire, size: FigMetrics.sixtyFour)
+
+                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                    Text(verbatim: "\(activeRoute) · Objectif \(dailyMinutes) min")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+
+                    Text(verbatim: "20 % acquis (2/10 jalons) · Prêt pour ton sprint")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
+                        .foregroundStyle(PrismColor.figmaHex("#475569"))
+
+                    // Progress gauge bar
+                    GeometryReader { geo in
+                        let ratio: CGFloat = 0.45
+                        let barWidth = geo.size.width.isFinite ? max(FigMetrics.twentyFour, geo.size.width * ratio) : FigMetrics.sixty
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: PrismRadius.pill, style: .continuous)
+                                .fill(PrismColor.figmaHex("#e2e8f0"))
+                            RoundedRectangle(cornerRadius: PrismRadius.pill, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            PrismColor.figmaHex("#1d4ed8"),
+                                            PrismColor.figmaHex("#10b981")
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: barWidth)
+                        }
+                    }
+                    .frame(height: FigMetrics.eight)
+                }
+            }
+
+            HStack(spacing: PrismSpacing.xs) {
+                Text(verbatim: "▶ Accès rapide au sprint (\(dailyMinutes) min)")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: FigMetrics.thirtySix)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                    .fill(PrismColor.figmaHex("#eff6ff"))
+            )
+            .accessibilityIdentifier("onboarding-widget-preview-sprint-badge")
+        }
+        .padding(PrismSpacing.l)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                .fill(PrismColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#bfdbfe"), lineWidth: PrismBorder.standard)
+        )
+    }
+
+    private func widgetInstallStepRow(
+        _ step: (number: Int, title: String, detail: String)
+    ) -> some View {
+        HStack(alignment: .top, spacing: PrismSpacing.m) {
+            Text(verbatim: "\(step.number)")
+                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                .foregroundStyle(PrismColor.onAccent)
+                .frame(width: FigMetrics.twentyEight, height: FigMetrics.twentyEight)
+                .background(
+                    Circle()
+                        .fill(PrismColor.figmaHex("#1d4ed8"))
+                )
+
+            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                Text(verbatim: step.title)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                Text(verbatim: step.detail)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    .lineSpacing(FigMetrics.two)
+            }
+
+            Spacer(minLength: .zero)
+        }
+    }
+}
+
+/// Refonte esthétique et pédagogique de l'écran « 3,4× plus rapide avec CertiGo » (Step 9/9) + Progression Dotée E1 (2 jalons sur 10 = 20 % d'avance offerte).
+public struct CertiGoOnboardingSpeedComparisonFinalStepView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Binding public var appState: CertiGoNativeAppState
+
+    public init(appState: Binding<CertiGoNativeAppState>) {
+        self._appState = appState
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.l) {
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                Text(verbatim: "3,4× plus rapide avec CertiGo")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+
+                Text(verbatim: "Comprends en un coup d'œil pourquoi tes sprints quotidiens remplacent des semaines de lecture passive.")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    .lineSpacing(FigMetrics.three)
+            }
+
+            // High-contrast 2-second comparative visual card (~11 weeks 29% vs 3 weeks 100% ⚡ 3,4×)
+            comparativeBarsCard
+
+            // 3 ultra-readable explanation cards (🎯, 🧠, 🏆)
+            VStack(spacing: PrismSpacing.s) {
+                ForEach(0..<CertiGoNativeAppState.onboardingSpeedPillars.count, id: \.self) { idx in
+                    speedPillarCard(CertiGoNativeAppState.onboardingSpeedPillars[idx])
+                }
+            }
+
+            // E1 (Nunes & Drèze Endowed Progress): 2 jalons sur 10 (20 % d'avance offerte) sur le premier chapitre
+            endowedProgressMilestoneCard
+
+            // C1: Single Primary 3D CTA Button + optional lightweight text link if not yet signed in
+            finalCTASection
+        }
+    }
+
+    private var endowedProgressCardTitle: String {
+        let route = appState.activeRouteCode.isEmpty ? "AZ-104" : appState.activeRouteCode
+        return "Chapitre 1 (\(route)) · 2 jalons sur 10 validés"
+    }
+
+    private var endowedProgressMilestoneCard: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+            HStack {
+                Text(verbatim: endowedProgressCardTitle)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#065f46"))
+                Spacer()
+                Text(verbatim: "20 % d'avance offerte")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(PrismColor.onAccent)
+                    .padding(.horizontal, PrismSpacing.s)
+                    .padding(.vertical, PrismSpacing.xxs)
+                    .background(
+                        Capsule()
+                            .fill(PrismColor.figmaHex("#059669"))
+                    )
+            }
+
+            // 10-segment milestone bar: 2/10 unlocked in Emerald Green
+            HStack(spacing: PrismSpacing.xxs) {
+                ForEach(0..<CertiGoNativeAppState.onboardingEndowedMilestonesTotal, id: \.self) { idx in
+                    let isCredited = idx < CertiGoNativeAppState.onboardingEndowedMilestonesCompleted
+                    RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
+                        .fill(PrismColor.figmaHex(isCredited ? "#10b981" : "#cbd5e1"))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: FigMetrics.ten)
+                }
+            }
+
+            Text(verbatim: CertiGoNativeAppState.onboardingEndowedProgressBannerText)
+                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
+                .foregroundStyle(PrismColor.figmaHex("#065f46"))
+        }
+        .padding(PrismSpacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .fill(PrismColor.figmaHex("#ecfdf5"))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#10b981"), lineWidth: PrismBorder.standard)
+        )
+        .accessibilityIdentifier("onboarding-endowed-progress-2of10-card")
+    }
+
+    private var comparativeBarsCard: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.l) {
+            // Row 1: Révision seule (cours longs & PDF) — ~11 semaines • mémorisation passive (29 %)
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                HStack {
+                    Text(verbatim: "Révision seule (cours longs & PDF)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    Spacer()
+                    Text(verbatim: "~11 semaines")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                }
+
+                GeometryReader { geo in
+                    let passiveRatio: CGFloat = 0.29
+                    let barWidth = geo.size.width.isFinite ? max(FigMetrics.forty, geo.size.width * passiveRatio) : FigMetrics.eighty
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                            .fill(PrismColor.figmaHex("#f1f5f9"))
+                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                            .fill(PrismColor.figmaHex("#94a3b8"))
+                            .frame(width: barWidth)
+                    }
+                }
+                .frame(height: FigMetrics.sixteen)
+
+                Text(verbatim: "29 % d'ancrage • mémorisation passive")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Medium"))
+                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
+            }
+
+            Divider()
+
+            // Row 2: Avec CertiGo (sprints actifs & mémoire espacée) — 3 semaines · 3,4× plus rapide (100 % + ⚡ 3,4×)
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                HStack(alignment: .center, spacing: PrismSpacing.xs) {
+                    Text(verbatim: "Avec CertiGo (sprints actifs & mémoire espacée)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                        .lineLimit(1)
+                    Spacer()
+                    Text(verbatim: "⚡ 3,4×")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                        .foregroundStyle(PrismColor.onAccent)
+                        .padding(.horizontal, PrismSpacing.s)
+                        .padding(.vertical, PrismSpacing.xxs)
+                        .background(
+                            Capsule()
+                                .fill(PrismColor.figmaHex("#059669"))
+                        )
+                }
+
+                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                PrismColor.figmaHex("#1d4ed8"),
+                                PrismColor.figmaHex("#10b981")
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(height: FigMetrics.twenty)
+
+                HStack {
+                    Text(verbatim: "3 semaines · 3,4× plus rapide")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
+                    Spacer()
+                    Text(verbatim: "100 % prêt")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#059669"))
+                }
+            }
+        }
+        .padding(PrismSpacing.l)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                .fill(PrismColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#bfdbfe"), lineWidth: PrismBorder.standard)
+        )
+    }
+
+    private func speedPillarCard(
+        _ pillar: (icon: String, title: String, detail: String)
+    ) -> some View {
+        HStack(alignment: .top, spacing: PrismSpacing.m) {
+            Text(verbatim: pillar.icon)
+                .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Regular"))
+                .frame(width: FigMetrics.fortyFour, height: FigMetrics.fortyFour)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                        .fill(PrismColor.figmaHex("#eff6ff"))
+                )
+
+            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                Text(verbatim: pillar.title)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                Text(verbatim: pillar.detail)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    .lineSpacing(FigMetrics.two)
+            }
+
+            Spacer(minLength: .zero)
+        }
+        .padding(PrismSpacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .fill(PrismColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+        )
+    }
+
+    private var finalCTASection: some View {
+        VStack(spacing: PrismSpacing.m) {
             Button {
                 withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
                     appState.completeOnboardingFlow(awardWelcomeBonus: true, startGuidedTour: true)
@@ -21807,6 +22552,22 @@ public struct CertiGoNativeOnboardingFlowView: View {
                 )
             )
             .accessibilityIdentifier("onboarding-complete-with-profile-button")
+
+            if !appState.isAccountConnected {
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        appState.isPresentingSignInPortalSheet = true
+                    }
+                } label: {
+                    Text(verbatim: "Sauvegarder mes 20 % acquis avec un compte →")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
+                        .padding(.vertical, PrismSpacing.xxs)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("onboarding-final-save-account-button")
+            }
         }
     }
 }
@@ -21867,13 +22628,17 @@ public struct CertiGoNativeAuthFlowSheetView: View {
                         Text(verbatim: provider.displayName)
                             .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                        Text(verbatim: "Authentification sécurisée CertiGo Cloud")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
-                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                        Text(
+                            verbatim: provider == .google
+                                ? "Connexion directe Google · Sans redirection Microsoft"
+                                : "Authentification directe et sécurisée sur CertiGo"
+                        )
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
+                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
                     }
                 }
 
-                // Editable Account Fields (Prénom & Nom, E-mail, Mot de passe)
+                // Editable Account Fields (Prénom & Nom, E-mail, et Mot de passe uniquement pour e-mail)
                 VStack(alignment: .leading, spacing: PrismSpacing.m) {
                     VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
                         Text(verbatim: "Prénom & Nom")
@@ -21900,7 +22665,7 @@ public struct CertiGoNativeAuthFlowSheetView: View {
                     }
 
                     VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                        Text(verbatim: "Adresse e-mail")
+                        Text(verbatim: provider == .google ? "Adresse Gmail / Google Workspace" : "Adresse e-mail")
                             .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#475569"))
                         TextField(
@@ -21926,28 +22691,30 @@ public struct CertiGoNativeAuthFlowSheetView: View {
                         )
                     }
 
-                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                        Text(verbatim: provider == .apple ? "Validation Face ID / Mot de passe" : "Mot de passe")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#475569"))
-                        SecureField(
-                            text: $appState.authDraftPassword,
-                            prompt: Text(verbatim: "••••••••••••")
-                        ) {
+                    if provider == .email {
+                        VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
                             Text(verbatim: "Mot de passe")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#475569"))
+                            SecureField(
+                                text: $appState.authDraftPassword,
+                                prompt: Text(verbatim: "••••••••••••")
+                            ) {
+                                Text(verbatim: "Mot de passe")
+                            }
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                            .padding(.horizontal, PrismSpacing.m)
+                            .frame(height: FigMetrics.fortyEight)
+                            .background(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .fill(PrismColor.surface)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                    .strokeBorder(PrismColor.figmaHex("#cbd5e1"), lineWidth: PrismBorder.standard)
+                            )
                         }
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
-                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                        .padding(.horizontal, PrismSpacing.m)
-                        .frame(height: FigMetrics.fortyEight)
-                        .background(
-                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                                .fill(PrismColor.surface)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                                .strokeBorder(PrismColor.figmaHex("#cbd5e1"), lineWidth: PrismBorder.standard)
-                        )
                     }
                 }
 
@@ -21979,9 +22746,13 @@ public struct CertiGoNativeAuthFlowSheetView: View {
                             ProgressView()
                                 .tint(PrismColor.onAccent)
                         }
-                        Text(verbatim: appState.isAuthRequestInFlight ? "Connexion en cours..." : "Valider & Continuer")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
-                            .foregroundStyle(PrismColor.onAccent)
+                        Text(
+                            verbatim: appState.isAuthRequestInFlight
+                                ? "Connexion en cours..."
+                                : (provider == .google ? "Continuer avec Google" : "Valider & Continuer")
+                        )
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.onAccent)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: FigMetrics.fiftyTwo)

@@ -22,10 +22,10 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 15)
     }
 
-    @Test("8-step native onboarding flow advances from step 0 to step 7, supports back navigation, and dismisses cleanly on completion or close")
+    @Test("10-step native onboarding flow advances from step 0 to step 9 (split rhythm, iOS widget guide, 3.4x speed comparison), supports back navigation, and dismisses cleanly on completion or close")
     func onboardingEightStepNavigationAndDismissal() {
         var appState = CertiGoNativeAppState()
-        #expect(CertiGoNativeAppState.onboardingStepCount == 8)
+        #expect(CertiGoNativeAppState.onboardingStepCount == 10)
 
         appState.startOnboardingFlow()
         #expect(appState.isPresentingOnboardingFlow == true)
@@ -38,11 +38,11 @@ struct CertiGoNativeFigmaAppTests {
         }
 
         appState.goBackOnboardingStep()
-        #expect(appState.onboardingStepIndex == 6)
+        #expect(appState.onboardingStepIndex == 8)
         appState.advanceOnboardingStep()
-        #expect(appState.onboardingStepIndex == 7)
+        #expect(appState.onboardingStepIndex == 9)
 
-        // Advancing from step 7 (8/8) completes and dismisses the onboarding flow
+        // Advancing from step 9 (9/9) completes and dismisses the onboarding flow
         appState.advanceOnboardingStep()
         #expect(appState.isPresentingOnboardingFlow == false)
 
@@ -52,6 +52,94 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.onboardingStepIndex == 1)
         appState.dismissOnboardingFlow()
         #expect(appState.isPresentingOnboardingFlow == false)
+    }
+
+    @Test("TestFlight Build 10: Direct Apple/Google/Email auth without Microsoft CIAM popup, split daily rhythm + notification screens, iOS Widget onboarding step, and 3.4x speed comparison")
+    @MainActor
+    func testFlightBuild10DirectAuthSplitRhythmWidgetStepAndSpeedComparison() async throws {
+        // 1. Direct Apple / Google / Email auth never uses Microsoft CIAM web session
+        #expect(CertiGoNativeSystemOAuthCoordinator.usesMicrosoftCIAMWebSession(for: .apple) == false)
+        #expect(CertiGoNativeSystemOAuthCoordinator.usesMicrosoftCIAMWebSession(for: .google) == false)
+        #expect(CertiGoNativeSystemOAuthCoordinator.usesMicrosoftCIAMWebSession(for: .email) == false)
+        #expect(CertiGoNativeSystemOAuthCoordinator.usesMicrosoftCIAMWebSession(for: .microsoft) == true)
+
+        let suiteName = "CertiGoAuthStoreTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = CertiGoNativeAuthSessionStore(defaults: defaults)
+        let savedApple = CertiGoPersistedAuthSession(
+            userId: "apple-user-001",
+            displayName: "Gabriel Chambaud",
+            email: "gabriel.chambaud@icloud.com",
+            accessToken: "apple.identity.jwt",
+            providerRawValue: CertiGoAuthProviderKind.apple.rawValue
+        )
+        store.saveSession(savedApple)
+        #expect(store.loadSession(for: .apple) == savedApple)
+        store.clearAllSessions()
+        #expect(store.loadSession(for: .apple) == nil)
+
+        // 2. Split Rhythm Screen 1 (Step 6): 4 daily goal options (5, 10, 15, 20 min/day) with 10 min recommended badge
+        let rhythmOptions = CertiGoNativeAppState.onboardingDailyRhythmOptions
+        #expect(rhythmOptions.map(\.minutes) == [5, 10, 15, 20])
+        #expect(rhythmOptions[0].subtitle == "Départ léger (1 micro-sprint)")
+        #expect(rhythmOptions[1].subtitle == "Rythme Certifié ⭐ Recommandé")
+        #expect(rhythmOptions[1].subBadge == "4 sessions de 10 min/semaine suffisent")
+        #expect(rhythmOptions[1].isRecommended == true)
+        #expect(rhythmOptions[2].subtitle == "Progression rapide")
+        #expect(rhythmOptions[3].subtitle == "Préparation intensive")
+
+        // 3. Split Rhythm Screen 2 (Step 7): 4 training moments (08:00, 12:30, 18:00, 20:30), time stepper, and notification scheduler
+        let anchors = CertiGoNativeAppState.onboardingRoutineAnchors
+        #expect(anchors.count == 4)
+        #expect(anchors.map(\.defaultTime) == ["08:00", "12:30", "18:00", "20:30"])
+        var appState = CertiGoNativeAppState()
+        appState.selectOnboardingDailyRhythm(15)
+        #expect(appState.onboardingDailyRhythmMinutes == 15)
+        appState.selectOnboardingRoutineAnchor(2)
+        #expect(appState.onboardingRoutineAnchorIndex == 2)
+        #expect(appState.onboardingReminderTimeText == "18:00")
+        appState.adjustOnboardingReminderTime(byMinutes: 30)
+        #expect(appState.onboardingReminderTimeText == "18:30")
+        appState.adjustOnboardingReminderTime(byMinutes: -60)
+        #expect(appState.onboardingReminderTimeText == "17:30")
+        #expect(CertiGoDailyNotificationScheduler.parseHourAndMinute(from: "20:30") == (20, 30))
+
+        appState.onboardingStepIndex = 7
+        appState.activateDailyReminderAndAdvance()
+        #expect(appState.hasScheduledOnboardingDailyReminder == true)
+        #expect(appState.settingsPushRemindersOn == true)
+        #expect(appState.onboardingStepIndex == 8)
+
+        // 4. Dedicated iOS Widget onboarding screen (Step 8): 3 numbered installation steps
+        let widgetSteps = CertiGoNativeAppState.onboardingWidgetInstallSteps
+        #expect(widgetSteps.map(\.number) == [1, 2, 3])
+        #expect(widgetSteps[0].title == "Appuie longuement")
+        #expect(widgetSteps[1].title.contains("Modifier"))
+        #expect(widgetSteps[2].title.contains("CertiGo"))
+
+        // 5. Redesigned 3.4x speed comparison screen (Step 9): ~11 weeks (29%) vs 3 weeks (100%, ⚡ 3,4×) + 3 explanation cards (🎯, 🧠, 🏆)
+        let bars = CertiGoNativeAppState.onboardingSpeedComparisonBars
+        #expect(bars.count == 2)
+        #expect(bars[0].durationText == "~11 semaines")
+        #expect(bars[0].percentValue == 29)
+        #expect(bars[1].durationText == "3 semaines · 3,4× plus rapide")
+        #expect(bars[1].percentValue == 100)
+        #expect(bars[1].badgeText == "⚡ 3,4×")
+
+        let pillars = CertiGoNativeAppState.onboardingSpeedPillars
+        #expect(pillars.count == 3)
+        #expect(pillars[0].icon == "🎯")
+        #expect(pillars[0].title == "100 % ciblé sur l'examen")
+        #expect(pillars[1].icon == "🧠")
+        #expect(pillars[1].title == "Ancrage actif en 10 min")
+        #expect(pillars[2].icon == "🏆")
+        #expect(pillars[2].title == "Départ déjà lancé (20 % acquis)")
+        #expect(pillars[2].detail.contains("2 jalons sur 10"))
+        #expect(CertiGoNativeAppState.onboardingEndowedMilestonesCompleted == 2)
+        #expect(CertiGoNativeAppState.onboardingEndowedMilestonesTotal == 10)
+        #expect(CertiGoNativeAppState.onboardingEndowedProgressPercent == 20)
+        #expect(CertiGoNativeAppState.onboardingEndowedProgressBannerText.contains("2 jalons sur 10 (20 % d'avance offerte)"))
     }
 
     @Test("deduplicatedParallelTrackCodes preserves order, returns 3 distinct certifications, and resolves distinct profile titles")
