@@ -340,13 +340,13 @@ public enum CertiGoErrorCode: String, Codable, CaseIterable, Identifiable, Senda
     public var technicalDetail: String {
         switch self {
         case .aiModelNotConnected1001:
-            return "Endpoint: AI_FOUNDRY_ENDPOINT=nil · HTTP 503 Service Unavailable (CertigoAI.ChatRouter)"
+            return "Endpoint: AI_FOUNDRY_ENDPOINT=nil · HTTP 503 Service Unavailable (CertiGoAI.ChatRouter)"
         case .voiceLiveNotConnected1002:
-            return "Transport: WSS_REALTIME_VOICE_URL=nil · WebSocket Handshake Aborted (CertigoAI.NovaVoice)"
+            return "Transport: WSS_REALTIME_VOICE_URL=nil · WebSocket Handshake Aborted (CertiGoAI.NovaVoice)"
         case .examReportAIDisconnected1003:
             return "Service: ExamRemediationSynthesizer · Missing Live LLM Credentials (HTTP 503)"
         case .aiInferenceTimeout1004:
-            return "DeadlineExceeded: Streaming token latency > 15,000 ms (CertigoAI.InferenceClient)"
+            return "DeadlineExceeded: Streaming token latency > 15,000 ms (CertiGoAI.InferenceClient)"
         case .backendUnreachableOffline2001:
             return "NSURLErrorNotConnectedToInternet (-1009) · Fallback: LocalOfflineStoreActive"
         case .leagueSyncFailed2002:
@@ -9277,6 +9277,121 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var guidedTourStepIndex: Int = 0
     public var returnTabAfterLessonSession: CertiGoNativeTab? = nil
 
+    //Contextual Mascot Vault & iOS Dynamic App Icon (`CertiGoMascotVault` / `CertiGoDynamicAppIconManager`)
+    public var showMascotVaultSheet: Bool = false
+    public var mascotSelectionMode: CertigoAppIconSelectionMode = .automatic
+    public var mascotManualOutfit: CertiGoMascotOutfit = .happyActive
+    public var mascotPreferredTheme: CertiGoMascotThemeVariant? = nil
+    public var mascotSimulatedOffline: Bool = false
+    public var mascotSimulatedInactive48h: Bool = false
+    public var mascotSimulatedMorning: Bool = false
+    public var mascotSimulatedCoffee: Bool = false
+    public var mascotSimulatedExamMode: Bool = false
+    public var mascotStatusMessage: String = "Synchronisé avec l'icône d'accueil iPhone"
+
+    public var currentMascotContextInput: CertiGoMascotContextInput {
+        var referenceDate = Date()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        if mascotSimulatedMorning {
+            referenceDate = calendar.date(bySettingHour: 7, minute: 45, second: 0, of: referenceDate) ?? referenceDate
+        } else if mascotSimulatedCoffee {
+            referenceDate = calendar.date(bySettingHour: 10, minute: 30, second: 0, of: referenceDate) ?? referenceDate
+        } else {
+            referenceDate = calendar.date(bySettingHour: 15, minute: 0, second: 0, of: referenceDate) ?? referenceDate
+        }
+        let lastActive: Date? = mascotSimulatedInactive48h
+            ? referenceDate.addingTimeInterval(-50.0 * 3600.0)
+            : referenceDate.addingTimeInterval(-2.0 * 3600.0)
+        return CertiGoMascotContextInput(
+            isOfflineOrAirplaneMode: mascotSimulatedOffline,
+            lastActiveDate: lastActive,
+            now: referenceDate,
+            hasCompletedFirstSessionToday: completedStepsTotal > 0 && !mascotSimulatedMorning && !mascotSimulatedCoffee,
+            isQuickSprintMode: mascotSimulatedCoffee,
+            isExamPrepMode: mascotSimulatedExamMode || isPresentingTimedExam23 || showExamLaunchSheet22,
+            streakDays: streakDays,
+            isProMember: isProMember,
+            preferPrestigeWhenPro: mascotPreferredTheme == .prestigeGoldBlack,
+            isDarkSystemAppearance: mascotPreferredTheme == .dark
+        )
+    }
+
+    public var currentMascotPreferences: CertiGoMascotDynamicPreferences {
+        CertiGoMascotDynamicPreferences(
+            selectionMode: mascotSelectionMode,
+            manualOutfit: mascotManualOutfit,
+            preferredTheme: mascotPreferredTheme,
+            preferPrestigeWhenPro: mascotPreferredTheme == .prestigeGoldBlack
+        )
+    }
+
+    public var effectiveMascotOutfit: CertiGoMascotOutfit {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return CertiGoMascotContextEvaluator.recommendedOutfit(
+            for: currentMascotContextInput,
+            preferences: currentMascotPreferences,
+            calendar: calendar
+        )
+    }
+
+    public var effectiveMascotTheme: CertiGoMascotThemeVariant {
+        CertiGoMascotContextEvaluator.resolvedTheme(
+            for: effectiveMascotOutfit,
+            context: currentMascotContextInput,
+            preferences: currentMascotPreferences
+        )
+    }
+
+    public mutating func openMascotVaultSheet() {
+        showMascotVaultSheet = true
+    }
+
+    public mutating func setMascotSelectionMode(_ mode: CertigoAppIconSelectionMode) {
+        mascotSelectionMode = mode
+        let outfit = effectiveMascotOutfit
+        mascotStatusMessage = mode == .automatic
+            ? "Mode automatique actif : \(outfit.displayName) (\(effectiveMascotTheme.shortTitle))"
+            : "Tenue forcée : \(outfit.displayName) (\(effectiveMascotTheme.shortTitle))"
+    }
+
+    public mutating func selectMascotOutfit(_ outfit: CertiGoMascotOutfit) {
+        mascotSelectionMode = .manual
+        mascotManualOutfit = outfit
+        if outfit == .prestigePro {
+            mascotPreferredTheme = .prestigeGoldBlack
+        }
+        mascotStatusMessage = "Icône iPhone & Mascotte : \(outfit.displayName) (\(effectiveMascotTheme.shortTitle))"
+    }
+
+    public mutating func selectMascotTheme(_ theme: CertiGoMascotThemeVariant) {
+        mascotPreferredTheme = theme
+        mascotStatusMessage = "Thème appliqué : \(theme.displayName)"
+    }
+
+    public mutating func toggleMascotSimulationSignal(_ signalId: String) {
+        mascotSelectionMode = .automatic
+        switch signalId {
+        case "airplane":
+            mascotSimulatedOffline.toggle()
+        case "inactive48h":
+            mascotSimulatedInactive48h.toggle()
+        case "morning":
+            mascotSimulatedMorning.toggle()
+            if mascotSimulatedMorning { mascotSimulatedCoffee = false }
+        case "coffee":
+            mascotSimulatedCoffee.toggle()
+            if mascotSimulatedCoffee { mascotSimulatedMorning = false }
+        case "exam":
+            mascotSimulatedExamMode.toggle()
+        default:
+            break
+        }
+        let outfit = effectiveMascotOutfit
+        mascotStatusMessage = "Contexte simulé → \(outfit.displayName) (\(effectiveMascotTheme.shortTitle))"
+    }
+
     public init(
         restoreFromDisk: Bool = false,
         databaseStore: CertiGoLocalDatabaseStore = .shared
@@ -11479,6 +11594,55 @@ public struct CertiGoNativeFigmaAppView: View {
             CertiGoNativeAuthFlowSheetView(appState: $appState, provider: provider)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $appState.showMascotVaultSheet) {
+            CertiGoMascotVaultSheetView(
+                selectedOutfit: appState.effectiveMascotOutfit,
+                selectedTheme: appState.effectiveMascotTheme,
+                selectionMode: appState.mascotSelectionMode,
+                isOfflineSimulated: appState.mascotSimulatedOffline,
+                isInactivitySimulated: appState.mascotSimulatedInactive48h,
+                isMorningSimulated: appState.mascotSimulatedMorning,
+                isCoffeeSimulated: appState.mascotSimulatedCoffee,
+                isExamModeSimulated: appState.mascotSimulatedExamMode,
+                isProMember: appState.isProMember,
+                streakDays: appState.streakDays,
+                statusBannerText: appState.mascotStatusMessage,
+                onSelectMode: { mode in
+                    appState.setMascotSelectionMode(mode)
+                    Task { @MainActor in
+                        await CertiGoDynamicAppIconManager.shared.setSelectionMode(mode)
+                        await CertiGoDynamicAppIconManager.shared.evaluateAndApply(
+                            context: appState.currentMascotContextInput
+                        )
+                    }
+                },
+                onSelectOutfit: { outfit in
+                    appState.selectMascotOutfit(outfit)
+                    Task { @MainActor in
+                        await CertiGoDynamicAppIconManager.shared.selectManualOutfit(outfit)
+                    }
+                },
+                onSelectTheme: { theme in
+                    appState.selectMascotTheme(theme)
+                    Task { @MainActor in
+                        await CertiGoDynamicAppIconManager.shared.selectPreferredTheme(theme)
+                    }
+                },
+                onToggleSimulationSignal: { signalId in
+                    appState.toggleMascotSimulationSignal(signalId)
+                    Task { @MainActor in
+                        await CertiGoDynamicAppIconManager.shared.setSelectionMode(.automatic)
+                        await CertiGoDynamicAppIconManager.shared.evaluateAndApply(
+                            context: appState.currentMascotContextInput
+                        )
+                    }
+                },
+                onClose: {
+                    appState.showMascotVaultSheet = false
+                }
+            )
+            .presentationDetents([.large])
+        }
         .fullScreenCover(isPresented: $appState.isPresentingLessonSession) {
             CertiGoNativeLessonSessionModalView(
                 appState: $appState,
@@ -11529,6 +11693,10 @@ public struct CertiGoNativeFigmaAppView: View {
             if !onboardingDone {
                 appState.startOnboardingFlow()
             }
+            CertiGoDynamicAppIconManager.shared.startMonitoringNetworkPath()
+            _ = await CertiGoDynamicAppIconManager.shared.evaluateAndApply(
+                context: appState.currentMascotContextInput
+            )
             withAnimation(
                 CertiGoMotion.spring(for: .anim05NovaLiveVoicePulse, reduceMotion: reduceMotion)
                     .repeatForever(autoreverses: true)
@@ -12134,15 +12302,26 @@ public struct CertiGoNativeFigmaAppView: View {
                     .offset(x: isLeftIsland ? (xOffset + 136) : (xOffset - 136))
                     .allowsHitTesting(false)
 
-                // Mascot Blason 1A (`angle34LeftPath`) dynamically anchored next to the `.active` node!
+                // Mascot Blason 1A dynamically anchored next to the `.active` node — tappable to open the Mascot Vault Sheet!
                 if lesson.state == .active {
-                    CertiGoMascotView(pose: .angle34LeftPath, size: PrismSize.mascotPath)
-                        .offset(
-                            x: isLeftIsland ? (xOffset - FigMetrics.fiftySix) : (xOffset + FigMetrics.fiftySix),
-                            y: -FigMetrics.ten
+                    Button {
+                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                            appState.openMascotVaultSheet()
+                        }
+                    } label: {
+                        CertiGoMascotAvatarView(
+                            outfit: appState.effectiveMascotOutfit,
+                            theme: appState.effectiveMascotTheme,
+                            size: PrismSize.mascotPath
                         )
-                        .zIndex(2)
-                        .allowsHitTesting(false)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("parcours-active-mascot-button")
+                    .offset(
+                        x: isLeftIsland ? (xOffset - FigMetrics.fiftySix) : (xOffset + FigMetrics.fiftySix),
+                        y: -FigMetrics.ten
+                    )
+                    .zIndex(2)
                 }
             }
         }
@@ -13200,6 +13379,44 @@ public struct CertiGoNativeFigmaAppView: View {
                             )
                             .accessibilityIdentifier("moi-open-stats-pro-08b")
 
+                            // Sheet 05: Banque & Costumes de la Mascotte (Icône Dynamique iOS Clair #07.1 / Sombre #07.2 / Prestige #07.10)
+                            Button {
+                                appState.openMascotVaultSheet()
+                            } label: {
+                                HStack(spacing: PrismSpacing.m) {
+                                    CertiGoMascotAvatarView(
+                                        outfit: appState.effectiveMascotOutfit,
+                                        theme: appState.effectiveMascotTheme,
+                                        size: FigMetrics.fortyEight,
+                                        showAppIconSquircle: true
+                                    )
+                                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                        Text(verbatim: "Banque & Costumes de la Mascotte")
+                                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
+                                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                        Text(verbatim: "Icône Dynamique · \(appState.effectiveMascotOutfit.displayName) (\(appState.effectiveMascotTheme.shortTitle))")
+                                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                                            .lineLimit(1)
+                                    }
+                                    Spacer(minLength: PrismSpacing.xs)
+                                    Text(verbatim: "›")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Black"))
+                                        .foregroundStyle(PrismColor.figmaHex("#94a3b8"))
+                                }
+                                .padding(PrismSpacing.m)
+                                .background(
+                                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                        .fill(PrismColor.surface)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                        .strokeBorder(PrismColor.figmaHex("#cbd5e1"), lineWidth: PrismBorder.standard)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("moi-open-mascot-vault-sheet")
+
                             // Clean Certifications Passeport List with Crest (48x48), Title (15 pt Semi Bold), Progress Bar (8 pt), % (14 pt Bold) & ›
                             let uniqueTrackCodes = appState.deduplicatedParallelTrackCodes(
                                 preferred: coordinator.parallelTracksPreference.selectedTracks.map(\.rawValue)
@@ -13893,6 +14110,16 @@ public struct CertiGoNativeFigmaAppView: View {
                                 ) {
                                     profileNavPath.append(.systemWidgetsSYS01)
                                 }
+                                Divider().padding(.leading, FigMetrics.fiftyTwo)
+                                settingsActionRow(
+                                    symbol: "sparkles.rectangle.stack.fill",
+                                    tintHex: "#0284c7",
+                                    title: "Banque & Costumes de la Mascotte (Icône Dynamique)",
+                                    value: appState.effectiveMascotOutfit.displayName
+                                ) {
+                                    appState.openMascotVaultSheet()
+                                }
+                                .accessibilityIdentifier("settings28-open-mascot-vault-sheet")
                             }
                             .background(
                                 RoundedRectangle(cornerRadius: FigMetrics.eighteen, style: .continuous)

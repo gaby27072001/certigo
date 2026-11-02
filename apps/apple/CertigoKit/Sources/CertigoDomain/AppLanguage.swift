@@ -279,13 +279,13 @@ public struct AppInterfaceCopy: Sendable, Equatable {
       )
     case .configurationAppStoreBundle:
       return (
-        "Utilisez l’identifiant de bundle App Store Certigo existant.",
-        "Use the existing Certigo App Store bundle identifier.",
-        "मौजूदा Certigo App Store बंडल पहचानकर्ता उपयोग करें।", "请使用现有 Certigo App Store 包标识符。",
-        "기존 Certigo App Store 번들 식별자를 사용하세요.",
-        "Usa el identificador de bundle existente de Certigo en App Store.",
-        "Usa l’identificatore bundle App Store Certigo esistente.",
-        "Verwende die bestehende Certigo-App-Store-Bundle-ID."
+        "Utilisez l’identifiant de bundle App Store CertiGo existant.",
+        "Use the existing CertiGo App Store bundle identifier.",
+        "मौजूदा CertiGo App Store बंडल पहचानकर्ता उपयोग करें।", "请使用现有 CertiGo App Store 包标识符。",
+        "기존 CertiGo App Store 번들 식별자를 사용하세요.",
+        "Usa el identificador de bundle existente de CertiGo en App Store.",
+        "Usa l’identificatore bundle App Store CertiGo esistente.",
+        "Verwende die bestehende CertiGo-App-Store-Bundle-ID."
       )
     case .configurationMissingProduction:
       return (
@@ -1525,14 +1525,14 @@ public struct AppInterfaceCopy: Sendable, Equatable {
       )
     case .deletionScopeNote:
       return (
-        "Supprime définitivement votre compte Certigo, votre apprentissage confirmé et votre progression. Les brouillons locaux et les références de compte téléchargées sont retirés uniquement après confirmation de fin par le serveur.",
-        "Permanently delete your Certigo account, confirmed learning and progression. Local drafts and downloaded account references are removed only after the server confirms completion.",
-        "आपका Certigo खाता, पुष्ट पढ़ाई और प्रगति स्थायी रूप से हटेंगे। स्थानीय ड्राफ़्ट और डाउनलोड खाता संदर्भ केवल सर्वर की पूर्णता पुष्टि के बाद हटेंगे।",
-        "永久删除您的 Certigo 账户、已确认的学习记录和进度。本地草稿和下载的账户引用仅在服务器确认完成后移除。",
-        "Certigo 계정, 확인된 학습 및 진도를 영구 삭제합니다. 로컬 초안과 다운로드된 계정 참조는 서버가 완료를 확인한 뒤에만 제거됩니다.",
-        "Elimina permanentemente tu cuenta Certigo, aprendizaje confirmado y progreso. Los borradores locales y referencias de cuenta descargadas solo se eliminan tras confirmarse la finalización en el servidor.",
-        "Elimina definitivamente account Certigo, apprendimento confermato e progressi. Bozze locali e riferimenti dell’account scaricati vengono rimossi solo dopo la conferma di completamento del server.",
-        "Löscht dein Certigo-Konto, bestätigtes Lernen und Fortschritt endgültig. Lokale Entwürfe und heruntergeladene Kontoverweise werden erst nach Abschlussbestätigung des Servers entfernt."
+        "Supprime définitivement votre compte CertiGo, votre apprentissage confirmé et votre progression. Les brouillons locaux et les références de compte téléchargées sont retirés uniquement après confirmation de fin par le serveur.",
+        "Permanently delete your CertiGo account, confirmed learning and progression. Local drafts and downloaded account references are removed only after the server confirms completion.",
+        "आपका CertiGo खाता, पुष्ट पढ़ाई और प्रगति स्थायी रूप से हटेंगे। स्थानीय ड्राफ़्ट और डाउनलोड खाता संदर्भ केवल सर्वर की पूर्णता पुष्टि के बाद हटेंगे।",
+        "永久删除您的 CertiGo 账户、已确认的学习记录和进度。本地草稿和下载的账户引用仅在服务器确认完成后移除。",
+        "CertiGo 계정, 확인된 학습 및 진도를 영구 삭제합니다. 로컬 초안과 다운로드된 계정 참조는 서버가 완료를 확인한 뒤에만 제거됩니다.",
+        "Elimina permanentemente tu cuenta CertiGo, aprendizaje confirmado y progreso. Los borradores locales y referencias de cuenta descargadas solo se eliminan tras confirmarse la finalización en el servidor.",
+        "Elimina definitivamente account CertiGo, apprendimento confermato e progressi. Bozze locali e riferimenti dell’account scaricati vengono rimossi solo dopo la conferma di completamento del server.",
+        "Löscht dein CertiGo-Konto, bestätigtes Lernen und Fortschritt endgültig. Lokale Entwürfe und heruntergeladene Kontoverweise werden erst nach Abschlussbestätigung des Servers entfernt."
       )
     case .deletionRetentionNote:
       return (
@@ -1645,11 +1645,11 @@ public struct AppInterfaceCopy: Sendable, Equatable {
       )
     case .deletionConfirmTitle:
       return (
-        "Supprimer définitivement ce compte Certigo ?", "Permanently delete this Certigo account?",
-        "यह Certigo खाता स्थायी रूप से हटाएँ?", "永久删除此 Certigo 账户？", "이 Certigo 계정을 영구 삭제할까요?",
-        "¿Eliminar permanentemente esta cuenta Certigo?",
-        "Eliminare definitivamente questo account Certigo?",
-        "Dieses Certigo-Konto endgültig löschen?"
+        "Supprimer définitivement ce compte CertiGo ?", "Permanently delete this CertiGo account?",
+        "यह CertiGo खाता स्थायी रूप से हटाएँ?", "永久删除此 CertiGo 账户？", "이 CertiGo 계정을 영구 삭제할까요?",
+        "¿Eliminar permanentemente esta cuenta CertiGo?",
+        "Eliminare definitivamente questo account CertiGo?",
+        "Dieses CertiGo-Konto endgültig löschen?"
       )
     case .deletionConfirmMessage:
       return (
@@ -1704,9 +1704,9 @@ public struct AppInterfaceCopy: Sendable, Equatable {
       )
     case .deletionTitle:
       return (
-        "Supprimer votre compte Certigo", "Delete your Certigo account", "अपना Certigo खाता हटाएँ",
-        "删除您的 Certigo 账户", "Certigo 계정 삭제", "Eliminar tu cuenta Certigo",
-        "Elimina il tuo account Certigo", "Dein Certigo-Konto löschen"
+        "Supprimer votre compte CertiGo", "Delete your CertiGo account", "अपना CertiGo खाता हटाएँ",
+        "删除您的 CertiGo 账户", "CertiGo 계정 삭제", "Eliminar tu cuenta CertiGo",
+        "Elimina il tuo account CertiGo", "Dein CertiGo-Konto löschen"
       )
     case .practiceAvailable:
       return (

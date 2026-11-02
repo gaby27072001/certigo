@@ -25,7 +25,7 @@ public enum CIAMConfigurationEnvironmentError: Error, Equatable, LocalizedError,
         case .productionBuildRequired:
             "Microsoft production sign-in is available only in the Distribution build."
         case .unsupportedProductionBundle:
-            "Microsoft production sign-in requires the Certigo App Store bundle identifier."
+            "Microsoft production sign-in requires the CertiGo App Store bundle identifier."
         case .missingBundleIdentifier:
             "The app bundle identifier is unavailable; CIAM sign-in cannot be initialized."
         case .callbackNotDeclared:

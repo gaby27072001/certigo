@@ -59,7 +59,7 @@ class NativeDistributionTests(unittest.TestCase):
         config = objects_of_type(text, "XCBuildConfiguration")["000000000000000000000085"]
         for setting in (
             "PRODUCT_BUNDLE_IDENTIFIER = com.certigo.mobileapp;",
-            "INFOPLIST_KEY_CFBundleDisplayName = Certigo;",
+            "INFOPLIST_KEY_CFBundleDisplayName = CertiGo;",
             "INFOPLIST_FILE = DistributionInfo.plist;",
             'MARKETING_VERSION = "$(CERTIGO_DISTRIBUTION_VERSION)";',
             'CURRENT_PROJECT_VERSION = "$(CERTIGO_DISTRIBUTION_BUILD)";',
@@ -163,6 +163,46 @@ class NativeDistributionTests(unittest.TestCase):
         with (standard / "Contents.json").open(encoding="utf-8") as file:
             preview = json.load(file)
         self.assertTrue((standard / preview["images"][0]["filename"]).is_file())
+
+        mascot_names = (
+            "CertiGoMascotHappyActive",
+            "CertiGoMascotSadMissing",
+            "CertiGoMascotMorningPajama",
+            "CertiGoMascotCoffeeBoost",
+            "CertiGoMascotSuitBoss",
+            "CertiGoMascotAirplaneOffline",
+            "CertiGoMascotStreakFire",
+            "CertiGoMascotPrestigePro",
+        )
+        for identifier in (
+            "000000000000000000000082",
+            "000000000000000000000083",
+            "000000000000000000000085",
+        ):
+            match = re.search(
+                r"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = \((.*?)\);",
+                configs[identifier],
+                re.DOTALL,
+            )
+            self.assertIsNotNone(match, identifier)
+            self.assertEqual(tuple(re.findall(r"\bCertiGoMascot\w+\b", match[1])), mascot_names)
+
+        for name in mascot_names:
+            app_icon_set = catalog / f"{name}.appiconset"
+            with (app_icon_set / "Contents.json").open(encoding="utf-8") as file:
+                contents = json.load(file)
+            self.assertEqual(len(contents["images"]), 2)
+            self.assertEqual(contents["images"][0]["filename"], f"{name}.png")
+            self.assertEqual(contents["images"][1]["filename"], f"{name}Dark.png")
+            self.assertEqual(
+                contents["images"][1]["appearances"],
+                [{"appearance": "luminosity", "value": "dark"}],
+            )
+            for image_entry in contents["images"]:
+                image_data = (app_icon_set / image_entry["filename"]).read_bytes()
+                self.assertEqual(image_data[:8], b"\x89PNG\r\n\x1a\n")
+                self.assertEqual(struct.unpack(">II", image_data[16:24]), (1024, 1024))
+                self.assertEqual(image_data[25], 2)
 
     def test_archive_and_direct_build_both_validate_before_compilation(self):
         tree = ET.parse(PROJECT / "xcshareddata/xcschemes/CertigoNative Distribution.xcscheme")

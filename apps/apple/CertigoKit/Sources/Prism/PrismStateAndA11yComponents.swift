@@ -1088,7 +1088,7 @@ public struct PrismShareCardView: View {
                     .foregroundStyle(PrismColor.feedbackSuccess)
                     .accessibilityHidden(true)
 
-                Text(verbatim: "Synthèse Certigo Prism · garantie sans spoiler")
+                Text(verbatim: "Synthèse CertiGo Prism · garantie sans spoiler")
                     .prismTextStyle(.caption)
                     .foregroundStyle(PrismColor.inkSecondary)
             }

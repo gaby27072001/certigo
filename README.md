@@ -1,6 +1,6 @@
 <div align="center">
 
-# Certigo
+# CertiGo
 
 **Apprenez, révisez et validez vos certifications cloud & IA — par micro-leçons premium.**
 
@@ -15,7 +15,7 @@ Grands Acteurs de l'IA** : Anthropic Claude, OpenAI ChatGPT, Google Gemini, Micr
 </div>
 
 > [!IMPORTANT]
-> **Certigo n'est pas une app de langues.** On n'apprend pas du vocabulaire :
+> **CertiGo n'est pas une app de langues.** On n'apprend pas du vocabulaire :
 > on enseigne des **concepts professionnels d'architecture et d'ingénierie** via une boucle pédagogique
 > stricte — *concept → exemple appliqué → vérification de compréhension (10 formats interactifs) →
 > révision adaptative FSRS & calibration de confiance (Brier)*.
@@ -459,5 +459,5 @@ Pour ajouter les intégrations réelles, démarrer l'émulateur puis définir
 
 Projet original. Microsoft, Azure, AWS, Google Cloud, GitHub, Cisco, Kubernetes/CNCF, HashiCorp,
 OpenAI, Anthropic et les codes de certification cités sont des marques de leurs détenteurs
-respectifs. Certigo n'est affilié ni approuvé par aucun fournisseur. Aucun contenu d'examen réel
+respectifs. CertiGo n'est affilié ni approuvé par aucun fournisseur. Aucun contenu d'examen réel
 n'est reproduit — toutes les leçons et tous les items sont **originaux**.

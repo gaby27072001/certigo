@@ -1446,7 +1446,7 @@ import Foundation
                         )
                         .foregroundStyle(.secondary)
                     } header: {
-                        Text("Certigo · \(copy.native(.development))")
+                        Text("CertiGo · \(copy.native(.development))")
                     }
                     .scrollContentBackground(.hidden)
                     .background(NativePrism.canvas)
@@ -1471,7 +1471,7 @@ import Foundation
                         .foregroundStyle(.secondary)
                     }
                 }
-                .navigationTitle("Certigo")
+                .navigationTitle("CertiGo")
                 .modifier(NativeDeveloperToolbar(close: closeDeveloper))
             }
         }

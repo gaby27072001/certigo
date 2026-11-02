@@ -1339,4 +1339,227 @@ struct CertiGoNativeFigmaAppTests {
         #expect(recState.lessonSession.isPlainLanguageModeEnabled == false)
         #expect(recState.lessonSession.exercises.contains(where: { $0.formatCode == "Q_TYPE_04" }))
     }
+
+    @Test("CertiGoMascotVault vector anatomy invariants, 8 contextual outfits, Light #07.1 / Dark #07.2 / Prestige #07.10 themes, and CertiGoDynamicAppIconManager")
+    @MainActor
+    func mascotVaultVectorAnatomyEightContextualOutfitsAndDynamicAppIconManager() async throws {
+        // 1. Verify all 8 contextual outfits and their vector anatomy invariants
+        let expectedRawValues = [
+            "happy_active",
+            "sad_missing",
+            "morning_pajama",
+            "coffee_boost",
+            "suit_boss",
+            "airplane_offline",
+            "streak_fire",
+            "prestige_pro"
+        ]
+        #expect(CertiGoMascotVault.allOutfits.map(\.rawValue) == expectedRawValues)
+        #expect(CertiGoMascotVault.allThemes.map(\.codeLabel) == ["#07.1", "#07.2", "#07.10"])
+
+        for outfit in CertiGoMascotVault.allOutfits {
+            let spec = CertiGoMascotVault.geometrySpec(for: outfit)
+            #expect(spec.outfit == outfit)
+            // Eyebrows cleanly above the eyes (never overlapping eyes)
+            #expect(spec.eyebrowBottomY < spec.eyeTopY)
+            #expect(spec.eyebrowClearanceAboveEye >= 0.05)
+            // Centered chest emblem / outfit with clear margin inside the shield contour (no legacy V-bar touching border)
+            #expect(spec.hasLegacyVBarTouchingShieldBorder == false)
+            #expect(spec.chestPlastronMaxRadiusRatio <= 0.64)
+            #expect(spec.chestPlastronMarginToShieldBorder >= 0.20)
+            // 100% symmetric orange feet
+            #expect(spec.areFeetSymmetric == true)
+            #expect(abs((spec.leftFootCenterX + spec.rightFootCenterX) - 1.0) < 0.0001)
+            // Clean eyes with single specular highlight and no star overlap
+            #expect(spec.hasOverlappingStarAndHighlight == false)
+            #expect(spec.specularHighlightCountPerEye == 1)
+            // Well-proportioned centered golden beak
+            #expect(spec.beakCenterX == 0.50)
+            #expect(spec.beakWidthRatio > 0.10)
+        }
+
+        // 2. Verify automatic contextual evaluation across all 8 states
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let afternoonDate = calendar.date(from: DateComponents(year: 2026, month: 11, day: 2, hour: 15, minute: 0))!
+        let morningDate = calendar.date(from: DateComponents(year: 2026, month: 11, day: 2, hour: 7, minute: 30))!
+        let coffeeDate = calendar.date(from: DateComponents(year: 2026, month: 11, day: 2, hour: 10, minute: 15))!
+
+        // Default Happy Active (#07.1 Light & #07.2 Dark)
+        let activeCtx = CertiGoMascotContextInput(
+            lastActiveDate: afternoonDate.addingTimeInterval(-3600),
+            now: afternoonDate,
+            hasCompletedFirstSessionToday: true
+        )
+        #expect(CertiGoMascotContextEvaluator.recommendedOutfit(for: activeCtx, calendar: calendar) == .happyActive)
+        #expect(CertiGoMascotContextEvaluator.resolvedTheme(for: .happyActive, context: activeCtx) == .light)
+
+        var darkCtx = activeCtx
+        darkCtx.isDarkSystemAppearance = true
+        #expect(CertiGoMascotContextEvaluator.resolvedTheme(for: .happyActive, context: darkCtx) == .dark)
+
+        // Sad Missing (> 48h inactivity)
+        let sadCtx = CertiGoMascotContextInput(
+            lastActiveDate: afternoonDate.addingTimeInterval(-49 * 3600),
+            now: afternoonDate
+        )
+        #expect(CertiGoMascotContextEvaluator.recommendedOutfit(for: sadCtx, calendar: calendar) == .sadMissing)
+
+        // Morning Pajama + Nightcap + Coffee (06:00..09:30 before first session)
+        let morningCtx = CertiGoMascotContextInput(
+            lastActiveDate: morningDate.addingTimeInterval(-10 * 3600),
+            now: morningDate,
+            hasCompletedFirstSessionToday: false
+        )
+        #expect(CertiGoMascotContextEvaluator.recommendedOutfit(for: morningCtx, calendar: calendar) == .morningPajama)
+
+        // Coffee Boost (09:30..14:00 or quick sprint)
+        let coffeeCtx = CertiGoMascotContextInput(
+            lastActiveDate: coffeeDate.addingTimeInterval(-4 * 3600),
+            now: coffeeDate,
+            hasCompletedFirstSessionToday: false
+        )
+        #expect(CertiGoMascotContextEvaluator.recommendedOutfit(for: coffeeCtx, calendar: calendar) == .coffeeBoost)
+
+        // Suit Boss (Exam Prep mode)
+        let examCtx = CertiGoMascotContextInput(
+            lastActiveDate: afternoonDate.addingTimeInterval(-1800),
+            now: afternoonDate,
+            isExamPrepMode: true
+        )
+        #expect(CertiGoMascotContextEvaluator.recommendedOutfit(for: examCtx, calendar: calendar) == .suitBoss)
+
+        // Airplane Offline (NWPathMonitor offline detection)
+        let airplaneCtx = CertiGoMascotContextInput(
+            isOfflineOrAirplaneMode: true,
+            lastActiveDate: afternoonDate.addingTimeInterval(-1800),
+            now: afternoonDate
+        )
+        #expect(CertiGoMascotContextEvaluator.recommendedOutfit(for: airplaneCtx, calendar: calendar) == .airplaneOffline)
+
+        // Streak Fire (streak >= 3 days)
+        let streakCtx = CertiGoMascotContextInput(
+            lastActiveDate: afternoonDate.addingTimeInterval(-1800),
+            now: afternoonDate,
+            hasCompletedFirstSessionToday: true,
+            streakDays: 5
+        )
+        #expect(CertiGoMascotContextEvaluator.recommendedOutfit(for: streakCtx, calendar: calendar) == .streakFire)
+
+        // Prestige PRO (#07.10 Gold & Black)
+        let proCtx = CertiGoMascotContextInput(
+            lastActiveDate: afternoonDate.addingTimeInterval(-1800),
+            now: afternoonDate,
+            hasCompletedFirstSessionToday: true,
+            streakDays: 1,
+            isProMember: true
+        )
+        #expect(CertiGoMascotContextEvaluator.recommendedOutfit(for: proCtx, calendar: calendar) == .prestigePro)
+        #expect(CertiGoMascotContextEvaluator.resolvedTheme(for: .prestigePro, context: proCtx) == .prestigeGoldBlack)
+
+        // 3. Verify CertiGoDynamicAppIconManager with mock alternate icon driver & CertiGoNativeAppState integration
+        @MainActor
+        final class MockIconDriver: CertiGoAlternateIconDriver {
+            var supportsAlternateIcons: Bool = true
+            var currentAlternateIconName: String? = nil
+            var appliedNames: [String?] = []
+
+            func setAlternateIconName(_ name: String?) async throws {
+                currentAlternateIconName = name
+                appliedNames.append(name)
+            }
+        }
+
+        let suiteName = "CertiGoMascotVaultTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let driver = MockIconDriver()
+        let manager = CertiGoDynamicAppIconManager(
+            defaults: defaults,
+            preferencesKey: "mascot-vault-test-prefs",
+            driver: driver,
+            initialContext: activeCtx
+        )
+
+        let resolved = await manager.evaluateAndApply(context: airplaneCtx, calendar: calendar)
+        #expect(resolved == .airplaneOffline)
+        #expect(driver.currentAlternateIconName == "CertiGoMascotAirplaneOffline")
+
+        await manager.selectManualOutfit(.prestigePro)
+        #expect(manager.activeOutfit == .prestigePro)
+        #expect(manager.activeTheme == .prestigeGoldBlack)
+        #expect(driver.currentAlternateIconName == "CertiGoMascotPrestigePro")
+
+        // Verify CertiGoNativeAppState Mascot Vault sheet state
+        var appState = CertiGoNativeAppState()
+        appState.openMascotVaultSheet()
+        #expect(appState.showMascotVaultSheet == true)
+        appState.toggleMascotSimulationSignal("airplane")
+        #expect(appState.effectiveMascotOutfit == .airplaneOffline)
+        appState.selectMascotOutfit(.suitBoss)
+        #expect(appState.effectiveMascotOutfit == .suitBoss)
+        appState.selectMascotTheme(.dark)
+        #expect(appState.effectiveMascotTheme == .dark)
+    }
+
+    @Test("All user-visible brand strings in CertigoNative and CertigoKit use CertiGo with an uppercase G and never Certigo with a lowercase g")
+    func noUserFacingUIStringInCertigoNativeContainsLowercaseGCertigo() throws {
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: root.appendingPathComponent("AGENTS.md").path) {
+            let parent = root.deletingLastPathComponent()
+            guard parent != root else { throw CocoaError(.fileNoSuchFile) }
+            root = parent
+        }
+
+        // 1. Verify CFBundleDisplayName in Info.plist files and project.pbxproj
+        let distPlist = try String(
+            contentsOf: root.appendingPathComponent("apps/apple/CertigoNative/DistributionInfo.plist"),
+            encoding: .utf8
+        )
+        let devPlist = try String(
+            contentsOf: root.appendingPathComponent("apps/apple/CertigoNative/DevelopmentInfo.plist"),
+            encoding: .utf8
+        )
+        let widgetPlist = try String(
+            contentsOf: root.appendingPathComponent("apps/apple/CertigoNative/WidgetExtension/Info.plist"),
+            encoding: .utf8
+        )
+        let pbxproj = try String(
+            contentsOf: root.appendingPathComponent("apps/apple/CertigoNative/CertigoNative.xcodeproj/project.pbxproj"),
+            encoding: .utf8
+        )
+        #expect(distPlist.contains("<string>CertiGo</string>"))
+        #expect(!distPlist.contains("<string>Certigo</string>"))
+        #expect(devPlist.contains("<string>CertiGo</string>"))
+        #expect(widgetPlist.contains("<string>CertiGo Widgets</string>"))
+        #expect(!widgetPlist.contains("<string>Certigo Widgets</string>"))
+        #expect(pbxproj.contains("INFOPLIST_KEY_CFBundleDisplayName = CertiGo;"))
+        #expect(pbxproj.contains("INFOPLIST_KEY_CFBundleDisplayName = \"CertiGo Dev\";"))
+        #expect(!pbxproj.contains("INFOPLIST_KEY_CFBundleDisplayName = Certigo;"))
+
+        // 2. Verify no user-facing string literal in CertigoNative/Sources or CertigoKit/Sources contains standalone "Certigo" (with lowercase g)
+        let stringWithLowercaseG = try NSRegularExpression(
+            pattern: #""[^"\n]*\bCertigo(?![A-Za-z0-9_])[^"\n]*""#
+        )
+        let allowedTechnicalFragments = [
+            "X-Certigo-",
+            "Certigo-Widgets"
+        ]
+        for relativeDir in ["apps/apple/CertigoNative/Sources", "apps/apple/CertigoKit/Sources"] {
+            let dirURL = root.appendingPathComponent(relativeDir)
+            let enumerator = try #require(
+                FileManager.default.enumerator(at: dirURL, includingPropertiesForKeys: nil)
+            )
+            for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
+                let source = try String(contentsOf: fileURL, encoding: .utf8)
+                let range = NSRange(source.startIndex..., in: source)
+                for match in stringWithLowercaseG.matches(in: source, range: range) {
+                    guard let matchRange = Range(match.range, in: source) else { continue }
+                    let literal = String(source[matchRange])
+                    let isTechnical = allowedTechnicalFragments.contains { literal.contains($0) }
+                    #expect(isTechnical, "Found lowercase-g 'Certigo' in user-facing string in \(fileURL.lastPathComponent): \(literal)")
+                }
+            }
+        }
+    }
 }
