@@ -402,12 +402,28 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
     public static let aiFrontierTracks: [CertiGoTrackDescriptor] =
         CertiGoAIFrontierTrackID.allCases.map(buildAIFrontierTrack)
 
+    public static let aiProductivityAndLegalTrackCodes: [String] =
+        CertiGoAIProductivityAndLegalCatalog.trackCodes
+
+    public static let aiProductivityAndLegalTracks: [CertiGoTrackDescriptor] =
+        CertiGoAIProductivityAndLegalCatalog.allTrackDescriptors
+
+    public static let officialBrandFilters: [CertiGoOfficialBrandFilterSpec] =
+        CertiGoAIProductivityAndLegalCatalog.officialBrandFilters
+
     public static var allTracks: [CertiGoTrackDescriptor] {
-        parallelCertificationTracks + aiFrontierTracks
+        parallelCertificationTracks + aiFrontierTracks + aiProductivityAndLegalTracks
+    }
+
+    public static func tracks(forBrandVendor vendorId: String) -> [CertiGoTrackDescriptor] {
+        CertiGoAIProductivityAndLegalCatalog.tracks(forBrandVendor: vendorId)
     }
 
     public static func track(forCode code: String) -> CertiGoTrackDescriptor {
         let normalized = code.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if let aiProd = CertiGoAIProductivityAndLegalCatalog.trackDescriptor(forCode: normalized) {
+            return aiProd
+        }
         if normalized == "AI-CLAUDE",
             let claude = aiFrontierTracks.first(where: { $0.code.uppercased() == "AI-ANTHROPIC" })
         {
@@ -416,7 +432,9 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
         if let found = allTracks.first(where: { $0.code.uppercased() == normalized || $0.id.uppercased() == normalized }) {
             return found
         }
-        if let foundByTitle = aiFrontierTracks.first(where: { $0.officialTitle.lowercased() == code.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }) {
+        if let foundByTitle = (aiFrontierTracks + aiProductivityAndLegalTracks).first(where: {
+            $0.officialTitle.lowercased() == code.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        }) {
             return foundByTitle
         }
         return parallelCertificationTracks[0]
@@ -427,7 +445,10 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
         if trimmed == "ai-claude" {
             return aiFrontierTracks.first(where: { $0.code.uppercased() == "AI-ANTHROPIC" })
         }
-        return aiFrontierTracks.first {
+        if let aiProd = CertiGoAIProductivityAndLegalCatalog.trackDescriptor(forCode: query) {
+            return aiProd
+        }
+        return (aiFrontierTracks + aiProductivityAndLegalTracks).first {
             $0.code.lowercased() == trimmed
                 || $0.id.lowercased() == trimmed
                 || $0.officialTitle.lowercased() == trimmed
@@ -2508,6 +2529,7 @@ public struct CertiGoQuestionFormatCardView: View {
 
 public struct CertiGoMultiTrackAndAICatalogScreen: View {
     @State private var selectedTrackCode: String
+    @State private var selectedBrandVendorId: String = "all"
     public let onSelectTrack: (CertiGoTrackDescriptor) -> Void
 
     public init(
@@ -2525,6 +2547,23 @@ public struct CertiGoMultiTrackAndAICatalogScreen: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
+                PrismSection(title: "Sélecteur de Marques Officielles") {
+                    CertiGoAIProductivityBrandSelectorBar(selectedVendorId: $selectedBrandVendorId) { filter in
+                        if let firstCode = filter.trackCodes.first {
+                            selectedTrackCode = firstCode
+                            onSelectTrack(CertiGoMultiTrackAndAIContentCatalog.track(forCode: firstCode))
+                        }
+                    }
+                }
+
+                PrismSection(title: "4 Parcours IA, Productivité Office & Legal Tech") {
+                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                        ForEach(CertiGoMultiTrackAndAIContentCatalog.aiProductivityAndLegalTracks) { prodTrack in
+                            aiFrontierTrackRow(for: prodTrack)
+                        }
+                    }
+                }
+
                 PrismSection(title: "13 Parcours Multi-Certifications en Parallèle") {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: PrismSpacing.s) {

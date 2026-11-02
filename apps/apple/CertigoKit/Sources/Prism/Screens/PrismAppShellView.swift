@@ -1362,8 +1362,11 @@ public struct PrismCourseSwitcherTrayView: View {
 
     private var brandFilters: [BrandFilterSpec] {
         [
-            .init(id: "all", label: "Toutes (39)", product: .azureVirtualNetwork),
+            .init(id: "all", label: "Toutes (43)", product: .azureVirtualNetwork),
             .init(id: "microsoft", label: "Microsoft", product: .azureVirtualNetwork),
+            .init(id: "openai", label: "OpenAI", product: .azureOpenAIService),
+            .init(id: "anthropic", label: "Anthropic", product: .microsoftFoundry),
+            .init(id: "harvey", label: "Harvey Legal AI", product: .microsoftFoundry),
             .init(id: "aws", label: "AWS", product: BrandProductID("aws-vpc")),
             .init(id: "gcp", label: "Google", product: BrandProductID("gcp-compute-engine")),
             .init(id: "github", label: "GitHub", product: BrandProductID("github-copilot")),
@@ -1373,9 +1376,13 @@ public struct PrismCourseSwitcherTrayView: View {
 
     private var courses: [CourseItemSpec] {
         let all: [CourseItemSpec] = [
+            .init(code: "MS-365-COPILOT", title: "M365 Copilot, Cowork, Office & Agents", brandId: "microsoft", progressText: "5 domaines · Office & Agents", product: .microsoftCopilotStudio),
             .init(code: "AZ-104", title: "Administrateur Microsoft Azure", brandId: "microsoft", progressText: "Unité 3 · 68 % prêt", product: .azureVirtualNetwork),
             .init(code: "AI-102", title: "Azure AI Engineer & Foundry", brandId: "microsoft", progressText: "Unité 2 · 42 % prêt", product: BrandProductID("azure-openai")),
             .init(code: "AZ-305", title: "Solutions Architect Expert", brandId: "microsoft", progressText: "Unité 4 · 54 % prêt", product: .azureVirtualMachines),
+            .init(code: "OPENAI-PRO", title: "OpenAI : ChatGPT, Codex & Agents IA", brandId: "openai", progressText: "4 domaines · o3/o4 & Codex", product: .azureOpenAIService),
+            .init(code: "ANTHROPIC-CLAUDE", title: "Anthropic : Claude, Claude Code & MCP", brandId: "anthropic", progressText: "4 domaines · XML, CLI & MCP", product: .microsoftFoundry),
+            .init(code: "HARVEY-LEGAL", title: "Harvey : Plateforme Legal IA & Pratique", brandId: "harvey", progressText: "4 domaines · Vault & Contrats", product: .microsoftFoundry),
             .init(code: "SAA-C03", title: "AWS Solutions Architect Assoc.", brandId: "aws", progressText: "Unité 1 · 20 % prêt", product: BrandProductID("aws-vpc")),
             .init(code: "ACE", title: "Google Associate Cloud Engineer", brandId: "gcp", progressText: "Nouveau parcours", product: BrandProductID("gcp-compute-engine")),
             .init(code: "GH-300", title: "GitHub Copilot Certification", brandId: "github", progressText: "Unité 2 · 75 % prêt", product: BrandProductID("github-copilot")),

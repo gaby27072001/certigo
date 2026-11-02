@@ -130,8 +130,14 @@ public enum CertiGoOfficialAssetCatalog {
             return "Certifications/tech-terraform-associate"
         case "VAULT":
             return "Certifications/tech-vault-associate"
-        case "CCA-F", "CLAUDE":
+        case "CCA-F", "CLAUDE", "ANTHROPIC-CLAUDE":
             return "Certifications/tech-anthropic-cca-foundations"
+        case "MS-365-COPILOT", "M365-COPILOT":
+            return "Certifications/ms-official-associate-badge"
+        case "OPENAI-PRO":
+            return "BrandLogos/brand-openai"
+        case "HARVEY-LEGAL", "HARVEY":
+            return "BrandLogos/brand-harvey"
         default:
             if upper.hasPrefix("AWS") {
                 return "Certifications/tech-aws-solutions-architect"
@@ -161,6 +167,8 @@ public enum CertiGoOfficialAssetCatalog {
             return "BrandLogos/brand-openai"
         case "claude", "anthropic":
             return "BrandLogos/brand-claude-ai"
+        case "harvey", "harvey-legal", "harvey-ai":
+            return "BrandLogos/brand-harvey"
         case "gemini", "google-gemini":
             return "BrandLogos/brand-google-gemini"
         case "mistral":
