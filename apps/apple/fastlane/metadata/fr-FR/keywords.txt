@@ -1,0 +1,1 @@
+certification,cloud,azure,aws,kubernetes,az-900,az-104,ai-900,devops,examen,qcm,informatique,it,ia

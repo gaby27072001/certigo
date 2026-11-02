@@ -1,0 +1,15 @@
+APP REVIEW INSTRUCTIONS — CERTIGO (iOS 1.1)
+
+1. IMMEDIATE ACCESS (NO ACCOUNT REQUIRED TO START):
+• You can launch CertiGo and immediately test the full interactive onboarding, certification path selection (AZ-900, AZ-104, AWS, Kubernetes, GitHub Copilot), 15-second Visual Insight Cards, Interactive Cloud Shell CLI exercises, and Daily Sprints in Guest Mode without signing in.
+• Optional Sign-In: Sign in with Apple and Microsoft Entra External ID (CIAM) are also available on the Welcome / Profile screen to synchronize progress across devices.
+
+2. HOW TO TEST KEY FEATURES:
+• Home Path ("Parcours"): Tap "Lancer mon Sprint (10 min)" or any unlocked node to experience a 5-step interactive micro-sprint (Visual Insight Card -> Scenario Quiz -> Cloud Shell CLI -> AI Coach explanation) with 3D cushion tactile buttons and Core Haptics interactive vibrations.
+• Mock Exam Simulator ("Examens"): Start a timed practice exam scored on the official /1000 scale.
+• AI Coach ("Coach IA"): Tap the center tab or "Demander au Coach IA" during any question for contextual explanations.
+• iOS Widgets & Dynamic Mascot ("Moi"): Add the CertiGo Home Screen or Lock Screen widget to view daily streaks and deep-link directly into a 90-second Streak Rescue session.
+
+3. IN-APP PURCHASES / CERTIGO PRO:
+• CertiGo offers a generous free tier (5 hearts/day, foundational units, daily streak).
+• CertiGo PRO (Monthly & Annual with 7-day free trial) unlocks unlimited hearts, full timed mock exams, unlimited AI Coach, and offline packs via native StoreKit 2.
