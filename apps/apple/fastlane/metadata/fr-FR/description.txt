@@ -1,0 +1,27 @@
+Réussis tes certifications Cloud, IA, DevOps et Cybersécurité 3,4× plus vite avec CertiGo — l'application d'entraînement actif pensée pour les ingénieurs, développeurs, architectes et étudiants IT.
+
+Fini les vidéos passives de 40 heures et les PDF indigestes : CertiGo transforme la préparation aux examens officiels en sprints interactifs de 10 minutes par jour sur iPhone et iPad.
+
+POURQUOI CERTIGO EST 3,4× PLUS RAPIDE
+• Apprentissage actif immédiat : chaque concept est découpé en Cartes Déclic visuelles de 15 secondes suivies de mises en situation d'examen.
+• Rétention scientifique (algorithme FSRS) : tes révisions s'adaptent automatiquement à ta courbe d'oubli pour ancrer durablement chaque domaine officiel.
+• Sensation tactile & haptique immersive : boutons coussins 3D interactifs et moteur de vibrations Core Haptics à chaque action, combo, terminal validé et célébration de réussite pour vivre chaque session comme un jeu.
+• Zéro friction : lance ton sprint quotidien en 1 clic depuis l'écran d'accueil, ton Widget iOS ou le Mode Sauvetage 90 secondes.
+
+LES FONCTIONNALITÉS CLÉS
+• Cartes Déclic & Schémas d'Architecture : visualise en 3 briques claires les architectures Azure, AWS, Kubernetes et IAM avec les pièges d'examen les plus fréquents.
+• Vrai Terminal Cloud Shell interactif : pratique les commandes Azure CLI, PowerShell, AWS CLI, Kubectl et Terraform avec autocomplétion intelligente et validation instantanée.
+• Coach IA contextuel : comprends immédiatement pourquoi une réponse est juste ou fausse, pose tes questions et épingle les points clés dans ton Carnet Personnel Jour-J.
+• Simulateur d'Examen Blanc (/1000) : entraîne-toi en conditions réelles chronométrées avec score de préparation par domaine officiel et seuil de réussite à 700/1000.
+• Widgets iOS, Live Activities & Mascotte Pro v2 : suis ta série quotidienne sur l'écran d'accueil et l'écran verrouillé, et débloque les 8 tenues dynamiques de la mascotte CertiGo (Matin Pyjama, Pause Café, Mode Examen, Feu de Série, Prestige Or).
+
++15 CERTIFICATIONS OFFICIELLES COUVERTES
+• Microsoft Azure & IA : AZ-900 (Azure Fundamentals), AZ-104 (Azure Administrator), AZ-204, AZ-305, AZ-500, AI-900, AI-102, DP-900, SC-900.
+• Amazon Web Services : AWS Cloud Practitioner (CLF-C02), AWS Solutions Architect Associate (SAA-C03).
+• Cloud Native, DevOps & IA Générative : Kubernetes (CKA / CKAD), HashiCorp Terraform Associate, Google Cloud Architect, GitHub Copilot (GH-300), Anthropic Claude & OpenAI Foundations.
+
+MODE GRATUIT & CERTIGO PRO
+Commence gratuitement sur tous les parcours fondamentaux avec 5 cœurs quotidiens. Passe à CertiGo PRO (essai gratuit de 7 jours disponible) pour débloquer les cœurs illimités, les examens blancs complets chronométrés, le Coach IA illimité et le mode hors-ligne complet.
+
+Politique de confidentialité : https://www.certigo-app.com/privacy-policy/
+Assistance & Conditions : https://www.certigo-app.com/

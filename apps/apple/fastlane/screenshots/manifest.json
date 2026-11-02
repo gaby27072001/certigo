@@ -1,0 +1,678 @@
+{
+  "fr-FR": {
+    "iphone_69_1320x2868": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "fr-FR_iphone_69_1320x2868_01_parcours_34x.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 174217
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "fr-FR_iphone_69_1320x2868_02_cartes_declic.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 174150
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "fr-FR_iphone_69_1320x2868_03_cloud_shell_cli.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 175907
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "fr-FR_iphone_69_1320x2868_04_coach_ia_examen.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 182706
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "fr-FR_iphone_69_1320x2868_05_widgets_mascotte.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 224062
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "fr-FR_iphone_69_1320x2868_06_catalogue_multicloud.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 239725
+      }
+    ],
+    "iphone_67_1290x2796": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "fr-FR_iphone_67_1290x2796_01_parcours_34x.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 168428
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "fr-FR_iphone_67_1290x2796_02_cartes_declic.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 169819
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "fr-FR_iphone_67_1290x2796_03_cloud_shell_cli.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 170347
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "fr-FR_iphone_67_1290x2796_04_coach_ia_examen.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 176370
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "fr-FR_iphone_67_1290x2796_05_widgets_mascotte.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 215659
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "fr-FR_iphone_67_1290x2796_06_catalogue_multicloud.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 231361
+      }
+    ],
+    "iphone_65_1284x2778": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "fr-FR_iphone_65_1284x2778_01_parcours_34x.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 166470
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "fr-FR_iphone_65_1284x2778_02_cartes_declic.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 168164
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "fr-FR_iphone_65_1284x2778_03_cloud_shell_cli.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 169798
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "fr-FR_iphone_65_1284x2778_04_coach_ia_examen.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 174883
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "fr-FR_iphone_65_1284x2778_05_widgets_mascotte.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 214196
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "fr-FR_iphone_65_1284x2778_06_catalogue_multicloud.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 229451
+      }
+    ],
+    "iphone_61_1206x2622": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "fr-FR_iphone_61_1206x2622_01_parcours_34x.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 157062
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "fr-FR_iphone_61_1206x2622_02_cartes_declic.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 158498
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "fr-FR_iphone_61_1206x2622_03_cloud_shell_cli.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 158776
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "fr-FR_iphone_61_1206x2622_04_coach_ia_examen.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 165044
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "fr-FR_iphone_61_1206x2622_05_widgets_mascotte.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 199980
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "fr-FR_iphone_61_1206x2622_06_catalogue_multicloud.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 212068
+      }
+    ],
+    "ipad_13_2064x2752": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "fr-FR_ipad_13_2064x2752_01_parcours_34x.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 186338
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "fr-FR_ipad_13_2064x2752_02_cartes_declic.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 178980
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "fr-FR_ipad_13_2064x2752_03_cloud_shell_cli.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 184543
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "fr-FR_ipad_13_2064x2752_04_coach_ia_examen.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 194769
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "fr-FR_ipad_13_2064x2752_05_widgets_mascotte.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 224967
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "fr-FR_ipad_13_2064x2752_06_catalogue_multicloud.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 243091
+      }
+    ],
+    "ipad_129_2048x2732": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "fr-FR_ipad_129_2048x2732_01_parcours_34x.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 185074
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "fr-FR_ipad_129_2048x2732_02_cartes_declic.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 178055
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "fr-FR_ipad_129_2048x2732_03_cloud_shell_cli.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 182690
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "fr-FR_ipad_129_2048x2732_04_coach_ia_examen.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 193508
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "fr-FR_ipad_129_2048x2732_05_widgets_mascotte.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 223428
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "fr-FR_ipad_129_2048x2732_06_catalogue_multicloud.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 241086
+      }
+    ]
+  },
+  "en-US": {
+    "iphone_69_1320x2868": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "en-US_iphone_69_1320x2868_01_parcours_34x.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 175515
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "en-US_iphone_69_1320x2868_02_cartes_declic.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 172095
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "en-US_iphone_69_1320x2868_03_cloud_shell_cli.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 174799
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "en-US_iphone_69_1320x2868_04_coach_ia_examen.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 180833
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "en-US_iphone_69_1320x2868_05_widgets_mascotte.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 217848
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "en-US_iphone_69_1320x2868_06_catalogue_multicloud.png",
+        "width": 1320,
+        "height": 2868,
+        "mode": "RGB",
+        "bytes": 241554
+      }
+    ],
+    "iphone_67_1290x2796": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "en-US_iphone_67_1290x2796_01_parcours_34x.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 170027
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "en-US_iphone_67_1290x2796_02_cartes_declic.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 167630
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "en-US_iphone_67_1290x2796_03_cloud_shell_cli.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 169370
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "en-US_iphone_67_1290x2796_04_coach_ia_examen.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 174931
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "en-US_iphone_67_1290x2796_05_widgets_mascotte.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 209303
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "en-US_iphone_67_1290x2796_06_catalogue_multicloud.png",
+        "width": 1290,
+        "height": 2796,
+        "mode": "RGB",
+        "bytes": 233349
+      }
+    ],
+    "iphone_65_1284x2778": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "en-US_iphone_65_1284x2778_01_parcours_34x.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 168079
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "en-US_iphone_65_1284x2778_02_cartes_declic.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 165941
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "en-US_iphone_65_1284x2778_03_cloud_shell_cli.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 168749
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "en-US_iphone_65_1284x2778_04_coach_ia_examen.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 173547
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "en-US_iphone_65_1284x2778_05_widgets_mascotte.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 208149
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "en-US_iphone_65_1284x2778_06_catalogue_multicloud.png",
+        "width": 1284,
+        "height": 2778,
+        "mode": "RGB",
+        "bytes": 231185
+      }
+    ],
+    "iphone_61_1206x2622": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "en-US_iphone_61_1206x2622_01_parcours_34x.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 158253
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "en-US_iphone_61_1206x2622_02_cartes_declic.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 156363
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "en-US_iphone_61_1206x2622_03_cloud_shell_cli.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 157834
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "en-US_iphone_61_1206x2622_04_coach_ia_examen.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 163621
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "en-US_iphone_61_1206x2622_05_widgets_mascotte.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 193233
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "en-US_iphone_61_1206x2622_06_catalogue_multicloud.png",
+        "width": 1206,
+        "height": 2622,
+        "mode": "RGB",
+        "bytes": 213438
+      }
+    ],
+    "ipad_13_2064x2752": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "en-US_ipad_13_2064x2752_01_parcours_34x.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 187618
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "en-US_ipad_13_2064x2752_02_cartes_declic.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 176780
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "en-US_ipad_13_2064x2752_03_cloud_shell_cli.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 183633
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "en-US_ipad_13_2064x2752_04_coach_ia_examen.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 193444
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "en-US_ipad_13_2064x2752_05_widgets_mascotte.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 219374
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "en-US_ipad_13_2064x2752_06_catalogue_multicloud.png",
+        "width": 2064,
+        "height": 2752,
+        "mode": "RGB",
+        "bytes": 244735
+      }
+    ],
+    "ipad_129_2048x2732": [
+      {
+        "slide": 1,
+        "slug": "01_parcours_34x",
+        "filename": "en-US_ipad_129_2048x2732_01_parcours_34x.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 186786
+      },
+      {
+        "slide": 2,
+        "slug": "02_cartes_declic",
+        "filename": "en-US_ipad_129_2048x2732_02_cartes_declic.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 175767
+      },
+      {
+        "slide": 3,
+        "slug": "03_cloud_shell_cli",
+        "filename": "en-US_ipad_129_2048x2732_03_cloud_shell_cli.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 181874
+      },
+      {
+        "slide": 4,
+        "slug": "04_coach_ia_examen",
+        "filename": "en-US_ipad_129_2048x2732_04_coach_ia_examen.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 192340
+      },
+      {
+        "slide": 5,
+        "slug": "05_widgets_mascotte",
+        "filename": "en-US_ipad_129_2048x2732_05_widgets_mascotte.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 218353
+      },
+      {
+        "slide": 6,
+        "slug": "06_catalogue_multicloud",
+        "filename": "en-US_ipad_129_2048x2732_06_catalogue_multicloud.png",
+        "width": 2048,
+        "height": 2732,
+        "mode": "RGB",
+        "bytes": 242674
+      }
+    ]
+  }
+}

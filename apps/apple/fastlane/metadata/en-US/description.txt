@@ -1,0 +1,27 @@
+Pass your Cloud, AI, DevOps, and Cybersecurity certifications 3.4× faster with CertiGo — the active exam prep app built for cloud engineers, developers, architects, and IT students.
+
+Replace 40-hour passive video courses and dry PDFs with interactive 10-minute daily sprints on iPhone and iPad.
+
+WHY CERTIGO IS 3.4× FASTER
+• Active Micro-Learning: Every exam objective is distilled into 15-second Visual Insight Cards followed immediately by hands-on exam scenarios.
+• Scientific Retention (FSRS Spaced Repetition): Your daily review queue adapts automatically to your memory curve so you master every official exam domain before exam day.
+• Immersive Tactile & Haptic Engine: Responsive 3D cushion buttons and Core Haptics interactive vibrations on every answer, streak combo, CLI execution, and milestone celebration make learning feel alive.
+• Zero Friction: Launch your daily sprint in 1 tap from the home path, your iOS Home/Lock Screen Widget, or the 90-second Streak Rescue mode.
+
+KEY FEATURES
+• 15-Second Visual Insight Cards: Understand Azure, AWS, Kubernetes, and IAM architectures in 3 clear visual blocks with highlighted exam traps.
+• Interactive Cloud Shell Terminal: Practice real Azure CLI, PowerShell, AWS CLI, Kubectl, and Terraform commands with smart token completion and instant feedback.
+• Contextual AI Coach: Get instant explanations on why each option is right or wrong, ask follow-up questions, and pin takeaways to your Exam-Day Personal Notebook.
+• Official Mock Exam Simulator (/1000): Train under timed exam conditions with domain-by-domain readiness scores and the official 700/1000 passing bar.
+• iOS Widgets, Live Activities & Mascot Pro v2: Track your daily streak on your Home Screen and Lock Screen, and unlock 8 dynamic CertiGo mascot outfits (Morning Pajama, Coffee Boost, Exam Suit, Streak Fire, Prestige Gold).
+
+15+ OFFICIAL CERTIFICATIONS COVERED
+• Microsoft Azure & AI: AZ-900 (Azure Fundamentals), AZ-104 (Azure Administrator), AZ-204, AZ-305, AZ-500, AI-900, AI-102, DP-900, SC-900.
+• Amazon Web Services: AWS Cloud Practitioner (CLF-C02), AWS Solutions Architect Associate (SAA-C03).
+• Cloud Native, DevOps & Generative AI: Kubernetes (CKA / CKAD), HashiCorp Terraform Associate, Google Cloud Architect, GitHub Copilot (GH-300), Anthropic Claude & OpenAI Foundations.
+
+FREE TIER & CERTIGO PRO
+Start free across foundational tracks with 5 daily hearts. Upgrade to CertiGo PRO (7-day free trial available) for unlimited hearts, full timed mock exams, unlimited AI Coach explanations, and offline study packs.
+
+Privacy Policy: https://www.certigo-app.com/privacy-policy/
+Support & Terms: https://www.certigo-app.com/
