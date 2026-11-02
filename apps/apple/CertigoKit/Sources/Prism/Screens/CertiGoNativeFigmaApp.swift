@@ -579,7 +579,7 @@ public struct CertiGoPathLessonNode: Identifiable, Codable, Equatable, Hashable,
             "BrandLogos/brand-kubernetes",
             "BrandLogos/brand-grafana",
             "BrandLogos/brand-terraform",
-            "BrandLogos/brand-cisco",
+            "BrandLogos/brand-kubernetes",
             "BrandLogos/brand-kubernetes",
             "BrandLogos/brand-grafana",
             "BrandLogos/brand-kubernetes"
@@ -1031,7 +1031,7 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
         }
     }
     public let mascotPose: CertiGoMascotPose
-    public let options: [OptionItem]
+    public var options: [OptionItem]
     public let cliPrefix: String?
     public let cliSuffix: String?
     public let expectedCLIInput: String?
@@ -1907,6 +1907,8 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
     public var isLoadingLiveSheet05Explanation: Bool
     public var isPlainLanguageModeEnabled: Bool
     public var experienceLevelIndex: Int
+    public var isRescue90sSprint: Bool
+    public var lastAnswerWasMasterStroke: Bool
 
     public var isSessionFailedOutOfHearts: Bool {
         heartsCount <= 0
@@ -1922,7 +1924,8 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         enableAdaptiveReplay: Bool = false,
         sessionSeed: UInt64 = 1,
         isPlainLanguageModeEnabled: Bool = false,
-        experienceLevelIndex: Int = 1
+        experienceLevelIndex: Int = 1,
+        isRescue90sSprint: Bool = false
     ) {
         self.routeCode = routeCode
         self.lessonId = lessonId
@@ -1931,6 +1934,8 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         self.lessonSlideIndex = 0
         self.isPlainLanguageModeEnabled = isPlainLanguageModeEnabled || (experienceLevelIndex == 0)
         self.experienceLevelIndex = experienceLevelIndex
+        self.isRescue90sSprint = isRescue90sSprint
+        self.lastAnswerWasMasterStroke = false
         let declic = Self.defaultDeclicCard(
             forRouteCode: routeCode,
             lessonId: lessonId,
@@ -1965,7 +1970,11 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
             routeCode: routeCode,
             lessonId: lessonId,
             experienceLevelIndex: experienceLevelIndex
-        )
+        ).map { item -> CertiGoNativeExerciseItem in
+            var copy = item
+            copy.options = CertiGoSchultzPredictionErrorEngine.normalizeOrderedChoiceBadges(item.options)
+            return copy
+        }
         self.exercises = resolvedExercises
         self.currentExerciseIndex = 0
         self.attemptPhase = .answering
@@ -2442,6 +2451,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
     }
 
     public mutating func advanceLessonSlideOrStartExercises() {
+        CertiGoHapticsEngine.shared.playOptionSelection()
         if lessonSlideIndex + 1 < lessonSlides.count {
             lessonSlideIndex += 1
         } else {
@@ -2450,6 +2460,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
     }
 
     public mutating func previousLessonSlide() {
+        CertiGoHapticsEngine.shared.playOptionSelection()
         if lessonSlideIndex > 0 {
             lessonSlideIndex -= 1
         }
@@ -2466,7 +2477,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         } else {
             selectedOptionIds = [optionId]
         }
-        CertiGoHapticsEngine.play(.selection)
+        CertiGoHapticsEngine.shared.playOptionSelection()
     }
 
     public mutating func toggleWordBankBrick(_ brick: String) {
@@ -2476,11 +2487,12 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         } else {
             assembledWordBankTokens.append(brick)
         }
-        CertiGoHapticsEngine.play(.selection)
+        CertiGoHapticsEngine.shared.playOptionSelection()
     }
 
     public mutating func tapMatchingPairItem(left: String?, right: String?) {
         guard case .answering = attemptPhase else { return }
+        CertiGoHapticsEngine.shared.playOptionSelection()
         if let left {
             selectedLeftMatchItem = left
         } else if right != nil, selectedLeftMatchItem != nil {
@@ -2492,6 +2504,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
     public mutating func moveHierarchyRowUp(at index: Int) {
         guard case .answering = attemptPhase else { return }
         guard index > 0, index < hierarchyOrderedItems.count else { return }
+        CertiGoHapticsEngine.shared.playOptionSelection()
         hierarchyOrderedItems.swapAt(index, index - 1)
     }
 
@@ -2522,17 +2535,26 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
             isCorrect = selectedOptionIds == expectedSet
         }
 
+        let isFirstAttemptOnQuestion = !ex.isReviewReplay
+            && !recentMistakesLog.contains(where: { $0.conceptId == ex.conceptId })
+        lastAnswerWasMasterStroke = CertiGoVariableRewardVault.isMasterStroke(
+            isCorrect: isCorrect,
+            isFirstAttemptOnQuestion: isFirstAttemptOnQuestion,
+            latencyMs: latencyMs,
+            difficulty: ex.difficulty
+        )
+
         totalVerifiedCount += 1
         if isCorrect {
             correctAnswersCount += 1
             lastLostHeartIndex = nil
-            CertiGoHapticsEngine.play(.correct)
+            CertiGoHapticsEngine.shared.playCorrectAnswer()
         } else {
             let lostIndex = max(0, heartsCount - 1)
             heartsCount = max(0, heartsCount - 1)
             lastLostHeartIndex = lostIndex
             heartLossAnimationTrigger += 1
-            CertiGoHapticsEngine.play(.incorrectSoft)
+            CertiGoHapticsEngine.shared.playWrongAnswer()
         }
 
         CertiGoAdaptiveSessionEngine.recordAnswer(
@@ -2648,6 +2670,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
             hierarchyOrderedItems = Array(currentExercise.hierarchyCorrectOrder.reversed())
         } else {
             isSessionCompleted = true
+            CertiGoHapticsEngine.shared.playLessonCompleteFanfare()
         }
     }
 
@@ -9205,61 +9228,6 @@ public extension CertiGoMascotPose {
     static let errorCorrectionEncouraging: Self = .emotionOopsCaring
 }
 
-/// Duolingo-style native iOS Taptic Engine coordinator triggered on onboarding card selections, step transitions, 20% stamp credits, and exercise validations.
-public enum CertiGoHapticsEngine {
-    nonisolated(unsafe) public private(set) static var totalTriggeredHapticsCount: Int = 0
-    nonisolated(unsafe) public private(set) static var lastTriggeredHapticToken: PrismHapticToken? = nil
-
-    #if canImport(UIKit)
-    private typealias ImpactGenerator = UIImpactFeedbackGenerator
-    private typealias SelectionGenerator = UISelectionFeedbackGenerator
-    private typealias NotificationGenerator = UINotificationFeedbackGenerator
-    #endif
-
-    public static func resetTestCounters() {
-        totalTriggeredHapticsCount = 0
-        lastTriggeredHapticToken = nil
-    }
-
-    public static func play(_ token: PrismHapticToken, isEnabled: Bool = true) {
-        guard isEnabled else { return }
-        totalTriggeredHapticsCount += 1
-        lastTriggeredHapticToken = token
-        #if canImport(UIKit)
-        Task { @MainActor in
-            switch token {
-            case .selection:
-                let generator = SelectionGenerator()
-                generator.prepare()
-                generator.selectionChanged()
-            case .correct:
-                let impact = ImpactGenerator(style: .medium)
-                impact.prepare()
-                impact.impactOccurred()
-                let generator = NotificationGenerator()
-                generator.prepare()
-                generator.notificationOccurred(.success)
-            case .declic:
-                let impact = ImpactGenerator(style: .rigid)
-                impact.prepare()
-                impact.impactOccurred()
-                let generator = NotificationGenerator()
-                generator.prepare()
-                generator.notificationOccurred(.success)
-            case .incorrectSoft:
-                let generator = NotificationGenerator()
-                generator.prepare()
-                generator.notificationOccurred(.error)
-            case .warning:
-                let generator = NotificationGenerator()
-                generator.prepare()
-                generator.notificationOccurred(.warning)
-            }
-        }
-        #endif
-    }
-}
-
 public extension CertigoParallelTracksPreference {
     var selectedTracks: [CertiGoParallelCertificationTrackID] {
         parallelTrackCodes.compactMap { CertiGoParallelCertificationTrackID(rawValue: $0.uppercased()) }
@@ -9548,7 +9516,21 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var settingsExplanationStyleIndex: Int = 0
     public var settingsPushRemindersOn: Bool = true
     public var settingsDailyRadarOn: Bool = true
-    public var settingsHapticsOn: Bool = true
+    public var settingsHapticsOn: Bool = true {
+        didSet {
+            CertiGoHapticsEngine.shared.isEnabled = settingsHapticsOn
+        }
+    }
+    public var variableRewardVault: CertiGoVariableRewardVault = CertiGoVariableRewardVault()
+    public var bracketRitual: CertiGoActionChunkingBracketRitual = CertiGoActionChunkingBracketRitual()
+    public var dayOneNotebook: CertiGoDayOneNotebook = CertiGoDayOneNotebook()
+    public var cooperativeCohortChallenge: CertiGoCooperativeCohortChallenge = CertiGoCooperativeCohortChallenge()
+    public var scheduledFoggNotifications: [CertiGoFoggLocalNotificationSpec] =
+        CertiGoFoggFacilitatorEngine.buildThreeFoggNotifications(
+            routeCode: "AZ-104",
+            preferredAnchorTime: "19:30",
+            hasCompletedSessionToday: false
+        )
     public static let onboardingStepCount: Int = 11
     public var onboardingStepIndex: Int = 0
     public var onboardingSelectedGoalIds: Set<String> = ["certifs", "ai-radar"]
@@ -10262,7 +10244,34 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
 
     public var currentUnits: [CertiGoCertificationUnit] {
         let upper = activeRouteCode.uppercased()
-        return unitsByRouteCode[upper] ?? CertiGoNativeRichCatalog.buildThreeUnits(forRouteCode: upper)
+        let rawUnits = unitsByRouteCode[upper] ?? CertiGoNativeRichCatalog.buildThreeUnits(forRouteCode: upper)
+        guard !trackedCertificationCodes.isEmpty || completedStepsTotal > 0 else {
+            return rawUnits
+        }
+        return rawUnits.map { unit in
+            let isUnlocked = unit.unitNumber == 1
+                || unit.lessons.contains(where: { $0.state == .active || $0.state == .completed })
+            let effectivePct = CertiGoEndowedProgressEngine.endowedProgressPercent(
+                forUnitNumber: unit.unitNumber,
+                rawPercent: unit.progressPercent,
+                isUnlocked: isUnlocked,
+                hasCompletedOnboarding: true
+            )
+            guard effectivePct != unit.progressPercent else { return unit }
+            return CertiGoCertificationUnit(
+                id: unit.id,
+                unitNumber: unit.unitNumber,
+                headerTitle: unit.headerTitle,
+                subtitle: unit.subtitle,
+                progressPercent: effectivePct,
+                accentHex: unit.accentHex,
+                lipHex: unit.lipHex,
+                memoActivity: unit.memoActivity,
+                memoKeyTopics: unit.memoKeyTopics,
+                memoGoldenRule: unit.memoGoldenRule,
+                lessons: unit.lessons
+            )
+        }
     }
 
     public var filteredUnitsForMimoRail: [CertiGoCertificationUnit] {
@@ -10312,13 +10321,20 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         }
         examQuestions = CertiGoNativeRichCatalog.buildExamQuestions(forRouteCode: upper)
         showCoursePopover02 = false
+        scheduledFoggNotifications = CertiGoFoggFacilitatorEngine.buildThreeFoggNotifications(
+            routeCode: upper,
+            preferredAnchorTime: onboardingReminderTimeText,
+            hasCompletedSessionToday: completedStepsTotal > 0
+        )
     }
 
     public mutating func openStepPreviewSheet(forLessonId lessonId: String) {
+        CertiGoHapticsEngine.shared.playButtonPress()
         activeStepSheet = .preview03(lessonId: lessonId)
     }
 
     public mutating func toggleStepMemoSheet14() {
+        CertiGoHapticsEngine.shared.playOptionSelection()
         guard let current = activeStepSheet else {
             activeStepSheet = .memo14(lessonId: activeLessonNode.id)
             return
@@ -10329,6 +10345,58 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         case .memo14(let id):
             activeStepSheet = .preview03(lessonId: id)
         }
+    }
+
+    public mutating func startOneTapDailySprint() {
+        startLessonSession(enableAdaptiveReplay: true)
+    }
+
+    public mutating func startRescue90SecondsSession(now: Date = Date()) {
+        let resolvedNode = activeLessonNode
+        activeStepSheet = nil
+        if heartsCount <= 0 {
+            heartsCount = 5
+        }
+        let flashExercises = CertiGoFoggFacilitatorEngine.buildRescueThreeFlashExercises(
+            forRouteCode: activeRouteCode,
+            lessonId: resolvedNode.id,
+            lessonTitle: resolvedNode.title
+        )
+        isPlainLanguageModeEnabled = true
+        lessonSession = CertiGoNativeLessonSessionEngine(
+            routeCode: activeRouteCode,
+            lessonId: resolvedNode.id,
+            lessonTitle: "⚡ Sprint 90s · \(resolvedNode.title)",
+            isShowingDeclicCard15: false,
+            exercises: flashExercises,
+            heartsCount: heartsCount,
+            enableAdaptiveReplay: false,
+            isPlainLanguageModeEnabled: true,
+            experienceLevelIndex: 0,
+            isRescue90sSprint: true
+        )
+        bracketRitual.triggerOpeningBracket(hapticsEnabled: settingsHapticsOn)
+        isPresentingLessonSession = true
+    }
+
+    @discardableResult
+    public mutating func pinCurrentLessonTrapToDayOneNotebook() -> CertiGoDayOneNotebookEntry {
+        CertiGoHapticsEngine.shared.playStampSealed()
+        let ex = lessonSession.currentExercise
+        let entry = dayOneNotebook.pinTrapForTomorrowCoffee(
+            routeCode: activeRouteCode,
+            lessonId: lessonSession.lessonId,
+            lessonTitle: lessonSession.lessonTitle,
+            conceptId: ex.conceptId,
+            trapSummary: ex.primaryCorrectOptionTitle,
+            goldenRule: ex.examTip
+        )
+        saveToLocalDatabase()
+        return entry
+    }
+
+    public var isCurrentLessonPinnedInDayOneNotebook: Bool {
+        dayOneNotebook.isPinned(lessonId: lessonSession.lessonId, routeCode: activeRouteCode)
     }
 
     public mutating func startLessonSession(
@@ -10357,7 +10425,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             return onboardingExperienceLevelIndex == 0 ? true : isPlainLanguageModeEnabled
         }()
         isPlainLanguageModeEnabled = shouldStartInPlainLanguage
-        lessonSession = CertiGoNativeLessonSessionEngine(
+        var builtEngine = CertiGoNativeLessonSessionEngine(
             routeCode: activeRouteCode,
             lessonId: resolvedNode.id,
             lessonTitle: resolvedNode.title,
@@ -10367,7 +10435,14 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             isPlainLanguageModeEnabled: shouldStartInPlainLanguage,
             experienceLevelIndex: effectiveExperienceLevel
         )
+        builtEngine.exercises = CertiGoDayOneNotebook.prioritizePinnedConcepts(
+            in: builtEngine.exercises,
+            routeCode: activeRouteCode,
+            notebook: dayOneNotebook
+        )
+        lessonSession = builtEngine
         isPlainLanguageModeEnabled = lessonSession.isPlainLanguageModeEnabled
+        bracketRitual.triggerOpeningBracket(hapticsEnabled: settingsHapticsOn)
         isPresentingLessonSession = true
     }
 
@@ -10377,10 +10452,10 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         let domainTitle = domains.isEmpty ? activeLessonNode.title : domains[clampedIdx].title
         let unitNum = min(3, max(1, (clampedIdx % 3) + 1))
         let targetLessonId = "\(activeRouteCode.uppercased())-u\(unitNum)-s1"
-        let domainExercises = CertiGoNativeLessonSessionEngine.defaultExercises(
-            forRouteCode: activeRouteCode,
-            lessonId: targetLessonId,
-            lessonTitle: domainTitle
+        let domainExercises = CertiGoDomainSprintFilterEngine.exercisesForDomainSprint(
+            routeCode: activeRouteCode,
+            domainIndex: clampedIdx,
+            domainTitle: domainTitle
         )
         selectedDomainForPractice = nil
         returnTabAfterLessonSession = .examens
@@ -10403,6 +10478,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             experienceLevelIndex: onboardingExperienceLevelIndex
         )
         isPlainLanguageModeEnabled = lessonSession.isPlainLanguageModeEnabled
+        bracketRitual.triggerOpeningBracket(hapticsEnabled: settingsHapticsOn)
         isPresentingLessonSession = true
     }
 
@@ -10479,18 +10555,25 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             }
         }
 
-        // Rebuild units with updated node states and unit progress percentages
+        // Rebuild units with updated node states and unit progress percentages (including E1 endowed progress)
         for uIdx in units.indices {
             let unitNum = units[uIdx].unitNumber
             let updatedLessons = flatNodes.filter { $0.unitNumber == unitNum }
             let doneCount = updatedLessons.filter { $0.state == .completed }.count
-            let pct = Int((Double(doneCount) / Double(max(1, updatedLessons.count)) * 100.0).rounded())
+            let rawPct = Int((Double(doneCount) / Double(max(1, updatedLessons.count)) * 100.0).rounded())
+            let isUnitUnlocked = unitNum == 1 || updatedLessons.contains(where: { $0.state == .active || $0.state == .completed })
+            let effectivePct = CertiGoEndowedProgressEngine.endowedProgressPercent(
+                forUnitNumber: unitNum,
+                rawPercent: max(units[uIdx].progressPercent, rawPct),
+                isUnlocked: isUnitUnlocked,
+                hasCompletedOnboarding: true
+            )
             units[uIdx] = CertiGoCertificationUnit(
                 id: units[uIdx].id,
                 unitNumber: unitNum,
                 headerTitle: units[uIdx].headerTitle,
                 subtitle: units[uIdx].subtitle,
-                progressPercent: max(units[uIdx].progressPercent, pct),
+                progressPercent: effectivePct,
                 accentHex: units[uIdx].accentHex,
                 lipHex: units[uIdx].lipHex,
                 memoActivity: units[uIdx].memoActivity,
@@ -10501,13 +10584,35 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         }
         unitsByRouteCode[upper] = units
 
-        // Update counters & CertigoCortex FSRS ConceptMastery
+        // Update counters, neuro-retention reward vault, cooperative cohort & CertigoCortex FSRS ConceptMastery
         heartsCount = lessonSession.heartsCount
         lastLostHeartIndex = lessonSession.lastLostHeartIndex
         streakDays = max(1, streakDays)
         gemsCount += 15
         completedStepsTotal += 1
         userXPPoints += isDoubleXPBoostActive ? 50 : 25
+        if lessonSession.lastAnswerWasMasterStroke {
+            _ = variableRewardVault.registerExerciseAttempt(
+                isCorrect: true,
+                isFirstAttemptOnQuestion: true,
+                latencyMs: 2_500,
+                difficulty: 0.65
+            )
+        }
+        _ = variableRewardVault.awardSurpriseRewardAtSessionEnd(
+            routeCode: upper,
+            lessonId: lessonSession.lessonId,
+            lessonTitle: lessonSession.lessonTitle,
+            sessionIndex: completedStepsTotal
+        )
+        cooperativeCohortChallenge.recordUserValidatedConcepts(max(1, lessonSession.correctAnswersCount))
+        bracketRitual.triggerClosingBracket(hapticsEnabled: settingsHapticsOn)
+        CertiGoHapticsEngine.shared.playStampSealed()
+        scheduledFoggNotifications = CertiGoFoggFacilitatorEngine.buildThreeFoggNotifications(
+            routeCode: upper,
+            preferredAnchorTime: onboardingReminderTimeText,
+            hasCompletedSessionToday: true
+        )
         syncCurrentUserLeaderboardEntry()
 
         let conceptKey = "\(upper.lowercased()):\(lessonSession.lessonId.lowercased())"
@@ -10780,27 +10885,48 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     }
 
     public mutating func openAITopic(_ topicKey: String, customUserQuestion: String? = nil) {
+        CertiGoHapticsEngine.shared.playOptionSelection()
         isAIDrawerOpen06D = false
-        let payload = CertiGoFigmaLiveRuntimeState.aiTopicsById[topicKey]
-            ?? CertiGoFigmaLiveRuntimeState.aiTopicsById["rbac-vs-policy"]!
-        let promptText = customUserQuestion ?? payload.question
-        let turn = CertiGoChatTurn(
-            id: "turn-\(chatTurns.count + 1)-\(topicKey)",
-            userPrompt: promptText,
-            aiHeadline: payload.intro,
-            aiBullet1: payload.bullet1,
-            aiBullet2: payload.bullet2,
-            examKeyRule1: payload.examRule1,
-            examKeyRule2: payload.examRule2,
-            closingTip: isLiveAIModelConnected
-                ? payload.closing
-                : "\(payload.closing)\n\nℹ️ Synthèse locale hors-ligne certifiée · Le mode conversationnel libre nécessite la connexion Azure AI Foundry (CG-ERR-1001).",
-            isStreamingOrLoading: isLiveAIModelConnected,
-            isLiveAIResponse: false,
-            liveSourceBadge: isLiveAIModelConnected
-                ? "✦ GPT-5.4-MINI EN DIRECT · PERSONNALISÉ POUR \(firstNameText.uppercased())"
-                : nil
+        let learnerCtx = buildPersonalLearnerContext()
+        let offlineSynthesis = CertiGoOfflineAICoachSynthesisEngine.buildStructuredOfflineSynthesis(
+            forTopicKey: topicKey,
+            routeCode: activeRouteCode,
+            weakConceptsSummary: learnerCtx.weakConceptsSummary,
+            recentMistakesSummary: learnerCtx.recentMistakesSummary,
+            customQuestion: customUserQuestion
         )
+        let payload = CertiGoFigmaLiveRuntimeState.aiTopicsById[topicKey]
+        let promptText = customUserQuestion ?? payload?.question ?? offlineSynthesis.questionPrompt
+        let turn: CertiGoChatTurn
+        if isLiveAIModelConnected, let payload {
+            turn = CertiGoChatTurn(
+                id: "turn-\(chatTurns.count + 1)-\(topicKey)",
+                userPrompt: promptText,
+                aiHeadline: payload.intro,
+                aiBullet1: payload.bullet1,
+                aiBullet2: payload.bullet2,
+                examKeyRule1: payload.examRule1,
+                examKeyRule2: payload.examRule2,
+                closingTip: payload.closing,
+                isStreamingOrLoading: true,
+                isLiveAIResponse: false,
+                liveSourceBadge: "✦ GPT-5.4-MINI EN DIRECT · PERSONNALISÉ POUR \(firstNameText.uppercased())"
+            )
+        } else {
+            turn = CertiGoChatTurn(
+                id: "turn-\(chatTurns.count + 1)-\(topicKey)",
+                userPrompt: promptText,
+                aiHeadline: offlineSynthesis.headline,
+                aiBullet1: offlineSynthesis.comparisonBullet1,
+                aiBullet2: offlineSynthesis.comparisonBullet2,
+                examKeyRule1: offlineSynthesis.examRule1,
+                examKeyRule2: offlineSynthesis.examRule2,
+                closingTip: offlineSynthesis.closingTip,
+                isStreamingOrLoading: false,
+                isLiveAIResponse: false,
+                liveSourceBadge: "✦ SYNTHÈSE LOCALE CERTIGO · \(activeRouteCode)"
+            )
+        }
         chatTurns.append(turn)
         if !aiThreads.contains(where: { $0.topicKey == topicKey && $0.routeBadge == activeRouteCode && $0.title == promptText }) {
             aiThreads.insert(
@@ -11634,6 +11760,13 @@ public struct CertiGoTactile3DButtonStyle: ButtonStyle {
             .padding(.bottom, lipDepth)
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .sensoryFeedback(PrismHapticToken.selection.sensoryFeedback, trigger: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, pressed in
+                if pressed {
+                    CertiGoHapticsEngine.shared.playButtonPress()
+                } else {
+                    CertiGoHapticsEngine.shared.playButtonRelease()
+                }
+            }
             .animation(
                 CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion),
                 value: configuration.isPressed
@@ -12153,6 +12286,7 @@ public struct CertiGoNativeFigmaAppView: View {
     }
 
     private func selectBottomTab(_ tab: CertiGoNativeTab) {
+        CertiGoHapticsEngine.shared.playOptionSelection()
         appState.selectedTab = tab
         switch tab {
         case .parcours: router.selectedTab = .today
@@ -12377,6 +12511,23 @@ public struct CertiGoNativeFigmaAppView: View {
                 let stageWidth = max(safeWidth - PrismSpacing.l * 2, FigMetrics.twoHundredEighty)
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: PrismSpacing.xl) {
+                        // C1 & D1: 1-Tap Direct Sprint Launch Bar + 90s Evening Rescue Flash Pill
+                        CertiGoOneTapSprintBarView(
+                            activeRouteCode: appState.activeRouteCode,
+                            activeLessonTitle: appState.activeLessonNode.title,
+                            isEveningRescueHighlighted: CertiGoFoggFacilitatorEngine.isEveningRescueWindow(),
+                            onStartOneTapSprint: {
+                                withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                                    appState.startOneTapDailySprint()
+                                }
+                            },
+                            onStartRescue90sSprint: {
+                                withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                                    appState.startRescue90SecondsSession()
+                                }
+                            }
+                        )
+
                         ForEach(appState.currentUnits) { unit in
                             unitSectionView(unit: unit, stageWidth: stageWidth)
                         }
@@ -12388,6 +12539,9 @@ public struct CertiGoNativeFigmaAppView: View {
                 .ignoresSafeArea(edges: .bottom)
             }
             .background(PrismColor.figmaHex("#f8fafc").ignoresSafeArea())
+
+            // C1: Top progressive vignette preventing scroll text collision under the two 44pt pills
+            CertiGoTopProgressiveVignetteView()
 
             // Front Layer: Levitating Top Pills (`[Logo | AZ-104 ▾]` + `[🔥 0  💎 0  ❤️ 5]`) — Exact same 44pt height on 1 single line!
             HStack(spacing: PrismSpacing.s) {
@@ -12487,11 +12641,19 @@ public struct CertiGoNativeFigmaAppView: View {
     }
 
     private func unitSectionView(unit: CertiGoCertificationUnit, stageWidth: CGFloat) -> some View {
-        let rawRatio = CGFloat(unit.progressPercent) / 100.0
+        let isUnlocked = unit.unitNumber == 1
+            || unit.lessons.contains(where: { $0.state == .active || $0.state == .completed })
+        let displayedPct = CertiGoEndowedProgressEngine.endowedProgressPercent(
+            forUnitNumber: unit.unitNumber,
+            rawPercent: unit.progressPercent,
+            isUnlocked: isUnlocked,
+            hasCompletedOnboarding: true
+        )
+        let rawRatio = CGFloat(displayedPct) / 100.0
         let safeRatio = rawRatio.isFinite ? min(max(rawRatio, 0), 1) : 0
 
         return VStack(spacing: PrismSpacing.l) {
-            // 3D Duolingo-Style Unit Header Banner (`UNITÉ 1 · ...` + `0%` ring + vertical divider + `[📖]` Memo button)
+            // 3D Duolingo-Style Unit Header Banner (`UNITÉ 1 · ...` + Endowed % ring + vertical divider + `[📖]` Memo button)
             HStack(spacing: PrismSpacing.m) {
                 ZStack {
                     Circle()
@@ -12505,7 +12667,7 @@ public struct CertiGoNativeFigmaAppView: View {
                         )
                         .rotationEffect(.degrees(-90))
                         .frame(width: FigMetrics.fortyEight, height: FigMetrics.fortyEight)
-                    Text(verbatim: "\(unit.progressPercent)%")
+                    Text(verbatim: "\(displayedPct)%")
                         .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
                         .foregroundStyle(PrismColor.onAccent)
                 }
@@ -12518,6 +12680,10 @@ public struct CertiGoNativeFigmaAppView: View {
                         .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#e0f2fe"))
                         .lineLimit(1)
+                    CertiGoHullStampCardView(
+                        unitNumber: unit.unitNumber,
+                        effectivePercent: displayedPct
+                    )
                 }
 
                 Spacer(minLength: PrismSpacing.xs)
@@ -16633,10 +16799,11 @@ public struct CertiGoNativeFigmaAppView: View {
 
                             Spacer(minLength: FigMetrics.four)
 
-                            Text(verbatim: "CertiGo AI")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
+                            Text(verbatim: "Coach IA · \(appState.activeRouteCode)")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
                                 .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.82)
 
                             Spacer(minLength: FigMetrics.four)
 
@@ -16683,13 +16850,17 @@ public struct CertiGoNativeFigmaAppView: View {
 
                                 Button {
                                     withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                                        CertiGoHapticsEngine.shared.playButtonPress()
                                         appState.chatTurns.removeAll()
                                     }
                                 } label: {
-                                    Text(verbatim: "+")
-                                        .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
+                                    Text(verbatim: "+ Nouvelle")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                         .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                                        .frame(width: FigMetrics.thirtySix, height: FigMetrics.thirtySix)
+                                        .lineLimit(1)
+                                        .fixedSize()
+                                        .padding(.horizontal, PrismSpacing.s)
+                                        .frame(height: FigMetrics.thirtySix)
                                         .background(
                                             RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
                                                 .fill(PrismColor.figmaHex("#eff6ff"))
@@ -17997,6 +18168,7 @@ public struct CertiGoNativeFigmaAppView: View {
         let isSelected = appState.selectedSocialSubTab == index
         return Button {
             withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                CertiGoHapticsEngine.shared.playOptionSelection()
                 appState.selectedSocialSubTab = index
             }
         } label: {
@@ -18015,13 +18187,22 @@ public struct CertiGoNativeFigmaAppView: View {
     }
 
     private var socialPodium07ScrollView: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        let sortedMembers = appState.leaderboardMembers.sorted { lhs, rhs in
+            if lhs.xpPoints != rhs.xpPoints {
+                return lhs.xpPoints > rhs.xpPoints
+            }
+            return !lhs.isCurrentUser && rhs.isCurrentUser
+        }
+        return ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: PrismSpacing.m) {
-                // 3D Podium Stage (`2e Sarah L.`, `1er Toi 👑`, `3e Thomas M.`)
+                // F2: Cooperative Cohort Weekly Goal Card
+                CertiGoCooperativeCohortCardView(challenge: appState.cooperativeCohortChallenge)
+
+                // 3D Podium Stage sorted by XP descending (`2e`, `1er 👑`, `3e`)
                 HStack(alignment: .bottom, spacing: PrismSpacing.m) {
-                    podiumColumnView(member: appState.leaderboardMembers[1], height: PrismSize.podiumSecondHeight, medal: "🥈 2e", pedestalHex: "#cbd5e1")
-                    podiumColumnView(member: appState.leaderboardMembers[0], height: PrismSize.podiumFirstHeight, medal: "👑 1er", pedestalHex: "#facc15")
-                    podiumColumnView(member: appState.leaderboardMembers[2], height: PrismSize.podiumThirdHeight, medal: "🥉 3e", pedestalHex: "#fdba74")
+                    podiumColumnView(member: sortedMembers[1], height: PrismSize.podiumSecondHeight, medal: "🥈 2e", pedestalHex: "#cbd5e1")
+                    podiumColumnView(member: sortedMembers[0], height: PrismSize.podiumFirstHeight, medal: "👑 1er", pedestalHex: "#facc15")
+                    podiumColumnView(member: sortedMembers[2], height: PrismSize.podiumThirdHeight, medal: "🥉 3e", pedestalHex: "#fdba74")
                 }
                 .padding(PrismSpacing.l)
                 .frame(maxWidth: .infinity)
@@ -18673,29 +18854,12 @@ public struct CertiGoNativeLessonSessionModalView: View {
                         .lineSpacing(5)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    if slideIdx == 1 {
-                        // Visual Architecture Flow on Slide 2/3
-                        VStack(spacing: PrismSpacing.xs) {
-                            declicArchitectureNodeBox(
-                                icon: "🏛️",
-                                title: "Management Group & Policy",
-                                subtitle: "Garde-fous hérités sur tous les abonnements",
-                                borderHex: "#93c5fd",
-                                bgHex: "#eff6ff",
-                                textHex: "#1e3a8a"
-                            )
-                            Text(verbatim: "↓")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
-                                .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                            declicArchitectureNodeBox(
-                                icon: "📦",
-                                title: "Resource Group & RBAC",
-                                subtitle: "Cycle de vie commun & contrôle d'accès",
-                                borderHex: "#34d399",
-                                bgHex: "#ecfdf5",
-                                textHex: "#065f46"
-                            )
-                        }
+                    if slideIdx <= 1 {
+                        // B1: Real 3-Brick Connected Visual Architecture Diagram on Déclic Cards
+                        CertiGoVisualArchitectureDiagramView(
+                            routeCode: appState.lessonSession.routeCode,
+                            lessonId: appState.lessonSession.lessonId
+                        )
                     }
 
                     HStack(alignment: .top, spacing: PrismSpacing.s) {
@@ -19330,8 +19494,18 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     Text(verbatim: "  \(ex.cliSuffix ?? "create --lock-type CanNotDelete -n LockProd -g RG-Prod")")
                         .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium", monospaced: true))
                         .foregroundStyle(PrismColor.figmaHex("#cbd5e1"))
+                        .lineLimit(nil)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    if case .checked(let isCorrect) = appState.lessonSession.attemptPhase, isCorrect {
+                        Text(verbatim: "✓ Output : Commande exécutée avec succès")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold", monospaced: true))
+                            .foregroundStyle(PrismColor.figmaHex("#4ade80"))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, PrismSpacing.xxs)
+                            .accessibilityIdentifier("session-cli-success-output")
+                    }
                 }
             }
             .padding(PrismSpacing.l)
@@ -19350,6 +19524,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     let isChosen = appState.lessonSession.cliInputText.lowercased() == brick.lowercased()
                     Button {
                         withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                            CertiGoHapticsEngine.shared.playOptionSelection()
                             appState.lessonSession.cliInputText = brick
                         }
                     } label: {
@@ -19489,90 +19664,30 @@ public struct CertiGoNativeLessonSessionModalView: View {
     }
 
     private func feedbackDrawer18Or04(isCorrect: Bool) -> some View {
-        let bgHex = isCorrect ? "#d7ffb8" : "#ffdfe0"
-        let titleHex = isCorrect ? "#3f7d00" : "#ea2b2b"
-        let primaryFaceHex = isCorrect ? "#58cc02" : "#ff4b4b"
-        let primaryLipHex = isCorrect ? "#46a302" : "#d93838"
-
-        return VStack(alignment: .leading, spacing: PrismSpacing.m) {
-            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                Text(verbatim: isCorrect ? "✓  Excellent !" : "✕  Incorrect")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex(titleHex))
-
-                if isCorrect {
-                    Text(verbatim: "+15 XP · Concept validé du premier coup")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                        .foregroundStyle(PrismColor.figmaHex("#3f7d00"))
-                } else {
-                    Text(verbatim: "Bonne réponse : \(appState.lessonSession.currentExercise.primaryCorrectOptionTitle)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
-                        .foregroundStyle(PrismColor.figmaHex("#991b1b"))
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
+        let ex = appState.lessonSession.currentExercise
+        let trapPill = CertiGoSchultzPredictionErrorEngine.compactExamTrapPillText(
+            forExerciseId: ex.id,
+            difficulty: ex.difficulty
+        )
+        return CertiGoFluidErrorFeedbackCardView(
+            isCorrect: isCorrect,
+            isMasterStroke: appState.lessonSession.lastAnswerWasMasterStroke,
+            trapBadgeText: trapPill,
+            primaryCorrectTitle: ex.primaryCorrectOptionTitle,
+            conciseExplanationText: appState.lessonSession.correctWhyRightExplanation,
+            examTipText: ex.examTip,
+            onTapDeepenExplanation: {
+                withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                    appState.recordCurrentLessonAttemptInPersonalMemory()
+                    appState.lessonSession.openErrorExplanationSheet05()
+                    requestLiveExplanationForCurrentExercise(isCorrect: isCorrect)
+                }
+            },
+            onTapContinue: {
+                withAnimation(CertiGoMotion.spring(for: .anim03Mascot34SpeechBubblePop, reduceMotion: reduceMotion)) {
+                    appState.lessonSession.advanceToNextExerciseOrFinish()
                 }
             }
-
-            HStack(spacing: PrismSpacing.m) {
-                Button {
-                    withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                        appState.recordCurrentLessonAttemptInPersonalMemory()
-                        appState.lessonSession.openErrorExplanationSheet05()
-                        requestLiveExplanationForCurrentExercise(isCorrect: isCorrect)
-                    }
-                } label: {
-                    Text(verbatim: "✦ Pourquoi ?")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex(titleHex))
-                        .frame(width: FigMetrics.oneHundredTwentyEight, height: FigMetrics.fortyEight)
-                }
-                .buttonStyle(
-                    CertiGoTactile3DButtonStyle(
-                        faceHex: "#ffffff",
-                        lipHex: "#cbd5e1",
-                        strokeHex: "#cbd5e1",
-                        cornerRadius: PrismRadius.l,
-                        lipDepth: FigMetrics.four
-                    )
-                )
-                .accessibilityIdentifier("session-explain-ai-button")
-
-                Button {
-                    withAnimation(CertiGoMotion.spring(for: .anim03Mascot34SpeechBubblePop, reduceMotion: reduceMotion)) {
-                        appState.lessonSession.advanceToNextExerciseOrFinish()
-                    }
-                } label: {
-                    Text(verbatim: "CONTINUER")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
-                        .foregroundStyle(PrismColor.onAccent)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: FigMetrics.fortyEight)
-                }
-                .buttonStyle(
-                    CertiGoTactile3DButtonStyle(
-                        faceHex: primaryFaceHex,
-                        lipHex: primaryLipHex,
-                        cornerRadius: PrismRadius.l,
-                        lipDepth: FigMetrics.four
-                    )
-                )
-                .accessibilityIdentifier("session-continue-button")
-            }
-        }
-        .padding(.horizontal, PrismSpacing.xl)
-        .padding(.top, PrismSpacing.l)
-        .padding(.bottom, PrismSpacing.xl)
-        .frame(maxWidth: .infinity)
-        .background(
-            UnevenRoundedRectangle(
-                topLeadingRadius: PrismRadius.sheet,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: PrismRadius.sheet,
-                style: .continuous
-            )
-            .fill(PrismColor.figmaHex(bgHex))
-            .ignoresSafeArea(.all, edges: .bottom)
         )
     }
 
@@ -20051,6 +20166,31 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 celebrationStatBox(title: "SÉRIE", value: "\(appState.streakDays) j 🔥", hex: "#ea580c")
             }
             .padding(.horizontal, PrismSpacing.l)
+
+            // A2, C2, E2, F3: Variable Reward + Striatal Closing Bracket + Day-One Notebook Pin + Healthy Stopping Point
+            CertiGoCelebrationNeuroStackView(
+                variableReward: appState.variableRewardVault.lastAwardedReward
+                    ?? CertiGoVariableRewardItem(
+                        id: "vr-preview-\(appState.activeRouteCode.lowercased())",
+                        kind: appState.lessonSession.lastAnswerWasMasterStroke ? .masterStrokeDoubleBoost : .examinerTrapCard,
+                        routeCode: appState.activeRouteCode,
+                        title: appState.lessonSession.lastAnswerWasMasterStroke
+                            ? "⚡ Boost de Maîtrise ×2 (< 8s)"
+                            : "🎯 Fiche Piège d'Examinateur · \(appState.activeRouteCode)",
+                        subtitle: appState.lessonSession.lessonTitle,
+                        architecturalRule: appState.lessonSession.currentExercise.examTip,
+                        bonusXP: appState.lessonSession.lastAnswerWasMasterStroke ? 30 : 20,
+                        isMasterStrokeTriggered: appState.lessonSession.lastAnswerWasMasterStroke
+                    ),
+                closingBracketText: appState.bracketRitual.closingBannerText,
+                isPinnedToDayOneNotebook: appState.isCurrentLessonPinnedInDayOneNotebook,
+                isDailyGoalReached: true,
+                onPinToDayOneNotebook: {
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        _ = appState.pinCurrentLessonTrapToDayOneNotebook()
+                    }
+                }
+            )
 
             Spacer()
 
