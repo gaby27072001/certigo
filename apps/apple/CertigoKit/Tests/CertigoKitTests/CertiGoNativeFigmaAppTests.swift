@@ -22,10 +22,10 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 15)
     }
 
-    @Test("8-step native onboarding flow advances from step 0 to step 7, supports back navigation, and dismisses cleanly on completion or close")
+    @Test("11-step native onboarding flow advances from step 0 to step 10 (6A rhythm, 6B moment, 6C widget, 7 speed 3.4x, 8 save 20% stamps), supports back navigation, and dismisses cleanly on completion or close")
     func onboardingEightStepNavigationAndDismissal() {
         var appState = CertiGoNativeAppState()
-        #expect(CertiGoNativeAppState.onboardingStepCount == 8)
+        #expect(CertiGoNativeAppState.onboardingStepCount == 11)
 
         appState.startOnboardingFlow()
         #expect(appState.isPresentingOnboardingFlow == true)
@@ -38,11 +38,11 @@ struct CertiGoNativeFigmaAppTests {
         }
 
         appState.goBackOnboardingStep()
-        #expect(appState.onboardingStepIndex == 6)
+        #expect(appState.onboardingStepIndex == 9)
         appState.advanceOnboardingStep()
-        #expect(appState.onboardingStepIndex == 7)
+        #expect(appState.onboardingStepIndex == 10)
 
-        // Advancing from step 7 (8/8) completes and dismisses the onboarding flow
+        // Advancing from step 10 (10/10) completes and dismisses the onboarding flow
         appState.advanceOnboardingStep()
         #expect(appState.isPresentingOnboardingFlow == false)
 
@@ -52,6 +52,107 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.onboardingStepIndex == 1)
         appState.dismissOnboardingFlow()
         #expect(appState.isPresentingOnboardingFlow == false)
+    }
+
+    @Test("TestFlight Build 10 & Figma Page 17: Direct Apple/Google/Email auth without Microsoft CIAM popup, minimalist 6A/6B/6C/7/8 screens, 2/10 stamps, and Duolingo haptics")
+    @MainActor
+    func testFlightBuild10DirectAuthSplitRhythmWidgetStepAndSpeedComparison() async throws {
+        // 1. Direct Apple / Google / Email auth never uses Microsoft CIAM web session
+        #expect(CertiGoNativeSystemOAuthCoordinator.usesMicrosoftCIAMWebSession(for: .apple) == false)
+        #expect(CertiGoNativeSystemOAuthCoordinator.usesMicrosoftCIAMWebSession(for: .google) == false)
+        #expect(CertiGoNativeSystemOAuthCoordinator.usesMicrosoftCIAMWebSession(for: .email) == false)
+        #expect(CertiGoNativeSystemOAuthCoordinator.usesMicrosoftCIAMWebSession(for: .microsoft) == true)
+
+        let suiteName = "CertiGoAuthStoreTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = CertiGoNativeAuthSessionStore(defaults: defaults)
+        let savedApple = CertiGoPersistedAuthSession(
+            userId: "apple-user-001",
+            displayName: "Gabriel Chambaud",
+            email: "gabriel.chambaud@icloud.com",
+            accessToken: "apple.identity.jwt",
+            providerRawValue: CertiGoAuthProviderKind.apple.rawValue
+        )
+        store.saveSession(savedApple)
+        #expect(store.loadSession(for: .apple) == savedApple)
+        store.clearAllSessions()
+        #expect(store.loadSession(for: .apple) == nil)
+
+        // 2. Étape 6A (Step 6): 4 daily goal options with 2-word subtitles and right-side badges
+        let rhythmOptions = CertiGoNativeAppState.onboardingDailyRhythmOptions
+        #expect(rhythmOptions.map(\.minutes) == [5, 10, 15, 20])
+        #expect(rhythmOptions[0].subtitle == "Départ léger")
+        #expect(rhythmOptions[0].subBadge == "🌱 Doux")
+        #expect(rhythmOptions[1].subtitle == "Rythme idéal")
+        #expect(rhythmOptions[1].subBadge == "⭐ Recommandé")
+        #expect(rhythmOptions[1].isRecommended == true)
+        #expect(rhythmOptions[2].subtitle == "Progression accélérée")
+        #expect(rhythmOptions[2].subBadge == "🚀 Soutenu")
+        #expect(rhythmOptions[3].subtitle == "Préparation intensive")
+        #expect(rhythmOptions[3].subBadge == "🔥 Intensif")
+
+        // 3. Étape 6B (Step 7): 4 training moments (08:00, 12:30, 18:00, 20:30), time stepper, notification scheduler, and Duolingo haptics
+        CertiGoHapticsEngine.resetTestCounters()
+        let anchors = CertiGoNativeAppState.onboardingRoutineAnchors
+        #expect(anchors.count == 4)
+        #expect(anchors.map(\.defaultTime) == ["08:00", "12:30", "18:00", "20:30"])
+        var appState = CertiGoNativeAppState()
+        appState.selectOnboardingDailyRhythm(15)
+        #expect(appState.onboardingDailyRhythmMinutes == 15)
+        #expect(CertiGoHapticsEngine.lastTriggeredHapticToken == .selection)
+
+        appState.selectOnboardingRoutineAnchor(2)
+        #expect(appState.onboardingRoutineAnchorIndex == 2)
+        #expect(appState.onboardingReminderTimeText == "18:00")
+        appState.adjustOnboardingReminderTime(byMinutes: 30)
+        #expect(appState.onboardingReminderTimeText == "18:30")
+        appState.adjustOnboardingReminderTime(byMinutes: -60)
+        #expect(appState.onboardingReminderTimeText == "17:30")
+        #expect(CertiGoDailyNotificationScheduler.parseHourAndMinute(from: "20:30") == (20, 30))
+
+        appState.onboardingStepIndex = 7
+        appState.activateDailyReminderAndAdvance()
+        #expect(appState.hasScheduledOnboardingDailyReminder == true)
+        #expect(appState.settingsPushRemindersOn == true)
+        #expect(appState.onboardingStepIndex == 8)
+
+        // 4. Étape 6C (Step 8): 3 single-line bold installation steps with zero grey subtext
+        let widgetSteps = CertiGoNativeAppState.onboardingWidgetInstallSteps
+        #expect(widgetSteps.map(\.number) == [1, 2, 3])
+        #expect(widgetSteps[0].title == "Appuie longuement sur ton écran d'accueil")
+        #expect(widgetSteps[1].title == "Touche « Modifier » ou « + » en haut à gauche")
+        #expect(widgetSteps[2].title == "Cherche « CertiGo » et place ton widget")
+        #expect(widgetSteps.allSatisfy { $0.detail.isEmpty })
+
+        // 5. Étape 7 (Step 9): ~11 weeks vs 3 weeks · 3,4× plus efficace 🏆 + 3 compact single-line 50pt pills (🎯, 🧠, 🎁)
+        let bars = CertiGoNativeAppState.onboardingSpeedComparisonBars
+        #expect(bars.count == 2)
+        #expect(bars[0].durationText == "~11 semaines")
+        #expect(bars[0].percentValue == 29)
+        #expect(bars[1].durationText == "3 semaines · 3,4× plus efficace 🏆")
+        #expect(bars[1].percentValue == 100)
+        #expect(bars[1].badgeText == "⚡ 3,4×")
+
+        let pillars = CertiGoNativeAppState.onboardingSpeedPillars
+        #expect(pillars.count == 3)
+        #expect(pillars[0].icon == "🎯")
+        #expect(pillars[0].title == "100 % ciblé sur les pièges d'examen")
+        #expect(pillars[1].icon == "🧠")
+        #expect(pillars[1].title == "Rappel actif & répétition espacée")
+        #expect(pillars[2].icon == "🎁")
+        #expect(pillars[2].title == "20 % du Chapitre 1 déjà crédités !")
+        #expect(pillars.allSatisfy { $0.detail.isEmpty })
+
+        // 6. Étape 8 (Step 10): Sauvegarde tes 20 % d'avance (Chapitre 1 : 2 / 10 tampons validés (20 %)) + Duolingo haptics on completion
+        #expect(CertiGoNativeAppState.onboardingEndowedMilestonesCompleted == 2)
+        #expect(CertiGoNativeAppState.onboardingEndowedMilestonesTotal == 10)
+        #expect(CertiGoNativeAppState.onboardingEndowedProgressPercent == 20)
+        #expect(CertiGoNativeAppState.onboardingEndowedProgressBannerText == "Chapitre 1 : 2 / 10 tampons validés (20 %)")
+
+        appState.completeOnboardingFlow(awardWelcomeBonus: true, startGuidedTour: false)
+        #expect(CertiGoHapticsEngine.lastTriggeredHapticToken == .declic)
+        #expect(CertiGoHapticsEngine.totalTriggeredHapticsCount >= 5)
     }
 
     @Test("deduplicatedParallelTrackCodes preserves order, returns 3 distinct certifications, and resolves distinct profile titles")
