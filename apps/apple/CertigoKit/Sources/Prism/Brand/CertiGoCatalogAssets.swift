@@ -150,7 +150,11 @@ public enum CertiGoOfficialAssetCatalog {
     }
 
     public static func brandLogoAssetName(forVendorId vendorId: String) -> String {
-        switch vendorId.lowercased() {
+        let normalized = vendorId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized.contains("kubernetes") || normalized.contains("cncf") || normalized == "k8s" {
+            return "BrandLogos/brand-kubernetes"
+        }
+        switch normalized {
         case "aws", "amazon":
             return "BrandLogos/brand-aws-official"
         case "microsoft":
