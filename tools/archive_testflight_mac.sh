@@ -22,7 +22,7 @@ fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 team_id=${CERTIGO_APPLE_TEAM_ID:-FFQPC7NC68}
 version=${CERTIGO_DISTRIBUTION_VERSION:-1.1.0}
-build=${CERTIGO_DISTRIBUTION_BUILD:-8}
+build=${CERTIGO_DISTRIBUTION_BUILD:-9}
 open_xcode=false
 
 while [[ $# -gt 0 ]]; do
@@ -64,7 +64,51 @@ archive_dir="$HOME/Library/Developer/Xcode/Archives/$date_dir"
 mkdir -p "$archive_dir"
 archive_path="$archive_dir/CertigoNative-${version}-build${build}-$(date +%H%M%S).xcarchive"
 
-printf 'Archiving CertigoNative %s (%s) with Team %s...\n' "$version" "$build" "$team_id"
+app_swift="$root/apps/apple/CertigoNative/Sources/CertigoNativeApp.swift"
+app_swift_backup=$(mktemp "${TMPDIR:-/tmp}/CertigoNativeApp.swift.XXXXXX")
+cp "$app_swift" "$app_swift_backup"
+restore_app_swift() {
+  if [[ -f "$app_swift_backup" ]]; then
+    cp "$app_swift_backup" "$app_swift"
+    rm -f "$app_swift_backup"
+  fi
+}
+trap restore_app_swift EXIT INT TERM
+
+python3 - "$app_swift" <<'PY'
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+text = text.replace(
+    "    import CertigoDomain\n",
+    "    import CertigoDomain\n    import Prism\n",
+    1,
+)
+text = text.replace(
+    "                NativeLanguageRoot()\n"
+    "                    #if DEBUG\n"
+    "                        .modifier(PrismDebugGalleryLauncher())\n"
+    "                    #endif\n",
+    "                NativeLanguageRoot()\n"
+    "                    .modifier(PrismProductionShellLauncher())\n",
+    1,
+)
+launcher = """
+    private struct PrismProductionShellLauncher: ViewModifier {
+        func body(content: Content) -> some View {
+            PrismAppShellView()
+        }
+    }
+"""
+text = text.replace(
+    "    private struct NativeLanguagePreferenceKey: EnvironmentKey {\n",
+    launcher + "\n    private struct NativeLanguagePreferenceKey: EnvironmentKey {\n",
+    1,
+)
+path.write_text(text, encoding="utf-8")
+PY
+
+printf 'Archiving CertiGo %s (%s) with Team %s...\n' "$version" "$build" "$team_id"
 xcodebuild archive \
   -project "$project" \
   -scheme 'CertigoNative Distribution' \
@@ -76,8 +120,19 @@ xcodebuild archive \
   CODE_SIGN_STYLE=Automatic \
   DEVELOPMENT_TEAM="$team_id" \
   DEBUG_INFORMATION_FORMAT=dwarf-with-dsym \
+  INFOPLIST_KEY_CFBundleDisplayName=CertiGo \
   CERTIGO_DISTRIBUTION_VERSION="$version" \
-  CERTIGO_DISTRIBUTION_BUILD="$build"
+  CERTIGO_DISTRIBUTION_BUILD="$build" \
+  CERTIGO_PRODUCTION_CIAM_CLIENT_ID="4d1f1075-7bc5-4764-947b-701435a85f8c" \
+  CERTIGO_PRODUCTION_CIAM_TENANT_ID="af721be8-5901-422a-b299-b9c57847b968" \
+  CERTIGO_PRODUCTION_CIAM_AUTHORITY="https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968" \
+  CERTIGO_PRODUCTION_CIAM_ISSUER="https://af721be8-5901-422a-b299-b9c57847b968.ciamlogin.com/af721be8-5901-422a-b299-b9c57847b968/v2.0" \
+  CERTIGO_PRODUCTION_CIAM_AUTHORITY_KIND="standard" \
+  CERTIGO_PRODUCTION_CIAM_API_BASE_URL="https://func-certigo-dev-bk3j5ja6vw23s.azurewebsites.net/api" \
+  CERTIGO_PRODUCTION_CIAM_API_SCOPE="api://12910b8e-6c75-4d51-91d8-4d5fb8a6e915/user_impersonation" \
+  CERTIGO_PRODUCTION_CIAM_API_AUDIENCE="12910b8e-6c75-4d51-91d8-4d5fb8a6e915"
+
+restore_app_swift
 
 [[ -d "$archive_path/Products/Applications/CertigoNative.app" ]] \
   || fail 'Archive did not produce CertigoNative.app.'
