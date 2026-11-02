@@ -17,6 +17,10 @@ public enum CertiGoMascotVault {
         CertiGoMascotVectorGeometrySpec.spec(for: outfit)
     }
 
+    public static func assetName(for outfit: CertiGoMascotOutfit) -> String {
+        "Mascots/mascot-prov2-\(outfit.rawValue.replacingOccurrences(of: "_", with: "-"))"
+    }
+
     /// Maps legacy 24-pose enum cases to their closest contextual mascot outfit when rendered in vector mode.
     public static func outfit(for pose: CertiGoMascotPose) -> CertiGoMascotOutfit {
         switch pose {
@@ -268,6 +272,49 @@ public struct CertiGoMascotAvatarView: View {
     }
 
     public var body: some View {
+        let assetName = CertiGoMascotVault.assetName(for: outfit)
+        ZStack {
+            if showAppIconSquircle {
+                RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                PrismColor.figmaHex(theme.backgroundPrimaryHex),
+                                PrismColor.figmaHex(theme.backgroundSecondaryHex)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                PrismColor.figmaHex(theme.haloRingHex).opacity(theme == .light ? 0.28 : 0.42),
+                                lineWidth: max(1.5, size * 0.022)
+                            )
+                            .padding(size * 0.055)
+                    )
+
+                Image(assetName, bundle: .module)
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size * 0.84, height: size * 0.84)
+            } else {
+                Image(assetName, bundle: .module)
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityLabel(Text(verbatim: "Mascotte CertiGo · \(outfit.displayName) · \(theme.shortTitle)"))
+        .accessibilityAddTraits(.isImage)
+    }
+
+    @available(*, deprecated, message: "Uses high-resolution Prism.xcassets PNG mascot assets directly")
+    private var legacyProceduralCanvasBody: some View {
         Canvas { context, canvasSize in
             let w = canvasSize.width
             let h = canvasSize.height

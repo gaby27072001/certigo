@@ -133,7 +133,7 @@ public enum CertiGoOfficialAssetCatalog {
         case "CCA-F", "CLAUDE", "ANTHROPIC-CLAUDE":
             return "Certifications/tech-anthropic-cca-foundations"
         case "MS-365-COPILOT", "M365-COPILOT":
-            return "Certifications/ms-official-associate-badge"
+            return "BrandLogos/brand-m365-copilot"
         case "OPENAI-PRO":
             return "BrandLogos/brand-openai"
         case "HARVEY-LEGAL", "HARVEY":
@@ -159,6 +159,22 @@ public enum CertiGoOfficialAssetCatalog {
             return "BrandLogos/brand-aws-official"
         case "microsoft":
             return "BrandLogos/brand-microsoft"
+        case "m365-copilot", "ms-365-copilot":
+            return "BrandLogos/brand-m365-copilot"
+        case "copilot-cowork", "cowork":
+            return "BrandLogos/brand-copilot-cowork"
+        case "word", "ms-word":
+            return "BrandLogos/brand-office-word"
+        case "excel", "ms-excel":
+            return "BrandLogos/brand-office-excel"
+        case "powerpoint", "ms-powerpoint":
+            return "BrandLogos/brand-office-powerpoint"
+        case "teams", "ms-teams":
+            return "BrandLogos/brand-office-teams"
+        case "outlook", "ms-outlook":
+            return "BrandLogos/brand-office-outlook"
+        case "copilot-studio":
+            return "BrandLogos/brand-copilot-studio"
         case "azure":
             return "BrandLogos/brand-microsoft-azure"
         case "gcp", "google", "google-cloud":
@@ -169,10 +185,28 @@ public enum CertiGoOfficialAssetCatalog {
             return "BrandLogos/brand-github-copilot"
         case "openai", "chatgpt":
             return "BrandLogos/brand-openai"
+        case "openai-codex", "codex":
+            return "BrandLogos/brand-openai-codex"
+        case "openai-o3", "o3":
+            return "BrandLogos/brand-openai-o3"
+        case "openai-agents", "responses-api":
+            return "BrandLogos/brand-openai-agents"
         case "claude", "anthropic":
             return "BrandLogos/brand-claude-ai"
+        case "claude-code":
+            return "BrandLogos/brand-claude-code"
+        case "mcp", "anthropic-mcp":
+            return "BrandLogos/brand-anthropic-mcp"
+        case "claude-artifacts", "artifacts":
+            return "BrandLogos/brand-claude-artifacts"
         case "harvey", "harvey-legal", "harvey-ai":
             return "BrandLogos/brand-harvey"
+        case "harvey-assistant":
+            return "BrandLogos/brand-harvey-assistant"
+        case "harvey-vault":
+            return "BrandLogos/brand-harvey-vault"
+        case "harvey-knowledge":
+            return "BrandLogos/brand-harvey-knowledge"
         case "gemini", "google-gemini":
             return "BrandLogos/brand-google-gemini"
         case "mistral":
@@ -207,6 +241,46 @@ public enum CertiGoOfficialAssetCatalog {
     public static func gcpServiceAssetName(_ serviceSlug: String) -> String {
         let normalized = serviceSlug.hasPrefix("gcp-") ? serviceSlug : "gcp-\(serviceSlug)"
         return "GCPServices/\(normalized)"
+    }
+}
+
+// MARK: - 2B. Dynamic Track Theme Palette (`CertiGoTrackThemePalette`)
+
+public struct CertiGoTrackThemePalette: Codable, Equatable, Hashable, Sendable {
+    public let primaryHex: String
+    public let lipHex: String
+    public let softHex: String
+    public let ringHex: String
+
+    public init(primaryHex: String, lipHex: String, softHex: String, ringHex: String) {
+        self.primaryHex = primaryHex
+        self.lipHex = lipHex
+        self.softHex = softHex
+        self.ringHex = ringHex
+    }
+
+    public static func palette(forRouteCode code: String) -> CertiGoTrackThemePalette {
+        let upper = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        switch upper {
+        case "HARVEY-LEGAL", "HARVEY", "TRACK-HARVEY-LEGAL", "HARVEY-AI":
+            return .init(primaryHex: "#18181b", lipHex: "#09090b", softHex: "#f4f4f5", ringHex: "#52525b")
+        case "OPENAI-PRO", "TRACK-OPENAI-PRO", "CHATGPT-PRO", "OPENAI-CODEX", "AI-OPENAI":
+            return .init(primaryHex: "#10a37f", lipHex: "#0d8a6a", softHex: "#ecfdf5", ringHex: "#34d399")
+        case "ANTHROPIC-CLAUDE", "CCA-F", "CLAUDE", "TRACK-ANTHROPIC-CLAUDE", "AI-ANTHROPIC":
+            return .init(primaryHex: "#d97757", lipHex: "#b85c3e", softHex: "#fff7ed", ringHex: "#fb923c")
+        case "MS-365-COPILOT", "M365-COPILOT", "TRACK-MS-365-COPILOT", "COPILOT-M365":
+            return .init(primaryHex: "#4f46e5", lipHex: "#3730a3", softHex: "#eef2ff", ringHex: "#818cf8")
+        case "SAA-C03", "CLF-C02", "DVA-C02", "AIF-C01", "SOA-C02", "SAP-C02":
+            return .init(primaryHex: "#ea580c", lipHex: "#c2410c", softHex: "#fff7ed", ringHex: "#fb923c")
+        case "GH-300", "GH-900", "GH-FOUNDATIONS", "GH-ACTIONS", "GH-AS":
+            return .init(primaryHex: "#24292f", lipHex: "#0d1117", softHex: "#f3f4f6", ringHex: "#8b5cf6")
+        case "CKA", "CKAD", "CKS":
+            return .init(primaryHex: "#2563eb", lipHex: "#1d4ed8", softHex: "#eff6ff", ringHex: "#60a5fa")
+        case "ACE", "PCA", "PDE", "AI-GEMINI":
+            return .init(primaryHex: "#1a73e8", lipHex: "#1557b0", softHex: "#eff6ff", ringHex: "#60a5fa")
+        default:
+            return .init(primaryHex: "#0078d4", lipHex: "#005a9e", softHex: "#eff6ff", ringHex: "#38bdf8")
+        }
     }
 }
 

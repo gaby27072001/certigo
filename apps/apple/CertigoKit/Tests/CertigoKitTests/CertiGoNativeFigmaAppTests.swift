@@ -6,7 +6,7 @@ import Foundation
 import Prism
 import Testing
 
-@Suite("PR #150 — Native Figma App Video Layout, Mimo Reset, 8-Step Onboarding & Parallel Tracks Deduplication")
+@Suite("PR #150 — Native Figma App Video Layout, Mimo Reset, 8-Step Onboarding & Parallel Tracks Deduplication", .serialized)
 struct CertiGoNativeFigmaAppTests {
 
     @Test("selectRoute resets selectedMimoFilter to .allUnits so all 3 units (15 winding nodes) appear after switching certifications")
@@ -22,10 +22,10 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 15)
     }
 
-    @Test("11-step native onboarding flow advances from step 0 to step 10 (6A rhythm, 6B moment, 6C widget, 7 speed 3.4x, 8 save 20% stamps), supports back navigation, and dismisses cleanly on completion or close")
+    @Test("10-step native onboarding flow advances from step 0 to step 9 (without duplicate Step 1 auth screen), supports back navigation, and dismisses cleanly on completion or close")
     func onboardingEightStepNavigationAndDismissal() {
         var appState = CertiGoNativeAppState()
-        #expect(CertiGoNativeAppState.onboardingStepCount == 11)
+        #expect(CertiGoNativeAppState.onboardingStepCount == 10)
 
         appState.startOnboardingFlow()
         #expect(appState.isPresentingOnboardingFlow == true)
@@ -38,11 +38,11 @@ struct CertiGoNativeFigmaAppTests {
         }
 
         appState.goBackOnboardingStep()
-        #expect(appState.onboardingStepIndex == 9)
+        #expect(appState.onboardingStepIndex == 8)
         appState.advanceOnboardingStep()
-        #expect(appState.onboardingStepIndex == 10)
+        #expect(appState.onboardingStepIndex == 9)
 
-        // Advancing from step 10 (10/10) completes and dismisses the onboarding flow
+        // Advancing from step 9 (final step) completes and dismisses the onboarding flow
         appState.advanceOnboardingStep()
         #expect(appState.isPresentingOnboardingFlow == false)
 
@@ -1119,7 +1119,7 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.onboardingVendorFilter == "all")
         #expect(appState.onboardingCategoryFilter == "all")
 
-        // Step 0 (OB_01) -> Step 1 (1/7 Auth) -> interactive auth advances to Step 2 (2/7 Goals)
+        // Step 0 (OB_01) -> Step 1 (Goals) -> interactive auth completes onboarding directly onto Parcours
         appState.startOnboardingFlow()
         #expect(appState.onboardingStepIndex == 0)
         appState.advanceOnboardingStep()
@@ -1137,7 +1137,19 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.isAccountConnected == true)
         #expect(appState.connectedAuthProvider == "Microsoft Entra ID")
         #expect(appState.activeAuthProviderSheet == nil)
-        #expect(appState.onboardingStepIndex == 2)
+        #expect(appState.hasCompletedOnboarding == true)
+        #expect(appState.isPresentingOnboardingFlow == false)
+
+        // Verify CertiGoTrackThemePalette returns distinct dominant themes per track
+        #expect(CertiGoTrackThemePalette.palette(forRouteCode: "HARVEY-LEGAL").primaryHex == "#18181b")
+        #expect(CertiGoTrackThemePalette.palette(forRouteCode: "OPENAI-PRO").primaryHex == "#10a37f")
+        #expect(CertiGoTrackThemePalette.palette(forRouteCode: "ANTHROPIC-CLAUDE").primaryHex == "#d97757")
+        #expect(CertiGoTrackThemePalette.palette(forRouteCode: "MS-365-COPILOT").primaryHex == "#4f46e5")
+        #expect(CertiGoTrackThemePalette.palette(forRouteCode: "SAA-C03").primaryHex == "#ea580c")
+        #expect(CertiGoTrackThemePalette.palette(forRouteCode: "GH-300").primaryHex == "#24292f")
+        #expect(CertiGoTrackThemePalette.palette(forRouteCode: "CKA").primaryHex == "#2563eb")
+        #expect(CertiGoTrackThemePalette.palette(forRouteCode: "ACE").primaryHex == "#1a73e8")
+        #expect(CertiGoTrackThemePalette.palette(forRouteCode: "AZ-104").primaryHex == "#0078d4")
 
         // Row 1 vendor tabs start with 'Tout' ("all") on the far left
         #expect(CertiGoNativeAppState.onboardingVendorFilterTabs.first?.id == "all")
@@ -1361,7 +1373,7 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.lessonSession.lessonSlides.count == 3)
         #expect(appState.lessonSession.lessonSlides[0].stepBadge.contains("VUE D'ENSEMBLE"))
         #expect(appState.lessonSession.lessonSlides[1].stepBadge.contains("LA GRANDE IMAGE"))
-        #expect(appState.lessonSession.lessonSlides[2].stepBadge.contains("LE PONT VERS L'EXAMEN"))
+        #expect(appState.lessonSession.lessonSlides[2].stepBadge.contains("MOTS-CLÉS"))
         #expect(appState.lessonSession.exercises.allSatisfy { $0.formatCode != "Q_TYPE_04" && $0.formatCode != "Q_TYPE_05" })
 
         // User can toggle between Plain Language and Exam Style at any time
