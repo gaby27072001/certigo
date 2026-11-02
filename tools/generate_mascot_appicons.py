@@ -11,17 +11,137 @@ import zlib
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "apps/apple/CertigoNative/Resources/CertigoAssets.xcassets"
 
-OUTFIT_SPECS: tuple[tuple[str, tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]], ...] = (
-    # (icon_name, shield_rgb, chest_rgb, accent_rgb)
-    ("CertiGoMascotHappyActive", (0, 120, 212), (2, 132, 199), (56, 189, 248)),
-    ("CertiGoMascotSadMissing", (51, 65, 85), (30, 41, 59), (56, 189, 248)),
-    ("CertiGoMascotMorningPajama", (0, 120, 212), (224, 242, 254), (99, 102, 241)),
-    ("CertiGoMascotCoffeeBoost", (0, 120, 212), (146, 64, 14), (245, 158, 11)),
-    ("CertiGoMascotSuitBoss", (0, 120, 212), (15, 23, 42), (14, 165, 233)),
-    ("CertiGoMascotAirplaneOffline", (0, 120, 212), (220, 38, 38), (56, 189, 248)),
-    ("CertiGoMascotStreakFire", (234, 88, 12), (3, 105, 161), (251, 146, 60)),
-    ("CertiGoMascotPrestigePro", (24, 24, 27), (28, 25, 23), (251, 191, 36)),
+OUTFIT_SPECS: tuple[tuple[str, str, tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]], ...] = (
+    # (icon_name, figma_prefix, shield_rgb, chest_rgb, accent_rgb)
+    ("CertiGoMascotHappyActive", "01_happy_active", (0, 120, 212), (2, 132, 199), (56, 189, 248)),
+    ("CertiGoMascotSadMissing", "02_sad_missing", (51, 65, 85), (30, 41, 59), (56, 189, 248)),
+    ("CertiGoMascotMorningPajama", "03_morning_pajama", (0, 120, 212), (224, 242, 254), (99, 102, 241)),
+    ("CertiGoMascotCoffeeBoost", "04_coffee_boost", (0, 120, 212), (146, 64, 14), (245, 158, 11)),
+    ("CertiGoMascotSuitBoss", "05_suit_boss", (0, 120, 212), (15, 23, 42), (14, 165, 233)),
+    ("CertiGoMascotAirplaneOffline", "06_airplane_offline", (0, 120, 212), (220, 38, 38), (56, 189, 248)),
+    ("CertiGoMascotStreakFire", "07_streak_fire", (234, 88, 12), (3, 105, 161), (251, 146, 60)),
+    ("CertiGoMascotPrestigePro", "08_prestige_pro", (24, 24, 27), (28, 25, 23), (251, 191, 36)),
 )
+
+FIGMA_VAULT_DIR = Path(
+    r"C:\Users\gchambaud\.copilot\session-state\dfbb47ac-bbf2-47f2-8f16-5d501fea8310\files\mascot_vault_v2"
+)
+
+
+def _paeth(a: int, b: int, c: int) -> int:
+    p = a + b - c
+    pa = abs(p - a)
+    pb = abs(p - b)
+    pc = abs(p - c)
+    if pa <= pb and pa <= pc:
+        return a
+    if pb <= pc:
+        return b
+    return c
+
+
+def upscale_figma_png_to_1024_rgb(
+    png_bytes: bytes,
+    bg_rgb: tuple[int, int, int],
+    target_size: int = 1024,
+) -> bytes:
+    """Decode an 8-bit RGBA/RGB PNG from Figma Page 16 and upscale to a 1024x1024 24-bit RGB PNG."""
+    pos = 8
+    w = h = bit_depth = color_type = 0
+    idat_chunks: list[bytes] = []
+    while pos < len(png_bytes):
+        length = struct.unpack(">I", png_bytes[pos : pos + 4])[0]
+        chunk_type = png_bytes[pos + 4 : pos + 8]
+        chunk_data = png_bytes[pos + 8 : pos + 8 + length]
+        pos += 12 + length
+        if chunk_type == b"IHDR":
+            w, h, bit_depth, color_type = struct.unpack(">IIBB", chunk_data[:10])
+        elif chunk_type == b"IDAT":
+            idat_chunks.append(chunk_data)
+        elif chunk_type == b"IEND":
+            break
+
+    bpp = 4 if color_type == 6 else 3
+    stride = w * bpp
+    raw = zlib.decompress(b"".join(idat_chunks))
+    recon = bytearray(h * stride)
+
+    for y in range(h):
+        filter_type = raw[y * (stride + 1)]
+        scan = raw[y * (stride + 1) + 1 : (y + 1) * (stride + 1)]
+        row_offset = y * stride
+        prev_offset = (y - 1) * stride
+        for i in range(stride):
+            x_byte = scan[i]
+            a = recon[row_offset + i - bpp] if i >= bpp else 0
+            b = recon[prev_offset + i] if y > 0 else 0
+            c = recon[prev_offset + i - bpp] if (y > 0 and i >= bpp) else 0
+            if filter_type == 0:
+                val = x_byte
+            elif filter_type == 1:
+                val = (x_byte + a) & 0xFF
+            elif filter_type == 2:
+                val = (x_byte + b) & 0xFF
+            elif filter_type == 3:
+                val = (x_byte + ((a + b) >> 1)) & 0xFF
+            elif filter_type == 4:
+                val = (x_byte + _paeth(a, b, c)) & 0xFF
+            else:
+                val = x_byte
+            recon[row_offset + i] = val
+
+    # Convert source rows to composited 24-bit RGB
+    src_rgb_rows: list[bytes] = []
+    bg_r, bg_g, bg_b = bg_rgb
+    for y in range(h):
+        row_rgb = bytearray(w * 3)
+        row_offset = y * stride
+        for x in range(w):
+            px = row_offset + x * bpp
+            r = recon[px]
+            g = recon[px + 1]
+            b_val = recon[px + 2]
+            if bpp == 4:
+                alpha = recon[px + 3]
+                if alpha < 255:
+                    inv = 255 - alpha
+                    r = (r * alpha + bg_r * inv) // 255
+                    g = (g * alpha + bg_g * inv) // 255
+                    b_val = (b_val * alpha + bg_b * inv) // 255
+            dst = x * 3
+            row_rgb[dst] = r
+            row_rgb[dst + 1] = g
+            row_rgb[dst + 2] = b_val
+        src_rgb_rows.append(bytes(row_rgb))
+
+    # Nearest-neighbor crisp upscaling from w x h to target_size x target_size
+    x_map = [min(w - 1, (x * w) // target_size) for x in range(target_size)]
+    out_rows: list[bytes] = []
+    last_sy = -1
+    cached_row = b""
+    for ty in range(target_size):
+        sy = min(h - 1, (ty * h) // target_size)
+        if sy != last_sy:
+            srow = src_rgb_rows[sy]
+            dst_row = bytearray(1 + target_size * 3)
+            dst_row[0] = 0
+            for tx, sx in enumerate(x_map):
+                s_idx = sx * 3
+                d_idx = 1 + tx * 3
+                dst_row[d_idx : d_idx + 3] = srow[s_idx : s_idx + 3]
+            cached_row = bytes(dst_row)
+            last_sy = sy
+        out_rows.append(cached_row)
+
+    raw_out = b"".join(out_rows)
+    ihdr = struct.pack(">IIBBBBB", target_size, target_size, 8, 2, 0, 0, 0)
+    compressed = zlib.compress(raw_out, level=6)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", ihdr)
+        + _png_chunk(b"IDAT", compressed)
+        + _png_chunk(b"IEND", b"")
+    )
 
 
 def _png_chunk(tag: bytes, payload: bytes) -> bytes:
@@ -160,7 +280,7 @@ def render_mascot_icon_png(
 
 def main() -> None:
     CATALOG.mkdir(parents=True, exist_ok=True)
-    for icon_name, shield_rgb, chest_rgb, accent_rgb in OUTFIT_SPECS:
+    for icon_name, figma_prefix, shield_rgb, chest_rgb, accent_rgb in OUTFIT_SPECS:
         is_prestige = icon_name == "CertiGoMascotPrestigePro"
         appiconset = CATALOG / f"{icon_name}.appiconset"
         appiconset.mkdir(parents=True, exist_ok=True)
@@ -168,24 +288,39 @@ def main() -> None:
         light_filename = f"{icon_name}.png"
         dark_filename = f"{icon_name}Dark.png"
 
-        (appiconset / light_filename).write_bytes(
-            render_mascot_icon_png(
+        figma_light = FIGMA_VAULT_DIR / f"{figma_prefix}_light.png"
+        figma_dark = FIGMA_VAULT_DIR / f"{figma_prefix}_dark.png"
+
+        if figma_light.is_file():
+            light_bytes = upscale_figma_png_to_1024_rgb(
+                figma_light.read_bytes(),
+                bg_rgb=(28, 25, 23) if is_prestige else (255, 255, 255),
+            )
+        else:
+            light_bytes = render_mascot_icon_png(
                 shield_rgb=shield_rgb,
                 chest_rgb=chest_rgb,
                 accent_rgb=accent_rgb,
                 is_dark=False,
                 is_prestige=is_prestige,
             )
-        )
-        (appiconset / dark_filename).write_bytes(
-            render_mascot_icon_png(
+
+        if figma_dark.is_file():
+            dark_bytes = upscale_figma_png_to_1024_rgb(
+                figma_dark.read_bytes(),
+                bg_rgb=(9, 9, 11) if is_prestige else (7, 20, 38),
+            )
+        else:
+            dark_bytes = render_mascot_icon_png(
                 shield_rgb=shield_rgb,
                 chest_rgb=chest_rgb,
                 accent_rgb=accent_rgb,
                 is_dark=True,
                 is_prestige=is_prestige,
             )
-        )
+
+        (appiconset / light_filename).write_bytes(light_bytes)
+        (appiconset / dark_filename).write_bytes(dark_bytes)
 
         contents = {
             "images": [

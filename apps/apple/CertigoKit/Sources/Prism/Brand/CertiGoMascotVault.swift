@@ -527,105 +527,135 @@ public struct CertiGoMascotAvatarView: View {
         height h: CGFloat,
         outfit: CertiGoMascotOutfit
     ) {
-        // Strictly centered inside the lower chest (x: 0.31..0.69, y: 0.57..0.77) -> generous margin inside shield!
-        let plastronRect = CGRect(x: w * 0.31, y: h * 0.57, width: w * 0.38, height: h * 0.19)
-        let plastronPath = Path(roundedRect: plastronRect, cornerRadius: w * 0.08)
-
+        // Master Mascot CertiGo Pro v2: strictly centered inside the lower chest with >= 13px (24%) clear margin from shield border!
         switch outfit {
         case .morningPajama:
-            // Soft sky pajama top with vertical stripes strictly inside the chest badge
-            context.fill(plastronPath, with: .color(PrismColor.figmaHex("#e0f2fe")))
-            for ratio in [0.37, 0.45, 0.55, 0.63] {
-                let stripeRect = CGRect(
-                    x: w * CGFloat(ratio),
-                    y: plastronRect.minY + h * 0.015,
-                    width: w * 0.025,
-                    height: plastronRect.height - h * 0.03
-                )
+            // Vertical sky pajama stripes + centered white button placket with 2 gold buttons
+            for stripeX in [w * 0.40, w * 0.60] {
+                let stripeRect = CGRect(x: stripeX - w * 0.014, y: h * 0.55, width: w * 0.028, height: h * 0.16)
                 context.fill(
-                    Path(roundedRect: stripeRect, cornerRadius: w * 0.01),
-                    with: .color(PrismColor.figmaHex("#38bdf8"))
+                    Path(roundedRect: stripeRect, cornerRadius: w * 0.014),
+                    with: .color(PrismColor.figmaHex("#bae6fd"))
                 )
+            }
+            let placketRect = CGRect(x: w * 0.47, y: h * 0.54, width: w * 0.06, height: h * 0.18)
+            context.fill(
+                Path(roundedRect: placketRect, cornerRadius: w * 0.03),
+                with: .color(PrismColor.figmaHex("#ffffff"))
+            )
+            for btnY in [h * 0.59, h * 0.66] {
+                let btnRect = CGRect(x: w * 0.488, y: btnY, width: w * 0.024, height: w * 0.024)
+                context.fill(Path(ellipseIn: btnRect), with: .color(PrismColor.figmaHex("#fbbf24")))
             }
 
         case .suitBoss:
-            // Cloud Architect Navy Suit Lapels + White Shirt + Azure Tie centered with margin
-            context.fill(plastronPath, with: .color(PrismColor.figmaHex("#0f172a")))
-            let shirtTriangle = Path { p in
-                p.move(to: CGPoint(x: w * 0.42, y: plastronRect.minY))
-                p.addLine(to: CGPoint(x: w * 0.58, y: plastronRect.minY))
-                p.addLine(to: CGPoint(x: w * 0.50, y: plastronRect.maxY - h * 0.02))
-                p.closeSubpath()
-            }
-            context.fill(shirtTriangle, with: .color(PrismColor.figmaHex("#f8fafc")))
-            let tiePath = Path { p in
-                p.move(to: CGPoint(x: w * 0.485, y: plastronRect.minY + h * 0.01))
-                p.addLine(to: CGPoint(x: w * 0.515, y: plastronRect.minY + h * 0.01))
-                p.addLine(to: CGPoint(x: w * 0.525, y: plastronRect.maxY - h * 0.04))
-                p.addLine(to: CGPoint(x: w * 0.50, y: plastronRect.maxY - h * 0.015))
-                p.addLine(to: CGPoint(x: w * 0.475, y: plastronRect.maxY - h * 0.04))
-                p.closeSubpath()
-            }
-            context.fill(tiePath, with: .color(PrismColor.figmaHex("#0ea5e9")))
-
-        case .airplaneOffline:
-            // Warm Aviator Scarf centered below the beak with flowing tail inside the chest
-            let scarfCollar = CGRect(x: w * 0.32, y: h * 0.565, width: w * 0.36, height: h * 0.065)
+            // Cloud Architect Navy Suit Jacket + White Shirt + Red Tie with Gold Tie Clip & Gold Lapel Pin
+            let shirtRect = CGRect(x: w * 0.43, y: h * 0.53, width: w * 0.14, height: h * 0.19)
             context.fill(
-                Path(roundedRect: scarfCollar, cornerRadius: h * 0.03),
+                Path(roundedRect: shirtRect, cornerRadius: w * 0.02),
+                with: .color(PrismColor.figmaHex("#ffffff"))
+            )
+            let leftLapel = CGRect(x: w * 0.35, y: h * 0.53, width: w * 0.10, height: h * 0.18)
+            let rightLapel = CGRect(x: w * 0.55, y: h * 0.53, width: w * 0.10, height: h * 0.18)
+            context.fill(
+                Path(roundedRect: leftLapel, cornerRadius: w * 0.03),
+                with: .color(PrismColor.figmaHex("#0f172a"))
+            )
+            context.fill(
+                Path(roundedRect: rightLapel, cornerRadius: w * 0.03),
+                with: .color(PrismColor.figmaHex("#0f172a"))
+            )
+            // Red tie + gold clip
+            let tieRect = CGRect(x: w * 0.48, y: h * 0.53, width: w * 0.04, height: h * 0.18)
+            context.fill(
+                Path(roundedRect: tieRect, cornerRadius: w * 0.015),
                 with: .color(PrismColor.figmaHex("#ef4444"))
             )
+            let tieClip = CGRect(x: w * 0.48, y: h * 0.61, width: w * 0.04, height: h * 0.016)
+            context.fill(Path(tieClip), with: .color(PrismColor.figmaHex("#fbbf24")))
+            let lapelPin = CGRect(x: w * 0.575, y: h * 0.59, width: w * 0.035, height: h * 0.018)
+            context.fill(
+                Path(roundedRect: lapelPin, cornerRadius: h * 0.009),
+                with: .color(PrismColor.figmaHex("#fbbf24"))
+            )
+
+        case .airplaneOffline:
+            // White Aviator Wind Scarf with flowing knot + compact lower feather chevron
+            let scarfBar = CGRect(x: w * 0.39, y: h * 0.54, width: w * 0.22, height: h * 0.05)
+            context.fill(
+                Path(roundedRect: scarfBar, cornerRadius: h * 0.025),
+                with: .color(PrismColor.figmaHex("#ffffff"))
+            )
             let scarfTail = Path { p in
-                p.move(to: CGPoint(x: w * 0.52, y: h * 0.61))
-                p.addLine(to: CGPoint(x: w * 0.64, y: h * 0.68))
-                p.addLine(to: CGPoint(x: w * 0.56, y: h * 0.74))
-                p.addLine(to: CGPoint(x: w * 0.47, y: h * 0.63))
+                p.move(to: CGPoint(x: w * 0.54, y: h * 0.56))
+                p.addLine(to: CGPoint(x: w * 0.62, y: h * 0.60))
+                p.addLine(to: CGPoint(x: w * 0.60, y: h * 0.64))
+                p.addLine(to: CGPoint(x: w * 0.52, y: h * 0.60))
                 p.closeSubpath()
             }
-            context.fill(scarfTail, with: .color(PrismColor.figmaHex("#dc2626")))
+            context.fill(scarfTail, with: .color(PrismColor.figmaHex("#f8fafc")))
+            drawCompactDoubleFeatherChevron(
+                in: &context,
+                width: w,
+                height: h,
+                topHex: "#e0f2fe",
+                bottomHex: "#bae6fd",
+                onlyLowerChevron: true
+            )
 
         case .prestigePro:
-            // Royal Gold & Black engraved chest crest (#07.10)
-            context.fill(plastronPath, with: .color(PrismColor.figmaHex("#1c1917")))
-            context.stroke(
-                plastronPath,
-                with: .color(PrismColor.figmaHex("#fbbf24")),
-                lineWidth: max(1.5, w * 0.022)
+            // Royal Gold compact double pectoral feather chevron (#07.10)
+            drawCompactDoubleFeatherChevron(
+                in: &context,
+                width: w,
+                height: h,
+                topHex: "#fbbf24",
+                bottomHex: "#f59e0b",
+                onlyLowerChevron: false
             )
-            let diamond = centeredDiamondPath(centerX: w * 0.5, centerY: h * 0.665, radius: w * 0.065)
-            context.fill(diamond, with: .color(PrismColor.figmaHex("#fbbf24")))
 
-        case .streakFire:
-            // Solar Flame Crest centered on chest
-            context.fill(plastronPath, with: .color(PrismColor.figmaHex("#0369a1")))
-            let flame = centeredDiamondPath(centerX: w * 0.5, centerY: h * 0.665, radius: w * 0.07)
-            context.fill(flame, with: .color(PrismColor.figmaHex("#fb923c")))
-
-        case .coffeeBoost:
-            // Focus Espresso Crest centered on chest
-            context.fill(plastronPath, with: .color(PrismColor.figmaHex("#0284c7")))
-            let bean = Path(
-                ellipseIn: CGRect(x: w * 0.445, y: h * 0.625, width: w * 0.11, height: h * 0.08)
+        case .happyActive, .sadMissing, .coffeeBoost, .streakFire:
+            // Master Mascot CertiGo Pro v2: Compact double pectoral feather chevron (width 22px equiv, 13px clear margin from shield border)
+            drawCompactDoubleFeatherChevron(
+                in: &context,
+                width: w,
+                height: h,
+                topHex: "#e0f2fe",
+                bottomHex: "#bae6fd",
+                onlyLowerChevron: false
             )
-            context.fill(bean, with: .color(PrismColor.figmaHex("#fde68a")))
-
-        case .sadMissing:
-            // Soft muted chest medallion
-            context.fill(plastronPath, with: .color(PrismColor.figmaHex("#1e293b").opacity(0.65)))
-            let core = centeredDiamondPath(centerX: w * 0.5, centerY: h * 0.665, radius: w * 0.055)
-            context.fill(core, with: .color(PrismColor.figmaHex("#94a3b8")))
-
-        case .happyActive:
-            // Crisp centered Azure pectoral shield medallion (replaces the old V-bar!)
-            context.fill(plastronPath, with: .color(PrismColor.figmaHex("#0284c7").opacity(0.85)))
-            context.stroke(
-                plastronPath,
-                with: .color(PrismColor.figmaHex("#7dd3fc")),
-                lineWidth: max(1.2, w * 0.018)
-            )
-            let core = centeredDiamondPath(centerX: w * 0.5, centerY: h * 0.665, radius: w * 0.06)
-            context.fill(core, with: .color(PrismColor.figmaHex("#e0f2fe")))
         }
+    }
+
+    private func drawCompactDoubleFeatherChevron(
+        in context: inout GraphicsContext,
+        width w: CGFloat,
+        height h: CGFloat,
+        topHex: String,
+        bottomHex: String,
+        onlyLowerChevron: Bool
+    ) {
+        let strokeW = max(1.8, w * 0.032)
+        if !onlyLowerChevron {
+            var upperChevron = Path()
+            upperChevron.move(to: CGPoint(x: w * 0.425, y: h * 0.575))
+            upperChevron.addLine(to: CGPoint(x: w * 0.50, y: h * 0.615))
+            upperChevron.addLine(to: CGPoint(x: w * 0.575, y: h * 0.575))
+            context.stroke(
+                upperChevron,
+                with: .color(PrismColor.figmaHex(topHex)),
+                style: StrokeStyle(lineWidth: strokeW, lineCap: .round, lineJoin: .round)
+            )
+        }
+        var lowerChevron = Path()
+        lowerChevron.move(to: CGPoint(x: w * 0.445, y: h * 0.635))
+        lowerChevron.addLine(to: CGPoint(x: w * 0.50, y: h * 0.668))
+        lowerChevron.addLine(to: CGPoint(x: w * 0.555, y: h * 0.635))
+        context.stroke(
+            lowerChevron,
+            with: .color(PrismColor.figmaHex(bottomHex)),
+            style: StrokeStyle(lineWidth: strokeW * 0.85, lineCap: .round, lineJoin: .round)
+        )
     }
 
     private func centeredDiamondPath(centerX: CGFloat, centerY: CGFloat, radius: CGFloat) -> Path {
@@ -645,11 +675,21 @@ public struct CertiGoMascotAvatarView: View {
         outfit: CertiGoMascotOutfit
     ) {
         let eyeRadius = w * 0.095
+        let ringRadius = eyeRadius * 1.24
         let eyeCenterY = h * 0.415
-        let leftEyeX = w * 0.365
-        let rightEyeX = w * 0.635
+        let leftEyeX = w * 0.405
+        let rightEyeX = w * 0.595
+        let ringHex = (outfit == .prestigePro) ? "#fbbf24" : "#bae6fd"
 
         for cx in [leftEyeX, rightEyeX] {
+            let ringRect = CGRect(
+                x: cx - ringRadius,
+                y: eyeCenterY - ringRadius,
+                width: ringRadius * 2,
+                height: ringRadius * 2
+            )
+            context.fill(Path(ellipseIn: ringRect), with: .color(PrismColor.figmaHex(ringHex)))
+
             let scleraRect = CGRect(
                 x: cx - eyeRadius,
                 y: eyeCenterY - eyeRadius,
@@ -667,26 +707,59 @@ public struct CertiGoMascotAvatarView: View {
             )
             context.fill(Path(ellipseIn: pupilRect), with: .color(PrismColor.figmaHex("#0f172a")))
 
-            // Single clean specular highlight (no overlapping star!)
+            // Crisp optical specular highlight (top-right primary + tiny bottom-left secondary, zero star overlap)
             let specRadius = eyeRadius * 0.24
             let specRect = CGRect(
-                x: cx - pupilRadius * 0.48,
-                y: eyeCenterY - pupilRadius * 0.52,
+                x: cx + pupilRadius * 0.12,
+                y: eyeCenterY - pupilRadius * 0.62,
                 width: specRadius * 2,
                 height: specRadius * 2
             )
             context.fill(Path(ellipseIn: specRect), with: .color(PrismColor.figmaHex("#ffffff")))
 
+            let microRadius = eyeRadius * 0.11
+            let microRect = CGRect(
+                x: cx - pupilRadius * 0.48,
+                y: eyeCenterY + pupilRadius * 0.18,
+                width: microRadius * 2,
+                height: microRadius * 2
+            )
+            context.fill(Path(ellipseIn: microRect), with: .color(PrismColor.figmaHex("#ffffff")))
+
             if outfit == .morningPajama {
-                // Warm sleepy upper eyelid crescent
+                // Warm sleepy half-closed upper eyelid with horizontal lash line
                 let lidRect = CGRect(
                     x: cx - eyeRadius,
                     y: eyeCenterY - eyeRadius,
                     width: eyeRadius * 2,
-                    height: eyeRadius * 0.72
+                    height: eyeRadius * 0.78
                 )
-                context.fill(Path(ellipseIn: lidRect), with: .color(PrismColor.figmaHex("#0284c7")))
+                context.fill(Path( lidRect), with: .color(PrismColor.figmaHex("#bae6fd")))
+                var lidLine = Path()
+                lidLine.move(to: CGPoint(x: cx - eyeRadius, y: eyeCenterY - eyeRadius * 0.22))
+                lidLine.addLine(to: CGPoint(x: cx + eyeRadius, y: eyeCenterY - eyeRadius * 0.22))
+                context.stroke(
+                    lidLine,
+                    with: .color(PrismColor.figmaHex("#075985")),
+                    lineWidth: max(1.5, w * 0.02)
+                )
             }
+
+            if outfit == .suitBoss {
+                // Round Executive Architect Glasses around each eye
+                let glassPath = Path(ellipseIn: ringRect.insetBy(dx: -w * 0.008, dy: -h * 0.008))
+                context.stroke(
+                    glassPath,
+                    with: .color(PrismColor.figmaHex("#0f172a")),
+                    lineWidth: max(1.8, w * 0.025)
+                )
+            }
+        }
+
+        if outfit == .suitBoss {
+            // Golden bridge between the executive glasses
+            let bridgeRect = CGRect(x: w * 0.485, y: eyeCenterY - h * 0.012, width: w * 0.03, height: h * 0.022)
+            context.fill(Path(bridgeRect), with: .color(PrismColor.figmaHex("#fbbf24")))
         }
     }
 

@@ -59,7 +59,7 @@ struct CertigoDailyWidget: Widget {
       CertigoWidgetCardView(entry: entry)
         .environment(\.locale, entry.snapshot?.language.locale ?? Locale.current)
     }
-    .configurationDisplayName("Certigo")
+    .configurationDisplayName("CertiGo")
     .description("A gentle reminder of your learning progress.")
     .supportedFamilies([
       .systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular,

@@ -330,7 +330,7 @@ variables, development tokens, special network access or a pre-existing session.
 
 Suggested review note after live verification:
 
-> Certigo helps users prepare learning goals; it does not issue official vendor
+> CertiGo helps users prepare learning goals; it does not issue official vendor
 > certifications or guarantee exam success. We are not affiliated with the
 > certification providers shown in the catalog. Practice availability is labeled.
 >

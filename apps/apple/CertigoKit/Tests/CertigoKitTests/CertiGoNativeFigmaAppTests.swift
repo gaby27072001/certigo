@@ -1534,10 +1534,10 @@ struct CertiGoNativeFigmaAppTests {
         #expect(widgetPlist.contains("<string>CertiGo Widgets</string>"))
         #expect(!widgetPlist.contains("<string>Certigo Widgets</string>"))
         #expect(pbxproj.contains("INFOPLIST_KEY_CFBundleDisplayName = CertiGo;"))
-        #expect(pbxproj.contains("INFOPLIST_KEY_CFBundleDisplayName = \"CertiGo Dev\";"))
         #expect(!pbxproj.contains("INFOPLIST_KEY_CFBundleDisplayName = Certigo;"))
+        #expect(!pbxproj.contains("INFOPLIST_KEY_CFBundleDisplayName = \"Certigo Dev\";"))
 
-        // 2. Verify no user-facing string literal in CertigoNative/Sources or CertigoKit/Sources contains standalone "Certigo" (with lowercase g)
+        // 2. Verify no user-facing string literal in CertigoNative/Sources, CertigoNative/WidgetExtension, or CertigoKit/Sources contains standalone "Certigo" (with lowercase g)
         let stringWithLowercaseG = try NSRegularExpression(
             pattern: #""[^"\n]*\bCertigo(?![A-Za-z0-9_])[^"\n]*""#
         )
@@ -1545,7 +1545,7 @@ struct CertiGoNativeFigmaAppTests {
             "X-Certigo-",
             "Certigo-Widgets"
         ]
-        for relativeDir in ["apps/apple/CertigoNative/Sources", "apps/apple/CertigoKit/Sources"] {
+        for relativeDir in ["apps/apple/CertigoNative/Sources", "apps/apple/CertigoNative/WidgetExtension", "apps/apple/CertigoKit/Sources"] {
             let dirURL = root.appendingPathComponent(relativeDir)
             let enumerator = try #require(
                 FileManager.default.enumerator(at: dirURL, includingPropertiesForKeys: nil)
