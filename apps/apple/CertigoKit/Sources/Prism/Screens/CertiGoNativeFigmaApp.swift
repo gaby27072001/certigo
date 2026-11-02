@@ -2466,6 +2466,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         } else {
             selectedOptionIds = [optionId]
         }
+        CertiGoHapticsEngine.play(.selection)
     }
 
     public mutating func toggleWordBankBrick(_ brick: String) {
@@ -2475,6 +2476,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         } else {
             assembledWordBankTokens.append(brick)
         }
+        CertiGoHapticsEngine.play(.selection)
     }
 
     public mutating func tapMatchingPairItem(left: String?, right: String?) {
@@ -2524,11 +2526,13 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         if isCorrect {
             correctAnswersCount += 1
             lastLostHeartIndex = nil
+            CertiGoHapticsEngine.play(.correct)
         } else {
             let lostIndex = max(0, heartsCount - 1)
             heartsCount = max(0, heartsCount - 1)
             lastLostHeartIndex = lostIndex
             heartLossAnimationTrigger += 1
+            CertiGoHapticsEngine.play(.incorrectSoft)
         }
 
         CertiGoAdaptiveSessionEngine.recordAnswer(
@@ -9201,6 +9205,61 @@ public extension CertiGoMascotPose {
     static let errorCorrectionEncouraging: Self = .emotionOopsCaring
 }
 
+/// Duolingo-style native iOS Taptic Engine coordinator triggered on onboarding card selections, step transitions, 20% stamp credits, and exercise validations.
+public enum CertiGoHapticsEngine {
+    nonisolated(unsafe) public private(set) static var totalTriggeredHapticsCount: Int = 0
+    nonisolated(unsafe) public private(set) static var lastTriggeredHapticToken: PrismHapticToken? = nil
+
+    #if canImport(UIKit)
+    private typealias ImpactGenerator = UIImpactFeedbackGenerator
+    private typealias SelectionGenerator = UISelectionFeedbackGenerator
+    private typealias NotificationGenerator = UINotificationFeedbackGenerator
+    #endif
+
+    public static func resetTestCounters() {
+        totalTriggeredHapticsCount = 0
+        lastTriggeredHapticToken = nil
+    }
+
+    public static func play(_ token: PrismHapticToken, isEnabled: Bool = true) {
+        guard isEnabled else { return }
+        totalTriggeredHapticsCount += 1
+        lastTriggeredHapticToken = token
+        #if canImport(UIKit)
+        Task { @MainActor in
+            switch token {
+            case .selection:
+                let generator = SelectionGenerator()
+                generator.prepare()
+                generator.selectionChanged()
+            case .correct:
+                let impact = ImpactGenerator(style: .medium)
+                impact.prepare()
+                impact.impactOccurred()
+                let generator = NotificationGenerator()
+                generator.prepare()
+                generator.notificationOccurred(.success)
+            case .declic:
+                let impact = ImpactGenerator(style: .rigid)
+                impact.prepare()
+                impact.impactOccurred()
+                let generator = NotificationGenerator()
+                generator.prepare()
+                generator.notificationOccurred(.success)
+            case .incorrectSoft:
+                let generator = NotificationGenerator()
+                generator.prepare()
+                generator.notificationOccurred(.error)
+            case .warning:
+                let generator = NotificationGenerator()
+                generator.prepare()
+                generator.notificationOccurred(.warning)
+            }
+        }
+        #endif
+    }
+}
+
 public extension CertigoParallelTracksPreference {
     var selectedTracks: [CertiGoParallelCertificationTrackID] {
         parallelTrackCodes.compactMap { CertiGoParallelCertificationTrackID(rawValue: $0.uppercased()) }
@@ -9490,7 +9549,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var settingsPushRemindersOn: Bool = true
     public var settingsDailyRadarOn: Bool = true
     public var settingsHapticsOn: Bool = true
-    public static let onboardingStepCount: Int = 10
+    public static let onboardingStepCount: Int = 11
     public var onboardingStepIndex: Int = 0
     public var onboardingSelectedGoalIds: Set<String> = ["certifs", "ai-radar"]
     public var onboardingSelectedAIRadarIds: Set<String> = ["ai-actors", "ai-agents-mcp"]
@@ -9517,10 +9576,10 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public static let certifiedCandidatesWeeklyBenchmarkText: String = "Repère des certifiés : 4 sessions de 10 min par semaine en moyenne"
 
     public static let onboardingDailyRhythmOptions: [(minutes: Int, title: String, subtitle: String, subBadge: String?, isRecommended: Bool)] = [
-        (5, "5 min / jour", "Départ léger (1 micro-sprint)", nil, false),
-        (10, "10 min / jour", "Rythme Certifié ⭐ Recommandé", "4 sessions de 10 min/semaine suffisent", true),
-        (15, "15 min / jour", "Progression rapide", nil, false),
-        (20, "20 min / jour", "Préparation intensive", nil, false)
+        (5, "5 min / jour", "Départ léger", "🌱 Doux", false),
+        (10, "10 min / jour", "Rythme idéal", "⭐ Recommandé", true),
+        (15, "15 min / jour", "Progression accélérée", "🚀 Soutenu", false),
+        (20, "20 min / jour", "Préparation intensive", "🔥 Intensif", false)
     ]
 
     public static let onboardingRoutineAnchors: [(icon: String, title: String, ifClause: String, defaultTime: String)] = [
@@ -9531,35 +9590,37 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     ]
 
     public static let onboardingWidgetInstallSteps: [(number: Int, title: String, detail: String)] = [
-        (1, "Appuie longuement", "sur un espace vide de ton écran d'accueil iPhone."),
-        (2, "Touche « Modifier » (ou « + »)", "en haut à gauche, puis « Ajouter un widget »."),
-        (3, "Cherche « CertiGo »", "et place-le sur ton écran d'accueil ou verrouillé.")
+        (1, "Appuie longuement sur ton écran d'accueil", ""),
+        (2, "Touche « Modifier » ou « + » en haut à gauche", ""),
+        (3, "Cherche « CertiGo » et place ton widget", "")
     ]
 
     public static let onboardingSpeedComparisonBars: [(label: String, subtitle: String, durationText: String, percentValue: Int, badgeText: String?, isHighlighted: Bool)] = [
         ("Révision seule (cours longs & PDF)", "mémorisation passive", "~11 semaines", 29, nil, false),
-        ("Avec CertiGo (sprints actifs & mémoire espacée)", "sprints actifs & mémoire espacée", "3 semaines · 3,4× plus rapide", 100, "⚡ 3,4×", true)
+        ("Avec CertiGo (sprints actifs & mémoire espacée)", "sprints actifs & mémoire espacée", "3 semaines · 3,4× plus efficace 🏆", 100, "⚡ 3,4×", true)
     ]
 
     public static let onboardingEndowedMilestonesCompleted: Int = 2
     public static let onboardingEndowedMilestonesTotal: Int = 10
     public static let onboardingEndowedProgressPercent: Int = 20
-    public static let onboardingEndowedProgressBannerText: String = "2 jalons sur 10 (20 % d'avance offerte) crédités d'office sur le premier chapitre"
+    public static let onboardingEndowedProgressBannerText: String = "Chapitre 1 : 2 / 10 tampons validés (20 %)"
 
     public static let onboardingSpeedPillars: [(icon: String, title: String, detail: String)] = [
-        ("🎯", "100 % ciblé sur l'examen", "Tu ne révises que les questions et architectures qui tombent vraiment."),
-        ("🧠", "Ancrage actif en 10 min", "Ton cerveau retient 3× mieux en répondant qu'en lisant passivement."),
-        ("🏆", "Départ déjà lancé (20 % acquis)", "Tes réponses du mini-quiz d'entrée créditent d'office 2 jalons sur 10 (20 % d'avance offerte) sur le premier chapitre de ton parcours !")
+        ("🎯", "100 % ciblé sur les pièges d'examen", ""),
+        ("🧠", "Rappel actif & répétition espacée", ""),
+        ("🎁", "20 % du Chapitre 1 déjà crédités !", "")
     ]
 
     public mutating func selectOnboardingDailyRhythm(_ minutes: Int) {
         onboardingDailyRhythmMinutes = minutes
+        CertiGoHapticsEngine.play(.selection, isEnabled: settingsHapticsOn)
     }
 
     public mutating func selectOnboardingRoutineAnchor(_ index: Int) {
         let clamped = min(max(index, 0), Self.onboardingRoutineAnchors.count - 1)
         onboardingRoutineAnchorIndex = clamped
         onboardingReminderTimeText = Self.onboardingRoutineAnchors[clamped].defaultTime
+        CertiGoHapticsEngine.play(.selection, isEnabled: settingsHapticsOn)
     }
 
     public mutating func adjustOnboardingReminderTime(byMinutes delta: Int) {
@@ -9568,16 +9629,19 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         let newHour = totalMinutes / 60
         let newMinute = totalMinutes % 60
         onboardingReminderTimeText = String(format: "%02d:%02d", newHour, newMinute)
+        CertiGoHapticsEngine.play(.selection, isEnabled: settingsHapticsOn)
     }
 
     public mutating func activateDailyReminderAndAdvance() {
         settingsPushRemindersOn = true
         hasScheduledOnboardingDailyReminder = true
+        CertiGoHapticsEngine.play(.correct, isEnabled: settingsHapticsOn)
         advanceOnboardingStep()
     }
 
     public mutating func skipDailyReminderAndAdvance() {
         hasScheduledOnboardingDailyReminder = false
+        CertiGoHapticsEngine.play(.selection, isEnabled: settingsHapticsOn)
         advanceOnboardingStep()
     }
 
@@ -9973,6 +10037,8 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         }
         if onboardingStepIndex + 1 < Self.onboardingStepCount {
             onboardingStepIndex += 1
+            let token: PrismHapticToken = (onboardingStepIndex >= Self.onboardingStepCount - 1) ? .declic : .selection
+            CertiGoHapticsEngine.play(token, isEnabled: settingsHapticsOn)
         } else {
             completeOnboardingFlow(awardWelcomeBonus: false)
         }
@@ -9981,6 +10047,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public mutating func goBackOnboardingStep() {
         if onboardingStepIndex > 0 {
             onboardingStepIndex -= 1
+            CertiGoHapticsEngine.play(.selection, isEnabled: settingsHapticsOn)
         }
     }
 
@@ -10047,13 +10114,14 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         saveToLocalDatabase()
 
         if isPresentingOnboardingFlow {
-            if authOriginIsExistingAccountButton {
-                completeOnboardingFlow(awardWelcomeBonus: true, startGuidedTour: false)
+            if authOriginIsExistingAccountButton || onboardingStepIndex >= Self.onboardingStepCount - 1 {
+                completeOnboardingFlow(awardWelcomeBonus: true, startGuidedTour: !authOriginIsExistingAccountButton)
             } else if onboardingStepIndex <= 1 {
                 onboardingStepIndex = 2
             }
         }
         authOriginIsExistingAccountButton = false
+        CertiGoHapticsEngine.play(.correct, isEnabled: settingsHapticsOn)
     }
 
     public mutating func connectMicrosoftEntraAccount() {
@@ -10089,6 +10157,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         if awardWelcomeBonus && gemsCount == 0 {
             gemsCount = 50
         }
+        CertiGoHapticsEngine.play(.declic, isEnabled: settingsHapticsOn)
         syncCurrentUserLeaderboardEntry()
         UserDefaults.standard.set(true, forKey: Self.onboardingCompletedDefaultsKey)
         saveToLocalDatabase()
@@ -10148,6 +10217,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         } else {
             onboardingSelectedGoalIds.insert(goalId)
         }
+        CertiGoHapticsEngine.play(.selection, isEnabled: settingsHapticsOn)
     }
 
     public mutating func toggleOnboardingAIRadar(_ radarId: String) {
@@ -10158,6 +10228,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         } else {
             onboardingSelectedAIRadarIds.insert(radarId)
         }
+        CertiGoHapticsEngine.play(.selection, isEnabled: settingsHapticsOn)
     }
 
     public mutating func resetToFreshNewUser(store: CertiGoLocalDatabaseStore = .shared) {
@@ -10186,6 +10257,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         if let first = onboardingSelectedCertifications.first {
             selectRoute(first)
         }
+        CertiGoHapticsEngine.play(.selection, isEnabled: settingsHapticsOn)
     }
 
     public var currentUnits: [CertiGoCertificationUnit] {
@@ -11561,6 +11633,7 @@ public struct CertiGoTactile3DButtonStyle: ButtonStyle {
             )
             .padding(.bottom, lipDepth)
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .sensoryFeedback(PrismHapticToken.selection.sensoryFeedback, trigger: configuration.isPressed)
             .animation(
                 CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion),
                 value: configuration.isPressed
@@ -20878,8 +20951,8 @@ public struct CertiGoNativeOnboardingFlowView: View {
             .scrollDismissesKeyboard(.interactively)
             .background(PrismColor.figmaHex("#f8fafc"))
 
-            // Pinned Bottom CTA Bar on Steps 2..8 (Steps 0, 1, and 9 have their own dedicated CTAs inside their views)
-            if step >= 2 && step <= 8 {
+            // Pinned Bottom CTA Bar on Steps 2..9 (Steps 0, 1, and 10 have their own dedicated CTAs inside their views)
+            if step >= 2 && step <= 9 {
                 onboardingFooterBar(for: step)
             }
         }
@@ -20984,13 +21057,15 @@ public struct CertiGoNativeOnboardingFlowView: View {
         case 5:
             return "CONTINUER →"
         case 6:
-            return "CONTINUER (\(appState.onboardingDailyRhythmMinutes) MIN / JOUR) →"
+            return "CONTINUER ➔"
         case 7:
             return "Activer mon rappel quotidien"
         case 8:
             return "Super, j'ai compris →"
+        case 9:
+            return "CONTINUER ➔"
         default:
-            return "CONTINUER →"
+            return "CONTINUER ➔"
         }
     }
 
@@ -21015,8 +21090,15 @@ public struct CertiGoNativeOnboardingFlowView: View {
             CertiGoOnboardingTrainingMomentStepView(appState: $appState)
         case 8:
             CertiGoOnboardingWidgetStepView(appState: $appState)
-        default:
+        case 9:
             CertiGoOnboardingSpeedComparisonFinalStepView(appState: $appState)
+        default:
+            CertiGoOnboardingSaveEndowedProgressStepView(
+                appState: $appState,
+                onTriggerAuth: { provider in
+                    triggerProviderSignIn(provider, fromExistingAccountButton: false)
+                }
+            )
         }
     }
 
@@ -21512,12 +21594,8 @@ public struct CertiGoNativeOnboardingFlowView: View {
 
         return VStack(alignment: .leading, spacing: PrismSpacing.m) {
             Text(verbatim: "Qu'est-ce qui t'amène sur CertiGo ?")
-                .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
+                .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
                 .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-            Text(verbatim: "Tu peux combiner certifications officielles et veille sur les nouvelles avancées Tech & IA.")
-                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                .foregroundStyle(PrismColor.figmaHex("#475569"))
-                .lineSpacing(3)
 
             ForEach(goals, id: \.id) { goal in
                 let isSelected = appState.onboardingSelectedGoalIds.contains(goal.id)
@@ -21722,12 +21800,8 @@ public struct CertiGoNativeOnboardingFlowView: View {
 
         return VStack(alignment: .leading, spacing: PrismSpacing.m) {
             Text(verbatim: "Reste à la pointe de l'IA")
-                .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
+                .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
                 .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-
-            Text(verbatim: "Choisis les sujets d'actualité que tu veux suivre en parallèle.")
-                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
-                .foregroundStyle(PrismColor.figmaHex("#64748b"))
 
             ForEach(radarCards, id: \.id) { card in
                 let isSelected = appState.onboardingSelectedAIRadarIds.contains(card.id)
@@ -21892,9 +21966,9 @@ public struct CertiGoNativeOnboardingFlowView: View {
 
 }
 
-// MARK: - 8B. Decoupled Onboarding Screens (Step 6 Daily Goal, Step 7 Training Moment + iOS Notification, Step 8 iOS Widget Guide, Step 9 3.4x Speed Comparison)
+// MARK: - 8B. Decoupled Minimalist Onboarding Screens (Figma Page 17 — Zero Grey Subtitles Under Screen Titles + Compact 50pt Pills + 2/10 Stamps)
 
-/// Écran Rythme 1 (Step 6/9) — « Choisis ton objectif quotidien » (1 seule décision par écran : 4 grandes cartes aérées et lisibles).
+/// Étape 6A (Step 6/10) — « Choisis ton objectif quotidien » (Zéro sous-titre sous le grand titre, zéro bannière bleue au-dessus, 2 mots en sous-texte + badge à droite).
 public struct CertiGoOnboardingDailyRhythmStepView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding public var appState: CertiGoNativeAppState
@@ -21905,16 +21979,9 @@ public struct CertiGoOnboardingDailyRhythmStepView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: PrismSpacing.l) {
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                Text(verbatim: "Choisis ton objectif quotidien")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-
-                Text(verbatim: "Quelques minutes régulières suffisent pour ancrer chaque concept durablement.")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
-                    .foregroundStyle(PrismColor.figmaHex("#475569"))
-                    .lineSpacing(FigMetrics.three)
-            }
+            Text(verbatim: "Choisis ton objectif quotidien")
+                .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
 
             VStack(spacing: PrismSpacing.m) {
                 ForEach(CertiGoNativeAppState.onboardingDailyRhythmOptions, id: \.minutes) { option in
@@ -21934,49 +22001,31 @@ public struct CertiGoOnboardingDailyRhythmStepView: View {
                 appState.selectOnboardingDailyRhythm(option.minutes)
             }
         } label: {
-            VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                HStack(alignment: .center, spacing: PrismSpacing.m) {
-                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                        Text(verbatim: option.title)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+            HStack(alignment: .center, spacing: PrismSpacing.m) {
+                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                    Text(verbatim: option.title)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
 
-                        Text(verbatim: option.subtitle)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
-                            .foregroundStyle(
-                                PrismColor.figmaHex(option.isRecommended || isSelected ? "#1d4ed8" : "#64748b")
-                            )
-                    }
-
-                    Spacer()
-
-                    ZStack {
-                        Circle()
-                            .fill(PrismColor.figmaHex(isSelected ? "#1d4ed8" : "#f1f5f9"))
-                            .frame(width: FigMetrics.thirtyTwo, height: FigMetrics.thirtyTwo)
-                        if isSelected {
-                            Text(verbatim: "✓")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
-                                .foregroundStyle(PrismColor.onAccent)
-                        }
-                    }
+                    Text(verbatim: option.subtitle)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
+                        .foregroundStyle(PrismColor.figmaHex(isSelected ? "#1d4ed8" : "#64748b"))
                 }
 
-                if let subBadge = option.subBadge {
-                    HStack(spacing: PrismSpacing.xs) {
-                        Text(verbatim: "✦")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#059669"))
-                        Text(verbatim: subBadge)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#065f46"))
-                    }
-                    .padding(.horizontal, PrismSpacing.m)
-                    .padding(.vertical, PrismSpacing.xs)
-                    .background(
-                        Capsule()
-                            .fill(PrismColor.figmaHex("#ecfdf5"))
-                    )
+                Spacer()
+
+                if let badge = option.subBadge {
+                    Text(verbatim: badge)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                        .foregroundStyle(
+                            PrismColor.figmaHex(option.isRecommended || isSelected ? "#1d4ed8" : "#475569")
+                        )
+                        .padding(.horizontal, PrismSpacing.m)
+                        .padding(.vertical, PrismSpacing.xs)
+                        .background(
+                            Capsule()
+                                .fill(PrismColor.figmaHex(option.isRecommended || isSelected ? "#dbeafe" : "#f1f5f9"))
+                        )
                 }
             }
             .padding(PrismSpacing.l)
@@ -21995,7 +22044,7 @@ public struct CertiGoOnboardingDailyRhythmStepView: View {
     }
 }
 
-/// Écran Rythme 2 (Step 7/9) — « Quand veux-tu t'entraîner ? » (Moment de la journée + Heure modifiable simplement).
+/// Étape 6B (Step 7/10) — « Quel est ton meilleur moment ? » (Zéro sous-titre sous le grand titre).
 public struct CertiGoOnboardingTrainingMomentStepView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding public var appState: CertiGoNativeAppState
@@ -22006,16 +22055,9 @@ public struct CertiGoOnboardingTrainingMomentStepView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: PrismSpacing.l) {
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                Text(verbatim: "Quand veux-tu t'entraîner ?")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-
-                Text(verbatim: "Associe ta session quotidienne à un moment clé de ta journée pour créer un réflexe naturel.")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
-                    .foregroundStyle(PrismColor.figmaHex("#475569"))
-                    .lineSpacing(FigMetrics.three)
-            }
+            Text(verbatim: "Quel est ton meilleur moment ?")
+                .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
 
             VStack(spacing: PrismSpacing.m) {
                 ForEach(0..<CertiGoNativeAppState.onboardingRoutineAnchors.count, id: \.self) { idx in
@@ -22026,7 +22068,7 @@ public struct CertiGoOnboardingTrainingMomentStepView: View {
             // Simple, clean time adjuster card
             VStack(alignment: .leading, spacing: PrismSpacing.s) {
                 HStack {
-                    Text(verbatim: "🔔 Heure de ton rappel quotidien")
+                    Text(verbatim: "🔔 Heure du rappel")
                         .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#475569"))
                     Spacer()
@@ -22114,16 +22156,10 @@ public struct CertiGoOnboardingTrainingMomentStepView: View {
                             .fill(PrismColor.figmaHex(isSelected ? "#dbeafe" : "#f1f5f9"))
                     )
 
-                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                    Text(verbatim: anchor.title)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                        .multilineTextAlignment(.leading)
-
-                    Text(verbatim: "Rappel suggéré · \(anchor.defaultTime)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
-                        .foregroundStyle(PrismColor.figmaHex(isSelected ? "#1d4ed8" : "#64748b"))
-                }
+                Text(verbatim: anchor.title)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .multilineTextAlignment(.leading)
 
                 Spacer()
 
@@ -22153,7 +22189,7 @@ public struct CertiGoOnboardingTrainingMomentStepView: View {
     }
 }
 
-/// Nouvel écran d'onboarding dédié aux Widgets iOS CertiGo (Step 8/9) — « Garde ta série sous les yeux avec le Widget CertiGo ».
+/// Étape 6C (Step 8/10) — « Ajoute le Widget CertiGo sur ton iPhone » (Zéro sous-titre sous le titre, 3 étapes d'une seule ligne en gras sans sous-texte gris).
 public struct CertiGoOnboardingWidgetStepView: View {
     @Binding public var appState: CertiGoNativeAppState
 
@@ -22163,26 +22199,13 @@ public struct CertiGoOnboardingWidgetStepView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: PrismSpacing.l) {
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                Text(verbatim: "Garde ta série sous les yeux avec le Widget CertiGo")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+            Text(verbatim: "Ajoute le Widget CertiGo sur ton iPhone")
+                .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
 
-                Text(verbatim: "Visualise ta série 🔥 et lance ton sprint quotidien en un geste depuis ton écran d'accueil iPhone.")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
-                    .foregroundStyle(PrismColor.figmaHex("#475569"))
-                    .lineSpacing(FigMetrics.three)
-            }
-
-            // Realistic iPhone Home Screen Widget Mockup (visual preview only — single primary CTA stays in the footer per C1)
             widgetHomeScreenPreviewCard
 
-            // 3-step visual installation guide
             VStack(alignment: .leading, spacing: PrismSpacing.m) {
-                Text(verbatim: "COMMENT L'AJOUTER EN 3 ÉTAPES")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
-
                 ForEach(CertiGoNativeAppState.onboardingWidgetInstallSteps, id: \.number) { step in
                     widgetInstallStepRow(step)
                 }
@@ -22221,7 +22244,7 @@ public struct CertiGoOnboardingWidgetStepView: View {
 
                 Spacer()
 
-                Text(verbatim: "APERÇU WIDGET iOS")
+                Text(verbatim: "WIDGET iOS")
                     .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#64748b"))
             }
@@ -22230,15 +22253,10 @@ public struct CertiGoOnboardingWidgetStepView: View {
                 CertiGoMascotView(pose: .emotionOnFire, size: FigMetrics.sixtyFour)
 
                 VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                    Text(verbatim: "\(activeRoute) · Objectif \(dailyMinutes) min")
+                    Text(verbatim: "\(activeRoute) · \(dailyMinutes) min / jour")
                         .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#0f172a"))
 
-                    Text(verbatim: "20 % acquis (2/10 jalons) · Prêt pour ton sprint")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
-                        .foregroundStyle(PrismColor.figmaHex("#475569"))
-
-                    // Progress gauge bar
                     GeometryReader { geo in
                         let ratio: CGFloat = 0.45
                         let barWidth = geo.size.width.isFinite ? max(FigMetrics.twentyFour, geo.size.width * ratio) : FigMetrics.sixty
@@ -22264,7 +22282,7 @@ public struct CertiGoOnboardingWidgetStepView: View {
             }
 
             HStack(spacing: PrismSpacing.xs) {
-                Text(verbatim: "▶ Accès rapide au sprint (\(dailyMinutes) min)")
+                Text(verbatim: "▶ Lancer le sprint (\(dailyMinutes) min)")
                     .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
             }
@@ -22290,7 +22308,7 @@ public struct CertiGoOnboardingWidgetStepView: View {
     private func widgetInstallStepRow(
         _ step: (number: Int, title: String, detail: String)
     ) -> some View {
-        HStack(alignment: .top, spacing: PrismSpacing.m) {
+        HStack(alignment: .center, spacing: PrismSpacing.m) {
             Text(verbatim: "\(step.number)")
                 .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                 .foregroundStyle(PrismColor.onAccent)
@@ -22300,24 +22318,19 @@ public struct CertiGoOnboardingWidgetStepView: View {
                         .fill(PrismColor.figmaHex("#1d4ed8"))
                 )
 
-            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                Text(verbatim: step.title)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                Text(verbatim: step.detail)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                    .foregroundStyle(PrismColor.figmaHex("#475569"))
-                    .lineSpacing(FigMetrics.two)
-            }
+            Text(verbatim: "\(step.number). \(step.title)")
+                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
 
             Spacer(minLength: .zero)
         }
     }
 }
 
-/// Refonte esthétique et pédagogique de l'écran « 3,4× plus rapide avec CertiGo » (Step 9/9) + Progression Dotée E1 (2 jalons sur 10 = 20 % d'avance offerte).
+/// Étape 7 (Step 9/10) — « 3,4× plus rapide avec CertiGo » (Zéro sous-titre sous le titre + Carte comparative + 3 pilules compactes d'une seule ligne de hauteur ~50 pt).
 public struct CertiGoOnboardingSpeedComparisonFinalStepView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding public var appState: CertiGoNativeAppState
 
     public init(appState: Binding<CertiGoNativeAppState>) {
@@ -22326,88 +22339,23 @@ public struct CertiGoOnboardingSpeedComparisonFinalStepView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: PrismSpacing.l) {
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                Text(verbatim: "3,4× plus rapide avec CertiGo")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+            Text(verbatim: "3,4× plus rapide avec CertiGo")
+                .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
 
-                Text(verbatim: "Comprends en un coup d'œil pourquoi tes sprints quotidiens remplacent des semaines de lecture passive.")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
-                    .foregroundStyle(PrismColor.figmaHex("#475569"))
-                    .lineSpacing(FigMetrics.three)
-            }
-
-            // High-contrast 2-second comparative visual card (~11 weeks 29% vs 3 weeks 100% ⚡ 3,4×)
             comparativeBarsCard
 
-            // 3 ultra-readable explanation cards (🎯, 🧠, 🏆)
+            // 3 compact single-line pills (height 50 pt, icon + short title only, zero explanation paragraph below)
             VStack(spacing: PrismSpacing.s) {
                 ForEach(0..<CertiGoNativeAppState.onboardingSpeedPillars.count, id: \.self) { idx in
-                    speedPillarCard(CertiGoNativeAppState.onboardingSpeedPillars[idx])
+                    speedCompactPill(CertiGoNativeAppState.onboardingSpeedPillars[idx])
                 }
             }
-
-            // E1 (Nunes & Drèze Endowed Progress): 2 jalons sur 10 (20 % d'avance offerte) sur le premier chapitre
-            endowedProgressMilestoneCard
-
-            // C1: Single Primary 3D CTA Button + optional lightweight text link if not yet signed in
-            finalCTASection
         }
-    }
-
-    private var endowedProgressCardTitle: String {
-        let route = appState.activeRouteCode.isEmpty ? "AZ-104" : appState.activeRouteCode
-        return "Chapitre 1 (\(route)) · 2 jalons sur 10 validés"
-    }
-
-    private var endowedProgressMilestoneCard: some View {
-        VStack(alignment: .leading, spacing: PrismSpacing.s) {
-            HStack {
-                Text(verbatim: endowedProgressCardTitle)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#065f46"))
-                Spacer()
-                Text(verbatim: "20 % d'avance offerte")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                    .foregroundStyle(PrismColor.onAccent)
-                    .padding(.horizontal, PrismSpacing.s)
-                    .padding(.vertical, PrismSpacing.xxs)
-                    .background(
-                        Capsule()
-                            .fill(PrismColor.figmaHex("#059669"))
-                    )
-            }
-
-            // 10-segment milestone bar: 2/10 unlocked in Emerald Green
-            HStack(spacing: PrismSpacing.xxs) {
-                ForEach(0..<CertiGoNativeAppState.onboardingEndowedMilestonesTotal, id: \.self) { idx in
-                    let isCredited = idx < CertiGoNativeAppState.onboardingEndowedMilestonesCompleted
-                    RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
-                        .fill(PrismColor.figmaHex(isCredited ? "#10b981" : "#cbd5e1"))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: FigMetrics.ten)
-                }
-            }
-
-            Text(verbatim: CertiGoNativeAppState.onboardingEndowedProgressBannerText)
-                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
-                .foregroundStyle(PrismColor.figmaHex("#065f46"))
-        }
-        .padding(PrismSpacing.m)
-        .background(
-            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                .fill(PrismColor.figmaHex("#ecfdf5"))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                .strokeBorder(PrismColor.figmaHex("#10b981"), lineWidth: PrismBorder.standard)
-        )
-        .accessibilityIdentifier("onboarding-endowed-progress-2of10-card")
     }
 
     private var comparativeBarsCard: some View {
         VStack(alignment: .leading, spacing: PrismSpacing.l) {
-            // Row 1: Révision seule (cours longs & PDF) — ~11 semaines • mémorisation passive (29 %)
             VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                 HStack {
                     Text(verbatim: "Révision seule (cours longs & PDF)")
@@ -22431,31 +22379,19 @@ public struct CertiGoOnboardingSpeedComparisonFinalStepView: View {
                     }
                 }
                 .frame(height: FigMetrics.sixteen)
-
-                Text(verbatim: "29 % d'ancrage • mémorisation passive")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Medium"))
-                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
             }
 
             Divider()
 
-            // Row 2: Avec CertiGo (sprints actifs & mémoire espacée) — 3 semaines · 3,4× plus rapide (100 % + ⚡ 3,4×)
             VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                 HStack(alignment: .center, spacing: PrismSpacing.xs) {
-                    Text(verbatim: "Avec CertiGo (sprints actifs & mémoire espacée)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                    Text(verbatim: "Avec CertiGo")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                        .lineLimit(1)
                     Spacer()
-                    Text(verbatim: "⚡ 3,4×")
+                    Text(verbatim: "3 semaines · 3,4× plus efficace 🏆")
                         .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                        .foregroundStyle(PrismColor.onAccent)
-                        .padding(.horizontal, PrismSpacing.s)
-                        .padding(.vertical, PrismSpacing.xxs)
-                        .background(
-                            Capsule()
-                                .fill(PrismColor.figmaHex("#059669"))
-                        )
+                        .foregroundStyle(PrismColor.figmaHex("#059669"))
                 }
 
                 RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
@@ -22471,16 +22407,6 @@ public struct CertiGoOnboardingSpeedComparisonFinalStepView: View {
                     )
                     .frame(maxWidth: .infinity)
                     .frame(height: FigMetrics.twenty)
-
-                HStack {
-                    Text(verbatim: "3 semaines · 3,4× plus rapide")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
-                    Spacer()
-                    Text(verbatim: "100 % prêt")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#059669"))
-                }
             }
         }
         .padding(PrismSpacing.l)
@@ -22494,32 +22420,24 @@ public struct CertiGoOnboardingSpeedComparisonFinalStepView: View {
         )
     }
 
-    private func speedPillarCard(
+    private func speedCompactPill(
         _ pillar: (icon: String, title: String, detail: String)
     ) -> some View {
-        HStack(alignment: .top, spacing: PrismSpacing.m) {
+        HStack(spacing: PrismSpacing.m) {
             Text(verbatim: pillar.icon)
-                .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Regular"))
-                .frame(width: FigMetrics.fortyFour, height: FigMetrics.fortyFour)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                        .fill(PrismColor.figmaHex("#eff6ff"))
-                )
+                .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Bold"))
 
-            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                Text(verbatim: pillar.title)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                Text(verbatim: pillar.detail)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
-                    .foregroundStyle(PrismColor.figmaHex("#475569"))
-                    .lineSpacing(FigMetrics.two)
-            }
+            Text(verbatim: pillar.title)
+                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
 
             Spacer(minLength: .zero)
         }
-        .padding(PrismSpacing.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, PrismSpacing.l)
+        .frame(maxWidth: .infinity)
+        .frame(height: FigMetrics.fifty)
         .background(
             RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
                 .fill(PrismColor.surface)
@@ -22529,45 +22447,157 @@ public struct CertiGoOnboardingSpeedComparisonFinalStepView: View {
                 .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
         )
     }
+}
 
-    private var finalCTASection: some View {
+/// Étape 8 Finale (Step 10/10) — « Sauvegarde tes 20 % d'avance » (Carte Chapitre 1 : 2 / 10 tampons validés (20 %) + 3 boutons d'authentification épurés sans bloc explicatif technique).
+public struct CertiGoOnboardingSaveEndowedProgressStepView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Binding public var appState: CertiGoNativeAppState
+    public let onTriggerAuth: (CertiGoAuthProviderKind) -> Void
+
+    public init(
+        appState: Binding<CertiGoNativeAppState>,
+        onTriggerAuth: @escaping (CertiGoAuthProviderKind) -> Void
+    ) {
+        self._appState = appState
+        self.onTriggerAuth = onTriggerAuth
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.l) {
+            Text(verbatim: "Sauvegarde tes 20 % d'avance")
+                .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+
+            stampsCard
+
+            authButtonsStack
+        }
+    }
+
+    private var stampsCard: some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            Text(verbatim: CertiGoNativeAppState.onboardingEndowedProgressBannerText)
+                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#065f46"))
+
+            HStack(spacing: PrismSpacing.xs) {
+                ForEach(0..<CertiGoNativeAppState.onboardingEndowedMilestonesTotal, id: \.self) { idx in
+                    let isStamped = idx < CertiGoNativeAppState.onboardingEndowedMilestonesCompleted
+                    ZStack {
+                        Circle()
+                            .fill(PrismColor.figmaHex(isStamped ? "#10b981" : "#e2e8f0"))
+                            .frame(width: FigMetrics.twentyEight, height: FigMetrics.twentyEight)
+                        Text(verbatim: isStamped ? "✓" : "\(idx + 1)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                            .foregroundStyle(isStamped ? PrismColor.onAccent : PrismColor.figmaHex("#64748b"))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .padding(PrismSpacing.l)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                .fill(PrismColor.figmaHex("#ecfdf5"))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#10b981"), lineWidth: PrismBorder.standard)
+        )
+        .accessibilityIdentifier("onboarding-endowed-progress-2of10-card")
+    }
+
+    private var authButtonsStack: some View {
         VStack(spacing: PrismSpacing.m) {
+            Button {
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    onTriggerAuth(.apple)
+                }
+            } label: {
+                HStack(spacing: PrismSpacing.s) {
+                    Text(verbatim: "")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Bold"))
+                    Text(verbatim: "Continuer avec Apple")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                }
+                .foregroundStyle(PrismColor.onAccent)
+                .frame(maxWidth: .infinity)
+                .frame(height: FigMetrics.fiftyTwo)
+            }
+            .buttonStyle(
+                CertiGoTactile3DButtonStyle(
+                    faceHex: "#0f172a",
+                    lipHex: "#020617",
+                    cornerRadius: PrismRadius.l,
+                    lipDepth: FigMetrics.four
+                )
+            )
+            .accessibilityIdentifier("onboarding-save20-apple-button")
+
+            Button {
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    onTriggerAuth(.google)
+                }
+            } label: {
+                HStack(spacing: PrismSpacing.s) {
+                    CertiGoBrandLogoView(vendorId: "google", size: PrismSize.brandS)
+                    Text(verbatim: "Continuer avec Google")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: FigMetrics.fiftyTwo)
+            }
+            .buttonStyle(
+                CertiGoTactile3DButtonStyle(
+                    faceHex: "#ffffff",
+                    lipHex: "#cbd5e1",
+                    strokeHex: "#cbd5e1",
+                    cornerRadius: PrismRadius.l,
+                    lipDepth: FigMetrics.four
+                )
+            )
+            .accessibilityIdentifier("onboarding-save20-google-button")
+
+            Button {
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    onTriggerAuth(.email)
+                }
+            } label: {
+                HStack(spacing: PrismSpacing.s) {
+                    Text(verbatim: "✉️")
+                    Text(verbatim: "Continuer avec mon adresse e-mail")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: FigMetrics.fiftyTwo)
+            }
+            .buttonStyle(
+                CertiGoTactile3DButtonStyle(
+                    faceHex: "#ffffff",
+                    lipHex: "#cbd5e1",
+                    strokeHex: "#cbd5e1",
+                    cornerRadius: PrismRadius.l,
+                    lipDepth: FigMetrics.four
+                )
+            )
+            .accessibilityIdentifier("onboarding-save20-email-button")
+
             Button {
                 withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
                     appState.completeOnboardingFlow(awardWelcomeBonus: true, startGuidedTour: true)
                 }
             } label: {
-                Text(verbatim: "🚀 DÉMARRER MON PARCOURS (+50 💎) →")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
-                    .foregroundStyle(PrismColor.onAccent)
+                Text(verbatim: "Continuer vers mon parcours →")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                    .padding(.vertical, PrismSpacing.xs)
                     .frame(maxWidth: .infinity)
-                    .frame(height: FigMetrics.fiftyTwo)
             }
-            .buttonStyle(
-                CertiGoTactile3DButtonStyle(
-                    faceHex: "#1d4ed8",
-                    lipHex: "#1e40af",
-                    cornerRadius: PrismRadius.l,
-                    lipDepth: FigMetrics.five
-                )
-            )
+            .buttonStyle(.plain)
             .accessibilityIdentifier("onboarding-complete-with-profile-button")
-
-            if !appState.isAccountConnected {
-                Button {
-                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                        appState.isPresentingSignInPortalSheet = true
-                    }
-                } label: {
-                    Text(verbatim: "Sauvegarder mes 20 % acquis avec un compte →")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
-                        .padding(.vertical, PrismSpacing.xxs)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("onboarding-final-save-account-button")
-            }
         }
     }
 }
