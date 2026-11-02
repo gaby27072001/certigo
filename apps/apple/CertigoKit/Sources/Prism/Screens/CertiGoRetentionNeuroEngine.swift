@@ -1654,6 +1654,7 @@ public struct CertiGoOneTapSprintBarView: View {
     }
 
     public var body: some View {
+        let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: activeRouteCode)
         HStack(spacing: PrismSpacing.s) {
             Button(action: onStartOneTapSprint) {
                 HStack(spacing: PrismSpacing.xs) {
@@ -1664,7 +1665,7 @@ public struct CertiGoOneTapSprintBarView: View {
                     Spacer(minLength: FigMetrics.four)
                     Text(verbatim: activeRouteCode)
                         .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
-                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                        .foregroundStyle(PrismColor.figmaHex(trackTheme.primaryHex))
                         .padding(.horizontal, PrismSpacing.xs)
                         .padding(.vertical, FigMetrics.two)
                         .background(Capsule().fill(PrismColor.surface))
@@ -1675,8 +1676,8 @@ public struct CertiGoOneTapSprintBarView: View {
             }
             .buttonStyle(
                 CertiGoTactile3DButtonStyle(
-                    faceHex: "#0078d4",
-                    lipHex: "#005a9e",
+                    faceHex: trackTheme.primaryHex,
+                    lipHex: trackTheme.lipHex,
                     cornerRadius: PrismRadius.l,
                     lipDepth: FigMetrics.four
                 )
@@ -1762,36 +1763,21 @@ public struct CertiGoHullStampCardView: View {
             forUnitNumber: unitNumber,
             effectivePercent: effectivePercent
         )
-        let stampedCount = stamps.filter(\.isStamped).count
 
-        VStack(alignment: .leading, spacing: FigMetrics.four) {
-            HStack {
-                Text(verbatim: "🎖️ \(stampedCount)/10 jalons")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
-                    .foregroundStyle(PrismColor.figmaHex("#e0f2fe"))
-                    .lineLimit(1)
-                Spacer()
-                Text(verbatim: unitNumber == 1 ? "+2 offerts ✓" : "+1 offert ✓")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#bbf7d0"))
-                    .lineLimit(1)
-            }
-
-            HStack(spacing: FigMetrics.four) {
-                ForEach(stamps) { stamp in
-                    ZStack {
-                        RoundedRectangle(cornerRadius: PrismRadius.xs, style: .continuous)
-                            .fill(
-                                stamp.isStamped
-                                    ? PrismColor.figmaHex("#58cc02")
-                                    : PrismColor.figmaHex("#ffffff:22")
-                            )
-                            .frame(maxWidth: .infinity)
-                            .frame(height: FigMetrics.eighteen)
-                        Text(verbatim: stamp.isStamped ? "✓" : "\(stamp.index)")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
-                            .foregroundStyle(PrismColor.onAccent)
-                    }
+        HStack(spacing: FigMetrics.four) {
+            ForEach(stamps) { stamp in
+                ZStack {
+                    RoundedRectangle(cornerRadius: PrismRadius.xs, style: .continuous)
+                        .fill(
+                            stamp.isStamped
+                                ? PrismColor.figmaHex("#58cc02")
+                                : PrismColor.figmaHex("#ffffff:22")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: FigMetrics.eighteen)
+                    Text(verbatim: stamp.isStamped ? "✓" : "\(stamp.index)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
+                        .foregroundStyle(PrismColor.onAccent)
                 }
             }
         }

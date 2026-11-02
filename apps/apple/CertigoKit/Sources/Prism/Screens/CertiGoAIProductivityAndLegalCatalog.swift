@@ -60,16 +60,16 @@ public enum CertiGoAIProductivityTrackID: String, CaseIterable, Codable, Hashabl
 
     public var brandLogoAssetName: String {
         switch self {
-        case .ms365Copilot: return "BrandLogos/brand-microsoft"
+        case .ms365Copilot: return "BrandLogos/brand-m365-copilot"
         case .openAIPro: return "BrandLogos/brand-openai"
-        case .anthropicClaude: return "BrandLogos/brand-anthropic"
+        case .anthropicClaude: return "BrandLogos/brand-claude-ai"
         case .harveyLegal: return "BrandLogos/brand-harvey"
         }
     }
 
     public var certificationAssetName: String {
         switch self {
-        case .ms365Copilot: return "Certifications/ms-official-associate-badge"
+        case .ms365Copilot: return "BrandLogos/brand-m365-copilot"
         case .openAIPro: return "BrandLogos/brand-openai"
         case .anthropicClaude: return "Certifications/tech-anthropic-cca-foundations"
         case .harveyLegal: return "BrandLogos/brand-harvey"
@@ -122,9 +122,9 @@ public enum CertiGoOfficialBrandVendorID: String, CaseIterable, Codable, Hashabl
         case .all: return "BrandLogos/brand-microsoft-azure"
         case .microsoft: return "BrandLogos/brand-microsoft"
         case .openai: return "BrandLogos/brand-openai"
-        case .anthropic: return "BrandLogos/brand-anthropic"
+        case .anthropic: return "BrandLogos/brand-claude-ai"
         case .harvey: return "BrandLogos/brand-harvey"
-        case .aiProductivity: return "BrandLogos/brand-github-copilot"
+        case .aiProductivity: return "BrandLogos/brand-m365-copilot"
         case .aws: return "BrandLogos/brand-aws-official"
         case .google: return "BrandLogos/brand-google-cloud"
         case .github: return "BrandLogos/brand-github"
@@ -917,8 +917,8 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                 UnitHeaderMeta(
                     headerTitle: "UNITÉ 1 · Copilot Chat, Work IQ, Cowork & Word/PPT",
                     subtitle: "Ancrage Graph, délégation Cowork & création documentaire",
-                    accentHex: "#0078d4",
-                    lipHex: "#005a9e",
+                    accentHex: "#4f46e5",
+                    lipHex: "#3730a3",
                     memoActivity: "Ancrer un livrable sur Work IQ et déléguer avec Cowork",
                     memoTopics: ["Work IQ Graph", "Copilot Cowork", "Word ➔ PowerPoint"],
                     memoRule: "Référence toujours tes fichiers sources avec `/` pour ancrer Copilot sur tes vraies données Graph."
@@ -979,8 +979,8 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                 UnitHeaderMeta(
                     headerTitle: "UNITÉ 1 · Prompt XML, Extended Thinking & 200k+",
                     subtitle: "Balises <context>/<instructions>, budget_tokens & Prompt Caching",
-                    accentHex: "#d97706",
-                    lipHex: "#b45309",
+                    accentHex: "#d97757",
+                    lipHex: "#b85c3e",
                     memoActivity: "Structurer un prompt XML avec Extended Thinking et Cache",
                     memoTopics: ["Balises XML", "Extended Thinking", "Prompt Caching"],
                     memoRule: "Place les documents longs dans <documents> tout en haut du prompt et la consigne finale tout en bas."
@@ -1010,8 +1010,8 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                 UnitHeaderMeta(
                     headerTitle: "UNITÉ 1 · Harvey Assistant & Rédaction Contractuelle",
                     subtitle: "Redlining NDA/MSA, playbooks de négociation & clauses",
-                    accentHex: "#111827",
-                    lipHex: "#030712",
+                    accentHex: "#18181b",
+                    lipHex: "#09090b",
                     memoActivity: "Auditer un MSA et générer un redline aligné sur le playbook",
                     memoTopics: ["Redlining MSA/NDA", "Plafond d'indemnisation", "Prompt Juridique"],
                     memoRule: "Fournis toujours le rôle, la juridiction applicable et la position de repli (fallback) dans ton prompt Harvey."
@@ -1049,7 +1049,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Connecter e-mails, réunions, chats et fichiers via `/`",
                     domainNumber: 1,
                     iconSymbol: "sparkles",
-                    serviceAsset: "BrandLogos/brand-microsoft",
+                    serviceAsset: "BrandLogos/brand-m365-copilot",
                     declicTitle: "Work IQ : tes données M365 en contexte",
                     brick1: ("👤", "Prompt + `/`", "Fichiers, e-mails et réunions ciblés"),
                     brick2: ("🕸️", "Microsoft Graph", "Index sémantique & droits ACL"),
@@ -1072,7 +1072,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Déléguer une mission asynchrone multi-étapes",
                     domainNumber: 1,
                     iconSymbol: "person.2.wave.2.fill",
-                    serviceAsset: "BrandLogos/brand-github-copilot",
+                    serviceAsset: "BrandLogos/brand-copilot-cowork",
                     declicTitle: "Cowork : délégation longue durée avec jalons",
                     brick1: ("🎯", "Objectif Mission", "Livrable, sources & contraintes"),
                     brick2: ("⚙️", "Copilot Cowork", "Exécution asynchrone multi-outils"),
@@ -1095,7 +1095,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Transformer une réponse Copilot en composant Loop vivant",
                     domainNumber: 1,
                     iconSymbol: "doc.on.doc.fill",
-                    serviceAsset: "BrandLogos/brand-microsoft",
+                    serviceAsset: "BrandLogos/brand-m365-copilot",
                     declicTitle: "Copilot Pages : du chat individuel au livrable d'équipe",
                     brick1: ("💬", "Session Copilot", "Recherche & premier jet IA"),
                     brick2: ("📄", "Copilot Page (Loop)", "Édition temps réel multi-auteurs"),
@@ -1118,7 +1118,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Structurer Objectif + Contexte + Source + Format",
                     domainNumber: 1,
                     iconSymbol: "terminal.fill",
-                    serviceAsset: "BrandLogos/brand-github-copilot",
+                    serviceAsset: "BrandLogos/brand-m365-copilot",
                     declicTitle: "Les 4 ingrédients d'un prompt M365 parfait",
                     brick1: ("🧭", "Objectif + Rôle", "Action précise + public cible"),
                     brick2: ("📂", "Sources Graph `/`", "Documents, réunions & e-mails"),
@@ -1141,7 +1141,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Brouillon multi-sources, ton exécutif et tableau récapitulatif",
                     domainNumber: 2,
                     iconSymbol: "doc.richtext.fill",
-                    serviceAsset: "BrandLogos/brand-microsoft",
+                    serviceAsset: "BrandLogos/brand-office-word",
                     declicTitle: "Copilot dans Word : rédiger et transformer en 1 clic",
                     brick1: ("📑", "Jusqu'à 3 Sources `/`", "Cahier des charges + notes + budget"),
                     brick2: ("✍️", "Rédaction & Ton", "Réécriture juridique ou exécutive"),
@@ -1164,7 +1164,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Générer un deck charté avec Speaker Notes depuis un fichier Word",
                     domainNumber: 2,
                     iconSymbol: "rectangle.on.rectangle.angled",
-                    serviceAsset: "BrandLogos/brand-microsoft",
+                    serviceAsset: "BrandLogos/brand-office-powerpoint",
                     declicTitle: "De Word à PowerPoint : styles H1/H2 = structure de slides",
                     brick1: ("📝", "Doc Word Structuré", "Titres 1 et Titres 2 bien balisés"),
                     brick2: ("🎨", "Masque d'Entreprise", "Ouverture préalable du template .potx"),
@@ -1187,7 +1187,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Générer et expliquer des formules complexes sur tableaux Excel",
                     domainNumber: 3,
                     iconSymbol: "tablecells.fill",
-                    serviceAsset: "BrandLogos/brand-microsoft",
+                    serviceAsset: "BrandLogos/brand-office-excel",
                     declicTitle: "Copilot dans Excel : formules dynamiques sans erreur",
                     brick1: ("📋", "Tableau Excel (Ctrl+T)", "Colonnes nommées sur OneDrive/SharePoint"),
                     brick2: ("🧮", "Formule Copilot", "XLOOKUP, FILTER, LET ou LAMBDA"),
@@ -1233,7 +1233,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Détecter les anomalies de marge et créer un TCD exécutif",
                     domainNumber: 3,
                     iconSymbol: "terminal.fill",
-                    serviceAsset: "BrandLogos/brand-microsoft",
+                    serviceAsset: "BrandLogos/brand-office-excel",
                     declicTitle: "Du tableau brut à l'insight décisionnel en 2 étapes",
                     brick1: ("🔍", "Filtre d'Anomalies", "Mise en évidence conditionnelle IA"),
                     brick2: ("📊", "Tableau Croisé (TCD)", "Agrégation par région et trimestre"),
@@ -1256,7 +1256,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Transcription, Intelligent Recap, décisions et propriétaires",
                     domainNumber: 4,
                     iconSymbol: "video.bubble.left.fill",
-                    serviceAsset: "BrandLogos/brand-microsoft",
+                    serviceAsset: "BrandLogos/brand-office-teams",
                     declicTitle: "Teams Copilot : ne plus jamais perdre une décision",
                     brick1: ("🎙️", "Transcription Active", "Attribution vocale par intervenant"),
                     brick2: ("🧠", "Intelligent Recap", "Synthèse des décisions & points ouverts"),
@@ -1279,7 +1279,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Résumer un long fil d'e-mails et calibrer le ton diplomatique",
                     domainNumber: 4,
                     iconSymbol: "envelope.badge.shield.half.filled",
-                    serviceAsset: "BrandLogos/brand-microsoft",
+                    serviceAsset: "BrandLogos/brand-office-outlook",
                     declicTitle: "Outlook Copilot : résumer 30 messages et coacher sa réponse",
                     brick1: ("📨", "Fil d'E-mails Long", "Synthèse des attentes et blocages"),
                     brick2: ("🎓", "Coaching par Copilot", "Analyse Ton, Clarté et Sentiment"),
@@ -1302,7 +1302,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Spécialiser Copilot avec instructions, SharePoint et connecteurs",
                     domainNumber: 5,
                     iconSymbol: "cpu.fill",
-                    serviceAsset: "BrandLogos/brand-github-copilot",
+                    serviceAsset: "BrandLogos/brand-m365-copilot",
                     declicTitle: "Agent Déclaratif : spécialiser M365 Copilot sans gérer d'infra",
                     brick1: ("📜", "Instructions Système", "Rôle métier, périmètre & garde-fous"),
                     brick2: ("📚", "Sources & Connecteurs", "Sites SharePoint + Graph Connectors"),
@@ -1325,7 +1325,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Déclencheurs événementiels, orchestration générative et connecteurs",
                     domainNumber: 5,
                     iconSymbol: "bolt.horizontal.circle.fill",
-                    serviceAsset: "AzureServices/Bot-Services",
+                    serviceAsset: "BrandLogos/brand-copilot-studio",
                     declicTitle: "Agent Autonome : agir dès qu'un événement métier survient",
                     brick1: ("🔔", "Déclencheur (Trigger)", "Nouveau ticket, e-mail ou ligne Dataverse"),
                     brick2: ("🧭", "Orchestrateur Génératif", "Sélection dynamique des Topics & Tools"),
@@ -1398,7 +1398,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Choisir entre réponse multimodale rapide et raisonnement profond",
                     domainNumber: 1,
                     iconSymbol: "brain.head.profile",
-                    serviceAsset: "BrandLogos/brand-openai",
+                    serviceAsset: "BrandLogos/brand-openai-o3",
                     declicTitle: "Routage : GPT-4o (vitesse) vs o3/o4 (raisonnement multi-étapes)",
                     brick1: ("⚡", "GPT-4o / 4.1", "Multimodal temps réel, rédaction & synthèse rapide"),
                     brick2: ("🧩", "Série o3 / o4-mini", "Chaîne de pensée interne, maths, architecture & code"),
@@ -1467,7 +1467,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Déléguer des tâches d'ingénierie parallèles dans un conteneur isolé",
                     domainNumber: 2,
                     iconSymbol: "terminal.fill",
-                    serviceAsset: "BrandLogos/brand-openai",
+                    serviceAsset: "BrandLogos/brand-openai-codex",
                     declicTitle: "Codex : un ingénieur logiciel autonome dans un sandbox sécurisé",
                     brick1: ("📦", "Sandbox Isolé", "Clone du dépôt + dépendances préchargées"),
                     brick2: ("🔁", "Boucle Test/Fix", "Exécution des tests, linters et typecheck"),
@@ -1513,7 +1513,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Reproduire un bug par un test rouge, corriger et valider le diff",
                     domainNumber: 2,
                     iconSymbol: "checkmark.seal.fill",
-                    serviceAsset: "BrandLogos/brand-openai",
+                    serviceAsset: "BrandLogos/brand-openai-codex",
                     declicTitle: "Méthode TDD avec Codex : Test Rouge ➔ Correctif ➔ Test Vert",
                     brick1: ("🔴", "Test Reproducteur", "Écrire le test qui échoue sur le bug"),
                     brick2: ("🟢", "Patch Minimal", "Corriger la cause racine sans effet de bord"),
@@ -1582,7 +1582,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Unifier génération, Web Search, File Search et Code Interpreter",
                     domainNumber: 4,
                     iconSymbol: "arrow.triangle.2.circlepath.circle.fill",
-                    serviceAsset: "BrandLogos/brand-openai",
+                    serviceAsset: "BrandLogos/brand-openai-agents",
                     declicTitle: "Responses API : la fondation unifiée pour les agents OpenAI",
                     brick1: ("📨", "Appel `POST /v1/responses`", "Entrées multimodales + `previous_response_id`"),
                     brick2: ("🧰", "Outils Intégrés", "`web_search`, `file_search`, `code_interpreter`, `mcp`"),
@@ -1651,7 +1651,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Orchestrer un agent de triage, des sous-agents et des Guardrails",
                     domainNumber: 4,
                     iconSymbol: "point.3.connected.trianglepath.dotted",
-                    serviceAsset: "BrandLogos/brand-openai",
+                    serviceAsset: "BrandLogos/brand-openai-agents",
                     declicTitle: "Agents SDK : Handoffs spécialisés et Input/Output Guardrails",
                     brick1: ("🛡️", "Input Guardrail", "Vérification sécurité en parallèle dès l'entrée"),
                     brick2: ("🔀", "Agent + Handoffs", "Délégation vers un agent spécialiste ciblé"),
@@ -1862,7 +1862,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Générer des composants React, SVG, Mermaid et documents interactifs",
                     domainNumber: 2,
                     iconSymbol: "sparkles.rectangle.stack.fill",
-                    serviceAsset: "BrandLogos/brand-claude-ai",
+                    serviceAsset: "BrandLogos/brand-claude-artifacts",
                     declicTitle: "Artifacts : visualiser et itérer en direct à côté du chat",
                     brick1: ("💬", "Spécification Courte", "Décrire l'interface, le flux ou le diagramme"),
                     brick2: ("🖥️", "Fenêtre Artifact", "Rendu React, HTML, SVG ou Mermaid en direct"),
@@ -1885,7 +1885,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Agent de développement en ligne de commande : exploration, édition et git",
                     domainNumber: 3,
                     iconSymbol: "terminal.fill",
-                    serviceAsset: "BrandLogos/brand-anthropic",
+                    serviceAsset: "BrandLogos/brand-claude-code",
                     declicTitle: "Claude Code : l'agent CLI qui comprend tout ton dépôt",
                     brick1: ("🔍", "Exploration Codebase", "Recherche ripgrep/glob et lecture ciblée"),
                     brick2: ("✏️", "Édition Multi-Fichiers", "Modifications atomiques coordonnées"),
@@ -1931,7 +1931,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Extraire un module, mettre à jour les imports et passer les tests",
                     domainNumber: 3,
                     iconSymbol: "wrench.and.screwdriver.fill",
-                    serviceAsset: "BrandLogos/brand-claude-ai",
+                    serviceAsset: "BrandLogos/brand-claude-code",
                     declicTitle: "Refactoring sans régression avec sous-agents et tests ciblés",
                     brick1: ("🧭", "Sous-Agent Recherche", "Cartographier tous les appels sans saturer le contexte"),
                     brick2: ("🔧", "Édition Chirurgicale", "Mise à jour des signatures et appels"),
@@ -1954,7 +1954,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Host, Client MCP, Serveur MCP et protocole JSON-RPC 2.0",
                     domainNumber: 4,
                     iconSymbol: "network",
-                    serviceAsset: "Certifications/tech-anthropic-cca-foundations",
+                    serviceAsset: "BrandLogos/brand-anthropic-mcp",
                     declicTitle: "MCP : le port USB-C universel pour connecter l'IA aux outils",
                     brick1: ("🖥️", "MCP Host & Client", "Claude Desktop / IDE / App maintenant une session 1:1"),
                     brick2: ("🔌", "Protocole JSON-RPC 2.0", "Transport local `stdio` ou distant `Streamable HTTP`"),
@@ -1977,7 +1977,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Distinguer qui contrôle chaque primitive du protocole MCP",
                     domainNumber: 4,
                     iconSymbol: "square.stack.3d.up.fill",
-                    serviceAsset: "Certifications/tech-anthropic-cca-foundations",
+                    serviceAsset: "BrandLogos/brand-anthropic-mcp",
                     declicTitle: "Les 3 primitives serveur MCP et leur modèle de contrôle",
                     brick1: ("📖", "Resources (App-controlled)", "Données en lecture seule attachées par l'application (`uri`)"),
                     brick2: ("💬", "Prompts (User-controlled)", "Modèles de commandes/workflows choisis par l'utilisateur"),
@@ -2096,7 +2096,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Structurer un prompt juridique : Rôle, Juridiction, Pièce et Livrable",
                     domainNumber: 1,
                     iconSymbol: "scale.3d",
-                    serviceAsset: "BrandLogos/brand-harvey",
+                    serviceAsset: "BrandLogos/brand-harvey-assistant",
                     declicTitle: "Prompt Juridique Harvey : précision du mandat et de la juridiction",
                     brick1: ("⚖️", "Rôle & Juridiction", "Ex. Avocat M&A côté Acquéreur · Droit français"),
                     brick2: ("📄", "Pièce & Standard", "Contrat cible + position de marché / playbook"),
@@ -2119,7 +2119,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Comparer un contrat au playbook interne et générer les contre-propositions",
                     domainNumber: 1,
                     iconSymbol: "doc.text.below.ecg.fill",
-                    serviceAsset: "BrandLogos/brand-harvey",
+                    serviceAsset: "BrandLogos/brand-harvey-assistant",
                     declicTitle: "Redlining Assisté : Position Idéale vs Position de Repli (Fallback)",
                     brick1: ("📘", "Playbook Direction Juridique", "Seuils acceptables : plafond, durée, juridiction"),
                     brick2: ("🔍", "Détection d'Écarts", "Repérage des clauses hors standard (ex. responsabilité illimitée)"),
@@ -2188,7 +2188,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Structurer et interroger des milliers de pièces en Due Diligence",
                     domainNumber: 2,
                     iconSymbol: "building.columns.fill",
-                    serviceAsset: "BrandLogos/brand-harvey",
+                    serviceAsset: "BrandLogos/brand-harvey-vault",
                     declicTitle: "Harvey Vault : Due Diligence à grande échelle avec renvoi à la pièce",
                     brick1: ("🗄️", "Data Room Vault", "Ingestion OCR + indexation de milliers de contrats/actes"),
                     brick2: ("📐", "Requête Multi-Pièces", "Extraction structurée sur tout le corpus en parallèle"),
@@ -2211,7 +2211,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Identifier les clauses de changement de contrôle, consentement et résiliation",
                     domainNumber: 2,
                     iconSymbol: "tablecells.badge.ellipsis",
-                    serviceAsset: "BrandLogos/brand-harvey",
+                    serviceAsset: "BrandLogos/brand-harvey-vault",
                     declicTitle: "Audit M&A : repérer chaque préavis et droit de résiliation anticipée",
                     brick1: ("📑", "Contrats Clés Cible", "Top clients, fournisseurs critiques, baux & financements"),
                     brick2: ("🔍", "Extraction Structurée", "Définition CoC · Consentement écrit · Préavis · Sanction"),
@@ -2257,7 +2257,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Recherche jurisprudentielle, doctrinale et réglementaire sourcée",
                     domainNumber: 3,
                     iconSymbol: "books.vertical.fill",
-                    serviceAsset: "BrandLogos/brand-harvey",
+                    serviceAsset: "BrandLogos/brand-harvey-knowledge",
                     declicTitle: "Harvey Knowledge : recherche juridique ancrée sur sources officielles",
                     brick1: ("📚", "Bases Officielles", "Législation, jurisprudence, doctrine & régulateurs"),
                     brick2: ("🔗", "Ancrage Vérifiable", "Chaque argument lié à sa référence officielle"),
@@ -2280,7 +2280,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Comparer AI Act, RGPD, DORA ou NIS 2 entre plusieurs pays",
                     domainNumber: 3,
                     iconSymbol: "globe.europe.africa.fill",
-                    serviceAsset: "BrandLogos/brand-harvey",
+                    serviceAsset: "BrandLogos/brand-harvey-knowledge",
                     declicTitle: "Matrice Réglementaire : comparer exigences et sanctions par pays",
                     brick1: ("🌍", "Périmètre Juridictions", "Ex. Union européenne (AI Act / RGPD), France, UK, US"),
                     brick2: ("📊", "Tableau Comparatif", "Obligation · Délai · Autorité compétente · Sanction max"),
