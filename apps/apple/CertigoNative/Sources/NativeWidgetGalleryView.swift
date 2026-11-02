@@ -285,7 +285,7 @@ struct NativeWidgetGalleryView: View {
       dailyGoalXP: 30,
       dailyXPEarned: earned,
       activeTrackCode: "DEMO",
-      activeTrackTitle: "Certigo preview",
+      activeTrackTitle: "CertiGo preview",
       serverStreakRisk: risk,
       studyPlanDailyMinutes: 10,
       targetExamDate: nil,

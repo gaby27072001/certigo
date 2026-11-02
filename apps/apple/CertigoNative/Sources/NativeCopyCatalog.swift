@@ -283,12 +283,12 @@ import Foundation
                 ]
             case .welcomeHint:
                 row = [
-                    "Découvrez l’aperçu natif de Certigo.",
-                    "Explore Certigo’s native learning preview.", "Certigo का नेटिव सीखने का पूर्वावलोकन देखें।",
-                    "探索 Certigo 原生学习预览。", "Certigo 네이티브 학습 미리 보기를 살펴보세요.",
-                    "Explora la vista nativa de aprendizaje de Certigo.",
-                    "Esplora l’anteprima nativa di Certigo.",
-                    "Entdecke Certigos native Lernvorschau.",
+                    "Découvrez l’aperçu natif de CertiGo.",
+                    "Explore CertiGo’s native learning preview.", "CertiGo का नेटिव सीखने का पूर्वावलोकन देखें।",
+                    "探索 CertiGo 原生学习预览。", "CertiGo 네이티브 학습 미리 보기를 살펴보세요.",
+                    "Explora la vista nativa de aprendizaje de CertiGo.",
+                    "Esplora l’anteprima nativa di CertiGo.",
+                    "Entdecke CertiGos native Lernvorschau.",
                 ]
             case .tryLearning:
                 row = [
@@ -372,13 +372,13 @@ import Foundation
                 ]
             case .productionHint:
                 row = [
-                    "Vos objectifs, vos exercices et votre progression confirmée, réunis dans Certigo.",
-                    "Your learning goals, practice and confirmed progress, together in Certigo.",
-                    "आपके सीखने के लक्ष्य, अभ्यास और पुष्ट प्रगति, सब Certigo में।", "学习目标、练习与已确认进度，尽在 Certigo。",
-                    "학습 목표, 연습, 확인된 진행 상황을 Certigo에서 함께.",
-                    "Tus objetivos, práctica y progreso confirmado, juntos en Certigo.",
-                    "Obiettivi, pratica e progressi confermati, insieme in Certigo.",
-                    "Lernziele, Übungen und bestätigter Fortschritt – vereint in Certigo.",
+                    "Vos objectifs, vos exercices et votre progression confirmée, réunis dans CertiGo.",
+                    "Your learning goals, practice and confirmed progress, together in CertiGo.",
+                    "आपके सीखने के लक्ष्य, अभ्यास और पुष्ट प्रगति, सब CertiGo में।", "学习目标、练习与已确认进度，尽在 CertiGo。",
+                    "학습 목표, 연습, 확인된 진행 상황을 CertiGo에서 함께.",
+                    "Tus objetivos, práctica y progreso confirmado, juntos en CertiGo.",
+                    "Obiettivi, pratica e progressi confermati, insieme in CertiGo.",
+                    "Lernziele, Übungen und bestätigter Fortschritt – vereint in CertiGo.",
                 ]
             case .continueLearning:
                 row = [

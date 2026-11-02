@@ -337,14 +337,14 @@ public struct CertigoWidgetCopy: Sendable {
 
   public var openCertigo: String {
     switch language {
-    case .french: "Ouvrez Certigo pour actualiser"
-    case .english: "Open Certigo to refresh"
-    case .hindi: "अपडेट करने के लिए Certigo खोलें"
-    case .chineseSimplified: "打开 Certigo 以刷新"
-    case .korean: "새로 고치려면 Certigo를 여세요"
-    case .spanish: "Abre Certigo para actualizar"
-    case .italian: "Apri Certigo per aggiornare"
-    case .german: "Öffne Certigo zum Aktualisieren"
+    case .french: "Ouvrez CertiGo pour actualiser"
+    case .english: "Open CertiGo to refresh"
+    case .hindi: "अपडेट करने के लिए CertiGo खोलें"
+    case .chineseSimplified: "打开 CertiGo 以刷新"
+    case .korean: "새로 고치려면 CertiGo를 여세요"
+    case .spanish: "Abre CertiGo para actualizar"
+    case .italian: "Apri CertiGo per aggiornare"
+    case .german: "Öffne CertiGo zum Aktualisieren"
     }
   }
 
@@ -363,14 +363,14 @@ public struct CertigoWidgetCopy: Sendable {
 
   public var galleryTitle: String {
     switch language {
-    case .french: "Widgets Certigo"
-    case .english: "Certigo widgets"
-    case .hindi: "Certigo विजेट"
-    case .chineseSimplified: "Certigo 小组件"
-    case .korean: "Certigo 위젯"
-    case .spanish: "Widgets de Certigo"
-    case .italian: "Widget Certigo"
-    case .german: "Certigo-Widgets"
+    case .french: "Widgets CertiGo"
+    case .english: "CertiGo widgets"
+    case .hindi: "CertiGo विजेट"
+    case .chineseSimplified: "CertiGo 小组件"
+    case .korean: "CertiGo 위젯"
+    case .spanish: "Widgets de CertiGo"
+    case .italian: "Widget CertiGo"
+    case .german: "CertiGo-Widgets"
     }
   }
 

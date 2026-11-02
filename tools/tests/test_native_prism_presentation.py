@@ -466,7 +466,7 @@ precondition(!NativeShowcaseUniverse.allCases.contains { $0.includes(code: "UNKN
         )[0]
         self.assertIn("if let code", hero)
         self.assertIn("NativeCertificationCrest(code: code, compact: true)", hero)
-        self.assertIn('Text("Certigo")', self.app)
+        self.assertIn('Text("CertiGo")', self.app)
         root = self.app.split("struct NativeRoot:", 1)[1]
         for section in ("private var profile:", "private var path:", "private var session:"):
             surface = root.split(section, 1)[1]
@@ -639,7 +639,7 @@ precondition(!NativeShowcaseUniverse.allCases.contains { $0.includes(code: "UNKN
                 if "\\(" in literal:
                     continue
                 self.assertIn(
-                    literal, {"Certigo", "Assistants IA responsables"},
+                    literal, {"CertiGo", "Assistants IA responsables"},
                     f"Unlocalized application chrome: {literal}",
                 )
         self.assertIn('NativeContentLanguageBadges(languages: ["fr"])', self.app)

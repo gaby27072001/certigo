@@ -582,7 +582,7 @@ import Foundation
                         if artwork.isMicrosoft {
                             NativeMicrosoftVendorBadge(size: 11)
                         }
-                        Text("Certigo").font(.caption2.weight(.medium))
+                        Text("CertiGo").font(.caption2.weight(.medium))
                     }
                     Text(code).font(.system(.caption, design: .rounded, weight: .bold))
                 }

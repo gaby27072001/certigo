@@ -83,7 +83,7 @@ import Foundation
                         }
                     #endif
                 }
-                .navigationTitle("Certigo")
+                .navigationTitle("CertiGo")
                 .fullScreenCover(isPresented: $showDemo) { NativeDemoRoot() }
                 #if DEBUG
                     .sheet(isPresented: $showDeveloper) {
@@ -199,7 +199,7 @@ import Foundation
                                         .font(.subheadline).foregroundStyle(.secondary)
                                 }
                             }
-                            .navigationTitle("Certigo")
+                            .navigationTitle("CertiGo")
                             .fullScreenCover(isPresented: $showDemo) { NativeDemoRoot() }
                             .alert(
                                 copy.native(.signInIncomplete),
@@ -372,7 +372,7 @@ import Foundation
                         }
                     }
                     .modifier(NativeDeveloperToolbar(close: { dismiss() }))
-                    .navigationTitle("Certigo")
+                    .navigationTitle("CertiGo")
                     .alert(
                         copy.native(.ciamIncomplete),
                         isPresented: Binding(

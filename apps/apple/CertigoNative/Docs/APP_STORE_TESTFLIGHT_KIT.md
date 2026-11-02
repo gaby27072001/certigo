@@ -1,4 +1,4 @@
-# Certigo App Store / TestFlight submission kit
+# CertiGo App Store / TestFlight submission kit
 
 Preparation snapshot: 2026-10-21, source base
 `4bc3079133c3292f6643495fb0b5e5251d5d03eb`. This is a **draft, not a submission**.
@@ -39,7 +39,7 @@ the interface picker. Do not advertise eight translated question banks.
 
 ## Localized metadata
 
-Each locale uses the brand name **Certigo**. App Store Connect locale mapping:
+Each locale uses the brand name **CertiGo**. App Store Connect locale mapping:
 `fr` → French, `en` → English (U.S.), `hi` → Hindi, `zh-Hans` → Chinese
 (Simplified), `ko` → Korean, `es` → Spanish (Spain), `it` → Italian,
 `de` → German. Add regional variants separately only after editorial review.
@@ -50,7 +50,7 @@ and verify the lengths again in App Store Connect.
 
 ### fr
 
-Name: Certigo
+Name: CertiGo
 
 Subtitle: Apprenez avec un objectif
 
@@ -60,7 +60,7 @@ Keywords: apprendre,certification,révision,quiz,examen,formation
 
 Description:
 
-Construisez votre parcours de préparation avec Certigo sur iPhone et iPad.
+Construisez votre parcours de préparation avec CertiGo sur iPhone et iPad.
 
 Définissez une date cible, votre niveau de départ et un objectif quotidien dans votre plan d’étude. Explorez les familles de certifications du catalogue ; seuls les packs signalés disponibles proposent des exercices.
 
@@ -84,7 +84,7 @@ Testez la démo sans compte, les huit langues, le changement de langue avec une 
 
 ### en
 
-Name: Certigo
+Name: CertiGo
 
 Subtitle: Learn with a clear goal
 
@@ -94,7 +94,7 @@ Keywords: learning,certification,revision,quiz,exam,study,practice
 
 Description:
 
-Build your certification preparation journey with Certigo on iPhone and iPad.
+Build your certification preparation journey with CertiGo on iPhone and iPad.
 
 Set a target date, starting level and daily study goal in your study plan. Explore certification families in the catalog; practice is offered only for question packs marked available.
 
@@ -118,7 +118,7 @@ Try the account-free demo, all eight interface languages, changing language whil
 
 ### hi
 
-Name: Certigo
+Name: CertiGo
 
 Subtitle: स्पष्ट लक्ष्य के साथ सीखें
 
@@ -128,7 +128,7 @@ Keywords: अध्ययन,परीक्षा,अभ्यास,प्र�
 
 Description:
 
-iPhone और iPad पर Certigo के साथ प्रमाणन की तैयारी का अपना रास्ता बनाएँ।
+iPhone और iPad पर CertiGo के साथ प्रमाणन की तैयारी का अपना रास्ता बनाएँ।
 
 अध्ययन योजना में लक्ष्य तारीख, शुरुआती स्तर और रोज़ की पढ़ाई का लक्ष्य तय करें। कैटलॉग में प्रमाणन श्रेणियाँ देखें; अभ्यास केवल उपलब्ध चिह्नित प्रश्न पैक में मिलता है।
 
@@ -152,7 +152,7 @@ What to Test:
 
 ### zh-Hans
 
-Name: Certigo
+Name: CertiGo
 
 Subtitle: 带着清晰目标学习
 
@@ -162,7 +162,7 @@ Keywords: 学习备考,认证考试,间隔复习,模拟测验
 
 Description:
 
-在 iPhone 和 iPad 上使用 Certigo，规划您的认证备考之路。
+在 iPhone 和 iPad 上使用 CertiGo，规划您的认证备考之路。
 
 在学习计划中设置目标日期、起始水平和每日学习目标。浏览目录中的认证类别；仅标记为可用的题包提供练习。
 
@@ -186,7 +186,7 @@ What to Test:
 
 ### ko
 
-Name: Certigo
+Name: CertiGo
 
 Subtitle: 분명한 목표로 시작하는 학습
 
@@ -196,7 +196,7 @@ Keywords: 자격증,시험준비,학습계획,간격복습,모의시험
 
 Description:
 
-iPhone과 iPad에서 Certigo로 자격증 시험 준비 과정을 만들어 보세요.
+iPhone과 iPad에서 CertiGo로 자격증 시험 준비 과정을 만들어 보세요.
 
 학습 계획에서 목표 날짜, 시작 수준, 일일 학습 목표를 설정하세요. 카탈로그의 자격증 분류를 살펴보세요. 사용 가능으로 표시된 문제 팩에서만 연습할 수 있습니다.
 
@@ -220,7 +220,7 @@ What to Test:
 
 ### es
 
-Name: Certigo
+Name: CertiGo
 
 Subtitle: Aprende con un objetivo claro
 
@@ -230,7 +230,7 @@ Keywords: aprender,certificación,repaso,cuestionario,examen,estudio
 
 Description:
 
-Prepara tu camino hacia la certificación con Certigo en iPhone y iPad.
+Prepara tu camino hacia la certificación con CertiGo en iPhone y iPad.
 
 Define una fecha objetivo, tu nivel inicial y una meta diaria en tu plan de estudio. Explora las familias de certificaciones del catálogo; solo ofrecen práctica los paquetes marcados como disponibles.
 
@@ -254,7 +254,7 @@ Prueba la demo sin cuenta, los ocho idiomas, cambiar de idioma con un error visi
 
 ### it
 
-Name: Certigo
+Name: CertiGo
 
 Subtitle: Impara con un obiettivo chiaro
 
@@ -264,7 +264,7 @@ Keywords: apprendimento,certificazione,ripasso,quiz,esame,studio
 
 Description:
 
-Costruisci il tuo percorso di preparazione alle certificazioni con Certigo su iPhone e iPad.
+Costruisci il tuo percorso di preparazione alle certificazioni con CertiGo su iPhone e iPad.
 
 Imposta una data obiettivo, il livello iniziale e una meta quotidiana nel piano di studio. Esplora le famiglie di certificazioni del catalogo; solo i pacchetti indicati come disponibili offrono esercizi.
 
@@ -288,7 +288,7 @@ Prova la demo senza account, le otto lingue, il cambio lingua con un errore visi
 
 ### de
 
-Name: Certigo
+Name: CertiGo
 
 Subtitle: Lerne mit einem klaren Ziel
 
@@ -298,7 +298,7 @@ Keywords: lernen,zertifizierung,wiederholen,quiz,prüfung,lernplan
 
 Description:
 
-Gestalte deine Zertifizierungsvorbereitung mit Certigo auf iPhone und iPad.
+Gestalte deine Zertifizierungsvorbereitung mit CertiGo auf iPhone und iPad.
 
 Lege im Lernplan ein Zieldatum, dein Ausgangsniveau und ein tägliches Lernziel fest. Entdecke Zertifizierungsfamilien im Katalog; nur als verfügbar markierte Fragenpakete bieten Übungen.
 
