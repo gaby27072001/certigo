@@ -8825,7 +8825,10 @@ extension CertiGoNativeSystemOAuthCoordinator:
             }
             return ASPresentationAnchor(windowScene: activeScene)
         }
-        return ASPresentationAnchor()
+        guard let fallbackScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+            preconditionFailure("Aucune UIWindowScene active disponible pour ASPresentationAnchor")
+        }
+        return ASPresentationAnchor(windowScene: fallbackScene)
     }
 
     public func authorizationController(
@@ -12410,125 +12413,11 @@ public struct CertiGoNativeFigmaAppView: View {
 
             // Unfolded Fiche Mémo `14` Table (Apple Pay style: ACTIVITÉ, SUJETS CLÉS, RÈGLE D'OR)
             if isMemoExpanded {
-                VStack(alignment: .leading, spacing: PrismSpacing.m) {
-                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                        Text(verbatim: "🎯 ACTIVITÉ DE L'ÉTAPE")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                        Text(verbatim: unit.memoActivity)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                    }
-
-                    VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                        Text(verbatim: "🔑 SUJETS CLÉS À MAÎTRISER")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                        HStack(spacing: PrismSpacing.xs) {
-                            ForEach(unit.memoKeyTopics, id: \.self) { topic in
-                                Text(verbatim: topic)
-                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Extra Bold"))
-                                    .foregroundStyle(PrismColor.figmaHex("#0369a1"))
-                                    .padding(.horizontal, PrismSpacing.s)
-                                    .padding(.vertical, PrismSpacing.xs)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
-                                            .fill(PrismColor.figmaHex("#e0f2fe"))
-                                    )
-                            }
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                        Text(verbatim: "💡 RÈGLE D'OR POUR L'EXAMEN")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex("#15803d"))
-                        Text(verbatim: unit.memoGoldenRule)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#166534"))
-                    }
-                    .padding(PrismSpacing.m)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                            .fill(PrismColor.figmaHex("#f0fdf4"))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                            .strokeBorder(PrismColor.figmaHex("#bbf7d0"), lineWidth: PrismBorder.standard)
-                    )
-                }
-                .padding(PrismSpacing.m)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                        .fill(PrismColor.figmaHex("#f8fafc"))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                        .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
-                )
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                stepSheetExpandedMemoSection(unit: unit)
             }
 
             // Recommendation 7: Compact 2-Option Session Mode Selector (`🌱 Découverte` vs `⚡ Défi Examen`) right above COMMENCER
-            HStack(spacing: PrismSpacing.xs) {
-                Button {
-                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                        appState.selectedSessionChallengeMode = 0
-                    }
-                } label: {
-                    Text(verbatim: "🌱 Découverte (Simple)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                        .foregroundStyle(
-                            appState.selectedSessionChallengeMode == 0
-                                ? PrismColor.figmaHex("#065f46")
-                                : PrismColor.figmaHex("#64748b")
-                        )
-                        .frame(maxWidth: .infinity)
-                        .frame(height: FigMetrics.thirtySix)
-                        .background(
-                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                                .fill(
-                                    appState.selectedSessionChallengeMode == 0
-                                        ? PrismColor.figmaHex("#ecfdf5")
-                                        : PrismColor.clear
-                                )
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("step-sheet-mode-discovery")
-
-                Button {
-                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                        appState.selectedSessionChallengeMode = 1
-                    }
-                } label: {
-                    Text(verbatim: "⚡ Défi Examen (+ CLI)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                        .foregroundStyle(
-                            appState.selectedSessionChallengeMode == 1
-                                ? PrismColor.figmaHex("#1d4ed8")
-                                : PrismColor.figmaHex("#64748b")
-                        )
-                        .frame(maxWidth: .infinity)
-                        .frame(height: FigMetrics.thirtySix)
-                        .background(
-                            RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                                .fill(
-                                    appState.selectedSessionChallengeMode == 1
-                                        ? PrismColor.figmaHex("#eff6ff")
-                                        : PrismColor.clear
-                                )
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("step-sheet-mode-exam-challenge")
-            }
-            .padding(PrismSpacing.xxs)
-            .background(
-                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                    .fill(PrismColor.figmaHex("#f1f5f9"))
-            )
+            stepSheetSessionModePicker
 
             // 3 Action Buttons Row: `[ 📖 | COMMENCER (+15 XP) | ✦ ]`
             HStack(spacing: PrismSpacing.m) {
@@ -12634,6 +12523,130 @@ public struct CertiGoNativeFigmaAppView: View {
                         }
                     }
                 }
+        )
+    }
+
+    @ViewBuilder
+    private func stepSheetExpandedMemoSection(unit: CertiGoCertificationUnit) -> some View {
+        VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                Text(verbatim: "🎯 ACTIVITÉ DE L'ÉTAPE")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                Text(verbatim: unit.memoActivity)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+            }
+
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                Text(verbatim: "🔑 SUJETS CLÉS À MAÎTRISER")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                HStack(spacing: PrismSpacing.xs) {
+                    ForEach(unit.memoKeyTopics, id: \.self) { topic in
+                        Text(verbatim: topic)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Extra Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0369a1"))
+                            .padding(.horizontal, PrismSpacing.s)
+                            .padding(.vertical, PrismSpacing.xs)
+                            .background(
+                                RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
+                                    .fill(PrismColor.figmaHex("#e0f2fe"))
+                            )
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                Text(verbatim: "💡 RÈGLE D'OR POUR L'EXAMEN")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#15803d"))
+                Text(verbatim: unit.memoGoldenRule)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#166534"))
+            }
+            .padding(PrismSpacing.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                    .fill(PrismColor.figmaHex("#f0fdf4"))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                    .strokeBorder(PrismColor.figmaHex("#bbf7d0"), lineWidth: PrismBorder.standard)
+            )
+        }
+        .padding(PrismSpacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .fill(PrismColor.figmaHex("#f8fafc"))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+        )
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
+    }
+
+    @ViewBuilder
+    private var stepSheetSessionModePicker: some View {
+        HStack(spacing: PrismSpacing.xs) {
+            Button {
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    appState.selectedSessionChallengeMode = 0
+                }
+            } label: {
+                Text(verbatim: "🌱 Découverte (Simple)")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(
+                        appState.selectedSessionChallengeMode == 0
+                            ? PrismColor.figmaHex("#065f46")
+                            : PrismColor.figmaHex("#64748b")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(height: FigMetrics.thirtySix)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                            .fill(
+                                appState.selectedSessionChallengeMode == 0
+                                    ? PrismColor.figmaHex("#ecfdf5")
+                                    : Color.clear
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("step-sheet-mode-discovery")
+
+            Button {
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    appState.selectedSessionChallengeMode = 1
+                }
+            } label: {
+                Text(verbatim: "⚡ Défi Examen (+ CLI)")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(
+                        appState.selectedSessionChallengeMode == 1
+                            ? PrismColor.figmaHex("#1d4ed8")
+                            : PrismColor.figmaHex("#64748b")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(height: FigMetrics.thirtySix)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                            .fill(
+                                appState.selectedSessionChallengeMode == 1
+                                    ? PrismColor.figmaHex("#eff6ff")
+                                    : Color.clear
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("step-sheet-mode-exam-challenge")
+        }
+        .padding(PrismSpacing.xxs)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .fill(PrismColor.figmaHex("#f1f5f9"))
         )
     }
 
@@ -18405,7 +18418,9 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                 .foregroundStyle(PrismColor.figmaHex("#065f46"))
 
-            ForEach(Array(items.prefix(3).enumerated()), id: \.offset) { _, pair in
+            let cappedCount = min(3, items.count)
+            ForEach(0..<cappedCount, id: \.self) { idx in
+                let pair = items[idx]
                 Text(verbatim: "💡 À l'examen : « \(pair.simpleMeaning) » s'appelle « \(pair.term) »")
                     .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
                     .foregroundStyle(PrismColor.figmaHex("#047857"))
@@ -19639,7 +19654,9 @@ public struct CertiGoNativeTimedExamCockpit23View: View {
                                 Text(verbatim: "🔍 Décodage des termes d'examen · 🔗 Pont vers l'examen")
                                     .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                                     .foregroundStyle(PrismColor.figmaHex("#065f46"))
-                                ForEach(Array(q.jargonGlossaryBridge.prefix(3).enumerated()), id: \.offset) { _, pair in
+                                let cappedCount = min(3, q.jargonGlossaryBridge.count)
+                                ForEach(0..<cappedCount, id: \.self) { idx in
+                                    let pair = q.jargonGlossaryBridge[idx]
                                     Text(verbatim: "💡 À l'examen : « \(pair.simpleMeaning) » s'appelle « \(pair.term) »")
                                         .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
                                         .foregroundStyle(PrismColor.figmaHex("#047857"))
