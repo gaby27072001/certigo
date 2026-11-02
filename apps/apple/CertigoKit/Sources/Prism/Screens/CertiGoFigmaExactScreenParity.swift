@@ -2982,6 +2982,106 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                     ("5. HCP Terraform, Sentinel & Gouvernance Cloud", "Poids officiel : 18 % · À cibler", "70 %", "#1d4ed8")
                 ]
             )
+        case "MS-365-COPILOT", "M365-COPILOT":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Copilot Chat, Work IQ & Cowork",
+                unitProgressPercentText: "80%",
+                stepTitles: [
+                    "Work IQ & Ancrage Graph",
+                    "Copilot Cowork & Délégation",
+                    "Pages Loop & Co-édition IA",
+                    "Lab Prompting · Work IQ",
+                    "Word Pro & Réécriture"
+                ],
+                stepPreviewSubtitle: "Work IQ, Cowork, Word/PPT/Excel, Teams & Agents Copilot Studio",
+                memoActivity: "Ancrer un livrable sur Work IQ et déléguer avec Cowork",
+                memoKeyTopics: ("Work IQ Graph", "Copilot Cowork", "Agents Studio"),
+                memoGoldenRule: "Référence toujours tes fichiers sources avec `/` pour ancrer Copilot sur tes vraies données Graph.",
+                examOfficialTitle: "M365 Copilot, Cowork, Office Pro & Agents",
+                examDomains: [
+                    ("1. Copilot Chat, Work IQ & Cowork", "Poids officiel : 20 %", "90 %", "#15803d"),
+                    ("2. Word & PowerPoint Pro", "Poids officiel : 20 %", "86 %", "#15803d"),
+                    ("3. Excel Pro & Python", "Poids officiel : 20 %", "82 %", "#1d4ed8"),
+                    ("4. Teams & Outlook", "Poids officiel : 20 %", "80 %", "#1d4ed8"),
+                    ("5. Agents M365 & Copilot Studio", "Poids officiel : 20 %", "76 %", "#1d4ed8")
+                ]
+            )
+        case "OPENAI-PRO":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "openai",
+                unitBannerTitle: "UNITÉ 1 · ChatGPT Pro, o3/o4 & Deep Research",
+                unitProgressPercentText: "78%",
+                stepTitles: [
+                    "GPT-4o vs Modèles o3/o4",
+                    "Deep Research Multi-Sources",
+                    "ChatGPT Canvas & Co-édition",
+                    "OpenAI Codex & Sandbox",
+                    "Standard AGENTS.md & Codex"
+                ],
+                stepPreviewSubtitle: "Raisonnement o3/o4, Deep Research, Codex & Responses API",
+                memoActivity: "Choisir entre GPT-4o, o3/o4, Deep Research et Codex",
+                memoKeyTopics: ("Modèles o3/o4", "OpenAI Codex", "Structured Outputs"),
+                memoGoldenRule: "Active strict: true et additionalProperties: false sur chaque objet de ton JSON Schema en production.",
+                examOfficialTitle: "OpenAI : ChatGPT, Codex & Agents IA",
+                examDomains: [
+                    ("1. ChatGPT Pro, o3/o4 & Deep Research", "Poids officiel : 25 %", "88 %", "#15803d"),
+                    ("2. OpenAI Codex & Dev Autonome", "Poids officiel : 25 %", "84 %", "#15803d"),
+                    ("3. Custom GPTs, Projects & Actions", "Poids officiel : 25 %", "80 %", "#1d4ed8"),
+                    ("4. Responses API, Schemas & Evals", "Poids officiel : 25 %", "76 %", "#1d4ed8"),
+                    ("5. Prompt Caching & Agents SDK", "Poids officiel : Transversal", "74 %", "#1d4ed8")
+                ]
+            )
+        case "ANTHROPIC-CLAUDE":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "anthropic",
+                unitBannerTitle: "UNITÉ 1 · Prompt XML & Extended Thinking",
+                unitProgressPercentText: "82%",
+                stepTitles: [
+                    "Structuration XML Claude",
+                    "Extended Thinking (budget_tokens)",
+                    "Contexte 200k+ & Caching",
+                    "Citations Natives & Grounding",
+                    "Claude Projects & Équipe"
+                ],
+                stepPreviewSubtitle: "Prompt XML, Artifacts, Claude Code CLI & Serveurs MCP",
+                memoActivity: "Structurer un prompt XML avec Extended Thinking et MCP",
+                memoKeyTopics: ("Balises XML", "Claude Code CLI", "Protocole MCP"),
+                memoGoldenRule: "Place les documents longs dans <documents> tout en haut du prompt et la consigne finale tout en bas.",
+                examOfficialTitle: "Anthropic : Claude, Claude Code & MCP",
+                examDomains: [
+                    ("1. Prompt XML & Extended Thinking", "Poids officiel : 25 %", "90 %", "#15803d"),
+                    ("2. Projects, Artifacts & Visuel", "Poids officiel : 25 %", "86 %", "#15803d"),
+                    ("3. Claude Code & CLI Agentique", "Poids officiel : 25 %", "82 %", "#1d4ed8"),
+                    ("4. Protocole MCP & Agents Sécurisés", "Poids officiel : 25 %", "78 %", "#1d4ed8"),
+                    ("5. Constitutional AI & Guardrails", "Poids officiel : Transversal", "76 %", "#1d4ed8")
+                ]
+            )
+        case "HARVEY-LEGAL", "HARVEY":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "harvey",
+                unitBannerTitle: "UNITÉ 1 · Harvey Assistant & Contrats",
+                unitProgressPercentText: "76%",
+                stepTitles: [
+                    "Harvey Assistant & Prompts",
+                    "Redlining NDA & MSA",
+                    "Clauses Critiques : IP & RGPD",
+                    "Lab · Prompt Redlining MSA",
+                    "Harvey Vault & Data Room M&A"
+                ],
+                stepPreviewSubtitle: "Harvey Assistant, Vault Due Diligence, Knowledge & Workflows",
+                memoActivity: "Auditer une Data Room Vault et rédiger un redline MSA",
+                memoKeyTopics: ("Harvey Assistant", "Harvey Vault M&A", "Harvey Knowledge"),
+                memoGoldenRule: "Fournis toujours le rôle, la juridiction applicable et la position de repli (fallback) dans ton prompt Harvey.",
+                examOfficialTitle: "Harvey : Plateforme Legal IA & Pratique Juridique",
+                examDomains: [
+                    ("1. Harvey Assistant & Contrats", "Poids officiel : 25 %", "88 %", "#15803d"),
+                    ("2. Harvey Vault & Due Diligence M&A", "Poids officiel : 25 %", "84 %", "#15803d"),
+                    ("3. Harvey Knowledge & Citations", "Poids officiel : 25 %", "80 %", "#1d4ed8"),
+                    ("4. Workflows & Déontologie", "Poids officiel : 25 %", "78 %", "#1d4ed8"),
+                    ("5. Cloisonnement Matter & Zero-Training", "Poids officiel : Transversal", "75 %", "#1d4ed8")
+                ]
+            )
         default:
             return CertiGoLiveTrackCurriculum(
                 vendorId: "microsoft",
@@ -3357,6 +3457,9 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
 
     public static let vendorDisplayNames: [String: String] = [
         "microsoft": "Microsoft",
+        "openai": "OpenAI",
+        "anthropic": "Anthropic",
+        "harvey": "Harvey Legal AI",
         "aws": "AWS",
         "google": "Google",
         "github": "GitHub",
@@ -3367,6 +3470,24 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
 
     public static func popoverCards(forVendor vendor: String) -> [PopoverCertificationCardItem] {
         switch vendor.lowercased() {
+        case "openai":
+            return [
+                PopoverCertificationCardItem(code: "OPENAI-PRO", title: "ChatGPT, Codex & Agents IA"),
+                PopoverCertificationCardItem(code: "AI-OPENAI", title: "Architecture GPT & Schemas"),
+                PopoverCertificationCardItem(code: "AI-102", title: "Azure OpenAI & Foundry")
+            ]
+        case "anthropic", "claude":
+            return [
+                PopoverCertificationCardItem(code: "ANTHROPIC-CLAUDE", title: "Claude, Claude Code & MCP"),
+                PopoverCertificationCardItem(code: "CCA-F", title: "Claude Architect Foundations"),
+                PopoverCertificationCardItem(code: "AI-ANTHROPIC", title: "Veille Anthropic & MCP")
+            ]
+        case "harvey", "harvey-legal", "harvey-ai":
+            return [
+                PopoverCertificationCardItem(code: "HARVEY-LEGAL", title: "Harvey Legal IA & Pratique"),
+                PopoverCertificationCardItem(code: "MS-365-COPILOT", title: "M365 Copilot & Word Juridique"),
+                PopoverCertificationCardItem(code: "ANTHROPIC-CLAUDE", title: "Claude Citations & Contrats")
+            ]
         case "aws":
             return [
                 PopoverCertificationCardItem(code: "SAA-C03", title: "Solutions Architect"),
@@ -3401,7 +3522,8 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
             return [
                 PopoverCertificationCardItem(code: "AZ-104", title: "Azure Administrator"),
                 PopoverCertificationCardItem(code: "AZ-900", title: "Azure Fundamentals"),
-                PopoverCertificationCardItem(code: "AI-102", title: "Azure AI Engineer")
+                PopoverCertificationCardItem(code: "AI-102", title: "Azure AI Engineer"),
+                PopoverCertificationCardItem(code: "MS-365-COPILOT", title: "M365 Copilot, Cowork & Agents")
             ]
         }
     }

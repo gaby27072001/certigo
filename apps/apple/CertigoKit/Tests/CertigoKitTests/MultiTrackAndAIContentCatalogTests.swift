@@ -87,7 +87,7 @@ struct MultiTrackAndAIContentCatalogTests {
         }
     }
 
-    @Test("Every referenced asset across all 18 tracks exists in Prism.xcassets on disk")
+    @Test("Every referenced asset across all 22 tracks exists in Prism.xcassets on disk")
     func allReferencedCatalogAssetsExistInPrismXcassets() throws {
         var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         while !FileManager.default.fileExists(atPath: root.appendingPathComponent("AGENTS.md").path) {
@@ -98,7 +98,7 @@ struct MultiTrackAndAIContentCatalogTests {
         let xcassetsRoot = root.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Resources/Prism.xcassets")
 
         let allTracks = CertiGoMultiTrackAndAIContentCatalog.allTracks
-        #expect(allTracks.count == 18)
+        #expect(allTracks.count == 22)
 
         let allowedPrefixes = [
             "AzureServices/",
@@ -125,17 +125,100 @@ struct MultiTrackAndAIContentCatalogTests {
         }
     }
 
-    @Test("Session player and coordinator switch cleanly across all 18 tracks")
+    @Test("Session player and coordinator switch cleanly across all 22 tracks")
     func sessionPlayerAndCoordinatorSwitchAcrossAllTracks() {
         var coordinator = PrismAppShellCoordinatorModel()
         for track in CertiGoMultiTrackAndAIContentCatalog.allTracks {
             coordinator.activateTrack(code: track.code)
             #expect(coordinator.todayModel.activeRouteCode == track.code)
             #expect(coordinator.todayModel.activeRouteTitle == track.officialTitle)
-            #expect(coordinator.catalogExplorer.routes.count == 18)
+            #expect(coordinator.catalogExplorer.routes.count == 22)
             // 1 WorkedExample learning card + 10 interactive question format items = 11 cards
             #expect(coordinator.sessionPlayerMachine.plan.cards.count == 11)
         }
+    }
+
+    @Test("All 4 AI Productivity, Dev & Legal tracks (MS-365-COPILOT, OPENAI-PRO, ANTHROPIC-CLAUDE, HARVEY-LEGAL) and official brands (Microsoft, OpenAI, Anthropic, Harvey) expose complete domains, 15 nodes, Cartes Declic, 3-brick schemas, and duplicate-free exercises")
+    func aiProductivityAndLegalTracksAndOfficialBrandsAreCompleteAndDuplicateFree() throws {
+        let expectedTrackCodes = ["MS-365-COPILOT", "OPENAI-PRO", "ANTHROPIC-CLAUDE", "HARVEY-LEGAL"]
+        #expect(CertiGoMultiTrackAndAIContentCatalog.aiProductivityAndLegalTrackCodes == expectedTrackCodes)
+        #expect(CertiGoAIProductivityAndLegalCatalog.allCurricula.count == 4)
+
+        // Verify official brands and brand filter routing
+        let brandIds = CertiGoMultiTrackAndAIContentCatalog.officialBrandFilters.map(\.id)
+        #expect(brandIds.contains("microsoft"))
+        #expect(brandIds.contains("openai"))
+        #expect(brandIds.contains("anthropic"))
+        #expect(brandIds.contains("harvey"))
+        #expect(brandIds.contains("ai-productivity"))
+
+        #expect(CertiGoMultiTrackAndAIContentCatalog.tracks(forBrandVendor: "microsoft").map(\.code).contains("MS-365-COPILOT"))
+        #expect(CertiGoMultiTrackAndAIContentCatalog.tracks(forBrandVendor: "openai").map(\.code).contains("OPENAI-PRO"))
+        #expect(CertiGoMultiTrackAndAIContentCatalog.tracks(forBrandVendor: "anthropic").map(\.code).contains("ANTHROPIC-CLAUDE"))
+        #expect(CertiGoMultiTrackAndAIContentCatalog.tracks(forBrandVendor: "harvey").map(\.code) == ["HARVEY-LEGAL"])
+        #expect(CertiGoMultiTrackAndAIContentCatalog.tracks(forBrandVendor: "ai-productivity").map(\.code) == expectedTrackCodes)
+
+        #expect(CertiGoOfficialAssetCatalog.brandLogoAssetName(forVendorId: "openai") == "BrandLogos/brand-openai")
+        #expect(CertiGoOfficialAssetCatalog.brandLogoAssetName(forVendorId: "anthropic") == "BrandLogos/brand-claude-ai")
+        #expect(CertiGoOfficialAssetCatalog.brandLogoAssetName(forVendorId: "harvey") == "BrandLogos/brand-harvey")
+
+        // Verify popover cards and live track curriculum for all 4 new tracks
+        #expect(CertiGoFigmaLiveRuntimeState.popoverCards(forVendor: "microsoft").map(\.code).contains("MS-365-COPILOT"))
+        #expect(CertiGoFigmaLiveRuntimeState.popoverCards(forVendor: "openai").map(\.code).contains("OPENAI-PRO"))
+        #expect(CertiGoFigmaLiveRuntimeState.popoverCards(forVendor: "anthropic").map(\.code).contains("ANTHROPIC-CLAUDE"))
+        #expect(CertiGoFigmaLiveRuntimeState.popoverCards(forVendor: "harvey").map(\.code).contains("HARVEY-LEGAL"))
+
+        let expectedDomainCounts: [String: Int] = [
+            "MS-365-COPILOT": 5,
+            "OPENAI-PRO": 4,
+            "ANTHROPIC-CLAUDE": 4,
+            "HARVEY-LEGAL": 4
+        ]
+
+        var allLessonIds = Set<String>()
+        var allDeclicTitles = Set<String>()
+        var allQuizPrompts = Set<String>()
+        var allLabExpectedTokens = Set<String>()
+
+        for code in expectedTrackCodes {
+            let curriculum = try #require(CertiGoAIProductivityAndLegalCatalog.curriculum(forCode: code))
+            #expect(curriculum.code == code)
+            #expect(curriculum.domains.count == expectedDomainCounts[code])
+            #expect(curriculum.units.count == 3)
+            #expect(curriculum.lessons.count == 15)
+            #expect(curriculum.examQuestions.count == 12)
+            #expect(curriculum.trackDescriptor.coveredQuestionFormats == Set(CertiGoQuestionFormatID.allCases))
+
+            // Verify concise 1-line domain titles (no newlines, concise length)
+            for domain in curriculum.domains {
+                #expect(!domain.title.contains("\n"))
+                #expect(domain.title.count <= 48)
+                #expect(domain.keyPillars.count == 3)
+            }
+
+            // Verify all 15 lessons, Cartes Declic, 3-brick schemas, practical labs, and quiz questions
+            for lesson in curriculum.lessons {
+                #expect(allLessonIds.insert(lesson.id).inserted, "Duplicate lesson id \(lesson.id)")
+                #expect(!lesson.title.contains("\n"))
+                #expect(lesson.declicCard.microSlides.count == 3)
+                #expect(lesson.declicCard.threeBrickSchema.bricks.count == 3)
+                #expect(allDeclicTitles.insert(lesson.declicCard.title).inserted, "Duplicate Declic title \(lesson.declicCard.title)")
+                #expect(lesson.practicalLab.matchesInput(lesson.practicalLab.expectedToken))
+                #expect(allLabExpectedTokens.insert("\(code):\(lesson.practicalLab.expectedToken)").inserted)
+                #expect(lesson.quizQuestions.count == 2)
+                let qcmPrompt = lesson.quizQuestions[0].prompt
+                #expect(allQuizPrompts.insert(qcmPrompt).inserted, "Duplicate quiz prompt \(qcmPrompt)")
+                #expect(lesson.quizQuestions[0].correctOptions.count == 1)
+            }
+
+            let liveCurriculum = CertiGoLiveTrackCurriculum.curriculum(forRouteCode: code)
+            #expect(liveCurriculum.stepTitles.count == 5)
+            #expect(liveCurriculum.examDomains.count == 5)
+        }
+
+        #expect(allLessonIds.count == 60)
+        #expect(allDeclicTitles.count == 60)
+        #expect(allQuizPrompts.count == 60)
     }
 
     @Test("CertigoParallelTracksPreference persists and reloads parallel tracks, active certification, AI frontier watch, bilingual EN terms, and 90m timed exam mode")
