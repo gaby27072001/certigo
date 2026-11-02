@@ -72,10 +72,10 @@ class PrismFoundationsTests(unittest.TestCase):
         expected_folders = {
             "AWSServices": 287,
             "AzureServices": 291,
-            "BrandLogos": 32,
+            "BrandLogos": 50,
             "Certifications": 52,
             "GCPServices": 214,
-            "Mascots": 24,
+            "Mascots": 32,
         }
         total = 0
         for folder, expected_count in expected_folders.items():
@@ -86,7 +86,7 @@ class PrismFoundationsTests(unittest.TestCase):
             imagesets = list(folder_dir.glob("*.imageset"))
             self.assertEqual(len(imagesets), expected_count, folder)
             total += len(imagesets)
-        self.assertEqual(total, 900)
+        self.assertEqual(total, 926)
         pbxproj = (
             ROOT / "apps/apple/CertigoNative/CertigoNative.xcodeproj/project.pbxproj"
         ).read_text(encoding="utf-8")
