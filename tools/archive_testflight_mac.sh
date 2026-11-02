@@ -75,11 +75,21 @@ xcodebuild archive \
   CODE_SIGNING_ALLOWED=YES \
   CODE_SIGN_STYLE=Automatic \
   DEVELOPMENT_TEAM="$team_id" \
+  DEBUG_INFORMATION_FORMAT=dwarf-with-dsym \
   CERTIGO_DISTRIBUTION_VERSION="$version" \
   CERTIGO_DISTRIBUTION_BUILD="$build"
 
 [[ -d "$archive_path/Products/Applications/CertigoNative.app" ]] \
   || fail 'Archive did not produce CertigoNative.app.'
+
+mkdir -p "$archive_path/dSYMs"
+for fw_bin in "$archive_path/Products/Applications/CertigoNative.app/Frameworks/"*.framework/*; do
+  [[ -f "$fw_bin" && -x "$fw_bin" ]] || continue
+  fw_name=$(basename "$(dirname "$fw_bin")")
+  if [[ ! -d "$archive_path/dSYMs/${fw_name}.dSYM" ]]; then
+    xcrun dsymutil "$fw_bin" -o "$archive_path/dSYMs/${fw_name}.dSYM" 2>/dev/null || true
+  fi
+done
 
 printf 'Archive created: %s\nOpening Xcode Organizer — click "Distribute App" -> "TestFlight & App Store" -> "Upload".\n' "$archive_path"
 open "$archive_path"
