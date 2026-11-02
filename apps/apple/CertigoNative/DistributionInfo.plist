@@ -39,6 +39,8 @@
 	<string>$(CERTIGO_PRODUCTION_CIAM_API_SCOPE)</string>
 	<key>CertigoProductionCIAMAPI_AUDIENCE</key>
 	<string>$(CERTIGO_PRODUCTION_CIAM_API_AUDIENCE)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSContactsUsageDescription</key>
 	<string>CertiGo utilise tes contacts pour retrouver tes amis déjà sur l'application et suivre votre progression commune.</string>
 </dict>
