@@ -20,6 +20,11 @@ public enum PrismRadius {
   public static let l: CGFloat = 16
   public static let xl: CGFloat = 24
   public static let capsule = PrismCorner.capsule
+
+  /// Apple HIG Concentric Corner Radius Law: R_inner = max(8, R_outer - padding).
+  public static func concentric(outer: CGFloat, padding: CGFloat) -> CGFloat {
+    max(8, outer - padding)
+  }
 }
 
 public enum PrismCorner: Equatable, Sendable {
@@ -29,7 +34,7 @@ public enum PrismCorner: Equatable, Sendable {
 
 public enum PrismSize {
   public static let minTouch: CGFloat = 44
-  public static let primaryButtonHeight: CGFloat = 50
+  public static let primaryButtonHeight: CGFloat = 52
   public static let readableWidth: CGFloat = 672
   public static let brandS: CGFloat = 20
   public static let brandM: CGFloat = 28
@@ -159,8 +164,8 @@ extension PrismSize {
   public static let centerAIButton: CGFloat = 58
   public static let centerAIHalo: CGFloat = 66
   public static let centerAIIcon: CGFloat = 24
-  public static let bottomBarHeight: CGFloat = 66
-  public static let tabItemHeight: CGFloat = 50
+  public static let bottomBarHeight: CGFloat = 64
+  public static let tabItemHeight: CGFloat = 52
   public static let optionBadge: CGFloat = 32
   public static let statIcon: CGFloat = 15
   public static let lipDepth: CGFloat = 5
@@ -173,8 +178,9 @@ extension PrismRadius {
   public static let pathNodeRing: CGFloat = 44
   public static let centerAI: CGFloat = 21
   public static let centerAIHalo: CGFloat = 24
-  public static let bottomBar: CGFloat = 33
-  public static let unitBanner: CGFloat = 22
+  public static let bottomBar: CGFloat = 32
+  public static let bottomBarDroplet: CGFloat = concentric(outer: 32, padding: 6)
+  public static let unitBanner: CGFloat = 24
   public static let stepPill: CGFloat = 14
 }
 
