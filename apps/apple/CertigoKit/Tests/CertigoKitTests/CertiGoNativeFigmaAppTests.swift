@@ -1675,4 +1675,83 @@ struct CertiGoNativeFigmaAppTests {
             }
         }
     }
+
+    @Test("Design System v3 (Build 12): 8pt/4pt Grid, Concentric Radii, True iOS 26 Liquid Glass Droplet, Lowered Bottom Bar, Lifted UNITÉ 1 without Sprint Bar, 4-Size Typography, and Unified 56pt Tab Headers")
+    func designSystemV3GridConcentricLiquidGlassParcoursAndBuild12() throws {
+        // 1. Rule 1: Strict 8pt / 4pt grid tokens
+        #expect(PrismSize.primaryButtonHeight == 52)
+        #expect(Int(PrismSize.primaryButtonHeight) % 4 == 0)
+        #expect(PrismSize.bottomBarHeight == 64)
+        #expect(Int(PrismSize.bottomBarHeight) % 8 == 0)
+        #expect(PrismSize.tabItemHeight == 52)
+        #expect(Int(PrismSize.tabItemHeight) % 4 == 0)
+        #expect(FigMetrics.bottomBarCompactHeight == 60)
+        #expect(Int(FigMetrics.bottomBarCompactHeight) % 4 == 0)
+        #expect(FigMetrics.bottomBarBottomOffset == 14)
+
+        // 2. Rule 2: Apple HIG Concentric Radii Law (R_interne = max(8, R_externe - padding))
+        #expect(PrismRadius.bottomBar == 32)
+        #expect(PrismRadius.concentric(outer: 32, padding: 6) == 26)
+        #expect(PrismRadius.bottomBarDroplet == 26)
+        #expect(PrismRadius.concentric(outer: 24, padding: 12) == 12)
+        #expect(PrismRadius.unitBanner == 24)
+
+        // 3. Rule 3: True iOS 26 Liquid Glass Water Droplet (`CertiGoTrueLiquidGlassDropletView`)
+        let azTheme = CertiGoTrackThemePalette.palette(forRouteCode: "AZ-104")
+        let restingDroplet = CertiGoTrueLiquidGlassDropletView(
+            trackTheme: azTheme,
+            width: 68,
+            height: FigMetrics.fortyEight,
+            isDragging: false
+        )
+        #expect(CertiGoTrueLiquidGlassDropletView.concentricCornerRadius == 26)
+        #expect(CertiGoTrueLiquidGlassDropletView.centerRefractionWhiteOpacity == 0.18)
+        #expect(CertiGoTrueLiquidGlassDropletView.edgeTintOpacity == 0.14)
+        #expect(CertiGoTrueLiquidGlassDropletView.topMeniscusWhiteOpacity == 0.92)
+        #expect(CertiGoTrueLiquidGlassDropletView.topMeniscusFadeStop == 0.38)
+        #expect(CertiGoTrueLiquidGlassDropletView.topMeniscusInset == 1.5)
+        #expect(CertiGoTrueLiquidGlassDropletView.bottomCausticRingOpacity == 0.45)
+        #expect(CertiGoTrueLiquidGlassDropletView.bottomCausticWhiteOpacity == 0.65)
+        #expect(CertiGoTrueLiquidGlassDropletView.rimLightLineWidth == 1.4)
+        #expect(restingDroplet.effectiveScaleX == 1.0)
+        #expect(restingDroplet.effectiveScaleY == 1.0)
+
+        let draggingDroplet = CertiGoTrueLiquidGlassDropletView(
+            trackTheme: azTheme,
+            width: 68,
+            height: FigMetrics.fortyEight,
+            isDragging: true
+        )
+        #expect(draggingDroplet.effectiveScaleX == 1.10)
+        #expect(draggingDroplet.effectiveScaleY == 1.04)
+
+        // 4. Rule 4 & Rule 8: 4-size typographic scale (24 / 17 / 15 / 12 pt) & unified 56pt tab header
+        #expect(FigMetrics.typeHeroTitle == 24)
+        #expect(FigMetrics.typeCardTitle == 17)
+        #expect(FigMetrics.typeBody == 15)
+        #expect(FigMetrics.typeBadge == 12)
+        #expect(FigMetrics.unifiedTabHeaderHeight == 56)
+
+        // 5. Rule 7 & Build 12: Verify CertiGoOneTapSprintBarView is removed from parcoursTab01View, UNITÉ 1 is lifted to .padding(.top, FigMetrics.sixty), and archive_testflight_mac.sh defaults to Build 12
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: root.appendingPathComponent("AGENTS.md").path) {
+            let parent = root.deletingLastPathComponent()
+            guard parent != root else { throw CocoaError(.fileNoSuchFile) }
+            root = parent
+        }
+        let figmaAppSource = try String(
+            contentsOf: root.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Screens/CertiGoNativeFigmaApp.swift"),
+            encoding: .utf8
+        )
+        #expect(!figmaAppSource.contains("CertiGoOneTapSprintBarView("))
+        #expect(figmaAppSource.contains("CertiGoTrueLiquidGlassDropletView("))
+        #expect(figmaAppSource.contains(".padding(.top, FigMetrics.sixty)"))
+        #expect(figmaAppSource.contains(".offset(y: FigMetrics.bottomBarBottomOffset)"))
+
+        let archiveScript = try String(
+            contentsOf: root.appendingPathComponent("tools/archive_testflight_mac.sh"),
+            encoding: .utf8
+        )
+        #expect(archiveScript.contains("build=${CERTIGO_DISTRIBUTION_BUILD:-12}"))
+    }
 }

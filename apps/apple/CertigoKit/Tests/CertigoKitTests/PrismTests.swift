@@ -13,12 +13,17 @@ import Testing
         PrismSpacing.huge, PrismSpacing.giant,
       ] == [2, 4, 8, 12, 16, 20, 24, 32, 48, 64])
     #expect([PrismRadius.s, PrismRadius.m, PrismRadius.l, PrismRadius.xl] == [8, 12, 16, 24])
+    #expect(PrismRadius.concentric(outer: 32, padding: 6) == 26)
+    #expect(PrismRadius.concentric(outer: 24, padding: 12) == 12)
+    #expect(PrismRadius.concentric(outer: 24, padding: 16) == 8)
+    #expect(PrismRadius.concentric(outer: 12, padding: 8) == 8)
     #expect(PrismRadius.capsule == .capsule)
     #expect(
       [
         PrismSize.minTouch, PrismSize.primaryButtonHeight, PrismSize.readableWidth,
         PrismSize.brandS, PrismSize.brandM, PrismSize.brandL, PrismSize.brandXL,
-      ] == [44, 50, 672, 20, 28, 40, 56])
+      ] == [44, 52, 672, 20, 28, 40, 56])
+    #expect([PrismSize.bottomBarHeight, PrismSize.tabItemHeight] == [64, 52])
     for token in PrismMotionToken.allCases {
       let reduced = PrismMotion.resolve(token, reduceMotion: true)
       #expect(reduced.opacityOnly)
