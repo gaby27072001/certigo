@@ -59,7 +59,7 @@ struct CertigoDailyWidget: Widget {
 }
 
 #if canImport(WidgetKit) && canImport(AppIntents)
-  @available(iOS 18.0, iOSApplicationExtension 18.0, *)
+  @available(iOS 18.0, *)
   struct LaunchCertiGoAIIntent: AppIntent {
     static let title: LocalizedStringResource = "Ouvrir CertiGo AI"
     static let description = IntentDescription(
@@ -81,7 +81,7 @@ struct CertigoDailyWidget: Widget {
     }
   }
 
-  @available(iOS 18.0, iOSApplicationExtension 18.0, *)
+  @available(iOS 18.0, *)
   struct CertiGoAIControlCenterWidget: ControlWidget {
     static let kind = "com.certigo.mobileapp.control.ai"
 
@@ -104,9 +104,7 @@ struct CertigoWidgetBundle: WidgetBundle {
   var body: some Widget {
     CertigoDailyWidget()
     #if canImport(WidgetKit) && canImport(AppIntents)
-      if #available(iOS 18.0, iOSApplicationExtension 18.0, *) {
-        CertiGoAIControlCenterWidget()
-      }
+      CertiGoAIControlCenterWidget()
     #endif
   }
 }
