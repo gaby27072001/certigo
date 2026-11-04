@@ -1285,10 +1285,13 @@ public struct CertiGoDayOneNotebook: Codable, Equatable, Sendable {
             return exercises
         }
 
-        if let matchIdx = exercises.firstIndex(where: {
+        let exactConceptIdx = exercises.firstIndex(where: {
             $0.conceptId.caseInsensitiveCompare(topEntry.conceptId) == .orderedSame
-                || $0.id.localizedCaseInsensitiveContains(topEntry.lessonId)
-        }), matchIdx > 0 {
+        })
+        let fallbackLessonIdx = exercises.firstIndex(where: {
+            $0.id.localizedCaseInsensitiveContains(topEntry.lessonId)
+        })
+        if let matchIdx = exactConceptIdx ?? fallbackLessonIdx, matchIdx > 0 {
             var reordered = exercises
             let match = reordered.remove(at: matchIdx)
             reordered.insert(match, at: 0)

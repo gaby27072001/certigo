@@ -1780,13 +1780,13 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
     public let lessonTitle: String
     public var isShowingDeclicCard15: Bool
     public var lessonSlideIndex: Int
-    public let lessonSlides: [CertiGoLessonMicroSlide]
-    public let declicTitle: String
-    public let declicDiagramTop: String
-    public let declicDiagramBottom: String
-    public let declicStep1: String
-    public let declicStep2: String
-    public let declicRule: String
+    public var lessonSlides: [CertiGoLessonMicroSlide]
+    public var declicTitle: String
+    public var declicDiagramTop: String
+    public var declicDiagramBottom: String
+    public var declicStep1: String
+    public var declicStep2: String
+    public var declicRule: String
     public var exercises: [CertiGoNativeExerciseItem]
     public var currentExerciseIndex: Int
     public var attemptPhase: CertiGoExerciseAttemptPhase
@@ -2414,6 +2414,14 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         lessonId: String,
         lessonTitle: String = ""
     ) -> [CertiGoNativeExerciseItem] {
+        let upper = routeCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if upper.isEmpty || upper == "AZ-104" {
+            return az104Exercises(
+                routeCode: "AZ-104",
+                lowerLessonId: lessonId.lowercased(),
+                lowerTitle: lessonTitle.lowercased()
+            )
+        }
         return CertiGoDedicatedTrackQuestionBank.exercises(
             forRouteCode: routeCode,
             lessonId: lessonId,
@@ -8699,6 +8707,7 @@ public struct CertiGoPersistedUserDatabase: Codable, Equatable, Sendable {
     public var aiThreads: [CertiGoAIThreadItem]
     public var recentMistakesLog: [CertiGoPersonalMistakeEntry]
     public var settingsLiquidGlassIntensityPercent: Int?
+    public var settingsLanguageIndex: Int?
 
     public init(
         userDisplayName: String = "Nouveau Candidat",
@@ -8725,7 +8734,8 @@ public struct CertiGoPersistedUserDatabase: Codable, Equatable, Sendable {
         savedAIMemos: [CertiGoChatTurn] = [],
         aiThreads: [CertiGoAIThreadItem] = [],
         recentMistakesLog: [CertiGoPersonalMistakeEntry] = [],
-        settingsLiquidGlassIntensityPercent: Int? = 75
+        settingsLiquidGlassIntensityPercent: Int? = 75,
+        settingsLanguageIndex: Int? = 0
     ) {
         self.userDisplayName = userDisplayName
         self.userHandle = userHandle
@@ -8752,6 +8762,7 @@ public struct CertiGoPersistedUserDatabase: Codable, Equatable, Sendable {
         self.aiThreads = aiThreads
         self.recentMistakesLog = recentMistakesLog
         self.settingsLiquidGlassIntensityPercent = settingsLiquidGlassIntensityPercent
+        self.settingsLanguageIndex = settingsLanguageIndex
     }
 }
 
@@ -8981,6 +8992,18 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var selectedRadarAxisIndex: Int = 0
     public var statsTimeRangeLabel: String = "30 jours ▾"
     public var settingsLanguageIndex: Int = 0
+
+    public var activeLanguage: CertiGoSupportedLanguage {
+        CertiGoMultilingualEngine.resolveLanguage(forIndex: settingsLanguageIndex)
+    }
+
+    public func tr(_ fr: String) -> String {
+        CertiGoMultilingualEngine.tr(fr, lang: settingsLanguageIndex)
+    }
+
+    public func localizedTabTitle(_ tab: CertiGoNativeTab) -> String {
+        CertiGoMultilingualEngine.localizedTabTitle(tab, lang: settingsLanguageIndex)
+    }
     public var settingsExamModeIndex: Int = 0
     public var settingsCoachVoiceIndex: Int = 0
     public var settingsExplanationStyleIndex: Int = 0
@@ -9473,7 +9496,8 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             savedAIMemos: savedAIMemos,
             aiThreads: aiThreads,
             recentMistakesLog: recentMistakesLog,
-            settingsLiquidGlassIntensityPercent: settingsLiquidGlassIntensityPercent
+            settingsLiquidGlassIntensityPercent: settingsLiquidGlassIntensityPercent,
+            settingsLanguageIndex: settingsLanguageIndex
         )
     }
 
@@ -9507,6 +9531,9 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         recentMistakesLog = cleaned.recentMistakesLog
         if let intensity = cleaned.settingsLiquidGlassIntensityPercent {
             settingsLiquidGlassIntensityPercent = min(max(intensity, 0), 100)
+        }
+        if let savedLangIdx = cleaned.settingsLanguageIndex {
+            settingsLanguageIndex = max(0, savedLangIdx)
         }
         friends = []
         suggestedFriends = []
@@ -9558,8 +9585,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         widgetStore: CertigoWidgetStore = CertigoWidgetStore(),
         now: Date = .now
     ) {
-        let langIndex = settingsLanguageIndex % max(1, CertiGoFigmaLiveRuntimeState.settingsLanguageOptions.count)
-        let resolvedLang: AppLanguage = (langIndex == 2) ? .english : .french
+        let resolvedLang = CertiGoMultilingualEngine.resolveAppLanguage(forIndex: settingsLanguageIndex)
         let trackCode = activeRouteCode.isEmpty ? "AZ-104" : activeRouteCode
         let trackTitle = CertiGoLiveTrackCurriculum.curriculum(forRouteCode: trackCode).examOfficialTitle
         let snapshot = CertigoWidgetSnapshot.defaultInitialSnapshot(
@@ -9679,7 +9705,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         Self.filterCatalogItems(
             vendorFilter: onboardingVendorFilter,
             categoryFilter: onboardingCategoryFilter
-        )
+        ).map { CertiGoMultilingualEngine.localizedOnboardingCatalogItem($0, lang: settingsLanguageIndex) }
     }
 
     public mutating func startOnboardingFlow() {
@@ -9947,33 +9973,36 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var currentUnits: [CertiGoCertificationUnit] {
         let upper = activeRouteCode.uppercased()
         let rawUnits = unitsByRouteCode[upper] ?? CertiGoNativeRichCatalog.buildThreeUnits(forRouteCode: upper)
-        guard !trackedCertificationCodes.isEmpty || completedStepsTotal > 0 else {
-            return rawUnits
-        }
-        return rawUnits.map { unit in
-            let isUnlocked = unit.unitNumber == 1
-                || unit.lessons.contains(where: { $0.state == .active || $0.state == .completed })
-            let effectivePct = CertiGoEndowedProgressEngine.endowedProgressPercent(
-                forUnitNumber: unit.unitNumber,
-                rawPercent: unit.progressPercent,
-                isUnlocked: isUnlocked,
-                hasCompletedOnboarding: true
-            )
-            guard effectivePct != unit.progressPercent else { return unit }
-            return CertiGoCertificationUnit(
-                id: unit.id,
-                unitNumber: unit.unitNumber,
-                headerTitle: unit.headerTitle,
-                subtitle: unit.subtitle,
-                progressPercent: effectivePct,
-                accentHex: unit.accentHex,
-                lipHex: unit.lipHex,
-                memoActivity: unit.memoActivity,
-                memoKeyTopics: unit.memoKeyTopics,
-                memoGoldenRule: unit.memoGoldenRule,
-                lessons: unit.lessons
-            )
-        }
+        let baseUnits: [CertiGoCertificationUnit] = {
+            guard !trackedCertificationCodes.isEmpty || completedStepsTotal > 0 else {
+                return rawUnits
+            }
+            return rawUnits.map { unit in
+                let isUnlocked = unit.unitNumber == 1
+                    || unit.lessons.contains(where: { $0.state == .active || $0.state == .completed })
+                let effectivePct = CertiGoEndowedProgressEngine.endowedProgressPercent(
+                    forUnitNumber: unit.unitNumber,
+                    rawPercent: unit.progressPercent,
+                    isUnlocked: isUnlocked,
+                    hasCompletedOnboarding: true
+                )
+                guard effectivePct != unit.progressPercent else { return unit }
+                return CertiGoCertificationUnit(
+                    id: unit.id,
+                    unitNumber: unit.unitNumber,
+                    headerTitle: unit.headerTitle,
+                    subtitle: unit.subtitle,
+                    progressPercent: effectivePct,
+                    accentHex: unit.accentHex,
+                    lipHex: unit.lipHex,
+                    memoActivity: unit.memoActivity,
+                    memoKeyTopics: unit.memoKeyTopics,
+                    memoGoldenRule: unit.memoGoldenRule,
+                    lessons: unit.lessons
+                )
+            }
+        }()
+        return baseUnits.map { CertiGoMultilingualEngine.localizedUnit($0, lang: settingsLanguageIndex) }
     }
 
     public var filteredUnitsForMimoRail: [CertiGoCertificationUnit] {
@@ -10133,7 +10162,16 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             in: builtEngine.exercises,
             routeCode: activeRouteCode,
             notebook: dayOneNotebook
-        )
+        ).map { CertiGoMultilingualEngine.localizedExercise($0, lang: settingsLanguageIndex) }
+        builtEngine.lessonSlides = builtEngine.lessonSlides.map {
+            CertiGoMultilingualEngine.localizedLessonSlide($0, lang: settingsLanguageIndex)
+        }
+        builtEngine.declicTitle = tr(builtEngine.declicTitle)
+        builtEngine.declicDiagramTop = tr(builtEngine.declicDiagramTop)
+        builtEngine.declicDiagramBottom = tr(builtEngine.declicDiagramBottom)
+        builtEngine.declicStep1 = tr(builtEngine.declicStep1)
+        builtEngine.declicStep2 = tr(builtEngine.declicStep2)
+        builtEngine.declicRule = tr(builtEngine.declicRule)
         lessonSession = builtEngine
         isPlainLanguageModeEnabled = lessonSession.isPlainLanguageModeEnabled
         bracketRitual.triggerOpeningBracket(hapticsEnabled: settingsHapticsOn)
@@ -10498,11 +10536,14 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     // MARK: Timed Mock Exam (Screen 23 & Report 24)
 
     public var currentExamQuestion: CertiGoNativeExamQuestion {
-        guard !examQuestions.isEmpty else {
-            return CertiGoNativeRichCatalog.buildExamQuestions(forRouteCode: activeRouteCode)[0]
-        }
-        let clamped = min(max(currentExamQuestionIndex, 0), examQuestions.count - 1)
-        return examQuestions[clamped]
+        let rawQuestion: CertiGoNativeExamQuestion = {
+            guard !examQuestions.isEmpty else {
+                return CertiGoNativeRichCatalog.buildExamQuestions(forRouteCode: activeRouteCode)[0]
+            }
+            let clamped = min(max(currentExamQuestionIndex, 0), examQuestions.count - 1)
+            return examQuestions[clamped]
+        }()
+        return CertiGoMultilingualEngine.localizedExamQuestion(rawQuestion, lang: settingsLanguageIndex)
     }
 
     public var formattedExamCountdown: String {
@@ -10601,35 +10642,36 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             customQuestion: customUserQuestion
         )
         let payload = CertiGoFigmaLiveRuntimeState.aiTopicsById[topicKey]
-        let promptText = customUserQuestion ?? payload?.question ?? offlineSynthesis.questionPrompt
+        let rawPromptText = customUserQuestion ?? payload?.question ?? offlineSynthesis.questionPrompt
+        let promptText = tr(rawPromptText)
         let turn: CertiGoChatTurn
         if isLiveAIModelConnected, let payload {
             turn = CertiGoChatTurn(
                 id: "turn-\(chatTurns.count + 1)-\(topicKey)",
                 userPrompt: promptText,
-                aiHeadline: payload.intro,
-                aiBullet1: payload.bullet1,
-                aiBullet2: payload.bullet2,
-                examKeyRule1: payload.examRule1,
-                examKeyRule2: payload.examRule2,
-                closingTip: payload.closing,
+                aiHeadline: tr(payload.intro),
+                aiBullet1: tr(payload.bullet1),
+                aiBullet2: tr(payload.bullet2),
+                examKeyRule1: tr(payload.examRule1),
+                examKeyRule2: tr(payload.examRule2),
+                closingTip: tr(payload.closing),
                 isStreamingOrLoading: true,
                 isLiveAIResponse: false,
-                liveSourceBadge: "✦ GPT-5.4-MINI EN DIRECT · PERSONNALISÉ POUR \(firstNameText.uppercased())"
+                liveSourceBadge: "✦ GPT-5.4-MINI · \(firstNameText.uppercased())"
             )
         } else {
             turn = CertiGoChatTurn(
                 id: "turn-\(chatTurns.count + 1)-\(topicKey)",
                 userPrompt: promptText,
-                aiHeadline: offlineSynthesis.headline,
-                aiBullet1: offlineSynthesis.comparisonBullet1,
-                aiBullet2: offlineSynthesis.comparisonBullet2,
-                examKeyRule1: offlineSynthesis.examRule1,
-                examKeyRule2: offlineSynthesis.examRule2,
-                closingTip: offlineSynthesis.closingTip,
+                aiHeadline: tr(offlineSynthesis.headline),
+                aiBullet1: tr(offlineSynthesis.comparisonBullet1),
+                aiBullet2: tr(offlineSynthesis.comparisonBullet2),
+                examKeyRule1: tr(offlineSynthesis.examRule1),
+                examKeyRule2: tr(offlineSynthesis.examRule2),
+                closingTip: tr(offlineSynthesis.closingTip),
                 isStreamingOrLoading: false,
                 isLiveAIResponse: false,
-                liveSourceBadge: "✦ SYNTHÈSE LOCALE CERTIGO · \(activeRouteCode)"
+                liveSourceBadge: "✦ CERTIGO AI · \(activeRouteCode)"
             )
         }
         chatTurns.append(turn)
@@ -11195,6 +11237,9 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         switch kind {
         case .language:
             settingsLanguageIndex = safeIndex % CertiGoFigmaLiveRuntimeState.settingsLanguageOptions.count
+            let resolvedAppLang = CertiGoMultilingualEngine.resolveAppLanguage(forIndex: settingsLanguageIndex)
+            AppLanguagePreference.explicit(resolvedAppLang).save(to: .standard)
+            saveToLocalDatabase()
         case .examMode:
             settingsExamModeIndex = safeIndex % CertiGoFigmaLiveRuntimeState.settingsExamModeOptions.count
         case .coachVoice:
@@ -12338,8 +12383,8 @@ public struct CertiGoNativeFigmaAppView: View {
     private func bottomBarItemsLayer(isHighlightedBlue: Bool, innerWidth: CGFloat) -> some View {
         let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: appState.activeRouteCode)
         return HStack(spacing: PrismSpacing.xs) {
-            tabBarItemButton(tab: .parcours, symbol: "safari.fill", label: "Parcours", isHighlightedBlue: isHighlightedBlue)
-            tabBarItemButton(tab: .examens, symbol: "scope", label: "Examens", isHighlightedBlue: isHighlightedBlue)
+            tabBarItemButton(tab: .parcours, symbol: "safari.fill", label: appState.tr("Parcours"), isHighlightedBlue: isHighlightedBlue)
+            tabBarItemButton(tab: .examens, symbol: "scope", label: appState.tr("Examens"), isHighlightedBlue: isHighlightedBlue)
 
             // Center 3D AI Hub Orb Button (`✦` : Figma `57:372` White Circle with Multicolor AngularGradient Ring)
             Button {
@@ -12384,8 +12429,8 @@ public struct CertiGoNativeFigmaAppView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier(isHighlightedBlue ? "native-tab-hub-ia-mask" : "native-tab-hub-ia")
 
-            tabBarItemButton(tab: .social, symbol: "trophy.fill", label: "Social", isHighlightedBlue: isHighlightedBlue)
-            tabBarItemButton(tab: .moi, symbol: "person.crop.circle.fill", label: "Moi", isHighlightedBlue: isHighlightedBlue)
+            tabBarItemButton(tab: .social, symbol: "trophy.fill", label: appState.tr("Social"), isHighlightedBlue: isHighlightedBlue)
+            tabBarItemButton(tab: .moi, symbol: "person.crop.circle.fill", label: appState.tr("Moi"), isHighlightedBlue: isHighlightedBlue)
         }
         .padding(.horizontal, FigMetrics.six)
         .padding(.vertical, FigMetrics.six)
@@ -13463,13 +13508,16 @@ public struct CertiGoNativeFigmaAppView: View {
                 false
             )
         ]
-        let spec = tourSpecs[step]
+        let spec = CertiGoMultilingualEngine.localizedGuidedTourStep(
+            stepIndex: step,
+            lang: appState.settingsLanguageIndex
+        )
         let isLastStep = (step == CertiGoNativeAppState.guidedTourStepCount - 1)
-        let skipLabel = isEnglish ? "Skip ✕" : "Passer ✕"
+        let skipLabel = appState.activeLanguage.isFrenchVariant ? "Passer ✕" : (isEnglish ? "Skip ✕" : appState.tr("Plus tard"))
         let nextLabel = isLastStep
-            ? (isEnglish ? "🚀 START MY 1st STEP" : "🚀 COMMENCER MA 1re ÉTAPE")
-            : (isEnglish ? "NEXT (\(step + 1)/5) →" : "SUIVANT (\(step + 1)/5) →")
-        let headerPrefix = isEnglish ? "🧭 GUIDED TOUR" : "🧭 VISITE GUIDÉE"
+            ? (appState.activeLanguage.isFrenchVariant ? "🚀 COMMENCER MA 1re ÉTAPE" : (isEnglish ? "🚀 START MY 1st STEP" : "🚀 \(appState.tr("COMMENCER"))"))
+            : (appState.activeLanguage.isFrenchVariant ? "SUIVANT (\(step + 1)/5) →" : (isEnglish ? "NEXT (\(step + 1)/5) →" : appState.tr("CONTINUER (\(step + 1)/5) →")))
+        let headerPrefix = appState.activeLanguage.isFrenchVariant ? "🧭 VISITE GUIDÉE" : "🧭 GUIDED TOUR"
 
         return GeometryReader { geo in
             let safeW = geo.size.width.isFinite ? geo.size.width : FigMetrics.threeHundredTwenty
@@ -17145,12 +17193,10 @@ public struct CertiGoNativeFigmaAppView: View {
     }
 
     private var hubIAWelcome06Content: some View {
-        let suggestions: [(icon: String, title: String, subtitle: String, key: String)] = [
-            ("📘", "Explique-moi RBAC vs Azure Policy", "Différences, portée & priorité en français clair", "rbac-vs-policy"),
-            ("🎙️", "Simuler un entretien technique à voix haute", "Discussion interactive sur ton architecture", "oral-interview"),
-            ("🎯", "Analyse ma progression et mes erreurs", "Conseils personnalisés selon tes réponses", "last-3-errors"),
-            ("⚡", "Donne-moi un exemple de code ou CLI", "Commandes \(appState.activeRouteCode), scripts & bonnes pratiques", "cli-example")
-        ]
+        let suggestions = CertiGoMultilingualEngine.localizedAICoachSuggestions(
+            routeCode: appState.activeRouteCode,
+            lang: appState.settingsLanguageIndex
+        )
 
         return VStack(spacing: PrismSpacing.xl) {
             if let activeError = appState.activeDiagnosticError {
@@ -21249,7 +21295,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
         }
     }
 
-    // Step 0 (`OB_01` : Figma `132:182`): Design 4 Opening with Dashed Arc + 4 White 3D Logo Cushions + 3-Column Banner + 2 Bottom Buttons
+    // Step 0 (`OB_01` : Figma `132:182`): Design 4 Opening with Dashed Arc + 4 White 3D Logo Cushions + 3-Column Banner + 2 Bottom Buttons + Top-Right Language Selector
     private var onboardingStep0WelcomeView: some View {
         let arcVendors: [(vendorId: String, xOffset: CGFloat, yOffset: CGFloat)] = [
             ("google", -118, 12),
@@ -21259,6 +21305,40 @@ public struct CertiGoNativeOnboardingFlowView: View {
         ]
 
         return VStack(spacing: PrismSpacing.l) {
+            // Top-Right Language Selector Pill on OB-01 so the user can pick their language right on the first screen
+            HStack {
+                Spacer()
+                Menu {
+                    ForEach(CertiGoSupportedLanguage.allCases) { lang in
+                        Button {
+                            withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                                appState.selectSettingsOption(for: .language, index: lang.rawValue)
+                            }
+                        } label: {
+                            Text(verbatim: "\(lang.flagEmoji) \(lang.nativeDisplayName)")
+                        }
+                    }
+                } label: {
+                    HStack(spacing: PrismSpacing.xxs) {
+                        Text(verbatim: appState.activeLanguage.compactPillLabel)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
+                        Text(verbatim: "▾")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
+                    }
+                    .padding(.horizontal, PrismSpacing.m)
+                    .padding(.vertical, PrismSpacing.xs)
+                    .background(
+                        Capsule().fill(PrismColor.figmaHex("#eff6ff"))
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(PrismColor.figmaHex("#bfdbfe"), lineWidth: PrismBorder.standard)
+                    )
+                }
+                .accessibilityIdentifier("onboarding-step0-language-selector")
+            }
+
             // Dashed Arc + 4 Official Brand 3D White Square Cushions (`60x60 pt`) around Central Mascot (`140x140 pt`)
             ZStack {
                 Circle()
@@ -21314,12 +21394,12 @@ public struct CertiGoNativeOnboardingFlowView: View {
                     .font(PrismTypography.figmaFont(size: FigMetrics.thirtyTwo, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
 
-                Text(verbatim: "Décroche tes certifications.\nMaîtrise l'IA & la Tech en continu.")
+                    Text(verbatim: appState.tr("Décroche tes certifications.\nMaîtrise l'IA & la Tech en continu."))
                     .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                     .multilineTextAlignment(.center)
 
-                Text(verbatim: "Suis plusieurs parcours en parallèle : certifications officielles, acteurs majeurs de l'IA et nouveautés Tech ajoutées chaque semaine.")
+                    Text(verbatim: appState.tr("Suis plusieurs parcours en parallèle : certifications officielles, acteurs majeurs de l'IA et nouveautés Tech ajoutées chaque semaine."))
                     .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
                     .foregroundStyle(PrismColor.figmaHex("#475569"))
                     .lineSpacing(3)
@@ -21329,15 +21409,15 @@ public struct CertiGoNativeOnboardingFlowView: View {
 
             // 3-Column White Banner separated by vertical dividers
             HStack(spacing: .zero) {
-                onboardingThreeColumnStatCell(top: "Multi-Parcours", bottom: "En parallèle")
+                    onboardingThreeColumnStatCell(top: appState.tr("Multi-Parcours"), bottom: appState.tr("En parallèle"))
+                Rectangle()
+                    .fill(PrismColor.figmaHex("#e2e8f0"))
+                        .frame(width: PrismBorder.hairline, height: FigMetrics.forty)
+                    onboardingThreeColumnStatCell(top: appState.tr("Certifs + IA"), bottom: appState.tr("Veille & Acteurs"))
                 Rectangle()
                     .fill(PrismColor.figmaHex("#e2e8f0"))
                     .frame(width: PrismBorder.hairline, height: FigMetrics.forty)
-                onboardingThreeColumnStatCell(top: "Certifs + IA", bottom: "Veille & Acteurs")
-                Rectangle()
-                    .fill(PrismColor.figmaHex("#e2e8f0"))
-                    .frame(width: PrismBorder.hairline, height: FigMetrics.forty)
-                onboardingThreeColumnStatCell(top: "Nouveautés 🔄", bottom: "Chaque semaine")
+                    onboardingThreeColumnStatCell(top: appState.tr("Nouveautés 🔄"), bottom: appState.tr("Chaque semaine"))
             }
             .padding(.vertical, PrismSpacing.m)
             .background(
@@ -21356,7 +21436,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
                         appState.advanceOnboardingStep()
                     }
                 } label: {
-                    Text(verbatim: "CRÉER MON COMPTE · C'EST PARTI !")
+                        Text(verbatim: appState.tr("CRÉER MON COMPTE · C'EST PARTI !"))
                         .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
                         .foregroundStyle(PrismColor.onAccent)
                         .frame(maxWidth: .infinity)
@@ -21377,7 +21457,7 @@ public struct CertiGoNativeOnboardingFlowView: View {
                         appState.isPresentingSignInPortalSheet = true
                     }
                 } label: {
-                    Text(verbatim: "J'ai déjà un compte · Se connecter")
+                        Text(verbatim: appState.tr("J'ai déjà un compte · Se connecter"))
                         .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
                         .padding(.vertical, PrismSpacing.xs)
