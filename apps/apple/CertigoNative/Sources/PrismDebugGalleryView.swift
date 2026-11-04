@@ -217,7 +217,7 @@
               }
             }
           } header: {
-            Text(verbatim: "Phase 3 · Home / Today & Router (§12–14)")
+            Text(verbatim: "Phase 3 · Home / Today & Router (§12-14)")
           }
           Section {
             Text(verbatim: "P1 Formats · choice · situation · predict · spotTheIssue · ordering · commandComposer")
@@ -225,7 +225,7 @@
             Text(verbatim: "Offline Cache · \(PrismOfflineSessionCache.maxCachedSessions) pre-composed sessions")
               .prismTextStyle(.caption)
           } header: {
-            Text(verbatim: "Phase 4 · Session Player & P1 Formats (§6.2–6.4)")
+            Text(verbatim: "Phase 4 · Session Player & P1 Formats (§6.2-6.4)")
           }
           Section {
             ForEach(MockExamTimePolicy.allCases) { policy in
@@ -233,7 +233,7 @@
                 .prismTextStyle(.callout)
             }
           } header: {
-            Text(verbatim: "Phase 5 · Feedback, Daily Situation & Mock Exam (§14–15)")
+            Text(verbatim: "Phase 5 · Feedback, Daily Situation & Mock Exam (§14-15)")
           }
           Section {
             ForEach(AtlasPresentationMode.allCases) { mode in
@@ -241,7 +241,7 @@
                 .prismTextStyle(.callout)
             }
           } header: {
-            Text(verbatim: "Phase 6 · Atlas, Concept, Readiness & Passport (§8, §14–15)")
+            Text(verbatim: "Phase 6 · Atlas, Concept, Readiness & Passport (§8, §14-15)")
           }
           Section {
             ForEach(MasteryMilestoneKind.allCases) { kind in
@@ -273,7 +273,7 @@
                 .prismTextStyle(.callout)
             }
           } header: {
-            Text(verbatim: "Phase 10 · Onboarding 60s, Pro StoreKit 2, Settings & iOS Surfaces (§14–15)")
+            Text(verbatim: "Phase 10 · Onboarding 60s, Pro StoreKit 2, Settings & iOS Surfaces (§14-15)")
           }
           Section {
             ForEach(AppStoreAccessibilityNutritionLabel.allCases) { label in
@@ -281,7 +281,7 @@
                 .prismTextStyle(.callout)
             }
           } header: {
-            Text(verbatim: "Phase 11 · Accessibility AX5, Budgets §30 & App Store Labels (§28–34)")
+            Text(verbatim: "Phase 11 · Accessibility AX5, Budgets §30 & App Store Labels (§28-34)")
           }
           Section {
             CertiGoSpeechBubbleHeaderView(

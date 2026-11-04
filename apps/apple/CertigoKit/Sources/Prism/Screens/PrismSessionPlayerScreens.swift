@@ -154,7 +154,7 @@ public struct PrismSessionItemModel: Codable, Equatable, Hashable, Sendable, Ide
             if lowerId.contains("q02")
                 || lowerStem.contains("2×2")
                 || lowerStem.contains("2x2")
-                || options.contains(where: { $0.text.contains(" — ") })
+                || options.contains(where: { $0.text.contains(" : ") })
             {
                 return .q02ServiceGrid2x2
             }
@@ -432,7 +432,7 @@ public struct PrismSessionBookmark: Codable, Equatable, Hashable, Sendable {
 /// Offline pre-composed session cache (§6.2: up to 2 pre-composed sessions cached).
 public struct PrismOfflineSessionCache: Codable, Equatable, Sendable {
     public static let maxCachedSessions: Int = 2
-    public static let offlineQueuedMessage = "Réponse enregistrée — résultat à la synchronisation"
+    public static let offlineQueuedMessage = "Réponse enregistrée : résultat à la synchronisation"
 
     public private(set) var cachedPlans: [PrismSessionPlan]
 

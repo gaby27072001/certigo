@@ -44,9 +44,9 @@ public enum CertiGoMascotOutfit: String, Codable, CaseIterable, Identifiable, Ha
         case .sadMissing:
             return "INACTIF > 48H"
         case .morningPajama:
-            return "MATIN 06H–09H30"
+            return "MATIN 06H-09H30"
         case .coffeeBoost:
-            return "FOCUS 09H30–14H"
+            return "FOCUS 09H30-14H"
         case .suitBoss:
             return "MODE EXAMEN"
         case .airplaneOffline:
@@ -67,7 +67,7 @@ public enum CertiGoMascotOutfit: String, Codable, CaseIterable, Identifiable, Ha
         case .morningPajama:
             return "Pyjama rayé, bonnet de nuit et tasse de café fumante au réveil avant la 1re séance."
         case .coffeeBoost:
-            return "Gobelet de café fumant à l'aile pour le sprint focus de la matinée (9h30–14h)."
+            return "Gobelet de café fumant à l'aile pour le sprint focus de la matinée (9h30-14h)."
         case .suitBoss:
             return "Costume-cravate d'architecte Cloud pendant la préparation d'un Examen Blanc."
         case .airplaneOffline:

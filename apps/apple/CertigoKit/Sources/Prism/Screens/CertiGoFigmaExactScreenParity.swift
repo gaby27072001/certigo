@@ -303,10 +303,10 @@ public enum CertiGoFigmaExactScreenParity {
                 "DÉMARRER L'EXAMEN COMPLET",
                 "S'ENTRAÎNER PAR DOMAINE OFFICIEL AZ-104",
                 "1. Identité & Gouvernance Entra ID",
-                "Poids officiel : 20–25 %",
+                "Poids officiel : 20-25 %",
                 "88 %",
                 "2. Stockage & Sécurité des données",
-                "Poids officiel : 15–20 %",
+                "Poids officiel : 15-20 %",
                 "82 %",
                 "3. Déploiement Calcul, VM & AKS"
             ],
@@ -1689,10 +1689,10 @@ public enum CertiGoFigmaExactScreenParity {
                 "DÉMARRER L'EXAMEN COMPLET",
                 "S'ENTRAÎNER PAR DOMAINE OFFICIEL AZ-104",
                 "1. Identité & Gouvernance Entra ID",
-                "Poids officiel : 20–25 %",
+                "Poids officiel : 20-25 %",
                 "88 %",
                 "2. Stockage & Sécurité des données",
-                "Poids officiel : 15–20 %",
+                "Poids officiel : 15-20 %",
                 "82 %",
                 "3. Déploiement Calcul, VM & AKS"
             ],
@@ -2650,11 +2650,11 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                 memoGoldenRule: "Le client reste toujours responsable de ses données, comptes et identités dans le Cloud.",
                 examOfficialTitle: "Microsoft Certified: Azure Fundamentals",
                 examDomains: [
-                    ("1. Concepts Cloud & Haute Disponibilité", "Poids officiel : 25–30 %", "94 %", "#15803d"),
-                    ("2. Architecture & Services Azure (Calcul/Data)", "Poids officiel : 35–40 %", "90 %", "#15803d"),
-                    ("3. Sécurité, Gouvernance & Conformité", "Poids officiel : 20–25 %", "88 %", "#1d4ed8"),
-                    ("4. Tarification, TCO & Cycle de vie SLA", "Poids officiel : 10–15 %", "85 %", "#1d4ed8"),
-                    ("5. Outils de gestion Portail, CLI & Advisor", "Poids officiel : 10–15 %", "82 %", "#15803d")
+                    ("1. Concepts Cloud & Haute Disponibilité", "Poids officiel : 25-30 %", "94 %", "#15803d"),
+                    ("2. Architecture & Services Azure (Calcul/Data)", "Poids officiel : 35-40 %", "90 %", "#15803d"),
+                    ("3. Sécurité, Gouvernance & Conformité", "Poids officiel : 20-25 %", "88 %", "#1d4ed8"),
+                    ("4. Tarification, TCO & Cycle de vie SLA", "Poids officiel : 10-15 %", "85 %", "#1d4ed8"),
+                    ("5. Outils de gestion Portail, CLI & Advisor", "Poids officiel : 10-15 %", "82 %", "#15803d")
                 ]
             )
         case "AI-102":
@@ -2675,11 +2675,11 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                 memoGoldenRule: "Active toujours la recherche hybride (vecteurs + mots-clés) avec Semantic Ranker en production.",
                 examOfficialTitle: "Microsoft Certified: Azure AI Engineer Associate",
                 examDomains: [
-                    ("1. Planifier & Gérer les services Azure AI", "Poids officiel : 15–20 %", "86 %", "#15803d"),
-                    ("2. Solutions IA Générative & Azure AI Foundry", "Poids officiel : 20–25 %", "84 %", "#15803d"),
-                    ("3. Recherche Vectorielle RAG & Agents IA", "Poids officiel : 20–25 %", "79 %", "#1d4ed8"),
-                    ("4. Vision par Ordinateur & Document Intelligence", "Poids officiel : 15–20 %", "72 %", "#1d4ed8"),
-                    ("5. Traitement du Langage (NLP) & Speech", "Poids officiel : 15–20 % · À cibler", "64 %", "#b45309")
+                    ("1. Planifier & Gérer les services Azure AI", "Poids officiel : 15-20 %", "86 %", "#15803d"),
+                    ("2. Solutions IA Générative & Azure AI Foundry", "Poids officiel : 20-25 %", "84 %", "#15803d"),
+                    ("3. Recherche Vectorielle RAG & Agents IA", "Poids officiel : 20-25 %", "79 %", "#1d4ed8"),
+                    ("4. Vision par Ordinateur & Document Intelligence", "Poids officiel : 15-20 %", "72 %", "#1d4ed8"),
+                    ("5. Traitement du Langage (NLP) & Speech", "Poids officiel : 15-20 % · À cibler", "64 %", "#b45309")
                 ]
             )
         case "SAA-C03":
@@ -2698,7 +2698,7 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                 memoActivity: "Architecturer un VPC Multi-AZ sans exposition Internet",
                 memoKeyTopics: ("IAM STS", "Security Group", "Gateway Endpoint"),
                 memoGoldenRule: "Utilise un Gateway VPC Endpoint gratuit pour S3 et DynamoDB plutôt qu'une NAT Gateway coûteuse.",
-                examOfficialTitle: "AWS Certified Solutions Architect – Associate",
+                examOfficialTitle: "AWS Certified Solutions Architect - Associate",
                 examDomains: [
                     ("1. Conception d'architectures sécurisées (IAM)", "Poids officiel : 30 %", "84 %", "#15803d"),
                     ("2. Conception d'architectures résilientes (Multi-AZ)", "Poids officiel : 26 %", "78 %", "#15803d"),
@@ -3060,25 +3060,25 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
         case "HARVEY-LEGAL", "HARVEY":
             return CertiGoLiveTrackCurriculum(
                 vendorId: "harvey",
-                unitBannerTitle: "UNITÉ 1 · Harvey Assistant & Contrats",
+                unitBannerTitle: "UNITÉ 1 · Harvey Academy Foundations, Assistant & Contrats",
                 unitProgressPercentText: "76%",
                 stepTitles: [
-                    "Harvey Assistant & Prompts",
-                    "Redlining NDA & MSA",
+                    "Harvey Academy · Level 1 & Assistant",
+                    "Redlining NDA, MSA & Word Add-In",
                     "Clauses Critiques : IP & RGPD",
                     "Lab · Prompt Redlining MSA",
                     "Harvey Vault & Data Room M&A"
                 ],
-                stepPreviewSubtitle: "Harvey Assistant, Vault Due Diligence, Knowledge & Workflows",
-                memoActivity: "Auditer une Data Room Vault et rédiger un redline MSA",
-                memoKeyTopics: ("Harvey Assistant", "Harvey Vault M&A", "Harvey Knowledge"),
+                stepPreviewSubtitle: "Harvey Academy (Level 1 & Legal Engineering), Assistant, Vault M&A, Word Add-In & Knowledge",
+                memoActivity: "Valider Harvey Academy Level 1, auditer une Data Room Vault et rédiger un redline MSA",
+                memoKeyTopics: ("Harvey Academy", "Harvey Vault M&A", "Legal Engineering"),
                 memoGoldenRule: "Fournis toujours le rôle, la juridiction applicable et la position de repli (fallback) dans ton prompt Harvey.",
-                examOfficialTitle: "Harvey : Plateforme Legal IA & Pratique Juridique",
+                examOfficialTitle: "Harvey Academy : Legal IA, Vault & Legal Engineering",
                 examDomains: [
-                    ("1. Harvey Assistant & Contrats", "Poids officiel : 25 %", "88 %", "#15803d"),
+                    ("1. Harvey Academy Foundations & Assistant", "Poids officiel : 25 %", "88 %", "#15803d"),
                     ("2. Harvey Vault & Due Diligence M&A", "Poids officiel : 25 %", "84 %", "#15803d"),
                     ("3. Harvey Knowledge & Citations", "Poids officiel : 25 %", "80 %", "#1d4ed8"),
-                    ("4. Workflows & Déontologie", "Poids officiel : 25 %", "78 %", "#1d4ed8"),
+                    ("4. Legal Engineering & Déontologie", "Poids officiel : 25 %", "78 %", "#1d4ed8"),
                     ("5. Cloisonnement Matter & Zero-Training", "Poids officiel : Transversal", "75 %", "#1d4ed8")
                 ]
             )
@@ -3100,11 +3100,11 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                 memoGoldenRule: "Un rôle accordé sur l'Abonnement s'hérite sur toutes ses ressources.",
                 examOfficialTitle: "Microsoft Certified: Azure Administrator Associate",
                 examDomains: [
-                    ("1. Identité & Gouvernance Entra ID", "Poids officiel : 20–25 %", "88 %", "#15803d"),
-                    ("2. Stockage & Sécurité des données", "Poids officiel : 15–20 %", "82 %", "#15803d"),
-                    ("3. Déploiement Calcul, VM & AKS", "Poids officiel : 20–25 %", "78 %", "#1d4ed8"),
-                    ("4. Réseaux virtuels VNet & DNS", "Poids officiel : 15–20 %", "74 %", "#1d4ed8"),
-                    ("5. Supervision Monitor & Backup", "Poids officiel : 10–15 % · À cibler", "58 %", "#b45309")
+                    ("1. Identité & Gouvernance Entra ID", "Poids officiel : 20-25 %", "88 %", "#15803d"),
+                    ("2. Stockage & Sécurité des données", "Poids officiel : 15-20 %", "82 %", "#15803d"),
+                    ("3. Déploiement Calcul, VM & AKS", "Poids officiel : 20-25 %", "78 %", "#1d4ed8"),
+                    ("4. Réseaux virtuels VNet & DNS", "Poids officiel : 15-20 %", "74 %", "#1d4ed8"),
+                    ("5. Supervision Monitor & Backup", "Poids officiel : 10-15 % · À cibler", "58 %", "#b45309")
                 ]
             )
         }
@@ -3627,7 +3627,7 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
             question: "Analyse mes 3 dernières erreurs et mes points faibles",
             intro: "J'ai analysé tes 3 dernières erreurs sur AZ-104. Voici ton diagnostic ciblé :",
             bullet1: "•  1. Private Endpoint & DNS (58 %) : Créer le Private Endpoint ne désactive pas publicNetworkAccess et requiert un Virtual Network Link sur privatelink.*.",
-            bullet2: "•  2. Rôles JSON personnalisés : Mettre \"*\" dans NotActions soustrait toutes les permissions d'Actions — le rôle ne peut plus rien faire.",
+            bullet2: "•  2. Rôles JSON personnalisés : Mettre \"*\" dans NotActions soustrait toutes les permissions d'Actions : le rôle ne peut plus rien faire.",
             examRule1: "•  3. Verrous Azure : Un verrou CanNotDelete prime toujours sur le rôle Propriétaire (Owner) tant qu'il n'est pas retiré.",
             examRule2: "•  Action recommandée : Lance le quiz ciblé de 5 questions pour transformer ces 3 pièges en points forts (+65 pts Pearson VUE).",
             closing: "Touche « 🎯 Quiz » ci-dessous pour t'entraîner immédiatement sur ces 3 sujets !"
@@ -3739,7 +3739,7 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
             badge: "ÉTUDE DE CAS CONTOSO · IDENTITÉ ENTRA ID",
             stem: "Un administrateur doit activer le rôle Global Reader uniquement pendant 4 heures avec approbation obligatoire et MFA.\nQuelle fonctionnalité déployez-vous ?",
             optionA: "Attributions RBAC permanentes avec groupe de sécurité dynamique",
-            optionB: "Microsoft Entra ID Privileged Identity Management (PIM) — rôle éligible",
+            optionB: "Microsoft Entra ID Privileged Identity Management (PIM) : rôle éligible",
             optionC: "Stratégie Azure Policy AuditIfNotExists sur l'abonnement",
             optionD: "Verrou Resource Manager ReadOnly sur le groupe d'administration"
         ),
@@ -4681,7 +4681,7 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
                     )
             }
             if node.i == "81:358", !isVoiceLiveListening {
-                return node.updating(tx: .some("⏸ Écoute vocale en pause — touche le micro central pour reprendre"))
+                return node.updating(tx: .some("⏸ Écoute vocale en pause : touche le micro central pour reprendre"))
             }
         }
         if screenId == "85:317" {

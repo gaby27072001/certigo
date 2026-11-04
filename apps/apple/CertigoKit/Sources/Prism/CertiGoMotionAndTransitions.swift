@@ -2,7 +2,7 @@ import BrandAssets
 import CertigoDomain
 import Foundation
 
-// MARK: - 1. Page 13 Figma Pro — 8 Validated Spring & Micro-Interaction Presets (ANIM_01 .. ANIM_08)
+// MARK: - 1. Page 13 Figma Pro : 8 Validated Spring & Micro-Interaction Presets (ANIM_01 .. ANIM_08)
 
 public enum CertiGoAnimationPresetID: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
   case anim01Tactile3DPress = "ANIM_01"
@@ -212,42 +212,42 @@ public enum CertiGoAnimationPresetID: String, CaseIterable, Codable, Hashable, S
   public var figmaBeforeNodeName: String {
     switch self {
     case .anim01Tactile3DPress:
-      return "ANIM_01_A · État Initial (Avant Transition) — Pression Tactile 3D Duolingo (Repos 4px ➔ Pressé 1px)"
+      return "ANIM_01_A · État Initial (Avant Transition) : Pression Tactile 3D Duolingo (Repos 4px ➔ Pressé 1px)"
     case .anim02ApplePayBottomSheet:
-      return "ANIM_02_A · État Initial (Avant Transition) — Montée Feuille Apple Pay + Voile 62 % + Blason AZ-104"
+      return "ANIM_02_A · État Initial (Avant Transition) : Montée Feuille Apple Pay + Voile 62 % + Blason AZ-104"
     case .anim03Mascot34SpeechBubblePop:
-      return "ANIM_03_A · État Initial (Avant Transition) — Apparition Mascotte 3/4 Droite & Bulle Empilée 15px ◀"
+      return "ANIM_03_A · État Initial (Avant Transition) : Apparition Mascotte 3/4 Droite & Bulle Empilée 15px ◀"
     case .anim04Claude85DrawerPush:
-      return "ANIM_04_A · État Initial (Avant Transition) — Tiroir Historique IA Push 85 % Style Claude (06B ➔ 06D)"
+      return "ANIM_04_A · État Initial (Avant Transition) : Tiroir Historique IA Push 85 % Style Claude (06B ➔ 06D)"
     case .anim05NovaLiveVoicePulse:
-      return "ANIM_05_A · État Initial (Avant Transition) — Orbe Vocal Live Nova 1.0x Pulsant & Onde Sonore (06C)"
+      return "ANIM_05_A · État Initial (Avant Transition) : Orbe Vocal Live Nova 1.0x Pulsant & Onde Sonore (06C)"
     case .anim06PearsonBarometerFill:
-      return "ANIM_06_A · État Initial (Avant Transition) — Baromètre Pearson VUE Gradué (0 ➔ 785/1000) & Carrousel ●○○"
+      return "ANIM_06_A · État Initial (Avant Transition) : Baromètre Pearson VUE Gradué (0 ➔ 785/1000) & Carrousel ●○○"
     case .anim07DualCurveAndFitnessRings:
-      return "ANIM_07_A · État Initial (Avant Transition) — Double Courbe (Avec CertiGo 845 vs Sans 580) & 3 Anneaux"
+      return "ANIM_07_A · État Initial (Avant Transition) : Double Courbe (Avec CertiGo 845 vs Sans 580) & 3 Anneaux"
     case .anim08CelebrationVictoryJump:
-      return "ANIM_08_A · État Initial (Avant Transition) — Saut de Victoire Célébration Blason 1A (Écran 19 · +18px)"
+      return "ANIM_08_A · État Initial (Avant Transition) : Saut de Victoire Célébration Blason 1A (Écran 19 · +18px)"
     }
   }
 
   public var figmaAfterNodeName: String {
     switch self {
     case .anim01Tactile3DPress:
-      return "ANIM_01_B · État Animé (Après Transition Spring) — Pression Tactile 3D Duolingo (Repos 4px ➔ Pressé 1px)"
+      return "ANIM_01_B · État Animé (Après Transition Spring) : Pression Tactile 3D Duolingo (Repos 4px ➔ Pressé 1px)"
     case .anim02ApplePayBottomSheet:
-      return "ANIM_02_B · État Animé (Après Transition Spring) — Montée Feuille Apple Pay + Voile 62 % + Blason AZ-104"
+      return "ANIM_02_B · État Animé (Après Transition Spring) : Montée Feuille Apple Pay + Voile 62 % + Blason AZ-104"
     case .anim03Mascot34SpeechBubblePop:
-      return "ANIM_03_B · État Animé (Après Transition Spring) — Apparition Mascotte 3/4 Droite & Bulle Empilée 15px ◀"
+      return "ANIM_03_B · État Animé (Après Transition Spring) : Apparition Mascotte 3/4 Droite & Bulle Empilée 15px ◀"
     case .anim04Claude85DrawerPush:
-      return "ANIM_04_B · État Animé (Après Transition Spring) — Tiroir Historique IA Push 85 % Style Claude (06B ➔ 06D)"
+      return "ANIM_04_B · État Animé (Après Transition Spring) : Tiroir Historique IA Push 85 % Style Claude (06B ➔ 06D)"
     case .anim05NovaLiveVoicePulse:
-      return "ANIM_05_B · État Animé (Après Transition Spring) — Orbe Vocal Live Nova 1.0x Pulsant & Onde Sonore (06C)"
+      return "ANIM_05_B · État Animé (Après Transition Spring) : Orbe Vocal Live Nova 1.0x Pulsant & Onde Sonore (06C)"
     case .anim06PearsonBarometerFill:
-      return "ANIM_06_B · État Animé (Après Transition Spring) — Baromètre Pearson VUE Gradué (0 ➔ 785/1000) & Carrousel ●○○"
+      return "ANIM_06_B · État Animé (Après Transition Spring) : Baromètre Pearson VUE Gradué (0 ➔ 785/1000) & Carrousel ●○○"
     case .anim07DualCurveAndFitnessRings:
-      return "ANIM_07_B · État Animé (Après Transition Spring) — Double Courbe (Avec CertiGo 845 vs Sans 580) & 3 Anneaux"
+      return "ANIM_07_B · État Animé (Après Transition Spring) : Double Courbe (Avec CertiGo 845 vs Sans 580) & 3 Anneaux"
     case .anim08CelebrationVictoryJump:
-      return "ANIM_08_B · État Animé (Après Transition Spring) — Saut de Victoire Célébration Blason 1A (Écran 19 · +18px)"
+      return "ANIM_08_B · État Animé (Après Transition Spring) : Saut de Victoire Célébration Blason 1A (Écran 19 · +18px)"
     }
   }
 
@@ -579,7 +579,7 @@ public enum CertiGoMotionSpecCatalog {
     }
   }
 
-  /// `ANIM_01` — Pression tactile 3D Duolingo : compression de la lèvre 3D (`PrismSize.lipDepth` ➔ `PrismBorder.hairline`) + retour haptique `PrismHapticToken.selection`.
+  /// `ANIM_01` : Pression tactile 3D Duolingo : compression de la lèvre 3D (`PrismSize.lipDepth` ➔ `PrismBorder.hairline`) + retour haptique `PrismHapticToken.selection`.
   public struct CertiGo3DPressButtonModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -626,7 +626,7 @@ public enum CertiGoMotionSpecCatalog {
     }
   }
 
-  /// `ANIM_02` — Montée de la feuille flottante Apple Pay + voile assombri (`0.58` / `0.62`).
+  /// `ANIM_02` : Montée de la feuille flottante Apple Pay + voile assombri (`0.58` / `0.62`).
   public struct CertiGoBottomSheetDimOverlayModifier<SheetContent: View>: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -694,7 +694,7 @@ public enum CertiGoMotionSpecCatalog {
     }
   }
 
-  /// `ANIM_03` — Apparition de la mascotte 3/4 droite et de la bulle empilée `15pt` (`scale 0.86 ➔ 1.0`).
+  /// `ANIM_03` : Apparition de la mascotte 3/4 droite et de la bulle empilée `15pt` (`scale 0.86 ➔ 1.0`).
   public struct CertiGoMascotBubbleEntranceModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -724,7 +724,7 @@ public enum CertiGoMotionSpecCatalog {
     }
   }
 
-  /// `ANIM_04` — Tiroir latéral d'historique IA `85 %` (`PrismSize.drawerWidth` = `334pt`) poussant l'écran principal (`06B ➔ 06D`).
+  /// `ANIM_04` : Tiroir latéral d'historique IA `85 %` (`PrismSize.drawerWidth` = `334pt`) poussant l'écran principal (`06B ➔ 06D`).
   public struct CertiGoDrawerPushContainerModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -765,7 +765,7 @@ public enum CertiGoMotionSpecCatalog {
     }
   }
 
-  /// `ANIM_05` — Orbe vocal Live `Nova` `1,0×` avec 3 anneaux concentriques (`PrismSize.ringOuter`, `PrismSize.ringMiddle`, `PrismSize.ringInner`).
+  /// `ANIM_05` : Orbe vocal Live `Nova` `1,0×` avec 3 anneaux concentriques (`PrismSize.ringOuter`, `PrismSize.ringMiddle`, `PrismSize.ringInner`).
   public struct CertiGoNovaVoicePulseView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -855,7 +855,7 @@ public enum CertiGoMotionSpecCatalog {
     }
   }
 
-  /// `ANIM_06` — Jauge graduée Pearson VUE (`0 ── Seuil 700 ── 785 / 1000`) avec franchissement du seuil officiel.
+  /// `ANIM_06` : Jauge graduée Pearson VUE (`0 ── Seuil 700 ── 785 / 1000`) avec franchissement du seuil officiel.
   public struct CertiGoAnimatedBarometerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -956,7 +956,7 @@ public enum CertiGoMotionSpecCatalog {
     }
   }
 
-  /// `ANIM_07` — Double courbe de progression (`Avec CertiGo 845 / 1000 ✓` vs `Sans CertiGo 580 / 1000`) et 3 anneaux d'activité.
+  /// `ANIM_07` : Double courbe de progression (`Avec CertiGo 845 / 1000 ✓` vs `Sans CertiGo 580 / 1000`) et 3 anneaux d'activité.
   public struct CertiGoDualCurveAndFitnessRingsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -1038,7 +1038,7 @@ public enum CertiGoMotionSpecCatalog {
     }
   }
 
-  /// `ANIM_08` — Saut de victoire Célébration `Blason 1A` (Écran 19 · `+18pt`) respectant `Calm Mode` et `Reduce Motion`.
+  /// `ANIM_08` : Saut de victoire Célébration `Blason 1A` (Écran 19 · `+18pt`) respectant `Calm Mode` et `Reduce Motion`.
   public struct CertiGoCelebrationJumpModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -1159,7 +1159,7 @@ public enum CertiGoMotionSpecCatalog {
     public var stateBadgeText: String {
       isAfterTransitionState
         ? "\(preset.rawValue) · ÉTAT B (APRÈS SMART ANIMATE) ✓"
-        : "\(preset.rawValue) · ÉTAT A (AVANT — CLIQUER POUR ANIMER)"
+        : "\(preset.rawValue) · ÉTAT A (AVANT : CLIQUER POUR ANIMER)"
     }
 
     public var footerActionText: String {

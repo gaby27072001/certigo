@@ -9,17 +9,17 @@ import Testing
 @Suite("PR #150 — Native Figma App Video Layout, Mimo Reset, 8-Step Onboarding & Parallel Tracks Deduplication", .serialized)
 struct CertiGoNativeFigmaAppTests {
 
-    @Test("selectRoute resets selectedMimoFilter to .allUnits so all 3 units (15 winding nodes) appear after switching certifications")
+    @Test("selectRoute resets selectedMimoFilter to .allUnits so all 3 units (30 winding nodes) appear after switching certifications")
     func selectRouteResetsSelectedMimoFilterToAllUnits() {
         var appState = CertiGoNativeAppState()
         appState.selectedMimoFilter = .miniLabs
-        #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 4)
+        #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 7)
 
         appState.selectRoute("PCA")
         #expect(appState.activeRouteCode == "PCA")
         #expect(appState.selectedMimoFilter == .allUnits)
         #expect(appState.filteredUnitsForMimoRail.count == 3)
-        #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 15)
+        #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 30)
     }
 
     @Test("10-step native onboarding flow advances from step 0 to step 9 (without duplicate Step 1 auth screen), supports back navigation, and dismisses cleanly on completion or close")
@@ -1021,12 +1021,20 @@ struct CertiGoNativeFigmaAppTests {
         }
         let prismAssets = root.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Resources/Prism.xcassets")
 
-        // 1. Verify all 15 steps across every certification have valid official service vector assets in Prism.xcassets
-        let certifications = ["AZ-104", "AZ-900", "AI-102", "SAA-C03", "CLF-C02", "AIF-C01", "PDE", "PCA", "ACE", "CKA", "CCNA", "TF-003", "GH-300", "CCA-F"]
+        // 1. Verify all 30 steps (3 units x 10 steps) across every certification have valid official service vector assets in Prism.xcassets
+        let certifications = [
+            "AZ-104", "AZ-900", "AI-102", "SAA-C03", "CLF-C02", "AIF-C01",
+            "PDE", "PCA", "ACE", "CKA", "CCNA", "TF-003", "GH-300", "GH-900", "GH-AS", "CCA-F",
+            "HARVEY-LEGAL", "OPENAI-PRO", "ANTHROPIC-CLAUDE", "MS-365-COPILOT"
+        ]
         for code in certifications {
             let units = CertiGoNativeRichCatalog.buildThreeUnits(forRouteCode: code)
+            #expect(units.count == 3)
+            for unit in units {
+                #expect(unit.lessons.count == 10)
+            }
             let lessons = units.flatMap(\.lessons)
-            #expect(lessons.count == 15)
+            #expect(lessons.count == 30)
             for lesson in lessons {
                 #expect(!lesson.serviceAssetName.isEmpty)
                 let assetDir = prismAssets.appendingPathComponent("\(lesson.serviceAssetName).imageset")
@@ -1042,7 +1050,15 @@ struct CertiGoNativeFigmaAppTests {
             #expect(lessons[3].isQuizOnlyChapter == true)
             #expect(lessons[4].isQuizOnlyChapter == true)
             #expect(lessons[4].chapterFormatBadgeText.contains("Quiz Express"))
+            #expect(lessons[9].chapterFormatBadgeText.contains("Boss"))
         }
+
+        // Verify GH-900 and AZ-900 never share identical questions
+        let gh900Ex = CertiGoNativeLessonSessionEngine.defaultExercises(forRouteCode: "GH-900", lessonId: "GH-900-u1-s1")
+        let az900Ex = CertiGoNativeLessonSessionEngine.defaultExercises(forRouteCode: "AZ-900", lessonId: "AZ-900-u1-s1")
+        #expect(gh900Ex.map(\.prompt) != az900Ex.map(\.prompt))
+        #expect(gh900Ex[0].prompt.contains("Pull Request"))
+        #expect(gh900Ex[0].options[0].title.contains("CODEOWNERS"))
 
         // 2. Verify progressive 3-slide micro-lesson navigation (1/3 -> 2/3 -> 3/3 -> questions) vs Express Quiz starting directly on questions
         var appState = CertiGoNativeAppState()
@@ -1194,14 +1210,14 @@ struct CertiGoNativeFigmaAppTests {
         let msCloudCodes = appState.filteredOnboardingCatalogItems.map(\.code)
         #expect(msCloudCodes == ["AZ-900", "AZ-104", "AZ-305"])
 
-        // Combine Microsoft + IA -> AI-900, AI-102
+        // Combine Microsoft + IA -> AI-900, MS-365-COPILOT, AI-102
         appState.onboardingCategoryFilter = "ai"
         let msAICodes = appState.filteredOnboardingCatalogItems.map(\.code)
-        #expect(msAICodes == ["AI-900", "AI-102"])
+        #expect(msAICodes == ["AI-900", "MS-365-COPILOT", "AI-102"])
 
-        // Filter by AWS, Google, GitHub, Kubernetes, Cisco
+        // Filter by OpenAI, Anthropic, Harvey Academy, AWS, Google, GitHub, Kubernetes, Cisco
         appState.onboardingCategoryFilter = "all"
-        for vendor in ["aws", "google", "github", "kubernetes", "cisco"] {
+        for vendor in ["openai", "anthropic", "harvey", "aws", "google", "github", "kubernetes", "cisco"] {
             appState.onboardingVendorFilter = vendor
             let items = appState.filteredOnboardingCatalogItems
             #expect(!items.isEmpty)
@@ -1389,27 +1405,28 @@ struct CertiGoNativeFigmaAppTests {
             }
         }
 
-        // 4. Verify Beginner mode (onboardingExperienceLevelIndex == 0) starts Chapter 1 (u1-s1) with Global Overview slides, plain-language mode enabled, and no raw CLI exercises
+        // 4. Verify Beginner mode (onboardingExperienceLevelIndex == 0) starts Chapter 1 (u1-s1) with Global Overview slides, NEVER auto-enables plain-language mode without user action, and has no raw CLI exercises
         var appState = CertiGoNativeAppState()
         appState.onboardingExperienceLevelIndex = 0 // Débutant
         appState.selectRoute("AZ-104")
         appState.startLessonSession(forLessonId: "AZ-104-u1-s1")
 
-        #expect(appState.lessonSession.isPlainLanguageModeEnabled == true)
-        #expect(appState.isPlainLanguageModeEnabled == true)
+        #expect(appState.lessonSession.isPlainLanguageModeEnabled == false)
+        #expect(appState.isPlainLanguageModeEnabled == false)
+        #expect(!appState.lessonSession.currentExercise.plainLanguagePrompt.contains("Version concrète sans jargon"))
         #expect(appState.lessonSession.lessonSlides.count == 3)
         #expect(appState.lessonSession.lessonSlides[0].stepBadge.contains("VUE D'ENSEMBLE"))
         #expect(appState.lessonSession.lessonSlides[1].stepBadge.contains("LA GRANDE IMAGE"))
         #expect(appState.lessonSession.lessonSlides[2].stepBadge.contains("MOTS-CLÉS"))
         #expect(appState.lessonSession.exercises.allSatisfy { $0.formatCode != "Q_TYPE_04" && $0.formatCode != "Q_TYPE_05" })
 
-        // User can toggle between Plain Language and Exam Style at any time
-        appState.togglePlainLanguageMode()
-        #expect(appState.lessonSession.isPlainLanguageModeEnabled == false)
-        #expect(appState.isPlainLanguageModeEnabled == false)
+        // User can toggle between Plain Language and Exam Style at any time via the iOS Toggle
         appState.togglePlainLanguageMode()
         #expect(appState.lessonSession.isPlainLanguageModeEnabled == true)
         #expect(appState.isPlainLanguageModeEnabled == true)
+        appState.togglePlainLanguageMode()
+        #expect(appState.lessonSession.isPlainLanguageModeEnabled == false)
+        #expect(appState.isPlainLanguageModeEnabled == false)
 
         // 5. Verify Social defaults to Mes Amis (selectedSocialSubTab == 1) and Cooperative Friends Quest has 0 fake partner when friends.isEmpty
         let freshSocialState = CertiGoNativeAppState()
@@ -1847,5 +1864,44 @@ struct CertiGoNativeFigmaAppTests {
             encoding: .utf8
         )
         #expect(archiveScript.contains("build=${CERTIGO_DISTRIBUTION_BUILD:-13}"))
+
+        // 6. Verify Typography Charter V3 (6+1 tokens), Widget App Group & Default Snapshot, Auth Validation, and Zero Long Dashes (— or –) across all Swift source files
+        #expect(CertiGoTypeToken.displayHero.pointSize == 28)
+        #expect(CertiGoTypeToken.screenTitle.pointSize == 22)
+        #expect(CertiGoTypeToken.sectionCardTitle.pointSize == 17)
+        #expect(CertiGoTypeToken.bodyQuestion.pointSize == 16)
+        #expect(CertiGoTypeToken.bodyQuestionMedium.pointSize == 16)
+        #expect(CertiGoTypeToken.controlButtonPill.pointSize == 14)
+        #expect(CertiGoTypeToken.captionBadge.pointSize == 12)
+        #expect(CertiGoTypeToken.codeMono.pointSize == 13)
+        #expect(PrismTypography.resolveToken(size: 48, style: "Black") == .displayHero)
+        #expect(PrismTypography.resolveToken(size: 24, style: "Bold") == .screenTitle)
+        #expect(PrismTypography.resolveToken(size: 16, style: "Black") == .sectionCardTitle)
+        #expect(PrismTypography.resolveToken(size: 15, style: "Semi Bold") == .bodyQuestionMedium)
+        #expect(PrismTypography.resolveToken(size: 14, style: "Bold") == .controlButtonPill)
+        #expect(PrismTypography.resolveToken(size: 11, style: "Black") == .captionBadge)
+        #expect(PrismTypography.resolveToken(size: 14, style: "Bold", monospaced: true) == .codeMono)
+
+        #expect(CertigoWidgetStore.defaultAppGroupIdentifier == "group.com.certigo.shared")
+        #expect(CertigoWidgetStore.supportedAppGroupIdentifiers == ["group.com.certigo.shared", "group.com.certigo.native"])
+        let defaultWidgetSnap = CertigoWidgetSnapshot.defaultInitialSnapshot()
+        #expect(defaultWidgetSnap.activeTrackCode == "AZ-104")
+        #expect(defaultWidgetSnap.totalXP == 0)
+
+        #expect(CertiGoLiveAuthService.validateCredentials(email: "bad-email", password: "ValidPassword123", provider: .email) != nil)
+        #expect(CertiGoLiveAuthService.validateCredentials(email: "user@certigo.app", password: "123", provider: .email) != nil)
+        #expect(CertiGoLiveAuthService.validateCredentials(email: "user@certigo.app", password: "ValidPassword123", provider: .email) == nil)
+
+        for relativeDir in ["apps/apple/CertigoKit/Sources", "apps/apple/CertigoNative/WidgetExtension"] {
+            let dirURL = root.appendingPathComponent(relativeDir)
+            let enumerator = try #require(
+                FileManager.default.enumerator(at: dirURL, includingPropertiesForKeys: nil)
+            )
+            for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
+                let source = try String(contentsOf: fileURL, encoding: .utf8)
+                #expect(!source.contains("\u{2014}"), "Found em-dash in \(fileURL.lastPathComponent)")
+                #expect(!source.contains("\u{2013}"), "Found en-dash in \(fileURL.lastPathComponent)")
+            }
+        }
     }
 }

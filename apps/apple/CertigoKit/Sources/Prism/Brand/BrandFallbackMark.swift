@@ -43,7 +43,7 @@ public struct BrandFallbackMarkModel: Equatable, Sendable {
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
 
-/// Neutral CertiGo fallback mark (§22A.11) — never imitates a third-party logo or certification badge.
+/// Neutral CertiGo fallback mark (§22A.11) : never imitates a third-party logo or certification badge.
 public struct BrandFallbackMark: View {
     public let model: BrandFallbackMarkModel
     @Environment(\.colorSchemeContrast) private var contrast

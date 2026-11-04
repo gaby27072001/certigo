@@ -47,7 +47,7 @@ public struct BrandNoticesModel: Equatable, Sendable {
                     iconCount: $0.count
                 )
             }
-        self.octiconsMITNotice = "Primer Octicons — Copyright (c) 2026 GitHub, Inc. Distribué sous licence MIT."
+        self.octiconsMITNotice = "Primer Octicons : Copyright (c) 2026 GitHub, Inc. Distribué sous licence MIT."
     }
 }
 

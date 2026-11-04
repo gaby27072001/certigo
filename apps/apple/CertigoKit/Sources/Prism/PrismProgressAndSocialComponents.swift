@@ -278,11 +278,11 @@ public struct PrismReadinessModel: Codable, Sendable, Equatable, Hashable {
 
     public var uncertaintySummaryText: String {
         guard isCalibrated, band != .insufficientEvidence else {
-            return "Intervalle non calibré — accumulez davantage de preuves"
+            return "Intervalle non calibré : accumulez davantage de preuves"
         }
         let lowPct = Int((uncertaintyLow * 100.0).rounded())
         let highPct = Int((uncertaintyHigh * 100.0).rounded())
-        return "Intervalle estimé : \(lowPct) % – \(highPct) %"
+        return "Intervalle estimé : \(lowPct) % - \(highPct) %"
     }
 }
 
@@ -1550,7 +1550,7 @@ public struct CommunityDistributionChart: View {
     }
 }
 
-#Preview("Progress & Social — Nominal / Vide / AX3 / Sombre") {
+#Preview("Progress & Social : Nominal / Vide / AX3 / Sombre") {
     ScrollView {
         VStack(alignment: .leading, spacing: PrismSpacing.md) {
             MasteryGlyph(state: .anchored)
@@ -1572,7 +1572,7 @@ public struct CommunityDistributionChart: View {
             )
             CommunityDistributionChart(
                 model: PrismCommunityDistributionModel(
-                    situationTitle: "Situation du jour — AZ-104",
+                    situationTitle: "Situation du jour : AZ-104",
                     hasAnswered: false,
                     buckets: [
                         PrismDistributionBucket(

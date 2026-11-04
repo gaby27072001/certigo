@@ -1260,7 +1260,7 @@ public extension View {
 
 // MARK: - 11. Previews (Nominal, Vide, Chargement, Erreur, AX3, Sombre)
 
-#Preview("Nominal — Celebration, ShareCard & Toast") {
+#Preview("Nominal : Celebration, ShareCard & Toast") {
     ScrollView {
         VStack(spacing: PrismSpacing.lg) {
             PrismOfflineBanner(
@@ -1302,7 +1302,7 @@ public extension View {
     .background(PrismColor.surfacePrimary)
 }
 
-#Preview("Vide — Standard & Format non pris en charge") {
+#Preview("Vide : Standard & Format non pris en charge") {
     VStack(spacing: PrismSpacing.lg) {
         PrismEmptyState(
             model: PrismEmptyStateModel(
@@ -1323,7 +1323,7 @@ public extension View {
     .background(PrismColor.surfacePrimary)
 }
 
-#Preview("Chargement — Squelette avec astuce") {
+#Preview("Chargement : Squelette avec astuce") {
     PrismSkeleton(
         rows: 3,
         learningTip: "Astuce : privilégie le moindre privilège sur chaque rôle d'identité.",
@@ -1333,7 +1333,7 @@ public extension View {
     .background(PrismColor.surfacePrimary)
 }
 
-#Preview("Erreur — Rassurante avec code technique") {
+#Preview("Erreur : Rassurante avec code technique") {
     PrismErrorState(
         model: PrismErrorStateModel(
             technicalCode: "SYNC-HTTP-503-RETRYABLE"
@@ -1344,7 +1344,7 @@ public extension View {
     .background(PrismColor.surfacePrimary)
 }
 
-#Preview("Accessibilité AX3 — AdaptiveStack & Rotor") {
+#Preview("Accessibilité AX3 : AdaptiveStack & Rotor") {
     VStack(spacing: PrismSpacing.lg) {
         PrismEmptyState(
             model: .unsupportedFormat(formatName: "Schéma topologique", region: .data),
@@ -1360,7 +1360,7 @@ public extension View {
     .environment(\.dynamicTypeSize, .accessibility3)
 }
 
-#Preview("Sombre — Mode Calme & Hors ligne") {
+#Preview("Sombre : Mode Calme & Hors ligne") {
     VStack(spacing: PrismSpacing.lg) {
         PrismOfflineBanner(
             model: PrismOfflineBannerModel(

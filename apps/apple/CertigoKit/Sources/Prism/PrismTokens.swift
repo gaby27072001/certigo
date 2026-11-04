@@ -232,37 +232,277 @@ extension PrismRadius {
   public static let crestPedestal: CGFloat = 28
 }
 
+/// Les 6 tokens typographiques sémantiques officiels CertiGo V3 (+ 1 token technique CLI).
+/// Règle d'or par écran : max 4 tokens de taille distincts et 2 graisses actives.
+public enum CertiGoTypeToken: String, Codable, Hashable, CaseIterable, Sendable {
+  /// 28pt Bold Rounded : Chiffre Hero, score final d'examen, titre de célébration majeure (max 1/écran).
+  case displayHero
+  /// 22pt Bold Rounded : Titre d'écran, titre de sheet modale, question principale d'onboarding.
+  case screenTitle
+  /// 17pt SemiBold Rounded : Titre de carte, bannière d'unité, en-tête de section, énoncé de question QCM.
+  case sectionCardTitle
+  /// 16pt Regular Rounded : Corps de lecture, scénario QCM, explication Coach IA.
+  case bodyQuestion
+  /// 16pt Medium Rounded : Proposition de réponse QCM (choix A/B/C/D) et ligne interactive de lecture.
+  case bodyQuestionMedium
+  /// 14pt SemiBold Rounded : Bouton CTA, pilule 1 ligne, onglet segmenté, contrôle de navigation.
+  case controlButtonPill
+  /// 12pt SemiBold Rounded : Badge, tag de certification, compteur de barre supérieure, légende, eyebrow.
+  case captionBadge
+  /// 13pt Medium Monospaced : Blocs de code/terminal CLI et jetons techniques uniquement.
+  case codeMono
+
+  public var pointSize: CGFloat {
+    switch self {
+    case .displayHero: return 28
+    case .screenTitle: return 22
+    case .sectionCardTitle: return 17
+    case .bodyQuestion, .bodyQuestionMedium: return 16
+    case .controlButtonPill: return 14
+    case .codeMono: return 13
+    case .captionBadge: return 12
+    }
+  }
+
+  public var tracking: CGFloat {
+    switch self {
+    case .displayHero: return -0.5
+    case .screenTitle: return -0.3
+    case .sectionCardTitle: return -0.2
+    case .bodyQuestion, .bodyQuestionMedium, .controlButtonPill, .codeMono: return 0.0
+    case .captionBadge: return 0.2
+    }
+  }
+
+  public var lineSpacing: CGFloat {
+    switch self {
+    case .displayHero: return 4
+    case .screenTitle: return 4
+    case .sectionCardTitle: return 5
+    case .bodyQuestion, .bodyQuestionMedium: return 6
+    case .controlButtonPill: return 4
+    case .codeMono: return 5
+    case .captionBadge: return 3
+    }
+  }
+}
+
 #if canImport(SwiftUI)
   import SwiftUI
 
+  extension CertiGoTypeToken {
+    public var weight: Font.Weight {
+      switch self {
+      case .displayHero, .screenTitle: return .bold
+      case .sectionCardTitle, .controlButtonPill, .captionBadge: return .semibold
+      case .bodyQuestionMedium, .codeMono: return .medium
+      case .bodyQuestion: return .regular
+      }
+    }
+
+    public var design: Font.Design {
+      self == .codeMono ? .monospaced : .default
+    }
+
+    public var relativeTextStyle: Font.TextStyle {
+      switch self {
+      case .displayHero: return .largeTitle
+      case .screenTitle: return .title2
+      case .sectionCardTitle: return .headline
+      case .bodyQuestion, .bodyQuestionMedium: return .body
+      case .controlButtonPill: return .subheadline
+      case .codeMono: return .footnote
+      case .captionBadge: return .caption
+      }
+    }
+
+    public func font(scaledSize: CGFloat? = nil, tabularDigits: Bool = false) -> Font {
+      let base = Font.system(
+        size: scaledSize ?? pointSize,
+        weight: weight,
+        design: design
+      )
+      return (tabularDigits || self == .codeMono) ? base.monospacedDigit() : base
+    }
+  }
+
   public enum PrismTypography {
+    /// Point d'entrée officiel CertiGo V3 (Colonne 2 - Option A : 100 % Apple HIG Pur SF Pro `Font.Design.default`).
+    public static func token(_ token: CertiGoTypeToken, tabularDigits: Bool = false) -> Font {
+      token.font(tabularDigits: tabularDigits)
+    }
+
+    /// Résout de façon déterministe tout appel `(size, style, monospaced)` vers l'échelle officielle Apple HIG `SF Pro` (`Font.Design.default`).
+    public static func resolveToken(
+      size: CGFloat,
+      style: String?,
+      monospaced: Bool = false
+    ) -> CertiGoTypeToken {
+      if monospaced {
+        return .codeMono
+      }
+      let normalized = (style ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+      if size >= 26 {
+        return .displayHero
+      }
+      if size >= 20 {
+        return .screenTitle
+      }
+      if size >= 17 {
+        if normalized == "regular" {
+          return .bodyQuestion
+        }
+        return .sectionCardTitle
+      }
+      if size >= 15 {
+        if size >= 16 && (normalized == "black" || normalized == "heavy" || normalized == "extra bold" || normalized == "extrabold" || normalized == "bold") {
+          return .sectionCardTitle
+        }
+        if normalized == "medium" || normalized == "semi bold" || normalized == "semibold" {
+          return .bodyQuestionMedium
+        }
+        return .bodyQuestion
+      }
+      if size >= 13 {
+        if normalized == "regular" && size >= 14 {
+          return .bodyQuestion
+        }
+        if normalized == "regular" || normalized == "medium" {
+          return .captionBadge
+        }
+        return .controlButtonPill
+      }
+      return .captionBadge
+    }
+
+    /// 100 % Apple HIG Pur (`SF Pro` standard `Font.Design.default`, zéro `.rounded`, zéro `.black`/`.heavy`, plancher strict `12 pt`).
     public static func figmaFont(
       size: CGFloat,
       style: String?,
       monospaced: Bool = false
     ) -> Font {
+      if monospaced {
+        return Font.system(size: 13, weight: .medium, design: .monospaced).monospacedDigit()
+      }
       let normalized = (style ?? "")
         .trimmingCharacters(in: .whitespacesAndNewlines)
         .lowercased()
-      let weight: Font.Weight
-      switch normalized {
-      case "black", "heavy":
-        weight = .black
-      case "extra bold", "extrabold":
-        weight = .heavy
-      case "bold":
-        weight = .bold
-      case "semi bold", "semibold":
-        weight = .semibold
-      case "medium":
-        weight = .medium
-      case "light":
-        weight = .light
-      default:
-        weight = .regular
+      // Apple HIG Large (Default) scale:
+      // Title 1: 28pt Bold, Title 2: 22pt Bold, Headline: 17pt Semibold, Body: 17pt Regular, Callout: 16pt Regular/Medium, Subhead: 15pt Semibold, Footnote: 13pt Semibold, Caption 1: 12pt Semibold.
+      let higPointSize: CGFloat
+      let higWeight: Font.Weight
+      if size >= 26 {
+        higPointSize = 28
+        higWeight = .bold
+      } else if size >= 20 {
+        higPointSize = 22
+        higWeight = .bold
+      } else if size >= 17 {
+        higPointSize = 17
+        higWeight = (normalized == "regular") ? .regular : .semibold
+      } else if size >= 16 {
+        if normalized == "black" || normalized == "heavy" || normalized == "extra bold" || normalized == "extrabold" || normalized == "bold" {
+          higPointSize = 17
+          higWeight = .semibold
+        } else if normalized == "medium" || normalized == "semi bold" || normalized == "semibold" {
+          higPointSize = 16
+          higWeight = .medium
+        } else {
+          higPointSize = 16
+          higWeight = .regular
+        }
+      } else if size >= 15 {
+        if normalized == "regular" {
+          higPointSize = 16
+          higWeight = .regular
+        } else if normalized == "medium" {
+          higPointSize = 16
+          higWeight = .medium
+        } else {
+          higPointSize = 15
+          higWeight = .semibold
+        }
+      } else if size >= 14 {
+        if normalized == "regular" {
+          higPointSize = 16
+          higWeight = .regular
+        } else {
+          higPointSize = 15
+          higWeight = .semibold
+        }
+      } else if size >= 13 {
+        higPointSize = 13
+        higWeight = (normalized == "regular") ? .regular : .semibold
+      } else {
+        higPointSize = 12
+        higWeight = .semibold
       }
-      let design: Font.Design = monospaced ? .monospaced : .rounded
-      return Font.system(size: size, weight: weight, design: design)
+      return Font.system(size: higPointSize, weight: higWeight, design: .default)
+    }
+  }
+
+  private struct CertiGoTypographyModifier: ViewModifier {
+    let token: CertiGoTypeToken
+    let tabularDigits: Bool
+    @ScaledMetric private var scaledSize: CGFloat
+
+    init(token: CertiGoTypeToken, tabularDigits: Bool = false) {
+      self.token = token
+      self.tabularDigits = tabularDigits
+      self._scaledSize = ScaledMetric(
+        wrappedValue: token.pointSize,
+        relativeTo: token.relativeTextStyle
+      )
+    }
+
+    func body(content: Content) -> some View {
+      content
+        .font(token.font(scaledSize: scaledSize, tabularDigits: tabularDigits))
+        .tracking(token.tracking)
+        .lineSpacing(token.lineSpacing)
+    }
+  }
+
+  extension View {
+    /// Applique un token typographique officiel CertiGo V3 avec Dynamic Type, tracking et interlignage.
+    public func certigoTypography(
+      _ token: CertiGoTypeToken,
+      tabularDigits: Bool = false
+    ) -> some View {
+      modifier(CertiGoTypographyModifier(token: token, tabularDigits: tabularDigits))
+    }
+  }
+#else
+  public enum PrismTypography {
+    public static func resolveToken(
+      size: CGFloat,
+      style: String?,
+      monospaced: Bool = false
+    ) -> CertiGoTypeToken {
+      if monospaced { return .codeMono }
+      let normalized = (style ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+      if size >= 26 { return .displayHero }
+      if size >= 21 { return .screenTitle }
+      if size >= 17 { return .sectionCardTitle }
+      if size >= 15 {
+        if size >= 16 && (normalized == "black" || normalized == "heavy" || normalized == "extra bold" || normalized == "extrabold" || normalized == "bold") {
+          return .sectionCardTitle
+        }
+        if normalized == "medium" || normalized == "semi bold" || normalized == "semibold" {
+          return .bodyQuestionMedium
+        }
+        return .bodyQuestion
+      }
+      if size >= 13 {
+        if normalized == "regular" && size >= 14 { return .bodyQuestion }
+        if normalized == "regular" || normalized == "medium" { return .captionBadge }
+        return .controlButtonPill
+      }
+      return .captionBadge
     }
   }
 #endif

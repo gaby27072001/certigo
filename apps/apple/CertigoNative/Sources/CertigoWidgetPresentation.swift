@@ -30,12 +30,22 @@ struct CertigoWidgetCardView: View {
 
   private var family: WidgetFamily { previewFamily ?? environmentFamily }
 
+  private var resolvedSnapshot: CertigoWidgetSnapshot {
+    if let snapshot = entry.snapshot, snapshot.phase(at: entry.date) != nil {
+      return snapshot
+    }
+    return CertigoWidgetSnapshot.defaultInitialSnapshot(
+      language: entry.snapshot?.language ?? .resolved(),
+      now: entry.date
+    )
+  }
+
   private var copy: CertigoWidgetCopy {
-    CertigoWidgetCopy(language: entry.snapshot?.language ?? .resolved())
+    CertigoWidgetCopy(language: resolvedSnapshot.language)
   }
 
   private var phase: CertigoWidgetPhase {
-    entry.snapshot?.phase(at: entry.date) ?? .readyToStart
+    resolvedSnapshot.phase(at: entry.date) ?? .readyToStart
   }
 
   private var accent: Color {
@@ -48,21 +58,13 @@ struct CertigoWidgetCardView: View {
   }
 
   var body: some View {
-    Group {
-      if entry.status == .available, let snapshot = entry.snapshot,
-        snapshot.phase(at: entry.date) != nil
-      {
-        content(snapshot, family: family)
-      } else {
-        unavailable
+    content(resolvedSnapshot, family: family)
+      .containerBackground(for: .widget) {
+        background
       }
-    }
-    .containerBackground(for: .widget) {
-      background
-    }
-    .widgetURL(entry.snapshot?.destination.url)
-    .privacySensitive()
-    .accessibilityElement(children: .combine)
+      .widgetURL(resolvedSnapshot.destination.url)
+      .privacySensitive()
+      .accessibilityElement(children: .combine)
   }
 
   @ViewBuilder
@@ -252,7 +254,7 @@ struct CertigoWidgetRing: View {
           )
           .rotationEffect(.degrees(-90))
       }
-      Text(progress.map { "\((Int(($0 * 100).rounded())))%" } ?? "—")
+      Text(progress.map { "\((Int(($0 * 100).rounded())))%" } ?? "-")
         .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
         .minimumScaleFactor(0.75)
     }

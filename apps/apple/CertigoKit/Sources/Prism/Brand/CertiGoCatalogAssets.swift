@@ -2,7 +2,7 @@ import BrandAssets
 import CertigoDomain
 import Foundation
 
-// MARK: - 1. Official CertiGo Mascot Library (Page 08 Figma Pro — 24 Validated Poses)
+// MARK: - 1. Official CertiGo Mascot Library (Page 08 Figma Pro : 24 Validated Poses)
 
 public enum CertiGoMascotPose: String, CaseIterable, Codable, Hashable, Sendable {
     // Planche 1 : 6 Angles de Vue (Turnaround)

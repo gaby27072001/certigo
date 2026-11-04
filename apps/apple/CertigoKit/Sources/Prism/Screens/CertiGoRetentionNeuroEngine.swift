@@ -281,7 +281,7 @@ public final class CertiGoHapticsEngine: @unchecked Sendable {
     }
 }
 
-// MARK: - 1. A1 — Schultz Positive Prediction Error Engine (EPR > 0) & Single Fluid Error Feedback
+// MARK: - 1. A1 : Schultz Positive Prediction Error Engine (EPR > 0) & Single Fluid Error Feedback
 
 public enum CertiGoSchultzPredictionErrorEngine: Sendable {
     /// Computes a deterministic, realistic percentage of exam candidates who fall into a specific trap on exam day (64%..86%).
@@ -336,7 +336,7 @@ public enum CertiGoSchultzPredictionErrorEngine: Sendable {
     }
 }
 
-// MARK: - 2. A2 — Variable Reward Vault (Schultz & Eyal Variable Schedule + Master Stroke < 8s)
+// MARK: - 2. A2 : Variable Reward Vault (Schultz & Eyal Variable Schedule + Master Stroke < 8s)
 
 public enum CertiGoVariableRewardKind: String, Codable, CaseIterable, Hashable, Sendable, Identifiable {
     case examinerTrapCard = "examiner_trap_card"
@@ -534,7 +534,7 @@ public struct CertiGoVariableRewardVault: Codable, Equatable, Sendable {
     }
 }
 
-// MARK: - 3. B1 — Visual Architecture Diagram Engine (Berridge Liking)
+// MARK: - 3. B1 : Visual Architecture Diagram Engine (Berridge Liking)
 
 public struct CertiGoVisualArchitectureBrick: Codable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
@@ -783,7 +783,7 @@ public struct CertiGoVisualArchitectureDiagramSpec: Codable, Equatable, Sendable
     }
 }
 
-// MARK: - 4. B2 — Readable CLI Terminal Output & Offline AI Coach Instant Synthesis
+// MARK: - 4. B2 : Readable CLI Terminal Output & Offline AI Coach Instant Synthesis
 
 public enum CertiGoCLITerminalOutputBuilder: Sendable {
     public static func fullCommandLine(for exercise: CertiGoNativeExerciseItem, userInput: String) -> String {
@@ -904,7 +904,7 @@ public enum CertiGoOfflineAICoachSynthesisEngine: Sendable {
     }
 }
 
-// MARK: - 5. C1 & C2 — 1-Tap Sprint Impulse & Graybiel Striatal Action-Chunking Bracket Ritual
+// MARK: - 5. C1 & C2 : 1-Tap Sprint Impulse & Graybiel Striatal Action-Chunking Bracket Ritual
 
 public struct CertiGoActionChunkingBracketRitual: Codable, Equatable, Sendable {
     public var isOpeningBracketActive: Bool
@@ -966,7 +966,7 @@ public enum CertiGoHapticDirector: Sendable {
     }
 }
 
-// MARK: - 6. D1 — Fogg Facilitator: 90-Second Rescue Sprint (3 Flash Cards) & 3 Local Notifications
+// MARK: - 6. D1 : Fogg Facilitator: 90-Second Rescue Sprint (3 Flash Cards) & 3 Local Notifications
 
 public enum CertiGoFoggTriggerKind: String, Codable, CaseIterable, Hashable, Sendable, Identifiable {
     case signal = "signal"
@@ -1085,7 +1085,7 @@ public enum CertiGoFoggFacilitatorEngine: Sendable {
             kind: .facilitator90s,
             title: "⚡ Fatigué ce soir ? Mode Sauvetage 90 secondes",
             body: hasCompletedSessionToday
-                ? "Objectif déjà validé aujourd'hui ✓ — mode 3 cartes Flash prêt pour demain soir si besoin."
+                ? "Objectif déjà validé aujourd'hui ✓ : mode 3 cartes Flash prêt pour demain soir si besoin."
                 : "3 cartes Flash sur \(upper) en 90 secondes suffisent pour garder ton rythme sans t'épuiser.",
             scheduledTimeText: "21:00",
             deepLinkAction: "certigo://sprint/rescue-90s?route=\(upper)"
@@ -1104,7 +1104,7 @@ public enum CertiGoFoggFacilitatorEngine: Sendable {
     }
 }
 
-// MARK: - 7. E1 & E2 — Nunes & Drèze Endowed Progress ("Jamais 0 %") + Eyal Day-One Notebook ("Carnet Jour-J")
+// MARK: - 7. E1 & E2 : Nunes & Drèze Endowed Progress ("Jamais 0 %") + Eyal Day-One Notebook ("Carnet Jour-J")
 
 public struct CertiGoHullMilestoneStamp: Codable, Equatable, Hashable, Sendable, Identifiable {
     public let id: Int
@@ -1270,7 +1270,7 @@ public struct CertiGoDayOneNotebook: Codable, Equatable, Sendable {
     }
 }
 
-// MARK: - 8. F1, F2, F3 — Domain Sprint Real Filtering, Cooperative Cohort Challenge & Healthy Stopping Point
+// MARK: - 8. F1, F2, F3 : Domain Sprint Real Filtering, Cooperative Cohort Challenge & Healthy Stopping Point
 
 public enum CertiGoDomainSprintFilterEngine: Sendable {
     /// Builds 5 domain-targeted exercises for the selected domain in `Examens` without repeating `az-104-qtype01` across domains or tracks.
@@ -1382,7 +1382,7 @@ public struct CertiGoCooperativeCohortChallenge: Codable, Equatable, Sendable {
     }
 
     public var summaryText: String {
-        "\(cohortTitle) : \(validatedConceptsCount) / \(weeklyTargetConceptsCount) concepts validés — chaque bonne réponse fait progresser l'objectif !"
+        "\(cohortTitle) : \(validatedConceptsCount) / \(weeklyTargetConceptsCount) concepts validés : chaque bonne réponse fait progresser l'objectif !"
     }
 
     public mutating func recordUserValidatedConcepts(_ count: Int = 1) {
@@ -1408,7 +1408,7 @@ public enum CertiGoHealthyStoppingPointEngine: Sendable {
 import SwiftUI
 import UIKit
 
-/// `A1` — Single fluid feedback card at the bottom of the quiz with ultra-concise Page 17 pills (`🎯 Piège d'examen (X %)`), 1-line answer summary, optional `🔎 Approfondir` button, and single-tap `CONTINUER`.
+/// `A1` : Single fluid feedback card at the bottom of the quiz with ultra-concise Page 17 pills (`🎯 Piège d'examen (X %)`), 1-line answer summary, optional `🔎 Approfondir` button, and single-tap `CONTINUER`.
 public struct CertiGoFluidErrorFeedbackCardView: View {
     public let isCorrect: Bool
     public let isMasterStroke: Bool
@@ -1463,19 +1463,6 @@ public struct CertiGoFluidErrorFeedbackCardView: View {
                         .padding(.vertical, FigMetrics.three)
                         .background(Capsule().fill(PrismColor.figmaHex("#fef3c7")))
                         .accessibilityIdentifier("session-master-stroke-badge")
-                } else if !isCorrect {
-                    Text(verbatim: trapBadgeText)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#92400e"))
-                        .lineLimit(1)
-                        .padding(.horizontal, PrismSpacing.s)
-                        .padding(.vertical, FigMetrics.three)
-                        .background(Capsule().fill(PrismColor.figmaHex("#fef3c7")))
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(PrismColor.figmaHex("#f59e0b"), lineWidth: PrismBorder.thin)
-                        )
-                        .accessibilityIdentifier("session-exam-trap-unmasked-badge")
                 }
             }
 
@@ -1547,7 +1534,7 @@ public struct CertiGoFluidErrorFeedbackCardView: View {
     }
 }
 
-/// `B1` — Real 3-Brick Connected Visual Architecture Diagram on Déclic Cards (`15`) with Page 17 minimalist single-line pills.
+/// `B1` : Real 3-Brick Connected Visual Architecture Diagram on Déclic Cards (`15`) with Page 17 minimalist single-line pills.
 public struct CertiGoVisualArchitectureDiagramView: View {
     public let spec: CertiGoVisualArchitectureDiagramSpec
 
@@ -1631,7 +1618,7 @@ public struct CertiGoVisualArchitectureDiagramView: View {
     }
 }
 
-/// `C1` & `D1` — 1-Tap Direct Sprint Launch Bar + Evening 90-Second Rescue Mode (3 Flash Cards) on Parcours.
+/// `C1` & `D1` : 1-Tap Direct Sprint Launch Bar + Evening 90-Second Rescue Mode (3 Flash Cards) on Parcours.
 public struct CertiGoOneTapSprintBarView: View {
     public let activeRouteCode: String
     public let activeLessonTitle: String
@@ -1692,7 +1679,7 @@ public struct CertiGoOneTapSprintBarView: View {
     }
 }
 
-/// `D1` — Fogg Facilitator 90-second Rescue Sprint Pill (`⚡ Sprint 90s · 3 cartes`).
+/// `D1` : Fogg Facilitator 90-second Rescue Sprint Pill (`⚡ Sprint 90s · 3 cartes`).
 public struct CertiGoRescueSprintBannerView: View {
     public let isEveningHighlighted: Bool
     public let onTriggerRescue90s: () -> Void
@@ -1729,7 +1716,7 @@ public struct CertiGoRescueSprintBannerView: View {
     }
 }
 
-/// `C1` — Top progressive vignette under the two 44pt floating pills on Parcours.
+/// `C1` : Top progressive vignette under the two 44pt floating pills on Parcours.
 public struct CertiGoTopProgressiveVignetteView: View {
     public init() {}
 
@@ -1748,7 +1735,7 @@ public struct CertiGoTopProgressiveVignetteView: View {
     }
 }
 
-/// `E1` — Hull 10-Stamp Visual Milestone Card (`Carte de palier à 10 tampons visuels`).
+/// `E1` : Hull 10-Stamp Visual Milestone Card (`Carte de palier à 10 tampons visuels`).
 public struct CertiGoHullStampCardView: View {
     public let unitNumber: Int
     public let effectivePercent: Int
@@ -1786,7 +1773,7 @@ public struct CertiGoHullStampCardView: View {
     }
 }
 
-/// `A2`, `C2`, `E2`, `F3` — End-of-Session Neuro-Retention Celebration Stack on Screen 19 (Page 17 minimalist single-line pills).
+/// `A2`, `C2`, `E2`, `F3` : End-of-Session Neuro-Retention Celebration Stack on Screen 19 (Page 17 minimalist single-line pills).
 public struct CertiGoCelebrationNeuroStackView: View {
     public let variableReward: CertiGoVariableRewardItem?
     public let closingBracketText: String
@@ -1905,7 +1892,7 @@ public struct CertiGoCelebrationNeuroStackView: View {
     }
 }
 
-/// `F2` — Cooperative Cohort Goal Card on Social / Leagues Tab (`🤝 Objectif Coopératif` — minimalist 1-line bar with 0 fake data).
+/// `F2` : Cooperative Cohort Goal Card on Social / Leagues Tab (`🤝 Objectif Coopératif` : minimalist 1-line bar with 0 fake data).
 public struct CertiGoCooperativeCohortCardView: View {
     public let challenge: CertiGoCooperativeCohortChallenge
 

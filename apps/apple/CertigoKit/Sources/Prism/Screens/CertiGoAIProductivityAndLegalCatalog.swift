@@ -23,7 +23,7 @@ public enum CertiGoAIProductivityTrackID: String, CaseIterable, Codable, Hashabl
         case .anthropicClaude:
             return "Anthropic : Claude, Claude Code & MCP"
         case .harveyLegal:
-            return "Harvey : Plateforme Legal IA & Pratique Juridique"
+            return "Harvey Academy : Legal IA, Vault & Legal Engineering"
         }
     }
 
@@ -36,7 +36,7 @@ public enum CertiGoAIProductivityTrackID: String, CaseIterable, Codable, Hashabl
         case .anthropicClaude:
             return "Prompt XML, Artifacts, Claude Code CLI & Serveurs MCP"
         case .harveyLegal:
-            return "Harvey Assistant, Vault M&A, Knowledge & Workflows"
+            return "Harvey Academy (Level 1 & Legal Engineering), Assistant, Vault M&A, Word Add-In & Knowledge"
         }
     }
 
@@ -863,10 +863,10 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                 CertiGoOfficialDomainSpec(
                     id: "harvey-d1",
                     domainNumber: 1,
-                    title: "1. Harvey Assistant & Contrats",
+                    title: "1. Harvey Academy Foundations & Assistant",
                     weightText: "Poids officiel : 25 %",
-                    conciseFocus: "Analyse de clauses, redlining NDA/MSA & prompts juridiques précis",
-                    keyPillars: ["Playbook Redlining NDA/MSA", "Clauses de responsabilité & IP", "Prompts juridiques structurés"],
+                    conciseFocus: "AI for Legal Basics, Word Add-In, redlining NDA/MSA & prompts",
+                    keyPillars: ["Harvey Academy Level 1", "Playbook Redlining & Word Add-In", "Prompts juridiques structurés"],
                     colorHex: "#111827"
                 ),
                 CertiGoOfficialDomainSpec(
@@ -874,7 +874,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     domainNumber: 2,
                     title: "2. Harvey Vault & Due Diligence M&A",
                     weightText: "Poids officiel : 25 %",
-                    conciseFocus: "Data Room multi-milliers de pièces, grille Change of Control & litiges",
+                    conciseFocus: "AI Analysis for Legal Workflows, Data Room Vault & Change of Control",
                     keyPillars: ["Audit massif en Data Room Vault", "Grille Change of Control & Indemnités", "Renvoi direct à la clause source"],
                     colorHex: "#1d4ed8"
                 ),
@@ -890,10 +890,10 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                 CertiGoOfficialDomainSpec(
                     id: "harvey-d4",
                     domainNumber: 4,
-                    title: "4. Workflows & Déontologie",
+                    title: "4. Legal Engineering & Déontologie",
                     weightText: "Poids officiel : 25 %",
-                    conciseFocus: "Automatisation cabinet/DJ, zéro-entraînement client & revue avocat",
-                    keyPillars: ["Workflows multi-étapes cabinet/DJ", "Cloisonnement Matter-Level & Zero-Training", "Validation déontologique humaine"],
+                    conciseFocus: "Legal Engineering Certification, Workflows, Ethical Walls & Credly",
+                    keyPillars: ["Harvey Academy Legal Engineering", "Cloisonnement Matter-Level & Zero-Training", "Validation déontologique humaine"],
                     colorHex: "#b45309"
                 )
             ]
@@ -1008,30 +1008,30 @@ public enum CertiGoAIProductivityAndLegalCatalog {
         case .harveyLegal:
             return [
                 UnitHeaderMeta(
-                    headerTitle: "UNITÉ 1 · Harvey Assistant & Rédaction Contractuelle",
-                    subtitle: "Redlining NDA/MSA, playbooks de négociation & clauses",
+                    headerTitle: "UNITÉ 1 · Harvey Academy Foundations, Assistant & Word Add-In",
+                    subtitle: "AI for Legal Basics (Level 1), Redlining NDA/MSA & Harvey for Word",
                     accentHex: "#18181b",
                     lipHex: "#09090b",
-                    memoActivity: "Auditer un MSA et générer un redline aligné sur le playbook",
-                    memoTopics: ["Redlining MSA/NDA", "Plafond d'indemnisation", "Prompt Juridique"],
-                    memoRule: "Fournis toujours le rôle, la juridiction applicable et la position de repli (fallback) dans ton prompt Harvey."
+                    memoActivity: "Valider le cursus Harvey Academy Level 1 Foundations et auditer un MSA",
+                    memoTopics: ["Harvey Academy Level 1", "Redlining MSA/NDA", "Harvey for Word Add-In"],
+                    memoRule: "Dans Harvey Academy (AI for Legal Basics), précise toujours le rôle, la juridiction applicable et la position de repli (fallback)."
                 ),
                 UnitHeaderMeta(
-                    headerTitle: "UNITÉ 2 · Harvey Vault, Due Diligence M&A & Knowledge",
-                    subtitle: "Audit Data Room, grille Change of Control & citations vérifiées",
+                    headerTitle: "UNITÉ 2 · Harvey Vault, AI Analysis Workflows & Knowledge",
+                    subtitle: "AI Analysis for Legal Workflows, Data Room M&A & citations vérifiées",
                     accentHex: "#1d4ed8",
                     lipHex: "#1e40af",
                     memoActivity: "Extraire une matrice Change of Control sur 2 000 contrats Vault",
-                    memoTopics: ["Harvey Vault M&A", "Change of Control", "Citations vérifiables"],
+                    memoTopics: ["Harvey Vault M&A", "AI Analysis Workflows", "Citations vérifiables"],
                     memoRule: "Vérifie systématiquement la citation cliquable dans Harvey Vault ou Knowledge avant de valider une conclusion."
                 ),
                 UnitHeaderMeta(
-                    headerTitle: "UNITÉ 3 · Workflows Juridiques, Confidentialité & Déontologie",
-                    subtitle: "Automatisation cabinet/DJ, zéro-entraînement & secret professionnel",
+                    headerTitle: "UNITÉ 3 · Harvey Academy Legal Engineering, Workflows & Déontologie",
+                    subtitle: "Legal Engineering Certification, Ethical Walls, Zero-Training & Credly",
                     accentHex: "#15803d",
                     lipHex: "#166534",
-                    memoActivity: "Orchestrer un workflow d'audit réglementaire cloisonné par dossier",
-                    memoTopics: ["Harvey Workflows", "Zero-Training Client", "Supervision Avocat"],
+                    memoActivity: "Obtenir la Legal Engineering Certification Harvey Academy et orchestrer un workflow cloisonné",
+                    memoTopics: ["Legal Engineering Cert", "Zero-Training Client", "Ethical Walls & Credly"],
                     memoRule: "Les pièces déposées dans Harvey restent isolées par dossier (Matter) sans aucun entraînement sur les données clients."
                 )
             ]
@@ -2092,27 +2092,27 @@ public enum CertiGoAIProductivityAndLegalCatalog {
         case .harveyLegal:
             return [
                 LessonSeed(
-                    stepTitle: "Harvey Assistant & Prompts",
-                    stepSubtitle: "Structurer un prompt juridique : Rôle, Juridiction, Pièce et Livrable",
+                    stepTitle: "Harvey Academy · Level 1 & Assistant",
+                    stepSubtitle: "AI for Legal Basics : Rôle, Juridiction, Pièce, Word Add-In et Livrable",
                     domainNumber: 1,
                     iconSymbol: "scale.3d",
                     serviceAsset: "BrandLogos/brand-harvey-assistant",
-                    declicTitle: "Prompt Juridique Harvey : précision du mandat et de la juridiction",
+                    declicTitle: "Harvey Academy (Level 1 Foundations) : mandat, juridiction et vérification",
                     brick1: ("⚖️", "Rôle & Juridiction", "Ex. Avocat M&A côté Acquéreur · Droit français"),
-                    brick2: ("📄", "Pièce & Standard", "Contrat cible + position de marché / playbook"),
-                    brick3: ("📋", "Format Livrable", "Tableau Clauses / Risques / Redline proposé"),
-                    declicRule: "Précise toujours la partie représentée (Client/Fournisseur, Acquéreur/Cédant) et le droit applicable dès la première phrase.",
+                    brick2: ("📄", "Pièce & Word Add-In", "Contrat cible + position de marché / playbook"),
+                    brick3: ("📋", "Format Livrable", "Tableau Clauses / Risques / Redline vérifiable"),
+                    declicRule: "Selon Harvey Academy (AI for Legal Basics), précise toujours la partie représentée et le droit applicable dès la première phrase.",
                     labKind: .prompting,
                     labPrefix: "Agis comme conseil juridique côté Client (Droit français). Analyse ce MSA et produis :",
                     labExpectedToken: "Clause | Risque identifié | Formulation de repli (Redline)",
                     labTokens: ["Clause | Risque identifié | Formulation de repli (Redline)", "avec renvoi à l'article exact"],
                     labDistractors: ["un résumé vague sans article", "sans préciser la partie représentée"],
-                    qcmPrompt: "Quels éléments sont indispensables dans un prompt adressé à Harvey Assistant pour obtenir une revue contractuelle pertinente ?",
+                    qcmPrompt: "Dans le cursus officiel Harvey Academy (AI for Legal Basics & Level 1 Foundations), quels éléments sont indispensables dans un prompt adressé à Harvey Assistant ?",
                     qcmCorrect: "La partie représentée (ex. Acquéreur/Client), la juridiction applicable, le document source et le format précis d'analyse/redline attendu",
                     qcmWrong1: "Uniquement le mot « Analyse » sans indiquer quelle partie on défend",
                     qcmWrong2: "Demander à Harvey de choisir une juridiction au hasard",
                     qcmWrong3: "Supprimer les numéros d'articles du contrat avant l'envoi",
-                    qcmTip: "Une clause d'indemnisation ou de responsabilité s'analyse de façon opposée selon que l'on conseille le Client ou le Prestataire."
+                    qcmTip: "Harvey Academy enseigne qu'une clause d'indemnisation s'analyse de façon opposée selon que l'on conseille le Client ou le Prestataire."
                 ),
                 LessonSeed(
                     stepTitle: "Redlining NDA & MSA",
@@ -2414,27 +2414,27 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     qcmTip: "Les ordres professionnels et juridictions sanctionnent sévèrement la production de citations non vérifiées."
                 ),
                 LessonSeed(
-                    stepTitle: "Boss Final · Harvey Legal IA",
-                    stepSubtitle: "Synthèse complète : Assistant, Vault M&A, Knowledge & Déontologie",
+                    stepTitle: "Boss Final · Harvey Academy & Legal Engineering",
+                    stepSubtitle: "Certification Level 1, Legal Engineering, Assistant, Vault M&A & Knowledge",
                     domainNumber: 4,
                     iconSymbol: "crown.fill",
                     serviceAsset: "BrandLogos/brand-harvey",
-                    declicTitle: "Architecture Complète de Pratique Juridique Augmentée par Harvey",
-                    brick1: ("✍️", "Harvey Assistant", "Redlining contractuel aligné sur le Playbook"),
-                    brick2: ("🗄️", "Harvey Vault & Knowledge", "Due Diligence M&A massive et recherche sourcée"),
-                    brick3: ("⚖️", "Workflows & Déontologie", "Cloisonnement Matter, zéro-entraînement & validation avocat"),
-                    declicRule: "Associe chaque module Harvey au bon usage : Assistant pour rédiger/négocier, Vault pour auditer la Data Room, Knowledge pour sourcer le droit.",
+                    declicTitle: "Harvey Academy Capstone : Legal Engineering, Vault, Knowledge & Word Add-In",
+                    brick1: ("✍️", "Harvey Assistant & Word", "Redlining contractuel aligné sur le Playbook dans Word"),
+                    brick2: ("🗄️", "Vault & AI Analysis", "Due Diligence M&A massive et recherche sourcée Knowledge"),
+                    brick3: ("⚖️", "Legal Engineering & Credly", "Workflows reproductibles, Ethical Walls & validation avocat"),
+                    declicRule: "Dans Harvey Academy (Legal Engineering Certification), associe Assistant/Word pour rédiger, Vault pour auditer la Data Room, et Knowledge pour sourcer le droit.",
                     labKind: .workflow,
-                    labPrefix: "Chaîne complète d'une opération M&A assistée par Harvey :",
+                    labPrefix: "Chaîne complète d'une opération M&A certifiée Harvey Academy :",
                     labExpectedToken: "Audit Data Room (Vault) ➔ Vérification légale (Knowledge) ➔ Redline SPA/GAP (Assistant) ➔ Revue Associé",
                     labTokens: ["Audit Data Room (Vault) ➔ Vérification légale (Knowledge) ➔ Redline SPA/GAP (Assistant) ➔ Revue Associé"],
                     labDistractors: ["Clôture M&A sans revue des clauses Change of Control"],
-                    qcmPrompt: "Dans une opération d'acquisition (M&A), comment articuler de manière optimale les modules de la plateforme Harvey ?",
-                    qcmCorrect: "Auditer les milliers de contrats cibles dans Harvey Vault, vérifier les points de droit multi-juridictions dans Knowledge, puis rédiger les clauses de garantie et redlines du SPA avec Assistant sous supervision d'avocat",
+                    qcmPrompt: "Selon les parcours de certification de Harvey Academy (Level 1 Foundations & Legal Engineering Certification), comment articuler les modules Harvey lors d'une acquisition (M&A) ?",
+                    qcmCorrect: "Auditer les milliers de contrats cibles dans Harvey Vault (AI Analysis for Legal Workflows), vérifier le droit dans Knowledge, puis rédiger les redlines du SPA dans Assistant / Word Add-In sous supervision d'avocat",
                     qcmWrong1: "Tout coller dans un outil grand public non sécurisé sans cloisonnement client",
                     qcmWrong2: "Signer le SPA avant d'ouvrir la Data Room",
                     qcmWrong3: "Ne jamais vérifier les renvois aux pièces sources",
-                    qcmTip: "La complémentarité Vault (Data Room) + Knowledge (Droit sourcé) + Assistant (Rédaction/Redline) couvre tout le cycle transactionnel."
+                    qcmTip: "La complémentarité Vault (Data Room) + Knowledge (Droit sourcé) + Assistant/Word Add-In (Rédaction/Redline) est au cœur de Harvey Academy."
                 )
             ]
         }
@@ -2741,7 +2741,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
             PrismChoiceOption(
                 id: card.id,
                 badge: card.badge,
-                text: "\(card.serviceTitle) — \(card.subtitle)",
+                text: "\(card.serviceTitle) : \(card.subtitle)",
                 explanation: card.explanation,
                 isCorrect: card.isCorrect
             )
@@ -2967,9 +2967,9 @@ public enum CertiGoAIProductivityAndLegalCatalog {
         )
 
         let orderItems = [
-            PrismOrderItem(id: "\(codeLower)-ord-1", text: "1. \(schema0.brick1.title) — \(schema0.brick1.subtitle)", indentLevel: 0),
-            PrismOrderItem(id: "\(codeLower)-ord-2", text: "2. \(schema0.brick2.title) — \(schema0.brick2.subtitle)", indentLevel: 1),
-            PrismOrderItem(id: "\(codeLower)-ord-3", text: "3. \(schema0.brick3.title) — \(schema0.brick3.subtitle)", indentLevel: 2),
+            PrismOrderItem(id: "\(codeLower)-ord-1", text: "1. \(schema0.brick1.title) : \(schema0.brick1.subtitle)", indentLevel: 0),
+            PrismOrderItem(id: "\(codeLower)-ord-2", text: "2. \(schema0.brick2.title) : \(schema0.brick2.subtitle)", indentLevel: 1),
+            PrismOrderItem(id: "\(codeLower)-ord-3", text: "3. \(schema0.brick3.title) : \(schema0.brick3.subtitle)", indentLevel: 2),
             PrismOrderItem(id: "\(codeLower)-ord-4", text: "4. Validation finale & audit de conformité", indentLevel: 3)
         ]
         let q08 = CertiGoInteractiveExerciseSpec(

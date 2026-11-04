@@ -298,7 +298,7 @@ public struct LegacyPathCleanupGovernance: Equatable, Hashable, Sendable {
     }
 }
 
-// MARK: - 4B. Page 12 Figma Pro — RES-01 Mode Hors-Ligne Train / Avion 142 Mo (§6.2, §19, §29, DR-004)
+// MARK: - 4B. Page 12 Figma Pro : RES-01 Mode Hors-Ligne Train / Avion 142 Mo (§6.2, §19, §29, DR-004)
 
 public struct CertiGoOfflinePackEntry: Identifiable, Codable, Equatable, Hashable, Sendable {
     public static let maxPrecomposedSessionsPerTrack: Int = PrismOfflineSessionCache.maxCachedSessions
@@ -578,7 +578,7 @@ public struct Phase11HardeningDashboardScreen: View {
     }
 }
 
-// MARK: - 6. Page 12 Figma Pro — RES-01 Offline Resilience & RES-02 Zero-Guilt Welcome Back Screen
+// MARK: - 6. Page 12 Figma Pro : RES-01 Offline Resilience & RES-02 Zero-Guilt Welcome Back Screen
 
 public struct CertiGoOfflineResilienceScreen: View {
     @State private var manager: CertiGoOfflinePackManagerModel

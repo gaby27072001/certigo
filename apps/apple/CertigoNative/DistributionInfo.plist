@@ -47,6 +47,8 @@
 	<false/>
 	<key>NSContactsUsageDescription</key>
 	<string>CertiGo utilise tes contacts pour retrouver tes amis déjà sur l'application et suivre votre progression commune.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CertiGo utilise le microphone uniquement pendant tes sessions vocales en direct avec le Coach IA.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

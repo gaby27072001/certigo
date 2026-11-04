@@ -70,7 +70,7 @@ public struct CertigoProFeatureComparisonRow: Identifiable, Codable, Equatable, 
         .init(id: "exams", featureTitle: "Examens Blancs Pearson VUE (90m)", freeTierValue: "1 démo", proTierValue: "Illimités ✓"),
         .init(id: "ai-coach", featureTitle: "Coach IA Vocal Live & Lab CLI", freeTierValue: "3 / jour", proTierValue: "Illimité 24/7 ✓"),
         .init(id: "ai-actors", featureTitle: "Cours Grands Acteurs IA & Radar Tech", freeTierValue: "Aperçu", proTierValue: "Accès complet ✓"),
-        .init(id: "offline", featureTitle: "Téléchargement Hors-Ligne (Train/Avion)", freeTierValue: "—", proTierValue: "Inclus ✓")
+        .init(id: "offline", featureTitle: "Téléchargement Hors-Ligne (Train/Avion)", freeTierValue: "-", proTierValue: "Inclus ✓")
     ]
 }
 
