@@ -10111,6 +10111,146 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         (3, "Cherche « CertiGo » et place ton widget", "")
     ]
 
+    public static let controlCenterAIWidgetKind: String = "com.certigo.mobileapp.control.ai"
+    public static let controlCenterAIDisplayName: String = "✦ CertiGo AI"
+    public static let controlCenterAIDescription: String =
+        "Ouvre instantanément l'assistant CertiGo AI pour poser une question sur tes cours ou l'actualité Tech."
+    public static let pendingDeepLinkTargetDefaultsKey: String = "certigo.PendingDeepLinkTarget"
+    public static let pendingDeepLinkTimestampDefaultsKey: String = "certigo.PendingDeepLinkTimestamp"
+    public static let pendingDeepLinkTargetHubIAValue: String = "hubIA"
+    public static let controlCenterAIDeepLinkURL: URL = URL(string: "certigo://ai")!
+
+    public static let controlCenterAIButtonInstallSteps: [(number: Int, title: String, detail: String)] = [
+        (1, "Balaye depuis le coin supérieur droit (Centre de contrôle)", ""),
+        (2, "Appuie sur « + » puis « Ajouter une commande »", ""),
+        (3, "Choisis « ✦ CertiGo AI » (ou Bouton Action / Écran verrouillé)", "")
+    ]
+
+    public static func isAIDeepLink(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased() else { return false }
+        let host = url.host?.lowercased() ?? ""
+        let pathComponents = url.pathComponents.filter { $0 != "/" }.map { $0.lowercased() }
+
+        if scheme == "certigo" {
+            if host == "ai" || host == "hub-ia" {
+                return true
+            }
+            if (host == "widget" || host == "control"), pathComponents.first == "ai" {
+                return true
+            }
+            if host.isEmpty, (pathComponents.first == "ai" || pathComponents.first == "hub-ia") {
+                return true
+            }
+        } else if scheme == "https" || scheme == "http" {
+            if host == "www.certigo-app.com" || host == "certigo-app.com" {
+                if pathComponents.first == "ai" || pathComponents.first == "hub-ia" {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    public static func recordPendingAIDeepLinkInAppGroup(
+        sharedDefaults: UserDefaults? = UserDefaults(suiteName: CertigoWidgetStore.defaultAppGroupIdentifier),
+        standardDefaults: UserDefaults = .standard,
+        now: Date = .now
+    ) {
+        let timestamp = now.timeIntervalSince1970
+        sharedDefaults?.set(Self.pendingDeepLinkTargetHubIAValue, forKey: Self.pendingDeepLinkTargetDefaultsKey)
+        sharedDefaults?.set(timestamp, forKey: Self.pendingDeepLinkTimestampDefaultsKey)
+        standardDefaults.set(Self.pendingDeepLinkTargetHubIAValue, forKey: Self.pendingDeepLinkTargetDefaultsKey)
+        standardDefaults.set(timestamp, forKey: Self.pendingDeepLinkTimestampDefaultsKey)
+    }
+
+    public mutating func navigateImmediatelyToAIHub(router: AppRouterState? = nil) {
+        showCoursePopover02 = false
+        activeStepSheet = nil
+        activeGamificationSheet = nil
+        showExamLaunchSheet22 = false
+        showExamNavigatorGridSheet = false
+        showExamDetailedCorrectionSheet = false
+        selectedDomainForPractice = nil
+        showProPaywallSheet27 = false
+        showMultiTrackSelectorSheet = false
+        showAddFriendSheet = false
+        selectedFriendProfile = nil
+        showSavedAIMemosSheet = false
+        showEditProfileSheet = false
+        activeSettingsPicker = nil
+        showErrorRegistrySheet = false
+        showMascotVaultSheet = false
+        isPresentingLessonSession = false
+        isPresentingTimedExam23 = false
+        isPresentingExamReport24 = false
+        isPresentingOnboardingFlow = false
+        isPresentingSignInPortalSheet = false
+        activeAuthProviderSheet = nil
+        isPresentingGuidedAppTour = false
+        isAIDrawerOpen06D = false
+        selectedTab = .hubIA
+        if let router {
+            router.activeCover = nil
+            router.activeSheet = nil
+            router.isShowingUnsavedInputConfirmation = false
+            router.selectedTab = .search
+            router.popToRoot(in: .search)
+        }
+    }
+
+    @discardableResult
+    public mutating func handleIncomingDeepLink(
+        _ url: URL,
+        router: AppRouterState? = nil,
+        sharedDefaults: UserDefaults? = UserDefaults(suiteName: CertigoWidgetStore.defaultAppGroupIdentifier),
+        standardDefaults: UserDefaults = .standard
+    ) -> Bool {
+        if Self.isAIDeepLink(url) {
+            sharedDefaults?.removeObject(forKey: Self.pendingDeepLinkTargetDefaultsKey)
+            sharedDefaults?.removeObject(forKey: Self.pendingDeepLinkTimestampDefaultsKey)
+            standardDefaults.removeObject(forKey: Self.pendingDeepLinkTargetDefaultsKey)
+            standardDefaults.removeObject(forKey: Self.pendingDeepLinkTimestampDefaultsKey)
+            navigateImmediatelyToAIHub(router: router)
+            return true
+        }
+        if let router {
+            let outcome = router.handleDeepLink(url)
+            switch outcome {
+            case .navigatedToTab(let tab, _):
+                switch tab {
+                case .today: selectedTab = .parcours
+                case .atlas: selectedTab = .examens
+                case .search: selectedTab = .hubIA
+                case .ensemble: selectedTab = .social
+                case .profile: selectedTab = .moi
+                }
+            default:
+                break
+            }
+        }
+        return false
+    }
+
+    @discardableResult
+    public mutating func consumePendingDeepLinkTargetIfNeeded(
+        router: AppRouterState? = nil,
+        sharedDefaults: UserDefaults? = UserDefaults(suiteName: CertigoWidgetStore.defaultAppGroupIdentifier),
+        standardDefaults: UserDefaults = .standard
+    ) -> Bool {
+        let sharedTarget = sharedDefaults?.string(forKey: Self.pendingDeepLinkTargetDefaultsKey)
+        let standardTarget = standardDefaults.string(forKey: Self.pendingDeepLinkTargetDefaultsKey)
+        let isHubIA = (sharedTarget?.caseInsensitiveCompare(Self.pendingDeepLinkTargetHubIAValue) == .orderedSame)
+            || (standardTarget?.caseInsensitiveCompare(Self.pendingDeepLinkTargetHubIAValue) == .orderedSame)
+        guard isHubIA else { return false }
+
+        sharedDefaults?.removeObject(forKey: Self.pendingDeepLinkTargetDefaultsKey)
+        sharedDefaults?.removeObject(forKey: Self.pendingDeepLinkTimestampDefaultsKey)
+        standardDefaults.removeObject(forKey: Self.pendingDeepLinkTargetDefaultsKey)
+        standardDefaults.removeObject(forKey: Self.pendingDeepLinkTimestampDefaultsKey)
+        navigateImmediatelyToAIHub(router: router)
+        return true
+    }
+
     public static let onboardingSpeedComparisonBars: [(label: String, subtitle: String, durationText: String, percentValue: Int, badgeText: String?, isHighlighted: Bool)] = [
         ("Révision seule (cours longs & PDF)", "mémorisation passive", "~11 semaines", 29, nil, false),
         ("Avec CertiGo (sprints actifs & mémoire espacée)", "sprints actifs & mémoire espacée", "3 semaines · 3,4× plus efficace 🏆", 100, "⚡ 3,4×", true)
@@ -12805,6 +12945,7 @@ public struct CertiGoEmptyStateCardView: View {
 public struct CertiGoNativeFigmaAppView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.scenePhase) private var scenePhase
     @Binding public var coordinator: PrismAppShellCoordinatorModel
     @Binding public var router: AppRouterState
     public let flags: FeatureFlags
@@ -13044,6 +13185,23 @@ public struct CertiGoNativeFigmaAppView: View {
                 coordinator: $coordinator
             )
         }
+        .onOpenURL { url in
+            if appState.handleIncomingDeepLink(url, router: router) {
+                profileNavPath.removeAll()
+            }
+        }
+        .onAppear {
+            if appState.consumePendingDeepLinkTargetIfNeeded(router: router) {
+                profileNavPath.removeAll()
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                if appState.consumePendingDeepLinkTargetIfNeeded(router: router) {
+                    profileNavPath.removeAll()
+                }
+            }
+        }
         .task {
             let persisted = preferenceStore.loadOrDefault()
             if coordinator.parallelTracksPreference != persisted {
@@ -13056,6 +13214,9 @@ public struct CertiGoNativeFigmaAppView: View {
                 appState.isPresentingOnboardingFlow = false
             } else {
                 appState.startOnboardingFlow()
+            }
+            if appState.consumePendingDeepLinkTargetIfNeeded(router: router) {
+                profileNavPath.removeAll()
             }
             CertiGoDynamicAppIconManager.shared.startMonitoringNetworkPath()
             _ = await CertiGoDynamicAppIconManager.shared.evaluateAndApply(
@@ -15571,6 +15732,16 @@ public struct CertiGoNativeFigmaAppView: View {
                                 }
                                 Divider().padding(.leading, FigMetrics.fiftyTwo)
                                 settingsActionRow(
+                                    symbol: "switch.2",
+                                    tintHex: "#7c3aed",
+                                    title: "✦ Bouton Centre de contrôle iOS (CertiGo AI)",
+                                    value: "iOS 18+"
+                                ) {
+                                    profileNavPath.append(.systemWidgetsSYS01)
+                                }
+                                .accessibilityIdentifier("settings28-open-control-center-ai-guide")
+                                Divider().padding(.leading, FigMetrics.fiftyTwo)
+                                settingsActionRow(
                                     symbol: "sparkles.rectangle.stack.fill",
                                     tintHex: "#0284c7",
                                     title: "Banque & Costumes de la Mascotte (Icône Dynamique)",
@@ -15816,6 +15987,7 @@ public struct CertiGoNativeFigmaAppView: View {
 
         private var systemWidgetsSYS01View: some View {
             let widgets: [(title: String, metric: String, hex: String)] = [
+                ("✦ Bouton Centre de contrôle · CertiGo AI", "iOS 18+ ✓", "#7c3aed"),
                 ("Widget Série & Objectif Quotidien", "Actif ✓", "#ea580c"),
                 ("Radar Hebdo IA & Agents MCP", "Actif ✓", "#0078d4"),
                 ("Situation Critique d'Architecture", "+25 XP", "#15803d"),
@@ -15856,6 +16028,85 @@ public struct CertiGoNativeFigmaAppView: View {
                             RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
                                 .fill(PrismColor.surface)
                         )
+
+                        // Dedicated iOS 18+ Control Center / Action Button / Lock Screen Card for « ✦ CertiGo AI »
+                        VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                            HStack(spacing: PrismSpacing.s) {
+                                Image(systemName: "sparkles")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
+                                    .foregroundStyle(PrismColor.onAccent)
+                                    .frame(width: FigMetrics.thirtySix, height: FigMetrics.thirtySix)
+                                    .background(
+                                        Circle()
+                                            .fill(PrismColor.figmaHex("#7c3aed"))
+                                    )
+                                Text(verbatim: "✦ CertiGo AI · Centre de contrôle iOS")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Extra Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(verbatim: "ControlWidget")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
+                                    .foregroundStyle(PrismColor.figmaHex("#7c3aed"))
+                                    .padding(.horizontal, PrismSpacing.s)
+                                    .padding(.vertical, PrismSpacing.xxs)
+                                    .background(
+                                        Capsule()
+                                            .fill(PrismColor.figmaHex("#f3e8ff"))
+                                    )
+                            }
+
+                            ForEach(CertiGoNativeAppState.controlCenterAIButtonInstallSteps, id: \.number) { step in
+                                HStack(spacing: PrismSpacing.s) {
+                                    Text(verbatim: "\(step.number)")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
+                                        .foregroundStyle(PrismColor.onAccent)
+                                        .frame(width: FigMetrics.twentyFour, height: FigMetrics.twentyFour)
+                                        .background(
+                                            Circle()
+                                                .fill(PrismColor.figmaHex("#7c3aed"))
+                                        )
+                                    Text(verbatim: step.title)
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
+                                    Spacer(minLength: .zero)
+                                }
+                            }
+
+                            Button {
+                                profileNavPath.removeAll()
+                                appState.navigateImmediatelyToAIHub(router: router)
+                            } label: {
+                                HStack(spacing: PrismSpacing.xs) {
+                                    Image(systemName: "sparkles")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                                    Text(verbatim: "Tester le raccourci ✦ CertiGo AI")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                                }
+                                .foregroundStyle(PrismColor.onAccent)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: FigMetrics.forty)
+                                .background(
+                                    RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                        .fill(PrismColor.figmaHex("#7c3aed"))
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("sys01-test-control-center-ai-button")
+                        }
+                        .padding(PrismSpacing.l)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                                .fill(PrismColor.surface)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                                .strokeBorder(PrismColor.figmaHex("#d8b4fe"), lineWidth: PrismBorder.standard)
+                        )
+                        .accessibilityIdentifier("sys01-control-center-ai-card")
 
                         ForEach(0..<widgets.count, id: \.self) { idx in
                             let item = widgets[idx]
@@ -23159,6 +23410,33 @@ public struct CertiGoOnboardingWidgetStepView: View {
                 RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
                     .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
             )
+
+            HStack(spacing: PrismSpacing.m) {
+                Image(systemName: "sparkles")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                    .foregroundStyle(PrismColor.onAccent)
+                    .frame(width: FigMetrics.twentyEight, height: FigMetrics.twentyEight)
+                    .background(
+                        Circle()
+                            .fill(PrismColor.figmaHex("#7c3aed"))
+                    )
+                Text(verbatim: "✦ CertiGo AI aussi dispo au Centre de contrôle & Bouton Action")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: .zero)
+            }
+            .padding(PrismSpacing.m)
+            .background(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .fill(PrismColor.figmaHex("#faf5ff"))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                    .strokeBorder(PrismColor.figmaHex("#d8b4fe"), lineWidth: PrismBorder.standard)
+            )
+            .accessibilityIdentifier("onboarding-widget-control-center-ai-pill")
         }
     }
 

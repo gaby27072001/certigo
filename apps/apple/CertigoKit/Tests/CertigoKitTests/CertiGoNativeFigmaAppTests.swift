@@ -1904,4 +1904,139 @@ struct CertiGoNativeFigmaAppTests {
             }
         }
     }
+
+    @Test("iOS 18+ / iOS 26 ControlWidget (✦ CertiGo AI), certigo://ai deep link, and certigo.PendingDeepLinkTarget == hubIA route immediately to selectedTab == .hubIA")
+    func iOSControlCenterCertiGoAIWidgetAndDeepLinkRoutingToHubIA() throws {
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: root.appendingPathComponent("AGENTS.md").path) {
+            let parent = root.deletingLastPathComponent()
+            guard parent != root else { throw CocoaError(.fileNoSuchFile) }
+            root = parent
+        }
+
+        // 1. Verify CertigoWidgetExtension.swift declares LaunchCertiGoAIIntent + CertiGoAIControlCenterWidget in CertigoWidgetBundle
+        let widgetExtSource = try String(
+            contentsOf: root.appendingPathComponent("apps/apple/CertigoNative/WidgetExtension/CertigoWidgetExtension.swift"),
+            encoding: .utf8
+        )
+        #expect(widgetExtSource.contains("struct CertiGoAIControlCenterWidget: ControlWidget"))
+        #expect(widgetExtSource.contains(#""com.certigo.mobileapp.control.ai""#))
+        #expect(widgetExtSource.contains("ControlWidgetButton(action: LaunchCertiGoAIIntent())"))
+        #expect(widgetExtSource.contains(#"Label("CertiGo AI", systemImage: "sparkles")"#))
+        #expect(widgetExtSource.contains(#".displayName("✦ CertiGo AI")"#))
+        #expect(widgetExtSource.contains("static let openAppWhenRun: Bool = true"))
+        #expect(widgetExtSource.contains(#""certigo.PendingDeepLinkTarget""#))
+        #expect(widgetExtSource.contains(#""certigo.PendingDeepLinkTimestamp""#))
+        #expect(widgetExtSource.contains(#""certigo://ai""#))
+
+        // 2. Verify deep link detection and routing (`certigo://ai`, `certigo://hub-ia`, `https://www.certigo-app.com/ai`)
+        let aiURL = try #require(URL(string: "certigo://ai"))
+        let hubIAURL = try #require(URL(string: "certigo://hub-ia"))
+        let universalAIURL = try #require(URL(string: "https://www.certigo-app.com/ai"))
+        let nonAIURL = try #require(URL(string: "certigo://today"))
+
+        #expect(CertiGoNativeAppState.isAIDeepLink(aiURL) == true)
+        #expect(CertiGoNativeAppState.isAIDeepLink(hubIAURL) == true)
+        #expect(CertiGoNativeAppState.isAIDeepLink(universalAIURL) == true)
+        #expect(CertiGoNativeAppState.isAIDeepLink(nonAIURL) == false)
+
+        let suiteA = "CertiGoControlWidgetTests.DeepLink.\(UUID().uuidString)"
+        let sharedDefaultsA = try #require(UserDefaults(suiteName: suiteA))
+        defer { sharedDefaultsA.removePersistentDomain(forName: suiteA) }
+        let suiteStdA = "CertiGoControlWidgetTests.StdA.\(UUID().uuidString)"
+        let stdDefaultsA = try #require(UserDefaults(suiteName: suiteStdA))
+        defer { stdDefaultsA.removePersistentDomain(forName: suiteStdA) }
+
+        var appState = CertiGoNativeAppState()
+        let router = AppRouterState()
+        appState.selectedTab = .parcours
+        appState.isPresentingLessonSession = true
+        appState.showProPaywallSheet27 = true
+        appState.isPresentingOnboardingFlow = true
+        router.presentCover(.sessionPlayer(length: .standard, resumeSessionId: nil))
+
+        let handled = appState.handleIncomingDeepLink(
+            aiURL,
+            router: router,
+            sharedDefaults: sharedDefaultsA,
+            standardDefaults: stdDefaultsA
+        )
+        #expect(handled == true)
+        #expect(appState.selectedTab == .hubIA)
+        #expect(appState.isPresentingLessonSession == false)
+        #expect(appState.showProPaywallSheet27 == false)
+        #expect(appState.isPresentingOnboardingFlow == false)
+        #expect(router.selectedTab == .search)
+        #expect(router.activeCover == nil)
+
+        appState.selectedTab = .examens
+        #expect(
+            appState.handleIncomingDeepLink(
+                universalAIURL,
+                router: router,
+                sharedDefaults: sharedDefaultsA,
+                standardDefaults: stdDefaultsA
+            ) == true
+        )
+        #expect(appState.selectedTab == .hubIA)
+
+        // 3. Verify App Group flag `certigo.PendingDeepLinkTarget == "hubIA"` is written, consumed once, and switches to `.hubIA`
+        let suiteB = "CertiGoControlWidgetTests.AppGroup.\(UUID().uuidString)"
+        let sharedDefaultsB = try #require(UserDefaults(suiteName: suiteB))
+        defer { sharedDefaultsB.removePersistentDomain(forName: suiteB) }
+        let suiteStdB = "CertiGoControlWidgetTests.StdB.\(UUID().uuidString)"
+        let stdDefaultsB = try #require(UserDefaults(suiteName: suiteStdB))
+        defer { stdDefaultsB.removePersistentDomain(forName: suiteStdB) }
+
+        appState.selectedTab = .moi
+        appState.showMascotVaultSheet = true
+        appState.isPresentingTimedExam23 = true
+
+        // When no flag is set, consumePendingDeepLinkTargetIfNeeded returns false and keeps current tab
+        #expect(
+            appState.consumePendingDeepLinkTargetIfNeeded(
+                router: router,
+                sharedDefaults: sharedDefaultsB,
+                standardDefaults: stdDefaultsB
+            ) == false
+        )
+        #expect(appState.selectedTab == .moi)
+
+        // Record pending target from ControlWidget intent and consume on scenePhase == .active / onAppear
+        let fixedNow = Date(timeIntervalSince1970: 1_762_268_000)
+        CertiGoNativeAppState.recordPendingAIDeepLinkInAppGroup(
+            sharedDefaults: sharedDefaultsB,
+            standardDefaults: stdDefaultsB,
+            now: fixedNow
+        )
+        #expect(sharedDefaultsB.string(forKey: "certigo.PendingDeepLinkTarget") == "hubIA")
+        #expect(sharedDefaultsB.double(forKey: "certigo.PendingDeepLinkTimestamp") == 1_762_268_000)
+
+        let consumed = appState.consumePendingDeepLinkTargetIfNeeded(
+            router: router,
+            sharedDefaults: sharedDefaultsB,
+            standardDefaults: stdDefaultsB
+        )
+        #expect(consumed == true)
+        #expect(appState.selectedTab == .hubIA)
+        #expect(appState.showMascotVaultSheet == false)
+        #expect(appState.isPresentingTimedExam23 == false)
+        #expect(sharedDefaultsB.string(forKey: "certigo.PendingDeepLinkTarget") == nil)
+        #expect(stdDefaultsB.string(forKey: "certigo.PendingDeepLinkTarget") == nil)
+
+        // Subsequent check after consumption is a no-op
+        #expect(
+            appState.consumePendingDeepLinkTargetIfNeeded(
+                router: router,
+                sharedDefaults: sharedDefaultsB,
+                standardDefaults: stdDefaultsB
+            ) == false
+        )
+
+        // 4. Verify visual guide metadata for Moi -> Paramètres & Onboarding Widgets
+        #expect(CertiGoNativeAppState.controlCenterAIWidgetKind == "com.certigo.mobileapp.control.ai")
+        #expect(CertiGoNativeAppState.controlCenterAIDisplayName == "✦ CertiGo AI")
+        #expect(CertiGoNativeAppState.controlCenterAIButtonInstallSteps.count == 3)
+        #expect(CertiGoNativeAppState.controlCenterAIButtonInstallSteps.map(\.number) == [1, 2, 3])
+    }
 }
