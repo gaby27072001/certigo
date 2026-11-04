@@ -2321,5 +2321,39 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.techNewsState.activeReaderSheetArticleId == firstArticle.id)
         appState.closeTechNewsReaderSheet()
         #expect(appState.techNewsState.activeReaderSheetArticleId == nil)
+
+        // 12. Verify FigMetrics.fifteen and hoisted CertiGoParcoursFinalExamBossCardView model
+        #expect(FigMetrics.fifteen == 15)
+        #expect(FigMetrics.fifteen == FigMetrics.fifteenOrSixteen)
+        var didTapBoss = false
+        let bossCardLocked = CertiGoParcoursFinalExamBossCardView(
+            routeCode: "AZ-104",
+            completedChapters: 12,
+            totalChapters: 30,
+            isUnlocked: false,
+            lastExamScoreOutOf1000: 0,
+            completedExamsCount: 0,
+            languageIndex: 0,
+            onOpenExamModule: { didTapBoss = true }
+        )
+        #expect(bossCardLocked.bossHeaderTitle == "🏆 EXAMEN BLANC · AZ-104")
+        #expect(bossCardLocked.unlockedBadgeTitle == nil)
+        #expect(bossCardLocked.statusSubtitle.contains("12/30"))
+        bossCardLocked.onOpenExamModule()
+        #expect(didTapBoss == true)
+
+        let bossCardUnlockedEN = CertiGoParcoursFinalExamBossCardView(
+            routeCode: "HARVEY-LEGAL",
+            completedChapters: 30,
+            totalChapters: 30,
+            isUnlocked: true,
+            lastExamScoreOutOf1000: 860,
+            completedExamsCount: 1,
+            languageIndex: 2,
+            onOpenExamModule: {}
+        )
+        #expect(bossCardUnlockedEN.bossHeaderTitle == "🏆 MOCK EXAM · HARVEY-LEGAL")
+        #expect(bossCardUnlockedEN.unlockedBadgeTitle == "UNLOCKED ✓")
+        #expect(bossCardUnlockedEN.statusSubtitle.contains("860/1000"))
     }
 }

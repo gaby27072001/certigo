@@ -11272,6 +11272,7 @@ public enum FigMetrics {
     public static let twelve: CGFloat = 12
     public static let thirteen: CGFloat = 13
     public static let fourteen: CGFloat = 14
+    public static let fifteen: CGFloat = 15
     public static let fifteenOrSixteen: CGFloat = 15
     public static let sixteen: CGFloat = 16
     public static let seventeen: CGFloat = 17
@@ -13475,109 +13476,6 @@ public struct CertiGoNativeFigmaAppView: View {
     private var guidedAppTourOverlayView: some View {
         let step = min(max(appState.guidedTourStepIndex, 0), CertiGoNativeAppState.guidedTourStepCount - 1)
         let isEnglish = (appState.settingsLanguageIndex % max(1, CertiGoFigmaLiveRuntimeState.settingsLanguageOptions.count)) == 2
-        let tourSpecs: [(badge: String, title: String, body: String, targetLabel: String, pose: CertiGoMascotPose, spotlightY: CGFloat, spotlightHeight: CGFloat, pointsUp: Bool)] = isEnglish ? [
-            (
-                "1/5 · PATH & CERTIFICATIONS",
-                "Your Path & 10-Step Units",
-                "Switch certifications at the top left, track your Streak, Gems and 5 Hearts at the top right, and complete the 10 steps of Unit 1.",
-                "▲ Course switcher, counters & Unit 1 (10 steps)",
-                .angle34LeftPath,
-                FigMetrics.fiftySix,
-                FigMetrics.oneHundredTwenty,
-                true
-            ),
-            (
-                "2/5 · OFFICIAL EXAM CENTER",
-                "Timed Mock Exams & Domain Sprints",
-                "Launch a timed mock exam scored out of 1000 or practice a specific exam domain in a 5-question sprint.",
-                "▲ Timed mock exam & official domains",
-                .poseAnalyst,
-                FigMetrics.oneHundredForty,
-                FigMetrics.oneHundredSixty,
-                true
-            ),
-            (
-                "3/5 · 24/7 AI COACH",
-                "Written & Live Voice AI Coach",
-                "Ask architecture questions, compare cloud services side by side, and pin your key takeaways for exam day.",
-                "▲ Interactive 24/7 AI Coach & Voice Live",
-                .specialistAICoach,
-                FigMetrics.oneHundredSixty,
-                FigMetrics.oneHundredSixty,
-                true
-            ),
-            (
-                "4/5 · TEAM QUEST & LEAGUE",
-                "Cooperative Quest & Friends League",
-                "Invite a study partner for the 15-step Team Quest and compare your weekly XP with your real friends.",
-                "▲ Team Quest & Friends Leaderboard",
-                .celebratingTrophy,
-                FigMetrics.oneHundredForty,
-                FigMetrics.oneHundredSixty,
-                true
-            ),
-            (
-                "5/5 · PROFILE & LIQUID GLASS",
-                "Your Profile, Settings & Liquid Glass Bar",
-                "Open Settings (⚙️) in your Profile to adjust the iOS 26 Liquid Glass intensity (0% to 100%) and manage up to 3 parallel tracks.",
-                "▼ Liquid Glass Navigation Bar & Settings (⚙️)",
-                .emotionStarryEyes,
-                FigMetrics.oneHundredTwenty,
-                FigMetrics.oneHundredForty,
-                false
-            )
-        ] : [
-            (
-                "1/5 · PARCOURS & UNITÉS EN 10 ÉTAPES",
-                "Ton Parcours & tes Unités de 10 étapes",
-                "Change de certification en haut à gauche, suis ta Série 🔥, tes Gemmes 💎 et tes 5 Vies ❤️ en haut à droite, et valide les 10 étapes de chaque Unité.",
-                "▲ Sélecteur de parcours, compteurs & Unité 1 (10 étapes)",
-                .angle34LeftPath,
-                FigMetrics.fiftySix,
-                FigMetrics.oneHundredTwenty,
-                true
-            ),
-            (
-                "2/5 · CENTRE D'EXAMEN OFFICIEL",
-                "Examens Blancs & Sprints par Domaine",
-                "Lance un examen blanc chronométré noté sur 1000 ou entraîne-toi sur un domaine précis en Sprint Express de 5 questions.",
-                "▲ Examen Blanc officiel & Domaines ciblés",
-                .poseAnalyst,
-                FigMetrics.oneHundredForty,
-                FigMetrics.oneHundredSixty,
-                true
-            ),
-            (
-                "3/5 · COACH IA 24/7",
-                "Coach IA Écrit & Vocal Temps Réel",
-                "Pose tes questions d'architecture, compare deux services côte à côte et épingle tes mémos IA pour le jour J.",
-                "▲ Coach IA 24/7 écrit & vocal interactif",
-                .specialistAICoach,
-                FigMetrics.oneHundredSixty,
-                FigMetrics.oneHundredSixty,
-                true
-            ),
-            (
-                "4/5 · QUÊTE D'ÉQUIPE & AMIS",
-                "Quête d'Équipe & Ligue entre Amis",
-                "Invite un binôme d'étude pour valider 15 étapes à deux et compare ta progression hebdomadaire avec tes vrais amis.",
-                "▲ Quête d'Équipe & Classement entre amis",
-                .celebratingTrophy,
-                FigMetrics.oneHundredForty,
-                FigMetrics.oneHundredSixty,
-                true
-            ),
-            (
-                "5/5 · PROFIL, PARAMÈTRES & LIQUID GLASS",
-                "Ton Profil, tes Réglages & Liquid Glass",
-                "Ouvre les Paramètres (⚙️) dans Moi pour régler le pourcentage de l'effet Liquid Glass (0 % à 100 %) et suivre jusqu'à 3 certifications.",
-                "▼ Barre Liquid Glass & Paramètres (⚙️)",
-                .emotionStarryEyes,
-                FigMetrics.oneHundredTwenty,
-                FigMetrics.oneHundredForty,
-                false
-            )
-        ]
         let spec = CertiGoMultilingualEngine.localizedGuidedTourStep(
             stepIndex: step,
             lang: appState.settingsLanguageIndex

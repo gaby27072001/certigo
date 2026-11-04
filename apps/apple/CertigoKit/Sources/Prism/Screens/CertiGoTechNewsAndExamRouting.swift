@@ -332,7 +332,7 @@ private final class CertiGoNativeSpeechSynthesizerBridge {
 
     func speak(text: String, languageCode: String, rateMultiplier: Double) {
         if synthesizer.isSpeaking {
-            synthesizer.stopSpeaking(at: .immediate)
+            _ = synthesizer.stopSpeaking(at: .immediate)
         }
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: languageCode) ?? AVSpeechSynthesisVoice(language: "fr-FR")
@@ -1488,6 +1488,76 @@ extension CertiGoNativeAppState {
     }
 }
 
+// MARK: - 5B. Cross-Platform Final Boss Island Model (`CertiGoParcoursFinalExamBossCardView`)
+
+public struct CertiGoParcoursFinalExamBossCardView {
+    public let routeCode: String
+    public let completedChapters: Int
+    public let totalChapters: Int
+    public let isUnlocked: Bool
+    public let lastExamScoreOutOf1000: Int
+    public let completedExamsCount: Int
+    public let languageIndex: Int
+    public let onOpenExamModule: () -> Void
+
+    public init(
+        routeCode: String,
+        completedChapters: Int,
+        totalChapters: Int,
+        isUnlocked: Bool,
+        lastExamScoreOutOf1000: Int,
+        completedExamsCount: Int,
+        languageIndex: Int,
+        onOpenExamModule: @escaping () -> Void
+    ) {
+        self.routeCode = routeCode
+        self.completedChapters = completedChapters
+        self.totalChapters = totalChapters
+        self.isUnlocked = isUnlocked
+        self.lastExamScoreOutOf1000 = lastExamScoreOutOf1000
+        self.completedExamsCount = completedExamsCount
+        self.languageIndex = languageIndex
+        self.onOpenExamModule = onOpenExamModule
+    }
+
+    public var isEnglish: Bool {
+        (languageIndex % 6) == 2
+    }
+
+    public var bossHeaderTitle: String {
+        isEnglish ? "🏆 MOCK EXAM · \(routeCode)" : "🏆 EXAMEN BLANC · \(routeCode)"
+    }
+
+    public var unlockedBadgeTitle: String? {
+        guard isUnlocked else { return nil }
+        return isEnglish ? "UNLOCKED ✓" : "DÉVERROUILLÉ ✓"
+    }
+
+    public var statusSubtitle: String {
+        let providerMeta = CertiGoNativeRichCatalog.examProviderMetadata(forRouteCode: routeCode)
+        if completedExamsCount > 0 {
+            return isEnglish
+                ? "Last score: \(lastExamScoreOutOf1000)/1000 · \(providerMeta.summaryLine)"
+                : "Dernier score : \(lastExamScoreOutOf1000)/1000 · \(providerMeta.summaryLine)"
+        }
+        if isUnlocked {
+            return isEnglish
+                ? "All \(totalChapters) chapters completed · Ready for final test!"
+                : "Les \(totalChapters) chapitres sont validés · Prêt pour le Boss Final !"
+        }
+        return isEnglish
+            ? "Final test after completing chapters (\(completedChapters)/\(totalChapters)) · \(providerMeta.summaryLine)"
+            : "Dernier test en fin de parcours (\(completedChapters)/\(totalChapters) chapitres) · \(providerMeta.summaryLine)"
+    }
+
+    public var connectorHex: String {
+        isUnlocked ? "#f59e0b" : "#cbd5e1"
+    }
+
+    public var faceHex: String {
+        isUnlocked ? "#d97706" : "#f59e0b"
+    }
+}
 
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
@@ -2484,7 +2554,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                     )
 
                     Text(verbatim: article.localizedSummary(isPlainLanguage: isPlain, languageIndex: appState.settingsLanguageIndex))
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Regular"))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Regular"))
                         .foregroundStyle(PrismColor.figmaHex("#1e293b"))
 
                     Text(verbatim: "🎓 \(article.localizedExamTakeaway(languageIndex: appState.settingsLanguageIndex))")
@@ -2663,45 +2733,14 @@ public struct CertiGoTop100SourcesDirectorySheetView: View {
 
 // MARK: - 8. Final Boss Island `🏆 EXAMEN BLANC` at Bottom of Parcours (`CertiGoParcoursFinalExamBossCardView`)
 
-public struct CertiGoParcoursFinalExamBossCardView: View {
-    public let routeCode: String
-    public let completedChapters: Int
-    public let totalChapters: Int
-    public let isUnlocked: Bool
-    public let lastExamScoreOutOf1000: Int
-    public let completedExamsCount: Int
-    public let languageIndex: Int
-    public let onOpenExamModule: () -> Void
-
-    public init(
-        routeCode: String,
-        completedChapters: Int,
-        totalChapters: Int,
-        isUnlocked: Bool,
-        lastExamScoreOutOf1000: Int,
-        completedExamsCount: Int,
-        languageIndex: Int,
-        onOpenExamModule: @escaping () -> Void
-    ) {
-        self.routeCode = routeCode
-        self.completedChapters = completedChapters
-        self.totalChapters = totalChapters
-        self.isUnlocked = isUnlocked
-        self.lastExamScoreOutOf1000 = lastExamScoreOutOf1000
-        self.completedExamsCount = completedExamsCount
-        self.languageIndex = languageIndex
-        self.onOpenExamModule = onOpenExamModule
-    }
-
+extension CertiGoParcoursFinalExamBossCardView: View {
     public var body: some View {
-        let isEN = (languageIndex % 6) == 2
-        let providerMeta = CertiGoNativeRichCatalog.examProviderMetadata(forRouteCode: routeCode)
         let innerConcentricRadius = PrismRadius.concentric(outer: PrismRadius.unitBanner, padding: PrismSpacing.m)
 
         VStack(spacing: PrismSpacing.s) {
             // Vertical golden connector from Unit 3's last node down to the Final Boss Island
             RoundedRectangle(cornerRadius: PrismRadius.xs, style: .continuous)
-                .fill(PrismColor.figmaHex(isUnlocked ? "#f59e0b" : "#cbd5e1"))
+                .fill(PrismColor.figmaHex(connectorHex))
                 .frame(width: FigMetrics.four, height: FigMetrics.twentyEight)
 
             Button {
@@ -2718,13 +2757,13 @@ public struct CertiGoParcoursFinalExamBossCardView: View {
 
                     VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
                         HStack(spacing: PrismSpacing.xs) {
-                            Text(verbatim: isEN ? "🏆 MOCK EXAM · \(routeCode)" : "🏆 EXAMEN BLANC · \(routeCode)")
+                            Text(verbatim: bossHeaderTitle)
                                 .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Black"))
                                 .foregroundStyle(PrismColor.onAccent)
                                 .lineLimit(1)
 
-                            if isUnlocked {
-                                Text(verbatim: isEN ? "UNLOCKED ✓" : "DÉVERROUILLÉ ✓")
+                            if let badgeTitle = unlockedBadgeTitle {
+                                Text(verbatim: badgeTitle)
                                     .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
                                     .foregroundStyle(PrismColor.figmaHex("#78350f"))
                                     .padding(.horizontal, PrismSpacing.xs)
@@ -2734,22 +2773,6 @@ public struct CertiGoParcoursFinalExamBossCardView: View {
                                     )
                             }
                         }
-
-                        let statusSubtitle: String = {
-                            if completedExamsCount > 0 {
-                                return isEN
-                                    ? "Last score: \(lastExamScoreOutOf1000)/1000 · \(providerMeta.summaryLine)"
-                                    : "Dernier score : \(lastExamScoreOutOf1000)/1000 · \(providerMeta.summaryLine)"
-                            }
-                            if isUnlocked {
-                                return isEN
-                                    ? "All \(totalChapters) chapters completed · Ready for final test!"
-                                    : "Les \(totalChapters) chapitres sont validés · Prêt pour le Boss Final !"
-                            }
-                            return isEN
-                                ? "Final test after completing chapters (\(completedChapters)/\(totalChapters)) · \(providerMeta.summaryLine)"
-                                : "Dernier test en fin de parcours (\(completedChapters)/\(totalChapters) chapitres) · \(providerMeta.summaryLine)"
-                        }()
 
                         Text(verbatim: statusSubtitle)
                             .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
@@ -2774,7 +2797,7 @@ public struct CertiGoParcoursFinalExamBossCardView: View {
             }
             .buttonStyle(
                 CertiGoTactile3DButtonStyle(
-                    faceHex: isUnlocked ? "#d97706" : "#f59e0b",
+                    faceHex: faceHex,
                     lipHex: "#b45309",
                     strokeHex: "#fde68a",
                     cornerRadius: PrismRadius.unitBanner,
