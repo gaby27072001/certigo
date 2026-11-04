@@ -2127,4 +2127,101 @@ struct CertiGoNativeFigmaAppTests {
         #expect(gh900Ex[0].prompt != az900Ex[0].prompt)
         #expect(gh900Ex[0].prompt.contains("Pull Request"))
     }
+
+    @Test("Custom Architecture B: Tab #2 Actus (100 ranked tech sites & 83 verified OPML RSS feeds), Version simple switch, Ask CertiGo AI handoff, +10 XP Flash Question, and Trophy 🏆 Exam routing in Popover 02 + Parcours Final Boss")
+    func customArchitectureBTechNewsAndExamRouting() throws {
+        // 1. Verify Tab #2 is Actus (`newspaper.fill`) while preserving `.examens` compatibility
+        #expect(CertiGoNativeTab.actus == .examens)
+        #expect(CertiGoNativeTab.actus.title == "Actus")
+        #expect(CertiGoNativeTab.actus.sfSymbolName == "newspaper.fill")
+        #expect(CertiGoNativeTab.actus.localizedTabTitle(languageIndex: 0) == "Actus")
+        #expect(CertiGoNativeTab.actus.localizedTabTitle(languageIndex: 2) == "News")
+
+        // 2. Verify all 100 ranked sites (`Top100_sites_tech_veille_2026-11-04.xlsx`) and 83 verified RSS feeds (`veille_tech_top100.opml`) across 8 official categories
+        #expect(CertiGoOPMLCategoryID.allCases.count == 8)
+        #expect(CertiGoVerifiedRSSFeedCatalog.all100RankedSites.count == 100)
+        #expect(CertiGoVerifiedRSSFeedCatalog.all83VerifiedFeeds.count == 83)
+        #expect(CertiGoVerifiedRSSFeedCatalog.all100RankedSites.first?.rank == 1)
+        #expect(CertiGoVerifiedRSSFeedCatalog.all100RankedSites.first?.name.contains("OpenAI") == true)
+        #expect(CertiGoVerifiedRSSFeedCatalog.all100RankedSites[1].rank == 2)
+        #expect(CertiGoVerifiedRSSFeedCatalog.all100RankedSites[1].name.contains("Microsoft") == true)
+        #expect(CertiGoVerifiedRSSFeedCatalog.all100RankedSites[7].rank == 8)
+        #expect(CertiGoVerifiedRSSFeedCatalog.all100RankedSites[7].name.contains("ANSSI") == true)
+        #expect(CertiGoVerifiedRSSFeedCatalog.all100RankedSites.last?.rank == 100)
+
+        for cat in CertiGoOPMLCategoryID.allCases {
+            #expect(!CertiGoVerifiedRSSFeedCatalog.feeds(forCategory: cat).isEmpty)
+            #expect(!CertiGoVerifiedRSSFeedCatalog.sites(forCategory: cat).isEmpty)
+        }
+
+        // 3. Verify 1-line filter bar (`🔥 Pour toi`, `OpenAI`, `Anthropic`, `Microsoft`, `Google`, `AWS`, `Harvey`, `GitHub`, `Cloud & Cyber`)
+        var appState = CertiGoNativeAppState()
+        #expect(CertiGoTechNewsFilterID.allCases.count == 9)
+        for filter in CertiGoTechNewsFilterID.allCases {
+            appState.selectTechNewsFilter(filter)
+            #expect(appState.techNewsState.selectedFilter == filter)
+            #expect(!appState.filteredTechNewsArticles.isEmpty, "Expected articles for filter \(filter.rawValue)")
+        }
+        appState.selectTechNewsFilter(.forYou)
+
+        // 4. Verify `Version simple` switch is NEVER auto-enabled and toggles cleanly between technical and plain-language summaries
+        let firstArticle = try #require(appState.filteredTechNewsArticles.first)
+        #expect(appState.techNewsState.isPlainLanguageEnabled(forArticleId: firstArticle.id) == false)
+        let techSummaryFR = firstArticle.localizedSummary(isPlainLanguage: false, languageIndex: 0)
+        let plainSummaryFR = firstArticle.localizedSummary(isPlainLanguage: true, languageIndex: 0)
+        #expect(techSummaryFR != plainSummaryFR)
+        appState.toggleTechNewsPlainLanguage(forArticleId: firstArticle.id)
+        #expect(appState.techNewsState.isPlainLanguageEnabled(forArticleId: firstArticle.id) == true)
+        appState.toggleTechNewsPlainLanguage(forArticleId: firstArticle.id)
+        #expect(appState.techNewsState.isPlainLanguageEnabled(forArticleId: firstArticle.id) == false)
+
+        // 5. Verify `✦ Demander à CertiGo AI` handoff switches to `.hubIA` and preloads the news context
+        appState.selectedTab = .actus
+        appState.askCertiGoAIAboutTechNews(firstArticle)
+        #expect(appState.selectedTab == .hubIA)
+        #expect(appState.techNewsState.lastAskedAIArticleId == firstArticle.id)
+        #expect(appState.chatTurns.last?.userPrompt.contains(firstArticle.headlineFR) == true)
+        #expect(appState.aiThreads.first?.routeBadge == firstArticle.linkedCertificationCode)
+
+        // 6. Verify `⚡ Question Flash · +10 XP` awards +10 XP and maintains 🔥 streak on correct answer
+        let xpBefore = appState.userXPPoints
+        appState.toggleTechNewsFlashQuiz(forArticleId: firstArticle.id)
+        #expect(appState.techNewsState.activeFlashQuizArticleId == firstArticle.id)
+        #expect(appState.answerTechNewsFlashQuiz(articleId: firstArticle.id, optionId: "A") == true)
+        #expect(appState.userXPPoints == xpBefore + 10)
+        #expect(appState.streakDays >= 1)
+        #expect(appState.techNewsState.validatedFlashArticleIds.contains(firstArticle.id))
+
+        // 7. Verify RSS 2.0 (`<item>`) and Atom (`<entry>`) XML parsing in `CertiGoLiveTechNewsAggregator`
+        let sampleFeed = CertiGoVerifiedRSSFeedCatalog.all83VerifiedFeeds[0]
+        let sampleRSS = """
+        <rss version="2.0"><channel>
+        <item><title>OpenAI Codex Cloud Agent Update</title><description>New multi-repo autonomous coding workflow.</description><link>https://openai.com/news/codex</link></item>
+        </channel></rss>
+        """
+        let parsedItems = CertiGoLiveTechNewsAggregator.parseRSSOrAtomXML(sampleRSS, feed: sampleFeed)
+        #expect(parsedItems.count == 1)
+        #expect(parsedItems[0].headlineFR == "OpenAI Codex Cloud Agent Update")
+        #expect(parsedItems[0].sourceRank == sampleFeed.rank)
+
+        // 8. Verify Exam Blanc routing via:
+        // (a) Right-hand Trophy button `🏆` on each certification row in `CoursePopover02`
+        appState.showCoursePopover02 = true
+        appState.openExamModuleFromCoursePopover(forRouteCode: "HARVEY-LEGAL")
+        #expect(appState.activeRouteCode == "HARVEY-LEGAL")
+        #expect(appState.showCoursePopover02 == false)
+        #expect(appState.isPresentingExamCenterModule == true)
+
+        appState.closeExamModule()
+        #expect(appState.isPresentingExamCenterModule == false)
+
+        // (b) Final Boss button `🏆 EXAMEN BLANC` at the bottom of `Parcours` (unlocking once all 30 chapters are completed)
+        #expect(appState.totalChaptersCountForActiveRoute == 30)
+        #expect(appState.isParcoursAllChaptersCompletedForActiveRoute == false)
+        appState.unlockAllChaptersForActiveRoute()
+        #expect(appState.completedChaptersCountForActiveRoute == 30)
+        #expect(appState.isParcoursAllChaptersCompletedForActiveRoute == true)
+        appState.openExamModuleFromParcoursBoss()
+        #expect(appState.isPresentingExamCenterModule == true)
+    }
 }
