@@ -115,6 +115,29 @@ public enum CertiGoSupportedLanguage: Int, CaseIterable, Codable, Hashable, Send
     }
 }
 
+extension String {
+    /// Removes all Markdown bold/italic asterisks (`****`, `***`, `**`, `*mot*`), double underscores (`__`), backticks, and long dashes (`\u{2014}` / `\u{2013}`) so raw Markdown never appears in SwiftUI `Text`.
+    public var strippingMarkdownAsterisks: String {
+        var cleaned = self
+            .replacingOccurrences(of: " \u{2014} ", with: " : ")
+            .replacingOccurrences(of: " \u{2013} ", with: " - ")
+            .replacingOccurrences(of: "\u{2014}", with: " : ")
+            .replacingOccurrences(of: "\u{2013}", with: "-")
+            .replacingOccurrences(of: "****", with: "")
+            .replacingOccurrences(of: "***", with: "")
+            .replacingOccurrences(of: "**", with: "")
+            .replacingOccurrences(of: "__", with: "")
+            .replacingOccurrences(of: "`", with: "")
+        if cleaned.contains("*"),
+           let regex = try? NSRegularExpression(pattern: #"(?<![/\.\w\[\*])\*([A-Za-zÀ-ÿ0-9][^\*\n]{0,90}[A-Za-zÀ-ÿ0-9\)])\*(?![/\.\w\]\*])"#)
+        {
+            let range = NSRange(cleaned.startIndex..<cleaned.endIndex, in: cleaned)
+            cleaned = regex.stringByReplacingMatches(in: cleaned, range: range, withTemplate: "$1")
+        }
+        return cleaned
+    }
+}
+
 // MARK: - 2. 100% Coverage Dynamic Localization Engine (`CertiGoMultilingualEngine`)
 
 public enum CertiGoMultilingualEngine {
@@ -130,13 +153,9 @@ public enum CertiGoMultilingualEngine {
         resolveLanguage(forIndex: langIndex).mappedAppLanguage
     }
 
-    /// Strips any em-dash (`\u{2014}`) or en-dash (`\u{2013}`) from localized copy.
+    /// Strips any em-dash (`\u{2014}`), en-dash (`\u{2013}`), or Markdown asterisks (`**` / `****`) from localized copy.
     public static func sanitizeNoLongDashes(_ raw: String) -> String {
-        raw
-            .replacingOccurrences(of: " \u{2014} ", with: " : ")
-            .replacingOccurrences(of: " \u{2013} ", with: " - ")
-            .replacingOccurrences(of: "\u{2014}", with: " : ")
-            .replacingOccurrences(of: "\u{2013}", with: "-")
+        raw.strippingMarkdownAsterisks
     }
 
     /// Primary dynamic translator `tr(_ fr: String, lang: Int) -> String` covering 100% of UI strings, unit/step titles, micro-slides, Cartes Déclic, questions, choices, explanations, and mock exams.
@@ -1643,6 +1662,14 @@ public enum CertiGoMultilingualEngine {
 
     private static let phraseRules: [PhraseTranslationRule] = [
         // Step & Slide badges
+        .init(fr: "VUE D'ENSEMBLE · TA MISSION", en: "OVERVIEW · YOUR MISSION", es: "VISTA GENERAL · TU MISIÓN", de: "ÜBERBLICK · DEINE MISSION", it: "PANORAMICA · LA TUA MISSIONE", pt: "VISÃO GERAL · SUA MISSÃO", ar: "نظرة عامة · مهمتك", ja: "全体像 · あなたのミッション", hi: "अवलोकन · आपका मिशन", zhHans: "全景概览 · 核心目标", ko: "전체 개요 · 핵심 미션"),
+        .init(fr: "LA GRANDE IMAGE · EN 3 BRIQUES", en: "THE BIG PICTURE · IN 3 BRICKS", es: "LA GRAN IMAGEN · EN 3 BLOQUES", de: "DAS GROSSE BILD · IN 3 BAUSTEINEN", it: "IL QUADRO GENERALE · IN 3 BLOCCHI", pt: "A VISÃO GERAL · EM 3 BLOCOS", ar: "الصورة الكبرى · في 3 ركائز", ja: "全体アーキテクチャ · 3つの柱", hi: "बड़ी तस्वीर · 3 मुख्य स्तंभ", zhHans: "核心架构 · 三大支柱", ko: "핵심 아키텍처 · 3대 구성요소"),
+        .init(fr: "3/3 · MOTS-CLÉS ESSENTIELS", en: "3/3 · ESSENTIAL KEYWORDS", es: "3/3 · PALABRAS CLAVE ESENCIALES", de: "3/3 · WICHTIGE SCHLÜSSELBEGRIFFE", it: "3/3 · PAROLE CHIAVE ESSENZIALI", pt: "3/3 · PALAVRAS-CHAVE ESSENCIAIS", ar: "3/3 · المصطلحات الأساسية", ja: "3/3 · 必須キーワード", hi: "3/3 · आवश्यक कीवर्ड", zhHans: "3/3 · 必背核心术语", ko: "3/3 · 필수 핵심 키워드"),
+        .init(fr: "NOTION 1/3 · CONCEPT CLÉ", en: "CONCEPT 1/3 · KEY IDEA", es: "NOCIÓN 1/3 · CONCEPTO CLAVE", de: "KONZEPT 1/3 · KERNIDEE", it: "NOZIONE 1/3 · CONCETTO CHIAVE", pt: "NOÇÃO 1/3 · CONCEITO-CHAVE", ar: "مفهوم 1/3 · الفكرة الأساسية", ja: "ポイント 1/3 · 基本概念", hi: "अवधारणा 1/3 · मुख्य सिद्धांत", zhHans: "要点 1/3 · 核心概念", ko: "핵심 1/3 · 주요 개념"),
+        .init(fr: "NOTION 1/3 · L'ESSENTIEL", en: "CONCEPT 1/3 · THE ESSENTIALS", es: "NOCIÓN 1/3 · LO ESENCIAL", de: "KONZEPT 1/3 · DAS WESENTLICHE", it: "NOZIONE 1/3 · L'ESSENZIALE", pt: "NOÇÃO 1/3 · O ESSENCIAL", ar: "مفهوم 1/3 · الأساسيات", ja: "ポイント 1/3 · 要点", hi: "अवधारणा 1/3 · मुख्य बातें", zhHans: "要点 1/3 · 核心精髓", ko: "핵심 1/3 · 필수 요약"),
+        .init(fr: "NOTION 2/3 · ARCHITECTURE & MÉCANISME", en: "CONCEPT 2/3 · ARCHITECTURE & MECHANISM", es: "NOCIÓN 2/3 · ARQUITECTURA Y MECANISMO", de: "KONZEPT 2/3 · ARCHITEKTUR & MECHANISMUS", it: "NOZIONE 2/3 · ARCHITETTURA E MECCANISMO", pt: "NOÇÃO 2/3 · ARQUITETURA E MECANISMO", ar: "مفهوم 2/3 · المعمارية والآلية", ja: "ポイント 2/3 · アーキテクチャと仕組み", hi: "अवधारणा 2/3 · आर्किटेक्चर और तंत्र", zhHans: "要点 2/3 · 架构与机制", ko: "핵심 2/3 · 아키텍처 및 작동 원리"),
+        .init(fr: "NOTION 3/3 · CAS PRATIQUE", en: "CONCEPT 3/3 · PRACTICAL CASE", es: "NOCIÓN 3/3 · CASO PRÁCTICO", de: "KONZEPT 3/3 · PRAXISFALL", it: "NOZIONE 3/3 · CASO PRATICO", pt: "NOÇÃO 3/3 · CASO PRÁTICO", ar: "مفهوم 3/3 · حالة عملية", ja: "ポイント 3/3 · 実践ケース", hi: "अवधारणा 3/3 · व्यावहारिक केस", zhHans: "要点 3/3 · 实战案例", ko: "핵심 3/3 · 실전 사례"),
+        .init(fr: "NOTION 3/3 · RÉFLEXE D'EXAMEN", en: "CONCEPT 3/3 · EXAM REFLEX", es: "NOCIÓN 3/3 · REFLEJO DE EXAMEN", de: "KONZEPT 3/3 · PRÜFUNGSREFLEX", it: "NOZIONE 3/3 · RIFLESSO D'ESAME", pt: "NOÇÃO 3/3 · REFLEXO DE EXAME", ar: "مفهوم 3/3 · قاعدة الاختبار", ja: "ポイント 3/3 · 試験の鉄則", hi: "अवधारणा 3/3 · परीक्षा नियम", zhHans: "要点 3/3 · 考试秒杀法则", ko: "핵심 3/3 · 시험 핵심 포인트"),
         .init(fr: "ÉTAPE 1/3 · LE PROBLÈME", en: "STEP 1/3 · THE PROBLEM", es: "PASO 1/3 · EL PROBLEMA", de: "SCHRITT 1/3 · DAS PROBLEM", it: "FASE 1/3 · IL PROBLEMA", pt: "PASSO 1/3 · O PROBLEMA", ar: "خطوة 1/3 · المشكلة", ja: "ステップ 1/3 · 課題", hi: "चरण 1/3 · समस्या", zhHans: "步骤 1/3 · 核心痛点", ko: "단계 1/3 · 문제 상황"),
         .init(fr: "ÉTAPE 2/3 · L'ARCHITECTURE", en: "STEP 2/3 · THE ARCHITECTURE", es: "PASO 2/3 · LA ARQUITECTURA", de: "SCHRITT 2/3 · DIE ARCHITEKTUR", it: "FASE 2/3 · L'ARCHITETTURA", pt: "PASSO 2/3 · A ARQUITETURA", ar: "خطوة 2/3 · المعمارية", ja: "ステップ 2/3 · アーキテクチャ", hi: "चरण 2/3 · आर्किटेक्चर", zhHans: "步骤 2/3 · 架构方案", ko: "단계 2/3 · 아키텍처"),
         .init(fr: "ÉTAPE 3/3 · RÉFLEXE D'EXAMEN", en: "STEP 3/3 · EXAM REFLEX", es: "PASO 3/3 · REFLEJO DE EXAMEN", de: "SCHRITT 3/3 · PRÜFUNGSREFLEX", it: "FASE 3/3 · RIFLESSO D'ESAME", pt: "PASSO 3/3 · REFLEXO DE EXAME", ar: "خطوة 3/3 · قاعدة الاختبار", ja: "ステップ 3/3 · 試験の鉄則", hi: "चरण 3/3 · परीक्षा नियम", zhHans: "步骤 3/3 · 考试秒杀法则", ko: "단계 3/3 · 시험 핵심 포인트"),

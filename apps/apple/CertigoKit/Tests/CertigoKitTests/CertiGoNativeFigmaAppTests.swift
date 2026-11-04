@@ -2356,4 +2356,213 @@ struct CertiGoNativeFigmaAppTests {
         #expect(bossCardUnlockedEN.unlockedBadgeTitle == "UNLOCKED ✓")
         #expect(bossCardUnlockedEN.statusSubtitle.contains("860/1000"))
     }
+
+    @Test("Non-regression audit across 33 certifications × 30 steps × 12 languages: zero Markdown asterisks (** / ****), zero long dashes, and zero duplicate pre-quiz slides, Declic cards, or questions")
+    func zeroMarkdownAsterisksAndZeroDuplicateSlidesDeclicAndQuestionsAcross33Tracks30StepsAnd12Languages() {
+        let allRoutes = CertiGoDedicatedTrackQuestionBank.allSupportedRouteCodes
+        #expect(allRoutes.count == 33)
+
+        func assertNoAsterisksOrLongDashes(_ text: String, context: String) {
+            #expect(!text.contains("**"), "Found '**' in \(context): \(text)")
+            #expect(!text.contains("****"), "Found '****' in \(context): \(text)")
+            #expect(!text.contains("\u{2014}"), "Found em-dash in \(context): \(text)")
+            #expect(!text.contains("\u{2013}"), "Found en-dash in \(context): \(text)")
+        }
+
+        for routeCode in allRoutes {
+            let units = CertiGoNativeRichCatalog.buildThreeUnits(forRouteCode: routeCode)
+            #expect(units.count == 3)
+
+            var trackStepFirstPrompts = Set<String>()
+            var trackDeclicTitles = Set<String>()
+
+            for unit in units {
+                #expect(unit.lessons.count == 10)
+                assertNoAsterisksOrLongDashes(unit.headerTitle, context: "\(routeCode) unit \(unit.unitNumber) headerTitle")
+                assertNoAsterisksOrLongDashes(unit.subtitle, context: "\(routeCode) unit \(unit.unitNumber) subtitle")
+                assertNoAsterisksOrLongDashes(unit.memoGoldenRule, context: "\(routeCode) unit \(unit.unitNumber) memoGoldenRule")
+
+                var unitDeclicTitles = Set<String>()
+                var unitDeclicRules = Set<String>()
+                var unitFirstPrompts = Set<String>()
+
+                for lesson in unit.lessons {
+                    assertNoAsterisksOrLongDashes(lesson.title, context: "\(lesson.id) title")
+                    assertNoAsterisksOrLongDashes(lesson.subtitle, context: "\(lesson.id) subtitle")
+
+                    let declic = CertiGoDedicatedTrackQuestionBank.declicCard(
+                        forRouteCode: routeCode,
+                        lessonId: lesson.id,
+                        lessonTitle: lesson.title
+                    )
+                    let slides = CertiGoDedicatedTrackQuestionBank.microSlides(
+                        forRouteCode: routeCode,
+                        lessonId: lesson.id,
+                        lessonTitle: lesson.title,
+                        declic: declic,
+                        serviceAssetName: lesson.serviceAssetName
+                    )
+                    #expect(slides.count == 3)
+
+                    // 1. Zero Markdown asterisks or long dashes in micro-slides and Carte Déclic
+                    for (sIdx, slide) in slides.enumerated() {
+                        assertNoAsterisksOrLongDashes(slide.stepBadge, context: "\(lesson.id) slide[\(sIdx)].stepBadge")
+                        assertNoAsterisksOrLongDashes(slide.title, context: "\(lesson.id) slide[\(sIdx)].title")
+                        assertNoAsterisksOrLongDashes(slide.bodyParagraph, context: "\(lesson.id) slide[\(sIdx)].bodyParagraph")
+                        assertNoAsterisksOrLongDashes(slide.keyTakeawayPill, context: "\(lesson.id) slide[\(sIdx)].keyTakeawayPill")
+                    }
+                    assertNoAsterisksOrLongDashes(declic.title, context: "\(lesson.id) declic.title")
+                    assertNoAsterisksOrLongDashes(declic.diagramTop, context: "\(lesson.id) declic.diagramTop")
+                    assertNoAsterisksOrLongDashes(declic.diagramBottom, context: "\(lesson.id) declic.diagramBottom")
+                    assertNoAsterisksOrLongDashes(declic.step1, context: "\(lesson.id) declic.step1")
+                    assertNoAsterisksOrLongDashes(declic.step2, context: "\(lesson.id) declic.step2")
+                    assertNoAsterisksOrLongDashes(declic.rule, context: "\(lesson.id) declic.rule")
+
+                    // 2. Within a single step, slide bodies, slide pills, and Declic fields are strictly distinct
+                    let intraStepTexts: [String] = [
+                        slides[0].bodyParagraph,
+                        slides[1].bodyParagraph,
+                        slides[2].bodyParagraph,
+                        slides[0].keyTakeawayPill,
+                        slides[1].keyTakeawayPill,
+                        slides[2].keyTakeawayPill,
+                        declic.title,
+                        declic.diagramTop,
+                        declic.diagramBottom,
+                        declic.step1,
+                        declic.step2,
+                        declic.rule
+                    ]
+                    #expect(
+                        Set(intraStepTexts).count == intraStepTexts.count,
+                        "Duplicate pre-quiz text found within step \(lesson.id): \(intraStepTexts)"
+                    )
+                    let slideTitles = slides.map(\.title)
+                    #expect(Set(slideTitles).count == 3, "Duplicate slide titles in \(lesson.id)")
+
+                    // 3. Within a unit (10 steps), every step has a unique Carte Déclic and unique questions
+                    #expect(
+                        unitDeclicTitles.insert(declic.title).inserted,
+                        "Duplicate Declic title in unit \(unit.unitNumber) at \(lesson.id)"
+                    )
+                    #expect(
+                        unitDeclicRules.insert(declic.rule).inserted,
+                        "Duplicate Declic rule in unit \(unit.unitNumber) at \(lesson.id)"
+                    )
+                    #expect(
+                        trackDeclicTitles.insert(declic.title).inserted,
+                        "Duplicate Declic title across track \(routeCode) at \(lesson.id)"
+                    )
+
+                    let exercises = CertiGoNativeLessonSessionEngine.defaultExercises(
+                        forRouteCode: routeCode,
+                        lessonId: lesson.id,
+                        lessonTitle: lesson.title
+                    )
+                    #expect(exercises.count >= 6)
+                    #expect(
+                        unitFirstPrompts.insert(exercises[0].prompt).inserted,
+                        "Duplicate first exercise prompt in unit \(unit.unitNumber) at \(lesson.id)"
+                    )
+                    #expect(
+                        trackStepFirstPrompts.insert(exercises[0].prompt).inserted,
+                        "Duplicate first exercise prompt across track \(routeCode) at \(lesson.id)"
+                    )
+
+                    var stepPrompts = Set<String>()
+                    for ex in exercises {
+                        assertNoAsterisksOrLongDashes(ex.prompt, context: "\(ex.id) prompt")
+                        assertNoAsterisksOrLongDashes(ex.plainLanguagePrompt, context: "\(ex.id) plainPrompt")
+                        assertNoAsterisksOrLongDashes(ex.examTip, context: "\(ex.id) examTip")
+                        #expect(ex.prompt != ex.plainLanguagePrompt, "prompt == plainLanguagePrompt in \(ex.id)")
+                        #expect(!slides.map(\.bodyParagraph).contains(ex.prompt), "Slide copied quiz prompt in \(ex.id)")
+                        #expect(stepPrompts.insert(ex.prompt).inserted, "Duplicate exercise prompt within \(lesson.id)")
+
+                        var optTitles = Set<String>()
+                        var optPlainTitles = Set<String>()
+                        for opt in ex.options {
+                            assertNoAsterisksOrLongDashes(opt.title, context: "\(ex.id) \(opt.id) title")
+                            assertNoAsterisksOrLongDashes(opt.plainLanguageTitle, context: "\(ex.id) \(opt.id) plainTitle")
+                            assertNoAsterisksOrLongDashes(opt.whyWrongOrRight, context: "\(ex.id) \(opt.id) explanation")
+                            #expect(opt.title != opt.plainLanguageTitle, "opt.title == opt.plainLanguageTitle in \(ex.id) \(opt.id)")
+                            #expect(optTitles.insert(opt.title).inserted, "Duplicate option title in \(ex.id)")
+                            #expect(optPlainTitles.insert(opt.plainLanguageTitle).inserted, "Duplicate option plainTitle in \(ex.id)")
+                        }
+                    }
+                }
+            }
+
+            // 4. Verify all 12 mock exam questions per certification
+            let examQuestions = CertiGoNativeRichCatalog.buildExamQuestions(forRouteCode: routeCode)
+            #expect(examQuestions.count == 12)
+            var examStems = Set<String>()
+            for q in examQuestions {
+                assertNoAsterisksOrLongDashes(q.stem, context: "\(q.id) stem")
+                assertNoAsterisksOrLongDashes(q.plainLanguageStem, context: "\(q.id) plainStem")
+                #expect(q.stem != q.plainLanguageStem)
+                #expect(examStems.insert(q.stem).inserted, "Duplicate exam stem in \(routeCode): \(q.stem)")
+                for ch in q.choices {
+                    assertNoAsterisksOrLongDashes(ch.text, context: "\(q.id) choice \(ch.badge) text")
+                    assertNoAsterisksOrLongDashes(ch.plainLanguageText, context: "\(q.id) choice \(ch.badge) plainText")
+                    #expect(ch.text != ch.plainLanguageText)
+                }
+            }
+
+            // 5. Verify across all 12 language modes that localization preserves slide/Declic distinctness and zero asterisks
+            let sampleLesson = units[0].lessons[1]
+            let baseDeclic = CertiGoDedicatedTrackQuestionBank.declicCard(
+                forRouteCode: routeCode,
+                lessonId: sampleLesson.id,
+                lessonTitle: sampleLesson.title
+            )
+            let baseSlides = CertiGoDedicatedTrackQuestionBank.microSlides(
+                forRouteCode: routeCode,
+                lessonId: sampleLesson.id,
+                lessonTitle: sampleLesson.title,
+                declic: baseDeclic,
+                serviceAssetName: sampleLesson.serviceAssetName
+            )
+            let baseEx = CertiGoNativeLessonSessionEngine.defaultExercises(
+                forRouteCode: routeCode,
+                lessonId: sampleLesson.id,
+                lessonTitle: sampleLesson.title
+            )[0]
+
+            for langIdx in 0..<CertiGoSupportedLanguage.allCases.count {
+                let locSlides = baseSlides.map { CertiGoMultilingualEngine.localizedLessonSlide($0, lang: langIdx) }
+                let locDeclicTitle = CertiGoMultilingualEngine.tr(baseDeclic.title, lang: langIdx)
+                let locDeclicRule = CertiGoMultilingualEngine.tr(baseDeclic.rule, lang: langIdx)
+                let locBodies = [
+                    locSlides[0].bodyParagraph,
+                    locSlides[1].bodyParagraph,
+                    locSlides[2].bodyParagraph,
+                    locDeclicTitle,
+                    locDeclicRule
+                ]
+                #expect(
+                    Set(locBodies).count == locBodies.count,
+                    "Localized slides/declic collapsed in \(routeCode) lang=\(langIdx)"
+                )
+                for text in locBodies {
+                    assertNoAsterisksOrLongDashes(text, context: "\(routeCode) lang=\(langIdx)")
+                }
+                let locEx = CertiGoMultilingualEngine.localizedExercise(baseEx, lang: langIdx)
+                assertNoAsterisksOrLongDashes(locEx.prompt, context: "\(routeCode) lang=\(langIdx) prompt")
+                assertNoAsterisksOrLongDashes(locEx.plainLanguagePrompt, context: "\(routeCode) lang=\(langIdx) plainPrompt")
+            }
+        }
+
+        // 6. Also verify CertiGoAIProductivityAndLegalCatalog curricula
+        for curr in CertiGoAIProductivityAndLegalCatalog.allCurricula {
+            for lesson in curr.lessons {
+                let s = lesson.declicCard.microSlides
+                let d = lesson.declicCard
+                let texts = [s[0].bodyParagraph, s[1].bodyParagraph, s[2].bodyParagraph, d.title, d.rule]
+                #expect(Set(texts).count == texts.count, "Duplicate text in AI curriculum lesson \(lesson.id)")
+                for t in texts {
+                    assertNoAsterisksOrLongDashes(t, context: "AI curriculum \(lesson.id)")
+                }
+            }
+        }
+    }
 }
