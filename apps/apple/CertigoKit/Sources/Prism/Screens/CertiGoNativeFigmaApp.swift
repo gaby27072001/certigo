@@ -502,10 +502,10 @@ public struct CertiGoLessonMicroSlide: Equatable, Sendable {
         keyTakeawayPill: String,
         serviceAssetName: String
     ) {
-        self.stepBadge = stepBadge
-        self.title = title
-        self.bodyParagraph = bodyParagraph
-        self.keyTakeawayPill = keyTakeawayPill
+        self.stepBadge = stepBadge.strippingMarkdownAsterisks
+        self.title = title.strippingMarkdownAsterisks
+        self.bodyParagraph = bodyParagraph.strippingMarkdownAsterisks
+        self.keyTakeawayPill = keyTakeawayPill.strippingMarkdownAsterisks
         self.serviceAssetName = serviceAssetName
     }
 }
@@ -905,15 +905,21 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
             isCorrect: Bool,
             whyWrongOrRight: String
         ) {
+            let cleanTitle = title.strippingMarkdownAsterisks
+            let cleanSub = subtitle?.strippingMarkdownAsterisks
+            let rawPlain = (plainLanguageTitle
+                ?? CertiGoPlainLanguageTranslator.simplifyOptionTitle(cleanTitle, subtitle: cleanSub)).strippingMarkdownAsterisks
+            let distinctPlain = rawPlain == cleanTitle
+                ? CertiGoPlainLanguageTranslator.simplifyOptionTitle(cleanTitle, subtitle: cleanSub).strippingMarkdownAsterisks
+                : rawPlain
             self.id = id
             self.badge = badge
-            self.title = title
-            self.plainLanguageTitle = plainLanguageTitle
-                ?? CertiGoPlainLanguageTranslator.simplifyOptionTitle(title, subtitle: subtitle)
-            self.subtitle = subtitle
+            self.title = cleanTitle
+            self.plainLanguageTitle = distinctPlain == cleanTitle ? "En clair : \(cleanTitle)" : distinctPlain
+            self.subtitle = cleanSub
             self.assetName = assetName
             self.isCorrect = isCorrect
-            self.whyWrongOrRight = whyWrongOrRight
+            self.whyWrongOrRight = whyWrongOrRight.strippingMarkdownAsterisks
         }
     }
 
@@ -996,45 +1002,61 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
         variantGroupId: String = "",
         isReviewReplay: Bool = false
     ) {
-        let resolvedConceptTitle = conceptTitle.isEmpty ? domainBadge : conceptTitle
-        self.id = id
-        self.formatCode = formatCode
-        self.domainBadge = domainBadge
-        self.subBadge = subBadge
-        self.prompt = prompt
-        self.plainLanguagePrompt = plainLanguagePrompt
+        let cleanDomainBadge = domainBadge.strippingMarkdownAsterisks
+        let cleanSubBadge = subBadge.strippingMarkdownAsterisks
+        let resolvedConceptTitle = (conceptTitle.isEmpty ? cleanDomainBadge : conceptTitle).strippingMarkdownAsterisks
+        let cleanPrompt = prompt.strippingMarkdownAsterisks
+        let rawPlain = (plainLanguagePrompt
             ?? CertiGoPlainLanguageTranslator.simplifyPrompt(
-                prompt,
+                cleanPrompt,
                 forExerciseId: id,
                 conceptTitle: resolvedConceptTitle
-            )
+            )).strippingMarkdownAsterisks
+        let distinctPlainPrompt = rawPlain == cleanPrompt
+            ? CertiGoPlainLanguageTranslator.simplifyPrompt(
+                cleanPrompt,
+                forExerciseId: id,
+                conceptTitle: resolvedConceptTitle
+            ).strippingMarkdownAsterisks
+            : rawPlain
+        self.id = id
+        self.formatCode = formatCode
+        self.domainBadge = cleanDomainBadge
+        self.subBadge = cleanSubBadge
+        self.prompt = cleanPrompt
+        self.plainLanguagePrompt = distinctPlainPrompt == cleanPrompt
+            ? "En clair : \(cleanPrompt)"
+            : distinctPlainPrompt
         let resolvedBridge = jargonGlossaryBridge
             ?? CertiGoPlainLanguageTranslator.buildJargonGlossaryBridge(
-                prompt: prompt,
+                prompt: cleanPrompt,
                 options: options,
                 exerciseId: id,
                 conceptTitle: resolvedConceptTitle
             )
         self.storedJargonGlossaryBridge = resolvedBridge.map {
-            CertiGoJargonBridgeItem(term: $0.term, simpleMeaning: $0.simpleMeaning)
+            CertiGoJargonBridgeItem(
+                term: $0.term.strippingMarkdownAsterisks,
+                simpleMeaning: $0.simpleMeaning.strippingMarkdownAsterisks
+            )
         }
         self.mascotPose = mascotPose
         self.options = options
-        self.cliPrefix = cliPrefix
-        self.cliSuffix = cliSuffix
-        self.expectedCLIInput = expectedCLIInput
-        self.cliSuggestionBricks = cliSuggestionBricks
-        self.wordBankTargetTokens = wordBankTargetTokens
-        self.wordBankAllBricks = wordBankAllBricks
-        self.matchingLeftItems = matchingLeftItems
-        self.matchingRightItems = matchingRightItems
-        self.hierarchyCorrectOrder = hierarchyCorrectOrder
-        self.examTip = examTip
-        self.comparisonLeftTitle = comparisonLeftTitle
-        self.comparisonLeftBullets = comparisonLeftBullets
-        self.comparisonRightTitle = comparisonRightTitle
-        self.comparisonRightBullets = comparisonRightBullets
-        self.comparisonGoldenRule = comparisonGoldenRule
+        self.cliPrefix = cliPrefix?.strippingMarkdownAsterisks
+        self.cliSuffix = cliSuffix?.strippingMarkdownAsterisks
+        self.expectedCLIInput = expectedCLIInput?.strippingMarkdownAsterisks
+        self.cliSuggestionBricks = cliSuggestionBricks.map(\.strippingMarkdownAsterisks)
+        self.wordBankTargetTokens = wordBankTargetTokens.map(\.strippingMarkdownAsterisks)
+        self.wordBankAllBricks = wordBankAllBricks.map(\.strippingMarkdownAsterisks)
+        self.matchingLeftItems = matchingLeftItems.map(\.strippingMarkdownAsterisks)
+        self.matchingRightItems = matchingRightItems.map(\.strippingMarkdownAsterisks)
+        self.hierarchyCorrectOrder = hierarchyCorrectOrder.map(\.strippingMarkdownAsterisks)
+        self.examTip = examTip.strippingMarkdownAsterisks
+        self.comparisonLeftTitle = comparisonLeftTitle.strippingMarkdownAsterisks
+        self.comparisonLeftBullets = comparisonLeftBullets.map(\.strippingMarkdownAsterisks)
+        self.comparisonRightTitle = comparisonRightTitle.strippingMarkdownAsterisks
+        self.comparisonRightBullets = comparisonRightBullets.map(\.strippingMarkdownAsterisks)
+        self.comparisonGoldenRule = comparisonGoldenRule.strippingMarkdownAsterisks
         self.conceptId = conceptId.isEmpty ? id : conceptId
         self.conceptTitle = resolvedConceptTitle
         self.difficulty = min(max(difficulty, 0.0), 1.0)
@@ -2007,9 +2029,12 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
     public var correctWhyRightExplanation: String {
         let ex = currentExercise
         if let firstCorrect = ex.options.first(where: \.isCorrect) {
+            if firstCorrect.whyWrongOrRight == ex.examTip {
+                return "Bonne réponse (\(ex.primaryCorrectOptionTitle)) : \(firstCorrect.whyWrongOrRight)"
+            }
             return firstCorrect.whyWrongOrRight
         }
-        return ex.examTip
+        return "Bonne réponse (\(ex.primaryCorrectOptionTitle)) : \(ex.examTip)"
     }
 
     public mutating func dismissDeclicCard15() {
@@ -2052,6 +2077,30 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         return exercises.map { ex in
             guard ex.formatCode == "Q_TYPE_04" || ex.formatCode == "Q_TYPE_05" else {
                 return ex
+            }
+            if ex.options.count >= 2 {
+                return CertiGoNativeExerciseItem(
+                    id: ex.id,
+                    formatCode: "Q_TYPE_01",
+                    domainBadge: ex.domainBadge,
+                    subBadge: ex.subBadge,
+                    prompt: ex.prompt,
+                    plainLanguagePrompt: ex.plainLanguagePrompt,
+                    jargonGlossaryBridge: ex.jargonGlossaryBridge,
+                    mascotPose: ex.mascotPose,
+                    options: ex.options,
+                    examTip: ex.examTip,
+                    comparisonLeftTitle: ex.comparisonLeftTitle,
+                    comparisonLeftBullets: ex.comparisonLeftBullets,
+                    comparisonRightTitle: ex.comparisonRightTitle,
+                    comparisonRightBullets: ex.comparisonRightBullets,
+                    comparisonGoldenRule: ex.comparisonGoldenRule,
+                    conceptId: ex.conceptId,
+                    conceptTitle: ex.conceptTitle,
+                    difficulty: 0.35,
+                    variantGroupId: ex.variantGroupId,
+                    isReviewReplay: ex.isReviewReplay
+                )
             }
             if ex.formatCode == "Q_TYPE_04" {
                 return CertiGoNativeExerciseItem(
@@ -2415,11 +2464,23 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         lessonTitle: String = ""
     ) -> [CertiGoNativeExerciseItem] {
         let upper = routeCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let lowerId = lessonId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if upper.isEmpty || upper == "AZ-104" {
-            return az104Exercises(
-                routeCode: "AZ-104",
-                lowerLessonId: lessonId.lowercased(),
-                lowerTitle: lessonTitle.lowercased()
+            if lowerId.isEmpty
+                || lowerId == "az-104-u1-s1"
+                || lowerId == "az-104-u2-s1"
+                || lowerId == "az-104-u3-s1"
+            {
+                return az104Exercises(
+                    routeCode: "AZ-104",
+                    lowerLessonId: lowerId,
+                    lowerTitle: lessonTitle.lowercased()
+                )
+            }
+            return CertiGoDedicatedTrackQuestionBank.exercises(
+                forRouteCode: "AZ-104",
+                lessonId: lessonId,
+                lessonTitle: lessonTitle
             )
         }
         return CertiGoDedicatedTrackQuestionBank.exercises(
@@ -4955,8 +5016,8 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                 prompt: "Vous interdisez à Copilot de lire les fichiers .env et le dossier secrets/.\nAssemble la règle YAML de Content Exclusion :",
                 mascotPose: .specialistCLIContainers,
                 options: [],
-                wordBankTargetTokens: ["paths:", "- \"**/.env\"", "- \"/secrets/**\""],
-                wordBankAllBricks: ["paths:", "- \"**/.env\"", "- \"/secrets/**\"", "allow_all:", "true"],
+                wordBankTargetTokens: ["paths:", "- \"*.env\"", "- \"/secrets/*\""],
+                wordBankAllBricks: ["paths:", "- \"*.env\"", "- \"/secrets/*\"", "allow_all:", "true"],
                 examTip: "Content Exclusion dans GitHub Copilot Business/Enterprise bloque l'accès aux fichiers sensibles dans l'IDE et dans Copilot Chat."
             ),
             CertiGoNativeExerciseItem(
@@ -5888,11 +5949,16 @@ public struct CertiGoNativeExamQuestion: Identifiable, Codable, Equatable, Hasha
             isCorrect: Bool,
             plainLanguageText: String? = nil
         ) {
+            let cleanText = text.strippingMarkdownAsterisks
+            let rawPlain = (plainLanguageText
+                ?? CertiGoPlainLanguageTranslator.simplifyOptionTitle(cleanText, subtitle: nil)).strippingMarkdownAsterisks
+            let distinctPlain = rawPlain == cleanText
+                ? CertiGoPlainLanguageTranslator.simplifyOptionTitle(cleanText, subtitle: nil).strippingMarkdownAsterisks
+                : rawPlain
             self.id = id
             self.badge = badge
-            self.text = text
-            self.plainLanguageText = plainLanguageText
-                ?? CertiGoPlainLanguageTranslator.simplifyOptionTitle(text, subtitle: nil)
+            self.text = cleanText
+            self.plainLanguageText = distinctPlain == cleanText ? "En clair : \(cleanText)" : distinctPlain
             self.isCorrect = isCorrect
         }
     }
@@ -5935,17 +6001,27 @@ public struct CertiGoNativeExamQuestion: Identifiable, Codable, Equatable, Hasha
         plainLanguageStem: String? = nil,
         choices: [Choice]
     ) {
+        let cleanDomain = domainTitle.strippingMarkdownAsterisks
+        let cleanStem = stem.strippingMarkdownAsterisks
+        let rawPlain = (plainLanguageStem
+            ?? CertiGoPlainLanguageTranslator.simplifyPrompt(
+                cleanStem,
+                forExerciseId: id,
+                conceptTitle: cleanDomain
+            )).strippingMarkdownAsterisks
+        let distinctPlain = rawPlain == cleanStem
+            ? CertiGoPlainLanguageTranslator.simplifyPrompt(
+                cleanStem,
+                forExerciseId: id,
+                conceptTitle: cleanDomain
+            ).strippingMarkdownAsterisks
+            : rawPlain
         self.id = id
         self.number = number
-        self.domainTitle = domainTitle
-        self.caseStudyBadge = caseStudyBadge
-        self.stem = stem
-        self.plainLanguageStem = plainLanguageStem
-            ?? CertiGoPlainLanguageTranslator.simplifyPrompt(
-                stem,
-                forExerciseId: id,
-                conceptTitle: domainTitle
-            )
+        self.domainTitle = cleanDomain
+        self.caseStudyBadge = caseStudyBadge.strippingMarkdownAsterisks
+        self.stem = cleanStem
+        self.plainLanguageStem = distinctPlain == cleanStem ? "En clair : \(cleanStem)" : distinctPlain
         self.choices = choices
     }
 }
@@ -7176,8 +7252,8 @@ public enum CertiGoNativeRichCatalog {
                 .init(id: "C", badge: "C", text: "Disable branch protection", isCorrect: false),
                 .init(id: "D", badge: "D", text: "Auto-merge pull requests", isCorrect: false)
             ]),
-            .init(id: "\(upper)-ex-6", number: 6, domainTitle: "Instructions Ciblées par Fichier (applyTo)", caseStudyBadge: "ÉTUDE DE CAS \(upper) · MONOREPO", stem: "Dans un monorepo mêlant Swift, .NET et Flutter, comment appliquer des règles spécifiques uniquement aux fichiers `backend/**/*.cs` ?", choices: [
-                .init(id: "A", badge: "A", text: "Créer un fichier .github/instructions/backend.instructions.md avec frontmatter applyTo: \"backend/**/*.cs\"", isCorrect: true),
+            .init(id: "\(upper)-ex-6", number: 6, domainTitle: "Instructions Ciblées par Fichier (applyTo)", caseStudyBadge: "ÉTUDE DE CAS \(upper) · MONOREPO", stem: "Dans un monorepo mêlant Swift, .NET et Flutter, comment appliquer des règles spécifiques uniquement aux fichiers backend/*.cs ?", choices: [
+                .init(id: "A", badge: "A", text: "Créer un fichier .github/instructions/backend.instructions.md avec frontmatter applyTo: \"backend/*.cs\"", isCorrect: true),
                 .init(id: "B", badge: "B", text: "Supprimer les autres langages du dépôt", isCorrect: false),
                 .init(id: "C", badge: "C", text: "Renommer tous les fichiers en .txt", isCorrect: false),
                 .init(id: "D", badge: "D", text: "Désactiver Git", isCorrect: false)
@@ -19063,8 +19139,8 @@ public struct CertiGoNativeLessonSessionModalView: View {
                         .lineSpacing(5)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    if slideIdx <= 1 {
-                        // B1: Real 3-Brick Connected Visual Architecture Diagram on Déclic Cards
+                    if slideIdx == 1 {
+                        // B1: Real 3-Brick Connected Visual Architecture Diagram on Slide 2 (Architecture & Mechanism)
                         CertiGoVisualArchitectureDiagramView(
                             routeCode: appState.lessonSession.routeCode,
                             lessonId: appState.lessonSession.lessonId
@@ -19894,22 +19970,24 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 .accessibilityIdentifier("sheet05-live-ai-explanation-card")
             }
 
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                Text(verbatim: "✕ TA RÉPONSE : \(appState.lessonSession.selectedOptionSummaryText)")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#e11d48"))
-                Text(verbatim: appState.lessonSession.selectedWhyWrongExplanation)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                    .foregroundStyle(PrismColor.figmaHex("#881337"))
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
+            if appState.lessonSession.selectedOptionSummaryText != ex.primaryCorrectOptionTitle {
+                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                    Text(verbatim: "✕ TA RÉPONSE : \(appState.lessonSession.selectedOptionSummaryText)")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#e11d48"))
+                    Text(verbatim: appState.lessonSession.selectedWhyWrongExplanation)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
+                        .foregroundStyle(PrismColor.figmaHex("#881337"))
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(PrismSpacing.m)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                        .fill(PrismColor.figmaHex("#fff1f2"))
+                )
             }
-            .padding(PrismSpacing.m)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                    .fill(PrismColor.figmaHex("#fff1f2"))
-            )
 
             VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                 Text(verbatim: "✓ BONNE RÉPONSE : \(ex.primaryCorrectOptionTitle)")

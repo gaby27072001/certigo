@@ -1017,8 +1017,8 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
                 configFileName: "copilot-content-exclusion.yml",
                 configLanguage: "yaml",
                 configValidLine1: "# Exclure les secrets du contexte GitHub Copilot",
-                configBuggyLine2: "- \"**/*.md\" # Oubli des fichiers .env et clés privées",
-                configValidLine3: "- \"/config/production-secrets/**\"",
+                configBuggyLine2: "- \"*.md\" # Oubli des fichiers .env et clés privées",
+                configValidLine3: "- \"/config/production-secrets/*\"",
                 scopeOrder: [
                     "Politique d'Entreprise (GitHub Enterprise Cloud Policy)",
                     "Politique d'Organisation (Organization Copilot Settings & Content Exclusion)",
