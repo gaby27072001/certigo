@@ -2641,4 +2641,82 @@ struct CertiGoNativeFigmaAppTests {
             }
         }
     }
+
+    @Test("Build 14 Visual Audit & Native iOS 26 Liquid Glass Bottom Tab Bar: GlassEffectContainer, matchedGeometryEffect, liquidGlassIntensity (0.0...1.0), and 32 P1/P2/P3 UI Fixes")
+    func build14VisualAuditAndNativeLiquidGlassBottomTabBar() throws {
+        // 1. Verify bidirectional liquidGlassIntensity (0.0 ... 1.0) <-> settingsLiquidGlassIntensityPercent (0 ... 100)
+        var appState = CertiGoNativeAppState(restoreFromDisk: false)
+        appState.liquidGlassIntensity = 0.0
+        #expect(appState.settingsLiquidGlassIntensityPercent == 0)
+        #expect(appState.liquidGlassIntensity == 0.0)
+        appState.liquidGlassIntensity = 0.75
+        #expect(appState.settingsLiquidGlassIntensityPercent == 75)
+        #expect(appState.liquidGlassIntensity == 0.75)
+        appState.liquidGlassIntensity = 1.0
+        #expect(appState.settingsLiquidGlassIntensityPercent == 100)
+        #expect(appState.liquidGlassIntensity == 1.0)
+
+        // 2. Verify CertiGoTrueLiquidGlassDropletView optical interpolation across 0% -> 100%
+        let azTheme = CertiGoTrackThemePalette.palette(forRouteCode: "AZ-900")
+        let droplet0 = CertiGoTrueLiquidGlassDropletView(trackTheme: azTheme, width: 68, intensityPercent: 0)
+        let droplet100 = CertiGoTrueLiquidGlassDropletView(trackTheme: azTheme, width: 68, intensityPercent: 100)
+        #expect(droplet0.glassVeilOpacity > droplet100.glassVeilOpacity)
+        #expect(droplet0.tintOpacity > droplet100.tintOpacity)
+        #expect(droplet0.chromaticRefractionOpacity == 0.0)
+        #expect(droplet100.chromaticRefractionOpacity == 1.0)
+        #expect(droplet0.specularMeniscusOpacity == 0.0)
+        #expect(abs(droplet100.specularMeniscusOpacity - 0.98) < 0.0001)
+        #expect(droplet100.shadowDepthRadius > droplet0.shadowDepthRadius)
+
+        // 3. Verify numbered points on Slide 2 start on separate lines (`\n2.`, `\n3.`) with zero Markdown asterisks
+        appState.selectRoute("AZ-900")
+        appState.startLessonSession()
+        let slide2Body = appState.lessonSession.lessonSlides[1].bodyParagraph
+        #expect(slide2Body.contains("\n2. "))
+        #expect(slide2Body.contains("\n3. "))
+        #expect(!slide2Body.contains("**"))
+
+        // 4. Verify source-level invariants for Native Liquid Glass & Build 14 Visual Audit fixes
+        var repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: repoRoot.appendingPathComponent("AGENTS.md").path) {
+            let parent = repoRoot.deletingLastPathComponent()
+            guard parent != repoRoot else { throw CocoaError(.fileNoSuchFile) }
+            repoRoot = parent
+        }
+        let figmaSource = try String(
+            contentsOf: repoRoot.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Screens/CertiGoNativeFigmaApp.swift"),
+            encoding: .utf8
+        )
+        let neuroSource = try String(
+            contentsOf: repoRoot.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Screens/CertiGoRetentionNeuroEngine.swift"),
+            encoding: .utf8
+        )
+        let actusSource = try String(
+            contentsOf: repoRoot.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Screens/CertiGoTechNewsAndExamRouting.swift"),
+            encoding: .utf8
+        )
+
+        #expect(figmaSource.contains("GlassEffectContainer"))
+        #expect(figmaSource.contains(".glassEffect("))
+        #expect(figmaSource.contains("matchedGeometryEffect(id: \"activeBottomTabLens\", in: bottomTabGlassNamespace)"))
+        #expect(figmaSource.contains(".spring(response: responseSeconds, dampingFraction: dampingRatio)"))
+        #expect(figmaSource.contains("✓ Bonne réponse"))
+        #expect(figmaSource.contains("✕ Ta réponse"))
+        #expect(figmaSource.contains("CapEx vs OpEx"))
+        #expect(figmaSource.contains("Modèle basé sur la consommation"))
+        #expect(figmaSource.contains("Ligue hebdo"))
+        #expect(figmaSource.contains("Costumes de la mascotte"))
+        #expect(figmaSource.contains("Parcours actifs"))
+        #expect(figmaSource.contains("Langue des cours"))
+        #expect(figmaSource.contains("Cours hors ligne"))
+        #expect(figmaSource.contains("Widgets et Dynamic Island"))
+        #expect(figmaSource.contains("Centre de contrôle"))
+        #expect(figmaSource.contains("Lien d'invitation"))
+        #expect(figmaSource.contains("Rechercher un pseudo"))
+        #expect(neuroSource.contains("let primaryFaceHex = isCorrect ? \"#58cc02\" : \"#0078d4\""))
+        #expect(actusSource.contains("Actus Tech"))
+        #expect(actusSource.contains("Question rapide"))
+        #expect(actusSource.contains("Ouvrir dans le Coach"))
+        #expect(actusSource.contains("Impact sur l'examen"))
+    }
 }

@@ -1068,6 +1068,54 @@ public enum CertiGoMultilingualEngine {
             en: "Weekly League", es: "Liga Semanal", de: "Wochenliga", it: "Lega Settimanale", pt: "Liga Semanal",
             ar: "دوري الأسبوع", ja: "週間リーグ", hi: "साप्ताहिक लीग", zhHans: "本周联赛", ko: "주간 리그"
         ),
+        "Ligue hebdo": .init(
+            en: "Weekly league", es: "Liga semanal", de: "Wochenliga", it: "Lega settimanale", pt: "Liga semanal",
+            ar: "الدوري الأسبوعي", ja: "週間リーグ", hi: "साप्ताहिक लीग", zhHans: "每周联赛", ko: "주간 리그"
+        ),
+        "Costumes de la mascotte": .init(
+            en: "Mascot outfits", es: "Figurinos de la mascota", de: "Maskottchen-Kostüme", it: "Costumi della mascotte", pt: "Figurinos do mascote",
+            ar: "أزياء التميمة", ja: "マスコット衣装", hi: "मैस्कॉट पोशाकें", zhHans: "吉祥物装扮", ko: "마스코트 의상"
+        ),
+        "Parcours actifs": .init(
+            en: "Active tracks", es: "Rutas activas", de: "Aktive Lernpfade", it: "Percorsi attivi", pt: "Trilhas ativas",
+            ar: "المسارات النشطة", ja: "学習中のコース", hi: "सक्रिय ट्रैक", zhHans: "活跃路径", ko: "진행 중인 트랙"
+        ),
+        "Langue des cours": .init(
+            en: "Course language", es: "Idioma de cursos", de: "Kurssprache", it: "Lingua dei corsi", pt: "Idioma dos cursos",
+            ar: "لغة الدورات", ja: "コースの言語", hi: "कोर्स की भाषा", zhHans: "课程语言", ko: "강의 언어"
+        ),
+        "Cours hors ligne": .init(
+            en: "Offline courses", es: "Cursos sin conexión", de: "Offline-Kurse", it: "Corsi offline", pt: "Cursos offline",
+            ar: "دورات دون اتصال", ja: "オフラインコース", hi: "ऑफ़लाइन कोर्स", zhHans: "离线课程", ko: "오프라인 강의"
+        ),
+        "Widgets et Dynamic Island": .init(
+            en: "Widgets & Dynamic Island", es: "Widgets y Dynamic Island", de: "Widgets & Dynamic Island", it: "Widget e Dynamic Island", pt: "Widgets e Dynamic Island",
+            ar: "الأدوات وDynamic Island", ja: "ウィジェット＆Dynamic Island", hi: "विजेट और Dynamic Island", zhHans: "小组件与灵动岛", ko: "위젯 및 Dynamic Island"
+        ),
+        "Centre de contrôle": .init(
+            en: "Control Center", es: "Centro de control", de: "Kontrollzentrum", it: "Centro di Controllo", pt: "Central de Controle",
+            ar: "مركز التحكم", ja: "コントロールセンター", hi: "कंट्रोल सेंटर", zhHans: "控制中心", ko: "제어 센터"
+        ),
+        "Lien d'invitation": .init(
+            en: "Invite link", es: "Enlace de invitación", de: "Einladungslink", it: "Link d'invito", pt: "Link de convite",
+            ar: "رابط الدعوة", ja: "招待リンク", hi: "आमंत्रण लिंक", zhHans: "邀请链接", ko: "초대 링크"
+        ),
+        "Lien et QR code": .init(
+            en: "Link & QR code", es: "Enlace y código QR", de: "Link & QR-Code", it: "Link e codice QR", pt: "Link e código QR",
+            ar: "الرابط ورمز QR", ja: "リンク＆QRコード", hi: "लिंक और QR कोड", zhHans: "链接与二维码", ko: "링크 및 QR 코드"
+        ),
+        "Rechercher un pseudo": .init(
+            en: "Search username", es: "Buscar usuario", de: "Nutzername suchen", it: "Cerca nickname", pt: "Buscar apelido",
+            ar: "ابحث عن اسم مستخدم", ja: "ユーザー名を検索", hi: "यूज़रनेम खोजें", zhHans: "搜索昵称", ko: "닉네임 검색"
+        ),
+        "Cours": .init(
+            en: "Course", es: "Curso", de: "Kurs", it: "Corso", pt: "Curso",
+            ar: "الدرس", ja: "コース", hi: "कोर्स", zhHans: "课程", ko: "강의"
+        ),
+        "Déclic": .init(
+            en: "Key insight", es: "Idea clave", de: "Aha-Moment", it: " intuizione", pt: "Virada de chave",
+            ar: "الفكرة الأساسية", ja: "ひらめき", hi: "मुख्य बिंदु", zhHans: "核心顿悟", ko: "핵심 포인트"
+        ),
         "📊 Voir mes Statistiques & Analyses Pro": .init(
             en: "📊 View my Pro Analytics & Readiness", es: "📊 Ver mis Estadísticas y Análisis Pro", de: "📊 Meine Pro-Statistiken & Analysen ansehen", it: "📊 Vedi Statistiche e Analisi Pro", pt: "📊 Ver minhas Estatísticas e Análises Pro",
             ar: "📊 عرض إحصائياتي وتحليلات PRO", ja: "📊 Pro統計＆合格予測分析を見る", hi: "📊 मेरे प्रो आंकड़े और विश्लेषण देखें", zhHans: "📊 查看专业数据统计与备考分析", ko: "📊 Pro 통계 및 합격 분석 보기"

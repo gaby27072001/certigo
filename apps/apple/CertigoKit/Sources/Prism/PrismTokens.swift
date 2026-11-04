@@ -439,7 +439,8 @@ public enum CertiGoTypeToken: String, Codable, Hashable, CaseIterable, Sendable 
         higPointSize = 12
         higWeight = .semibold
       }
-      return Font.system(size: higPointSize, weight: higWeight, design: .default)
+      let effectivePointSize = max(higPointSize, size)
+      return Font.system(size: effectivePointSize, weight: higWeight, design: .default)
     }
   }
 

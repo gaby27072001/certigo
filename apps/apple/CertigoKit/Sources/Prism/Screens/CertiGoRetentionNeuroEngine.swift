@@ -1450,6 +1450,10 @@ public struct CertiGoFluidErrorFeedbackCardView: View {
     public let onTapDeepenExplanation: () -> Void
     public let onTapContinue: () -> Void
 
+    @ScaledMetric(relativeTo: .headline) private var scaledHeaderSize: CGFloat = FigMetrics.seventeen
+    @ScaledMetric(relativeTo: .subheadline) private var scaledAnswerSize: CGFloat = FigMetrics.fourteen
+    @ScaledMetric(relativeTo: .footnote) private var scaledTakeawaySize: CGFloat = FigMetrics.thirteen
+
     public init(
         isCorrect: Bool,
         isMasterStroke: Bool = false,
@@ -1473,15 +1477,28 @@ public struct CertiGoFluidErrorFeedbackCardView: View {
     public var body: some View {
         let bgHex = isCorrect ? "#d7ffb8" : "#ffdfe0"
         let titleHex = isCorrect ? "#3f7d00" : "#ea2b2b"
-        let primaryFaceHex = isCorrect ? "#58cc02" : "#ff4b4b"
-        let primaryLipHex = isCorrect ? "#46a302" : "#d93838"
+        // Keep green on success; use CertiGo Blue (#0078d4) for Continuer after an error so it never mimics the red wrong answer
+        let primaryFaceHex = isCorrect ? "#58cc02" : "#0078d4"
+        let primaryLipHex = isCorrect ? "#46a302" : "#005a9e"
+        let takeawayDetail: String = {
+            let trimmedConcise = conciseExplanationText.strippingMarkdownAsterisks.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedTip = examTipText.strippingMarkdownAsterisks.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedTip.isEmpty && trimmedTip != primaryCorrectTitle {
+                return trimmedTip
+            }
+            if !trimmedConcise.isEmpty && trimmedConcise != primaryCorrectTitle {
+                return trimmedConcise
+            }
+            return "En Cloud (OpEx), tu paies uniquement à la consommation réelle sans investissement matériel initial (CapEx)."
+        }()
 
         VStack(alignment: .leading, spacing: PrismSpacing.s) {
             HStack(spacing: PrismSpacing.xs) {
                 Text(verbatim: isCorrect ? "✓  Exact !" : "✕  À retenir")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
+                    .font(PrismTypography.figmaFont(size: scaledHeaderSize, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex(titleHex))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Spacer()
 
@@ -1498,22 +1515,30 @@ public struct CertiGoFluidErrorFeedbackCardView: View {
             }
 
             if !isCorrect {
-                Text(verbatim: "✓ \(primaryCorrectTitle)")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#991b1b"))
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                    Text(verbatim: "✓ Bonne réponse : \(primaryCorrectTitle.strippingMarkdownAsterisks)")
+                        .font(PrismTypography.figmaFont(size: scaledAnswerSize, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#991b1b"))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(verbatim: takeawayDetail)
+                        .font(PrismTypography.figmaFont(size: scaledTakeawaySize, style: "Semi Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#7f1d1d"))
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } else {
                 Text(verbatim: isMasterStroke ? "⚡ +30 XP · < 8s" : "✓ +15 XP")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                    .font(PrismTypography.figmaFont(size: scaledAnswerSize, style: "Semi Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#3f7d00"))
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack(spacing: PrismSpacing.m) {
                 Button(action: onTapDeepenExplanation) {
                     Text(verbatim: "🔎 Approfondir")
                         .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex(titleHex))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                         .lineLimit(1)
                         .frame(width: FigMetrics.oneHundredTwentyEight, height: FigMetrics.fortyEight)
                 }
@@ -1529,7 +1554,7 @@ public struct CertiGoFluidErrorFeedbackCardView: View {
                 .accessibilityIdentifier("session-explain-ai-button")
 
                 Button(action: onTapContinue) {
-                    Text(verbatim: "CONTINUER")
+                    Text(verbatim: "Continuer")
                         .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
                         .foregroundStyle(PrismColor.onAccent)
                         .lineLimit(1)
@@ -1565,7 +1590,7 @@ public struct CertiGoFluidErrorFeedbackCardView: View {
     }
 }
 
-/// `B1` : Real 3-Brick Connected Visual Architecture Diagram on Déclic Cards (`15`) with Page 17 minimalist single-line pills.
+/// `B1` : Real 3-Brick Connected Visual Architecture Diagram on Déclic Cards (`15`) with category above each term and zero truncation.
 public struct CertiGoVisualArchitectureDiagramView: View {
     public let spec: CertiGoVisualArchitectureDiagramSpec
 
@@ -1578,24 +1603,25 @@ public struct CertiGoVisualArchitectureDiagramView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-            HStack {
+        VStack(alignment: .leading, spacing: PrismSpacing.s) {
+            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
                 Text(verbatim: spec.headerTitle)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                    .lineLimit(1)
-                Spacer()
-                Text(verbatim: "3 BRIQUES")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Bold"))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(verbatim: "3 briques")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#0369a1"))
-                    .padding(.horizontal, PrismSpacing.xs)
+                    .padding(.horizontal, PrismSpacing.s)
                     .padding(.vertical, FigMetrics.two)
                     .background(Capsule().fill(PrismColor.figmaHex("#e0f2fe")))
             }
 
             ForEach(Array(spec.bricks.enumerated()), id: \.element.id) { index, brick in
                 VStack(spacing: FigMetrics.two) {
-                    HStack(spacing: PrismSpacing.s) {
+                    HStack(alignment: .top, spacing: PrismSpacing.s) {
                         Text(verbatim: brick.icon)
                             .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Regular"))
                             .frame(width: FigMetrics.thirtyTwo, height: FigMetrics.thirtyTwo)
@@ -1604,20 +1630,22 @@ public struct CertiGoVisualArchitectureDiagramView: View {
                                     .fill(PrismColor.surface)
                             )
 
-                        Text(verbatim: brick.title)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex(brick.textHex))
-                            .lineLimit(1)
+                        VStack(alignment: .leading, spacing: FigMetrics.two) {
+                            Text(verbatim: brick.pillBadge)
+                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex(brick.textHex).opacity(0.85))
+                                .lineLimit(1)
 
-                        Spacer(minLength: PrismSpacing.xs)
-
-                        Text(verbatim: brick.pillBadge)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
-                            .foregroundStyle(PrismColor.figmaHex(brick.textHex))
-                            .lineLimit(1)
+                            Text(verbatim: brick.title)
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex(brick.textHex))
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(.horizontal, PrismSpacing.m)
-                    .padding(.vertical, PrismSpacing.xs)
+                    .padding(.vertical, PrismSpacing.s)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
