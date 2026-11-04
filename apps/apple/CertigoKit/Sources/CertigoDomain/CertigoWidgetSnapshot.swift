@@ -155,6 +155,62 @@ public struct CertigoWidgetSnapshot: Codable, Equatable, Sendable {
     )
   }
 
+  public static func defaultInitialSnapshot(
+    activeTrackCode: String = "AZ-104",
+    activeTrackTitle: String = "Microsoft Azure Administrator",
+    totalXP: Int = 0,
+    streakDays: Int = 0,
+    dailyGoalXP: Int = 30,
+    dailyXPEarned: Int = 0,
+    studyPlanDailyMinutes: Int = 10,
+    language: AppLanguage = .french,
+    now: Date = .now,
+    deviceTimeZone: TimeZone = .autoupdatingCurrent
+  ) -> Self {
+    let rawOffset = deviceTimeZone.secondsFromGMT(for: now) / 60
+    let offsetMinutes = min(max(rawOffset, -720), 840)
+    let safeNow = now.timeIntervalSince1970.isFinite && now.timeIntervalSince1970 >= 0
+      ? now
+      : Date(timeIntervalSince1970: 1_767_225_600)
+    let day = Self.studyDayKey(at: safeNow, utcOffsetMinutes: offsetMinutes) ?? "2026-01-01"
+    let validUntil = safeNow.addingTimeInterval(24 * 60 * 60)
+    if let snapshot = try? Self(
+      updatedAt: safeNow,
+      validUntil: validUntil,
+      studyDay: day,
+      studyDayUtcOffsetMinutes: offsetMinutes,
+      totalXP: max(0, totalXP),
+      streakDays: max(0, streakDays),
+      dailyGoalXP: max(1, dailyGoalXP),
+      dailyXPEarned: max(0, dailyXPEarned),
+      activeTrackCode: activeTrackCode.isEmpty ? "AZ-104" : activeTrackCode,
+      activeTrackTitle: activeTrackTitle.isEmpty ? "Microsoft Azure Administrator" : activeTrackTitle,
+      serverStreakRisk: false,
+      studyPlanDailyMinutes: max(1, min(1_440, studyPlanDailyMinutes)),
+      targetExamDate: nil,
+      language: language
+    ) {
+      return snapshot
+    }
+    let fallbackDate = Date(timeIntervalSince1970: 1_767_225_600)
+    return try! Self(
+      updatedAt: fallbackDate,
+      validUntil: fallbackDate.addingTimeInterval(24 * 60 * 60),
+      studyDay: "2026-01-01",
+      studyDayUtcOffsetMinutes: 0,
+      totalXP: 0,
+      streakDays: 0,
+      dailyGoalXP: 30,
+      dailyXPEarned: 0,
+      activeTrackCode: "AZ-104",
+      activeTrackTitle: "Microsoft Azure Administrator",
+      serverStreakRisk: false,
+      studyPlanDailyMinutes: 10,
+      targetExamDate: nil,
+      language: language
+    )
+  }
+
   public var dailyGoalProgress: Double? {
     guard let dailyGoalXP, dailyGoalXP > 0, let dailyXPEarned, dailyXPEarned >= 0 else {
       return nil
@@ -376,14 +432,14 @@ public struct CertigoWidgetCopy: Sendable {
 
   public var simulatedLabel: String {
     switch language {
-    case .french: "Simulation — données fictives"
-    case .english: "Preview — sample data"
-    case .hindi: "पूर्वावलोकन — नमूना डेटा"
-    case .chineseSimplified: "预览 — 示例数据"
-    case .korean: "미리보기 — 샘플 데이터"
-    case .spanish: "Vista previa — datos de ejemplo"
-    case .italian: "Anteprima — dati di esempio"
-    case .german: "Vorschau — Beispieldaten"
+    case .french: "Simulation : données fictives"
+    case .english: "Preview : sample data"
+    case .hindi: "पूर्वावलोकन : नमूना डेटा"
+    case .chineseSimplified: "预览 : 示例数据"
+    case .korean: "미리보기 : 샘플 데이터"
+    case .spanish: "Vista previa : datos de ejemplo"
+    case .italian: "Anteprima : dati di esempio"
+    case .german: "Vorschau : Beispieldaten"
     }
   }
 

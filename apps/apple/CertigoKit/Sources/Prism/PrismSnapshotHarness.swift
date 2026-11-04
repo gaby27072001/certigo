@@ -40,7 +40,7 @@ public struct PrismSnapshot: Equatable, Sendable {
   public func matches(_ reference: Self) -> Bool { self == reference }
 }
 
-// MARK: - Master Figma Pro Screen Verification Registry (Pages 01 to 12 — 53 Validated Screens)
+// MARK: - Master Figma Pro Screen Verification Registry (Pages 01 to 12 : 53 Validated Screens)
 
 public enum CertiGoFigmaChapter: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
   case onboardingPage07 = "Chapitre 1 · Onboarding & Pop-ups Système Natifs iOS (Page 07)"
@@ -170,7 +170,7 @@ public enum CertiGoMasterScreenCatalog {
   public static let mascotFreeScreenCodes: Set<String> = ["20", "22", "27"]
 
   public static let allScreens: [CertiGoMasterFigmaScreenDescriptor] = [
-    // 1. Onboarding Flow & Native iOS Pop-ups (OB-01 .. OB-08B — 11 Screens, Page 07)
+    // 1. Onboarding Flow & Native iOS Pop-ups (OB-01 .. OB-08B : 11 Screens, Page 07)
     .init(
       screenCode: "OB-01",
       nodeId: "132:182",
@@ -260,7 +260,7 @@ public enum CertiGoMasterScreenCatalog {
       mascotPose: nil
     ),
 
-    // 2. Main Home, Switcher Popover, Preview Sheet, Question & AI Feedback (01 .. 05 — 5 Screens)
+    // 2. Main Home, Switcher Popover, Preview Sheet, Question & AI Feedback (01 .. 05 : 5 Screens)
     .init(
       screenCode: "01",
       nodeId: "37:375",
@@ -303,7 +303,7 @@ public enum CertiGoMasterScreenCatalog {
       mascotPose: .specialistAICoach
     ),
 
-    // 3. Complete 4-Screen AI Hub (06A .. 06D — 4 Screens)
+    // 3. Complete 4-Screen AI Hub (06A .. 06D : 4 Screens)
     .init(
       screenCode: "06A",
       nodeId: "79:332",
@@ -337,7 +337,7 @@ public enum CertiGoMasterScreenCatalog {
       mascotPose: nil
     ),
 
-    // 4. Social Podium, Profile & Merged 2-Pane Pro Statistics Dashboard (07A, 08, 08B-1, 08B-2 — 4 Screens)
+    // 4. Social Podium, Profile & Merged 2-Pane Pro Statistics Dashboard (07A, 08, 08B-1, 08B-2 : 4 Screens)
     .init(
       screenCode: "07A",
       nodeId: "88:317",
@@ -371,7 +371,7 @@ public enum CertiGoMasterScreenCatalog {
       mascotPose: .emotionDetermined
     ),
 
-    // 5. Session Flow, Pearson VUE Mock Exam, Friends, Certificate, PRO & Settings (14 .. 28 — 15 Screens)
+    // 5. Session Flow, Pearson VUE Mock Exam, Friends, Certificate, PRO & Settings (14 .. 28 : 15 Screens)
     .init(
       screenCode: "14",
       nodeId: "58:705",
@@ -497,7 +497,7 @@ public enum CertiGoMasterScreenCatalog {
       mascotPose: nil
     ),
 
-    // 6. The 10 Interactive Question Formats (Q_TYPE_01 .. Q_TYPE_10 — 10 Screens, Page 06)
+    // 6. The 10 Interactive Question Formats (Q_TYPE_01 .. Q_TYPE_10 : 10 Screens, Page 06)
     .init(
       screenCode: "Q_TYPE_01",
       nodeId: "73:393",
@@ -579,7 +579,7 @@ public enum CertiGoMasterScreenCatalog {
       mascotPose: .specialistAICoach
     ),
 
-    // 7. iOS 18 System Surfaces (Page 11) & Offline / Zero-Guilt Resilience (Page 12) (SYS-01, SYS-02, RES-01, RES-02 — 4 Screens)
+    // 7. iOS 18 System Surfaces (Page 11) & Offline / Zero-Guilt Resilience (Page 12) (SYS-01, SYS-02, RES-01, RES-02 : 4 Screens)
     .init(
       screenCode: "SYS-01",
       nodeId: "161:93",

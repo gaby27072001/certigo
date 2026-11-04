@@ -9,17 +9,17 @@ import Testing
 @Suite("PR #150 — Native Figma App Video Layout, Mimo Reset, 8-Step Onboarding & Parallel Tracks Deduplication", .serialized)
 struct CertiGoNativeFigmaAppTests {
 
-    @Test("selectRoute resets selectedMimoFilter to .allUnits so all 3 units (15 winding nodes) appear after switching certifications")
+    @Test("selectRoute resets selectedMimoFilter to .allUnits so all 3 units (30 winding nodes) appear after switching certifications")
     func selectRouteResetsSelectedMimoFilterToAllUnits() {
         var appState = CertiGoNativeAppState()
         appState.selectedMimoFilter = .miniLabs
-        #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 4)
+        #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 7)
 
         appState.selectRoute("PCA")
         #expect(appState.activeRouteCode == "PCA")
         #expect(appState.selectedMimoFilter == .allUnits)
         #expect(appState.filteredUnitsForMimoRail.count == 3)
-        #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 15)
+        #expect(appState.filteredUnitsForMimoRail.flatMap(\.lessons).count == 30)
     }
 
     @Test("10-step native onboarding flow advances from step 0 to step 9 (without duplicate Step 1 auth screen), supports back navigation, and dismisses cleanly on completion or close")
@@ -185,25 +185,38 @@ struct CertiGoNativeFigmaAppTests {
         #expect(Set(customTitles).count == 3)
     }
 
-    @Test("addSuggestedFriend adds the suggested colleague to friends in real time and openFriendProfile populates CertiGoSocialProfilePreview")
+    @Test("addSuggestedFriend and addNewFriendFromSearch add real colleagues to friends & leaderboard in real time (zero fake pre-populated suggestions) and openFriendProfile populates CertiGoSocialProfilePreview")
     func socialAddSuggestedFriendAndOpenProfilePreview() {
         var appState = CertiGoNativeAppState()
-        let initialFriendsCount = appState.friends.count
-        #expect(appState.suggestedFriends.count == 5)
-        #expect(appState.suggestedFriends[0].displayName == "Camille D.")
-        #expect(appState.suggestedFriends[0].isAdded == false)
+        #expect(CertiGoNativeRichCatalog.defaultFriends.isEmpty)
+        #expect(CertiGoNativeRichCatalog.defaultSuggestedFriends.isEmpty)
+        #expect(appState.friends.isEmpty)
+        #expect(appState.suggestedFriends.isEmpty)
 
-        appState.addSuggestedFriend("sf-1")
+        let customSuggestion = CertiGoSuggestedFriend(
+            id: "sf-real-1",
+            displayName: "Camille D.",
+            handle: "@camille_az",
+            initials: "CD",
+            routeCode: "AZ-104",
+            activeTrackText: "AZ-104 · Architecte Azure",
+            streakDays: 0,
+            avatarHex: "#0078d4"
+        )
+        appState.suggestedFriends = [customSuggestion]
+        appState.addSuggestedFriend("sf-real-1")
         #expect(appState.suggestedFriends[0].isAdded == true)
-        #expect(appState.friends.count == initialFriendsCount + 1)
+        #expect(appState.friends.count == 1)
         #expect(appState.friends[0].displayName == "Camille D.")
         #expect(appState.friends[0].handle == "@camille_az")
+        #expect(appState.leaderboardMembers.count == 2)
         #expect(appState.lastAddedFriendConfirmation?.contains("Camille D.") == true)
 
         appState.openFriendProfile(for: appState.friends[0])
         #expect(appState.selectedFriendProfile != nil)
         #expect(appState.selectedFriendProfile?.displayName == "Camille D.")
         #expect(appState.selectedFriendProfile?.handle == "@camille_az")
+        #expect(appState.selectedFriendProfile?.xpPoints == 0)
         #expect(appState.selectedFriendProfile?.isSaluted == true)
 
         appState.toggleSalutSelectedProfile()
@@ -267,13 +280,18 @@ struct CertiGoNativeFigmaAppTests {
         #expect(units[0].lessons[3].state == .miniLab)
         #expect(units[0].lessons[4].state == .locked)
 
-        // Connect Microsoft Entra ID & complete onboarding -> awards +50 welcome gems
+        // Connect Microsoft Entra ID & complete onboarding -> zero fake welcome gems (starts at 0 gems, 0 XP, 0 streak)
         appState.connectMicrosoftEntraAccount()
         #expect(appState.isAccountConnected == true)
         #expect(appState.connectedAuthProvider == "Microsoft Entra ID")
         appState.completeOnboardingFlow(awardWelcomeBonus: true)
         #expect(appState.hasCompletedOnboarding == true)
-        #expect(appState.gemsCount == 50)
+        #expect(appState.gemsCount == 0)
+        #expect(appState.userXPPoints == 0)
+        #expect(appState.streakDays == 0)
+        #expect(appState.authDraftDisplayName.isEmpty)
+        #expect(appState.authDraftEmail.isEmpty)
+        #expect(appState.authDraftPassword.isEmpty)
 
         // Reset to fresh new user -> clears everything back to 0 and re-opens onboarding
         appState.resetToFreshNewUser()
@@ -642,7 +660,7 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.userInitials == "AM")
         #expect(appState.showEditProfileSheet == false)
         let meAtZeroXP = appState.leaderboardMembers.first(where: \.isCurrentUser)
-        #expect(meAtZeroXP?.rank == 12)
+        #expect(meAtZeroXP?.rank == 1)
         #expect(meAtZeroXP?.displayName == "Toi (Alexandre)")
         #expect(meAtZeroXP?.initials == "AM")
     }
@@ -715,7 +733,7 @@ struct CertiGoNativeFigmaAppTests {
 
         appState.completeOnboardingFlow(awardWelcomeBonus: true, startGuidedTour: true)
         #expect(appState.hasCompletedOnboarding == true)
-        #expect(appState.gemsCount == 50)
+        #expect(appState.gemsCount == 0)
         #expect(appState.isPresentingGuidedAppTour == true)
         #expect(appState.guidedTourStepIndex == 0)
         #expect(appState.selectedTab == .parcours)
@@ -778,28 +796,28 @@ struct CertiGoNativeFigmaAppTests {
         }
     }
 
-    @Test("Chantier 6: Social leaderboard sorts by XP with 0 XP at rank 12, Free vs Pro tier badge, GH-300 6 domains, exam provider metadata, and Domain Sprint returns to .examens")
+    @Test("Chantier 6: Social leaderboard starts with only current user (zero fake data), syncs real added friends, Free vs Pro tier badge, GH-300 6 domains, exam provider metadata, and Domain Sprint returns to .examens")
     func socialLeaderboardSortingFreeVsProGH300DomainsAndDomainSprintRouting() {
         var appState = CertiGoNativeAppState()
 
-        // 1. Leaderboard sorted by XP descending: Sarah L. (1390) is #1, Thomas M. (1260) is #2, Inès K. (1185) is #3, and Toi (0 XP) is #12
-        #expect(appState.leaderboardMembers.count == 12)
-        #expect(appState.leaderboardMembers[0].displayName == "Sarah L.")
+        // 1. Leaderboard starts with only the real current user at rank 1 with 0 XP (zero fake profiles)
+        #expect(CertiGoNativeRichCatalog.defaultLeaderboardMembers.count == 1)
+        #expect(appState.leaderboardMembers.count == 1)
+        #expect(appState.leaderboardMembers[0].isCurrentUser == true)
+        #expect(appState.leaderboardMembers[0].xpPoints == 0)
         #expect(appState.leaderboardMembers[0].rank == 1)
-        #expect(appState.leaderboardMembers[1].displayName == "Thomas M.")
-        #expect(appState.leaderboardMembers[1].rank == 2)
-        #expect(appState.leaderboardMembers[2].displayName == "Inès K.")
-        #expect(appState.leaderboardMembers[2].rank == 3)
-        #expect(appState.leaderboardMembers[11].isCurrentUser == true)
-        #expect(appState.leaderboardMembers[11].xpPoints == 0)
-        #expect(appState.leaderboardMembers[11].rank == 12)
 
-        // Earning 1500 XP promotes current user to rank 1
-        appState.userXPPoints = 1500
+        // Adding a real friend adds them to the leaderboard; earning XP keeps current user #1
+        appState.friendSearchQuery = "@thomas"
+        appState.addNewFriendFromSearch()
+        #expect(appState.friends.count == 1)
+        #expect(appState.leaderboardMembers.count == 2)
+
+        appState.userXPPoints = 150
         appState.syncCurrentUserLeaderboardEntry()
         #expect(appState.leaderboardMembers[0].isCurrentUser == true)
         #expect(appState.leaderboardMembers[0].rank == 1)
-        #expect(appState.leaderboardMembers[1].displayName == "Sarah L.")
+        #expect(appState.leaderboardMembers[1].displayName == "Thomas")
         #expect(appState.leaderboardMembers[1].rank == 2)
 
         // 2. Free vs Pro membership tier
@@ -1003,12 +1021,20 @@ struct CertiGoNativeFigmaAppTests {
         }
         let prismAssets = root.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Resources/Prism.xcassets")
 
-        // 1. Verify all 15 steps across every certification have valid official service vector assets in Prism.xcassets
-        let certifications = ["AZ-104", "AZ-900", "AI-102", "SAA-C03", "CLF-C02", "AIF-C01", "PDE", "PCA", "ACE", "CKA", "CCNA", "TF-003", "GH-300", "CCA-F"]
+        // 1. Verify all 30 steps (3 units x 10 steps) across every certification have valid official service vector assets in Prism.xcassets
+        let certifications = [
+            "AZ-104", "AZ-900", "AI-102", "SAA-C03", "CLF-C02", "AIF-C01",
+            "PDE", "PCA", "ACE", "CKA", "CCNA", "TF-003", "GH-300", "GH-900", "GH-AS", "CCA-F",
+            "HARVEY-LEGAL", "OPENAI-PRO", "ANTHROPIC-CLAUDE", "MS-365-COPILOT"
+        ]
         for code in certifications {
             let units = CertiGoNativeRichCatalog.buildThreeUnits(forRouteCode: code)
+            #expect(units.count == 3)
+            for unit in units {
+                #expect(unit.lessons.count == 10)
+            }
             let lessons = units.flatMap(\.lessons)
-            #expect(lessons.count == 15)
+            #expect(lessons.count == 30)
             for lesson in lessons {
                 #expect(!lesson.serviceAssetName.isEmpty)
                 let assetDir = prismAssets.appendingPathComponent("\(lesson.serviceAssetName).imageset")
@@ -1024,7 +1050,15 @@ struct CertiGoNativeFigmaAppTests {
             #expect(lessons[3].isQuizOnlyChapter == true)
             #expect(lessons[4].isQuizOnlyChapter == true)
             #expect(lessons[4].chapterFormatBadgeText.contains("Quiz Express"))
+            #expect(lessons[9].chapterFormatBadgeText.contains("Boss"))
         }
+
+        // Verify GH-900 and AZ-900 never share identical questions
+        let gh900Ex = CertiGoNativeLessonSessionEngine.defaultExercises(forRouteCode: "GH-900", lessonId: "GH-900-u1-s1")
+        let az900Ex = CertiGoNativeLessonSessionEngine.defaultExercises(forRouteCode: "AZ-900", lessonId: "AZ-900-u1-s1")
+        #expect(gh900Ex.map(\.prompt) != az900Ex.map(\.prompt))
+        #expect(gh900Ex[0].prompt.contains("Pull Request"))
+        #expect(gh900Ex[0].options[0].title.contains("CODEOWNERS"))
 
         // 2. Verify progressive 3-slide micro-lesson navigation (1/3 -> 2/3 -> 3/3 -> questions) vs Express Quiz starting directly on questions
         var appState = CertiGoNativeAppState()
@@ -1176,14 +1210,14 @@ struct CertiGoNativeFigmaAppTests {
         let msCloudCodes = appState.filteredOnboardingCatalogItems.map(\.code)
         #expect(msCloudCodes == ["AZ-900", "AZ-104", "AZ-305"])
 
-        // Combine Microsoft + IA -> AI-900, AI-102
+        // Combine Microsoft + IA -> AI-900, MS-365-COPILOT, AI-102
         appState.onboardingCategoryFilter = "ai"
         let msAICodes = appState.filteredOnboardingCatalogItems.map(\.code)
-        #expect(msAICodes == ["AI-900", "AI-102"])
+        #expect(msAICodes == ["AI-900", "MS-365-COPILOT", "AI-102"])
 
-        // Filter by AWS, Google, GitHub, Kubernetes, Cisco
+        // Filter by OpenAI, Anthropic, Harvey Academy, AWS, Google, GitHub, Kubernetes, Cisco
         appState.onboardingCategoryFilter = "all"
-        for vendor in ["aws", "google", "github", "kubernetes", "cisco"] {
+        for vendor in ["openai", "anthropic", "harvey", "aws", "google", "github", "kubernetes", "cisco"] {
             appState.onboardingVendorFilter = vendor
             let items = appState.filteredOnboardingCatalogItems
             #expect(!items.isEmpty)
@@ -1239,15 +1273,24 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.aiThreads.isEmpty)
         #expect(appState.chatTurns.isEmpty)
 
-        // Verify phone contacts sync & 1-tap friend addition
+        // Verify phone contacts sync never injects fake fallback contacts when address book is empty/unauthorised
         appState.syncPhoneContacts()
         #expect(appState.hasSyncedPhoneContacts == true)
-        #expect(!appState.phoneContactsMatchedOnApp.isEmpty)
-        #expect(!appState.phoneContactsToInvite.isEmpty)
-        let firstContactId = appState.phoneContactsMatchedOnApp[0].id
-        appState.addMatchedPhoneContact(firstContactId)
+        #expect(appState.phoneContactsMatchedOnApp.isEmpty)
+        appState.phoneContactsMatchedOnApp = [
+            CertiGoPhoneContactItem(
+                id: "cn-real-1",
+                fullName: "Maxime Laurent",
+                initials: "ML",
+                phoneOrHandle: "@maxime_cloud",
+                activeRouteCode: "AZ-104",
+                isOnCertiGo: true
+            )
+        ]
+        appState.addMatchedPhoneContact("cn-real-1")
         #expect(appState.phoneContactsMatchedOnApp[0].isAddedOrInvited == true)
         #expect(appState.friends.count == 1)
+        #expect(appState.friends[0].streakDays == 0)
     }
 
     @Test("CertiGoNativeSystemOAuthCoordinator builds live CIAM OAuth 2.0 + PKCE URLs with exact domain_hint (apple, Google, live.com), decodes JWT claims, and opens email auth sheet")
@@ -1362,40 +1405,45 @@ struct CertiGoNativeFigmaAppTests {
             }
         }
 
-        // 4. Verify Beginner mode (onboardingExperienceLevelIndex == 0) starts Chapter 1 (u1-s1) with Global Overview slides, plain-language mode enabled, and no raw CLI exercises
+        // 4. Verify Beginner mode (onboardingExperienceLevelIndex == 0) starts Chapter 1 (u1-s1) with Global Overview slides, NEVER auto-enables plain-language mode without user action, and has no raw CLI exercises
         var appState = CertiGoNativeAppState()
         appState.onboardingExperienceLevelIndex = 0 // Débutant
         appState.selectRoute("AZ-104")
         appState.startLessonSession(forLessonId: "AZ-104-u1-s1")
 
-        #expect(appState.lessonSession.isPlainLanguageModeEnabled == true)
-        #expect(appState.isPlainLanguageModeEnabled == true)
+        #expect(appState.lessonSession.isPlainLanguageModeEnabled == false)
+        #expect(appState.isPlainLanguageModeEnabled == false)
+        #expect(!appState.lessonSession.currentExercise.plainLanguagePrompt.contains("Version concrète sans jargon"))
         #expect(appState.lessonSession.lessonSlides.count == 3)
         #expect(appState.lessonSession.lessonSlides[0].stepBadge.contains("VUE D'ENSEMBLE"))
         #expect(appState.lessonSession.lessonSlides[1].stepBadge.contains("LA GRANDE IMAGE"))
         #expect(appState.lessonSession.lessonSlides[2].stepBadge.contains("MOTS-CLÉS"))
         #expect(appState.lessonSession.exercises.allSatisfy { $0.formatCode != "Q_TYPE_04" && $0.formatCode != "Q_TYPE_05" })
 
-        // User can toggle between Plain Language and Exam Style at any time
-        appState.togglePlainLanguageMode()
-        #expect(appState.lessonSession.isPlainLanguageModeEnabled == false)
-        #expect(appState.isPlainLanguageModeEnabled == false)
+        // User can toggle between Plain Language and Exam Style at any time via the iOS Toggle
         appState.togglePlainLanguageMode()
         #expect(appState.lessonSession.isPlainLanguageModeEnabled == true)
         #expect(appState.isPlainLanguageModeEnabled == true)
+        appState.togglePlainLanguageMode()
+        #expect(appState.lessonSession.isPlainLanguageModeEnabled == false)
+        #expect(appState.isPlainLanguageModeEnabled == false)
 
-        // 5. Verify Social defaults to Mes Amis (selectedSocialSubTab == 1) and Cooperative Friends Quest clap awards +5 gems once
+        // 5. Verify Social defaults to Mes Amis (selectedSocialSubTab == 1) and Cooperative Friends Quest has 0 fake partner when friends.isEmpty
         let freshSocialState = CertiGoNativeAppState()
         #expect(freshSocialState.selectedSocialSubTab == 1)
         #expect(freshSocialState.hasClappedQuestPartner == false)
         var mutableSocial = freshSocialState
-        let initialGems = mutableSocial.gemsCount
+        mutableSocial.clapQuestPartnerSarah()
+        #expect(mutableSocial.showAddFriendSheet == true)
+        #expect(mutableSocial.hasClappedQuestPartner == false)
+        #expect(mutableSocial.gemsCount == 0)
+
+        mutableSocial.friendSearchQuery = "@alex"
+        mutableSocial.addNewFriendFromSearch()
         mutableSocial.clapQuestPartnerSarah()
         #expect(mutableSocial.hasClappedQuestPartner == true)
-        #expect(mutableSocial.gemsCount == initialGems + 5)
-        #expect(mutableSocial.lastAddedFriendConfirmation == "✓ Clap envoyé à Sarah !")
-        mutableSocial.clapQuestPartnerSarah()
-        #expect(mutableSocial.gemsCount == initialGems + 5)
+        #expect(mutableSocial.lastAddedFriendConfirmation == "✓ Encouragement envoyé à Alex !")
+        #expect(mutableSocial.gemsCount == 0)
 
         // 6. Verify Recommendations 1, 3 (PRO-only), 4, 5, 6, and 7:
         // Rec 1: Implementation Intention ("Plan Si – Alors") with 4 routine anchors
@@ -1696,7 +1744,7 @@ struct CertiGoNativeFigmaAppTests {
         #expect(PrismRadius.concentric(outer: 24, padding: 12) == 12)
         #expect(PrismRadius.unitBanner == 24)
 
-        // 3. Rule 3: True iOS 26 Liquid Glass Water Droplet (`CertiGoTrueLiquidGlassDropletView`)
+        // 3. Rule 3: True iOS 26 Liquid Glass Water Droplet (`CertiGoTrueLiquidGlassDropletView`) + User Intensity Slider (0% .. 100%)
         let azTheme = CertiGoTrackThemePalette.palette(forRouteCode: "AZ-104")
         let restingDroplet = CertiGoTrueLiquidGlassDropletView(
             trackTheme: azTheme,
@@ -1705,14 +1753,17 @@ struct CertiGoNativeFigmaAppTests {
             isDragging: false
         )
         #expect(CertiGoTrueLiquidGlassDropletView.concentricCornerRadius == 26)
-        #expect(CertiGoTrueLiquidGlassDropletView.centerRefractionWhiteOpacity == 0.18)
-        #expect(CertiGoTrueLiquidGlassDropletView.edgeTintOpacity == 0.14)
-        #expect(CertiGoTrueLiquidGlassDropletView.topMeniscusWhiteOpacity == 0.92)
+        #expect(CertiGoTrueLiquidGlassDropletView.centerRefractionWhiteOpacity == 0.88)
+        #expect(CertiGoTrueLiquidGlassDropletView.middleSoftTintOpacity == 0.75)
+        #expect(CertiGoTrueLiquidGlassDropletView.edgeTintOpacity == 0.22)
+        #expect(CertiGoTrueLiquidGlassDropletView.topMeniscusWhiteOpacity == 0.98)
         #expect(CertiGoTrueLiquidGlassDropletView.topMeniscusFadeStop == 0.38)
         #expect(CertiGoTrueLiquidGlassDropletView.topMeniscusInset == 1.5)
         #expect(CertiGoTrueLiquidGlassDropletView.bottomCausticRingOpacity == 0.45)
         #expect(CertiGoTrueLiquidGlassDropletView.bottomCausticWhiteOpacity == 0.65)
-        #expect(CertiGoTrueLiquidGlassDropletView.rimLightLineWidth == 1.4)
+        #expect(CertiGoTrueLiquidGlassDropletView.rimLightLineWidth == 1.6)
+        #expect(CertiGoTrueLiquidGlassDropletView.meniscusOuterTintOpacity == 0.42)
+        #expect(CertiGoTrueLiquidGlassDropletView.causticShadowTintOpacity == 0.28)
         #expect(restingDroplet.effectiveScaleX == 1.0)
         #expect(restingDroplet.effectiveScaleY == 1.0)
 
@@ -1725,6 +1776,64 @@ struct CertiGoNativeFigmaAppTests {
         #expect(draggingDroplet.effectiveScaleX == 1.10)
         #expect(draggingDroplet.effectiveScaleY == 1.04)
 
+        let halfDroplet = CertiGoTrueLiquidGlassDropletView(
+            trackTheme: azTheme,
+            width: 68,
+            height: FigMetrics.fortyEight,
+            isDragging: true,
+            intensityPercent: 50
+        )
+        #expect(abs(halfDroplet.effectiveScaleX - 1.05) < 0.0001)
+        #expect(abs(halfDroplet.effectiveScaleY - 1.02) < 0.0001)
+
+        let zeroDroplet = CertiGoTrueLiquidGlassDropletView(
+            trackTheme: azTheme,
+            width: 68,
+            height: FigMetrics.fortyEight,
+            isDragging: true,
+            intensityPercent: 0
+        )
+        #expect(zeroDroplet.effectiveScaleX == 1.0)
+        #expect(zeroDroplet.effectiveScaleY == 1.0)
+
+        // Verify settingsLiquidGlassIntensityPercent (0, 50, 75, 100) and v13 real data purge persistence
+        let tempFileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("certigo-test-v13-glass-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: tempFileURL) }
+        let customStore = CertiGoLocalDatabaseStore(fileURL: tempFileURL)
+        customStore.clear()
+
+        var glassState = CertiGoNativeAppState(restoreFromDisk: false, databaseStore: customStore)
+        #expect(CertiGoNativeAppState.defaultLiquidGlassIntensityPercent == 75)
+        #expect(CertiGoNativeAppState.liquidGlassIntensityPresets == [0, 25, 50, 75, 100])
+        glassState.setLiquidGlassIntensityPercent(0)
+        #expect(glassState.settingsLiquidGlassIntensityPercent == 0)
+        #expect(glassState.liquidGlassIntensityFraction == 0.0)
+        glassState.setLiquidGlassIntensityPercent(50)
+        #expect(glassState.settingsLiquidGlassIntensityPercent == 50)
+        #expect(glassState.liquidGlassIntensityFraction == 0.5)
+        glassState.setLiquidGlassIntensityPercent(100)
+        #expect(glassState.settingsLiquidGlassIntensityPercent == 100)
+        #expect(glassState.liquidGlassIntensityFraction == 1.0)
+        glassState.saveToLocalDatabase(store: customStore)
+
+        let restoredGlassState = CertiGoNativeAppState(restoreFromDisk: true, databaseStore: customStore)
+        #expect(restoredGlassState.settingsLiquidGlassIntensityPercent == 100)
+
+        // Verify v13 real_data_purge_done sanitizes legacy fake 50 gems when completedStepsTotal == 0
+        let legacyFakeDB = CertiGoPersistedUserDatabase(
+            streakDays: 3,
+            gemsCount: 50,
+            userXPPoints: 120,
+            completedStepsTotal: 0,
+            completedExamsCount: 0
+        )
+        let sanitizedDB = CertiGoLocalDatabaseStore.sanitizeRealDataOnly(legacyFakeDB)
+        #expect(sanitizedDB.gemsCount == 0)
+        #expect(sanitizedDB.userXPPoints == 0)
+        #expect(sanitizedDB.streakDays == 0)
+        #expect(CertiGoLocalDatabaseStore.realDataPurgeV13DefaultsKey == "certigo.v13.real_data_purge_done")
+
         // 4. Rule 4 & Rule 8: 4-size typographic scale (24 / 17 / 15 / 12 pt) & unified 56pt tab header
         #expect(FigMetrics.typeHeroTitle == 24)
         #expect(FigMetrics.typeCardTitle == 17)
@@ -1732,7 +1841,7 @@ struct CertiGoNativeFigmaAppTests {
         #expect(FigMetrics.typeBadge == 12)
         #expect(FigMetrics.unifiedTabHeaderHeight == 56)
 
-        // 5. Rule 7 & Build 12: Verify CertiGoOneTapSprintBarView is removed from parcoursTab01View, UNITÉ 1 is lifted to .padding(.top, FigMetrics.sixty), and archive_testflight_mac.sh defaults to Build 12
+        // 5. Rule 7 & Build 13: Verify CertiGoOneTapSprintBarView and CertiGoTopProgressiveVignetteView are removed from parcoursTab01View, UNITÉ 1 starts at .padding(.top, FigMetrics.sixtyEight), and archive_testflight_mac.sh defaults to Build 13
         var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         while !FileManager.default.fileExists(atPath: root.appendingPathComponent("AGENTS.md").path) {
             let parent = root.deletingLastPathComponent()
@@ -1744,14 +1853,55 @@ struct CertiGoNativeFigmaAppTests {
             encoding: .utf8
         )
         #expect(!figmaAppSource.contains("CertiGoOneTapSprintBarView("))
+        #expect(!figmaAppSource.contains("CertiGoTopProgressiveVignetteView()"))
         #expect(figmaAppSource.contains("CertiGoTrueLiquidGlassDropletView("))
-        #expect(figmaAppSource.contains(".padding(.top, FigMetrics.sixty)"))
+        #expect(figmaAppSource.contains(".padding(.top, FigMetrics.sixtyEight)"))
         #expect(figmaAppSource.contains(".offset(y: FigMetrics.bottomBarBottomOffset)"))
+        #expect(figmaAppSource.contains("settings28-liquid-glass-slider"))
 
         let archiveScript = try String(
             contentsOf: root.appendingPathComponent("tools/archive_testflight_mac.sh"),
             encoding: .utf8
         )
-        #expect(archiveScript.contains("build=${CERTIGO_DISTRIBUTION_BUILD:-12}"))
+        #expect(archiveScript.contains("build=${CERTIGO_DISTRIBUTION_BUILD:-13}"))
+
+        // 6. Verify Typography Charter V3 (6+1 tokens), Widget App Group & Default Snapshot, Auth Validation, and Zero Long Dashes (— or –) across all Swift source files
+        #expect(CertiGoTypeToken.displayHero.pointSize == 28)
+        #expect(CertiGoTypeToken.screenTitle.pointSize == 22)
+        #expect(CertiGoTypeToken.sectionCardTitle.pointSize == 17)
+        #expect(CertiGoTypeToken.bodyQuestion.pointSize == 16)
+        #expect(CertiGoTypeToken.bodyQuestionMedium.pointSize == 16)
+        #expect(CertiGoTypeToken.controlButtonPill.pointSize == 14)
+        #expect(CertiGoTypeToken.captionBadge.pointSize == 12)
+        #expect(CertiGoTypeToken.codeMono.pointSize == 13)
+        #expect(PrismTypography.resolveToken(size: 48, style: "Black") == .displayHero)
+        #expect(PrismTypography.resolveToken(size: 24, style: "Bold") == .screenTitle)
+        #expect(PrismTypography.resolveToken(size: 16, style: "Black") == .sectionCardTitle)
+        #expect(PrismTypography.resolveToken(size: 15, style: "Semi Bold") == .bodyQuestionMedium)
+        #expect(PrismTypography.resolveToken(size: 14, style: "Bold") == .controlButtonPill)
+        #expect(PrismTypography.resolveToken(size: 11, style: "Black") == .captionBadge)
+        #expect(PrismTypography.resolveToken(size: 14, style: "Bold", monospaced: true) == .codeMono)
+
+        #expect(CertigoWidgetStore.defaultAppGroupIdentifier == "group.com.certigo.shared")
+        #expect(CertigoWidgetStore.supportedAppGroupIdentifiers == ["group.com.certigo.shared", "group.com.certigo.native"])
+        let defaultWidgetSnap = CertigoWidgetSnapshot.defaultInitialSnapshot()
+        #expect(defaultWidgetSnap.activeTrackCode == "AZ-104")
+        #expect(defaultWidgetSnap.totalXP == 0)
+
+        #expect(CertiGoLiveAuthService.validateCredentials(email: "bad-email", password: "ValidPassword123", provider: .email) != nil)
+        #expect(CertiGoLiveAuthService.validateCredentials(email: "user@certigo.app", password: "123", provider: .email) != nil)
+        #expect(CertiGoLiveAuthService.validateCredentials(email: "user@certigo.app", password: "ValidPassword123", provider: .email) == nil)
+
+        for relativeDir in ["apps/apple/CertigoKit/Sources", "apps/apple/CertigoNative/WidgetExtension"] {
+            let dirURL = root.appendingPathComponent(relativeDir)
+            let enumerator = try #require(
+                FileManager.default.enumerator(at: dirURL, includingPropertiesForKeys: nil)
+            )
+            for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
+                let source = try String(contentsOf: fileURL, encoding: .utf8)
+                #expect(!source.contains("\u{2014}"), "Found em-dash in \(fileURL.lastPathComponent)")
+                #expect(!source.contains("\u{2013}"), "Found en-dash in \(fileURL.lastPathComponent)")
+            }
+        }
     }
 }

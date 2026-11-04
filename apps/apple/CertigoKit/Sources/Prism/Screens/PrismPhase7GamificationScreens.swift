@@ -103,7 +103,7 @@ public struct WelcomeBackBannerModel: Codable, Equatable, Hashable, Sendable {
     }
 }
 
-// MARK: - 1B. Page 12 Figma Pro — RES-02 Reprise Bienveillante Zéro Culpabilité (§7, §9, §16.7, DR-005)
+// MARK: - 1B. Page 12 Figma Pro : RES-02 Reprise Bienveillante Zéro Culpabilité (§7, §9, §16.7, DR-005)
 
 public struct CertiGoZeroGuiltWelcomeBackModel: Codable, Equatable, Hashable, Sendable {
     public static let screenCode: String = "RES-02"
@@ -259,7 +259,7 @@ public struct MasteryMilestoneItem: Codable, Equatable, Hashable, Sendable, Iden
     }
 }
 
-// MARK: - 3. Weekly Missions (`<= 3`, 1 Cooperative Squad Mission — §9, `missions.v1`)
+// MARK: - 3. Weekly Missions (`<= 3`, 1 Cooperative Squad Mission : §9, `missions.v1`)
 
 public struct WeeklyMissionItem: Codable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
@@ -313,7 +313,7 @@ public struct WeeklyMissionBoardModel: Codable, Equatable, Hashable, Sendable {
     }
 }
 
-// MARK: - 4. Cooperative Seasonal Highlights (`<= 4 / year`, no battle pass — §9, `events.v1`)
+// MARK: - 4. Cooperative Seasonal Highlights (`<= 4 / year`, no battle pass : §9, `events.v1`)
 
 public struct CooperativeEventBannerModel: Codable, Equatable, Hashable, Sendable, Identifiable {
     public static let maxEventsPerYear: Int = 4

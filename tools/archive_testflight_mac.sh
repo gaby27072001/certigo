@@ -22,7 +22,7 @@ fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 team_id=${CERTIGO_APPLE_TEAM_ID:-FFQPC7NC68}
 version=${CERTIGO_DISTRIBUTION_VERSION:-1.1.0}
-build=${CERTIGO_DISTRIBUTION_BUILD:-12}
+build=${CERTIGO_DISTRIBUTION_BUILD:-13}
 open_xcode=false
 
 while [[ $# -gt 0 ]]; do
@@ -65,19 +65,36 @@ mkdir -p "$archive_dir"
 archive_path="$archive_dir/CertigoNative-${version}-build${build}-$(date +%H%M%S).xcarchive"
 
 app_swift="$root/apps/apple/CertigoNative/Sources/CertigoNativeApp.swift"
+pbxproj_file="$project/project.pbxproj"
 app_swift_backup=$(mktemp "${TMPDIR:-/tmp}/CertigoNativeApp.swift.XXXXXX")
+pbxproj_backup=$(mktemp "${TMPDIR:-/tmp}/project.pbxproj.XXXXXX")
 cp "$app_swift" "$app_swift_backup"
+cp "$pbxproj_file" "$pbxproj_backup"
 restore_app_swift() {
   if [[ -f "$app_swift_backup" ]]; then
     cp "$app_swift_backup" "$app_swift"
     rm -f "$app_swift_backup"
   fi
+  if [[ -f "$pbxproj_backup" ]]; then
+    cp "$pbxproj_backup" "$pbxproj_file"
+    rm -f "$pbxproj_backup"
+  fi
 }
 trap restore_app_swift EXIT INT TERM
 
-python3 - "$app_swift" <<'PY'
+python3 - "$app_swift" "$pbxproj_file" <<'PY'
 import pathlib, sys
 path = pathlib.Path(sys.argv[1])
+pbx = pathlib.Path(sys.argv[2])
+pbx_text = pbx.read_text(encoding="utf-8")
+target_marker = '000000000000000000000085 /* Distribution */ = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {'
+if target_marker in pbx_text:
+    pbx_text = pbx_text.replace(
+        target_marker,
+        target_marker + '\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = CertigoNative.entitlements;',
+        1,
+    )
+    pbx.write_text(pbx_text, encoding="utf-8")
 text = path.read_text(encoding="utf-8")
 text = text.replace(
     "    import CertigoDomain\n",

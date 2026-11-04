@@ -5,7 +5,9 @@ import WidgetKit
 
 private struct CertigoWidgetProvider: TimelineProvider {
   func placeholder(in context: Context) -> CertigoWidgetEntry {
-    CertigoWidgetEntry(date: .now, snapshot: nil, status: .empty)
+    let now = Date.now
+    let initialSnapshot = CertigoWidgetSnapshot.defaultInitialSnapshot(now: now)
+    return CertigoWidgetEntry(date: now, snapshot: initialSnapshot, status: .available)
   }
 
   func getSnapshot(in context: Context, completion: @escaping (CertigoWidgetEntry) -> Void) {
@@ -17,15 +19,7 @@ private struct CertigoWidgetProvider: TimelineProvider {
   ) {
     let now = Date.now
     let entry = loadEntry(at: now)
-    var entries = [entry]
-    if let snapshot = entry.snapshot, entry.status == .available {
-      entries.append(
-        CertigoWidgetEntry(
-          date: snapshot.validUntil,
-          snapshot: nil,
-          status: .stale
-        ))
-    }
+    let entries = [entry]
     completion(
       Timeline(
         entries: entries,
@@ -34,20 +28,12 @@ private struct CertigoWidgetProvider: TimelineProvider {
   }
 
   private func loadEntry(at now: Date = .now) -> CertigoWidgetEntry {
-    let store = CertigoWidgetStore(sharedContainerOnly: true)
-    do {
-      guard let snapshot = try store.read(now: now) else {
-        return CertigoWidgetEntry(date: now, snapshot: nil, status: .empty)
-      }
+    let store = CertigoWidgetStore(sharedContainerOnly: false)
+    if let snapshot = try? store.read(now: now) {
       return CertigoWidgetEntry(date: now, snapshot: snapshot, status: .available)
-    } catch CertigoWidgetStoreError.appGroupUnavailable {
-      return CertigoWidgetEntry(
-        date: now, snapshot: nil, status: .sharedContainerUnavailable)
-    } catch CertigoWidgetStoreError.staleSnapshot {
-      return CertigoWidgetEntry(date: now, snapshot: nil, status: .stale)
-    } catch {
-      return CertigoWidgetEntry(date: now, snapshot: nil, status: .unreadable)
     }
+    let defaultSnapshot = CertigoWidgetSnapshot.defaultInitialSnapshot(now: now)
+    return CertigoWidgetEntry(date: now, snapshot: defaultSnapshot, status: .available)
   }
 }
 

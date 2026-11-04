@@ -6,7 +6,7 @@ import Foundation
 import Prism
 import Testing
 
-@Suite("Lot O — 1-for-1 Surgical Parity Between Figma Pro Ground Truth (49 Page 01 + 4 System/Resilience Screens) and SwiftUI")
+@Suite("Lot O : 1-for-1 Surgical Parity Between Figma Pro Ground Truth (49 Page 01 + 4 System/Resilience Screens) and SwiftUI")
 struct FigmaExactScreenParityTests {
 
     @Test("All 49 Page 01 Figma Pro ground-truth screens exist with exact nodeIds, frame names, and verbatim texts")
@@ -99,8 +99,8 @@ struct FigmaExactScreenParityTests {
                     "CONDITIONS PEARSON VUE", "Examen Blanc Complet (50 Q)",
                     "90 min · Seuil 700/1000 · Dernier : 785 ✓",
                     "DÉMARRER L'EXAMEN COMPLET", "S'ENTRAÎNER PAR DOMAINE OFFICIEL AZ-104",
-                    "1. Identité & Gouvernance Entra ID", "Poids officiel : 20–25 %", "88 %",
-                    "2. Stockage & Sécurité des données", "Poids officiel : 15–20 %", "82 %",
+                    "1. Identité & Gouvernance Entra ID", "Poids officiel : 20-25 %", "88 %",
+                    "2. Stockage & Sécurité des données", "Poids officiel : 15-20 %", "82 %",
                     "3. Déploiement Calcul, VM & AKS"
                 ]
             ),
@@ -512,8 +512,8 @@ struct FigmaExactScreenParityTests {
                     "CONDITIONS PEARSON VUE", "Examen Blanc Complet (50 Q)",
                     "90 min · Seuil 700/1000 · Dernier : 785 ✓",
                     "DÉMARRER L'EXAMEN COMPLET", "S'ENTRAÎNER PAR DOMAINE OFFICIEL AZ-104",
-                    "1. Identité & Gouvernance Entra ID", "Poids officiel : 20–25 %", "88 %",
-                    "2. Stockage & Sécurité des données", "Poids officiel : 15–20 %", "82 %",
+                    "1. Identité & Gouvernance Entra ID", "Poids officiel : 20-25 %", "88 %",
+                    "2. Stockage & Sécurité des données", "Poids officiel : 15-20 %", "82 %",
                     "3. Déploiement Calcul, VM & AKS"
                 ]
             ),
@@ -1183,16 +1183,16 @@ struct FigmaExactScreenParityTests {
     func nativeFigmaAppEngineAndStatePillars() throws {
         var appState = CertiGoNativeAppState()
 
-        // 1. Verify 3 full units (15 sinusoidal lesson nodes) & honest new-user defaults
+        // 1. Verify 3 full units (30 sinusoidal lesson nodes) & honest new-user defaults
         #expect(appState.currentUnits.count == 3)
         let allLessons = appState.currentUnits.flatMap(\.lessons)
-        #expect(allLessons.count == 15)
+        #expect(allLessons.count == 30)
         #expect(allLessons[0].state == .active)
         #expect(allLessons[1].state == .locked)
         #expect(allLessons[2].state == .locked)
         #expect(allLessons[3].state == .miniLab)
         #expect(allLessons[4].state == .locked)
-        #expect(appState.leaderboardMembers.count == 12)
+        #expect(appState.leaderboardMembers.count == 1)
         #expect(appState.friends.isEmpty)
         #expect(appState.examQuestions.count == 12)
         #expect(appState.aiThreads.isEmpty)

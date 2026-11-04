@@ -1273,12 +1273,12 @@ public struct CertiGoMascotVaultSheetView: View {
                                 )
                                 contextSimChip(
                                     id: "morning",
-                                    label: "🛌 Réveil 06h–09h30",
+                                    label: "🛌 Réveil 06h-09h30",
                                     active: isMorningSimulated
                                 )
                                 contextSimChip(
                                     id: "coffee",
-                                    label: "☕ Pause Café 09h30–14h",
+                                    label: "☕ Pause Café 09h30-14h",
                                     active: isCoffeeSimulated
                                 )
                                 contextSimChip(

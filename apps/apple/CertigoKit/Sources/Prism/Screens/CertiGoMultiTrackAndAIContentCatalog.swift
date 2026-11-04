@@ -782,7 +782,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             seed = TrackSeed(
                 id: "track-saa-c03",
                 code: "SAA-C03",
-                officialTitle: "AWS Certified Solutions Architect – Associate",
+                officialTitle: "AWS Certified Solutions Architect - Associate",
                 shortSubtitle: "Unité 1 · VPC Endpoints, AWS PrivateLink & Multi-AZ",
                 vendorId: "aws",
                 isAIFrontierTrack: false,
@@ -1182,7 +1182,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             seed = TrackSeed(
                 id: "track-cca-f",
                 code: "CCA-F",
-                officialTitle: "Anthropic Claude Certified Architect – Foundations",
+                officialTitle: "Anthropic Claude Certified Architect - Foundations",
                 shortSubtitle: "Unité 2 · Prompt Caching, Extended Thinking, Tool Use & MCP",
                 vendorId: "claude",
                 isAIFrontierTrack: false,
@@ -1517,9 +1517,9 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
     private static func makeUnits(from seed: TrackSeed) -> [CertiGoCurriculumUnit] {
         let titles = [seed.unit1Title, seed.unit2Title, seed.unit3Title]
         let weights = [
-            "5 étapes · Objectif examen : 30–35 %",
-            "5 étapes · Objectif examen : 35–40 %",
-            "5 étapes · Objectif examen : 25–30 %"
+            "5 étapes · Objectif examen : 30-35 %",
+            "5 étapes · Objectif examen : 35-40 %",
+            "5 étapes · Objectif examen : 25-30 %"
         ]
         return titles.enumerated().map { idx, unitTitle -> CertiGoCurriculumUnit in
             let unitNum = idx + 1
@@ -1589,7 +1589,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
         let assets = seed.serviceAssets
         let labels = seed.serviceLabels
 
-        // Q_TYPE_01 — Scénario QCM Classique (Bulle 3/4 + 4 Options A/B/C/D)
+        // Q_TYPE_01 : Scénario QCM Classique (Bulle 3/4 + 4 Options A/B/C/D)
         let q01Options = [
             PrismChoiceOption(
                 id: "\(codeLower)-q01-a",
@@ -1643,7 +1643,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             )
         )
 
-        // Q_TYPE_02 — Grille 2x2 de Services Officiels (Vraies Icônes SVG)
+        // Q_TYPE_02 : Grille 2x2 de Services Officiels (Vraies Icônes SVG)
         let gridCards: [CertiGoServiceGridOption] = [
             CertiGoServiceGridOption(
                 id: "\(codeLower)-q02-a",
@@ -1686,7 +1686,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             PrismChoiceOption(
                 id: card.id,
                 badge: card.badge,
-                text: "\(card.serviceTitle) — \(card.subtitle)",
+                text: "\(card.serviceTitle) : \(card.subtitle)",
                 explanation: card.explanation,
                 isCorrect: card.isCorrect
             )
@@ -1714,7 +1714,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             )
         )
 
-        // Q_TYPE_03 — Schéma d'Architecture Interactif à Compléter ([ ? ])
+        // Q_TYPE_03 : Schéma d'Architecture Interactif à Compléter ([ ? ])
         let diagramSpec = CertiGoDiagramSlotSpec(
             sourceLabel: labels[1],
             sourceAssetName: assets[1],
@@ -1766,7 +1766,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             )
         )
 
-        // Q_TYPE_04 — Saisie Clavier iOS (Paramètre / Zone / Commande)
+        // Q_TYPE_04 : Saisie Clavier iOS (Paramètre / Zone / Commande)
         let keyboardSpec = CertiGoKeyboardInputSpec(
             commandPrefix: seed.cliPrefix,
             placeholder: seed.cliExpectedKeyword,
@@ -1806,7 +1806,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             )
         )
 
-        // Q_TYPE_05 — Assemblage de Briques CLI (Word Bank Duolingo)
+        // Q_TYPE_05 : Assemblage de Briques CLI (Word Bank Duolingo)
         let q05Tokens = seed.cliTokens.enumerated().map { idx, tok in
             PrismCommandToken(id: "\(codeLower)-q05-tok-\(idx)", text: tok)
         }
@@ -1835,7 +1835,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             )
         )
 
-        // Q_TYPE_06 — Paires à Relier (Symboles ↔ Rôles Exact)
+        // Q_TYPE_06 : Paires à Relier (Symboles ↔ Rôles Exact)
         let pairs: [CertiGoMatchingPairSpec] = [
             CertiGoMatchingPairSpec(
                 id: "\(codeLower)-pair-1",
@@ -1894,7 +1894,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             )
         )
 
-        // Q_TYPE_07 — Diagnostic d'Anomalie JSON / YAML / Bicep (Trouver la Ligne Fautive)
+        // Q_TYPE_07 : Diagnostic d'Anomalie JSON / YAML / Bicep (Trouver la Ligne Fautive)
         let bugArtifact = PrismArtifactDocument(
             id: "\(codeLower)-bug-doc",
             title: seed.configFileName,
@@ -1932,7 +1932,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             )
         )
 
-        // Q_TYPE_08 — Hiérarchie de Portée à Ordonner (1 ➔ 4)
+        // Q_TYPE_08 : Hiérarchie de Portée à Ordonner (1 ➔ 4)
         let orderItems = seed.scopeOrder.enumerated().map { idx, text in
             PrismOrderItem(id: "\(codeLower)-ord-\(idx + 1)", text: text, indentLevel: idx)
         }
@@ -1958,7 +1958,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             )
         )
 
-        // Q_TYPE_09 — Verdict Rapide d'Architecture (Autorisé / Bloqué / Conforme)
+        // Q_TYPE_09 : Verdict Rapide d'Architecture (Autorisé / Bloqué / Conforme)
         let verdictOptions = [
             PrismChoiceOption(
                 id: "\(codeLower)-q09-allow",
@@ -2014,7 +2014,7 @@ public enum CertiGoMultiTrackAndAIContentCatalog {
             )
         )
 
-        // Q_TYPE_10 — Multi-Sélection à Cases à Cocher (Exactement 2 Réponses)
+        // Q_TYPE_10 : Multi-Sélection à Cases à Cocher (Exactement 2 Réponses)
         let q10Options = [
             PrismChoiceOption(
                 id: "\(codeLower)-q10-1",

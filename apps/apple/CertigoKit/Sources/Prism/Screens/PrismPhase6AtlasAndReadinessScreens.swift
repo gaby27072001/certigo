@@ -270,7 +270,7 @@ public enum ExamReportedOutcome: String, Codable, CaseIterable, Equatable, Hasha
     public var title: String {
         switch self {
         case .passed: "Examen réussi"
-        case .needsRetake: "À repasser — ajuster mon plan"
+        case .needsRetake: "À repasser : ajuster mon plan"
         }
     }
 }

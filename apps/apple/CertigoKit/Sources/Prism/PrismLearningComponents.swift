@@ -73,7 +73,7 @@ public enum PrismSessionLength: String, CaseIterable, Codable, Sendable, Identif
         case .standard:
             return "~15 min"
         case .deepDive:
-            return "30–45 min"
+            return "30-45 min"
         }
     }
 
@@ -2979,7 +2979,7 @@ private struct PrismLearningPreviewGallery: View {
                         title: "Modèle de responsabilité partagée",
                         body: "Le transfert vers le cloud déplace la charge opérationnelle physique mais jamais la propriété des données.",
                         keyPoints: ["Données et identités : toujours Client", "Physique : toujours Fournisseur Cloud"],
-                        verifiedSources: [PrismVerifiedSource(id: "src1", title: "Microsoft Learn — Responsabilité partagée", referenceCode: "AZ-900-1.2")]
+                        verifiedSources: [PrismVerifiedSource(id: "src1", title: "Microsoft Learn : Responsabilité partagée", referenceCode: "AZ-900-1.2")]
                     )
                 )
                 ResponsibilityMatrix(
@@ -2997,11 +2997,11 @@ private struct PrismLearningPreviewGallery: View {
     }
 }
 
-#Preview("Prism Learning — Nominal") {
+#Preview("Prism Learning : Nominal") {
     PrismLearningPreviewGallery()
 }
 
-#Preview("Prism Learning — Vide") {
+#Preview("Prism Learning : Vide") {
     VStack(spacing: PrismSpacing.md) {
         SessionProgressHeader(currentIndex: 0, totalCount: 0, stepTitle: "Aucune étape active") {}
         ResponsibilityMatrix(entries: [])
@@ -3010,7 +3010,7 @@ private struct PrismLearningPreviewGallery: View {
     .padding(PrismSpacing.md)
 }
 
-#Preview("Prism Learning — Chargement") {
+#Preview("Prism Learning : Chargement") {
     VStack(spacing: PrismSpacing.md) {
         SessionProgressHeader(currentIndex: 1, totalCount: 10, stepTitle: "Préparation de l'exercice…") {}
         QuestionCard(
@@ -3024,7 +3024,7 @@ private struct PrismLearningPreviewGallery: View {
     .padding(PrismSpacing.md)
 }
 
-#Preview("Prism Learning — Erreur & Repli IA") {
+#Preview("Prism Learning : Erreur & Repli IA") {
     VStack(spacing: PrismSpacing.md) {
         FeedbackPanel(
             state: PrismFeedbackState(
@@ -3039,12 +3039,12 @@ private struct PrismLearningPreviewGallery: View {
     .padding(PrismSpacing.md)
 }
 
-#Preview("Prism Learning — Accessibilité AX3") {
+#Preview("Prism Learning : Accessibilité AX3") {
     PrismLearningPreviewGallery()
         .dynamicTypeSize(.accessibility3)
 }
 
-#Preview("Prism Learning — Sombre") {
+#Preview("Prism Learning : Sombre") {
     PrismLearningPreviewGallery()
         .preferredColorScheme(.dark)
 }

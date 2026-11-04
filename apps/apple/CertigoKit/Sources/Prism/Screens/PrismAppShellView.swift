@@ -379,7 +379,7 @@ public struct PrismAppShellCoordinatorModel: Equatable, Sendable {
                 CatalogRouteItem(
                     id: "aws-saa",
                     code: "SAA-C03",
-                    officialTitle: "AWS Certified Solutions Architect – Associate",
+                    officialTitle: "AWS Certified Solutions Architect - Associate",
                     region: .cloud
                 )
             ]

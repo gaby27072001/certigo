@@ -417,7 +417,7 @@ public struct TodayRootScreen: View {
                 Text(verbatim: unitBannerTitle)
                     .prismTextStyle(.title3)
                     .foregroundStyle(PrismColor.onAccent)
-                Text(verbatim: "5 étapes · Objectif examen : 25–30 %")
+                Text(verbatim: "5 étapes · Objectif examen : 25-30 %")
                     .prismTextStyle(.footnote)
                     .foregroundStyle(PrismColor.onAccent.opacity(0.9))
             }

@@ -19,7 +19,12 @@ public enum CertigoWidgetStoreError: Error, Equatable, Sendable {
 }
 
 public final class CertigoWidgetStore: @unchecked Sendable {
-  public static let defaultAppGroupIdentifier = "group.com.certigo.native"
+  public static let defaultAppGroupIdentifier = "group.com.certigo.shared"
+  public static let legacyAppGroupIdentifier = "group.com.certigo.native"
+  public static let supportedAppGroupIdentifiers = [
+    "group.com.certigo.shared",
+    "group.com.certigo.native",
+  ]
   public static let maximumSnapshotBytes = 64 * 1_024
 
   private let appGroupIdentifier: String
@@ -157,9 +162,24 @@ public final class CertigoWidgetStore: @unchecked Sendable {
   private func appGroupDirectory() -> URL? {
     guard !appGroupIdentifier.isEmpty else { return nil }
     #if os(iOS) || os(macOS)
-      return fileManager.containerURL(
-        forSecurityApplicationGroupIdentifier: appGroupIdentifier
-      )?.appendingPathComponent("CertigoWidget", isDirectory: true)
+      let candidates: [String]
+      if Self.supportedAppGroupIdentifiers.contains(appGroupIdentifier) {
+        var ordered = [appGroupIdentifier]
+        for group in Self.supportedAppGroupIdentifiers where !ordered.contains(group) {
+          ordered.append(group)
+        }
+        candidates = ordered
+      } else {
+        candidates = [appGroupIdentifier]
+      }
+      for group in candidates {
+        if let container = fileManager.containerURL(
+          forSecurityApplicationGroupIdentifier: group
+        ) {
+          return container.appendingPathComponent("CertigoWidget", isDirectory: true)
+        }
+      }
+      return nil
     #else
       return nil
     #endif
