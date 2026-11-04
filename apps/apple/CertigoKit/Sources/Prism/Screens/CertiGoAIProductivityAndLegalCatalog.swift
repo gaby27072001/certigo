@@ -2561,39 +2561,39 @@ public enum CertiGoAIProductivityAndLegalCatalog {
             switch trackId {
             case .ms365Copilot:
                 return [
-                    "BrandLogos/brand-microsoft",
-                    "BrandLogos/brand-github-copilot",
-                    "BrandLogos/brand-python",
-                    "AzureServices/Bot-Services",
-                    "AzureServices/Security-Center",
-                    "Certifications/ms-official-associate-badge"
+                    "BrandLogos/brand-m365-copilot",
+                    "BrandLogos/brand-copilot-cowork",
+                    "BrandLogos/brand-office-word",
+                    "BrandLogos/brand-office-powerpoint",
+                    "BrandLogos/brand-office-excel",
+                    "BrandLogos/brand-office-teams"
                 ]
             case .openAIPro:
                 return [
                     "BrandLogos/brand-openai",
+                    "BrandLogos/brand-openai-o3",
+                    "BrandLogos/brand-openai-codex",
+                    "BrandLogos/brand-openai-agents",
                     "BrandLogos/brand-github",
-                    "BrandLogos/brand-python",
-                    "AzureServices/Cognitive-Services",
-                    "AzureServices/Search-Services",
-                    "AzureServices/Key-Vaults"
+                    "BrandLogos/brand-python"
                 ]
             case .anthropicClaude:
                 return [
                     "BrandLogos/brand-anthropic",
                     "BrandLogos/brand-claude-ai",
-                    "Certifications/tech-anthropic-cca-foundations",
-                    "BrandLogos/brand-github",
-                    "AWSServices/Amazon-SageMaker",
-                    "GCPServices/gcp-vertexai"
+                    "BrandLogos/brand-claude-code",
+                    "BrandLogos/brand-anthropic-mcp",
+                    "BrandLogos/brand-claude-artifacts",
+                    "Certifications/tech-anthropic-cca-foundations"
                 ]
             case .harveyLegal:
                 return [
                     "BrandLogos/brand-harvey",
-                    "AzureServices/Security-Center",
-                    "AzureServices/Key-Vaults",
-                    "AzureServices/Search-Services",
-                    "AzureServices/Policy",
-                    "Certifications/ms-official-expert-badge"
+                    "BrandLogos/brand-harvey-assistant",
+                    "BrandLogos/brand-harvey-vault",
+                    "BrandLogos/brand-harvey-knowledge",
+                    "BrandLogos/brand-harvey",
+                    "BrandLogos/brand-harvey-assistant"
                 ]
             }
         }()

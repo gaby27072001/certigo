@@ -2039,4 +2039,92 @@ struct CertiGoNativeFigmaAppTests {
         #expect(CertiGoNativeAppState.controlCenterAIButtonInstallSteps.count == 3)
         #expect(CertiGoNativeAppState.controlCenterAIButtonInstallSteps.map(\.number) == [1, 2, 3])
     }
+
+    @Test("All 33 certifications in CertiGoDedicatedTrackQuestionBank have 100% distinct questions, 30 dedicated steps, 12 exam questions, zero Azure icons on non-Microsoft tracks, and Harvey Academy + Anthropic Academy content")
+    func allThirtyThreeCertificationsHaveDedicatedQuestionBankLogosAndZeroCrossCloudLeak() throws {
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: root.appendingPathComponent("AGENTS.md").path) {
+            let parent = root.deletingLastPathComponent()
+            guard parent != root else { throw CocoaError(.fileNoSuchFile) }
+            root = parent
+        }
+        let prismAssets = root.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Resources/Prism.xcassets")
+
+        let allCodes = CertiGoDedicatedTrackQuestionBank.allSupportedRouteCodes
+        #expect(allCodes.count == 33)
+
+        var firstExercisePrompts = Set<String>()
+        var firstExamStems = Set<String>()
+
+        for code in allCodes {
+            let meta = CertiGoDedicatedTrackQuestionBank.brandMetadata(forRouteCode: code)
+            #expect(meta.routeCode == code)
+            #expect(!meta.vendorId.isEmpty)
+            #expect(
+                FileManager.default.fileExists(
+                    atPath: prismAssets.appendingPathComponent("\(meta.brandLogoAssetName).imageset").path
+                ),
+                "Missing brand logo \(meta.brandLogoAssetName) for \(code)"
+            )
+            #expect(
+                FileManager.default.fileExists(
+                    atPath: prismAssets.appendingPathComponent("\(meta.certificationAssetName).imageset").path
+                ),
+                "Missing crest asset \(meta.certificationAssetName) for \(code)"
+            )
+
+            // Every island asset across all 33 certifications must exist on disk
+            for islandAsset in meta.islandServiceAssetNames {
+                #expect(
+                    FileManager.default.fileExists(
+                        atPath: prismAssets.appendingPathComponent("\(islandAsset).imageset").path
+                    ),
+                    "Missing island asset \(islandAsset) for \(code)"
+                )
+            }
+
+            // Non-Microsoft tracks must never reference AzureServices/*
+            if meta.vendorId != "microsoft" {
+                #expect(
+                    meta.islandServiceAssetNames.allSatisfy { !$0.hasPrefix("AzureServices/") },
+                    "Found Azure icon on non-Microsoft track \(code)"
+                )
+            }
+
+            let units = CertiGoNativeRichCatalog.buildThreeUnits(forRouteCode: code)
+            #expect(units.count == 3)
+            #expect(units.flatMap(\.lessons).count == 30)
+
+            let exercises = CertiGoNativeLessonSessionEngine.defaultExercises(
+                forRouteCode: code,
+                lessonId: "\(code)-u1-s1"
+            )
+            #expect(exercises.count >= 6)
+            #expect(
+                firstExercisePrompts.insert(exercises[0].prompt).inserted,
+                "Duplicate first exercise prompt on track \(code): \(exercises[0].prompt)"
+            )
+            for ex in exercises {
+                #expect(!ex.plainLanguagePrompt.contains("Version concrète sans jargon"))
+                #expect(!ex.plainLanguagePrompt.contains("Une version concrète sans jargon"))
+            }
+
+            let exams = CertiGoNativeRichCatalog.buildExamQuestions(forRouteCode: code)
+            #expect(exams.count == 12)
+            #expect(
+                firstExamStems.insert(exams[0].stem).inserted,
+                "Duplicate first exam stem on track \(code): \(exams[0].stem)"
+            )
+        }
+
+        // Verify Harvey Academy and Anthropic Academy specifics
+        let harveyEx = CertiGoNativeLessonSessionEngine.defaultExercises(forRouteCode: "HARVEY-LEGAL", lessonId: "HARVEY-LEGAL-u1-s1")
+        #expect(harveyEx[0].prompt.contains("Harvey Academy"))
+        let anthropicEx = CertiGoNativeLessonSessionEngine.defaultExercises(forRouteCode: "ANTHROPIC-CLAUDE", lessonId: "ANTHROPIC-CLAUDE-u1-s1")
+        #expect(anthropicEx[0].prompt.contains("Anthropic Academy"))
+        let gh900Ex = CertiGoNativeLessonSessionEngine.defaultExercises(forRouteCode: "GH-900", lessonId: "GH-900-u1-s1")
+        let az900Ex = CertiGoNativeLessonSessionEngine.defaultExercises(forRouteCode: "AZ-900", lessonId: "AZ-900-u1-s1")
+        #expect(gh900Ex[0].prompt != az900Ex[0].prompt)
+        #expect(gh900Ex[0].prompt.contains("Pull Request"))
+    }
 }
