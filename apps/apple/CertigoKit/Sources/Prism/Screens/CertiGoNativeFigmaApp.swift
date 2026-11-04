@@ -156,7 +156,7 @@ public enum CertiGoNativeTab: String, Codable, Sendable, CaseIterable, Identifia
     public var title: String {
         switch self {
         case .parcours: return "Parcours"
-        case .examens: return "Examens"
+        case .examens: return "Actus"
         case .hubIA: return "✦ IA"
         case .social: return "Social"
         case .moi: return "Moi"
@@ -8888,6 +8888,8 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
 
     // Overlays, Popovers, Bottom Sheets & FullScreenCovers
     public var showCoursePopover02: Bool = false
+    public var isPresentingExamCenterModule: Bool = false
+    public var techNewsState: CertiGoTechNewsRuntimeState = CertiGoTechNewsRuntimeState()
     public var activeStepSheet: CertiGoStepSheetMode?
     public var activeGamificationSheet: CertiGoGamificationSheetKind? = nil
     public var showExamLaunchSheet22: Bool = false
@@ -9144,6 +9146,8 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
 
     public mutating func navigateImmediatelyToAIHub(router: AppRouterState? = nil) {
         showCoursePopover02 = false
+        isPresentingExamCenterModule = false
+        techNewsState.showTop100SourcesDirectorySheet = false
         activeStepSheet = nil
         activeGamificationSheet = nil
         showExamLaunchSheet22 = false
@@ -11977,22 +11981,32 @@ public struct CertiGoNativeFigmaAppView: View {
         ZStack(alignment: .bottom) {
             // Active Tab Root View
             Group {
-                switch appState.selectedTab {
-                case .parcours:
-                    parcoursTab01View
-                case .examens:
+                if appState.isPresentingExamCenterModule {
                     examensTab21View
-                case .hubIA:
-                    hubIATab06View
-                case .social:
-                    socialTab07And25View
-                case .moi:
-                    moiTab08NavigationStack
+                } else {
+                    switch appState.selectedTab {
+                    case .parcours:
+                        parcoursTab01View
+                    case .examens:
+                        CertiGoTechNewsFeedView(
+                            appState: $appState,
+                            onAskCertiGoAI: { article in
+                                appState.askCertiGoAIAboutTechNews(article)
+                                triggerLiveAITutorRequestForLatestTurn()
+                            }
+                        )
+                    case .hubIA:
+                        hubIATab06View
+                    case .social:
+                        socialTab07And25View
+                    case .moi:
+                        moiTab08NavigationStack
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Pinned Floating Bottom Tab Bar (5 Tabs: Parcours, Examens, ✦ IA, Social, Moi)
+            // Pinned Floating Bottom Tab Bar (5 Tabs: Parcours, Actus, ✦ IA, Social, Moi)
             if !(appState.selectedTab == .moi && !profileNavPath.isEmpty)
                 && !isAIInputFocused
                 && !(appState.selectedTab == .hubIA && appState.isAIDrawerOpen06D)
@@ -12248,6 +12262,7 @@ public struct CertiGoNativeFigmaAppView: View {
 
     private func selectBottomTab(_ tab: CertiGoNativeTab) {
         CertiGoHapticsEngine.shared.playOptionSelection()
+        appState.isPresentingExamCenterModule = false
         appState.selectedTab = tab
         switch tab {
         case .parcours: router.selectedTab = .today
@@ -12383,8 +12398,18 @@ public struct CertiGoNativeFigmaAppView: View {
     private func bottomBarItemsLayer(isHighlightedBlue: Bool, innerWidth: CGFloat) -> some View {
         let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: appState.activeRouteCode)
         return HStack(spacing: PrismSpacing.xs) {
-            tabBarItemButton(tab: .parcours, symbol: "safari.fill", label: appState.tr("Parcours"), isHighlightedBlue: isHighlightedBlue)
-            tabBarItemButton(tab: .examens, symbol: "scope", label: appState.tr("Examens"), isHighlightedBlue: isHighlightedBlue)
+            tabBarItemButton(
+                tab: .parcours,
+                symbol: "safari.fill",
+                label: appState.tr("Parcours"),
+                isHighlightedBlue: isHighlightedBlue
+            )
+            tabBarItemButton(
+                tab: .actus,
+                symbol: "newspaper.fill",
+                label: CertiGoNativeTab.actus.localizedTabTitle(languageIndex: appState.settingsLanguageIndex),
+                isHighlightedBlue: isHighlightedBlue
+            )
 
             // Center 3D AI Hub Orb Button (`✦` : Figma `57:372` White Circle with Multicolor AngularGradient Ring)
             Button {
@@ -12482,6 +12507,22 @@ public struct CertiGoNativeFigmaAppView: View {
                         ForEach(appState.currentUnits) { unit in
                             unitSectionView(unit: unit, stageWidth: stageWidth)
                         }
+
+                        // Final Boss Island at the end of the Parcours (`🏆 EXAMEN BLANC`)
+                        CertiGoParcoursFinalExamBossCardView(
+                            routeCode: appState.activeRouteCode,
+                            completedChapters: appState.completedChaptersCountForActiveRoute,
+                            totalChapters: appState.totalChaptersCountForActiveRoute,
+                            isUnlocked: appState.isParcoursAllChaptersCompletedForActiveRoute,
+                            lastExamScoreOutOf1000: appState.lastComputedExamScoreOutOf1000,
+                            completedExamsCount: appState.completedExamsCount,
+                            languageIndex: appState.settingsLanguageIndex,
+                            onOpenExamModule: {
+                                withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                                    appState.openExamModuleFromParcoursBoss()
+                                }
+                            }
+                        )
                     }
                     .padding(.horizontal, PrismSpacing.xl)
                     .padding(.top, FigMetrics.sixtyEight)
@@ -12993,60 +13034,89 @@ public struct CertiGoNativeFigmaAppView: View {
             }
             .fixedSize(horizontal: false, vertical: true)
 
-            // Certification Cards for Selected Vendor
+            // Certification Cards for Selected Vendor (with right-side Trophy 🏆 button on every row to open Mock Exam module!)
             VStack(spacing: PrismSpacing.s) {
                 ForEach(cards, id: \.code) { card in
                     let isActive = card.code.uppercased() == appState.activeRouteCode.uppercased()
-                    Button {
-                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                            appState.selectRoute(card.code)
-                            coordinator.parallelTracksPreference.setActiveTrack(card.code)
-                            try? preferenceStore.save(coordinator.parallelTracksPreference)
-                        }
-                    } label: {
-                        HStack(spacing: PrismSpacing.m) {
-                            CertiGoOfficialCrestView(routeCode: card.code, size: FigMetrics.fortyFour)
-
-                            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                                HStack(spacing: PrismSpacing.xs) {
-                                    Text(verbatim: card.code)
-                                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
-                                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                                    if isActive {
-                                        Text(verbatim: "ACTIF ✓")
-                                            .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
-                                            .foregroundStyle(PrismColor.onAccent)
-                                            .padding(.horizontal, PrismSpacing.xs)
-                                            .padding(.vertical, PrismSpacing.xxs)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: PrismRadius.xs, style: .continuous)
-                                                    .fill(PrismColor.figmaHex("#58cc02"))
-                                            )
-                                    }
-                                }
-                                Text(verbatim: card.title)
-                                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Extra Bold"))
-                                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                                Text(verbatim: CertiGoLiveTrackCurriculum.curriculum(forRouteCode: card.code).unitBannerTitle)
-                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                    HStack(spacing: PrismSpacing.s) {
+                        Button {
+                            withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                                appState.selectRoute(card.code)
+                                coordinator.parallelTracksPreference.setActiveTrack(card.code)
+                                try? preferenceStore.save(coordinator.parallelTracksPreference)
                             }
-                            Spacer(minLength: PrismSpacing.xs)
+                        } label: {
+                            HStack(spacing: PrismSpacing.m) {
+                                CertiGoOfficialCrestView(routeCode: card.code, size: FigMetrics.fortyFour)
+
+                                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                    HStack(spacing: PrismSpacing.xs) {
+                                        Text(verbatim: card.code)
+                                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
+                                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                                        if isActive {
+                                            Text(verbatim: "ACTIF ✓")
+                                                .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
+                                                .foregroundStyle(PrismColor.onAccent)
+                                                .padding(.horizontal, PrismSpacing.xs)
+                                                .padding(.vertical, PrismSpacing.xxs)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: PrismRadius.xs, style: .continuous)
+                                                        .fill(PrismColor.figmaHex("#58cc02"))
+                                                )
+                                        }
+                                    }
+                                    Text(verbatim: card.title)
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Extra Bold"))
+                                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                        .lineLimit(1)
+                                    Text(verbatim: CertiGoLiveTrackCurriculum.curriculum(forRouteCode: card.code).unitBannerTitle)
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: PrismSpacing.xxs)
+                            }
+                            .contentShape(Rectangle())
                         }
-                        .padding(PrismSpacing.m)
-                        .background(
-                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                                .fill(isActive ? PrismColor.figmaHex("#eff6ff") : PrismColor.figmaHex("#f8fafc"))
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("popover-select-course-\(card.code)")
+
+                        // Right-end Trophy Button `🏆` on each certification row -> Opens Mock Exam Module directly!
+                        Button {
+                            withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                                appState.openExamModuleFromCoursePopover(forRouteCode: card.code)
+                                coordinator.parallelTracksPreference.setActiveTrack(card.code)
+                                try? preferenceStore.save(coordinator.parallelTracksPreference)
+                            }
+                        } label: {
+                            Text(verbatim: "🏆")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Bold"))
+                                .frame(width: FigMetrics.fortyFour, height: FigMetrics.fortyFour)
+                        }
+                        .buttonStyle(
+                            CertiGoTactile3DButtonStyle(
+                                faceHex: "#fef3c7",
+                                lipHex: "#d97706",
+                                strokeHex: "#f59e0b",
+                                cornerRadius: PrismRadius.m,
+                                lipDepth: FigMetrics.three
+                            )
                         )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                                .strokeBorder(
-                                    isActive ? PrismColor.figmaHex("#0078d4") : PrismColor.figmaHex("#e2e8f0"),
-                                    lineWidth: PrismBorder.standard
-                                )
-                        )
+                        .accessibilityIdentifier("popover-exam-trophy-\(card.code)")
                     }
-                    .buttonStyle(.plain)
+                    .padding(PrismSpacing.m)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                            .fill(isActive ? PrismColor.figmaHex("#eff6ff") : PrismColor.figmaHex("#f8fafc"))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                            .strokeBorder(
+                                isActive ? PrismColor.figmaHex("#0078d4") : PrismColor.figmaHex("#e2e8f0"),
+                                lineWidth: PrismBorder.standard
+                            )
+                    )
                 }
             }
 
@@ -13706,10 +13776,35 @@ public struct CertiGoNativeFigmaAppView: View {
 
         return VStack(spacing: .zero) {
             // Rule 8: Unified 56pt Top Tab Header with 20pt horizontal margin
-            HStack {
-                Text(verbatim: "Examens")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
+            HStack(spacing: PrismSpacing.s) {
+                if appState.isPresentingExamCenterModule {
+                    Button {
+                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                            appState.closeExamModule()
+                        }
+                    } label: {
+                        Text(verbatim: "← Parcours")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                            .padding(.horizontal, PrismSpacing.m)
+                            .frame(height: FigMetrics.thirtyEight)
+                            .background(
+                                RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                                    .fill(PrismColor.surface)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                                    .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("examens-back-to-parcours-button")
+                }
+
+                Text(verbatim: "🏆 Examens Blancs")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .lineLimit(1)
 
                 Spacer()
 
