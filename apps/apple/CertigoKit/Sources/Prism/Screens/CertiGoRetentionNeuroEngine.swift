@@ -1064,40 +1064,68 @@ public enum CertiGoFoggFacilitatorEngine: Sendable {
     public static func buildThreeFoggNotifications(
         routeCode: String,
         preferredAnchorTime: String,
-        hasCompletedSessionToday: Bool
+        hasCompletedSessionToday: Bool,
+        activeStepTitle: String? = nil,
+        streakDays: Int = 7,
+        language: AppLanguage = .french
     ) -> [CertiGoFoggLocalNotificationSpec] {
         let upper = routeCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         let cleanTime = preferredAnchorTime.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "19:30"
             : preferredAnchorTime
 
+        let anchorSpec = CertiGoSmartNotificationsCatalog.notification(
+            for: .dailyAnchor,
+            routeCode: upper,
+            activeStepTitle: activeStepTitle,
+            streakDays: streakDays,
+            preferredAnchorTime: cleanTime,
+            language: language
+        )
+        let rescueSpec = CertiGoSmartNotificationsCatalog.notification(
+            for: .streakRescue90s,
+            routeCode: upper,
+            activeStepTitle: activeStepTitle,
+            streakDays: streakDays,
+            preferredAnchorTime: cleanTime,
+            language: language
+        )
+        let comebackSpec = CertiGoSmartNotificationsCatalog.notification(
+            for: .kindComeback48h,
+            routeCode: upper,
+            activeStepTitle: activeStepTitle,
+            streakDays: streakDays,
+            preferredAnchorTime: cleanTime,
+            language: language
+        )
+
         let signal = CertiGoFoggLocalNotificationSpec(
             id: "fogg-signal-\(upper.lowercased())",
             kind: .signal,
-            title: "🔔 Signal CertiGo · Ton créneau \(upper) (\(cleanTime))",
-            body: "Ta parenthèse d'architecture de 5 min est prête. Lance ton sprint en 1 seul clic !",
+            title: anchorSpec.title,
+            body: anchorSpec.body,
             scheduledTimeText: cleanTime,
-            deepLinkAction: "certigo://sprint/one-tap?route=\(upper)"
+            deepLinkAction: anchorSpec.primaryDeepLinkURL
         )
 
         let facilitator = CertiGoFoggLocalNotificationSpec(
             id: "fogg-facilitator-21h-\(upper.lowercased())",
             kind: .facilitator90s,
-            title: "⚡ Fatigué ce soir ? Mode Sauvetage 90 secondes",
+            title: rescueSpec.title,
             body: hasCompletedSessionToday
-                ? "Objectif déjà validé aujourd'hui ✓ : mode 3 cartes Flash prêt pour demain soir si besoin."
-                : "3 cartes Flash sur \(upper) en 90 secondes suffisent pour garder ton rythme sans t'épuiser.",
+                ? "Objectif du jour validé ✓ : repos mérité ce soir."
+                : rescueSpec.body,
             scheduledTimeText: "21:00",
-            deepLinkAction: "certigo://sprint/rescue-90s?route=\(upper)"
+            deepLinkAction: rescueSpec.primaryDeepLinkURL
         )
 
         let spark = CertiGoFoggLocalNotificationSpec(
             id: "fogg-spark-48h-\(upper.lowercased())",
             kind: .spark48hBonus,
-            title: "🌱 Étincelle Reprise +20 XP sur \(upper)",
-            body: "Reprends en douceur après 48h : +20 XP offerts dès ta première carte validée, zéro pénalité.",
+            title: comebackSpec.title,
+            body: comebackSpec.body,
             scheduledTimeText: "+48h",
-            deepLinkAction: "certigo://sprint/kind-comeback?route=\(upper)"
+            deepLinkAction: comebackSpec.primaryDeepLinkURL
         )
 
         return [signal, facilitator, spark]

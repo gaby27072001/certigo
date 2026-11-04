@@ -8957,20 +8957,27 @@ public actor CertiGoDailyNotificationScheduler {
     public func requestAuthorizationAndScheduleDailyReminder(
         timeText: String,
         routeCode: String,
-        dailyMinutes: Int
+        dailyMinutes: Int,
+        activeStepTitle: String? = nil,
+        language: AppLanguage = .french
     ) async -> Bool {
         let (hour, minute) = Self.parseHourAndMinute(from: timeText)
+        let anchorSpec = CertiGoSmartNotificationsCatalog.notification(
+            for: .dailyAnchor,
+            routeCode: routeCode,
+            activeStepTitle: activeStepTitle,
+            preferredAnchorTime: timeText,
+            language: language
+        )
         #if canImport(UserNotifications)
         let center = UNUserNotificationCenter.current()
         let granted = (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) ?? false
         guard granted else { return false }
 
+        CertiGoSmartNotificationsCatalog.registerCategoriesOnNotificationCenter(center, language: language)
         center.removePendingNotificationRequests(withIdentifiers: [Self.dailyReminderIdentifier])
 
-        let content = UNMutableNotificationContent()
-        content.title = "CertiGo · Ton sprint \(routeCode) t'attend 🔥"
-        content.body = "Prends \(dailyMinutes) min pour garder ta série active et ancrer tes concepts d'examen."
-        content.sound = .default
+        let content = CertiGoSmartNotificationsCatalog.makeUNNotificationContent(from: anchorSpec)
 
         var dateComponents = DateComponents()
         dateComponents.hour = hour
@@ -8984,7 +8991,7 @@ public actor CertiGoDailyNotificationScheduler {
         try? await center.add(request)
         return true
         #else
-        _ = (hour, minute, routeCode, dailyMinutes)
+        _ = (hour, minute, routeCode, dailyMinutes, anchorSpec)
         return true
         #endif
     }

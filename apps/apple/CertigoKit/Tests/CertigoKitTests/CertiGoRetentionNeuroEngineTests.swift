@@ -348,4 +348,60 @@ struct CertiGoRetentionNeuroEngineTests {
         #expect(engine.recordedEvents.isEmpty)
         engine.isEnabled = true
     }
+
+    @Test("CertiGoSmartNotificationsCatalog V3 enforces <= 38 title chars, <= 90 body chars, zero em/en dashes, and quick actions across all 5 categories, 17 tracks, and 8 languages")
+    func smartNotificationsCatalogV3CompliesWithLockScreenCharterAcrossAllTracksAndLanguages() {
+        let trackCodes = [
+            "AZ-900", "AZ-104", "AZ-305", "AI-102",
+            "HARVEY-LEGAL", "OPENAI-PRO", "ANTHROPIC-CLAUDE", "MS-365-COPILOT",
+            "GH-300", "SAA-C03", "CLF-C02", "CKA",
+            "PCA", "ACE", "TF-003", "CCNA", "CCA-F"
+        ]
+
+        // Verify French quick action labels
+        #expect(CertiGoSmartNotificationQuickAction.oneTapLaunch.localizedTitle(in: .french) == "Lancer en 1 tap")
+        #expect(CertiGoSmartNotificationQuickAction.askCertiGoAI.localizedTitle(in: .french) == "Demander à CertiGo AI")
+
+        // Verify Harvey Academy & OpenAI Pro French exemplars
+        let harveyAnchor = CertiGoSmartNotificationsCatalog.notification(
+            for: .dailyAnchor,
+            routeCode: "HARVEY-LEGAL",
+            language: .french
+        )
+        #expect(harveyAnchor.title == "🎯 2 min sur Harvey Academy ?")
+        #expect(harveyAnchor.body == "Ta prochaine étape sur Vault Due Diligence t'attend.")
+        #expect(harveyAnchor.compliesWithLockScreenCopyCharter == true)
+
+        let openAINews = CertiGoSmartNotificationsCatalog.notification(
+            for: .techNewsFlash,
+            routeCode: "OPENAI-PRO",
+            language: .french
+        )
+        #expect(openAINews.title == "⚡ Actu OpenAI : que change-t-elle ?")
+        #expect(openAINews.body == "Découvre le résumé en 30s ou demande à CertiGo AI de te l'expliquer.")
+        #expect(openAINews.compliesWithLockScreenCopyCharter == true)
+
+        // Exhaustive check across all 17 tracks × 8 languages × 5 categories
+        for track in trackCodes {
+            for language in AppLanguage.allCases {
+                let suite = CertiGoSmartNotificationsCatalog.buildCompleteSuite(
+                    routeCode: track,
+                    streakDays: 14,
+                    preferredAnchorTime: "19:30",
+                    language: language
+                )
+                #expect(suite.count == 5)
+                for spec in suite {
+                    #expect(spec.title.count <= CertiGoSmartNotificationCategory.maxTitleCharacters)
+                    #expect(spec.body.count <= CertiGoSmartNotificationCategory.maxBodyCharacters)
+                    #expect(!spec.title.contains("—"))
+                    #expect(!spec.title.contains("–"))
+                    #expect(!spec.body.contains("—"))
+                    #expect(!spec.body.contains("–"))
+                    #expect(spec.quickActionTitles.count == 2)
+                    #expect(spec.compliesWithLockScreenCopyCharter == true)
+                }
+            }
+        }
+    }
 }
