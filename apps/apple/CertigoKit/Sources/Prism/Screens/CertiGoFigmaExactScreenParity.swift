@@ -3532,11 +3532,7 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
         Self.popoverCards(forVendor: selectedVendorInPopover)
     }
 
-    public static let settingsLanguageOptions: [String] = [
-        "FR + Termes EN  ›",
-        "Français intégral  ›",
-        "English (US)  ›"
-    ]
+    public static let settingsLanguageOptions: [String] = CertiGoMultilingualEngine.allLanguageOptionLabels
 
     public static let settingsExamModeOptions: [String] = [
         "Chrono 90m  ›",
