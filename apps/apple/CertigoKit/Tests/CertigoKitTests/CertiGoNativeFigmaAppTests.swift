@@ -1887,6 +1887,28 @@ struct CertiGoNativeFigmaAppTests {
         let defaultWidgetSnap = CertigoWidgetSnapshot.defaultInitialSnapshot()
         #expect(defaultWidgetSnap.activeTrackCode == "AZ-104")
         #expect(defaultWidgetSnap.totalXP == 0)
+        let unprovisionedStore = CertigoWidgetStore(
+            appGroupIdentifier: "group.com.certigo.unprovisioned.\(UUID().uuidString)",
+            sharedContainerOnly: false
+        )
+        if case .ready(let loadedSnap) = unprovisionedStore.loadState() {
+            #expect(!loadedSnap.activeTrackCode!.isEmpty)
+        } else {
+            Issue.record("Expected CertigoWidgetStore.loadState() to always return .ready(snapshot)")
+        }
+
+        let nativeEntitlements = try String(
+            contentsOf: root.appendingPathComponent("apps/apple/CertigoNative/CertigoNative.entitlements"),
+            encoding: .utf8
+        )
+        #expect(!nativeEntitlements.contains("com.apple.security.application-groups"))
+        #expect(!nativeEntitlements.contains("com.apple.developer.applesignin"))
+        let pbxprojText = try String(
+            contentsOf: root.appendingPathComponent("apps/apple/CertigoNative/CertigoNative.xcodeproj/project.pbxproj"),
+            encoding: .utf8
+        )
+        #expect(!pbxprojText.contains("CertigoWidgetExtension.entitlements"))
+        #expect(!archiveScript.contains("CODE_SIGN_ENTITLEMENTS = CertigoNative.entitlements;"))
 
         #expect(CertiGoLiveAuthService.validateCredentials(email: "bad-email", password: "ValidPassword123", provider: .email) != nil)
         #expect(CertiGoLiveAuthService.validateCredentials(email: "user@certigo.app", password: "123", provider: .email) != nil)

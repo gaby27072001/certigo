@@ -286,5 +286,23 @@ final class CertigoWidgetTests: XCTestCase {
     XCTAssertThrowsError(try store.read()) {
       XCTAssertEqual($0 as? CertigoWidgetStoreError, .appGroupUnavailable)
     }
+    let now = try date("2026-01-02T10:00:00Z")
+    switch store.loadState(language: .french, now: now) {
+    case .ready(let fallbackSnapshot):
+      XCTAssertEqual(fallbackSnapshot.activeTrackCode, "AZ-104")
+      XCTAssertEqual(fallbackSnapshot.phase(at: now), .readyToStart)
+    case .unconfigured:
+      XCTFail("loadState must never return .unconfigured when App Group is unavailable")
+    }
+    XCTAssertFalse(
+      CertigoWidgetCopy(language: .french).sharingNotConfigured.contains(
+        "n’est pas configuré"
+      )
+    )
+    XCTAssertFalse(
+      CertigoWidgetCopy(language: .french).sharingNotConfigured.contains(
+        "n'est pas configuré"
+      )
+    )
   }
 }

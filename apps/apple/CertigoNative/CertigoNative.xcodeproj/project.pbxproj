@@ -55,7 +55,6 @@
 		0000000000000000000000B3 /* CertigoWidgetExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertigoWidgetExtension.swift; sourceTree = "<group>"; };
 		0000000000000000000000B4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0000000000000000000000B5 /* CertigoWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = CertigoWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		0000000000000000000000BF /* CertigoWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CertigoWidgetExtension.entitlements; sourceTree = "<group>"; };
 		0000000000000000000000D2 /* CertigoAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = CertigoAssets.xcassets; sourceTree = "<group>"; };
 		0000000000000000000000E1 /* NativeCatalogModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCatalogModels.swift; sourceTree = "<group>"; };
 		0000000000000000000000E2 /* NativeCopyCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCopyCatalog.swift; sourceTree = "<group>"; };
@@ -145,7 +144,6 @@
 			children = (
 				0000000000000000000000B3 /* CertigoWidgetExtension.swift */,
 				0000000000000000000000B4 /* Info.plist */,
-				0000000000000000000000BF /* CertigoWidgetExtension.entitlements */,
 			);
 			path = WidgetExtension;
 			sourceTree = "<group>";
@@ -503,7 +501,6 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGN_ENTITLEMENTS = WidgetExtension/CertigoWidgetExtension.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WidgetExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
@@ -531,7 +528,6 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGN_ENTITLEMENTS = WidgetExtension/CertigoWidgetExtension.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WidgetExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
@@ -558,7 +554,6 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGN_ENTITLEMENTS = WidgetExtension/CertigoWidgetExtension.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WidgetExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
