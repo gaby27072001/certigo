@@ -24,12 +24,16 @@ struct NativeWidgetGalleryView: View {
     if showsSimulation {
       return Self.simulatedEntry(for: selectedPhase, language: language)
     }
-    guard let liveSnapshot, liveSnapshot.phase(at: .now) != nil else {
-      return CertigoWidgetEntry(
-        date: .now, snapshot: nil,
-        status: storeLocation == .unavailable ? .sharedContainerUnavailable : .empty)
+    if let liveSnapshot, liveSnapshot.phase(at: .now) != nil {
+      return CertigoWidgetEntry(date: .now, snapshot: liveSnapshot, status: .available)
     }
-    return CertigoWidgetEntry(date: .now, snapshot: liveSnapshot, status: .available)
+    switch CertigoWidgetStore(sharedContainerOnly: false).loadState(language: language, now: .now) {
+    case .ready(let fallback):
+      return CertigoWidgetEntry(date: .now, snapshot: fallback, status: .available)
+    case .unconfigured:
+      let fallback = CertigoWidgetSnapshot.defaultInitialSnapshot(language: language, now: .now)
+      return CertigoWidgetEntry(date: .now, snapshot: fallback, status: .available)
+    }
   }
 
   var body: some View {
@@ -46,15 +50,9 @@ struct NativeWidgetGalleryView: View {
           }
           .pickerStyle(.segmented)
 
-          if showsSimulation {
-            Text(copy.simulatedLabel)
-              .font(.caption.weight(.semibold))
-              .foregroundStyle(.secondary)
-          } else if storeLocation != .appGroup {
-            Label(copy.sharingNotConfigured, systemImage: "info.circle")
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-          }
+          Text(showsSimulation ? copy.simulatedLabel : copy.liveLabel)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
 
           LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             ForEach(CertigoWidgetPhase.allCases, id: \.self) { phase in

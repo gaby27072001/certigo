@@ -32,11 +32,13 @@ private struct CertigoWidgetProvider: TimelineProvider {
 
   private func loadEntry(at now: Date = .now) -> CertigoWidgetEntry {
     let store = CertigoWidgetStore(sharedContainerOnly: false)
-    if let snapshot = try? store.read(now: now) {
+    switch store.loadState(now: now) {
+    case .ready(let snapshot):
       return CertigoWidgetEntry(date: now, snapshot: snapshot, status: .available)
+    case .unconfigured:
+      let defaultSnapshot = CertigoWidgetSnapshot.defaultInitialSnapshot(now: now)
+      return CertigoWidgetEntry(date: now, snapshot: defaultSnapshot, status: .available)
     }
-    let defaultSnapshot = CertigoWidgetSnapshot.defaultInitialSnapshot(now: now)
-    return CertigoWidgetEntry(date: now, snapshot: defaultSnapshot, status: .available)
   }
 }
 

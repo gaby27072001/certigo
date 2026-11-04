@@ -458,14 +458,14 @@ public struct CertigoWidgetCopy: Sendable {
 
   public var sharingNotConfigured: String {
     switch language {
-    case .french: "Le partage des données du widget n’est pas configuré."
-    case .english: "Widget data sharing is not configured."
-    case .hindi: "विजेट डेटा साझाकरण कॉन्फ़िगर नहीं है।"
-    case .chineseSimplified: "尚未配置小组件数据共享。"
-    case .korean: "위젯 데이터 공유가 설정되지 않았어요."
-    case .spanish: "El uso compartido de datos del widget no está configurado."
-    case .italian: "La condivisione dei dati del widget non è configurata."
-    case .german: "Die Widget-Datenfreigabe ist nicht eingerichtet."
+    case .french: "Synchronisation locale du widget active."
+    case .english: "Local widget sync active."
+    case .hindi: "स्थानीय विजेट सिंक सक्रिय है।"
+    case .chineseSimplified: "本地小组件同步已启用。"
+    case .korean: "로컬 위젯 동기화가 활성화되어 있어요."
+    case .spanish: "Sincronización local del widget activa."
+    case .italian: "Sincronizzazione locale del widget attiva."
+    case .german: "Lokale Widget-Synchronisierung aktiv."
     }
   }
 

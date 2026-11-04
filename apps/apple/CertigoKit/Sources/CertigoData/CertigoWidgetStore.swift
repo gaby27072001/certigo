@@ -8,6 +8,11 @@ public enum CertigoWidgetStoreLocation: Equatable, Sendable {
   case unavailable
 }
 
+public enum CertigoWidgetLoadState: Equatable, Sendable {
+  case ready(CertigoWidgetSnapshot)
+  case unconfigured
+}
+
 public enum CertigoWidgetStoreError: Error, Equatable, Sendable {
   case invalidPath
   case appGroupUnavailable
@@ -25,6 +30,7 @@ public final class CertigoWidgetStore: @unchecked Sendable {
     "group.com.certigo.shared",
     "group.com.certigo.native",
   ]
+  public static let userDefaultsSnapshotKey = "certigo.widget.snapshot.json"
   public static let maximumSnapshotBytes = 64 * 1_024
 
   private let appGroupIdentifier: String
@@ -81,6 +87,14 @@ public final class CertigoWidgetStore: @unchecked Sendable {
         throw CertigoWidgetStoreError.oversizedSnapshot
       }
       try data.write(to: url, options: [.atomic])
+      if explicitFileURL == nil {
+        if !appGroupIdentifier.isEmpty,
+          let suiteDefaults = UserDefaults(suiteName: appGroupIdentifier)
+        {
+          suiteDefaults.set(data, forKey: Self.userDefaultsSnapshotKey)
+        }
+        UserDefaults.standard.set(data, forKey: Self.userDefaultsSnapshotKey)
+      }
       #if os(iOS)
         do {
           try fileManager.setAttributes(
@@ -135,9 +149,47 @@ public final class CertigoWidgetStore: @unchecked Sendable {
   public func clear() throws {
     lock.lock()
     defer { lock.unlock() }
+    if explicitFileURL == nil {
+      if !appGroupIdentifier.isEmpty,
+        let suiteDefaults = UserDefaults(suiteName: appGroupIdentifier)
+      {
+        suiteDefaults.removeObject(forKey: Self.userDefaultsSnapshotKey)
+      }
+      UserDefaults.standard.removeObject(forKey: Self.userDefaultsSnapshotKey)
+    }
     let url = try snapshotURL()
     guard fileManager.fileExists(atPath: url.path) else { return }
     try fileManager.removeItem(at: url)
+  }
+
+  public func loadState(
+    language: AppLanguage = .french,
+    now: Date = .now
+  ) -> CertigoWidgetLoadState {
+    if let snapshot = try? read(now: now) {
+      return .ready(snapshot)
+    }
+    if explicitFileURL == nil {
+      var candidateData: [Data] = []
+      if !appGroupIdentifier.isEmpty,
+        let suiteDefaults = UserDefaults(suiteName: appGroupIdentifier),
+        let data = suiteDefaults.data(forKey: Self.userDefaultsSnapshotKey)
+      {
+        candidateData.append(data)
+      }
+      if let stdData = UserDefaults.standard.data(forKey: Self.userDefaultsSnapshotKey) {
+        candidateData.append(stdData)
+      }
+      for data in candidateData where data.count <= Self.maximumSnapshotBytes {
+        if let decoded = try? JSONDecoder().decode(CertigoWidgetSnapshot.self, from: data),
+          let validated = try? decoded.validated(),
+          validated.isFresh(at: now)
+        {
+          return .ready(validated)
+        }
+      }
+    }
+    return .ready(CertigoWidgetSnapshot.defaultInitialSnapshot(language: language, now: now))
   }
 
   private func snapshotURL() throws -> URL {
