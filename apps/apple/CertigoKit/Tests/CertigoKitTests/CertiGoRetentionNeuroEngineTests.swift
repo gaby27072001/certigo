@@ -294,11 +294,11 @@ struct CertiGoRetentionNeuroEngineTests {
         #expect(dom2Ids.count == 5)
         #expect(dom2Ids != dom0Ids)
 
-        // F2: Leaderboard sorted by XP descending + Cooperative Cohort increments on completion
-        #expect(appState.leaderboardMembers.first?.displayName == "Sarah L.")
-        #expect(appState.leaderboardMembers.last?.isCurrentUser == true)
+        // F2: Leaderboard starts with only the real current user (0 fake profiles) + Cooperative Cohort starts at 0 and increments on completion
+        #expect(appState.leaderboardMembers.count == 1)
+        #expect(appState.leaderboardMembers.first?.isCurrentUser == true)
         let initialCohortCount = appState.cooperativeCohortChallenge.validatedConceptsCount
-        #expect(initialCohortCount == 845)
+        #expect(initialCohortCount == 0)
         appState.lessonSession.correctAnswersCount = 4
         appState.completeActiveLessonSessionAndUnlockNextNode()
         #expect(appState.cooperativeCohortChallenge.validatedConceptsCount == initialCohortCount + 4)

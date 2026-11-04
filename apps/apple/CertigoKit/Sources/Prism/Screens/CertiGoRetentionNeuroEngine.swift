@@ -1365,9 +1365,9 @@ public struct CertiGoCooperativeCohortChallenge: Codable, Equatable, Sendable {
     public var userContributedConceptsCount: Int
 
     public init(
-        cohortTitle: String = "Promo CertiGo de la semaine",
-        validatedConceptsCount: Int = 845,
-        weeklyTargetConceptsCount: Int = 1_000,
+        cohortTitle: String = "Objectif hebdomadaire partagé",
+        validatedConceptsCount: Int = 0,
+        weeklyTargetConceptsCount: Int = 100,
         userContributedConceptsCount: Int = 0
     ) {
         self.cohortTitle = cohortTitle
@@ -1377,12 +1377,12 @@ public struct CertiGoCooperativeCohortChallenge: Codable, Equatable, Sendable {
     }
 
     public var progressRatio: Double {
-        guard weeklyTargetConceptsCount > 0 else { return 1.0 }
+        guard weeklyTargetConceptsCount > 0 else { return 0.0 }
         return min(1.0, max(0.0, Double(validatedConceptsCount) / Double(weeklyTargetConceptsCount)))
     }
 
     public var summaryText: String {
-        "\(cohortTitle) : \(validatedConceptsCount) / 1 000 concepts validés ensemble — chaque bonne réponse aide toute la cohorte !"
+        "\(cohortTitle) : \(validatedConceptsCount) / \(weeklyTargetConceptsCount) concepts validés — chaque bonne réponse fait progresser l'objectif !"
     }
 
     public mutating func recordUserValidatedConcepts(_ count: Int = 1) {
@@ -1905,7 +1905,7 @@ public struct CertiGoCelebrationNeuroStackView: View {
     }
 }
 
-/// `F2` — Cooperative Cohort Goal Card on Social / Leagues Tab (`🤝 Objectif Coopératif de Promo` — minimalist 1-line bar).
+/// `F2` — Cooperative Cohort Goal Card on Social / Leagues Tab (`🤝 Objectif Coopératif` — minimalist 1-line bar with 0 fake data).
 public struct CertiGoCooperativeCohortCardView: View {
     public let challenge: CertiGoCooperativeCohortChallenge
 
@@ -1916,7 +1916,7 @@ public struct CertiGoCooperativeCohortCardView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: PrismSpacing.xs) {
             HStack {
-                Text(verbatim: "🤝 Promo : \(challenge.validatedConceptsCount) / 1 000 concepts")
+                Text(verbatim: "🤝 \(challenge.cohortTitle) : \(challenge.validatedConceptsCount) / \(challenge.weeklyTargetConceptsCount) concepts")
                     .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
                     .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                     .lineLimit(1)
@@ -1928,13 +1928,16 @@ public struct CertiGoCooperativeCohortCardView: View {
             }
 
             GeometryReader { geo in
-                let w = geo.size.width.isFinite ? max(FigMetrics.twenty, geo.size.width * CGFloat(challenge.progressRatio)) : FigMetrics.twenty
+                let rawWidth = geo.size.width.isFinite ? geo.size.width * CGFloat(challenge.progressRatio) : 0
+                let w = challenge.validatedConceptsCount > 0 ? max(FigMetrics.eight, rawWidth) : FigMetrics.zero
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(PrismColor.figmaHex("#e2e8f0"))
-                    Capsule()
-                        .fill(PrismColor.figmaHex("#58cc02"))
-                        .frame(width: w)
+                    if w > 0 {
+                        Capsule()
+                            .fill(PrismColor.figmaHex("#58cc02"))
+                            .frame(width: w)
+                    }
                 }
             }
             .frame(height: FigMetrics.eight)

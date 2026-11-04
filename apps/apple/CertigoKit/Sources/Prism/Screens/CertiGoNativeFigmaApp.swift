@@ -7299,46 +7299,16 @@ public enum CertiGoNativeRichCatalog {
         ]
     }
 
-    /// 12 leaderboard members for Social Screen 07 (`Podium Semaine`) — sorted by `xpPoints` descending so a fresh 0 XP user starts at rank 12!
+    /// Leaderboard members for Social Screen 07 (`Podium Semaine`) — zero fake data: contains only the real current user (`Toi`, 0 XP, 0 streak) until real friends are added.
     public static let defaultLeaderboardMembers: [CertiGoLeaderboardMember] = [
-        .init(id: "lb-2", rank: 1, displayName: "Sarah L.", initials: "SL", routeBadge: "AZ-104 · AI-102", xpPoints: 1390, streakDays: 19, avatarHex: "#7c3aed"),
-        .init(id: "lb-3", rank: 2, displayName: "Thomas M.", initials: "TM", routeBadge: "SAA-C03 · CKA", xpPoints: 1260, streakDays: 11, avatarHex: "#d97706"),
-        .init(id: "lb-4", rank: 3, displayName: "Inès K.", initials: "IK", routeBadge: "AI-102 · GH-300", xpPoints: 1185, streakDays: 9, avatarHex: "#059669"),
-        .init(id: "lb-5", rank: 4, displayName: "Maxime R.", initials: "MR", routeBadge: "AZ-305 · AZ-104", xpPoints: 1120, streakDays: 15, avatarHex: "#2563eb"),
-        .init(id: "lb-6", rank: 5, displayName: "Clara V.", initials: "CV", routeBadge: "GH-300 · CCA-F", xpPoints: 1045, streakDays: 8, avatarHex: "#db2777"),
-        .init(id: "lb-7", rank: 6, displayName: "Yanis B.", initials: "YB", routeBadge: "ACE · PCA", xpPoints: 980, streakDays: 7, avatarHex: "#0284c7"),
-        .init(id: "lb-8", rank: 7, displayName: "Léa D.", initials: "LD", routeBadge: "AZ-900 · AI-102", xpPoints: 930, streakDays: 12, avatarHex: "#4f46e5"),
-        .init(id: "lb-9", rank: 8, displayName: "Hugo P.", initials: "HP", routeBadge: "CKA · TF-003", xpPoints: 875, streakDays: 6, avatarHex: "#0d9488"),
-        .init(id: "lb-10", rank: 9, displayName: "Camille T.", initials: "CT", routeBadge: "SAA-C03 · CLF-C02", xpPoints: 820, streakDays: 5, avatarHex: "#ea580c"),
-        .init(id: "lb-11", rank: 10, displayName: "Antoine G.", initials: "AG", routeBadge: "SC-300 · AZ-104", xpPoints: 760, streakDays: 4, avatarHex: "#dc2626"),
-        .init(id: "lb-12", rank: 11, displayName: "Nora S.", initials: "NS", routeBadge: "PDE · AI-GEMINI", xpPoints: 710, streakDays: 6, avatarHex: "#9333ea"),
-        .init(id: "lb-1", rank: 12, displayName: "Toi (Nouveau)", initials: "NV", routeBadge: "AZ-104", xpPoints: 0, streakDays: 0, isCurrentUser: true, avatarHex: "#0078d4")
+        .init(id: "lb-1", rank: 1, displayName: "Toi (Nouveau)", initials: "NV", routeBadge: "AZ-104", xpPoints: 0, streakDays: 0, isCurrentUser: true, avatarHex: "#0078d4")
     ]
 
-    /// Sample friends catalog (not pre-populated on new-user launch; `appState.friends` starts empty `[]`).
-    public static let defaultFriends: [CertiGoFriendItem] = [
-        .init(id: "fr-1", displayName: "Sarah L.", handle: "@sarah_cloud", initials: "SL", activeTrackText: "AZ-104 · 88 % prêt", streakDays: 19, avatarHex: "#7c3aed"),
-        .init(id: "fr-2", displayName: "Thomas M.", handle: "@tom_k8s", initials: "TM", activeTrackText: "SAA-C03 · 81 % prêt", streakDays: 11, avatarHex: "#d97706"),
-        .init(id: "fr-3", displayName: "Inès K.", handle: "@ines_ai", initials: "IK", activeTrackText: "AI-102 · Foundry RAG", streakDays: 9, avatarHex: "#059669"),
-        .init(id: "fr-4", displayName: "Maxime R.", handle: "@max_arch", initials: "MR", activeTrackText: "AZ-305 · Solutions Expert", streakDays: 15, avatarHex: "#2563eb"),
-        .init(id: "fr-5", displayName: "Clara V.", handle: "@clara_copilot", initials: "CV", activeTrackText: "GH-300 · GitHub Copilot", streakDays: 8, avatarHex: "#db2777"),
-        .init(id: "fr-6", displayName: "Yanis B.", handle: "@yanis_gcp", initials: "YB", activeTrackText: "PCA · Google Cloud", streakDays: 7, avatarHex: "#0284c7"),
-        .init(id: "fr-7", displayName: "Léa D.", handle: "@lea_azure", initials: "LD", activeTrackText: "AZ-900 · Certifiée ✓", streakDays: 12, avatarHex: "#4f46e5"),
-        .init(id: "fr-8", displayName: "Hugo P.", handle: "@hugo_cncf", initials: "HP", activeTrackText: "CKA · Kubernetes Admin", streakDays: 6, avatarHex: "#0d9488"),
-        .init(id: "fr-9", displayName: "Camille T.", handle: "@cam_aws", initials: "CT", activeTrackText: "AIF-C01 · AWS Bedrock", streakDays: 5, avatarHex: "#ea580c"),
-        .init(id: "fr-10", displayName: "Antoine G.", handle: "@antoine_sec", initials: "AG", activeTrackText: "GH-AS · CodeQL & Secrets", streakDays: 4, avatarHex: "#dc2626"),
-        .init(id: "fr-11", displayName: "Nora S.", handle: "@nora_data", initials: "NS", activeTrackText: "PDE · BigQuery & Vertex", streakDays: 6, avatarHex: "#9333ea"),
-        .init(id: "fr-12", displayName: "Lucas F.", handle: "@lucas_tf", initials: "LF", activeTrackText: "TF-003 · HashiCorp Terraform", streakDays: 10, avatarHex: "#0891b2")
-    ]
+    /// Friends list starts 100% empty (`[]`) — zero pre-populated or fake friends.
+    public static let defaultFriends: [CertiGoFriendItem] = []
 
-    /// 5 suggested colleagues for the `➕ Ajouter un ami` sheet (`Suggestions d'Architectes`).
-    public static let defaultSuggestedFriends: [CertiGoSuggestedFriend] = [
-        .init(id: "sf-1", displayName: "Camille D.", handle: "@camille_az", initials: "CD", routeCode: "AZ-104", activeTrackText: "AZ-104 · Architecte Azure", streakDays: 11, avatarHex: "#0078d4"),
-        .init(id: "sf-2", displayName: "Nicolas B.", handle: "@nico_aws", initials: "NB", routeCode: "SAA-C03", activeTrackText: "SAA-C03 · AWS Solutions", streakDays: 9, avatarHex: "#d97706"),
-        .init(id: "sf-3", displayName: "Yasmine T.", handle: "@yasmine_gcp", initials: "YT", routeCode: "PCA", activeTrackText: "PCA · Cloud Architect", streakDays: 14, avatarHex: "#0284c7"),
-        .init(id: "sf-4", displayName: "Hugo R.", handle: "@hugo_ai", initials: "HR", routeCode: "AI-102", activeTrackText: "AI-102 · Azure AI Engineer", streakDays: 7, avatarHex: "#7c3aed"),
-        .init(id: "sf-5", displayName: "Elena V.", handle: "@elena_k8s", initials: "EV", routeCode: "CKA", activeTrackText: "CKA · Kubernetes Admin", streakDays: 12, avatarHex: "#059669")
-    ]
+    /// Suggested friends starts 100% empty (`[]`) — zero fake suggested colleagues.
+    public static let defaultSuggestedFriends: [CertiGoSuggestedFriend] = []
 
     /// Official explanation per mock exam question for the Detailed Correction sheet in Report 24.
     public static func officialExplanation(forExamQuestion question: CertiGoNativeExamQuestion) -> String {
@@ -9261,6 +9231,7 @@ public struct CertiGoPersistedUserDatabase: Codable, Equatable, Sendable {
     public var savedAIMemos: [CertiGoChatTurn]
     public var aiThreads: [CertiGoAIThreadItem]
     public var recentMistakesLog: [CertiGoPersonalMistakeEntry]
+    public var settingsLiquidGlassIntensityPercent: Int?
 
     public init(
         userDisplayName: String = "Nouveau Candidat",
@@ -9286,7 +9257,8 @@ public struct CertiGoPersistedUserDatabase: Codable, Equatable, Sendable {
         completedLessonIdsByRoute: [String: [String]] = [:],
         savedAIMemos: [CertiGoChatTurn] = [],
         aiThreads: [CertiGoAIThreadItem] = [],
-        recentMistakesLog: [CertiGoPersonalMistakeEntry] = []
+        recentMistakesLog: [CertiGoPersonalMistakeEntry] = [],
+        settingsLiquidGlassIntensityPercent: Int? = 75
     ) {
         self.userDisplayName = userDisplayName
         self.userHandle = userHandle
@@ -9312,12 +9284,14 @@ public struct CertiGoPersistedUserDatabase: Codable, Equatable, Sendable {
         self.savedAIMemos = savedAIMemos
         self.aiThreads = aiThreads
         self.recentMistakesLog = recentMistakesLog
+        self.settingsLiquidGlassIntensityPercent = settingsLiquidGlassIntensityPercent
     }
 }
 
 public final class CertiGoLocalDatabaseStore: @unchecked Sendable {
     public static let shared = CertiGoLocalDatabaseStore()
     public static let databaseDefaultsKey = "certigo.native.database.v1"
+    public static let realDataPurgeV13DefaultsKey = "certigo.v13.real_data_purge_done"
 
     private let defaults: UserDefaults
     private let fileURL: URL?
@@ -9333,9 +9307,22 @@ public final class CertiGoLocalDatabaseStore: @unchecked Sendable {
         }
     }
 
+    public static func sanitizeRealDataOnly(_ db: CertiGoPersistedUserDatabase) -> CertiGoPersistedUserDatabase {
+        var cleaned = db
+        let totalCompletedLessons = cleaned.completedLessonIdsByRoute.values.reduce(0) { $0 + $1.count }
+        if cleaned.completedStepsTotal == 0 && totalCompletedLessons == 0 && cleaned.completedExamsCount == 0 {
+            cleaned.gemsCount = 0
+            cleaned.userXPPoints = 0
+            cleaned.streakDays = 0
+        }
+        return cleaned
+    }
+
     public func save(_ database: CertiGoPersistedUserDatabase) {
-        guard let encoded = try? JSONEncoder().encode(database) else { return }
+        let cleaned = Self.sanitizeRealDataOnly(database)
+        guard let encoded = try? JSONEncoder().encode(cleaned) else { return }
         defaults.set(encoded, forKey: Self.databaseDefaultsKey)
+        defaults.set(true, forKey: Self.realDataPurgeV13DefaultsKey)
         if let fileURL {
             let parent = fileURL.deletingLastPathComponent()
             try? FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
@@ -9344,18 +9331,26 @@ public final class CertiGoLocalDatabaseStore: @unchecked Sendable {
     }
 
     public func load() -> CertiGoPersistedUserDatabase? {
+        var rawDecoded: CertiGoPersistedUserDatabase?
         if let data = defaults.data(forKey: Self.databaseDefaultsKey),
            let decoded = try? JSONDecoder().decode(CertiGoPersistedUserDatabase.self, from: data)
         {
-            return decoded
-        }
-        if let fileURL,
-           let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode(CertiGoPersistedUserDatabase.self, from: data)
+            rawDecoded = decoded
+        } else if let fileURL,
+                  let data = try? Data(contentsOf: fileURL),
+                  let decoded = try? JSONDecoder().decode(CertiGoPersistedUserDatabase.self, from: data)
         {
-            return decoded
+            rawDecoded = decoded
         }
-        return nil
+        guard let rawDecoded else {
+            defaults.set(true, forKey: Self.realDataPurgeV13DefaultsKey)
+            return nil
+        }
+        let sanitized = Self.sanitizeRealDataOnly(rawDecoded)
+        if !defaults.bool(forKey: Self.realDataPurgeV13DefaultsKey) || sanitized != rawDecoded {
+            save(sanitized)
+        }
+        return sanitized
     }
 
     public func clear() {
@@ -9369,6 +9364,10 @@ public final class CertiGoLocalDatabaseStore: @unchecked Sendable {
 public struct CertiGoNativeAppState: Equatable, Sendable {
     public static let onboardingCompletedDefaultsKey: String = "certigo.native.hasCompletedOnboarding.v3"
     public static let personalLearnerUserIdDefaultsKey: String = "certigo.native.personalLearnerUserId"
+    public static let realDataPurgeV13DefaultsKey: String = CertiGoLocalDatabaseStore.realDataPurgeV13DefaultsKey
+    public static let liquidGlassIntensityDefaultsKey: String = "certigo.native.settingsLiquidGlassIntensityPercent"
+    public static let defaultLiquidGlassIntensityPercent: Int = 75
+    public static let liquidGlassIntensityPresets: [Int] = [0, 25, 50, 75, 100]
 
     public static func resolveOrCreatePersonalLearnerUserId(
         defaults: UserDefaults = .standard
@@ -9430,9 +9429,9 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var isPresentingOnboardingFlow: Bool = false
     public var isPresentingSignInPortalSheet: Bool = false
     public var activeAuthProviderSheet: CertiGoAuthProviderKind? = nil
-    public var authDraftDisplayName: String = "Gabriel Chambaud"
-    public var authDraftEmail: String = "gabriel.chambaud@example.com"
-    public var authDraftPassword: String = "CertiGo!2026"
+    public var authDraftDisplayName: String = ""
+    public var authDraftEmail: String = ""
+    public var authDraftPassword: String = ""
     public var authAccessToken: String? = nil
     public var isAuthRequestInFlight: Bool = false
     public var authStatusMessage: String? = nil
@@ -9478,10 +9477,13 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var hasClappedQuestPartner: Bool = false
 
     public mutating func clapQuestPartnerSarah() {
+        guard let partner = friends.first else {
+            showAddFriendSheet = true
+            return
+        }
         if !hasClappedQuestPartner {
             hasClappedQuestPartner = true
-            gemsCount += 5
-            lastAddedFriendConfirmation = "✓ Clap envoyé à Sarah !"
+            lastAddedFriendConfirmation = "✓ Encouragement envoyé à \(partner.displayName) !"
         }
     }
     public var hasSyncedPhoneContacts: Bool = false
@@ -9520,6 +9522,26 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         didSet {
             CertiGoHapticsEngine.shared.isEnabled = settingsHapticsOn
         }
+    }
+    public var settingsLiquidGlassIntensityPercent: Int = CertiGoNativeAppState.defaultLiquidGlassIntensityPercent {
+        didSet {
+            let clamped = min(max(settingsLiquidGlassIntensityPercent, 0), 100)
+            if settingsLiquidGlassIntensityPercent != clamped {
+                settingsLiquidGlassIntensityPercent = clamped
+            }
+            UserDefaults.standard.set(settingsLiquidGlassIntensityPercent, forKey: Self.liquidGlassIntensityDefaultsKey)
+        }
+    }
+
+    public var liquidGlassIntensityFraction: Double {
+        Double(min(max(settingsLiquidGlassIntensityPercent, 0), 100)) / 100.0
+    }
+
+    public mutating func setLiquidGlassIntensityPercent(_ percent: Int) {
+        let clamped = min(max(percent, 0), 100)
+        settingsLiquidGlassIntensityPercent = clamped
+        CertiGoHapticsEngine.play(.selection, isEnabled: settingsHapticsOn)
+        saveToLocalDatabase()
     }
     public var variableRewardVault: CertiGoVariableRewardVault = CertiGoVariableRewardVault()
     public var bracketRitual: CertiGoActionChunkingBracketRitual = CertiGoActionChunkingBracketRitual()
@@ -9788,9 +9810,14 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         let onboardingDone = UserDefaults.standard.bool(forKey: Self.onboardingCompletedDefaultsKey)
         self.hasCompletedOnboarding = onboardingDone
         self.isPresentingOnboardingFlow = !onboardingDone
+        if UserDefaults.standard.object(forKey: Self.liquidGlassIntensityDefaultsKey) != nil {
+            let stored = UserDefaults.standard.integer(forKey: Self.liquidGlassIntensityDefaultsKey)
+            self.settingsLiquidGlassIntensityPercent = min(max(stored, 0), 100)
+        }
         if restoreFromDisk, let persisted = databaseStore.load() {
             self.applyPersistedDatabase(persisted)
         }
+        self.syncCurrentUserLeaderboardEntry()
     }
 
     public func buildPersistedDatabase() -> CertiGoPersistedUserDatabase {
@@ -9825,37 +9852,44 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             completedLessonIdsByRoute: completedByRoute,
             savedAIMemos: savedAIMemos,
             aiThreads: aiThreads,
-            recentMistakesLog: recentMistakesLog
+            recentMistakesLog: recentMistakesLog,
+            settingsLiquidGlassIntensityPercent: settingsLiquidGlassIntensityPercent
         )
     }
 
     public mutating func applyPersistedDatabase(_ db: CertiGoPersistedUserDatabase) {
-        userDisplayName = db.userDisplayName
-        userHandle = db.userHandle
-        userAvatarHex = db.userAvatarHex
-        targetExamDateText = db.targetExamDateText
-        isProMember = db.isProMember
-        isAccountConnected = db.isAccountConnected
-        connectedAuthProvider = db.connectedAuthProvider
-        streakDays = db.streakDays
-        gemsCount = db.gemsCount
-        heartsCount = max(1, db.heartsCount)
-        userXPPoints = db.userXPPoints
-        completedStepsTotal = db.completedStepsTotal
-        completedExamsCount = db.completedExamsCount
-        lastComputedExamScoreOutOf1000 = db.lastComputedExamScoreOutOf1000
-        activeRouteCode = db.activeRouteCode.uppercased()
-        if !db.trackedCertificationCodes.isEmpty {
-            trackedCertificationCodes = db.trackedCertificationCodes.map { $0.uppercased() }
+        let cleaned = CertiGoLocalDatabaseStore.sanitizeRealDataOnly(db)
+        userDisplayName = cleaned.userDisplayName
+        userHandle = cleaned.userHandle
+        userAvatarHex = cleaned.userAvatarHex
+        targetExamDateText = cleaned.targetExamDateText
+        isProMember = cleaned.isProMember
+        isAccountConnected = cleaned.isAccountConnected
+        connectedAuthProvider = cleaned.connectedAuthProvider
+        streakDays = cleaned.streakDays
+        gemsCount = cleaned.gemsCount
+        heartsCount = max(1, cleaned.heartsCount)
+        userXPPoints = cleaned.userXPPoints
+        completedStepsTotal = cleaned.completedStepsTotal
+        completedExamsCount = cleaned.completedExamsCount
+        lastComputedExamScoreOutOf1000 = cleaned.lastComputedExamScoreOutOf1000
+        activeRouteCode = cleaned.activeRouteCode.uppercased()
+        if !cleaned.trackedCertificationCodes.isEmpty {
+            trackedCertificationCodes = cleaned.trackedCertificationCodes.map { $0.uppercased() }
             onboardingSelectedCertifications = trackedCertificationCodes
         }
-        onboardingExperienceLevelIndex = db.onboardingExperienceLevelIndex
-        onboardingDailyRhythmMinutes = db.onboardingDailyRhythmMinutes
-        onboardingExamDeadlineIndex = db.onboardingTargetHorizonIndex
-        onboardingRoutineAnchorIndex = db.onboardingRoutineAnchorIndex
-        savedAIMemos = db.savedAIMemos
-        aiThreads = db.aiThreads
-        recentMistakesLog = db.recentMistakesLog
+        onboardingExperienceLevelIndex = cleaned.onboardingExperienceLevelIndex
+        onboardingDailyRhythmMinutes = cleaned.onboardingDailyRhythmMinutes
+        onboardingExamDeadlineIndex = cleaned.onboardingTargetHorizonIndex
+        onboardingRoutineAnchorIndex = cleaned.onboardingRoutineAnchorIndex
+        savedAIMemos = cleaned.savedAIMemos
+        aiThreads = cleaned.aiThreads
+        recentMistakesLog = cleaned.recentMistakesLog
+        if let intensity = cleaned.settingsLiquidGlassIntensityPercent {
+            settingsLiquidGlassIntensityPercent = min(max(intensity, 0), 100)
+        }
+        friends = []
+        suggestedFriends = []
 
         let routesToBuild = Set([activeRouteCode] + trackedCertificationCodes + Array(db.completedLessonIdsByRoute.keys))
         for route in routesToBuild {
@@ -10042,12 +10076,12 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         fromExistingAccountButton: Bool = false
     ) {
         authOriginIsExistingAccountButton = fromExistingAccountButton
-        if authDraftDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || authDraftDisplayName == "Nouveau Candidat"
+        if userDisplayName != "Nouveau Candidat"
+            && !userDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && authDraftDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         {
-            authDraftDisplayName = userDisplayName == "Nouveau Candidat" ? "Gabriel Chambaud" : userDisplayName
+            authDraftDisplayName = userDisplayName
         }
-        authDraftEmail = provider.defaultSuggestedEmail
         authStatusMessage = nil
         activeAuthProviderSheet = provider
     }
@@ -10121,9 +10155,10 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     }
 
     public mutating func completeOnboardingFlow(
-        awardWelcomeBonus: Bool = true,
+        awardWelcomeBonus: Bool = false,
         startGuidedTour: Bool = false
     ) {
+        _ = awardWelcomeBonus
         if onboardingSelectedCertifications.isEmpty && trackedCertificationCodes.isEmpty {
             onboardingSelectedCertifications = ["AZ-900"]
             trackedCertificationCodes = ["AZ-900"]
@@ -10133,12 +10168,15 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         isPresentingOnboardingFlow = false
         isPresentingSignInPortalSheet = false
         activeAuthProviderSheet = nil
-        if awardWelcomeBonus && gemsCount == 0 {
-            gemsCount = 50
+        if completedStepsTotal == 0 && completedExamsCount == 0 {
+            gemsCount = 0
+            userXPPoints = 0
+            streakDays = 0
         }
         CertiGoHapticsEngine.play(.declic, isEnabled: settingsHapticsOn)
         syncCurrentUserLeaderboardEntry()
         UserDefaults.standard.set(true, forKey: Self.onboardingCompletedDefaultsKey)
+        UserDefaults.standard.set(true, forKey: Self.realDataPurgeV13DefaultsKey)
         saveToLocalDatabase()
         if startGuidedTour {
             startGuidedAppTour()
@@ -10750,26 +10788,44 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     }
 
     public mutating func syncCurrentUserLeaderboardEntry() {
-        if let meIdx = leaderboardMembers.firstIndex(where: \.isCurrentUser) {
-            let firstToken = userDisplayName.split(separator: " ").first.map(String.init) ?? userDisplayName
-            let existing = leaderboardMembers[meIdx]
-            leaderboardMembers[meIdx] = CertiGoLeaderboardMember(
-                id: existing.id,
-                rank: existing.rank,
-                displayName: "Toi (\(firstToken))",
-                initials: userInitials,
-                routeBadge: activeRouteCode,
-                xpPoints: userXPPoints,
-                streakDays: streakDays,
-                isCurrentUser: true,
-                avatarHex: userAvatarHex
+        let firstToken = userDisplayName.split(separator: " ").first.map(String.init) ?? userDisplayName
+        let currentUserEntry = CertiGoLeaderboardMember(
+            id: "lb-1",
+            rank: 1,
+            displayName: "Toi (\(firstToken))",
+            initials: userInitials,
+            routeBadge: activeRouteCode,
+            xpPoints: userXPPoints,
+            streakDays: streakDays,
+            isCurrentUser: true,
+            avatarHex: userAvatarHex
+        )
+
+        let friendEntries: [CertiGoLeaderboardMember] = friends.map { friend in
+            let existingXP = leaderboardMembers.first(where: { !$0.isCurrentUser && ($0.id == "lb-\(friend.id)" || $0.displayName == friend.displayName) })?.xpPoints ?? 0
+            let routeCode = friend.activeTrackText
+                .components(separatedBy: "·")
+                .first?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? activeRouteCode
+            return CertiGoLeaderboardMember(
+                id: "lb-\(friend.id)",
+                rank: 1,
+                displayName: friend.displayName,
+                initials: friend.initials,
+                routeBadge: routeCode,
+                xpPoints: existingXP,
+                streakDays: friend.streakDays,
+                isCurrentUser: false,
+                avatarHex: friend.avatarHex
             )
         }
-        let sorted = leaderboardMembers.sorted { lhs, rhs in
+
+        let combined = [currentUserEntry] + friendEntries
+        let sorted = combined.sorted { lhs, rhs in
             if lhs.xpPoints != rhs.xpPoints {
                 return lhs.xpPoints > rhs.xpPoints
             }
-            return !lhs.isCurrentUser && rhs.isCurrentUser
+            return lhs.isCurrentUser && !rhs.isCurrentUser
         }
         leaderboardMembers = sorted.enumerated().map { idx, item in
             CertiGoLeaderboardMember(
@@ -11125,7 +11181,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     // MARK: Social Friends Filter, Phone Contacts (`CNContactStore`) & Salut
 
     public mutating func syncPhoneContacts() {
-        var matched: [CertiGoPhoneContactItem] = []
+        let matched: [CertiGoPhoneContactItem] = []
         var inviteList: [CertiGoPhoneContactItem] = []
 
         #if canImport(Contacts)
@@ -11150,14 +11206,10 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
                     fullName: full,
                     initials: ini.isEmpty ? "CG" : ini,
                     phoneOrHandle: phone,
-                    activeRouteCode: index % 2 == 0 ? "AZ-104" : "SAA-C03",
-                    isOnCertiGo: index < 2
+                    activeRouteCode: activeRouteCode,
+                    isOnCertiGo: false
                 )
-                if item.isOnCertiGo {
-                    matched.append(item)
-                } else {
-                    inviteList.append(item)
-                }
+                inviteList.append(item)
                 index += 1
                 if index >= 8 {
                     stop.pointee = true
@@ -11167,47 +11219,6 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             CNContactStore().requestAccess(for: .contacts) { _, _ in }
         }
         #endif
-
-        if matched.isEmpty {
-            matched = [
-                CertiGoPhoneContactItem(
-                    id: "cn-match-1",
-                    fullName: "Maxime Laurent",
-                    initials: "ML",
-                    phoneOrHandle: "@maxime_cloud · +33 6 42 •• •• 18",
-                    activeRouteCode: "AZ-104",
-                    isOnCertiGo: true
-                ),
-                CertiGoPhoneContactItem(
-                    id: "cn-match-2",
-                    fullName: "Inès Benali",
-                    initials: "IB",
-                    phoneOrHandle: "@ines_ai · +33 6 78 •• •• 94",
-                    activeRouteCode: "AI-102",
-                    isOnCertiGo: true
-                )
-            ]
-        }
-        if inviteList.isEmpty {
-            inviteList = [
-                CertiGoPhoneContactItem(
-                    id: "cn-invite-1",
-                    fullName: "Antoine Moreau",
-                    initials: "AM",
-                    phoneOrHandle: "+33 6 14 •• •• 52",
-                    activeRouteCode: activeRouteCode,
-                    isOnCertiGo: false
-                ),
-                CertiGoPhoneContactItem(
-                    id: "cn-invite-2",
-                    fullName: "Clara Lefèvre",
-                    initials: "CL",
-                    phoneOrHandle: "+33 6 89 •• •• 31",
-                    activeRouteCode: activeRouteCode,
-                    isOnCertiGo: false
-                )
-            ]
-        }
 
         phoneContactsMatchedOnApp = matched
         phoneContactsToInvite = inviteList
@@ -11228,13 +11239,14 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             handle: handleSlug,
             initials: item.initials,
             activeTrackText: "\(item.activeRouteCode) · Contact iPhone",
-            streakDays: 4,
+            streakDays: 0,
             avatarHex: "#0284c7",
             isSaluted: true
         )
         if !friends.contains(where: { $0.id == newFriend.id || $0.displayName == newFriend.displayName }) {
             friends.insert(newFriend, at: 0)
         }
+        syncCurrentUserLeaderboardEntry()
         lastAddedFriendConfirmation = "\(item.fullName) (Contacts iPhone) ajouté(e) à tes amis ✓"
     }
 
@@ -11264,11 +11276,12 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             handle: raw.hasPrefix("@") ? raw.lowercased() : "@\(raw.lowercased())",
             initials: initials.isEmpty ? "CG" : initials,
             activeTrackText: "\(activeRouteCode) · Nouveau partenaire",
-            streakDays: 1,
+            streakDays: 0,
             avatarHex: "#0078d4",
             isSaluted: true
         )
         friends.insert(newFriend, at: 0)
+        syncCurrentUserLeaderboardEntry()
         lastAddedFriendConfirmation = "\(newFriend.displayName) ajouté(e) à tes partenaires d'étude ✓"
         friendSearchQuery = ""
     }
@@ -11297,6 +11310,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             if !friends.contains(where: { $0.handle.caseInsensitiveCompare(suggestion.handle) == .orderedSame }) {
                 friends.insert(newFriend, at: 0)
             }
+            syncCurrentUserLeaderboardEntry()
             lastAddedFriendConfirmation = "\(suggestion.displayName) ajouté(e) à tes partenaires d'étude ✓"
         }
     }
@@ -11318,6 +11332,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         if !friends.contains(where: { $0.handle.caseInsensitiveCompare(suggestion.handle) == .orderedSame || $0.id == newFriend.id }) {
             friends.insert(newFriend, at: 0)
         }
+        syncCurrentUserLeaderboardEntry()
         lastAddedFriendConfirmation = "\(suggestion.displayName) ajouté(e) à tes partenaires d'étude ✓"
     }
 
@@ -11328,7 +11343,7 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             .filter { !$0.isEmpty }
         let matchedFriend = friends.first(where: { $0.initials == member.initials || member.displayName.contains($0.displayName) })
         let handle = matchedFriend?.handle ?? (member.isCurrentUser ? userHandle : "@\(member.initials.lowercased())_cloud")
-        let accuracy = min(98, max(78, 95 - (member.rank - 1) * 2))
+        let accuracy = member.isCurrentUser ? (completedStepsTotal > 0 ? lessonSession.accuracyPercent : 0) : 0
         selectedFriendProfile = CertiGoSocialProfilePreview(
             id: "profile-\(member.id)",
             displayName: member.displayName,
@@ -11354,9 +11369,9 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
             .components(separatedBy: "·")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty } ?? [extractedCode]
-        let rank = matchedMember?.rank ?? 6
-        let xp = matchedMember?.xpPoints ?? (900 + friend.streakDays * 25)
-        let accuracy = min(97, max(79, 82 + friend.streakDays / 2))
+        let rank = matchedMember?.rank ?? 2
+        let xp = matchedMember?.xpPoints ?? 0
+        let accuracy = 0
         selectedFriendProfile = CertiGoSocialProfilePreview(
             id: "profile-\(friend.id)",
             displayName: friend.displayName,
@@ -11623,21 +11638,25 @@ public enum FigMetrics {
     public static let radarSize: CGFloat = 190
 }
 
-/// Rule 3 — iOS 26 True Liquid Glass Convex Water Droplet (`CertiGoTrueLiquidGlassDropletView`) with concentric 26pt radius (`32 - 6`), 6 optical layers, and physical drag stretch (`1.10x × 1.04y`).
+/// Rule 3 — iOS 26 True Liquid Glass Convex Water Droplet (`CertiGoTrueLiquidGlassDropletView`) with concentric 26pt radius (`32 - 6`), 6 optical layers, real-time intensity interpolation (`0% .. 100%`), and physical drag stretch (`1.10x × 1.04y`).
 public struct CertiGoTrueLiquidGlassDropletView: Equatable, Sendable {
     public static let outerBarRadius: CGFloat = PrismRadius.bottomBar
     public static let barInternalPadding: CGFloat = FigMetrics.six
     public static var concentricCornerRadius: CGFloat {
         PrismRadius.concentric(outer: outerBarRadius, padding: barInternalPadding)
     }
-    public static let centerRefractionWhiteOpacity: Double = 0.18
-    public static let edgeTintOpacity: Double = 0.14
-    public static let topMeniscusWhiteOpacity: Double = 0.92
+    public static let centerRefractionWhiteOpacity: Double = 0.88
+    public static let middleSoftTintOpacity: Double = 0.75
+    public static let edgeTintOpacity: Double = 0.22
+    public static let topMeniscusWhiteOpacity: Double = 0.98
     public static let topMeniscusFadeStop: Double = 0.38
     public static let topMeniscusInset: CGFloat = 1.5
     public static let bottomCausticRingOpacity: Double = 0.45
     public static let bottomCausticWhiteOpacity: Double = 0.65
-    public static let rimLightLineWidth: CGFloat = 1.4
+    public static let rimLightLineWidth: CGFloat = 1.6
+    public static let meniscusOuterTintOpacity: Double = 0.42
+    public static let meniscusFlankSlateOpacity: Double = 0.14
+    public static let causticShadowTintOpacity: Double = 0.28
     public static let dragStretchScaleX: CGFloat = 1.10
     public static let dragStretchScaleY: CGFloat = 1.04
 
@@ -11645,25 +11664,34 @@ public struct CertiGoTrueLiquidGlassDropletView: Equatable, Sendable {
     public let width: CGFloat
     public let height: CGFloat
     public let isDragging: Bool
+    public let intensityPercent: Int
 
     public init(
         trackTheme: CertiGoTrackThemePalette,
         width: CGFloat,
         height: CGFloat = FigMetrics.fortyEight,
-        isDragging: Bool = false
+        isDragging: Bool = false,
+        intensityPercent: Int = 100
     ) {
         self.trackTheme = trackTheme
         self.width = width
         self.height = height
         self.isDragging = isDragging
+        self.intensityPercent = min(max(intensityPercent, 0), 100)
+    }
+
+    public var intensityFraction: Double {
+        Double(intensityPercent) / 100.0
     }
 
     public var effectiveScaleX: CGFloat {
-        isDragging ? Self.dragStretchScaleX : 1.0
+        guard isDragging else { return 1.0 }
+        return 1.0 + (Self.dragStretchScaleX - 1.0) * CGFloat(intensityFraction)
     }
 
     public var effectiveScaleY: CGFloat {
-        isDragging ? Self.dragStretchScaleY : 1.0
+        guard isDragging else { return 1.0 }
+        return 1.0 + (Self.dragStretchScaleY - 1.0) * CGFloat(intensityFraction)
     }
 }
 
@@ -11764,88 +11792,145 @@ extension CertiGoStructuredPromptView: View {
     }
 }
 
+extension View {
+    @ViewBuilder
+    fileprivate func applyiOS26LiquidGlassIfAvailable(intensity: Double) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, macOS 26.0, *), intensity > 0.05 {
+            self.glassEffect(.regular.interactive(), in: .capsule)
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}
+
 extension CertiGoTrueLiquidGlassDropletView: View {
     public var body: some View {
         let dropletRadius = Self.concentricCornerRadius
+        let t = intensityFraction
         ZStack {
-            // 1. Corps de réfraction translucide (.ultraThinMaterial + radial gradient interne imitant la courbure d'une goutte d'eau)
-            Capsule(style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    Capsule(style: .continuous)
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    PrismColor.figmaHex("#ffffff:18"),
-                                    PrismColor.figmaHex("\(trackTheme.primaryHex):14")
-                                ],
-                                center: .center,
-                                startRadius: FigMetrics.two,
-                                endRadius: max(FigMetrics.twentyFour, width * 0.65)
+            if intensityPercent == 0 {
+                // 0 % : Classic flat opaque selection pill without optical refraction
+                Capsule(style: .continuous)
+                    .fill(PrismColor.figmaHex(trackTheme.softHex))
+                RoundedRectangle(cornerRadius: dropletRadius, style: .continuous)
+                    .strokeBorder(PrismColor.figmaHex("#cbd5e1"), lineWidth: PrismBorder.standard)
+            } else {
+                // 1. Cœur réfractif teinté (.ultraThinMaterial + dégradé interne haut -> centre -> bas créant une vraie lentille d'eau colorée)
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: PrismColor.figmaHex("#ffffff:88"), location: 0.0),
+                                        .init(color: PrismColor.figmaHex("\(trackTheme.softHex):75").opacity(0.45 + 0.55 * t), location: 0.52),
+                                        .init(color: PrismColor.figmaHex("\(trackTheme.primaryHex):22").opacity(t), location: 1.0)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
                             )
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        PrismColor.figmaHex("#ffffff:35").opacity(t),
+                                        PrismColor.figmaHex("\(trackTheme.primaryHex):18").opacity(t)
+                                    ],
+                                    center: .center,
+                                    startRadius: FigMetrics.two,
+                                    endRadius: max(FigMetrics.twentyFour, width * 0.65)
+                                )
+                            )
+                    )
+
+                // 2. Reflet spéculaire bombé supérieur (lame de lumière convexe #ffffff:98 + légère ombre interne juste en dessous)
+                Capsule(style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            stops: [
+                                .init(color: PrismColor.figmaHex("#ffffff:98").opacity(t), location: 0.0),
+                                .init(color: PrismColor.figmaHex("#ffffff:35").opacity(t), location: 0.24),
+                                .init(color: PrismColor.figmaHex("#0f172a:08").opacity(t), location: Self.topMeniscusFadeStop),
+                                .init(color: PrismColor.figmaHex("#ffffff:00"), location: 0.48)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
-                )
-
-            // 2. Ménisque / Croissant spéculaire supérieur (effet goutte d'eau bombée : #FFFFFF 0.92 -> 0.0 à 38% de hauteur, décalé de 1.5 pt)
-            Capsule(style: .continuous)
-                .fill(
-                    LinearGradient(
-                        stops: [
-                            .init(color: PrismColor.figmaHex("#ffffff:92"), location: 0.0),
-                            .init(color: PrismColor.figmaHex("#ffffff:00"), location: Self.topMeniscusFadeStop)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
                     )
-                )
-                .padding(.horizontal, FigMetrics.two)
-                .padding(.top, FigMetrics.onePointFive)
+                    .padding(.horizontal, FigMetrics.three)
+                    .padding(.top, FigMetrics.onePointFive)
 
-            // 3. Caustique / Reflet de réfraction inférieur (lueur interne en bas teintée avec trackTheme.ringHex 0.45 + blanc 0.65)
-            Capsule(style: .continuous)
-                .fill(
-                    LinearGradient(
-                        stops: [
-                            .init(color: PrismColor.figmaHex("#ffffff:00"), location: 0.58),
-                            .init(color: PrismColor.figmaHex("\(trackTheme.ringHex):45"), location: 0.86),
-                            .init(color: PrismColor.figmaHex("#ffffff:65"), location: 1.0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
+                // 3. Caustique / Reflet de réfraction inférieur (lueur interne en bas teintée avec trackTheme.ringHex 0.45 + blanc 0.65)
+                Capsule(style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            stops: [
+                                .init(color: PrismColor.figmaHex("#ffffff:00"), location: 0.56),
+                                .init(color: PrismColor.figmaHex("\(trackTheme.ringHex):45").opacity(t), location: 0.85),
+                                .init(color: PrismColor.figmaHex("#ffffff:65").opacity(t), location: 1.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                )
-                .padding(.horizontal, FigMetrics.two)
-                .padding(.bottom, FigMetrics.one)
+                    .padding(.horizontal, FigMetrics.two)
+                    .padding(.bottom, FigMetrics.one)
 
-            // 4. Anneau de tension superficielle (Rim Light : #FFFFFF 0.95 en haut-gauche, trackTheme.ringHex 0.45 sur les flancs, #FFFFFF 0.75 en bas-droite)
-            RoundedRectangle(cornerRadius: dropletRadius, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            PrismColor.figmaHex("#ffffff:95"),
-                            PrismColor.figmaHex("\(trackTheme.ringHex):45"),
-                            PrismColor.figmaHex("#ffffff:75")
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: Self.rimLightLineWidth
-                )
+                // 4a. Ménisque extérieur chromatique contrasté (filet sombre/coloré pour que la goutte ressorte à l'œil nu sur fond clair)
+                RoundedRectangle(cornerRadius: dropletRadius, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            stops: [
+                                .init(color: PrismColor.figmaHex("#0f172a:14").opacity(0.4 + 0.6 * t), location: 0.0),
+                                .init(color: PrismColor.figmaHex("\(trackTheme.ringHex):35").opacity(t), location: 0.5),
+                                .init(color: PrismColor.figmaHex("\(trackTheme.primaryHex):42").opacity(0.45 + 0.55 * t), location: 1.0)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: Self.rimLightLineWidth
+                    )
+
+                // 4b. Biseau spéculaire intérieur blanc pur (#ffffff:95 en haut-gauche)
+                RoundedRectangle(cornerRadius: max(FigMetrics.eight, dropletRadius - FigMetrics.one), style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                PrismColor.figmaHex("#ffffff:95").opacity(t),
+                                PrismColor.figmaHex("\(trackTheme.ringHex):45").opacity(t),
+                                PrismColor.figmaHex("#ffffff:80").opacity(t)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: FigMetrics.one
+                    )
+                    .padding(FigMetrics.one)
+            }
         }
-        // 5. Ombre portée liquide + caustique au sol
+        .applyiOS26LiquidGlassIfAvailable(intensity: t)
+        // 5. Ombre caustique colorée sous la goutte (${trackTheme.primaryHex}:28, radius: 10, y: 4)
         .shadow(
-            color: PrismColor.figmaHex("#000000:10"),
-            radius: FigMetrics.eight,
+            color: PrismColor.figmaHex("\(trackTheme.primaryHex):28").opacity(t),
+            radius: FigMetrics.ten,
             x: FigMetrics.zero,
             y: FigMetrics.four
         )
         .shadow(
-            color: PrismColor.figmaHex("\(trackTheme.primaryHex):18"),
-            radius: FigMetrics.twelve,
+            color: PrismColor.figmaHex("#0f172a:12").opacity(t),
+            radius: FigMetrics.six,
             x: FigMetrics.zero,
-            y: FigMetrics.five
+            y: FigMetrics.two
         )
-        // 6. Élasticité physique de goutte d'eau (scaleEffect x: 1.10, y: 1.04 pendant le glissement)
+        // 6. Élasticité physique de goutte d'eau (scaleEffect x: 1.10, y: 1.04 pendant le glissement, modulé par l'intensité)
         .frame(width: width, height: height)
         .scaleEffect(x: effectiveScaleX, y: effectiveScaleY)
     }
@@ -12452,6 +12537,9 @@ public struct CertiGoNativeFigmaAppView: View {
 
     private var floatingBottomTabBar: some View {
         let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: appState.activeRouteCode)
+        let glassIntensity = appState.settingsLiquidGlassIntensityPercent
+        let t = appState.liquidGlassIntensityFraction
+        let barWhiteVeilOpacity = 1.0 - (0.66 * t)
         return GeometryReader { barGeo in
             let innerWidth = max(FigMetrics.twoHundredEighty, barGeo.size.width - FigMetrics.six * 2)
             let colWidth = innerWidth / 5.0
@@ -12467,28 +12555,30 @@ public struct CertiGoNativeFigmaAppView: View {
                 }
                 return (CGFloat(activeIndex) + 0.5) * colWidth
             }()
+            let droplet = CertiGoTrueLiquidGlassDropletView(
+                trackTheme: trackTheme,
+                width: pillWidth,
+                height: dropletHeight,
+                isDragging: isDragging,
+                intensityPercent: glassIntensity
+            )
 
             ZStack(alignment: .leading) {
                 // Layer 1 (Base): All tab icons and letters in slate grey `#64748b`
                 bottomBarItemsLayer(isHighlightedBlue: false, innerWidth: innerWidth)
 
                 // Layer 2: True iOS 26 Liquid Glass Water Droplet (`CertiGoTrueLiquidGlassDropletView`, R_interne = 32 - 6 = 26 pt)
-                CertiGoTrueLiquidGlassDropletView(
-                    trackTheme: trackTheme,
-                    width: pillWidth,
-                    height: dropletHeight,
-                    isDragging: isDragging
-                )
-                .position(x: FigMetrics.six + pillCenterX, y: FigMetrics.thirty)
-                .animation(
-                    CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion),
-                    value: activeIndex
-                )
-                .animation(
-                    CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion),
-                    value: isDragging
-                )
-                .allowsHitTesting(false)
+                droplet
+                    .position(x: FigMetrics.six + pillCenterX, y: FigMetrics.thirty)
+                    .animation(
+                        CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion),
+                        value: activeIndex
+                    )
+                    .animation(
+                        CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion),
+                        value: isDragging
+                    )
+                    .allowsHitTesting(false)
 
                 // Layer 3 (Refracted Track-Colored Layer): Identical tab items in track dominant color (`trackTheme.primaryHex`), masked pixel-for-pixel by the Liquid Glass water droplet!
                 bottomBarItemsLayer(isHighlightedBlue: true, innerWidth: innerWidth)
@@ -12499,8 +12589,8 @@ public struct CertiGoNativeFigmaAppView: View {
                                 .fill(Color.black)
                                 .frame(width: pillWidth, height: dropletHeight)
                                 .scaleEffect(
-                                    x: isDragging ? CertiGoTrueLiquidGlassDropletView.dragStretchScaleX : 1.0,
-                                    y: isDragging ? CertiGoTrueLiquidGlassDropletView.dragStretchScaleY : 1.0
+                                    x: droplet.effectiveScaleX,
+                                    y: droplet.effectiveScaleY
                                 )
                                 .position(x: FigMetrics.six + pillCenterX, y: FigMetrics.thirty)
                         }
@@ -12517,18 +12607,33 @@ public struct CertiGoNativeFigmaAppView: View {
             }
             .frame(height: FigMetrics.bottomBarCompactHeight)
             .background(
-                RoundedRectangle(cornerRadius: PrismRadius.bottomBar, style: .continuous)
-                    .fill(PrismColor.surface)
-                    .shadow(
-                        color: PrismColor.figmaHex("#0f172a:12"),
-                        radius: FigMetrics.twenty,
-                        x: FigMetrics.zero,
-                        y: FigMetrics.six
-                    )
+                ZStack {
+                    RoundedRectangle(cornerRadius: PrismRadius.bottomBar, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: PrismRadius.bottomBar, style: .continuous)
+                        .fill(PrismColor.figmaHex("#ffffff:55").opacity(barWhiteVeilOpacity))
+                }
+                .shadow(
+                    color: PrismColor.figmaHex("#0f172a:14"),
+                    radius: FigMetrics.twenty,
+                    x: FigMetrics.zero,
+                    y: FigMetrics.six
+                )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: PrismRadius.bottomBar, style: .continuous)
-                    .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                PrismColor.figmaHex("#ffffff:95"),
+                                PrismColor.figmaHex("\(trackTheme.ringHex):35").opacity(t),
+                                PrismColor.figmaHex("#cbd5e1:85")
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: PrismBorder.standard
+                    )
             )
             .simultaneousGesture(
                 DragGesture(minimumDistance: 4)
@@ -12643,8 +12748,9 @@ public struct CertiGoNativeFigmaAppView: View {
 
     private var parcoursTab01View: some View {
         let curriculum = CertiGoLiveTrackCurriculum.curriculum(forRouteCode: appState.activeRouteCode)
+        let topPillVeilOpacity = 1.0 - (0.55 * appState.liquidGlassIntensityFraction)
         return ZStack(alignment: .top) {
-            // Back Layer: Full-Screen Scrolling Path starting cleanly below the two levitating pills (UNITÉ 1 lifted right to the top!)
+            // Back Layer: Full-Screen Scrolling Path starting cleanly below the two levitating pills (UNITÉ 1 lifted right below the 44pt pills with zero white vignette!)
             GeometryReader { geo in
                 let safeWidth = geo.size.width.isFinite ? geo.size.width : FigMetrics.twoHundredEighty
                 let stageWidth = max(safeWidth - PrismSpacing.xl * 2, FigMetrics.twoHundredEighty)
@@ -12655,15 +12761,12 @@ public struct CertiGoNativeFigmaAppView: View {
                         }
                     }
                     .padding(.horizontal, PrismSpacing.xl)
-                    .padding(.top, FigMetrics.sixty)
+                    .padding(.top, FigMetrics.sixtyEight)
                     .padding(.bottom, FigMetrics.bottomBarTotalClearance)
                 }
                 .ignoresSafeArea(edges: .bottom)
             }
             .background(PrismColor.figmaHex("#f8fafc").ignoresSafeArea())
-
-            // C1: Top progressive vignette preventing scroll text collision under the two 44pt pills
-            CertiGoTopProgressiveVignetteView()
 
             // Front Layer: Levitating Top Pills (`[Logo | AZ-104 ▾]` + `[🔥 0  💎 0  ❤️ 5]`) — Exact same 44pt height on 1 single line!
             HStack(spacing: PrismSpacing.s) {
@@ -12683,14 +12786,18 @@ public struct CertiGoNativeFigmaAppView: View {
                     .padding(.horizontal, PrismSpacing.m)
                     .frame(height: FigMetrics.fortyFour)
                     .background(
-                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                            .fill(PrismColor.surface)
-                            .shadow(
-                                color: PrismColor.figmaHex("#0f172a:14"),
-                                radius: FigMetrics.sixteen,
-                                x: FigMetrics.zero,
-                                y: FigMetrics.six
-                            )
+                        ZStack {
+                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                .fill(PrismColor.surface.opacity(topPillVeilOpacity))
+                        }
+                        .shadow(
+                            color: PrismColor.figmaHex("#0f172a:14"),
+                            radius: FigMetrics.sixteen,
+                            x: FigMetrics.zero,
+                            y: FigMetrics.six
+                        )
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
@@ -12743,14 +12850,18 @@ public struct CertiGoNativeFigmaAppView: View {
                 .padding(.horizontal, PrismSpacing.m)
                 .frame(height: FigMetrics.fortyFour)
                 .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                        .fill(PrismColor.surface)
-                        .shadow(
-                            color: PrismColor.figmaHex("#0f172a:14"),
-                            radius: FigMetrics.sixteen,
-                            x: FigMetrics.zero,
-                            y: FigMetrics.six
-                        )
+                    ZStack {
+                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                            .fill(PrismColor.surface.opacity(topPillVeilOpacity))
+                    }
+                    .shadow(
+                        color: PrismColor.figmaHex("#0f172a:14"),
+                        radius: FigMetrics.sixteen,
+                        x: FigMetrics.zero,
+                        y: FigMetrics.six
+                    )
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
@@ -14771,14 +14882,82 @@ public struct CertiGoNativeFigmaAppView: View {
                             )
                         }
 
-                        // Section 3: Rappels, Série & Veille IA
+                        // Section 3: Apparence Liquid Glass iOS 26, Rappels & Haptique
                         VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                            Text(verbatim: "Rappels, Série & Veille IA")
+                            Text(verbatim: "Apparence Liquid Glass, Rappels & Haptique")
                                 .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
                                 .foregroundStyle(PrismColor.figmaHex("#64748b"))
                                 .padding(.horizontal, PrismSpacing.xs)
 
                             VStack(spacing: .zero) {
+                                // Interactive Liquid Glass Intensity Control (0 % .. 100 %)
+                                let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: appState.activeRouteCode)
+                                VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                                    HStack(spacing: PrismSpacing.s) {
+                                        Text(verbatim: "💧 Effet Liquid Glass · \(appState.settingsLiquidGlassIntensityPercent)%")
+                                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                        Spacer()
+                                        CertiGoTrueLiquidGlassDropletView(
+                                            trackTheme: trackTheme,
+                                            width: FigMetrics.fiftySix,
+                                            height: FigMetrics.twentyEight,
+                                            isDragging: false,
+                                            intensityPercent: appState.settingsLiquidGlassIntensityPercent
+                                        )
+                                    }
+
+                                    Text(verbatim: "Réfraction optique de la barre de navigation et de la goutte de sélection")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
+                                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+
+                                    Slider(
+                                        value: Binding(
+                                            get: { Double(appState.settingsLiquidGlassIntensityPercent) },
+                                            set: { newValue in
+                                                appState.setLiquidGlassIntensityPercent(Int(newValue.rounded()))
+                                            }
+                                        ),
+                                        in: 0...100,
+                                        step: 1
+                                    )
+                                    .tint(PrismColor.figmaHex(trackTheme.primaryHex))
+                                    .accessibilityIdentifier("settings28-liquid-glass-slider")
+
+                                    HStack(spacing: PrismSpacing.xs) {
+                                        ForEach(CertiGoNativeAppState.liquidGlassIntensityPresets, id: \.self) { preset in
+                                            let isSelected = appState.settingsLiquidGlassIntensityPercent == preset
+                                            Button {
+                                                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                                                    appState.setLiquidGlassIntensityPercent(preset)
+                                                }
+                                            } label: {
+                                                Text(verbatim: "\(preset)%")
+                                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                                    .foregroundStyle(
+                                                        isSelected
+                                                            ? PrismColor.onAccent
+                                                            : PrismColor.figmaHex("#475569")
+                                                    )
+                                                    .frame(maxWidth: .infinity)
+                                                    .frame(height: FigMetrics.thirtyTwo)
+                                                    .background(
+                                                        RoundedRectangle(cornerRadius: PrismRadius.s, style: .continuous)
+                                                            .fill(
+                                                                isSelected
+                                                                    ? PrismColor.figmaHex(trackTheme.primaryHex)
+                                                                    : PrismColor.figmaHex("#f1f5f9")
+                                                            )
+                                                    )
+                                            }
+                                            .buttonStyle(.plain)
+                                            .accessibilityIdentifier("settings28-liquid-glass-preset-\(preset)")
+                                        }
+                                    }
+                                }
+                                .padding(PrismSpacing.m)
+
+                                Divider().padding(.leading, FigMetrics.fiftyTwo)
                                 settingsToggleRow(
                                     symbol: "bell.badge.fill",
                                     tintHex: "#ea580c",
@@ -16013,54 +16192,55 @@ public struct CertiGoNativeFigmaAppView: View {
                         }
                     }
 
-                    // 5 Suggested Colleagues
-                    Text(verbatim: "SUGGESTIONS D'ARCHITECTES (MÊME LIGUE OR)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
-                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                    if !appState.suggestedFriends.isEmpty {
+                        Text(verbatim: "SUGGESTIONS D'ARCHITECTES (MÊME LIGUE OR)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
 
-                    ForEach(0..<appState.suggestedFriends.count, id: \.self) { idx in
-                        let suggestion = appState.suggestedFriends[idx]
-                        HStack(spacing: PrismSpacing.m) {
-                            Text(verbatim: suggestion.initials)
-                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Black"))
-                                .foregroundStyle(PrismColor.onAccent)
-                                .frame(width: FigMetrics.forty, height: FigMetrics.forty)
-                                .background(Circle().fill(PrismColor.figmaHex(suggestion.avatarHex)))
+                        ForEach(0..<appState.suggestedFriends.count, id: \.self) { idx in
+                            let suggestion = appState.suggestedFriends[idx]
+                            HStack(spacing: PrismSpacing.m) {
+                                Text(verbatim: suggestion.initials)
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Black"))
+                                    .foregroundStyle(PrismColor.onAccent)
+                                    .frame(width: FigMetrics.forty, height: FigMetrics.forty)
+                                    .background(Circle().fill(PrismColor.figmaHex(suggestion.avatarHex)))
 
-                            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                                Text(verbatim: "\(suggestion.displayName) · \(suggestion.routeCode)")
-                                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Extra Bold"))
-                                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                                Text(verbatim: "\(suggestion.handle) · 🔥 \(suggestion.streakDays)j")
-                                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
-                                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                            }
+                                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                    Text(verbatim: "\(suggestion.displayName) · \(suggestion.routeCode)")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Extra Bold"))
+                                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                    Text(verbatim: "\(suggestion.handle) · 🔥 \(suggestion.streakDays)j")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
+                                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                                }
 
-                            Spacer()
+                                Spacer()
 
-                            Button {
-                                appState.addSuggestedFriend(at: idx)
-                            } label: {
-                                Text(verbatim: suggestion.isAdded ? "✓ Ajouté" : "+ Ajouter")
-                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
-                                    .foregroundStyle(suggestion.isAdded ? PrismColor.figmaHex("#15803d") : PrismColor.onAccent)
-                                    .padding(.horizontal, PrismSpacing.m)
-                                    .padding(.vertical, PrismSpacing.xs)
-                            }
-                            .buttonStyle(
-                                CertiGoTactile3DButtonStyle(
-                                    faceHex: suggestion.isAdded ? "#dcfce7" : "#0078d4",
-                                    lipHex: suggestion.isAdded ? "#86efac" : "#005a9e",
-                                    cornerRadius: PrismRadius.s,
-                                    lipDepth: FigMetrics.three
+                                Button {
+                                    appState.addSuggestedFriend(at: idx)
+                                } label: {
+                                    Text(verbatim: suggestion.isAdded ? "✓ Ajouté" : "+ Ajouter")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
+                                        .foregroundStyle(suggestion.isAdded ? PrismColor.figmaHex("#15803d") : PrismColor.onAccent)
+                                        .padding(.horizontal, PrismSpacing.m)
+                                        .padding(.vertical, PrismSpacing.xs)
+                                }
+                                .buttonStyle(
+                                    CertiGoTactile3DButtonStyle(
+                                        faceHex: suggestion.isAdded ? "#dcfce7" : "#0078d4",
+                                        lipHex: suggestion.isAdded ? "#86efac" : "#005a9e",
+                                        cornerRadius: PrismRadius.s,
+                                        lipDepth: FigMetrics.three
+                                    )
                                 )
+                            }
+                            .padding(PrismSpacing.m)
+                            .background(
+                                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                    .fill(PrismColor.surface)
                             )
                         }
-                        .padding(PrismSpacing.m)
-                        .background(
-                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                                .fill(PrismColor.surface)
-                        )
                     }
 
                     // iPhone Contacts Synchronization (`CNContactStore`)
@@ -17753,32 +17933,35 @@ public struct CertiGoNativeFigmaAppView: View {
 
     private var socialCooperativeFriendsQuestCardView: some View {
         let mySteps = appState.completedStepsTotal
-        let partnerSteps = 9
+        let partner = appState.friends.first
+        let partnerSteps = 0
         let totalSteps = min(15, partnerSteps + mySteps)
-        let partnerFraction = min(1.0, Double(partnerSteps) / 15.0)
-        let myFraction = min(max(0.0, 1.0 - partnerFraction), Double(mySteps) / 15.0)
+        let myFraction = min(1.0, Double(mySteps) / 15.0)
+        let partnerFraction = min(max(0.0, 1.0 - myFraction), Double(partnerSteps) / 15.0)
         let innerConcentricRadius = PrismRadius.concentric(outer: PrismRadius.xl, padding: PrismSpacing.m)
 
         return VStack(alignment: .leading, spacing: PrismSpacing.s) {
             HStack(alignment: .center, spacing: PrismSpacing.m) {
-                // Cooperative 76×76 pt Two-Color Ring (Blue `#0078d4` for Sarah L. + Green `#58cc02` for Toi)
+                // Cooperative 76×76 pt Ring (Green `#58cc02` for Toi + Blue `#0078d4` for real invited partner)
                 ZStack {
                     Circle()
                         .stroke(PrismColor.figmaHex("#e2e8f0"), lineWidth: FigMetrics.eight)
 
-                    Circle()
-                        .trim(from: 0, to: partnerFraction)
-                        .stroke(
-                            PrismColor.figmaHex("#0078d4"),
-                            style: StrokeStyle(lineWidth: FigMetrics.eight, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(-90))
-
                     if myFraction > 0 {
                         Circle()
-                            .trim(from: partnerFraction, to: min(1.0, partnerFraction + myFraction))
+                            .trim(from: 0, to: myFraction)
                             .stroke(
                                 PrismColor.figmaHex("#58cc02"),
+                                style: StrokeStyle(lineWidth: FigMetrics.eight, lineCap: .round)
+                            )
+                            .rotationEffect(.degrees(-90))
+                    }
+
+                    if partnerFraction > 0 {
+                        Circle()
+                            .trim(from: myFraction, to: min(1.0, myFraction + partnerFraction))
+                            .stroke(
+                                PrismColor.figmaHex("#0078d4"),
                                 style: StrokeStyle(lineWidth: FigMetrics.eight, lineCap: .round)
                             )
                             .rotationEffect(.degrees(-90))
@@ -17796,7 +17979,7 @@ public struct CertiGoNativeFigmaAppView: View {
                 .frame(width: FigMetrics.seventySix, height: FigMetrics.seventySix)
 
                 VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                    Text(verbatim: "QUÊTE D'ÉQUIPE · ⏱ 4 JOURS")
+                    Text(verbatim: "QUÊTE D'ÉQUIPE · OBJECTIF HEBDO")
                         .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#0078d4"))
 
@@ -17814,47 +17997,71 @@ public struct CertiGoNativeFigmaAppView: View {
                             .foregroundStyle(PrismColor.figmaHex("#15803d"))
                     }
 
-                    HStack {
-                        Text(verbatim: "● Sarah L. (Binôme)")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#475569"))
-                        Spacer()
-                        Text(verbatim: "9 étapes")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                    if let partner {
+                        HStack {
+                            Text(verbatim: "● \(partner.displayName) (Binôme)")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#475569"))
+                            Spacer()
+                            Text(verbatim: "\(partnerSteps) étape\(partnerSteps > 1 ? "s" : "")")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                        }
+                    } else {
+                        Text(verbatim: "Aucun binôme associé pour le moment")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
+                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
                     }
                 }
             }
 
-            Button {
-                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                    appState.clapQuestPartnerSarah()
+            if let partner {
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        appState.clapQuestPartnerSarah()
+                    }
+                } label: {
+                    Text(
+                        verbatim: appState.hasClappedQuestPartner
+                            ? "✓ Encouragement envoyé à \(partner.displayName) !"
+                            : "👏 Encourager \(partner.displayName)"
+                    )
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(
+                        appState.hasClappedQuestPartner
+                            ? PrismColor.figmaHex("#15803d")
+                            : PrismColor.figmaHex("#0078d4")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(height: FigMetrics.forty)
+                    .background(
+                        RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                            .fill(
+                                appState.hasClappedQuestPartner
+                                    ? PrismColor.figmaHex("#dcfce7")
+                                    : PrismColor.figmaHex("#eff6ff")
+                            )
+                    )
                 }
-            } label: {
-                Text(
-                    verbatim: appState.hasClappedQuestPartner
-                        ? "✓ Clap envoyé à Sarah !"
-                        : "👏 Féliciter Sarah (+5 💎)"
-                )
-                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                .foregroundStyle(
-                    appState.hasClappedQuestPartner
-                        ? PrismColor.figmaHex("#15803d")
-                        : PrismColor.figmaHex("#0078d4")
-                )
-                .frame(maxWidth: .infinity)
-                .frame(height: FigMetrics.forty)
-                .background(
-                    RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
-                        .fill(
-                            appState.hasClappedQuestPartner
-                                ? PrismColor.figmaHex("#dcfce7")
-                                : PrismColor.figmaHex("#eff6ff")
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("social-friends-quest-clap-button")
+            } else {
+                Button {
+                    appState.showAddFriendSheet = true
+                } label: {
+                    Text(verbatim: "➕ Inviter un binôme")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: FigMetrics.forty)
+                        .background(
+                            RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                                .fill(PrismColor.figmaHex("#eff6ff"))
                         )
-                )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("social-friends-quest-invite-button")
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("social-friends-quest-clap-button")
         }
         .padding(PrismSpacing.l)
         .background(
@@ -18194,24 +18401,26 @@ public struct CertiGoNativeFigmaAppView: View {
                 // F2: Cooperative Cohort Weekly Goal Card
                 CertiGoCooperativeCohortCardView(challenge: appState.cooperativeCohortChallenge)
 
-                // 3D Podium Stage sorted by XP descending (`2e`, `1er 👑`, `3e`)
-                HStack(alignment: .bottom, spacing: PrismSpacing.m) {
-                    podiumColumnView(member: sortedMembers[1], height: PrismSize.podiumSecondHeight, medal: "🥈 2e", pedestalHex: "#cbd5e1")
-                    podiumColumnView(member: sortedMembers[0], height: PrismSize.podiumFirstHeight, medal: "👑 1er", pedestalHex: "#facc15")
-                    podiumColumnView(member: sortedMembers[2], height: PrismSize.podiumThirdHeight, medal: "🥉 3e", pedestalHex: "#fdba74")
+                // 3D Podium Stage sorted by XP descending (`2e`, `1er 👑`, `3e`) when at least 3 real participants exist
+                if sortedMembers.count >= 3 {
+                    HStack(alignment: .bottom, spacing: PrismSpacing.m) {
+                        podiumColumnView(member: sortedMembers[1], height: PrismSize.podiumSecondHeight, medal: "🥈 2e", pedestalHex: "#cbd5e1")
+                        podiumColumnView(member: sortedMembers[0], height: PrismSize.podiumFirstHeight, medal: "👑 1er", pedestalHex: "#facc15")
+                        podiumColumnView(member: sortedMembers[2], height: PrismSize.podiumThirdHeight, medal: "🥉 3e", pedestalHex: "#fdba74")
+                    }
+                    .padding(PrismSpacing.l)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                            .fill(PrismColor.surface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
+                            .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+                    )
                 }
-                .padding(PrismSpacing.l)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
-                        .fill(PrismColor.surface)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
-                        .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
-                )
 
-                // Full 12-Member Leaderboard (`1er` .. `12e`) — Every row is tappable to open `friendProfileSheetView`
+                // Real Leaderboard Rows (Current User + Real Added Friends) — Every row is tappable to open `friendProfileSheetView`
                 VStack(spacing: PrismSpacing.s) {
                     ForEach(appState.leaderboardMembers) { member in
                         Button {
@@ -18255,6 +18464,18 @@ public struct CertiGoNativeFigmaAppView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                }
+
+                if appState.leaderboardMembers.count <= 1 {
+                    CertiGoEmptyStateCardView(
+                        mascotPose: .onboardingWelcome,
+                        title: "Termine ta première leçon ou ajoute des amis pour comparer votre progression hebdomadaire",
+                        subtitle: "",
+                        actionTitle: "➕ Ajouter un ami"
+                    ) {
+                        appState.showAddFriendSheet = true
+                    }
+                    .accessibilityIdentifier("social-leaderboard-empty-state-card")
                 }
             }
             .padding(.horizontal, PrismSpacing.xl)
