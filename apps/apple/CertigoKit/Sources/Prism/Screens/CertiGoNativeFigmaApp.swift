@@ -11386,6 +11386,7 @@ public enum FigMetrics {
     public static let oneHundredTwenty: CGFloat = 120
     public static let oneHundredTwentyEight: CGFloat = 128
     public static let oneHundredForty: CGFloat = 140
+    public static let oneHundredFortyEight: CGFloat = 148
     public static let oneHundredFifty: CGFloat = 150
     public static let oneHundredFiftySix: CGFloat = 156
     public static let oneHundredSixty: CGFloat = 160

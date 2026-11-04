@@ -2355,6 +2355,82 @@ struct CertiGoNativeFigmaAppTests {
         #expect(bossCardUnlockedEN.bossHeaderTitle == "🏆 MOCK EXAM · HARVEY-LEGAL")
         #expect(bossCardUnlockedEN.unlockedBadgeTitle == "UNLOCKED ✓")
         #expect(bossCardUnlockedEN.statusSubtitle.contains("860/1000"))
+
+        // 13. Verify Apple News × Perplexity Discover v2 Editorial Redesign:
+        // - 6 editorial rubriques (`À la une`, `IA & Modèles`, `Cloud & Infra`, `Cybersécurité`, `Dev & Open Source`, `Régulation & Europe`)
+        // - Collapsible search bar & query filtering
+        // - Clean editorial media names without `#rank` or `OPML` jargon
+        // - 3 Perplexity suggestions (`Explique-moi simplement ce que ça change`, `Pourquoi tout le monde en parle ?`, `Quel est le lien avec mon parcours ?`)
+        #expect(CertiGoTechNewsCatalog.all100RankedSites.count == 100)
+        #expect(CertiGoEditorialRubricID.allCases.count == 6)
+        #expect(CertiGoEditorialRubricID.topStories.displayTitle(languageIndex: 0) == "À la une")
+        #expect(CertiGoEditorialRubricID.aiAndModels.displayTitle(languageIndex: 0) == "IA & Modèles")
+        #expect(CertiGoEditorialRubricID.cloudAndInfra.displayTitle(languageIndex: 0) == "Cloud & Infra")
+        #expect(CertiGoEditorialRubricID.cybersecurity.displayTitle(languageIndex: 0) == "Cybersécurité")
+        #expect(CertiGoEditorialRubricID.devAndOpenSource.displayTitle(languageIndex: 0) == "Dev & Open Source")
+        #expect(CertiGoEditorialRubricID.regulationAndEurope.displayTitle(languageIndex: 0) == "Régulation & Europe")
+
+        for rubric in CertiGoEditorialRubricID.allCases {
+            appState.selectEditorialRubric(rubric)
+            #expect(appState.techNewsState.selectedEditorialRubric == rubric)
+            #expect(!appState.filteredTechNewsArticles.isEmpty, "Expected articles for editorial rubric \(rubric.rawValue)")
+        }
+        appState.selectEditorialRubric(.topStories)
+
+        #expect(appState.editorialHeaderDateSubtitle(languageIndex: 0) == "Mercredi 4 novembre · Monde entier")
+        #expect(appState.editorialHeaderDateSubtitle(languageIndex: 2) == "Wednesday, November 4 · Worldwide")
+        #expect(appState.techNewsState.isSearchFieldVisible == false)
+        appState.toggleTechNewsSearchField()
+        #expect(appState.techNewsState.isSearchFieldVisible == true)
+        appState.techNewsState.feedSearchQuery = "Codex"
+        #expect(!appState.filteredTechNewsArticles.isEmpty)
+        appState.toggleTechNewsSearchField()
+        #expect(appState.techNewsState.isSearchFieldVisible == false)
+        #expect(appState.techNewsState.feedSearchQuery.isEmpty)
+
+        for article in CertiGoVerifiedRSSFeedCatalog.defaultCuratedTechNewsArticles {
+            #expect(!article.editorialMediaName.contains("#"))
+            #expect(!article.editorialMediaName.contains("OPML"))
+            #expect(article.editorialHeroTimeLabel(languageIndex: 0).hasPrefix("Il y a "))
+            #expect(article.editorialCompactTimeLabel.hasSuffix(" h"))
+            #expect(article.editorialGradientStartHex.hasPrefix("#"))
+            #expect(article.editorialGradientEndHex.hasPrefix("#"))
+            #expect(!article.editorialWatermarkSymbol.isEmpty)
+        }
+
+        let chipsFR = firstArticle.suggestedFollowUpQuestions(languageIndex: 0)
+        #expect(chipsFR == [
+            "Explique-moi simplement ce que ça change",
+            "Pourquoi tout le monde en parle ?",
+            "Quel est le lien avec mon parcours ?"
+        ])
+        #expect(FigMetrics.oneHundredFortyEight == 148)
+
+        var repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: repoRoot.appendingPathComponent("AGENTS.md").path) {
+            let parent = repoRoot.deletingLastPathComponent()
+            guard parent != repoRoot else { throw CocoaError(.fileNoSuchFile) }
+            repoRoot = parent
+        }
+        let actusSource = try String(
+            contentsOf: repoRoot.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Screens/CertiGoTechNewsAndExamRouting.swift"),
+            encoding: .utf8
+        )
+        #expect(!actusSource.contains("—"))
+        #expect(!actusSource.contains("–"))
+        #expect(actusSource.contains("public typealias TechNewsTabRootView = CertiGoTechNewsFeedView"))
+        #expect(actusSource.contains("public typealias CertiGoTechNewsCatalog = CertiGoVerifiedRSSFeedCatalog"))
+        #expect(!actusSource.contains("📡 Top 100 · 83 RSS"))
+        #expect(!actusSource.contains("🔴 DIRECT · MONDE"))
+        #expect(actusSource.contains("Explorer les 100 médias Tech suivis →"))
+        #expect(actusSource.contains("🔊 Écouter · 1 min"))
+        #expect(actusSource.contains("Lire l'article →"))
+        #expect(actusSource.contains("Dernières actualités"))
+        #expect(actusSource.contains("À retenir"))
+        #expect(actusSource.contains("Pourquoi c'est important"))
+        #expect(actusSource.contains("✦ Des questions sur cette actu ?"))
+        #expect(actusSource.contains("Aller plus loin"))
+        #expect(actusSource.contains("⚡ Tester si j'ai compris (+10 XP)"))
     }
 
     @Test("Non-regression audit across 33 certifications × 30 steps × 12 languages: zero Markdown asterisks (** / ****), zero long dashes, and zero duplicate pre-quiz slides, Declic cards, or questions")
