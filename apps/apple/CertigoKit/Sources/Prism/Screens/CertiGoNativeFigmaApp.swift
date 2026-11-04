@@ -495,6 +495,17 @@ public struct CertiGoLessonMicroSlide: Equatable, Sendable {
     public let keyTakeawayPill: String
     public let serviceAssetName: String
 
+    public static func formatNumberedPointsOnSeparateLines(_ raw: String) -> String {
+        var text = raw.strippingMarkdownAsterisks
+        for num in 2...9 {
+            text = text
+                .replacingOccurrences(of: " · \(num). ", with: "\n\(num). ")
+                .replacingOccurrences(of: " • \(num). ", with: "\n\(num). ")
+                .replacingOccurrences(of: " ; \(num). ", with: "\n\(num). ")
+        }
+        return text
+    }
+
     public init(
         stepBadge: String,
         title: String,
@@ -504,7 +515,7 @@ public struct CertiGoLessonMicroSlide: Equatable, Sendable {
     ) {
         self.stepBadge = stepBadge.strippingMarkdownAsterisks
         self.title = title.strippingMarkdownAsterisks
-        self.bodyParagraph = bodyParagraph.strippingMarkdownAsterisks
+        self.bodyParagraph = Self.formatNumberedPointsOnSeparateLines(bodyParagraph)
         self.keyTakeawayPill = keyTakeawayPill.strippingMarkdownAsterisks
         self.serviceAssetName = serviceAssetName
     }
@@ -9106,6 +9117,15 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         Double(min(max(settingsLiquidGlassIntensityPercent, 0), 100)) / 100.0
     }
 
+    /// Real-time normalized Liquid Glass opacity/intensity (`0.0 ... 1.0`) directly connected to the Settings slider (`0 % - 100 %`).
+    public var liquidGlassIntensity: Double {
+        get { liquidGlassIntensityFraction }
+        set {
+            let clamped = min(max(newValue, 0.0), 1.0)
+            setLiquidGlassIntensityPercent(Int((clamped * 100.0).rounded()))
+        }
+    }
+
     public mutating func setLiquidGlassIntensityPercent(_ percent: Int) {
         let clamped = min(max(percent, 0), 100)
         settingsLiquidGlassIntensityPercent = clamped
@@ -11464,6 +11484,26 @@ public struct CertiGoTrueLiquidGlassDropletView: Equatable, Sendable {
         Double(intensityPercent) / 100.0
     }
 
+    public var glassVeilOpacity: Double {
+        0.88 - (0.64 * intensityFraction)
+    }
+
+    public var tintOpacity: Double {
+        0.82 - (0.64 * intensityFraction)
+    }
+
+    public var chromaticRefractionOpacity: Double {
+        intensityFraction
+    }
+
+    public var specularMeniscusOpacity: Double {
+        Self.topMeniscusWhiteOpacity * intensityFraction
+    }
+
+    public var shadowDepthRadius: CGFloat {
+        FigMetrics.four + (FigMetrics.ten * CGFloat(intensityFraction))
+    }
+
     public var effectiveScaleX: CGFloat {
         guard isDragging else { return 1.0 }
         return 1.0 + (Self.dragStretchScaleX - 1.0) * CGFloat(intensityFraction)
@@ -11558,17 +11598,27 @@ import UIKit
 
 extension CertiGoStructuredPromptView: View {
     public var body: some View {
-        let parts = Self.splitScenarioAndQuestion(prompt)
+        CertiGoScaledStructuredPromptBodyView(prompt: prompt)
+    }
+}
+
+private struct CertiGoScaledStructuredPromptBodyView: View {
+    let prompt: String
+    @ScaledMetric(relativeTo: .body) private var scenarioFontSize: CGFloat = FigMetrics.typeBody
+    @ScaledMetric(relativeTo: .headline) private var questionFontSize: CGFloat = FigMetrics.typeCardTitle
+
+    var body: some View {
+        let parts = CertiGoStructuredPromptView.splitScenarioAndQuestion(prompt)
         VStack(alignment: .leading, spacing: PrismSpacing.s) {
             if let scenario = parts.scenario, !scenario.isEmpty {
                 Text(verbatim: scenario)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.typeBody, style: "Semi Bold"))
+                    .font(PrismTypography.figmaFont(size: scenarioFontSize, style: "Semi Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#334155"))
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Text(verbatim: parts.question)
-                .font(PrismTypography.figmaFont(size: FigMetrics.typeCardTitle, style: "Bold"))
+                .font(PrismTypography.figmaFont(size: questionFontSize, style: "Bold"))
                 .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                 .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
@@ -11578,10 +11628,31 @@ extension CertiGoStructuredPromptView: View {
 
 extension View {
     @ViewBuilder
-    fileprivate func applyiOS26LiquidGlassIfAvailable(intensity: Double) -> some View {
+    fileprivate func applyiOS26LiquidGlassIfAvailable(
+        intensity: Double,
+        tintOpacity: Double = 0.22
+    ) -> some View {
         #if compiler(>=6.2)
-        if #available(iOS 26.0, macOS 26.0, *), intensity > 0.05 {
-            self.glassEffect(.regular.interactive(), in: .capsule)
+        if #available(iOS 26.0, macOS 26.0, *), intensity > 0.01 {
+            self.glassEffect(
+                .regular.tint(Color.white.opacity(tintOpacity)).interactive(),
+                in: Capsule(style: .continuous)
+            )
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    fileprivate func wrapIniOS26GlassEffectContainerIfAvailable(intensity: Double) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, macOS 26.0, *), intensity > 0.01 {
+            GlassEffectContainer(spacing: FigMetrics.twelve) {
+                self
+            }
         } else {
             self
         }
@@ -11603,7 +11674,7 @@ extension CertiGoTrueLiquidGlassDropletView: View {
                 RoundedRectangle(cornerRadius: dropletRadius, style: .continuous)
                     .strokeBorder(PrismColor.figmaHex("#cbd5e1"), lineWidth: PrismBorder.standard)
             } else {
-                // 1. Cœur réfractif teinté (.ultraThinMaterial + dégradé interne haut -> centre -> bas créant une vraie lentille d'eau colorée)
+                // 1. Cœur réfractif teinté (.ultraThinMaterial + voile modulé par glassVeilOpacity et chromaticRefractionOpacity)
                 Capsule(style: .continuous)
                     .fill(.ultraThinMaterial)
                     .overlay(
@@ -11611,9 +11682,9 @@ extension CertiGoTrueLiquidGlassDropletView: View {
                             .fill(
                                 LinearGradient(
                                     stops: [
-                                        .init(color: PrismColor.figmaHex("#ffffff:88"), location: 0.0),
-                                        .init(color: PrismColor.figmaHex("\(trackTheme.softHex):75").opacity(0.45 + 0.55 * t), location: 0.52),
-                                        .init(color: PrismColor.figmaHex("\(trackTheme.primaryHex):22").opacity(t), location: 1.0)
+                                        .init(color: Color.white.opacity(glassVeilOpacity), location: 0.0),
+                                        .init(color: PrismColor.figmaHex("\(trackTheme.softHex):75").opacity(0.28 + 0.42 * (1.0 - t)), location: 0.52),
+                                        .init(color: PrismColor.figmaHex("\(trackTheme.primaryHex):22").opacity(chromaticRefractionOpacity), location: 1.0)
                                     ],
                                     startPoint: .top,
                                     endPoint: .bottom
@@ -11625,8 +11696,8 @@ extension CertiGoTrueLiquidGlassDropletView: View {
                             .fill(
                                 RadialGradient(
                                     colors: [
-                                        PrismColor.figmaHex("#ffffff:35").opacity(t),
-                                        PrismColor.figmaHex("\(trackTheme.primaryHex):18").opacity(t)
+                                        PrismColor.figmaHex("#ffffff:35").opacity(chromaticRefractionOpacity),
+                                        PrismColor.figmaHex("\(trackTheme.primaryHex):18").opacity(chromaticRefractionOpacity)
                                     ],
                                     center: .center,
                                     startRadius: FigMetrics.two,
@@ -11635,12 +11706,12 @@ extension CertiGoTrueLiquidGlassDropletView: View {
                             )
                     )
 
-                // 2. Reflet spéculaire bombé supérieur (lame de lumière convexe #ffffff:98 + légère ombre interne juste en dessous)
+                // 2. Reflet spéculaire bombé supérieur (lame de lumière convexe modulée par specularMeniscusOpacity)
                 Capsule(style: .continuous)
                     .fill(
                         LinearGradient(
                             stops: [
-                                .init(color: PrismColor.figmaHex("#ffffff:98").opacity(t), location: 0.0),
+                                .init(color: Color.white.opacity(specularMeniscusOpacity), location: 0.0),
                                 .init(color: PrismColor.figmaHex("#ffffff:35").opacity(t), location: 0.24),
                                 .init(color: PrismColor.figmaHex("#0f172a:08").opacity(t), location: Self.topMeniscusFadeStop),
                                 .init(color: PrismColor.figmaHex("#ffffff:00"), location: 0.48)
@@ -11652,14 +11723,14 @@ extension CertiGoTrueLiquidGlassDropletView: View {
                     .padding(.horizontal, FigMetrics.three)
                     .padding(.top, FigMetrics.onePointFive)
 
-                // 3. Caustique / Reflet de réfraction inférieur (lueur interne en bas teintée avec trackTheme.ringHex 0.45 + blanc 0.65)
+                // 3. Caustique / Reflet de réfraction inférieur
                 Capsule(style: .continuous)
                     .fill(
                         LinearGradient(
                             stops: [
                                 .init(color: PrismColor.figmaHex("#ffffff:00"), location: 0.56),
-                                .init(color: PrismColor.figmaHex("\(trackTheme.ringHex):45").opacity(t), location: 0.85),
-                                .init(color: PrismColor.figmaHex("#ffffff:65").opacity(t), location: 1.0)
+                                .init(color: PrismColor.figmaHex("\(trackTheme.ringHex):45").opacity(chromaticRefractionOpacity), location: 0.85),
+                                .init(color: PrismColor.figmaHex("#ffffff:65").opacity(chromaticRefractionOpacity), location: 1.0)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -11668,14 +11739,14 @@ extension CertiGoTrueLiquidGlassDropletView: View {
                     .padding(.horizontal, FigMetrics.two)
                     .padding(.bottom, FigMetrics.one)
 
-                // 4a. Ménisque extérieur chromatique contrasté (filet sombre/coloré pour que la goutte ressorte à l'œil nu sur fond clair)
-                RoundedRectangle(cornerRadius: dropletRadius, style: .continuous)
+                // 4a. Ménisque extérieur chromatique harmonisé
+                Capsule(style: .continuous)
                     .strokeBorder(
                         LinearGradient(
                             stops: [
-                                .init(color: PrismColor.figmaHex("#0f172a:14").opacity(0.4 + 0.6 * t), location: 0.0),
-                                .init(color: PrismColor.figmaHex("\(trackTheme.ringHex):35").opacity(t), location: 0.5),
-                                .init(color: PrismColor.figmaHex("\(trackTheme.primaryHex):42").opacity(0.45 + 0.55 * t), location: 1.0)
+                                .init(color: PrismColor.figmaHex("#0f172a:14").opacity(0.30 + 0.45 * t), location: 0.0),
+                                .init(color: PrismColor.figmaHex("\(trackTheme.ringHex):35").opacity(chromaticRefractionOpacity), location: 0.5),
+                                .init(color: PrismColor.figmaHex("\(trackTheme.primaryHex):42").opacity(0.35 + 0.45 * t), location: 1.0)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -11683,14 +11754,14 @@ extension CertiGoTrueLiquidGlassDropletView: View {
                         lineWidth: Self.rimLightLineWidth
                     )
 
-                // 4b. Biseau spéculaire intérieur blanc pur (#ffffff:95 en haut-gauche)
-                RoundedRectangle(cornerRadius: max(FigMetrics.eight, dropletRadius - FigMetrics.one), style: .continuous)
+                // 4b. Biseau spéculaire intérieur blanc pur
+                Capsule(style: .continuous)
                     .strokeBorder(
                         LinearGradient(
                             colors: [
-                                PrismColor.figmaHex("#ffffff:95").opacity(t),
-                                PrismColor.figmaHex("\(trackTheme.ringHex):45").opacity(t),
-                                PrismColor.figmaHex("#ffffff:80").opacity(t)
+                                PrismColor.figmaHex("#ffffff:90").opacity(t),
+                                PrismColor.figmaHex("\(trackTheme.ringHex):38").opacity(t),
+                                PrismColor.figmaHex("#ffffff:70").opacity(t)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -11700,19 +11771,13 @@ extension CertiGoTrueLiquidGlassDropletView: View {
                     .padding(FigMetrics.one)
             }
         }
-        .applyiOS26LiquidGlassIfAvailable(intensity: t)
-        // 5. Ombre caustique colorée sous la goutte (${trackTheme.primaryHex}:28, radius: 10, y: 4)
+        .applyiOS26LiquidGlassIfAvailable(intensity: t, tintOpacity: tintOpacity)
+        // 5. Ombre caustique harmonisée et modulée par l'intensité Liquid Glass
         .shadow(
-            color: PrismColor.figmaHex("\(trackTheme.primaryHex):28").opacity(t),
-            radius: FigMetrics.ten,
+            color: PrismColor.figmaHex("\(trackTheme.primaryHex):22").opacity(t),
+            radius: shadowDepthRadius * 0.65,
             x: FigMetrics.zero,
-            y: FigMetrics.four
-        )
-        .shadow(
-            color: PrismColor.figmaHex("#0f172a:12").opacity(t),
-            radius: FigMetrics.six,
-            x: FigMetrics.zero,
-            y: FigMetrics.two
+            y: FigMetrics.three
         )
         // 6. Élasticité physique de goutte d'eau (scaleEffect x: 1.10, y: 1.04 pendant le glissement, modulé par l'intensité)
         .frame(width: width, height: height)
@@ -12028,6 +12093,7 @@ public struct CertiGoEmptyStateCardView: View {
 public struct CertiGoNativeFigmaAppView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
     @Binding public var coordinator: PrismAppShellCoordinatorModel
     @Binding public var router: AppRouterState
@@ -12040,7 +12106,7 @@ public struct CertiGoNativeFigmaAppView: View {
     @State private var voiceHaloPulse: Bool = false
     @State private var stepSheetDragOffset: CGFloat = 0
     @State private var tabBarDragX: CGFloat? = nil
-    @Namespace private var tabGlassNamespace
+    @Namespace private var bottomTabGlassNamespace
     @FocusState private var isAIInputFocused: Bool
 
     public init(
@@ -12055,9 +12121,16 @@ public struct CertiGoNativeFigmaAppView: View {
         self.preferenceStore = preferenceStore
     }
 
+    private var isModalSheetOrOverlayOpen: Bool {
+        appState.activeStepSheet != nil
+            || appState.showExamLaunchSheet22
+            || appState.showCoursePopover02
+            || appState.isPresentingGuidedAppTour
+    }
+
     public var body: some View {
         ZStack(alignment: .bottom) {
-            // Active Tab Root View
+            // Active Tab Root View (scrolls edge-to-edge underneath floatingBottomTabBar)
             Group {
                 if appState.isPresentingExamCenterModule {
                     examensTab21View
@@ -12083,6 +12156,7 @@ public struct CertiGoNativeFigmaAppView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea(edges: .bottom)
 
             // Pinned Floating Bottom Tab Bar (5 Tabs: Parcours, Actus, ✦ IA, Social, Moi)
             if !(appState.selectedTab == .moi && !profileNavPath.isEmpty)
@@ -12090,6 +12164,9 @@ public struct CertiGoNativeFigmaAppView: View {
                 && !(appState.selectedTab == .hubIA && appState.isAIDrawerOpen06D)
             {
                 floatingBottomTabBar
+                    .opacity(isModalSheetOrOverlayOpen ? 0.0 : 1.0)
+                    .allowsHitTesting(!isModalSheetOrOverlayOpen)
+                    .accessibilityHidden(isModalSheetOrOverlayOpen)
             }
 
             // Full-Screen Smooth Backdrop Dimmer (opacity-only, zero bottom edge border)
@@ -12351,11 +12428,25 @@ public struct CertiGoNativeFigmaAppView: View {
         }
     }
 
+    private var bottomTabLensMorphAnimation: Animation {
+        let responseSeconds: Double = 0.32
+        let dampingRatio: Double = 0.78
+        return reduceMotion
+            ? CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: true)
+            : .spring(response: responseSeconds, dampingFraction: dampingRatio)
+    }
+
     private var floatingBottomTabBar: some View {
         let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: appState.activeRouteCode)
         let glassIntensity = reduceTransparency ? 0 : appState.settingsLiquidGlassIntensityPercent
-        let t = reduceTransparency ? 0.0 : appState.liquidGlassIntensityFraction
-        let barWhiteVeilOpacity = 1.0 - (0.66 * t)
+        let t = reduceTransparency ? 0.0 : appState.liquidGlassIntensity
+        // Neutral translucent base: 0% -> 0.94 quasi-opaque sober surface; 100% -> 0.28 translucent neutral veil keeping crisp inactive tab contrast over green/blue cards
+        let tintOpacity = 0.94 - (0.66 * t)
+        let meniscusOpacity = 0.25 + (0.70 * t)
+        let shadowRadius = FigMetrics.eight + (FigMetrics.eight * CGFloat(t))
+        let shadowOpacity = 0.08 + (0.08 * t)
+        let morphSpring = bottomTabLensMorphAnimation
+
         return GeometryReader { barGeo in
             let innerWidth = max(FigMetrics.twoHundredEighty, barGeo.size.width - FigMetrics.six * 2)
             let colWidth = innerWidth / 5.0
@@ -12380,21 +12471,33 @@ public struct CertiGoNativeFigmaAppView: View {
             )
 
             ZStack(alignment: .leading) {
-                // Layer 1 (Base): All tab icons and letters in slate grey `#64748b`
+                // Layer 1 (Base): All tab icons and letters in high-contrast slate `#475569`
                 bottomBarItemsLayer(isHighlightedBlue: false, innerWidth: innerWidth)
 
-                // Layer 2: True iOS 26 Liquid Glass Water Droplet (`CertiGoTrueLiquidGlassDropletView`, R_interne = 32 - 6 = 26 pt)
-                droplet
-                    .position(x: FigMetrics.six + pillCenterX, y: FigMetrics.thirty)
-                    .animation(
-                        CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion),
-                        value: activeIndex
-                    )
-                    .animation(
-                        CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion),
-                        value: isDragging
-                    )
+                // Layer 2: True iOS 26 Liquid Glass Morphing Lens (`matchedGeometryEffect` + draggable tracking)
+                if isDragging {
+                    droplet
+                        .matchedGeometryEffect(id: "activeBottomTabLens", in: bottomTabGlassNamespace)
+                        .position(x: FigMetrics.six + pillCenterX, y: FigMetrics.thirty)
+                        .animation(morphSpring, value: activeIndex)
+                        .animation(morphSpring, value: isDragging)
+                        .allowsHitTesting(false)
+                } else {
+                    HStack(spacing: .zero) {
+                        ForEach(orderedBottomTabs, id: \.self) { tab in
+                            ZStack {
+                                if tab == activeTab {
+                                    droplet
+                                        .matchedGeometryEffect(id: "activeBottomTabLens", in: bottomTabGlassNamespace)
+                                }
+                            }
+                            .frame(width: colWidth, height: FigMetrics.bottomBarCompactHeight)
+                        }
+                    }
+                    .padding(.horizontal, FigMetrics.six)
+                    .animation(morphSpring, value: activeTab)
                     .allowsHitTesting(false)
+                }
 
                 // Layer 3 (Refracted Track-Colored Layer): Identical tab items in track dominant color (`trackTheme.primaryHex`), masked pixel-for-pixel by the Liquid Glass water droplet!
                 bottomBarItemsLayer(isHighlightedBlue: true, innerWidth: innerWidth)
@@ -12411,38 +12514,52 @@ public struct CertiGoNativeFigmaAppView: View {
                                 .position(x: FigMetrics.six + pillCenterX, y: FigMetrics.thirty)
                         }
                     )
-                    .animation(
-                        CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion),
-                        value: activeIndex
-                    )
-                    .animation(
-                        CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion),
-                        value: isDragging
-                    )
+                    .animation(morphSpring, value: activeIndex)
+                    .animation(morphSpring, value: isDragging)
                     .allowsHitTesting(false)
             }
             .frame(height: FigMetrics.bottomBarCompactHeight)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: PrismRadius.bottomBar, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                    RoundedRectangle(cornerRadius: PrismRadius.bottomBar, style: .continuous)
-                        .fill(PrismColor.figmaHex("#ffffff:55").opacity(barWhiteVeilOpacity))
+                    if glassIntensity == 0 {
+                        Capsule(style: .continuous)
+                            .fill(PrismColor.surface.opacity(0.96))
+                    } else {
+                        Capsule(style: .continuous)
+                            .fill(.ultraThinMaterial)
+                        Capsule(style: .continuous)
+                            .fill(Color.white.opacity(tintOpacity))
+                        // Top specular meniscus + bottom chromatic refraction rim connected to state.liquidGlassIntensity
+                        Capsule(style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: Color.white.opacity(0.82 * t), location: 0.0),
+                                        .init(color: Color.white.opacity(0.18 * t), location: 0.28),
+                                        .init(color: Color.clear, location: 0.62),
+                                        .init(color: PrismColor.figmaHex("\(trackTheme.ringHex):28").opacity(t), location: 1.0)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    }
                 }
+                .applyiOS26LiquidGlassIfAvailable(intensity: t, tintOpacity: tintOpacity)
                 .shadow(
-                    color: PrismColor.figmaHex("#0f172a:14"),
-                    radius: FigMetrics.twenty,
+                    color: Color.black.opacity(shadowOpacity),
+                    radius: shadowRadius,
                     x: FigMetrics.zero,
-                    y: FigMetrics.six
+                    y: FigMetrics.four
                 )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: PrismRadius.bottomBar, style: .continuous)
+                Capsule(style: .continuous)
                     .strokeBorder(
                         LinearGradient(
                             colors: [
-                                PrismColor.figmaHex("#ffffff:95"),
-                                PrismColor.figmaHex("\(trackTheme.ringHex):35").opacity(t),
+                                Color.white.opacity(meniscusOpacity),
+                                PrismColor.figmaHex("\(trackTheme.ringHex):32").opacity(t),
                                 PrismColor.figmaHex("#cbd5e1:85")
                             ],
                             startPoint: .topLeading,
@@ -12451,6 +12568,7 @@ public struct CertiGoNativeFigmaAppView: View {
                         lineWidth: PrismBorder.standard
                     )
             )
+            .wrapIniOS26GlassEffectContainerIfAvailable(intensity: t)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 4)
                     .onChanged { value in
@@ -12460,7 +12578,7 @@ public struct CertiGoNativeFigmaAppView: View {
                     .onEnded { value in
                         let localX = value.location.x - FigMetrics.six
                         let targetTab = hoveredBottomTab(forDragX: localX, totalWidth: innerWidth)
-                        withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        withAnimation(morphSpring) {
                             tabBarDragX = nil
                             selectBottomTab(targetTab)
                         }
@@ -12491,7 +12609,7 @@ public struct CertiGoNativeFigmaAppView: View {
 
             // Center 3D AI Hub Orb Button (`✦` : Figma `57:372` White Circle with Multicolor AngularGradient Ring)
             Button {
-                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                withAnimation(bottomTabLensMorphAnimation) {
                     selectBottomTab(.hubIA)
                 }
             } label: {
@@ -12547,7 +12665,7 @@ public struct CertiGoNativeFigmaAppView: View {
     ) -> some View {
         let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: appState.activeRouteCode)
         return Button {
-            withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+            withAnimation(bottomTabLensMorphAnimation) {
                 selectBottomTab(tab)
             }
         } label: {
@@ -12555,12 +12673,12 @@ public struct CertiGoNativeFigmaAppView: View {
                 Image(systemName: symbol)
                     .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
                     .foregroundStyle(
-                        isHighlightedBlue ? PrismColor.figmaHex(trackTheme.primaryHex) : PrismColor.figmaHex("#64748b")
+                        isHighlightedBlue ? PrismColor.figmaHex(trackTheme.primaryHex) : PrismColor.figmaHex("#475569")
                     )
                 Text(verbatim: label)
                     .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                     .foregroundStyle(
-                        isHighlightedBlue ? PrismColor.figmaHex(trackTheme.primaryHex) : PrismColor.figmaHex("#64748b")
+                        isHighlightedBlue ? PrismColor.figmaHex(trackTheme.primaryHex) : PrismColor.figmaHex("#475569")
                     )
             }
             .frame(maxWidth: .infinity)
@@ -12635,10 +12753,10 @@ public struct CertiGoNativeFigmaAppView: View {
                                 .fill(PrismColor.surface.opacity(topPillVeilOpacity))
                         }
                         .shadow(
-                            color: PrismColor.figmaHex("#0f172a:14"),
-                            radius: FigMetrics.sixteen,
+                            color: PrismColor.figmaHex("#0f172a:10"),
+                            radius: FigMetrics.ten,
                             x: FigMetrics.zero,
-                            y: FigMetrics.six
+                            y: FigMetrics.three
                         )
                     )
                     .overlay(
@@ -12699,10 +12817,10 @@ public struct CertiGoNativeFigmaAppView: View {
                             .fill(PrismColor.surface.opacity(topPillVeilOpacity))
                     }
                     .shadow(
-                        color: PrismColor.figmaHex("#0f172a:14"),
-                        radius: FigMetrics.sixteen,
+                        color: PrismColor.figmaHex("#0f172a:10"),
+                        radius: FigMetrics.ten,
                         x: FigMetrics.zero,
-                        y: FigMetrics.six
+                        y: FigMetrics.three
                     )
                 )
                 .overlay(
@@ -12729,65 +12847,90 @@ public struct CertiGoNativeFigmaAppView: View {
         )
         let rawRatio = CGFloat(displayedPct) / 100.0
         let safeRatio = rawRatio.isFinite ? min(max(rawRatio, 0), 1) : 0
+        let headerParts: (overline: String, cleanTitle: String) = {
+            if let dotRange = unit.headerTitle.range(of: "·") {
+                let prefix = String(unit.headerTitle[..<dotRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let rawBody = String(unit.headerTitle[dotRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let shortOverline = prefix.uppercased().hasPrefix("UNITÉ ")
+                    ? "Unité \(unit.unitNumber)"
+                    : prefix
+                if rawBody.lowercased().hasPrefix("concepts du cloud") {
+                    return (shortOverline, "Concepts du cloud")
+                }
+                if let commaIdx = rawBody.firstIndex(of: ","), rawBody.count > 28 {
+                    return (shortOverline, String(rawBody[..<commaIdx]).trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+                return (shortOverline, rawBody)
+            }
+            return ("Unité \(unit.unitNumber)", unit.headerTitle)
+        }()
 
         return VStack(spacing: PrismSpacing.l) {
-            // 3D Duolingo-Style Unit Header Banner (`UNITÉ 1 · ...` + Endowed % ring + 10 stamps + vertical divider + `[📖]` Memo button)
-            HStack(spacing: PrismSpacing.m) {
-                ZStack {
-                    Circle()
-                        .stroke(PrismColor.figmaHex("#ffffff:30"), lineWidth: FigMetrics.four)
-                        .frame(width: FigMetrics.fortyEight, height: FigMetrics.fortyEight)
-                    Circle()
-                        .trim(from: 0, to: safeRatio)
-                        .stroke(
-                            PrismColor.figmaHex("#58cc02"),
-                            style: StrokeStyle(lineWidth: FigMetrics.four, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: FigMetrics.fortyEight, height: FigMetrics.fortyEight)
-                    Text(verbatim: "\(displayedPct)%")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
-                        .foregroundStyle(PrismColor.onAccent)
-                }
-
-                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                    Text(verbatim: unit.headerTitle)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
-                        .foregroundStyle(PrismColor.onAccent)
-                        .lineLimit(1)
-                    CertiGoHullStampCardView(
-                        unitNumber: unit.unitNumber,
-                        effectivePercent: displayedPct
-                    )
-                }
-
-                Spacer(minLength: PrismSpacing.xs)
-
-                Rectangle()
-                    .fill(PrismColor.figmaHex("#ffffff:26"))
-                    .frame(width: PrismBorder.standard, height: FigMetrics.forty)
-
-                Button {
-                    let targetLessonId = unit.lessons.first(where: { $0.state == .active })?.id
-                        ?? unit.lessons.first?.id
-                        ?? appState.activeLessonNode.id
-                    withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
-                        appState.activeStepSheet = .memo14(lessonId: targetLessonId)
-                    }
-                } label: {
-                    Text(verbatim: "📖")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
-                        .frame(width: FigMetrics.fortyFour, height: FigMetrics.fortyFour)
-                        .background(
-                            RoundedRectangle(
-                                cornerRadius: PrismRadius.concentric(outer: PrismRadius.unitBanner, padding: PrismSpacing.m),
-                                style: .continuous
+            // 3D Duolingo-Style Unit Header Banner (`Unité X` small overline + full `Concepts du cloud` title + fixed `[📖]` right button + 10 stamps row below title)
+            VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                HStack(alignment: .center, spacing: PrismSpacing.m) {
+                    ZStack {
+                        Circle()
+                            .stroke(PrismColor.figmaHex("#ffffff:30"), lineWidth: FigMetrics.four)
+                            .frame(width: FigMetrics.fortyEight, height: FigMetrics.fortyEight)
+                        Circle()
+                            .trim(from: 0, to: safeRatio)
+                            .stroke(
+                                PrismColor.figmaHex("#58cc02"),
+                                style: StrokeStyle(lineWidth: FigMetrics.four, lineCap: .round)
                             )
-                            .fill(PrismColor.figmaHex("#ffffff:22"))
-                        )
+                            .rotationEffect(.degrees(-90))
+                            .frame(width: FigMetrics.fortyEight, height: FigMetrics.fortyEight)
+                        Text(verbatim: "\(displayedPct)%")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
+                            .foregroundStyle(PrismColor.onAccent)
+                    }
+
+                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                        Text(verbatim: headerParts.overline)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#ffffff:85"))
+                            .lineLimit(1)
+                        Text(verbatim: headerParts.cleanTitle)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
+                            .foregroundStyle(PrismColor.onAccent)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Rectangle()
+                        .fill(PrismColor.figmaHex("#ffffff:26"))
+                        .frame(width: PrismBorder.standard, height: FigMetrics.forty)
+
+                    Button {
+                        let targetLessonId = unit.lessons.first(where: { $0.state == .active })?.id
+                            ?? unit.lessons.first?.id
+                            ?? appState.activeLessonNode.id
+                        withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                            appState.activeStepSheet = .memo14(lessonId: targetLessonId)
+                        }
+                    } label: {
+                        Text(verbatim: "📖")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
+                            .frame(width: FigMetrics.fortyFour, height: FigMetrics.fortyFour)
+                            .background(
+                                RoundedRectangle(
+                                    cornerRadius: PrismRadius.concentric(outer: PrismRadius.unitBanner, padding: PrismSpacing.m),
+                                    style: .continuous
+                                )
+                                .fill(PrismColor.figmaHex("#ffffff:22"))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(appState.tr("Cours"))
+                    .accessibilityIdentifier("unit-\(unit.unitNumber)-memo-button")
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("unit-\(unit.unitNumber)-memo-button")
+
+                CertiGoHullStampCardView(
+                    unitNumber: unit.unitNumber,
+                    effectivePercent: displayedPct
+                )
             }
             .padding(PrismSpacing.l)
             .background(
@@ -12829,6 +12972,24 @@ public struct CertiGoNativeFigmaAppView: View {
         let isLeftIsland = lesson.horizontalOffsetFactor <= 0
 
         if lesson.state == .miniLab {
+            let miniLabParsed: (title: String, subtitle: String) = {
+                let cleaned = lesson.title
+                    .replacingOccurrences(of: "Lab · ", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if cleaned.lowercased().contains("capex vs opex") {
+                    return ("CapEx vs OpEx", "Modèle basé sur la consommation")
+                }
+                if let openParen = cleaned.firstIndex(of: "("),
+                   let closeParen = cleaned.lastIndex(of: ")"),
+                   openParen < closeParen
+                {
+                    let head = String(cleaned[..<openParen]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let sub = String(cleaned[cleaned.index(after: openParen)..<closeParen]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    return (head.isEmpty ? cleaned : head, sub.isEmpty ? lesson.subtitle : sub)
+                }
+                return (cleaned, lesson.subtitle)
+            }()
+
             // Interactive 3D Mini-Lab Card (`🧪 MINI-LAB PRATIQUE` : Figma `37:420`)
             Button {
                 withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
@@ -12836,7 +12997,7 @@ public struct CertiGoNativeFigmaAppView: View {
                 }
             } label: {
                 HStack(spacing: PrismSpacing.m) {
-                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
                         Text(verbatim: "🧪 MINI-LAB PRATIQUE")
                             .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#7c3aed"))
@@ -12847,10 +13008,16 @@ public struct CertiGoNativeFigmaAppView: View {
                                     .fill(PrismColor.figmaHex("#f3e8ff"))
                             )
 
-                        Text(verbatim: lesson.title)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
+                        Text(verbatim: miniLabParsed.title)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                             .lineLimit(1)
+
+                        Text(verbatim: miniLabParsed.subtitle)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
+                            .foregroundStyle(PrismColor.figmaHex("#475569"))
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Spacer(minLength: PrismSpacing.xs)
@@ -12869,7 +13036,7 @@ public struct CertiGoNativeFigmaAppView: View {
                 }
                 .padding(PrismSpacing.l)
                 .frame(maxWidth: .infinity)
-                .frame(height: FigMetrics.eightyEight)
+                .frame(minHeight: FigMetrics.eightyEight)
             }
             .buttonStyle(
                 CertiGoTactile3DButtonStyle(
@@ -12884,6 +13051,8 @@ public struct CertiGoNativeFigmaAppView: View {
         } else {
             ZStack {
                 let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: appState.activeRouteCode)
+                let isLargeDynamicType = dynamicTypeSize.isAccessibilitySize || dynamicTypeSize >= .xxxLarge
+                let calloutLabel = (unitProgressPercent == 0 && lesson.stepIndexInUnit == 0) ? "COMMENCER" : "CONTINUER"
                 // 3D Rounded-Square Island Cushion (`72x64pt`, cornerRadius 22pt : Figma `37:375` `PathNode_Island3D`)
                 ZStack {
                     if lesson.state == .active {
@@ -12891,6 +13060,7 @@ public struct CertiGoNativeFigmaAppView: View {
                             .stroke(PrismColor.figmaHex("\(trackTheme.ringHex):55"), lineWidth: FigMetrics.four)
                             .frame(width: FigMetrics.eightyEight, height: FigMetrics.eightyTwo)
                             .scaleEffect(activeNodePulse ? 1.06 : 0.96)
+                            .allowsHitTesting(false)
                     }
 
                     Button {
@@ -12923,6 +13093,20 @@ public struct CertiGoNativeFigmaAppView: View {
                                             .strokeBorder(PrismColor.surface, lineWidth: FigMetrics.two)
                                     )
                                     .offset(x: FigMetrics.six, y: -FigMetrics.six)
+                            } else if lesson.state == .locked {
+                                Image(systemName: "lock.fill")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#475569"))
+                                    .frame(width: FigMetrics.twentyTwo, height: FigMetrics.twentyTwo)
+                                    .background(
+                                        Circle()
+                                            .fill(PrismColor.figmaHex("#e2e8f0"))
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .strokeBorder(PrismColor.surface, lineWidth: FigMetrics.two)
+                                    )
+                                    .offset(x: FigMetrics.four, y: -FigMetrics.four)
                             }
                         }
                     }
@@ -12935,61 +13119,101 @@ public struct CertiGoNativeFigmaAppView: View {
                             lipDepth: FigMetrics.six
                         )
                     )
-                    .accessibilityIdentifier("path-node-\(lesson.id)")
-
-                    if lesson.state == .active {
-                        let calloutLabel = (unitProgressPercent == 0 && lesson.stepIndexInUnit == 0) ? "COMMENCER" : "CONTINUER"
-                        VStack(spacing: .zero) {
-                            Text(verbatim: calloutLabel)
-                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
-                                .foregroundStyle(PrismColor.onAccent)
-                                .padding(.horizontal, PrismSpacing.m)
-                                .padding(.vertical, FigMetrics.five)
-                                .background(
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                                            .fill(PrismColor.figmaHex(trackTheme.lipHex))
-                                            .offset(y: FigMetrics.three)
-                                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
-                                            .fill(PrismColor.figmaHex(trackTheme.primaryHex))
-                                    }
-                                )
-                            Text(verbatim: "▼")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.eight, style: "Black"))
-                                .foregroundStyle(PrismColor.figmaHex(trackTheme.lipHex))
-                                .offset(y: FigMetrics.one)
+                    .overlay(alignment: .top) {
+                        if lesson.state == .active {
+                            Button {
+                                withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                                    appState.openStepPreviewSheet(forLessonId: lesson.id)
+                                }
+                            } label: {
+                                VStack(spacing: .zero) {
+                                    Text(verbatim: calloutLabel)
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                                        .foregroundStyle(PrismColor.onAccent)
+                                        .lineLimit(1)
+                                        .fixedSize(horizontal: true, vertical: false)
+                                        .padding(.horizontal, PrismSpacing.m)
+                                        .padding(.vertical, FigMetrics.five)
+                                        .background(
+                                            ZStack {
+                                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                                    .fill(PrismColor.figmaHex(trackTheme.lipHex))
+                                                    .offset(y: FigMetrics.three)
+                                                RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                                                    .fill(PrismColor.figmaHex(trackTheme.primaryHex))
+                                            }
+                                        )
+                                    Text(verbatim: "▼")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.eight, style: "Black"))
+                                        .foregroundStyle(PrismColor.figmaHex(trackTheme.lipHex))
+                                        .offset(y: FigMetrics.two)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .offset(y: activeNodePulse ? -FigMetrics.fortyFour : -FigMetrics.forty)
+                            .accessibilityHidden(true)
                         }
-                        .offset(y: activeNodePulse ? -FigMetrics.fiftyTwo : -FigMetrics.fortyEight)
-                        .allowsHitTesting(false)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(
+                        lesson.state == .active
+                            ? "\(calloutLabel) · \(lesson.title)"
+                            : (lesson.state == .locked ? "Verrouillé · \(lesson.title)" : lesson.title)
+                    )
+                    .accessibilityIdentifier("path-node-\(lesson.id)")
                 }
                 .offset(x: xOffset)
 
-                // Step Title placed NEXT TO the island in the free opposite space (Figma `37:375`)
-                Text(verbatim: lesson.title)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
-                    .foregroundStyle(
-                        lesson.state == .locked
-                            ? PrismColor.figmaHex("#94a3b8")
-                            : PrismColor.figmaHex("#0f172a")
-                    )
-                    .lineLimit(2)
-                    .multilineTextAlignment(isLeftIsland ? .leading : .trailing)
-                    .frame(
-                        width: lesson.state == .active ? FigMetrics.oneHundredTwenty : FigMetrics.oneHundredSeventyFive,
-                        alignment: isLeftIsland ? .leading : .trailing
-                    )
-                    .offset(
-                        x: isLeftIsland
-                            ? (xOffset + (lesson.state == .active ? 108 : 136))
-                            : (xOffset - (lesson.state == .active ? 108 : 136))
-                    )
-                    .allowsHitTesting(false)
+                // Step Title: 3 lines max without truncation; shifts below the node on large Dynamic Type sizes
+                let activeTitleWidth = min(max(FigMetrics.oneHundredFortyEight, stageWidth * 0.44), FigMetrics.oneHundredEighty)
+                HStack(spacing: FigMetrics.four) {
+                    if lesson.state == .locked && isLeftIsland {
+                        Image(systemName: "lock.fill")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    }
+                    Text(verbatim: lesson.title)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                        .foregroundStyle(
+                            lesson.state == .locked
+                                ? PrismColor.figmaHex("#475569")
+                                : PrismColor.figmaHex("#0f172a")
+                        )
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(
+                            (lesson.state == .active && isLargeDynamicType)
+                                ? .center
+                                : (isLeftIsland ? .leading : .trailing)
+                        )
+                    if lesson.state == .locked && !isLeftIsland {
+                        Image(systemName: "lock.fill")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#475569"))
+                    }
+                }
+                .frame(
+                    width: lesson.state == .active
+                        ? (isLargeDynamicType ? min(stageWidth - PrismSpacing.l, FigMetrics.twoHundredForty) : activeTitleWidth)
+                        : FigMetrics.oneHundredSeventyFive,
+                    alignment: (lesson.state == .active && isLargeDynamicType)
+                        ? .center
+                        : (isLeftIsland ? .leading : .trailing)
+                )
+                .offset(
+                    x: (lesson.state == .active && isLargeDynamicType)
+                        ? xOffset
+                        : (isLeftIsland
+                            ? (xOffset + (lesson.state == .active ? 118 : 136))
+                            : (xOffset - (lesson.state == .active ? 118 : 136))),
+                    y: (lesson.state == .active && isLargeDynamicType) ? FigMetrics.fiftyTwo : FigMetrics.zero
+                )
+                .allowsHitTesting(false)
 
                 // Mascot Blason 1A dynamically anchored in the free space facing the `.active` node : tappable to open the Mascot Vault Sheet!
                 if lesson.state == .active {
-                    let maxMascotOffset = max(FigMetrics.eighty, stageWidth * 0.5 - PrismSize.mascotPath * 0.5 - FigMetrics.six)
-                    let mascotOffset = min(CGFloat(116), maxMascotOffset)
+                    let maxMascotOffset = max(FigMetrics.eightyEight, stageWidth * 0.5 - PrismSize.mascotPath * 0.5 - FigMetrics.two)
+                    let mascotOffset = min(CGFloat(126), maxMascotOffset)
                     Button {
                         withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
                             appState.openMascotVaultSheet()
@@ -13317,17 +13541,23 @@ public struct CertiGoNativeFigmaAppView: View {
             // Recommendation 7: Compact 2-Option Session Mode Selector (`🌱 Découverte` vs `⚡ Défi Examen`) right above COMMENCER
             stepSheetSessionModePicker
 
-            // 3 Action Buttons Row: `[ 📖 | COMMENCER (+15 XP) | ✦ ]`
-            HStack(spacing: PrismSpacing.m) {
-                // 1. Toggle Memo 14 (`📖`)
+            // 3 Action Buttons Row: `[ 📖 Cours | Commencer (+15 gemmes) | ✦ Déclic ]`
+            HStack(spacing: PrismSpacing.s) {
+                // 1. Toggle Memo 14 (`📖 Cours`)
                 Button {
                     withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
                         appState.toggleStepMemoSheet14()
                     }
                 } label: {
-                    Text(verbatim: "📖")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Bold"))
-                        .frame(width: FigMetrics.fiftySix, height: PrismSize.primaryButtonHeight)
+                    VStack(spacing: FigMetrics.two) {
+                        Text(verbatim: "📖")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
+                        Text(verbatim: appState.tr("Cours"))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                            .lineLimit(1)
+                    }
+                    .frame(width: FigMetrics.sixtyEight, height: PrismSize.primaryButtonHeight)
                 }
                 .buttonStyle(
                     CertiGoTactile3DButtonStyle(
@@ -13337,19 +13567,35 @@ public struct CertiGoNativeFigmaAppView: View {
                         cornerRadius: PrismRadius.l
                     )
                 )
+                .accessibilityLabel(appState.tr("Cours"))
                 .accessibilityIdentifier("step-sheet-toggle-memo14")
 
-                // 2. Primary CTA (`COMMENCER`) : Cleanly dismisses Step Sheet 03 before presenting Lesson Session
+                // 2. Primary CTA (`Commencer` visually separated from `+15 gemmes`)
                 Button {
                     appState.selectedSessionChallengeMode = appState.selectedSessionChallengeMode
                     appState.activeStepSheet = nil
                     appState.startLessonSession(forLessonId: lesson.id, enableAdaptiveReplay: true)
                 } label: {
-                    Text(verbatim: "COMMENCER  +15 💎")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Black"))
-                        .foregroundStyle(PrismColor.onAccent)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: PrismSize.primaryButtonHeight)
+                    HStack(spacing: PrismSpacing.xs) {
+                        Text(verbatim: appState.tr("Commencer"))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.onAccent)
+                            .lineLimit(1)
+                        Text(verbatim: "+15 gemmes")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                            .foregroundStyle(PrismColor.onAccent)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, PrismSpacing.xs)
+                            .padding(.vertical, FigMetrics.three)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(PrismColor.figmaHex("#ffffff:24"))
+                            )
+                    }
+                    .padding(.horizontal, PrismSpacing.s)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: PrismSize.primaryButtonHeight)
                 }
                 .buttonStyle(
                     CertiGoTactile3DButtonStyle(
@@ -13360,7 +13606,7 @@ public struct CertiGoNativeFigmaAppView: View {
                 )
                 .accessibilityIdentifier("step-sheet-start-lesson")
 
-                // 3. AI Coach Shortcut (`✦`)
+                // 3. AI Coach / Déclic Shortcut (`✦ Déclic`)
                 Button {
                     appState.activeStepSheet = nil
                     appState.openAITopic(
@@ -13369,10 +13615,16 @@ public struct CertiGoNativeFigmaAppView: View {
                     )
                     appState.selectedTab = .hubIA
                 } label: {
-                    Text(verbatim: "✦")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Black"))
-                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                        .frame(width: FigMetrics.fiftySix, height: PrismSize.primaryButtonHeight)
+                    VStack(spacing: FigMetrics.two) {
+                        Text(verbatim: "✦")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Black"))
+                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                        Text(verbatim: appState.tr("Déclic"))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                            .lineLimit(1)
+                    }
+                    .frame(width: FigMetrics.sixtyEight, height: PrismSize.primaryButtonHeight)
                 }
                 .buttonStyle(
                     CertiGoTactile3DButtonStyle(
@@ -13382,6 +13634,7 @@ public struct CertiGoNativeFigmaAppView: View {
                         cornerRadius: PrismRadius.l
                     )
                 )
+                .accessibilityLabel(appState.tr("Déclic"))
                 .accessibilityIdentifier("step-sheet-ask-ai")
             }
         }
@@ -13934,8 +14187,9 @@ public struct CertiGoNativeFigmaAppView: View {
                 }
                 .padding(.horizontal, PrismSpacing.xl)
                 .padding(.top, PrismSpacing.xs)
-                .padding(.bottom, FigMetrics.bottomBarTotalClearance)
+                .padding(.bottom, FigMetrics.oneHundredTwenty)
             }
+            .ignoresSafeArea(edges: .bottom)
             .background(PrismColor.figmaHex("#f8fafc"))
         }
     }
@@ -14068,7 +14322,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                 Button {
                                     appState.activeGamificationSheet = .hearts
                                 } label: {
-                                    moiStatCard(icon: "🏆", value: "\(appState.userXPPoints) XP", label: "Ligue Semaine")
+                                    moiStatCard(icon: "🏆", value: "\(appState.userXPPoints) XP", label: appState.tr("Ligue hebdo"))
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityIdentifier("moi-stat-card-hearts")
@@ -14099,7 +14353,7 @@ public struct CertiGoNativeFigmaAppView: View {
                             )
                             .accessibilityIdentifier("moi-open-stats-pro-08b")
 
-                            // Sheet 05: Banque & Costumes de la Mascotte (1-line ultra-clean row, white surface + subtle #E2E8F0 border)
+                            // Sheet 05: Costumes de la mascotte (clean row, white surface + subtle #E2E8F0 border, never truncated)
                             Button {
                                 appState.openMascotVaultSheet()
                             } label: {
@@ -14110,10 +14364,11 @@ public struct CertiGoNativeFigmaAppView: View {
                                         size: FigMetrics.fortyEight,
                                         showAppIconSquircle: true
                                     )
-                                    Text(verbatim: "Banque & Costumes de la Mascotte")
+                                    Text(verbatim: appState.tr("Costumes de la mascotte"))
                                         .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
                                         .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                                        .lineLimit(1)
+                                        .lineLimit(2)
+                                        .fixedSize(horizontal: false, vertical: true)
                                     Spacer(minLength: PrismSpacing.xs)
                                     Text(verbatim: "›")
                                         .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
@@ -14132,7 +14387,7 @@ public struct CertiGoNativeFigmaAppView: View {
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("moi-open-mascot-vault-sheet")
 
-                            // Clean Certifications Passeport List with Crest (48x48), Title (15 pt Semi Bold), Progress Bar (8 pt), % (12 pt Bold) & ›
+                            // Clean Certifications Passeport List with dedicated Certification Code line (`Parcours AZ-900` + `Unité 1`), Title (2 lines max), Progress Bar & ›
                             let uniqueTrackCodes = appState.deduplicatedParallelTrackCodes(
                                 preferred: coordinator.parallelTracksPreference.selectedTracks.map(\.rawValue)
                             )
@@ -14143,18 +14398,49 @@ public struct CertiGoNativeFigmaAppView: View {
 
                                 ForEach(uniqueTrackCodes, id: \.self) { code in
                                     let detail = CertiGoNativeRichCatalog.profileCertificationDetail(forCode: code)
+                                    let cleanDetailTitle = detail.title
+                                        .replacingOccurrences(of: " (\(code))", with: "")
+                                        .replacingOccurrences(of: " · \(code)", with: "")
                                     let pct = appState.routeProgressPercent(forRouteCode: code)
+                                    let unit1RawPct = (appState.unitsByRouteCode[code.uppercased()]?.first?.progressPercent) ?? 0
+                                    let unit1EndowedPct = CertiGoEndowedProgressEngine.endowedProgressPercent(
+                                        forUnitNumber: 1,
+                                        rawPercent: unit1RawPct,
+                                        isUnlocked: true,
+                                        hasCompletedOnboarding: true
+                                    )
                                     let fraction = min(max(CGFloat(pct) / 100.0, 0), 1)
                                     Button {
                                         profileNavPath.append(.certificationDetail26(code: code))
                                     } label: {
                                         HStack(spacing: PrismSpacing.m) {
                                             CertiGoOfficialCrestView(routeCode: code, size: FigMetrics.fortyEight)
-                                            VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                                                Text(verbatim: detail.title)
+                                            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                                                // Dedicated line for the certification code + explicit scope (`Parcours AZ-900` & `Unité 1`)
+                                                HStack(spacing: PrismSpacing.xs) {
+                                                    Text(verbatim: code)
+                                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                                        .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                                                        .lineLimit(1)
+                                                        .fixedSize(horizontal: true, vertical: false)
+                                                        .padding(.horizontal, PrismSpacing.xs)
+                                                        .padding(.vertical, FigMetrics.two)
+                                                        .background(
+                                                            Capsule(style: .continuous)
+                                                                .fill(PrismColor.figmaHex("#eff6ff"))
+                                                        )
+
+                                                    Text(verbatim: "Parcours \(code) : \(pct)% · Unité 1 : \(unit1EndowedPct)%")
+                                                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
+                                                        .foregroundStyle(PrismColor.figmaHex("#475569"))
+                                                        .lineLimit(1)
+                                                }
+
+                                                Text(verbatim: cleanDetailTitle)
                                                     .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
                                                     .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                                                    .lineLimit(1)
+                                                    .lineLimit(2)
+                                                    .fixedSize(horizontal: false, vertical: true)
 
                                                 GeometryReader { barGeo in
                                                     let totalBarWidth = barGeo.size.width.isFinite ? max(40, barGeo.size.width) : 140
@@ -14184,6 +14470,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                             Text(verbatim: "\(pct)%")
                                                 .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                                 .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                                                .fixedSize(horizontal: true, vertical: false)
                                             Text(verbatim: "›")
                                                 .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
                                                 .foregroundStyle(PrismColor.figmaHex("#475569"))
@@ -14204,8 +14491,9 @@ public struct CertiGoNativeFigmaAppView: View {
                         }
                         .padding(.horizontal, PrismSpacing.xl)
                         .padding(.top, PrismSpacing.xs)
-                        .padding(.bottom, FigMetrics.bottomBarTotalClearance)
+                        .padding(.bottom, FigMetrics.oneHundredTwenty)
                     }
+                    .ignoresSafeArea(edges: .bottom)
                 }
                 .background(PrismColor.figmaHex("#f8fafc"))
                 .toolbar(.hidden, for: .navigationBar)
@@ -14232,7 +14520,7 @@ public struct CertiGoNativeFigmaAppView: View {
         }
 
         private func moiStatCard(icon: String, value: String, label: String) -> some View {
-            VStack(spacing: PrismSpacing.s) {
+            VStack(spacing: PrismSpacing.xs) {
                 Text(verbatim: icon)
                     .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
                 Text(verbatim: value)
@@ -14242,7 +14530,9 @@ public struct CertiGoNativeFigmaAppView: View {
                 Text(verbatim: label)
                     .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#475569"))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity)
             .padding(PrismSpacing.l)
@@ -14727,7 +15017,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                 settingsActionRow(
                                     symbol: "square.stack.3d.up.fill",
                                     tintHex: "#0078d4",
-                                    title: "Parcours actifs en parallèle",
+                                    title: appState.tr("Parcours actifs"),
                                     value: "\(appState.activeRouteCode) + 2"
                                 ) {
                                     appState.showMultiTrackSelectorSheet = true
@@ -14736,7 +15026,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                 settingsActionRow(
                                     symbol: "globe",
                                     tintHex: "#0284c7",
-                                    title: "Langue des cours & examens",
+                                    title: appState.tr("Langue des cours"),
                                     value: langLabel
                                 ) {
                                     appState.activeSettingsPicker = .language
@@ -14745,7 +15035,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                 settingsActionRow(
                                     symbol: "timer",
                                     tintHex: "#4f46e5",
-                                    title: "Mode Examen Blanc",
+                                    title: appState.tr("Mode Examen Blanc"),
                                     value: examModeLabel
                                 ) {
                                     appState.activeSettingsPicker = .examMode
@@ -14754,7 +15044,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                 settingsActionRow(
                                     symbol: "arrow.down.circle.fill",
                                     tintHex: "#059669",
-                                    title: "Cours téléchargés (Hors-Ligne)",
+                                    title: appState.tr("Cours hors ligne"),
                                     value: "142 Mo"
                                 ) {
                                     profileNavPath.append(.offlineResilienceRES01)
@@ -14781,7 +15071,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                 settingsActionRow(
                                     symbol: "waveform",
                                     tintHex: "#0078d4",
-                                    title: "Voix de CertiGo AI Live",
+                                    title: appState.tr("Voix de CertiGo AI Live"),
                                     value: voiceLabel
                                 ) {
                                     appState.activeSettingsPicker = .coachVoice
@@ -14790,7 +15080,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                 settingsActionRow(
                                     symbol: "sparkles",
                                     tintHex: "#7c3aed",
-                                    title: "Style des explications",
+                                    title: appState.tr("Style des explications"),
                                     value: styleLabel
                                 ) {
                                     appState.activeSettingsPicker = .explanationStyle
@@ -14799,7 +15089,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                 settingsActionRow(
                                     symbol: "apps.iphone",
                                     tintHex: "#ea580c",
-                                    title: "Widgets iOS 18 & Dynamic Island",
+                                    title: appState.tr("Widgets et Dynamic Island"),
                                     value: "Actifs"
                                 ) {
                                     profileNavPath.append(.systemWidgetsSYS01)
@@ -14808,7 +15098,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                 settingsActionRow(
                                     symbol: "switch.2",
                                     tintHex: "#7c3aed",
-                                    title: "✦ Bouton Centre de contrôle iOS (CertiGo AI)",
+                                    title: appState.tr("Centre de contrôle"),
                                     value: "iOS 18+"
                                 ) {
                                     profileNavPath.append(.systemWidgetsSYS01)
@@ -14818,7 +15108,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                 settingsActionRow(
                                     symbol: "sparkles.rectangle.stack.fill",
                                     tintHex: "#0284c7",
-                                    title: "Banque & Costumes de la Mascotte (Icône Dynamique)",
+                                    title: appState.tr("Costumes de la mascotte"),
                                     value: appState.effectiveMascotOutfit.displayName
                                 ) {
                                     appState.openMascotVaultSheet()
@@ -15319,7 +15609,13 @@ public struct CertiGoNativeFigmaAppView: View {
             titleHex: String = "#0f172a",
             action: @escaping () -> Void
         ) -> some View {
-            Button(action: action) {
+            // Strip any embedded chevron `›` from value so the row never displays two chevrons on the right
+            let cleanValue = value
+                .replacingOccurrences(of: "›", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let stackValueUnderTitle = cleanValue.count > 10 || title.count > 22
+
+            return Button(action: action) {
                 HStack(spacing: PrismSpacing.m) {
                     Image(systemName: symbol)
                         .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Semi Bold"))
@@ -15330,18 +15626,29 @@ public struct CertiGoNativeFigmaAppView: View {
                                 .fill(PrismColor.figmaHex(tintHex).opacity(0.12))
                         )
 
-                    Text(verbatim: title)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Regular"))
-                        .foregroundStyle(PrismColor.figmaHex(titleHex))
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: FigMetrics.two) {
+                        Text(verbatim: title)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Regular"))
+                            .foregroundStyle(PrismColor.figmaHex(titleHex))
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if !cleanValue.isEmpty && stackValueUnderTitle {
+                            Text(verbatim: cleanValue)
+                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
+                                .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                                .lineLimit(1)
+                        }
+                    }
 
                     Spacer(minLength: PrismSpacing.xs)
 
-                    if !value.isEmpty {
-                        Text(verbatim: value)
+                    if !cleanValue.isEmpty && !stackValueUnderTitle {
+                        Text(verbatim: cleanValue)
                             .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
                             .foregroundStyle(PrismColor.figmaHex("#64748b"))
                             .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
 
                     Text(verbatim: "›")
@@ -17070,11 +17377,25 @@ public struct CertiGoNativeFigmaAppView: View {
 
                             Spacer(minLength: FigMetrics.four)
 
-                            Text(verbatim: "Coach IA · \(appState.activeRouteCode)")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
-                                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.82)
+                            HStack(spacing: PrismSpacing.xs) {
+                                Text(verbatim: "Coach IA")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+
+                                Text(verbatim: appState.activeRouteCode)
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                                    .padding(.horizontal, PrismSpacing.xs)
+                                    .padding(.vertical, FigMetrics.three)
+                                    .background(
+                                        Capsule(style: .continuous)
+                                            .fill(PrismColor.figmaHex("#eff6ff"))
+                                    )
+                            }
 
                             Spacer(minLength: FigMetrics.four)
 
@@ -17117,6 +17438,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                         )
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel("Mode vocal")
                                 .accessibilityIdentifier("hub-ia-header-voice-button")
 
                                 Button {
@@ -17138,6 +17460,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                         )
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel("Nouvelle discussion")
                                 .accessibilityIdentifier("hub-ia-new-thread-button")
                             }
                         }
@@ -17145,25 +17468,28 @@ public struct CertiGoNativeFigmaAppView: View {
                         .frame(height: FigMetrics.unifiedTabHeaderHeight)
                         .background(PrismColor.figmaHex("#f8fafc"))
 
-                        // Scrollable Body (`06` Empty Welcome vs `06B` Multi-Turn Thread) with Interactive Keyboard Dismissal
-                        ScrollView(.vertical, showsIndicators: false) {
-                            if appState.chatTurns.isEmpty {
-                                hubIAWelcome06Content
-                            } else {
-                                hubIAConversation06BContent
+                        // ZStack(alignment: .bottom) so chat & 4th suggestion scroll cleanly beneath both the input bar and floatingBottomTabBar
+                        ZStack(alignment: .bottom) {
+                            ScrollView(.vertical, showsIndicators: false) {
+                                if appState.chatTurns.isEmpty {
+                                    hubIAWelcome06Content
+                                } else {
+                                    hubIAConversation06BContent
+                                }
                             }
-                        }
-                        .scrollDismissesKeyboard(.interactively)
-                        .background(PrismColor.figmaHex("#f8fafc"))
-                        .onTapGesture {
-                            if isAIInputFocused {
-                                dismissKeyboardInteractively()
+                            .ignoresSafeArea(edges: .bottom)
+                            .scrollDismissesKeyboard(.interactively)
+                            .background(PrismColor.figmaHex("#f8fafc").ignoresSafeArea(edges: .bottom))
+                            .onTapGesture {
+                                if isAIInputFocused {
+                                    dismissKeyboardInteractively()
+                                }
                             }
-                        }
 
-                        // Bottom Input Bar (`TextField` + subtle `waveform` inside pill + Send `↑` on far right)
-                        hubIABottomInputBar
-                            .padding(.bottom, isAIInputFocused ? PrismSpacing.s : FigMetrics.eightyEight)
+                            // Bottom Input Bar (`TextField` + `Mode vocal` + `Envoyer` on far right)
+                            hubIABottomInputBar
+                                .padding(.bottom, isAIInputFocused ? PrismSpacing.s : FigMetrics.eightyEight)
+                        }
                     }
                     .frame(width: safeGeoWidth)
                     .disabled(appState.isAIDrawerOpen06D)
@@ -17384,7 +17710,7 @@ public struct CertiGoNativeFigmaAppView: View {
             }
         }
         .padding(.horizontal, PrismSpacing.xl)
-        .padding(.bottom, PrismSpacing.xxl)
+        .padding(.bottom, isAIInputFocused ? FigMetrics.ninetySix : FigMetrics.oneHundredEighty)
     }
 
     private var hubIAConversation06BContent: some View {
@@ -17536,16 +17862,18 @@ public struct CertiGoNativeFigmaAppView: View {
             }
         }
         .padding(.horizontal, PrismSpacing.xl)
-        .padding(.vertical, PrismSpacing.m)
+        .padding(.top, PrismSpacing.m)
+        .padding(.bottom, isAIInputFocused ? FigMetrics.ninetySix : FigMetrics.oneHundredEighty)
     }
 
     private var hubIABottomInputBar: some View {
         let hasText = !appState.aiDraftMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         return HStack(spacing: PrismSpacing.s) {
-            HStack(spacing: PrismSpacing.xs) {
+            HStack(spacing: PrismSpacing.s) {
                 TextField(
                     text: $appState.aiDraftMessage,
                     prompt: Text(verbatim: "Poser une question à CertiGo AI...")
+                        .foregroundStyle(PrismColor.figmaHex("#475569"))
                 ) {
                     Text(verbatim: "Poser une question à CertiGo AI...")
                 }
@@ -17562,7 +17890,7 @@ public struct CertiGoNativeFigmaAppView: View {
                 }
                 .accessibilityIdentifier("hub-ia-textfield")
 
-                // Subtle Voice Mode Button (`06C`) just to the left of Send `↑` inside the input pill
+                // Distinct Voice Mode Button (`06C`) with explicit accessibility label
                 Button {
                     withAnimation(CertiGoMotion.spring(for: .anim05NovaLiveVoicePulse, reduceMotion: reduceMotion)) {
                         dismissKeyboardInteractively()
@@ -17575,13 +17903,14 @@ public struct CertiGoNativeFigmaAppView: View {
                 } label: {
                     Image(systemName: "waveform")
                         .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#475569"))
-                        .frame(width: FigMetrics.thirtyFour, height: FigMetrics.thirtyFour)
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                        .frame(width: FigMetrics.thirtyEight, height: FigMetrics.thirtyEight)
                         .background(
                             Circle().fill(PrismColor.figmaHex("#f1f5f9"))
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Mode vocal")
                 .accessibilityIdentifier("hub-ia-voice-live-button")
             }
             .padding(.leading, PrismSpacing.m)
@@ -17590,6 +17919,12 @@ public struct CertiGoNativeFigmaAppView: View {
             .background(
                 RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
                     .fill(PrismColor.surface)
+                    .shadow(
+                        color: PrismColor.figmaHex("#0f172a:10"),
+                        radius: FigMetrics.ten,
+                        x: FigMetrics.zero,
+                        y: FigMetrics.three
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
@@ -17604,7 +17939,7 @@ public struct CertiGoNativeFigmaAppView: View {
                     }
             )
 
-            // Always-visible Far-Right Round Send Button (`↑`)
+            // Always-visible Far-Right Round Send Button (`↑`) with explicit accessibility label
             Button {
                 guard hasText else { return }
                 withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
@@ -17615,7 +17950,7 @@ public struct CertiGoNativeFigmaAppView: View {
             } label: {
                 Image(systemName: "arrow.up")
                     .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
-                    .foregroundStyle(hasText ? PrismColor.onAccent : PrismColor.figmaHex("#94a3b8"))
+                    .foregroundStyle(hasText ? PrismColor.onAccent : PrismColor.figmaHex("#475569"))
                     .frame(width: FigMetrics.fortyFour, height: FigMetrics.fortyFour)
                     .background(
                         Circle().fill(
@@ -17625,11 +17960,11 @@ public struct CertiGoNativeFigmaAppView: View {
             }
             .buttonStyle(.plain)
             .disabled(!hasText)
+            .accessibilityLabel("Envoyer")
             .accessibilityIdentifier("hub-ia-send-button")
         }
         .padding(.horizontal, PrismSpacing.l)
         .padding(.top, PrismSpacing.xs)
-        .background(PrismColor.figmaHex("#f8fafc"))
     }
 
     private var voiceLive06CView: some View {
@@ -18551,8 +18886,9 @@ public struct CertiGoNativeFigmaAppView: View {
             }
             .padding(.horizontal, PrismSpacing.xl)
             .padding(.top, PrismSpacing.xs)
-            .padding(.bottom, FigMetrics.bottomBarTotalClearance)
+            .padding(.bottom, FigMetrics.oneHundredTwenty)
         }
+        .ignoresSafeArea(edges: .bottom)
         .background(PrismColor.figmaHex("#f8fafc"))
     }
 
@@ -18606,14 +18942,15 @@ public struct CertiGoNativeFigmaAppView: View {
         let innerConcentricRadius = PrismRadius.concentric(outer: PrismRadius.xl, padding: PrismSpacing.m)
         return ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: PrismSpacing.xl) {
-                // Live Search & Add Friend Bar (`🔍 Chercher ou ajouter un pseudo...`)
+                // Live Search & Add Friend Bar (`🔍 Rechercher un pseudo` with high-contrast placeholder `#475569`)
                 HStack(spacing: PrismSpacing.s) {
                     Text(verbatim: "🔍")
                     TextField(
                         text: $appState.friendSearchQuery,
-                        prompt: Text(verbatim: "Chercher ou ajouter un pseudo...")
+                        prompt: Text(verbatim: appState.tr("Rechercher un pseudo"))
+                            .foregroundStyle(PrismColor.figmaHex("#475569"))
                     ) {
-                        Text(verbatim: "Chercher ou ajouter un pseudo...")
+                        Text(verbatim: appState.tr("Rechercher un pseudo"))
                     }
                     .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#0f172a"))
@@ -18649,10 +18986,10 @@ public struct CertiGoNativeFigmaAppView: View {
                         .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
                 )
 
-                // Invite Link Card (`🔗 Partager mon lien d'invitation` + SINGLE 3D Primary Colored CTA `+ Inviter / QR Code`)
+                // Invite Link Card (`Lien d'invitation` + sober secondary `Lien et QR code` button so primary blue belongs to `Ajouter un ami`)
                 VStack(spacing: PrismSpacing.s) {
                     HStack(spacing: PrismSpacing.m) {
-                        Text(verbatim: "🔗 Partager mon lien d'invitation")
+                        Text(verbatim: appState.tr("Lien d'invitation"))
                             .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                             .lineLimit(1)
@@ -18683,16 +19020,17 @@ public struct CertiGoNativeFigmaAppView: View {
                     Button {
                         appState.showAddFriendSheet = true
                     } label: {
-                        Text(verbatim: "+ Inviter / QR Code & Suggestions")
+                        Text(verbatim: appState.tr("Lien et QR code"))
                             .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
-                            .foregroundStyle(PrismColor.onAccent)
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                             .frame(maxWidth: .infinity)
                             .frame(height: PrismSize.primaryButtonHeight)
                     }
                     .buttonStyle(
                         CertiGoTactile3DButtonStyle(
-                            faceHex: trackTheme.primaryHex,
-                            lipHex: trackTheme.lipHex,
+                            faceHex: "#f8fafc",
+                            lipHex: "#cbd5e1",
+                            strokeHex: "#cbd5e1",
                             cornerRadius: innerConcentricRadius,
                             lipDepth: FigMetrics.three
                         )
@@ -18714,7 +19052,7 @@ public struct CertiGoNativeFigmaAppView: View {
                         mascotPose: .onboardingWelcome,
                         title: "Aucun ami ajouté",
                         subtitle: "",
-                        actionTitle: "➕ Ajouter un ami"
+                        actionTitle: "Ajouter un ami"
                     ) {
                         appState.showAddFriendSheet = true
                     }
@@ -18779,8 +19117,9 @@ public struct CertiGoNativeFigmaAppView: View {
             }
             .padding(.horizontal, PrismSpacing.xl)
             .padding(.top, PrismSpacing.xs)
-            .padding(.bottom, FigMetrics.bottomBarTotalClearance)
+            .padding(.bottom, FigMetrics.oneHundredTwenty)
         }
+        .ignoresSafeArea(edges: .bottom)
         .scrollDismissesKeyboard(.interactively)
         .background(PrismColor.figmaHex("#f8fafc"))
     }
@@ -18924,6 +19263,9 @@ public struct CertiGoDiagnosticErrorCardView: View {
 
 public struct CertiGoNativeLessonSessionModalView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .body) private var scaledOptionTitleSize: CGFloat = FigMetrics.fifteenOrSixteen
+    @ScaledMetric(relativeTo: .subheadline) private var scaledOptionSubtitleSize: CGFloat = FigMetrics.twelve
+    @ScaledMetric(relativeTo: .body) private var scaledSlideBodySize: CGFloat = FigMetrics.fifteenOrSixteen
     @Binding public var appState: CertiGoNativeAppState
     public let onCompleteSession: () -> Void
     public let onJumpToAIHubWithTopic: (String) -> Void
@@ -18953,6 +19295,15 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     } else {
                         exerciseActiveContentScrollView
                             .id(appState.lessonSession.currentExercise.id)
+                            .safeAreaInset(edge: .bottom, spacing: .zero) {
+                                switch appState.lessonSession.attemptPhase {
+                                case .answering:
+                                    verifierBottomBar
+                                case .checked(let isCorrect), .explainingError(let isCorrect), .comparingServices(let isCorrect):
+                                    feedbackDrawer18Or04(isCorrect: isCorrect)
+                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                }
+                            }
                             .transition(
                                 .asymmetric(
                                     insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -18989,11 +19340,8 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 }
 
                 switch appState.lessonSession.attemptPhase {
-                case .answering:
-                    verifierBottomBar
-                case .checked(let isCorrect):
-                    feedbackDrawer18Or04(isCorrect: isCorrect)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                case .answering, .checked:
+                    EmptyView()
                 case .explainingError:
                     explanationSheet05Overlay
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -19075,28 +19423,25 @@ public struct CertiGoNativeLessonSessionModalView: View {
         let slide = appState.lessonSession.currentLessonSlide
         let isLastSlide = slideIdx + 1 >= appState.lessonSession.lessonSlides.count
 
+        let paragraphLines = slide.bodyParagraph
+            .strippingMarkdownAsterisks
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
         return ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: PrismSpacing.l) {
-                // 3-Slide Progressive Lesson Header (`● ● ○ : Page X sur 3`)
-                HStack(spacing: PrismSpacing.s) {
-                    HStack(spacing: FigMetrics.six) {
-                        ForEach(0..<3, id: \.self) { dotIndex in
-                            Circle()
-                                .fill(
-                                    dotIndex <= slideIdx
-                                        ? PrismColor.figmaHex("#0078d4")
-                                        : PrismColor.figmaHex("#cbd5e1")
-                                )
-                                .frame(width: FigMetrics.eight, height: FigMetrics.eight)
-                        }
-                    }
+                // Clean 3-Slide Progressive Header (`Page X sur 3` + Left-aligned `slide.stepBadge` on its own row when needed)
+                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                     Text(verbatim: "Page \(slideIdx + 1) sur 3")
                         .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                    Spacer()
-                    Text(verbatim: slide.stepBadge)
+
+                    Text(verbatim: slide.stepBadge.strippingMarkdownAsterisks)
                         .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, PrismSpacing.s)
                         .padding(.vertical, PrismSpacing.xxs)
                         .background(
@@ -19128,17 +19473,22 @@ public struct CertiGoNativeLessonSessionModalView: View {
                                 .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
                             )
 
-                        Text(verbatim: slide.title)
+                        Text(verbatim: slide.title.strippingMarkdownAsterisks)
                             .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    Text(verbatim: slide.bodyParagraph)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#334155"))
-                        .lineSpacing(5)
-                        .fixedSize(horizontal: false, vertical: true)
+                    // Distinct starting line for each numbered or bulleted point, zero raw Markdown markers
+                    VStack(alignment: .leading, spacing: PrismSpacing.s) {
+                        ForEach(Array(paragraphLines.enumerated()), id: \.offset) { _, line in
+                            Text(verbatim: line)
+                                .font(PrismTypography.figmaFont(size: scaledSlideBodySize, style: "Semi Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#334155"))
+                                .lineSpacing(4)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
 
                     if slideIdx == 1 {
                         // B1: Real 3-Brick Connected Visual Architecture Diagram on Slide 2 (Architecture & Mechanism)
@@ -19151,7 +19501,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     HStack(alignment: .top, spacing: PrismSpacing.s) {
                         Text(verbatim: "💡")
                             .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
-                        Text(verbatim: slide.keyTakeawayPill)
+                        Text(verbatim: slide.keyTakeawayPill.strippingMarkdownAsterisks)
                             .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#1e3a8a"))
                             .lineSpacing(4)
@@ -19184,7 +19534,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
                         .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
                 )
 
-                // Navigation Buttons (`←` + `CONTINUER (X/3) →` or `J'AI COMPRIS · PASSER AUX QUESTIONS →`)
+                // Navigation Buttons (`←` + `Continuer` or `Passer aux questions →`)
                 HStack(spacing: PrismSpacing.m) {
                     if slideIdx > 0 {
                         Button {
@@ -19205,6 +19555,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
                                 cornerRadius: PrismRadius.l
                             )
                         )
+                        .accessibilityLabel("Carte précédente")
                         .accessibilityIdentifier("declic15-prev-slide-button")
                     }
 
@@ -19215,8 +19566,8 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     } label: {
                         Text(
                             verbatim: isLastSlide
-                                ? "J'AI COMPRIS · PASSER AUX QUESTIONS →"
-                                : "CONTINUER (\(slideIdx + 1)/3) →"
+                                ? "Passer aux questions →"
+                                : "Continuer"
                         )
                         .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
                         .foregroundStyle(PrismColor.onAccent)
@@ -19481,6 +19832,27 @@ public struct CertiGoNativeLessonSessionModalView: View {
         let isSelected = appState.lessonSession.selectedOptionIds.contains(opt.id)
         let isSimple = appState.lessonSession.isPlainLanguageModeEnabled
         let badgeRadius = PrismRadius.concentric(outer: PrismRadius.xl, padding: PrismSpacing.m)
+        let isCheckedPhase: Bool = {
+            if case .answering = appState.lessonSession.attemptPhase { return false }
+            return true
+        }()
+        let badgeGlyph: String = {
+            if isCheckedPhase {
+                if opt.isCorrect { return "✓" }
+                if isSelected && !opt.isCorrect { return "✕" }
+            }
+            return isMultiChoice && isSelected ? "✓" : opt.badge
+        }()
+        let statusStateBadge: (text: String, fgHex: String, bgHex: String)? = {
+            guard isCheckedPhase else { return nil }
+            if opt.isCorrect {
+                return ("✓ Bonne réponse", "#15803d", "#dcfce7")
+            }
+            if isSelected && !opt.isCorrect {
+                return ("✕ Ta réponse", "#b91c1c", "#fee2e2")
+            }
+            return nil
+        }()
 
         return Button {
             withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
@@ -19488,7 +19860,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
             }
         } label: {
             HStack(alignment: .top, spacing: PrismSpacing.m) {
-                Text(verbatim: isMultiChoice && isSelected ? "✓" : opt.badge)
+                Text(verbatim: badgeGlyph)
                     .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                     .foregroundStyle(
                         (isSelected || palette.badgeBg != "#f1f5f9")
@@ -19502,15 +19874,27 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     )
 
                 VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                    if let status = statusStateBadge {
+                        Text(verbatim: status.text)
+                            .font(PrismTypography.figmaFont(size: scaledOptionSubtitleSize, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex(status.fgHex))
+                            .padding(.horizontal, PrismSpacing.s)
+                            .padding(.vertical, FigMetrics.two)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(PrismColor.figmaHex(status.bgHex))
+                            )
+                    }
+
                     Text(verbatim: isSimple ? opt.plainLanguageTitle : opt.title)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
+                        .font(PrismTypography.figmaFont(size: scaledOptionTitleSize, style: "Semi Bold"))
                         .foregroundStyle(PrismColor.figmaHex(palette.text))
                         .lineSpacing(3)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     if !isSimple, let sub = opt.subtitle {
                         Text(verbatim: sub)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .font(PrismTypography.figmaFont(size: scaledOptionSubtitleSize, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#475569"))
                             .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
@@ -19530,18 +19914,34 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 lipDepth: FigMetrics.four
             )
         )
+        .accessibilityValue(
+            isCheckedPhase
+                ? (opt.isCorrect ? "Bonne réponse" : (isSelected ? "Ta réponse" : ""))
+                : (isSelected ? "Sélectionné" : "")
+        )
         .accessibilityIdentifier("exercise-option-\(opt.id)")
     }
 
     private func serviceGridOptionCard(_ opt: CertiGoNativeExerciseItem.OptionItem) -> some View {
         let palette = optionVisualPalette(for: opt)
+        let isSelected = appState.lessonSession.selectedOptionIds.contains(opt.id)
         let isSimple = appState.lessonSession.isPlainLanguageModeEnabled
+        let isCheckedPhase: Bool = {
+            if case .answering = appState.lessonSession.attemptPhase { return false }
+            return true
+        }()
         return Button {
             withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
                 appState.lessonSession.selectOption(opt.id)
             }
         } label: {
             VStack(spacing: PrismSpacing.s) {
+                if isCheckedPhase && (opt.isCorrect || isSelected) {
+                    Text(verbatim: opt.isCorrect ? "✓ Bonne réponse" : "✕ Ta réponse")
+                        .font(PrismTypography.figmaFont(size: scaledOptionSubtitleSize, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex(opt.isCorrect ? "#15803d" : "#b91c1c"))
+                        .lineLimit(1)
+                }
                 if let assetName = opt.assetName {
                     Image(assetName, bundle: .module)
                         .renderingMode(.original)
@@ -19550,21 +19950,23 @@ public struct CertiGoNativeLessonSessionModalView: View {
                         .frame(width: FigMetrics.fortyEight, height: FigMetrics.fortyEight)
                 }
                 Text(verbatim: isSimple ? opt.plainLanguageTitle : opt.title)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
+                    .font(PrismTypography.figmaFont(size: scaledOptionTitleSize, style: "Semi Bold"))
                     .foregroundStyle(PrismColor.figmaHex(palette.text))
                     .lineSpacing(2)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                 if !isSimple, let sub = opt.subtitle {
                     Text(verbatim: sub)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                        .font(PrismTypography.figmaFont(size: scaledOptionSubtitleSize, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#475569"))
                         .lineSpacing(3)
                         .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(PrismSpacing.l)
             .frame(maxWidth: .infinity)
-            .frame(height: FigMetrics.oneHundredForty)
+            .frame(minHeight: FigMetrics.oneHundredForty)
         }
         .buttonStyle(
             CertiGoTactile3DButtonStyle(
@@ -19574,6 +19976,11 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 cornerRadius: PrismRadius.xl,
                 lipDepth: FigMetrics.five
             )
+        )
+        .accessibilityValue(
+            isCheckedPhase
+                ? (opt.isCorrect ? "Bonne réponse" : (isSelected ? "Ta réponse" : ""))
+                : (isSelected ? "Sélectionné" : "")
         )
         .accessibilityIdentifier("exercise-grid-option-\(opt.id)")
     }
