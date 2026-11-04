@@ -2223,5 +2223,81 @@ struct CertiGoNativeFigmaAppTests {
         #expect(appState.isParcoursAllChaptersCompletedForActiveRoute == true)
         appState.openExamModuleFromParcoursBoss()
         #expect(appState.isPresentingExamCenterModule == true)
+
+        // 9. Verify AI Voice Reader (`🔊 Écouter avec l'IA` / `CertiGoTechNewsAudioReaderState`):
+        // Play / Pause / Resume / Stop, speed cycling (1.0x -> 1.25x -> 1.5x -> 1.0x), and automatic `Version simple` adaptation
+        appState.settingsLanguageIndex = 0 // French
+        appState.setTechNewsPlainLanguage(false, forArticleId: firstArticle.id)
+        appState.toggleTechNewsAudioSpeech(forArticle: firstArticle)
+        #expect(appState.techNewsState.audioReader.activeArticleId == firstArticle.id)
+        #expect(appState.techNewsState.audioReader.isSpeaking == true)
+        #expect(appState.techNewsState.audioReader.isPaused == false)
+        #expect(appState.techNewsState.audioReader.voiceLanguageCode == "fr-FR")
+        #expect(appState.techNewsState.audioReader.wasPlainLanguageUsed == false)
+        #expect(appState.techNewsState.audioReader.spokenTranscript.contains(firstArticle.technicalSummaryFR))
+
+        // Toggling `Version simple` while reading aloud automatically updates the spoken transcript to the plain-language version
+        appState.toggleTechNewsPlainLanguage(forArticleId: firstArticle.id)
+        #expect(appState.techNewsState.audioReader.wasPlainLanguageUsed == true)
+        #expect(appState.techNewsState.audioReader.spokenTranscript.contains(firstArticle.plainLanguageSummaryFR))
+
+        // Pause & Resume
+        appState.toggleTechNewsAudioSpeech(forArticle: firstArticle)
+        #expect(appState.techNewsState.audioReader.isSpeaking == false)
+        #expect(appState.techNewsState.audioReader.isPaused == true)
+        appState.toggleTechNewsAudioSpeech(forArticle: firstArticle)
+        #expect(appState.techNewsState.audioReader.isSpeaking == true)
+        #expect(appState.techNewsState.audioReader.isPaused == false)
+
+        // Speed cycling (1.0x -> 1.25x -> 1.5x -> 1.0x)
+        #expect(appState.techNewsState.audioReader.speedBadgeText == "1.0x")
+        #expect(appState.cycleTechNewsAudioSpeed() == 1.25)
+        #expect(appState.techNewsState.audioReader.speedBadgeText == "1.25x")
+        #expect(appState.cycleTechNewsAudioSpeed() == 1.5)
+        #expect(appState.techNewsState.audioReader.speedBadgeText == "1.5x")
+        #expect(appState.cycleTechNewsAudioSpeed() == 1.0)
+        #expect(appState.techNewsState.audioReader.speedBadgeText == "1.0x")
+
+        // Stop speech
+        appState.stopTechNewsAudioSpeech()
+        #expect(appState.techNewsState.audioReader.activeArticleId == nil)
+        #expect(appState.techNewsState.audioReader.isSpeaking == false)
+
+        // 10. Verify Official Website URL (`🌐 Site officiel`) and Native Share Payload (`📤 Partager`) on 100% of curated articles
+        for article in CertiGoVerifiedRSSFeedCatalog.defaultCuratedTechNewsArticles {
+            let officialURL = try #require(article.officialURL)
+            #expect(officialURL.scheme == "https")
+            #expect(!article.officialDomainHost.isEmpty)
+            let sharePayload = article.sharePayloadText(languageIndex: 0, isPlainLanguage: false)
+            #expect(sharePayload.contains(article.headlineFR))
+            #expect(sharePayload.contains(article.articleURL))
+            #expect(sharePayload.contains(article.linkedCertificationCode))
+        }
+        let openedURL = appState.openTechNewsOfficialWebsite(forArticle: firstArticle)
+        #expect(openedURL?.absoluteString == firstArticle.articleURL)
+        #expect(appState.techNewsState.lastOpenedOfficialURLString == firstArticle.articleURL)
+
+        // 11. Verify Perplexity-style Inline Q&A (`✦ Poser une question à l'IA sur cette actu`) + Reader Sheet
+        let suggestedChips = firstArticle.suggestedFollowUpQuestions(languageIndex: 0)
+        #expect(suggestedChips.count == 3)
+        let rawQA1 = appState.askInlineQuestionAboutTechNews(
+            articleId: firstArticle.id,
+            question: suggestedChips[0]
+        )
+        let qaEntry1 = try #require(rawQA1)
+        #expect(qaEntry1.userQuestion == suggestedChips[0])
+        #expect(qaEntry1.aiAnswer.contains(firstArticle.plainLanguageSummaryFR))
+        let rawQA2 = appState.askInlineQuestionAboutTechNews(
+            articleId: firstArticle.id,
+            question: "Quel est l'impact sur ma certification \(firstArticle.linkedCertificationCode) ?"
+        )
+        let qaEntry2 = try #require(rawQA2)
+        #expect(qaEntry2.aiAnswer.contains(firstArticle.examTakeawayFR))
+        #expect(appState.techNewsState.qaEntries(forArticleId: firstArticle.id).count == 2)
+
+        appState.openTechNewsReaderSheet(forArticleId: firstArticle.id)
+        #expect(appState.techNewsState.activeReaderSheetArticleId == firstArticle.id)
+        appState.closeTechNewsReaderSheet()
+        #expect(appState.techNewsState.activeReaderSheetArticleId == nil)
     }
 }

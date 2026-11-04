@@ -201,12 +201,263 @@ public struct CertiGoTechNewsArticle: Identifiable, Codable, Equatable, Hashable
         return isEN ? flashExplanationEN : flashExplanationFR
     }
 
-    public func buildCertiGoAIPrompt(languageIndex: Int, activeRouteCode: String) -> String {
+    public func buildCertiGoAIPrompt(languageIndex: Int, activeRouteCode: String, customQuestion: String? = nil) -> String {
         let isEN = (languageIndex % 6) == 2
+        if let custom = customQuestion?.trimmingCharacters(in: .whitespacesAndNewlines), !custom.isEmpty {
+            if isEN {
+                return "Regarding the tech news « \(headlineEN) » (#\(sourceRank) \(sourceName), linked to \(linkedCertificationCode)): \(custom)"
+            }
+            return "À propos de l'actualité « \(headlineFR) » (#\(sourceRank) \(sourceName), liée à \(linkedCertificationCode)) : \(custom)"
+        }
         if isEN {
             return "Explain the tech news « \(headlineEN) » (#\(sourceRank) \(sourceName)) in simple terms and show its concrete impact on my \(linkedCertificationCode) / \(activeRouteCode) certification."
         }
         return "Explique-moi simplement l'actualité « \(headlineFR) » (#\(sourceRank) \(sourceName)) et montre son impact concret sur ma certification \(linkedCertificationCode) / \(activeRouteCode)."
+    }
+
+    /// Validated official URL for opening the article on the publisher's website (`🌐 Site officiel`).
+    public var officialURL: URL? {
+        if let direct = URL(string: articleURL), direct.scheme != nil {
+            return direct
+        }
+        if let site = CertiGoVerifiedRSSFeedCatalog.all100RankedSites.first(where: { $0.rank == sourceRank }),
+           let fallback = URL(string: site.siteURL)
+        {
+            return fallback
+        }
+        return URL(string: "https://openai.com/news/")
+    }
+
+    /// Clean domain host displayed on the `🌐 Site officiel` button (e.g. `openai.com`, `blogs.microsoft.com`).
+    public var officialDomainHost: String {
+        guard let host = officialURL?.host?.lowercased() else {
+            return sourceName
+        }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
+    /// Formatted share payload for SwiftUI `ShareLink` (`📤 Partager`).
+    public func sharePayloadText(languageIndex: Int, isPlainLanguage: Bool = false) -> String {
+        let isEN = (languageIndex % 6) == 2
+        let title = localizedHeadline(languageIndex: languageIndex)
+        let summary = localizedSummary(isPlainLanguage: isPlainLanguage, languageIndex: languageIndex)
+        let takeaway = localizedExamTakeaway(languageIndex: languageIndex)
+        if isEN {
+            return "📰 \(title) (#\(sourceRank) \(sourceName) · \(linkedCertificationCode))\n\(summary)\n🎯 \(takeaway)\n🌐 \(articleURL)\nShared via CertiGo Tech News"
+        }
+        return "📰 \(title) (#\(sourceRank) \(sourceName) · \(linkedCertificationCode))\n\(summary)\n🎯 \(takeaway)\n🌐 \(articleURL)\nPartagé depuis CertiGo Actus Tech"
+    }
+
+    /// Spoken transcript read aloud by `CertiGoTechNewsAudioReader` (`AVSpeechSynthesizer`), adapting to the `Version simple` toggle.
+    public func buildSpeechScript(isPlainLanguage: Bool, languageIndex: Int) -> String {
+        let isEN = (languageIndex % 6) == 2
+        let headline = localizedHeadline(languageIndex: languageIndex)
+        let body = localizedSummary(isPlainLanguage: isPlainLanguage, languageIndex: languageIndex)
+        let takeaway = localizedExamTakeaway(languageIndex: languageIndex)
+        if isEN {
+            let modeLabel = isPlainLanguage ? "Simple version." : "Technical summary."
+            return "Source number \(sourceRank), \(sourceName). \(headline). \(modeLabel) \(body) Key takeaway for \(linkedCertificationCode): \(takeaway)"
+        }
+        let modeLabel = isPlainLanguage ? "Version simple sans jargon." : "Synthèse technique."
+        return "Source numéro \(sourceRank), \(sourceName). \(headline). \(modeLabel) \(body) À retenir pour \(linkedCertificationCode) : \(takeaway)"
+    }
+
+    /// Perplexity Discover-style suggested follow-up questions for instant Q&A right after listening or reading.
+    public func suggestedFollowUpQuestions(languageIndex: Int) -> [String] {
+        let isEN = (languageIndex % 6) == 2
+        if isEN {
+            return [
+                "Explain simply without jargon",
+                "What impact on \(linkedCertificationCode)?",
+                "3 key points to remember"
+            ]
+        }
+        return [
+            "Explique-moi simplement",
+            "Quel impact sur \(linkedCertificationCode) ?",
+            "3 points clés à retenir"
+        ]
+    }
+
+    /// Generates an immediate contextual answer from CertiGo AI for an inline question on this article.
+    public func generateContextualAIAnswer(
+        forQuestion question: String,
+        languageIndex: Int,
+        activeRouteCode: String
+    ) -> String {
+        let isEN = (languageIndex % 6) == 2
+        let lower = question.lowercased()
+        if lower.contains("simpl") || lower.contains("jargon") || lower.contains("clair") || lower.contains("explain") {
+            if isEN {
+                return "💡 In plain English (#\(sourceRank) \(sourceName)): \(plainLanguageSummaryEN) Bottom line: \(flashExplanationEN)"
+            }
+            return "💡 En clair sans jargon (#\(sourceRank) \(sourceName)) : \(plainLanguageSummaryFR) En bref : \(flashExplanationFR)"
+        }
+        if lower.contains("impact") || lower.contains("certif") || lower.contains("examen") || lower.contains(linkedCertificationCode.lowercased()) {
+            if isEN {
+                return "🎯 Certification impact (\(linkedCertificationCode) / \(activeRouteCode)): \(examTakeawayEN). Exam tip: \(flashExplanationEN)"
+            }
+            return "🎯 Impact certification (\(linkedCertificationCode) / \(activeRouteCode)) : \(examTakeawayFR). Réflexe examen : \(flashExplanationFR)"
+        }
+        if isEN {
+            return "✦ CertiGo AI (#\(sourceRank) \(sourceName) · \(linkedCertificationCode)):\n1) Simple view: \(plainLanguageSummaryEN)\n2) Architecture detail: \(technicalSummaryEN)\n3) Exam takeaway: \(examTakeawayEN)"
+        }
+        return "✦ CertiGo AI (#\(sourceRank) \(sourceName) · \(linkedCertificationCode)) :\n1) En clair : \(plainLanguageSummaryFR)\n2) Détail technique : \(technicalSummaryFR)\n3) À retenir pour \(linkedCertificationCode) : \(examTakeawayFR)"
+    }
+}
+
+// MARK: - 1B. AI Voice Audio Reader (`CertiGoTechNewsAudioReader`) & Inline Q&A Entry (`CertiGoTechNewsQAEntry`)
+
+public struct CertiGoTechNewsQAEntry: Identifiable, Codable, Equatable, Sendable {
+    public let id: String
+    public let articleId: String
+    public let userQuestion: String
+    public let aiAnswer: String
+
+    public init(id: String, articleId: String, userQuestion: String, aiAnswer: String) {
+        self.id = id
+        self.articleId = articleId
+        self.userQuestion = userQuestion
+        self.aiAnswer = aiAnswer
+    }
+}
+
+#if canImport(AVFoundation) && !os(Linux)
+import AVFoundation
+
+@MainActor
+private final class CertiGoNativeSpeechSynthesizerBridge {
+    static let shared = CertiGoNativeSpeechSynthesizerBridge()
+    private let synthesizer = AVSpeechSynthesizer()
+
+    func speak(text: String, languageCode: String, rateMultiplier: Double) {
+        if synthesizer.isSpeaking {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: languageCode) ?? AVSpeechSynthesisVoice(language: "fr-FR")
+        let baseRate = Double(AVSpeechUtteranceDefaultSpeechRate)
+        let scaled = min(Double(AVSpeechUtteranceMaximumSpeechRate), max(Double(AVSpeechUtteranceMinimumSpeechRate), baseRate * rateMultiplier))
+        utterance.rate = Float(scaled)
+        utterance.pitchMultiplier = 1.02
+        synthesizer.speak(utterance)
+    }
+
+    func pause() {
+        if synthesizer.isSpeaking {
+            _ = synthesizer.pauseSpeaking(at: .word)
+        }
+    }
+
+    func resume() {
+        if synthesizer.isPaused {
+            _ = synthesizer.continueSpeaking()
+        }
+    }
+
+    func stop() {
+        if synthesizer.isSpeaking || synthesizer.isPaused {
+            _ = synthesizer.stopSpeaking(at: .immediate)
+        }
+    }
+}
+#endif
+
+/// Native AI Text-to-Speech controller for `Actus Tech`, allowing any article to be read aloud in standard or `Version simple` mode.
+public struct CertiGoTechNewsAudioReaderState: Codable, Equatable, Sendable {
+    public static let supportedSpeedMultipliers: [Double] = [1.0, 1.25, 1.5]
+
+    public var activeArticleId: String? = nil
+    public var activeArticleHeadline: String? = nil
+    public var activeSourceBadge: String? = nil
+    public var isSpeaking: Bool = false
+    public var isPaused: Bool = false
+    public var playbackRateMultiplier: Double = 1.0
+    public var voiceLanguageCode: String = "fr-FR"
+    public var spokenTranscript: String = ""
+    public var wasPlainLanguageUsed: Bool = false
+
+    public init() {}
+
+    public var speedBadgeText: String {
+        if playbackRateMultiplier == 1.25 { return "1.25x" }
+        if playbackRateMultiplier == 1.5 { return "1.5x" }
+        return "1.0x"
+    }
+
+    public mutating func startReading(
+        article: CertiGoTechNewsArticle,
+        isPlainLanguage: Bool,
+        languageIndex: Int
+    ) {
+        let isEN = (languageIndex % 6) == 2
+        let langCode = isEN ? "en-US" : "fr-FR"
+        let transcript = article.buildSpeechScript(isPlainLanguage: isPlainLanguage, languageIndex: languageIndex)
+        activeArticleId = article.id
+        activeArticleHeadline = article.localizedHeadline(languageIndex: languageIndex)
+        activeSourceBadge = article.rankedSourceBadgeText
+        isSpeaking = true
+        isPaused = false
+        voiceLanguageCode = langCode
+        spokenTranscript = transcript
+        wasPlainLanguageUsed = isPlainLanguage
+        #if canImport(AVFoundation) && !os(Linux)
+        let rate = playbackRateMultiplier
+        Task { @MainActor in
+            CertiGoNativeSpeechSynthesizerBridge.shared.speak(
+                text: transcript,
+                languageCode: langCode,
+                rateMultiplier: rate
+            )
+        }
+        #endif
+    }
+
+    public mutating func pause() {
+        guard activeArticleId != nil, isSpeaking else { return }
+        isSpeaking = false
+        isPaused = true
+        #if canImport(AVFoundation) && !os(Linux)
+        Task { @MainActor in
+            CertiGoNativeSpeechSynthesizerBridge.shared.pause()
+        }
+        #endif
+    }
+
+    public mutating func resume() {
+        guard activeArticleId != nil, isPaused else { return }
+        isSpeaking = true
+        isPaused = false
+        #if canImport(AVFoundation) && !os(Linux)
+        Task { @MainActor in
+            CertiGoNativeSpeechSynthesizerBridge.shared.resume()
+        }
+        #endif
+    }
+
+    public mutating func stop() {
+        activeArticleId = nil
+        activeArticleHeadline = nil
+        activeSourceBadge = nil
+        isSpeaking = false
+        isPaused = false
+        spokenTranscript = ""
+        #if canImport(AVFoundation) && !os(Linux)
+        Task { @MainActor in
+            CertiGoNativeSpeechSynthesizerBridge.shared.stop()
+        }
+        #endif
+    }
+
+    public mutating func cycleSpeed() -> Double {
+        if playbackRateMultiplier < 1.1 {
+            playbackRateMultiplier = 1.25
+        } else if playbackRateMultiplier < 1.4 {
+            playbackRateMultiplier = 1.5
+        } else {
+            playbackRateMultiplier = 1.0
+        }
+        return playbackRateMultiplier
     }
 }
 
@@ -818,6 +1069,16 @@ public struct CertiGoTechNewsRuntimeState: Codable, Equatable, Sendable {
     public var isRefreshingLiveRSS: Bool = false
     public var lastLiveSyncStatusText: String? = nil
     public var lastAskedAIArticleId: String? = nil
+    /// Native AI Text-to-Speech reader state (`🔊 Écouter avec l'IA`).
+    public var audioReader: CertiGoTechNewsAudioReaderState = .init()
+    /// Perplexity-style inline Q&A history per article (`✦ Poser une question à l'IA sur cette actu`).
+    public var qaHistoryByArticleId: [String: [CertiGoTechNewsQAEntry]] = [:]
+    /// Draft freeform question per article.
+    public var draftQuestionByArticleId: [String: String] = [:]
+    /// Optional article ID opened in the full Apple News / Perplexity Reader Sheet.
+    public var activeReaderSheetArticleId: String? = nil
+    /// Last official article URL opened by the user (`🌐 Site officiel`).
+    public var lastOpenedOfficialURLString: String? = nil
 
     public init() {}
 
@@ -832,6 +1093,10 @@ public struct CertiGoTechNewsRuntimeState: Codable, Equatable, Sendable {
 
     public mutating func setPlainLanguage(_ enabled: Bool, forArticleId articleId: String) {
         plainLanguageByArticleId[articleId] = enabled
+    }
+
+    public func qaEntries(forArticleId articleId: String) -> [CertiGoTechNewsQAEntry] {
+        qaHistoryByArticleId[articleId] ?? []
     }
 }
 
@@ -943,9 +1208,129 @@ extension CertiGoNativeAppState {
     }
 
     /// Toggles the Apple iOS `Version simple` switch on a specific Tech News card (never auto-enabled).
+    /// If the AI voice reader is currently reading this article aloud, it automatically updates the spoken transcript!
     public mutating func toggleTechNewsPlainLanguage(forArticleId articleId: String) {
         CertiGoHapticsEngine.shared.playOptionSelection()
         techNewsState.togglePlainLanguage(forArticleId: articleId)
+        refreshAudioSpeechIfReadingArticle(articleId: articleId)
+    }
+
+    /// Sets the `Version simple` switch for an article and updates the AI voice reader if it is currently reading this article.
+    public mutating func setTechNewsPlainLanguage(_ enabled: Bool, forArticleId articleId: String) {
+        CertiGoHapticsEngine.shared.playOptionSelection()
+        techNewsState.setPlainLanguage(enabled, forArticleId: articleId)
+        refreshAudioSpeechIfReadingArticle(articleId: articleId)
+    }
+
+    private mutating func refreshAudioSpeechIfReadingArticle(articleId: String) {
+        guard techNewsState.audioReader.activeArticleId == articleId else { return }
+        let allArticles = techNewsState.liveFetchedArticles + CertiGoVerifiedRSSFeedCatalog.defaultCuratedTechNewsArticles
+        guard let article = allArticles.first(where: { $0.id == articleId }) else { return }
+        let isPlain = techNewsState.isPlainLanguageEnabled(forArticleId: articleId)
+        let wasPaused = techNewsState.audioReader.isPaused
+        techNewsState.audioReader.startReading(
+            article: article,
+            isPlainLanguage: isPlain,
+            languageIndex: settingsLanguageIndex
+        )
+        if wasPaused {
+            techNewsState.audioReader.pause()
+        }
+    }
+
+    // MARK: - AI Voice Reader (`🔊 Écouter avec l'IA`), Inline Perplexity Q&A (`✦ Poser une question`), & Official Website (`🌐 Site officiel`)
+
+    /// Starts, pauses, or resumes AI Text-to-Speech (`AVSpeechSynthesizer`) for the given Tech News article.
+    public mutating func toggleTechNewsAudioSpeech(forArticle article: CertiGoTechNewsArticle) {
+        CertiGoHapticsEngine.shared.playButtonPress()
+        let isPlain = techNewsState.isPlainLanguageEnabled(forArticleId: article.id)
+        if techNewsState.audioReader.activeArticleId == article.id {
+            if techNewsState.audioReader.isSpeaking {
+                techNewsState.audioReader.pause()
+            } else if techNewsState.audioReader.isPaused {
+                techNewsState.audioReader.resume()
+            } else {
+                techNewsState.audioReader.startReading(
+                    article: article,
+                    isPlainLanguage: isPlain,
+                    languageIndex: settingsLanguageIndex
+                )
+            }
+        } else {
+            techNewsState.audioReader.startReading(
+                article: article,
+                isPlainLanguage: isPlain,
+                languageIndex: settingsLanguageIndex
+            )
+        }
+    }
+
+    /// Stops AI Text-to-Speech playback immediately.
+    public mutating func stopTechNewsAudioSpeech() {
+        CertiGoHapticsEngine.shared.playOptionSelection()
+        techNewsState.audioReader.stop()
+    }
+
+    /// Cycles the AI Text-to-Speech speed (`1.0x` -> `1.25x` -> `1.5x` -> `1.0x`) and restarts current speech if active.
+    @discardableResult
+    public mutating func cycleTechNewsAudioSpeed() -> Double {
+        CertiGoHapticsEngine.shared.playOptionSelection()
+        let nextSpeed = techNewsState.audioReader.cycleSpeed()
+        if let activeId = techNewsState.audioReader.activeArticleId, techNewsState.audioReader.isSpeaking {
+            refreshAudioSpeechIfReadingArticle(articleId: activeId)
+        }
+        return nextSpeed
+    }
+
+    /// Asks an inline Perplexity-style follow-up question on an article and generates an immediate contextual CertiGo AI answer right inside the card/sheet.
+    @discardableResult
+    public mutating func askInlineQuestionAboutTechNews(
+        articleId: String,
+        question: String
+    ) -> CertiGoTechNewsQAEntry? {
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let allArticles = techNewsState.liveFetchedArticles + CertiGoVerifiedRSSFeedCatalog.defaultCuratedTechNewsArticles
+        guard let article = allArticles.first(where: { $0.id == articleId }) else { return nil }
+        CertiGoHapticsEngine.shared.playButtonPress()
+        let answer = article.generateContextualAIAnswer(
+            forQuestion: trimmed,
+            languageIndex: settingsLanguageIndex,
+            activeRouteCode: activeRouteCode
+        )
+        let existingCount = techNewsState.qaHistoryByArticleId[articleId]?.count ?? 0
+        let entry = CertiGoTechNewsQAEntry(
+            id: "qa-\(articleId)-\(existingCount + 1)",
+            articleId: articleId,
+            userQuestion: trimmed,
+            aiAnswer: answer
+        )
+        var list = techNewsState.qaHistoryByArticleId[articleId] ?? []
+        list.append(entry)
+        techNewsState.qaHistoryByArticleId[articleId] = list
+        techNewsState.draftQuestionByArticleId[articleId] = ""
+        techNewsState.lastAskedAIArticleId = articleId
+        return entry
+    }
+
+    /// Records and returns the validated official website URL for an article (`🌐 Site officiel`).
+    @discardableResult
+    public mutating func openTechNewsOfficialWebsite(forArticle article: CertiGoTechNewsArticle) -> URL? {
+        CertiGoHapticsEngine.shared.playOptionSelection()
+        techNewsState.lastOpenedOfficialURLString = article.articleURL
+        return article.officialURL
+    }
+
+    /// Opens the Apple News / Perplexity Discover Reader Sheet for an article.
+    public mutating func openTechNewsReaderSheet(forArticleId articleId: String) {
+        CertiGoHapticsEngine.shared.playButtonPress()
+        techNewsState.activeReaderSheetArticleId = articleId
+    }
+
+    /// Closes the Apple News / Perplexity Discover Reader Sheet.
+    public mutating func closeTechNewsReaderSheet() {
+        CertiGoHapticsEngine.shared.playOptionSelection()
+        techNewsState.activeReaderSheetArticleId = nil
     }
 
     /// Toggles the interactive 1-question Flash Quiz (`⚡ Question Flash · +10 XP`) on a Tech News card.
@@ -984,13 +1369,14 @@ extension CertiGoNativeAppState {
         }
     }
 
-    /// Handoff from `✦ Demander à CertiGo AI` on any Tech News card: preloads the news context in CertiGo AI and switches to `.hubIA`.
-    public mutating func askCertiGoAIAboutTechNews(_ article: CertiGoTechNewsArticle) {
+    /// Handoff from `✦ Demander à CertiGo AI` on any Tech News card: preloads the news context (plus optional custom question) in CertiGo AI and switches to `.hubIA`.
+    public mutating func askCertiGoAIAboutTechNews(_ article: CertiGoTechNewsArticle, customQuestion: String? = nil) {
         CertiGoHapticsEngine.shared.playButtonPress()
         techNewsState.lastAskedAIArticleId = article.id
         let prompt = article.buildCertiGoAIPrompt(
             languageIndex: settingsLanguageIndex,
-            activeRouteCode: activeRouteCode
+            activeRouteCode: activeRouteCode,
+            customQuestion: customQuestion
         )
         let turn = CertiGoChatTurn(
             id: "turn-news-\(chatTurns.count + 1)-\(article.id)",
@@ -1019,6 +1405,7 @@ extension CertiGoNativeAppState {
         )
         isAIDrawerOpen06D = false
         isShowingVoiceLive06C = false
+        techNewsState.activeReaderSheetArticleId = nil
         selectedTab = .hubIA
     }
 
@@ -1106,7 +1493,7 @@ extension CertiGoNativeAppState {
 import SwiftUI
 import UIKit
 
-// MARK: - 6. Tab #2 `Actus` (`CertiGoTechNewsFeedView`) : Top 100 Tech Watch & 83 Verified RSS Feeds × CertiGo AI
+// MARK: - 6. Tab #2 `Actus` (`CertiGoTechNewsFeedView`) : Apple News × Google News × Perplexity Discover × CertiGo AI
 
 public struct CertiGoTechNewsFeedView: View {
     @Binding public var appState: CertiGoNativeAppState
@@ -1128,15 +1515,32 @@ public struct CertiGoTechNewsFeedView: View {
 
     public var body: some View {
         let innerConcentricRadius = PrismRadius.concentric(outer: PrismRadius.xl, padding: PrismSpacing.m)
+        let articles = appState.filteredTechNewsArticles
+
         VStack(spacing: .zero) {
-            // Unified 56pt Apple HIG Header (`Actus Tech` in 22pt SF Pro Bold + Top 100 / 83 RSS Directory + Live Refresh)
+            // Unified 56pt Apple HIG Header (`Actus Tech` in 22pt SF Pro Bold + Worldwide Live Badge + Top 100 / 83 RSS Directory + Live Refresh)
             HStack(spacing: PrismSpacing.s) {
                 Text(verbatim: isEnglish ? "Tech News" : "Actus Tech")
                     .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                     .lineLimit(1)
 
-                Spacer(minLength: PrismSpacing.xs)
+                Text(verbatim: isEnglish ? "🔴 LIVE · WORLD" : "🔴 DIRECT · MONDE")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#dc2626"))
+                    .lineLimit(1)
+                    .padding(.horizontal, PrismSpacing.xs)
+                    .frame(height: FigMetrics.twentyFour)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(PrismColor.figmaHex("#fef2f2"))
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(PrismColor.figmaHex("#fecaca"), lineWidth: PrismBorder.standard)
+                    )
+
+                Spacer(minLength: PrismSpacing.xxs)
 
                 // Top 100 / 83 RSS Verified Sources Directory Button
                 Button {
@@ -1149,7 +1553,7 @@ public struct CertiGoTechNewsFeedView: View {
                             .foregroundStyle(PrismColor.figmaHex("#0078d4"))
                             .lineLimit(1)
                     }
-                    .padding(.horizontal, PrismSpacing.m)
+                    .padding(.horizontal, PrismSpacing.s)
                     .frame(height: FigMetrics.thirtySix)
                     .background(
                         RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
@@ -1173,7 +1577,7 @@ public struct CertiGoTechNewsFeedView: View {
                             appState.techNewsState.liveFetchedArticles = liveItems
                             appState.techNewsState.lastLiveSyncStatusText = isEnglish
                                 ? "✓ Live RSS synced (\(liveItems.count) new)"
-                                : "✓ Flux RSS synchronisés (\(liveItems.count) actus)"
+                                : "✓ Flux RSS mondiaux synchronisés (\(liveItems.count) actus)"
                         } else {
                             appState.techNewsState.lastLiveSyncStatusText = isEnglish
                                 ? "✓ 83 verified RSS feeds ready"
@@ -1201,6 +1605,11 @@ public struct CertiGoTechNewsFeedView: View {
             .padding(.horizontal, PrismSpacing.xl)
             .frame(height: FigMetrics.unifiedTabHeaderHeight)
             .background(PrismColor.figmaHex("#f8fafc"))
+
+            // Active AI Voice Audio Mini-Player Banner (`AVSpeechSynthesizer`)
+            if appState.techNewsState.audioReader.activeArticleId != nil {
+                activeAudioMiniPlayerBanner(innerConcentricRadius: innerConcentricRadius)
+            }
 
             // 1-Line Horizontal Filter Bar with Official Brand Logos (`🔥 Pour toi`, `OpenAI`, `Anthropic`, `Microsoft`, `Google`, `AWS`, `Harvey`, `GitHub`, `Cloud & Cyber`)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -1290,7 +1699,7 @@ public struct CertiGoTechNewsFeedView: View {
             }
             .background(PrismColor.figmaHex("#f8fafc"))
 
-            // Feed ScrollView of Rich Tech News Cards
+            // Feed ScrollView of Rich Tech News Cards (Apple News × Google News × Perplexity Discover)
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: PrismSpacing.l) {
                     if let syncBanner = appState.techNewsState.lastLiveSyncStatusText {
@@ -1305,13 +1714,19 @@ public struct CertiGoTechNewsFeedView: View {
                             )
                     }
 
-                    ForEach(appState.filteredTechNewsArticles) { article in
-                        techNewsCardView(article: article)
+                    ForEach(Array(articles.enumerated()), id: \.element.id) { index, article in
+                        techNewsCardView(article: article, isTopStory: index == 0)
                     }
                 }
                 .padding(.horizontal, PrismSpacing.xl)
                 .padding(.top, PrismSpacing.xs)
                 .padding(.bottom, FigMetrics.bottomBarTotalClearance)
+            }
+            .refreshable {
+                let liveItems = await CertiGoLiveTechNewsAggregator.fetchLatestArticles()
+                if !liveItems.isEmpty {
+                    appState.techNewsState.liveFetchedArticles = liveItems
+                }
             }
             .background(PrismColor.figmaHex("#f8fafc"))
         }
@@ -1319,17 +1734,138 @@ public struct CertiGoTechNewsFeedView: View {
             CertiGoTop100SourcesDirectorySheetView(appState: $appState)
                 .presentationDetents([.large])
         }
+        .sheet(
+            isPresented: Binding(
+                get: { appState.techNewsState.activeReaderSheetArticleId != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        appState.techNewsState.activeReaderSheetArticleId = nil
+                    }
+                }
+            )
+        ) {
+            if let activeId = appState.techNewsState.activeReaderSheetArticleId,
+               let article = (appState.techNewsState.liveFetchedArticles + CertiGoVerifiedRSSFeedCatalog.defaultCuratedTechNewsArticles).first(where: { $0.id == activeId })
+            {
+                CertiGoTechNewsArticleReaderSheetView(
+                    appState: $appState,
+                    article: article,
+                    onAskCertiGoAI: onAskCertiGoAI
+                )
+                .presentationDetents([.large])
+            }
+        }
     }
 
     @ViewBuilder
-    private func techNewsCardView(article: CertiGoTechNewsArticle) -> some View {
+    private func activeAudioMiniPlayerBanner(innerConcentricRadius: CGFloat) -> some View {
+        let reader = appState.techNewsState.audioReader
+        HStack(spacing: PrismSpacing.s) {
+            Image(systemName: reader.isSpeaking ? "waveform.circle.fill" : "pause.circle.fill")
+                .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#4f46e5"))
+
+            VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                Text(verbatim: isEnglish ? "🔊 AI Voice Reader · \(reader.activeSourceBadge ?? "")" : "🔊 Lecture IA · \(reader.activeSourceBadge ?? "")")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#4f46e5"))
+                    .lineLimit(1)
+
+                Text(verbatim: reader.activeArticleHeadline ?? "")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: PrismSpacing.xxs)
+
+            Button {
+                appState.cycleTechNewsAudioSpeed()
+            } label: {
+                Text(verbatim: reader.speedBadgeText)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                    .foregroundStyle(PrismColor.figmaHex("#3730a3"))
+                    .padding(.horizontal, PrismSpacing.xs)
+                    .frame(height: FigMetrics.twentyEight)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(PrismColor.surface)
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("tech-news-audio-banner-speed-button")
+
+            Button {
+                if let activeId = reader.activeArticleId,
+                   let article = (appState.techNewsState.liveFetchedArticles + CertiGoVerifiedRSSFeedCatalog.defaultCuratedTechNewsArticles).first(where: { $0.id == activeId })
+                {
+                    appState.toggleTechNewsAudioSpeech(forArticle: article)
+                }
+            } label: {
+                Image(systemName: reader.isSpeaking ? "pause.fill" : "play.fill")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(PrismColor.onAccent)
+                    .frame(width: FigMetrics.twentyEight, height: FigMetrics.twentyEight)
+                    .background(
+                        Circle().fill(PrismColor.figmaHex("#4f46e5"))
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("tech-news-audio-banner-playpause-button")
+
+            Button {
+                appState.stopTechNewsAudioSpeech()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                    .frame(width: FigMetrics.twentyEight, height: FigMetrics.twentyEight)
+                    .background(
+                        Circle().fill(PrismColor.surface)
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("tech-news-audio-banner-stop-button")
+        }
+        .padding(.horizontal, PrismSpacing.m)
+        .padding(.vertical, PrismSpacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                .fill(PrismColor.figmaHex("#eef2ff"))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#c7d2fe"), lineWidth: PrismBorder.standard)
+        )
+        .padding(.horizontal, PrismSpacing.xl)
+        .padding(.bottom, PrismSpacing.xs)
+    }
+
+    @ViewBuilder
+    private func techNewsCardView(article: CertiGoTechNewsArticle, isTopStory: Bool) -> some View {
         let isPlain = appState.techNewsState.isPlainLanguageEnabled(forArticleId: article.id)
         let isFlashExpanded = appState.techNewsState.activeFlashQuizArticleId == article.id
         let selectedChoiceId = appState.techNewsState.selectedFlashChoiceByArticleId[article.id]
         let isValidated = appState.techNewsState.validatedFlashArticleIds.contains(article.id)
+        let isSpeakingThis = appState.techNewsState.audioReader.activeArticleId == article.id && appState.techNewsState.audioReader.isSpeaking
+        let isPausedThis = appState.techNewsState.audioReader.activeArticleId == article.id && appState.techNewsState.audioReader.isPaused
+        let qaEntries = appState.techNewsState.qaEntries(forArticleId: article.id)
         let innerConcentricRadius = PrismRadius.concentric(outer: PrismRadius.xl, padding: PrismSpacing.m)
 
         VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            // Apple News Top Story Kicker on the #1 featured card
+            if isTopStory {
+                HStack(spacing: PrismSpacing.xs) {
+                    Text(verbatim: isEnglish ? "🔥 TOP STORY · WORLDWIDE COVERAGE" : "🔥 À LA UNE · MONDE ENTIER")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                        .foregroundStyle(PrismColor.figmaHex("#dc2626"))
+                    Spacer()
+                    Text(verbatim: article.publishedRelativeLabel)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                }
+            }
+
             // Top Row: Actor Badge with Real Vector Logo (`CertiGoBrandLogoView`) + OPML Rank + Linked Certification Tag
             HStack(spacing: PrismSpacing.xs) {
                 HStack(spacing: PrismSpacing.xs) {
@@ -1359,24 +1895,138 @@ public struct CertiGoTechNewsFeedView: View {
 
                 Spacer(minLength: FigMetrics.zero)
 
-                if let url = URL(string: article.articleURL) {
-                    Button {
-                        openURL(url)
-                    } label: {
-                        Image(systemName: "arrow.up.right.square")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("tech-news-open-source-\(article.id)")
+                Button {
+                    appState.openTechNewsReaderSheet(forArticleId: article.id)
+                } label: {
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#475569"))
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("tech-news-open-reader-\(article.id)")
             }
 
-            // Clear Headline in 17pt SF Pro Semibold
-            Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
-                .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Semi Bold"))
-                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                .fixedSize(horizontal: false, vertical: true)
+            // Clear Headline in 17pt SF Pro Semibold (tappable to open full Apple News / Perplexity Reader Sheet)
+            Button {
+                appState.openTechNewsReaderSheet(forArticleId: article.id)
+            } label: {
+                Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Semi Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .buttonStyle(.plain)
+
+            // Multimedia & Source Action Bar: 1. `🔊 Écouter avec l'IA` + Speed (`1.0x`) · 2. `🌐 Site officiel` · 3. `📤 Partager` (`ShareLink`)
+            HStack(spacing: PrismSpacing.xs) {
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        appState.toggleTechNewsAudioSpeech(forArticle: article)
+                    }
+                } label: {
+                    let voiceLabel: String = {
+                        if isSpeakingThis {
+                            return isEnglish ? "⏸ Pause AI" : "⏸ Pause IA"
+                        }
+                        if isPausedThis {
+                            return isEnglish ? "▶️ Resume AI" : "▶️ Reprendre"
+                        }
+                        return isEnglish ? "🔊 Listen AI" : "🔊 Écouter"
+                    }()
+                    HStack(spacing: PrismSpacing.xxs) {
+                        Text(verbatim: voiceLabel)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(isSpeakingThis ? PrismColor.onAccent : PrismColor.figmaHex("#3730a3"))
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, PrismSpacing.s)
+                    .frame(height: FigMetrics.thirtyTwo)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(isSpeakingThis ? PrismColor.figmaHex("#4f46e5") : PrismColor.figmaHex("#eef2ff"))
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(PrismColor.figmaHex("#818cf8"), lineWidth: PrismBorder.standard)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("tech-news-listen-ai-\(article.id)")
+
+                Button {
+                    appState.cycleTechNewsAudioSpeed()
+                } label: {
+                    Text(verbatim: appState.techNewsState.audioReader.speedBadgeText)
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Black"))
+                        .foregroundStyle(PrismColor.figmaHex("#475569"))
+                        .padding(.horizontal, PrismSpacing.xs)
+                        .frame(height: FigMetrics.thirtyTwo)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(PrismColor.figmaHex("#f1f5f9"))
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("tech-news-speed-ai-\(article.id)")
+
+                Spacer(minLength: FigMetrics.zero)
+
+                // Official Website Button (`🌐 Site officiel`)
+                Button {
+                    if let url = appState.openTechNewsOfficialWebsite(forArticle: article) {
+                        openURL(url)
+                    }
+                } label: {
+                    HStack(spacing: PrismSpacing.xxs) {
+                        Text(verbatim: isEnglish ? "🌐 Official site ↗" : "🌐 Site officiel ↗")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, PrismSpacing.s)
+                    .frame(height: FigMetrics.thirtyTwo)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(PrismColor.figmaHex("#f1f5f9"))
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(PrismColor.figmaHex("#cbd5e1"), lineWidth: PrismBorder.standard)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("tech-news-open-source-\(article.id)")
+
+                // Native iOS Share Button (`📤 Partager` via `ShareLink`)
+                ShareLink(
+                    item: article.sharePayloadText(
+                        languageIndex: appState.settingsLanguageIndex,
+                        isPlainLanguage: isPlain
+                    )
+                ) {
+                    HStack(spacing: PrismSpacing.xxs) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                        Text(verbatim: isEnglish ? "Share" : "Partager")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .padding(.horizontal, PrismSpacing.s)
+                    .frame(height: FigMetrics.thirtyTwo)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(PrismColor.figmaHex("#f1f5f9"))
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(PrismColor.figmaHex("#cbd5e1"), lineWidth: PrismBorder.standard)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("tech-news-share-\(article.id)")
+            }
 
             // Apple iOS Sliding Switch `Version simple` (`Toggle` identical to questions, never auto-enabled)
             HStack(spacing: PrismSpacing.s) {
@@ -1393,8 +2043,7 @@ public struct CertiGoTechNewsFeedView: View {
                         get: { appState.techNewsState.isPlainLanguageEnabled(forArticleId: article.id) },
                         set: { newValue in
                             withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                                CertiGoHapticsEngine.shared.playOptionSelection()
-                                appState.techNewsState.setPlainLanguage(newValue, forArticleId: article.id)
+                                appState.setTechNewsPlainLanguage(newValue, forArticleId: article.id)
                             }
                         }
                     )
@@ -1437,6 +2086,112 @@ public struct CertiGoTechNewsFeedView: View {
                         .fill(PrismColor.figmaHex("#eff6ff"))
                 )
             }
+
+            // Perplexity Discover-style Contextual AI Q&A Section (`✦ Poser une question à l'IA sur cette actu`)
+            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                Text(verbatim: isEnglish ? "✦ Ask AI a question about this news" : "✦ Poser une question à l'IA sur cette actu")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#3730a3"))
+
+                // Quick follow-up chips (Perplexity style)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: PrismSpacing.xs) {
+                        ForEach(article.suggestedFollowUpQuestions(languageIndex: appState.settingsLanguageIndex), id: \.self) { chipQuestion in
+                            Button {
+                                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                                    _ = appState.askInlineQuestionAboutTechNews(articleId: article.id, question: chipQuestion)
+                                }
+                            } label: {
+                                Text(verbatim: "✦ \(chipQuestion)")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#3730a3"))
+                                    .padding(.horizontal, PrismSpacing.s)
+                                    .frame(height: FigMetrics.twentyEight)
+                                    .background(
+                                        Capsule(style: .continuous)
+                                            .fill(PrismColor.surface)
+                                    )
+                                    .overlay(
+                                        Capsule(style: .continuous)
+                                            .strokeBorder(PrismColor.figmaHex("#c7d2fe"), lineWidth: PrismBorder.standard)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                // Inline Q&A History Answers
+                ForEach(qaEntries) { entry in
+                    VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                        Text(verbatim: "💬 \(entry.userQuestion)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#1e293b"))
+                        Text(verbatim: entry.aiAnswer)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
+                            .foregroundStyle(PrismColor.figmaHex("#334155"))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(PrismSpacing.s)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                            .fill(PrismColor.surface)
+                    )
+                }
+
+                // Freeform question input + send button
+                HStack(spacing: PrismSpacing.xs) {
+                    TextField(
+                        isEnglish ? "Ask a question about this article..." : "Poser une question sur cet article...",
+                        text: Binding(
+                            get: { appState.techNewsState.draftQuestionByArticleId[article.id] ?? "" },
+                            set: { appState.techNewsState.draftQuestionByArticleId[article.id] = $0 }
+                        )
+                    )
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .submitLabel(.send)
+                    .onSubmit {
+                        let q = appState.techNewsState.draftQuestionByArticleId[article.id] ?? ""
+                        _ = appState.askInlineQuestionAboutTechNews(articleId: article.id, question: q)
+                    }
+
+                    Button {
+                        let q = appState.techNewsState.draftQuestionByArticleId[article.id] ?? ""
+                        if !q.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            _ = appState.askInlineQuestionAboutTechNews(articleId: article.id, question: q)
+                        } else {
+                            onAskCertiGoAI(article)
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#4f46e5"))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("tech-news-send-inline-qa-\(article.id)")
+                }
+                .padding(.horizontal, PrismSpacing.s)
+                .frame(height: FigMetrics.thirtySix)
+                .background(
+                    RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                        .fill(PrismColor.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: PrismRadius.m, style: .continuous)
+                        .strokeBorder(PrismColor.figmaHex("#c7d2fe"), lineWidth: PrismBorder.standard)
+                )
+            }
+            .padding(PrismSpacing.m)
+            .background(
+                RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                    .fill(PrismColor.figmaHex("#f5f3ff"))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                    .strokeBorder(PrismColor.figmaHex("#ddd6fe"), lineWidth: PrismBorder.standard)
+            )
 
             // Expandable 1-Question Flash Quiz (`⚡ Question Flash · +10 XP`)
             if isFlashExpanded {
@@ -1532,7 +2287,7 @@ public struct CertiGoTechNewsFeedView: View {
                 } label: {
                     HStack {
                         Spacer()
-                        Text(verbatim: isEnglish ? "✦ Ask CertiGo AI" : "✦ Demander à CertiGo AI")
+                        Text(verbatim: isEnglish ? "✦ Discuss in CertiGo AI Tab" : "✦ Demander à CertiGo AI")
                             .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#3730a3"))
                         Spacer()
@@ -1587,6 +2342,202 @@ public struct CertiGoTechNewsFeedView: View {
             RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
                 .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
         )
+    }
+}
+
+// MARK: - 6B. Apple News × Perplexity Discover Article Reader Sheet (`CertiGoTechNewsArticleReaderSheetView`)
+
+public struct CertiGoTechNewsArticleReaderSheetView: View {
+    @Binding public var appState: CertiGoNativeAppState
+    public let article: CertiGoTechNewsArticle
+    public let onAskCertiGoAI: (CertiGoTechNewsArticle) -> Void
+    @Environment(\.openURL) private var openURL
+
+    public init(
+        appState: Binding<CertiGoNativeAppState>,
+        article: CertiGoTechNewsArticle,
+        onAskCertiGoAI: @escaping (CertiGoTechNewsArticle) -> Void
+    ) {
+        self._appState = appState
+        self.article = article
+        self.onAskCertiGoAI = onAskCertiGoAI
+    }
+
+    private var isEnglish: Bool {
+        (appState.settingsLanguageIndex % 6) == 2
+    }
+
+    public var body: some View {
+        let isPlain = appState.techNewsState.isPlainLanguageEnabled(forArticleId: article.id)
+        let isSpeakingThis = appState.techNewsState.audioReader.activeArticleId == article.id && appState.techNewsState.audioReader.isSpeaking
+        let qaEntries = appState.techNewsState.qaEntries(forArticleId: article.id)
+        let innerConcentricRadius = PrismRadius.concentric(outer: PrismRadius.xl, padding: PrismSpacing.m)
+
+        VStack(spacing: PrismSpacing.m) {
+            // Top Toolbar: Source Badge + Share + Official Site + Close
+            HStack(spacing: PrismSpacing.xs) {
+                CertiGoBrandLogoView(vendorId: article.vendorLogoId, size: FigMetrics.twentyFour)
+                Text(verbatim: article.rankedSourceBadgeText)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                    .lineLimit(1)
+
+                Spacer()
+
+                ShareLink(
+                    item: article.sharePayloadText(
+                        languageIndex: appState.settingsLanguageIndex,
+                        isPlainLanguage: isPlain
+                    )
+                ) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                        .frame(width: FigMetrics.thirtySix, height: FigMetrics.thirtySix)
+                        .background(Circle().fill(PrismColor.figmaHex("#f1f5f9")))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    appState.closeTechNewsReaderSheet()
+                } label: {
+                    Text(verbatim: "✕")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Black"))
+                        .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                        .frame(width: FigMetrics.thirtySix, height: FigMetrics.thirtySix)
+                        .background(Circle().fill(PrismColor.figmaHex("#f1f5f9")))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, PrismSpacing.xl)
+            .padding(.top, PrismSpacing.l)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                    Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+
+                    // AI Audio Controls + Official Website Link
+                    HStack(spacing: PrismSpacing.xs) {
+                        Button {
+                            appState.toggleTechNewsAudioSpeech(forArticle: article)
+                        } label: {
+                            Text(verbatim: isSpeakingThis ? (isEnglish ? "⏸ Pause AI Voice" : "⏸ Pause voix IA") : (isEnglish ? "🔊 Read aloud with AI" : "🔊 Lire à haute voix (IA)"))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .foregroundStyle(PrismColor.onAccent)
+                                .padding(.horizontal, PrismSpacing.m)
+                                .frame(height: FigMetrics.thirtySix)
+                                .background(Capsule().fill(PrismColor.figmaHex("#4f46e5")))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            appState.cycleTechNewsAudioSpeed()
+                        } label: {
+                            Text(verbatim: appState.techNewsState.audioReader.speedBadgeText)
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Black"))
+                                .foregroundStyle(PrismColor.figmaHex("#3730a3"))
+                                .padding(.horizontal, PrismSpacing.s)
+                                .frame(height: FigMetrics.thirtySix)
+                                .background(Capsule().fill(PrismColor.figmaHex("#eef2ff")))
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer()
+
+                        Button {
+                            if let url = appState.openTechNewsOfficialWebsite(forArticle: article) {
+                                openURL(url)
+                            }
+                        } label: {
+                            Text(verbatim: "🌐 \(article.officialDomainHost) ↗")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                                .padding(.horizontal, PrismSpacing.s)
+                                .frame(height: FigMetrics.thirtySix)
+                                .background(Capsule().fill(PrismColor.figmaHex("#eff6ff")))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Simple Version Switch
+                    HStack {
+                        Text(verbatim: isEnglish ? "💡 Simple version (no jargon)" : "💡 Version simple (sans jargon)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                        Spacer()
+                        Toggle(
+                            "",
+                            isOn: Binding(
+                                get: { appState.techNewsState.isPlainLanguageEnabled(forArticleId: article.id) },
+                                set: { appState.setTechNewsPlainLanguage($0, forArticleId: article.id) }
+                            )
+                        )
+                        .labelsHidden()
+                        .toggleStyle(SwitchToggleStyle(tint: PrismColor.figmaHex("#58cc02")))
+                    }
+                    .padding(PrismSpacing.m)
+                    .background(
+                        RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                            .fill(PrismColor.surface)
+                    )
+
+                    Text(verbatim: article.localizedSummary(isPlainLanguage: isPlain, languageIndex: appState.settingsLanguageIndex))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Regular"))
+                        .foregroundStyle(PrismColor.figmaHex("#1e293b"))
+
+                    Text(verbatim: "🎓 \(article.localizedExamTakeaway(languageIndex: appState.settingsLanguageIndex))")
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                        .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
+                        .padding(PrismSpacing.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                                .fill(PrismColor.figmaHex("#eff6ff"))
+                        )
+
+                    // Perplexity Q&A in Reader Sheet
+                    ForEach(qaEntries) { entry in
+                        VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
+                            Text(verbatim: "💬 \(entry.userQuestion)")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                            Text(verbatim: entry.aiAnswer)
+                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
+                                .foregroundStyle(PrismColor.figmaHex("#334155"))
+                        }
+                        .padding(PrismSpacing.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                                .fill(PrismColor.surface)
+                        )
+                    }
+
+                    Button {
+                        onAskCertiGoAI(article)
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text(verbatim: isEnglish ? "✦ Continue with CertiGo AI" : "✦ Poser une question dans CertiGo AI")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                                .foregroundStyle(PrismColor.onAccent)
+                            Spacer()
+                        }
+                        .frame(height: FigMetrics.fortyFour)
+                        .background(
+                            RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                                .fill(PrismColor.figmaHex("#4f46e5"))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, PrismSpacing.xl)
+                .padding(.bottom, PrismSpacing.xl)
+            }
+        }
+        .background(PrismColor.figmaHex("#f8fafc"))
     }
 }
 
