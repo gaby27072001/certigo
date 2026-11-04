@@ -389,6 +389,30 @@ public final class AppRouterState: @unchecked Sendable {
                 selectedTab = .profile
                 return .navigatedToTab(.profile, route: nil)
             }
+
+            if host == "ai" || host == "hub-ia" || (host == "widget" && pathComponents.first?.lowercased() == "ai") || (host == "control" && pathComponents.first?.lowercased() == "ai") {
+                activeCover = nil
+                activeSheet = nil
+                isShowingUnsavedInputConfirmation = false
+                selectedTab = .search
+                popToRoot(in: .search)
+                return .navigatedToTab(.search, route: nil)
+            }
+        }
+
+        if (scheme == "https" || scheme == "http"),
+           let host = url.host?.lowercased(),
+           (host == "www.certigo-app.com" || host == "certigo-app.com")
+        {
+            let pathComponents = url.pathComponents.filter { $0 != "/" }.map { $0.lowercased() }
+            if pathComponents.first == "ai" || pathComponents.first == "hub-ia" {
+                activeCover = nil
+                activeSheet = nil
+                isShowingUnsavedInputConfirmation = false
+                selectedTab = .search
+                popToRoot(in: .search)
+                return .navigatedToTab(.search, route: nil)
+            }
         }
 
         if let pilotLink = EditorialPilotLessonLink(url: url) {

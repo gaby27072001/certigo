@@ -255,24 +255,24 @@ public struct CertiGoSmartNotificationSpec: Codable, Equatable, Hashable, Sendab
     public var compliesWithLockScreenCopyCharter: Bool {
         title.count <= CertiGoSmartNotificationCategory.maxTitleCharacters
             && body.count <= CertiGoSmartNotificationCategory.maxBodyCharacters
-            && !title.contains("—")
-            && !title.contains("–")
-            && !body.contains("—")
-            && !body.contains("–")
-            && quickActionTitles.allSatisfy { !$0.contains("—") && !$0.contains("–") }
+            && !title.contains("\u{2014}")
+            && !title.contains("\u{2013}")
+            && !body.contains("\u{2014}")
+            && !body.contains("\u{2013}")
+            && quickActionTitles.allSatisfy { !$0.contains("\u{2014}") && !$0.contains("\u{2013}") }
     }
 }
 
 // MARK: - 4. Official CertiGo V3 Smart Notifications Catalog & UNUserNotificationCenter Bridge
 
 public enum CertiGoSmartNotificationsCatalog: Sendable {
-    /// Replaces any forbidden em-dash (`—`) or en-dash (`–`) with clean punctuation.
+    /// Replaces any forbidden em-dash or en-dash with clean punctuation.
     public static func sanitizeForbiddenDashes(in text: String) -> String {
         text
-            .replacingOccurrences(of: " — ", with: " : ")
-            .replacingOccurrences(of: " – ", with: " : ")
-            .replacingOccurrences(of: "—", with: ":")
-            .replacingOccurrences(of: "–", with: "-")
+            .replacingOccurrences(of: " \u{2014} ", with: " : ")
+            .replacingOccurrences(of: " \u{2013} ", with: " : ")
+            .replacingOccurrences(of: "\u{2014}", with: ":")
+            .replacingOccurrences(of: "\u{2013}", with: "-")
     }
 
     /// Ensures the string contains zero em/en dashes and fits strictly within `maxLength` characters.
