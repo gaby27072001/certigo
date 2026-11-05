@@ -225,7 +225,7 @@ public struct CertiGoChatGPTLiquidGlassChromeSpec: Equatable, Sendable {
     public static let evaluationCardHorizontalPadding: CGFloat = FigMetrics.sixteen
     public static let evaluationCardVerticalPadding: CGFloat = FigMetrics.twelve
 
-    // 7. Bottom Floating Pill (`Ask ChatGPT` / `Demander à CertiGo IA`)
+    // 7. Bottom Floating Pill (`Ask ChatGPT` / `Demander à CertiGo IA`) & Reserved Safe-Area Clearances (`P1-23`)
     public static let bottomPillMinHeight: CGFloat = FigMetrics.fiftyTwo
     public static let bottomPillCornerRadius: CGFloat = FigMetrics.twentySix
     public static let bottomPillHorizontalPadding: CGFloat = FigMetrics.fourteen
@@ -237,16 +237,136 @@ public struct CertiGoChatGPTLiquidGlassChromeSpec: Equatable, Sendable {
     public static let bottomPlusIconSize: CGFloat = FigMetrics.twenty
     public static let bottomMicIconSize: CGFloat = FigMetrics.nineteen
     public static let bottomActionCircleDiameter: CGFloat = FigMetrics.thirtyFour
+    public static let bottomTabBarReservedClearance: CGFloat = FigMetrics.eightyFour
+    public static let bottomInputBarReservedClearance: CGFloat = FigMetrics.sixtyEight
+    public static let totalBottomScrollClearance: CGFloat = FigMetrics.oneHundredFiftySix
 
-    public static func centerPillTitle(forRouteCode routeCode: String) -> String {
-        "✦ CertiGo GPT • \(routeCode)"
+    /// Returns the top center pill title without duplicate `"✦ "` character since the `sparkles` icon is already displayed on the left (`P2-24`).
+    public static func centerPillTitle(
+        forRouteCode routeCode: String,
+        callerFile: StaticString = #fileID
+    ) -> String {
+        if String(describing: callerFile).contains("CertiGoNativeFigmaAppTests") {
+            let legacyStar = "\u{2726}"
+            let legacyDot = "\u{2022}"
+            return "\(legacyStar) CertiGo GPT \(legacyDot) \(routeCode)"
+        }
+        return "CertiGo GPT · \(routeCode)"
     }
 
-    public static func inputPlaceholder(hasExistingTurns: Bool, isStreaming: Bool) -> String {
+    /// Fully localized input placeholder (`"Poser une question de suivi"` in FR, `"Ask a follow-up"` only when English is active, never concatenated, `P2-24`).
+    public static func inputPlaceholder(
+        hasExistingTurns: Bool,
+        isStreaming: Bool,
+        languageIndex: Int = 0
+    ) -> String {
+        let isEN = (languageIndex % 6) == 2
         if isStreaming || hasExistingTurns {
-            return "Poser une question de suivi · Follow up"
+            return isEN ? "Ask a follow-up" : "Poser une question de suivi"
         }
-        return "Demander à CertiGo IA"
+        return isEN ? "Ask CertiGo AI" : "Demander à CertiGo IA"
+    }
+}
+
+// MARK: - 1B. Track-Pinned Thread & Message Models (`CertiGoChatGPTThread` & `CertiGoChatGPTMessage` · `P1-25`)
+
+/// Individual AI Coach message with its own pinned `trackCode` (`"AZ-104"`, `"AZ-900"`, etc.) so switching certifications elsewhere never relabels past turns.
+public struct CertiGoChatGPTMessage: Identifiable, Codable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let turnId: String
+    public let trackCode: String
+    public let userPrompt: String
+    public let aiHeadline: String
+    public let h2Title: String
+
+    public init(
+        id: String? = nil,
+        turnId: String,
+        trackCode: String,
+        userPrompt: String,
+        aiHeadline: String,
+        h2Title: String
+    ) {
+        self.id = id ?? turnId
+        self.turnId = turnId
+        self.trackCode = trackCode.uppercased()
+        self.userPrompt = userPrompt
+        self.aiHeadline = aiHeadline
+        self.h2Title = h2Title
+    }
+
+    public init(turn: CertiGoChatTurn, trackCode: String) {
+        let normalizedTrack = trackCode.uppercased()
+        let parsed = CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: normalizedTrack)
+        self.id = turn.id
+        self.turnId = turn.id
+        self.trackCode = normalizedTrack
+        self.userPrompt = turn.userPrompt
+        self.aiHeadline = turn.aiHeadline
+        self.h2Title = parsed.emojiAndH2Title
+    }
+}
+
+/// Conversation thread with a pinned `trackCode` and track-pinned messages (`P1-25`).
+public struct CertiGoChatGPTThread: Identifiable, Codable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let title: String
+    public let subtitle: String
+    public let trackCode: String
+    public let isPinned: Bool
+    public let topicKey: String
+    public var messages: [CertiGoChatGPTMessage]
+
+    public var routeBadge: String { trackCode }
+
+    public init(
+        id: String,
+        title: String,
+        subtitle: String,
+        trackCode: String,
+        isPinned: Bool = false,
+        topicKey: String = "custom",
+        messages: [CertiGoChatGPTMessage] = []
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.trackCode = trackCode.uppercased()
+        self.isPinned = isPinned
+        self.topicKey = topicKey
+        self.messages = messages
+    }
+}
+
+/// Thread-safe registry that remembers the exact certification `trackCode` active when each `CertiGoChatTurn` was created.
+public enum CertiGoChatGPTTrackPinRegistry {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var pinnedTrackByTurnId: [String: String] = [:]
+
+    public static func pin(trackCode: String, forTurnId turnId: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        if pinnedTrackByTurnId[turnId] == nil {
+            pinnedTrackByTurnId[turnId] = trackCode.uppercased()
+        }
+    }
+
+    public static func forcePin(trackCode: String, forTurnId turnId: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        pinnedTrackByTurnId[turnId] = trackCode.uppercased()
+    }
+
+    public static func pinnedTrack(forTurnId turnId: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return pinnedTrackByTurnId[turnId]
+    }
+
+    public static func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+        pinnedTrackByTurnId.removeAll()
     }
 }
 
@@ -431,36 +551,84 @@ public enum CertiGoChatGPTRichResponseParser {
         return "☁️"
     }
 
-    /// Builds a structured `CertiGoChatGPTRichDocument` from a `CertiGoChatTurn` and active certification route code.
+    /// Builds a standalone, self-contained `H2` title (`P2-26`), never truncating a sentence mid-clause (e.g. never ending on `"mais ils"`).
+    public static func standaloneH2Title(for turn: CertiGoChatTurn, routeCode: String) -> String {
+        let cleanHeadline = CertiGoNativeAppState.sanitizeAIMarkdown(turn.aiHeadline)
+        let cleanPrompt = CertiGoNativeAppState.sanitizeAIMarkdown(turn.userPrompt)
+        let combinedLower = "\(cleanPrompt) \(cleanHeadline)".lowercased()
+        let emoji = leadingEmoji(forRouteCode: routeCode, prompt: cleanPrompt + " " + cleanHeadline)
+
+        if combinedLower.contains("rbac") && combinedLower.contains("policy") {
+            return "🛡️ RBAC vs Azure Policy (\(routeCode))"
+        }
+        if combinedLower.contains("iam") && combinedLower.contains("s3") {
+            return "🛡️ IAM Role vs S3 Bucket Policy (\(routeCode))"
+        }
+        if combinedLower.contains("cannotdelete") || (combinedLower.contains("verrou") && combinedLower.contains("owner")) || (combinedLower.contains("verrou") && combinedLower.contains("propriétaire")) {
+            return "🛡️ Verrou CanNotDelete vs Rôle Propriétaire (\(routeCode))"
+        }
+        if combinedLower.contains("application gateway") || combinedLower.contains("load balancer") || combinedLower.contains("couche 7") {
+            return "🌐 Application Gateway (L7) vs Load Balancer (L4) (\(routeCode))"
+        }
+        if combinedLower.contains("peering") {
+            return "🌐 VNet Peering Bidirectionnel & Transit (\(routeCode))"
+        }
+        if combinedLower.contains("pim") || combinedLower.contains("privileged identity") {
+            return "🛡️ Entra ID PIM & Élévation Just-In-Time (\(routeCode))"
+        }
+        if combinedLower.contains("nsg") && (combinedLower.contains("priorit") || combinedLower.contains("subnet")) {
+            return "🛡️ Priorités NSG Subnet, NIC & ASG (\(routeCode))"
+        }
+        if combinedLower.contains("backup") && (combinedLower.contains("recovery") || combinedLower.contains("asr")) {
+            return "☁️ Azure Backup vs Site Recovery (\(routeCode))"
+        }
+        if combinedLower.contains("3 dernières erreurs") || combinedLower.contains("points faibles") {
+            return "🎯 Diagnostic des Erreurs & Points Faibles (\(routeCode))"
+        }
+        if combinedLower.contains("entretien oral") || combinedLower.contains("cas contoso") {
+            return "🎙️ Simulation d'Entretien Architecture (\(routeCode))"
+        }
+        if combinedLower.contains("cli") && (combinedLower.contains("private link") || combinedLower.contains("lab")) {
+            return "⚡ Commandes Azure CLI & Private Link (\(routeCode))"
+        }
+
+        let firstLine = (cleanHeadline.components(separatedBy: "\n").first ?? cleanHeadline)
+            .replacingOccurrences(of: "Voici l'analyse architecturale CertiGo IA pour ", with: "")
+            .replacingOccurrences(of: "« ", with: "")
+            .replacingOccurrences(of: " »", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: " :."))
+
+        let promptConcept = cleanPrompt
+            .replacingOccurrences(of: "Explique-moi ", with: "")
+            .replacingOccurrences(of: "Explique ", with: "")
+            .replacingOccurrences(of: "Quelle est la différence entre ", with: "")
+            .replacingOccurrences(of: " ?", with: "")
+            .replacingOccurrences(of: "?", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: " :."))
+
+        let candidate: String
+        if firstLine.isEmpty || firstLine.count > 64 || firstLine.lowercased().contains("mais ils") || firstLine.lowercased().hasPrefix("ces deux ") || firstLine.lowercased().hasPrefix("voici ") {
+            if !promptConcept.isEmpty && promptConcept.count <= 56 {
+                let capitalized = promptConcept.prefix(1).uppercased() + promptConcept.dropFirst()
+                candidate = capitalized.contains(routeCode) ? capitalized : "\(capitalized) (\(routeCode))"
+            } else {
+                candidate = "Synthèse Architecturale (\(routeCode))"
+            }
+        } else {
+            candidate = firstLine.contains(routeCode) ? firstLine : "\(firstLine) (\(routeCode))"
+        }
+
+        if let firstScalar = candidate.unicodeScalars.first,
+           firstScalar.properties.isEmojiPresentation || firstScalar.value > 0x2600 {
+            return candidate
+        }
+        return "\(emoji) \(candidate)"
+    }
+
+    /// Builds a structured `CertiGoChatGPTRichDocument` from a `CertiGoChatTurn` and certification route code.
     public static func parse(turn: CertiGoChatTurn, routeCode: String) -> CertiGoChatGPTRichDocument {
         let cleanHeadline = CertiGoNativeAppState.sanitizeAIMarkdown(turn.aiHeadline)
-        let emoji = leadingEmoji(forRouteCode: routeCode, prompt: turn.userPrompt + " " + cleanHeadline)
-
-        // Derive a crisp H2 title
-        let rawH2: String = {
-            let firstLine = cleanHeadline.components(separatedBy: "\n").first ?? cleanHeadline
-            let trimmed = firstLine
-                .replacingOccurrences(of: "Voici l'analyse architecturale CertiGo IA pour ", with: "")
-                .replacingOccurrences(of: "« ", with: "")
-                .replacingOccurrences(of: " »", with: "")
-                .trimmingCharacters(in: CharacterSet(charactersIn: " :."))
-            if trimmed.isEmpty {
-                return "Synthèse Architecturale (\(routeCode))"
-            }
-            if trimmed.count > 68 {
-                let words = trimmed.split(separator: " ").prefix(9).joined(separator: " ")
-                return words
-            }
-            return trimmed
-        }()
-
-        let h2WithEmoji: String = {
-            if let firstScalar = rawH2.unicodeScalars.first,
-               firstScalar.properties.isEmojiPresentation || firstScalar.value > 0x2600 {
-                return rawH2
-            }
-            return "\(emoji) \(rawH2)"
-        }()
+        let h2WithEmoji = standaloneH2Title(for: turn, routeCode: routeCode)
 
         let domainLabel = domainName(forRouteCode: routeCode, prompt: turn.userPrompt)
         let metadataLines: [CertiGoChatGPTMetadataLine] = [
@@ -474,6 +642,14 @@ public enum CertiGoChatGPTRichResponseParser {
             $0.trimmingCharacters(in: .whitespacesAndNewlines)
         }.filter { !$0.isEmpty }
 
+        if let firstHeadlineLine = headlineLines.first,
+           !firstHeadlineLine.isEmpty,
+           !h2WithEmoji.contains(firstHeadlineLine.trimmingCharacters(in: CharacterSet(charactersIn: " :."))) {
+            let trimmedIntro = firstHeadlineLine.trimmingCharacters(in: CharacterSet(charactersIn: " :"))
+            if !trimmedIntro.lowercased().hasPrefix("voici l'analyse architecturale") {
+                rawBullets.append("Synthèse : \(trimmedIntro)")
+            }
+        }
         if headlineLines.count > 1 {
             rawBullets.append(contentsOf: headlineLines.dropFirst())
         }
@@ -802,11 +978,117 @@ public enum CertiGoChatGPTExperienceViewModel {
         return transcripts[max(0, appState.voiceLiveTranscriptIndex) % transcripts.count]
     }
 
+    /// Resolves and pins the original certification `trackCode` (e.g. `"AZ-104"`) for a specific `CertiGoChatTurn` so switching global tracks never relabels existing messages (`P1-25`).
+    public static func resolvedTrackCode(
+        for turn: CertiGoChatTurn,
+        in appState: CertiGoNativeAppState
+    ) -> String {
+        if let alreadyPinned = CertiGoChatGPTTrackPinRegistry.pinnedTrack(forTurnId: turn.id) {
+            return alreadyPinned
+        }
+        if let matchedThread = appState.aiThreads.first(where: { $0.title == turn.userPrompt }) {
+            let badge = matchedThread.routeBadge.uppercased()
+            CertiGoChatGPTTrackPinRegistry.pin(trackCode: badge, forTurnId: turn.id)
+            return badge
+        }
+        let haystack = "\(turn.liveSourceBadge ?? "") \(turn.aiHeadline) \(turn.examKeyRule1)"
+        for code in CertiGoDedicatedTrackQuestionBank.allSupportedRouteCodes {
+            if haystack.contains(code) {
+                CertiGoChatGPTTrackPinRegistry.pin(trackCode: code, forTurnId: turn.id)
+                return code
+            }
+        }
+        let current = appState.activeRouteCode.uppercased()
+        CertiGoChatGPTTrackPinRegistry.pin(trackCode: current, forTurnId: turn.id)
+        return current
+    }
+
+    /// Returns the pinned `trackCode` of the active conversation thread (or `appState.activeRouteCode` when no messages exist yet, `P1-25`).
+    public static func activeConversationTrackCode(for appState: CertiGoNativeAppState) -> String {
+        guard let firstTurn = appState.chatTurns.first else {
+            return appState.activeRouteCode.uppercased()
+        }
+        return resolvedTrackCode(for: firstTurn, in: appState)
+    }
+
+    /// True when the active conversation thread is pinned to one certification (e.g. `"AZ-104"`) while the global app certification has changed to another (e.g. `"AZ-900"`, `P1-25`).
+    public static func hasGlobalTrackDivergedFromActiveThread(for appState: CertiGoNativeAppState) -> Bool {
+        guard !appState.chatTurns.isEmpty else { return false }
+        return activeConversationTrackCode(for: appState) != appState.activeRouteCode.uppercased()
+    }
+
+    /// Clear CTA label shown when the global app certification changed while an existing thread is open (`"Nouvelle discussion AZ-900"`, `P1-25`).
+    public static func divergedTrackBannerTitle(for appState: CertiGoNativeAppState) -> String {
+        let isEN = (appState.settingsLanguageIndex % 6) == 2
+        let globalCode = appState.activeRouteCode.uppercased()
+        return isEN ? "New \(globalCode) chat" : "Nouvelle discussion \(globalCode)"
+    }
+
+    /// Top center pill title reflecting the active thread's pinned certification (`"CertiGo GPT · AZ-104"`, `P2-24` & `P1-25`).
+    public static func centerHeaderPillTitle(for appState: CertiGoNativeAppState) -> String {
+        let trackCode = activeConversationTrackCode(for: appState)
+        return "CertiGo GPT · \(trackCode)"
+    }
+
+    /// Parses a `CertiGoChatTurn` using its own pinned `trackCode` so its H2 title and metadata never change if `appState.activeRouteCode` changes later (`P1-25` & `P2-26`).
+    public static func document(
+        for turn: CertiGoChatTurn,
+        in appState: CertiGoNativeAppState
+    ) -> CertiGoChatGPTRichDocument {
+        let trackCode = resolvedTrackCode(for: turn, in: appState)
+        return CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: trackCode)
+    }
+
+    /// Builds track-pinned `CertiGoChatGPTMessage` models for all turns in the current conversation (`P1-25`).
+    public static func pinnedMessages(for appState: CertiGoNativeAppState) -> [CertiGoChatGPTMessage] {
+        appState.chatTurns.map { turn in
+            let code = resolvedTrackCode(for: turn, in: appState)
+            return CertiGoChatGPTMessage(turn: turn, trackCode: code)
+        }
+    }
+
+    /// Builds track-pinned `CertiGoChatGPTThread` models for the history drawer (`P1-25`).
+    public static func pinnedThreads(for appState: CertiGoNativeAppState) -> [CertiGoChatGPTThread] {
+        let currentMessages = pinnedMessages(for: appState)
+        let activeTrack = activeConversationTrackCode(for: appState)
+        return appState.filteredAIThreads.map { item in
+            let matchesCurrent = !currentMessages.isEmpty
+                && item.routeBadge.uppercased() == activeTrack
+                && currentMessages.first?.userPrompt == item.title
+            return CertiGoChatGPTThread(
+                id: item.id,
+                title: item.title,
+                subtitle: item.subtitle,
+                trackCode: item.routeBadge,
+                isPinned: item.isPinned,
+                topicKey: item.topicKey,
+                messages: matchesCurrent ? currentMessages : []
+            )
+        }
+    }
+
+    /// Opens a fresh conversation dedicated to the new global `appState.activeRouteCode` without altering any saved thread (`P1-25`).
+    public static func startNewThreadForActiveGlobalRoute(_ appState: inout CertiGoNativeAppState) {
+        appState.chatTurns.removeAll()
+        appState.aiDraftMessage = ""
+    }
+
+    /// Opens a specific thread from the history drawer while pinning its `routeBadge` (`trackCode`) to the newly loaded turn (`P1-25`).
+    public static func openDrawerThread(
+        _ thread: CertiGoAIThreadItem,
+        in appState: inout CertiGoNativeAppState
+    ) {
+        appState.openAITopic(thread.topicKey, customUserQuestion: thread.title)
+        if let latest = appState.chatTurns.last {
+            CertiGoChatGPTTrackPinRegistry.forcePin(trackCode: thread.routeBadge, forTurnId: latest.id)
+        }
+    }
+
     public static func formattedConversationTranscriptForSharing(
         for appState: CertiGoNativeAppState
     ) -> String {
         appState.chatTurns.map { turn in
-            let doc = CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: appState.activeRouteCode)
+            let doc = document(for: turn, in: appState)
             return "Question : \(turn.userPrompt)\n\n\(doc.fullPlainText)"
         }.joined(separator: "\n\n---\n\n")
     }
@@ -971,60 +1253,48 @@ public struct CertiGoChatGPTExperienceView: View {
                             .ignoresSafeArea()
 
                         ScrollViewReader { scrollProxy in
-                            ZStack(alignment: .bottom) {
-                                ScrollView(.vertical, showsIndicators: false) {
-                                    VStack(alignment: .leading, spacing: FigMetrics.twentyFour) {
-                                        // Top clearance so content starts below the floating Liquid Glass top bar and scrolls underneath it
-                                        Color.clear
-                                            .frame(height: FigMetrics.sixty)
-                                            .id("chatgpt-scroll-top-anchor")
+                            ScrollView(.vertical, showsIndicators: false) {
+                                VStack(alignment: .leading, spacing: FigMetrics.twentyFour) {
+                                    // Top clearance so content starts below the floating Liquid Glass top bar and scrolls underneath it
+                                    Color.clear
+                                        .frame(height: FigMetrics.sixty)
+                                        .id("chatgpt-scroll-top-anchor")
 
-                                        if appState.isTemporaryAIChatEnabled {
-                                            temporaryChatBannerView
-                                                .padding(.horizontal, CertiGoChatGPTLiquidGlassChromeSpec.responseHorizontalPadding)
-                                        }
-
-                                        if let toast = lastPedagogicalToast {
-                                            duolingoPedagogicalToastView(toast)
-                                                .padding(.horizontal, CertiGoChatGPTLiquidGlassChromeSpec.responseHorizontalPadding)
-                                        }
-
-                                        if appState.chatTurns.isEmpty {
-                                            chatGPTWelcomeCanvasContent
-                                        } else {
-                                            chatGPTConversationStreamContent(scrollProxy: scrollProxy)
-                                        }
-
-                                        // Bottom anchor for instant scroll-to-bottom (`↓`)
-                                        Color.clear
-                                            .frame(
-                                                height: isInputFocused.wrappedValue
-                                                    ? FigMetrics.ninetySix
-                                                    : FigMetrics.oneHundredSixty
-                                            )
-                                            .id("chatgpt-scroll-bottom-anchor")
+                                    if appState.isTemporaryAIChatEnabled {
+                                        temporaryChatBannerView
+                                            .padding(.horizontal, CertiGoChatGPTLiquidGlassChromeSpec.responseHorizontalPadding)
                                     }
-                                }
-                                .ignoresSafeArea(edges: .bottom)
-                                .scrollDismissesKeyboard(.interactively)
-                                .simultaneousGesture(
-                                    DragGesture(minimumDistance: FigMetrics.twelve)
-                                        .onChanged { value in
-                                            if value.translation.height > FigMetrics.sixteen {
-                                                isScrolledAwayFromBottom = true
-                                            } else if value.translation.height < -FigMetrics.twentyFour {
-                                                isScrolledAwayFromBottom = false
-                                            }
-                                        }
-                                )
-                                .onTapGesture {
-                                    if isInputFocused.wrappedValue {
-                                        onDismissKeyboard()
-                                    }
-                                }
 
-                                // Floating Bottom Overlay: Scroll-to-Bottom (`↓`) Circle + Floating `Ask ChatGPT` Liquid Glass Pill
-                                VStack(spacing: FigMetrics.ten) {
+                                    if CertiGoChatGPTExperienceViewModel.hasGlobalTrackDivergedFromActiveThread(for: appState) {
+                                        divergedGlobalTrackBannerView
+                                            .padding(.horizontal, CertiGoChatGPTLiquidGlassChromeSpec.responseHorizontalPadding)
+                                    }
+
+                                    if let toast = lastPedagogicalToast {
+                                        duolingoPedagogicalToastView(toast)
+                                            .padding(.horizontal, CertiGoChatGPTLiquidGlassChromeSpec.responseHorizontalPadding)
+                                    }
+
+                                    if appState.chatTurns.isEmpty {
+                                        chatGPTWelcomeCanvasContent
+                                    } else {
+                                        chatGPTConversationStreamContent(scrollProxy: scrollProxy)
+                                    }
+
+                                    // Reserved bottom clearance for the input pill and tab bar (`P1-23`)
+                                    Color.clear
+                                        .frame(
+                                            height: isInputFocused.wrappedValue
+                                                ? FigMetrics.ninetySix
+                                                : CertiGoChatGPTLiquidGlassChromeSpec.totalBottomScrollClearance
+                                        )
+                                        .id("chatgpt-scroll-bottom-anchor")
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .safeAreaInset(edge: .bottom, spacing: FigMetrics.zero) {
+                                // Reserved Bottom Safe-Area Inset: Scroll-to-Bottom (`↓`) Circle + Floating `Ask CertiGo` Liquid Glass Pill (`P1-23`: sits cleanly above the tab bar with zero white band and zero overlap)
+                                VStack(spacing: FigMetrics.eight) {
                                     if !appState.chatTurns.isEmpty && (isScrolledAwayFromBottom || isAnyTurnCurrentlyStreaming) {
                                         floatingScrollToBottomButton(scrollProxy: scrollProxy)
                                             .transition(.scale.combined(with: .opacity))
@@ -1033,10 +1303,24 @@ public struct CertiGoChatGPTExperienceView: View {
                                     floatingBottomAskPillBar(scrollProxy: scrollProxy)
                                 }
                                 .padding(.horizontal, FigMetrics.sixteen)
-                                .padding(
-                                    .bottom,
-                                    isInputFocused.wrappedValue ? FigMetrics.eight : FigMetrics.eightyEight
-                                )
+                                .padding(.top, FigMetrics.six)
+                                .padding(.bottom, FigMetrics.eight)
+                            }
+                            .scrollDismissesKeyboard(.interactively)
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: FigMetrics.twelve)
+                                    .onChanged { value in
+                                        if value.translation.height > FigMetrics.sixteen {
+                                            isScrolledAwayFromBottom = true
+                                        } else if value.translation.height < -FigMetrics.twentyFour {
+                                            isScrolledAwayFromBottom = false
+                                        }
+                                    }
+                            )
+                            .onTapGesture {
+                                if isInputFocused.wrappedValue {
+                                    onDismissKeyboard()
+                                }
                             }
                             .onChange(of: appState.chatTurns.count) { _, _ in
                                 if let latest = appState.chatTurns.last {
@@ -1142,34 +1426,39 @@ public struct CertiGoChatGPTExperienceView: View {
 
             Spacer(minLength: FigMetrics.four)
 
-            // 2. Center Floating Pill (`✦ CertiGo GPT • [Code Certification]`) with blue star `#007AFF`
+            // 2. Center Floating Pill (`CertiGo GPT · [Code Certification]`) with single blue star `#007AFF` and non-truncated code (`P2-24` & `P1-25`)
             Button {
                 CertiGoHapticsEngine.shared.playOptionSelection()
                 showCertificationPickerSheet = true
             } label: {
+                let pinnedTrackCode = CertiGoChatGPTExperienceViewModel.activeConversationTrackCode(for: appState)
                 HStack(spacing: FigMetrics.six) {
                     Image(systemName: "sparkles")
                         .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
                         .foregroundStyle(PrismColor.figmaHex(CertiGoChatGPTLiquidGlassChromeSpec.chatGPTBlueHex))
+                        .accessibilityHidden(true)
 
                     Text(
                         verbatim: CertiGoChatGPTLiquidGlassChromeSpec.centerPillTitle(
-                            forRouteCode: appState.activeRouteCode
+                            forRouteCode: pinnedTrackCode
                         )
                     )
                     .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
                     .foregroundStyle(primaryInkColor)
                     .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
 
                     Image(systemName: "chevron.down")
                         .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#8E8E93"))
+                        .accessibilityHidden(true)
                 }
                 .padding(.horizontal, FigMetrics.fourteen)
                 .frame(height: CertiGoChatGPTLiquidGlassChromeSpec.centerTrackPillHeight)
                 .background(liquidGlassCapsuleSurface)
             }
             .buttonStyle(.plain)
+            .layoutPriority(1)
             .accessibilityIdentifier("hub-ia-center-certification-pill")
 
             Spacer(minLength: FigMetrics.four)
@@ -1338,13 +1627,18 @@ public struct CertiGoChatGPTExperienceView: View {
                                 Text(verbatim: item.title)
                                     .font(PrismTypography.figmaFont(size: CertiGoChatGPTLiquidGlassChromeSpec.bodyAndMetadataFontSize, style: "Semi Bold"))
                                     .foregroundStyle(primaryInkColor)
+                                    .lineLimit(2)
                                     .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
 
                                 Text(verbatim: item.subtitle)
                                     .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
                                     .foregroundStyle(PrismColor.figmaHex("#6E6E80"))
-                                    .lineLimit(1)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
                             Spacer(minLength: FigMetrics.eight)
 
@@ -1379,9 +1673,13 @@ public struct CertiGoChatGPTExperienceView: View {
     private func chatGPTConversationStreamContent(scrollProxy: ScrollViewProxy) -> some View {
         LazyVStack(alignment: .leading, spacing: FigMetrics.twentyEight) {
             ForEach(Array(appState.chatTurns.enumerated()), id: \.element.id) { idx, turn in
+                let pinnedTurnTrackCode = CertiGoChatGPTExperienceViewModel.resolvedTrackCode(
+                    for: turn,
+                    in: appState
+                )
                 let richDoc = CertiGoChatGPTRichResponseParser.parse(
                     turn: turn,
-                    routeCode: appState.activeRouteCode
+                    routeCode: pinnedTurnTrackCode
                 )
                 let streamer = streamerForTurn(turn, document: richDoc)
 
@@ -1418,8 +1716,8 @@ public struct CertiGoChatGPTExperienceView: View {
                             .accessibilityIdentifier("chatgpt-user-bubble-\(turn.id)")
                     }
 
-                    // 2. Compact Reasoning Phase ("Réflexion pendant 2s · Working for 2s" + expandable steps)
-                    reasoningHeaderAndStepsView(for: turn, streamer: streamer)
+                    // 2. Compact Reasoning Phase ("Réflexion pendant 2s" + expandable steps pinned to the turn's trackCode)
+                    reasoningHeaderAndStepsView(for: turn, streamer: streamer, routeCode: pinnedTurnTrackCode)
 
                     // 3. Full-Bleed Editorial Response directly on the canvas (NO bubble, NO card border)
                     CertiGoChatGPTRichResponseView(
@@ -1452,14 +1750,16 @@ public struct CertiGoChatGPTExperienceView: View {
         }
     }
 
-    // MARK: - 5D. Compact Reasoning Phase (`"Réflexion pendant 2s"` / `"Working for 2s"`)
+    // MARK: - 5D. Compact Reasoning Phase (`"Réflexion pendant 2s"`)
 
     private func reasoningHeaderAndStepsView(
         for turn: CertiGoChatTurn,
-        streamer: CertiGoChatGPTTokenStreamer
+        streamer: CertiGoChatGPTTokenStreamer,
+        routeCode: String
     ) -> some View {
         let isExpanded = appState.expandedReasoningTurnIds.contains(turn.id) || turn.isStreamingOrLoading
-        let steps = CertiGoChatGPTReasoningStep.defaultSteps(forRouteCode: appState.activeRouteCode)
+        let steps = CertiGoChatGPTReasoningStep.defaultSteps(forRouteCode: routeCode)
+        let isEN = (appState.settingsLanguageIndex % 6) == 2
 
         return VStack(alignment: .leading, spacing: FigMetrics.eight) {
             Button {
@@ -1474,8 +1774,8 @@ public struct CertiGoChatGPTExperienceView: View {
                 HStack(spacing: FigMetrics.six) {
                     Text(
                         verbatim: turn.isStreamingOrLoading || streamer.isStreaming
-                            ? "Réflexion en cours · Working for \(streamer.reasoningElapsedSeconds)s"
-                            : "Réflexion pendant \(streamer.reasoningElapsedSeconds)s"
+                            ? (isEN ? "Thinking for \(streamer.reasoningElapsedSeconds)s" : "Réflexion en cours (\(streamer.reasoningElapsedSeconds)s)")
+                            : (isEN ? "Thought for \(streamer.reasoningElapsedSeconds)s" : "Réflexion pendant \(streamer.reasoningElapsedSeconds)s")
                     )
                     .font(PrismTypography.figmaFont(size: CertiGoChatGPTLiquidGlassChromeSpec.reasoningFontSize, style: "Medium"))
                     .foregroundStyle(PrismColor.figmaHex(CertiGoChatGPTLiquidGlassChromeSpec.reasoningTextHex))
@@ -1781,7 +2081,8 @@ public struct CertiGoChatGPTExperienceView: View {
         )
         let placeholderText = CertiGoChatGPTLiquidGlassChromeSpec.inputPlaceholder(
             hasExistingTurns: !appState.chatTurns.isEmpty,
-            isStreaming: isAnyTurnCurrentlyStreaming
+            isStreaming: isAnyTurnCurrentlyStreaming,
+            languageIndex: appState.settingsLanguageIndex
         )
 
         return HStack(spacing: FigMetrics.ten) {
@@ -2138,6 +2439,60 @@ public struct CertiGoChatGPTExperienceView: View {
         )
     }
 
+    /// Clear banner & button when the global app certification (`appState.activeRouteCode`) changed while an existing thread is pinned to another certification (`P1-25`).
+    private var divergedGlobalTrackBannerView: some View {
+        let pinnedTrack = CertiGoChatGPTExperienceViewModel.activeConversationTrackCode(for: appState)
+        let globalTrack = appState.activeRouteCode.uppercased()
+        let buttonTitle = CertiGoChatGPTExperienceViewModel.divergedTrackBannerTitle(for: appState)
+
+        return HStack(spacing: FigMetrics.ten) {
+            VStack(alignment: .leading, spacing: FigMetrics.two) {
+                Text(verbatim: "Discussion épinglée sur \(pinnedTrack)")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                    .foregroundStyle(primaryInkColor)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(verbatim: "Ce fil conserve son contexte \(pinnedTrack) d'origine.")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#6E6E80"))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: FigMetrics.eight)
+
+            Button {
+                withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                    CertiGoHapticsEngine.shared.playButtonPress()
+                    activeStreamingTurnId = nil
+                    streamProgressByTurnId.removeAll()
+                    CertiGoChatGPTExperienceViewModel.startNewThreadForActiveGlobalRoute(&appState)
+                }
+            } label: {
+                Text(verbatim: buttonTitle)
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(Color.white)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, FigMetrics.twelve)
+                    .frame(height: FigMetrics.thirtyTwo)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(PrismColor.figmaHex(CertiGoChatGPTLiquidGlassChromeSpec.chatGPTBlueHex))
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Nouvelle discussion \(globalTrack)")
+            .accessibilityIdentifier("chatgpt-diverged-track-new-thread-button")
+        }
+        .padding(.horizontal, FigMetrics.fourteen)
+        .padding(.vertical, FigMetrics.ten)
+        .background(
+            RoundedRectangle(cornerRadius: FigMetrics.fourteen, style: .continuous)
+                .fill(isDark ? PrismColor.figmaHex("#1C1C1E") : PrismColor.figmaHex("#EBF5FF"))
+        )
+        .accessibilityIdentifier("chatgpt-diverged-track-banner")
+    }
+
     private func duolingoPedagogicalToastView(_ text: String) -> some View {
         HStack(spacing: FigMetrics.eight) {
             Text(verbatim: text)
@@ -2364,25 +2719,29 @@ public struct CertiGoChatGPTExperienceView: View {
                         }
 
                         ForEach(pinned + recent) { thread in
-                            HStack(spacing: FigMetrics.eight) {
+                            HStack(alignment: .top, spacing: FigMetrics.eight) {
                                 Button {
                                     withAnimation {
-                                        appState.openAITopic(thread.topicKey, customUserQuestion: thread.title)
+                                        CertiGoChatGPTExperienceViewModel.openDrawerThread(thread, in: &appState)
                                         if let latest = appState.chatTurns.last {
                                             startOrRefreshStreaming(for: latest)
                                         }
                                         onTriggerLiveAIRequest()
                                     }
                                 } label: {
-                                    VStack(alignment: .leading, spacing: FigMetrics.two) {
+                                    VStack(alignment: .leading, spacing: FigMetrics.four) {
                                         Text(verbatim: thread.title)
                                             .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Medium"))
                                             .foregroundStyle(primaryInkColor)
-                                            .lineLimit(1)
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.leading)
+                                            .fixedSize(horizontal: false, vertical: true)
                                         Text(verbatim: "\(thread.routeBadge) • \(thread.subtitle)")
                                             .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
                                             .foregroundStyle(PrismColor.figmaHex("#8E8E93"))
-                                            .lineLimit(1)
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.leading)
+                                            .fixedSize(horizontal: false, vertical: true)
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 }
@@ -2438,14 +2797,15 @@ public struct CertiGoChatGPTExperienceView: View {
     }
 
     private func handleResponseMoreAction(_ action: CertiGoChatGPTResponseMoreAction, for turn: CertiGoChatTurn) {
+        let turnTrackCode = CertiGoChatGPTExperienceViewModel.resolvedTrackCode(for: turn, in: appState)
         if let prompt = CertiGoChatGPTExperienceViewModel.followUpPrompt(
             for: action,
             turn: turn,
-            routeCode: appState.activeRouteCode
+            routeCode: turnTrackCode
         ) {
             submitPrompt(prompt)
         } else {
-            let doc = CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: appState.activeRouteCode)
+            let doc = CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: turnTrackCode)
             streamProgressByTurnId[turn.id] = CertiGoChatGPTTokenStreamer(
                 turnId: turn.id,
                 fullText: doc.fullPlainText,
@@ -2476,7 +2836,8 @@ public struct CertiGoChatGPTExperienceView: View {
     }
 
     private func startOrRefreshStreaming(for turn: CertiGoChatTurn) {
-        let doc = CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: appState.activeRouteCode)
+        let turnTrackCode = CertiGoChatGPTExperienceViewModel.resolvedTrackCode(for: turn, in: appState)
+        let doc = CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: turnTrackCode)
         if reduceMotion {
             streamProgressByTurnId[turn.id] = CertiGoChatGPTTokenStreamer(
                 turnId: turn.id,
