@@ -11621,6 +11621,7 @@ public enum FigMetrics {
     public static let thirteen: CGFloat = 13
     public static let fourteen: CGFloat = 14
     public static let fifteen: CGFloat = 15
+    public static let fifteenPointFive: CGFloat = 15.5
     public static let fifteenOrSixteen: CGFloat = 15
     public static let sixteen: CGFloat = 16
     public static let seventeen: CGFloat = 17
@@ -11652,6 +11653,7 @@ public enum FigMetrics {
     public static let sixtyEight: CGFloat = 68
     public static let seventy: CGFloat = 70
     public static let seventyTwo: CGFloat = 72
+    public static let seventyFour: CGFloat = 74
     public static let seventySix: CGFloat = 76
     public static let eighty: CGFloat = 80
     public static let eightyTwo: CGFloat = 82
@@ -11664,6 +11666,7 @@ public enum FigMetrics {
     public static let oneHundredFour: CGFloat = 104
     public static let oneHundredTen: CGFloat = 110
     public static let oneHundredTwelve: CGFloat = 112
+    public static let oneHundredFourteen: CGFloat = 114
     public static let oneHundredSixteen: CGFloat = 116
     public static let oneHundredEighteen: CGFloat = 118
     public static let oneHundredTwenty: CGFloat = 120
@@ -11685,6 +11688,7 @@ public enum FigMetrics {
     public static let twoHundredTen: CGFloat = 210
     public static let twoHundredTwenty: CGFloat = 220
     public static let twoHundredThirty: CGFloat = 230
+    public static let twoHundredThirtyFive: CGFloat = 235
     public static let twoHundredForty: CGFloat = 240
     public static let twoHundredFortyEight: CGFloat = 248
     public static let twoHundredFifty: CGFloat = 250
@@ -11738,6 +11742,13 @@ public enum FigPalette {
     public static let amber500: String = "#eab308"
     public static let orange600: String = "#ea580c"
     public static let red500: String = "#ef4444"
+    public static let appleNewsCoralRed: String = "#FA2D48"
+    public static let appleNewsOrange: String = "#FF6B00"
+    public static let appleNewsDarkCard: String = "#24272D"
+    public static let appleNewsSystemGray: String = "#8E8E93"
+    public static let appleNewsBackground: String = "#F2F2F7"
+    public static let appleNewsTintedSection: String = "#E9ECF2"
+    public static let appleNewsAmberBadge: String = "#F59E0B"
 }
 
 /// Rule 3 : iOS 26 True Liquid Glass Convex Water Droplet (`CertiGoTrueLiquidGlassDropletView`) with concentric 26pt radius (`32 - 6`), 6 optical layers, real-time intensity interpolation (`0% .. 100%`), and physical drag stretch (`1.10x × 1.04y`).

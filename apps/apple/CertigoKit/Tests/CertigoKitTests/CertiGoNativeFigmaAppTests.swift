@@ -3041,4 +3041,83 @@ struct CertiGoNativeFigmaAppTests {
             "Undeclared FigPalette references found in Sources/Prism: \(missingPaletteOccurrences.joined(separator: ", "))"
         )
     }
+
+    @Test("Apple News iOS Redesign (7 Mobbin Captures) × Duolingo × Floating Liquid Glass Controls in Actus & Article Reader")
+    @MainActor
+    func testAppleNewsIOSRedesignWithDuolingoAndFloatingLiquidGlassControls() throws {
+        // 1. Verify Apple News FigMetrics & FigPalette tokens
+        #expect(FigMetrics.fifteenPointFive == 15.5)
+        #expect(FigMetrics.seventyFour == 74)
+        #expect(FigMetrics.eightyTwo == 82)
+        #expect(FigMetrics.oneHundredFour == 104)
+        #expect(FigMetrics.oneHundredFourteen == 114)
+        #expect(FigMetrics.twoHundredTwenty == 220)
+        #expect(FigMetrics.twoHundredThirtyFive == 235)
+        #expect(FigPalette.appleNewsCoralRed == "#FA2D48")
+        #expect(FigPalette.appleNewsOrange == "#FF6B00")
+        #expect(FigPalette.appleNewsDarkCard == "#24272D")
+        #expect(FigPalette.appleNewsSystemGray == "#8E8E93")
+
+        // 2. Verify Apple News Masthead, Edition Stamp, and 7 Floating Liquid Glass Topic Pills
+        var appState = CertiGoNativeAppState(restoreFromDisk: false)
+        #expect(appState.appleNewsMastheadDateLine(languageIndex: 0) == "29 octobre")
+        #expect(appState.appleNewsMastheadDateLine(languageIndex: 2) == "October 29")
+        #expect(appState.appleNewsMastheadBrandLine(languageIndex: 0) == " Actus Tech")
+        #expect(appState.appleNewsMastheadBrandLine(languageIndex: 2) == " Tech News+")
+        #expect(CertiGoNativeAppState.appleNewsEditionStampText == "TECH EDITION • CERTIGO")
+
+        #expect(CertiGoAppleNewsTopicPillID.allCases.count == 7)
+        #expect(CertiGoAppleNewsTopicPillID.pillHeight == 38)
+        #expect(CertiGoAppleNewsTopicPillID.pillCornerRadius == 19)
+        #expect(CertiGoAppleNewsTopicPillID.labelFontSize == 15)
+        #expect(CertiGoAppleNewsTopicPillID.allCases.map { $0.displayTitle(languageIndex: 0) } == [
+            "À la Une", "IA & LLM", "Cloud & Infra", "Cybersécurité", "Dev & Open Source", "Audio 🎧", "Enregistrés"
+        ])
+
+        for pill in CertiGoAppleNewsTopicPillID.allCases {
+            appState.selectAppleNewsTopicPill(pill)
+            #expect(appState.techNewsState.selectedAppleNewsTopicPill == pill)
+            #expect(!pill.sfSymbolName.isEmpty)
+            #expect(pill.iconColorHex.hasPrefix("#"))
+        }
+        appState.selectAppleNewsTopicPill(.topStories)
+
+        // 3. Verify Apple News Sections (`À la Une`, `IA Générative & Modèles ›`, `Tendances Tech` 1..4, `Écouter maintenant`)
+        #expect(appState.appleNewsAITopicSectionArticles.count >= 3)
+        #expect(appState.appleNewsTrendingFourArticles.count == 4)
+        #expect(appState.appleNewsListenNowArticles.count == 3)
+
+        let hero = try #require(appState.filteredTechNewsArticles.first)
+        #expect(hero.appleNewsHeroFooterMetadata(languageIndex: 0).contains("•"))
+        #expect(hero.appleNewsHeroFooterMetadata(languageIndex: 0).hasSuffix("3 min"))
+        #expect(hero.appleNewsCompactFooterMetadata(languageIndex: 0).contains("•"))
+        #expect(hero.appleNewsAudioDurationPillText(languageIndex: 0).hasPrefix("🎧 "))
+        #expect(hero.appleNewsBylineAndTimestamp(languageIndex: 0).hasPrefix("Par "))
+        #expect(hero.appleNewsPhotoCaptionCredit(languageIndex: 0).hasPrefix("Photo : "))
+
+        // 4. Verify Bookmarks, `Aa` Reader Font Size Cycling (16 -> 18 -> 21 -> 16 pt), and Audio Speeds (0.9x / 1.0x / 1.25x)
+        #expect(appState.isTechNewsArticleBookmarked(hero.id) == false)
+        appState.toggleTechNewsBookmark(forArticleId: hero.id)
+        #expect(appState.isTechNewsArticleBookmarked(hero.id) == true)
+        appState.toggleTechNewsBookmark(forArticleId: hero.id)
+        #expect(appState.isTechNewsArticleBookmarked(hero.id) == false)
+
+        #expect(appState.techNewsState.readerFontSizeTier == .standard18)
+        #expect(appState.cycleTechNewsReaderFontSize() == 21)
+        #expect(appState.cycleTechNewsReaderFontSize() == 16)
+        #expect(appState.cycleTechNewsReaderFontSize() == 18)
+
+        #expect(CertiGoTechNewsAudioReaderState.appleNewsReaderSpeedMultipliers == [0.9, 1.0, 1.25])
+        appState.setTechNewsAudioSpeed(0.9)
+        #expect(appState.techNewsState.audioReader.speedBadgeText == "0.9x")
+        appState.setTechNewsAudioSpeed(1.25)
+        #expect(appState.techNewsState.audioReader.speedBadgeText == "1.25x")
+        appState.setTechNewsAudioSpeed(1.0)
+        #expect(appState.techNewsState.audioReader.speedBadgeText == "1.0x")
+
+        CertiGoTechNewsAudioReaderState.shared.togglePlayback(for: hero, language: 0)
+        #expect(CertiGoTechNewsAudioReaderState.shared.activeArticleId == hero.id)
+        #expect(CertiGoTechNewsAudioReaderState.shared.isSpeaking == true)
+        CertiGoTechNewsAudioReaderState.shared.stop()
+    }
 }
