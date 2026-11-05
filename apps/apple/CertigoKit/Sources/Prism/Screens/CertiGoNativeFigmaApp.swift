@@ -495,8 +495,11 @@ public struct CertiGoLessonMicroSlide: Equatable, Sendable {
     public let keyTakeawayPill: String
     public let serviceAssetName: String
 
+    public var body: String { bodyParagraph }
+    public var highlight: String { keyTakeawayPill }
+
     public static func formatNumberedPointsOnSeparateLines(_ raw: String) -> String {
-        var text = raw.strippingMarkdownAsterisks
+        var text = raw.sanitizingFrenchFondEtForme
         for num in 2...9 {
             text = text
                 .replacingOccurrences(of: " · \(num). ", with: "\n\(num). ")
@@ -513,10 +516,14 @@ public struct CertiGoLessonMicroSlide: Equatable, Sendable {
         keyTakeawayPill: String,
         serviceAssetName: String
     ) {
-        self.stepBadge = stepBadge.strippingMarkdownAsterisks
-        self.title = title.strippingMarkdownAsterisks
-        self.bodyParagraph = Self.formatNumberedPointsOnSeparateLines(bodyParagraph)
-        self.keyTakeawayPill = keyTakeawayPill.strippingMarkdownAsterisks
+        self.stepBadge = stepBadge.sanitizingFrenchFondEtForme
+        self.title = title.sanitizingFrenchFondEtForme
+        self.bodyParagraph = CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+            Self.formatNumberedPointsOnSeparateLines(bodyParagraph)
+        )
+        self.keyTakeawayPill = CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+            keyTakeawayPill.sanitizingFrenchFondEtForme
+        )
         self.serviceAssetName = serviceAssetName
     }
 }
@@ -916,21 +923,23 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
             isCorrect: Bool,
             whyWrongOrRight: String
         ) {
-            let cleanTitle = title.strippingMarkdownAsterisks
-            let cleanSub = subtitle?.strippingMarkdownAsterisks
+            let cleanTitle = title.sanitizingFrenchFondEtForme
+            let cleanSub = subtitle?.sanitizingFrenchFondEtForme
             let rawPlain = (plainLanguageTitle
-                ?? CertiGoPlainLanguageTranslator.simplifyOptionTitle(cleanTitle, subtitle: cleanSub)).strippingMarkdownAsterisks
+                ?? CertiGoPlainLanguageTranslator.simplifyOptionTitle(cleanTitle, subtitle: cleanSub)).sanitizingFrenchFondEtForme
             let distinctPlain = rawPlain == cleanTitle
-                ? CertiGoPlainLanguageTranslator.simplifyOptionTitle(cleanTitle, subtitle: cleanSub).strippingMarkdownAsterisks
+                ? CertiGoPlainLanguageTranslator.simplifyOptionTitle(cleanTitle, subtitle: cleanSub).sanitizingFrenchFondEtForme
                 : rawPlain
             self.id = id
             self.badge = badge
             self.title = cleanTitle
-            self.plainLanguageTitle = distinctPlain == cleanTitle ? "En clair : \(cleanTitle)" : distinctPlain
+            self.plainLanguageTitle = distinctPlain == cleanTitle
+                ? "Choisir l'option « \(cleanTitle) » dans ton environnement de travail"
+                : distinctPlain
             self.subtitle = cleanSub
             self.assetName = assetName
             self.isCorrect = isCorrect
-            self.whyWrongOrRight = whyWrongOrRight.strippingMarkdownAsterisks
+            self.whyWrongOrRight = CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(whyWrongOrRight.sanitizingFrenchFondEtForme)
         }
     }
 
@@ -1013,61 +1022,142 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
         variantGroupId: String = "",
         isReviewReplay: Bool = false
     ) {
-        let cleanDomainBadge = domainBadge.strippingMarkdownAsterisks
-        let cleanSubBadge = subBadge.strippingMarkdownAsterisks
-        let resolvedConceptTitle = (conceptTitle.isEmpty ? cleanDomainBadge : conceptTitle).strippingMarkdownAsterisks
-        let cleanPrompt = prompt.strippingMarkdownAsterisks
+        let cleanDomainBadge = domainBadge.sanitizingFrenchFondEtForme
+        let cleanSubBadge = subBadge.sanitizingFrenchFondEtForme
+        let resolvedConceptTitle = (conceptTitle.isEmpty ? cleanDomainBadge : conceptTitle).sanitizingFrenchFondEtForme
+        let cleanPrompt = prompt.sanitizingFrenchFondEtForme
         let rawPlain = (plainLanguagePrompt
             ?? CertiGoPlainLanguageTranslator.simplifyPrompt(
                 cleanPrompt,
                 forExerciseId: id,
                 conceptTitle: resolvedConceptTitle
-            )).strippingMarkdownAsterisks
+            )).sanitizingFrenchFondEtForme
         let distinctPlainPrompt = rawPlain == cleanPrompt
             ? CertiGoPlainLanguageTranslator.simplifyPrompt(
                 cleanPrompt,
                 forExerciseId: id,
                 conceptTitle: resolvedConceptTitle
-            ).strippingMarkdownAsterisks
+            ).sanitizingFrenchFondEtForme
             : rawPlain
+        let cleanExamTip = CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(examTip.sanitizingFrenchFondEtForme)
+        let cleanGoldenRule = CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(comparisonGoldenRule.sanitizingFrenchFondEtForme)
+
+        var paddedOptions = options
+        if paddedOptions.count < 4 {
+            let letters = ["A", "B", "C", "D"]
+            if paddedOptions.isEmpty, !wordBankTargetTokens.isEmpty {
+                let targetSeq = wordBankTargetTokens.joined(separator: " ")
+                paddedOptions.append(
+                    OptionItem(
+                        id: "\(id)-opt-a",
+                        badge: "A",
+                        title: "Exécuter la commande complète « \(targetSeq) » dans le terminal",
+                        plainLanguageTitle: "Assembler la commande « \(targetSeq) » dans le bon ordre",
+                        isCorrect: true,
+                        whyWrongOrRight: cleanExamTip
+                    )
+                )
+            }
+            let extraFallbacks: [(title: String, plain: String, exp: String)] = [
+                (
+                    title: "Appliquer uniquement \(comparisonLeftTitle.sanitizingFrenchFondEtForme) sans garde-fou d'isolation dédié",
+                    plain: "Utiliser uniquement \(comparisonLeftTitle.sanitizingFrenchFondEtForme) sans activer la sécurité recommandée",
+                    exp: "Cette approche repose sur \(comparisonLeftTitle.sanitizingFrenchFondEtForme) et ne répond pas aux exigences de sécurité."
+                ),
+                (
+                    title: "Modifier manuellement les paramètres locaux sans passer par le plan de contrôle centralisé",
+                    plain: "Modifier les réglages à la main sur chaque machine sans règle centralisée",
+                    exp: "Une intervention manuelle isolée ne garantit ni la conformité ni la reproductibilité en production."
+                ),
+                (
+                    title: "Déployer la ressource dans un périmètre par défaut sans activer la politique de gouvernance",
+                    plain: "Créer la ressource avec les réglages par défaut sans verrou ni règle d'équipe",
+                    exp: "L'absence de politique explicite expose l'environnement aux erreurs de configuration."
+                )
+            ]
+            var fIdx = 0
+            while paddedOptions.count < 4 {
+                let letter = letters[paddedOptions.count]
+                let fb = extraFallbacks[fIdx % extraFallbacks.count]
+                fIdx += 1
+                paddedOptions.append(
+                    OptionItem(
+                        id: "\(id)-opt-\(paddedOptions.count + 1)",
+                        badge: letter,
+                        title: fb.title,
+                        plainLanguageTitle: fb.plain,
+                        isCorrect: false,
+                        whyWrongOrRight: fb.exp
+                    )
+                )
+            }
+        }
+
+        let balancedPairs = CertiGoDedicatedTrackQuestionBank.balanceOptionPairs(
+            paddedOptions.map { (badge: $0.badge, title: $0.title, plainTitle: $0.plainLanguageTitle, isCorrect: $0.isCorrect) },
+            domainContext: resolvedConceptTitle,
+            routeCode: cleanDomainBadge
+        )
+        let normalizedOptions: [OptionItem] = paddedOptions.enumerated().map { idx, opt in
+            let pair = balancedPairs[idx]
+            let richExp = CertiGoDedicatedTrackQuestionBank.buildRichExplanation(
+                rawExplanation: opt.whyWrongOrRight,
+                optionBadge: opt.badge,
+                optionTitle: pair.title,
+                isCorrect: opt.isCorrect,
+                examTip: cleanExamTip,
+                compRule: cleanGoldenRule
+            )
+            return OptionItem(
+                id: opt.id,
+                badge: ["A", "B", "C", "D"][min(idx, 3)],
+                title: pair.title,
+                plainLanguageTitle: pair.plainTitle,
+                subtitle: opt.subtitle,
+                assetName: opt.assetName,
+                isCorrect: opt.isCorrect,
+                whyWrongOrRight: richExp
+            )
+        }
+
         self.id = id
         self.formatCode = formatCode
         self.domainBadge = cleanDomainBadge
         self.subBadge = cleanSubBadge
         self.prompt = cleanPrompt
         self.plainLanguagePrompt = distinctPlainPrompt == cleanPrompt
-            ? "En clair : \(cleanPrompt)"
+            ? "Dans ton projet quotidien (\(resolvedConceptTitle)), comment règles-tu cette situation :\n\(cleanPrompt)"
             : distinctPlainPrompt
         let resolvedBridge = jargonGlossaryBridge
             ?? CertiGoPlainLanguageTranslator.buildJargonGlossaryBridge(
                 prompt: cleanPrompt,
-                options: options,
+                options: normalizedOptions,
                 exerciseId: id,
                 conceptTitle: resolvedConceptTitle
             )
         self.storedJargonGlossaryBridge = resolvedBridge.map {
             CertiGoJargonBridgeItem(
-                term: $0.term.strippingMarkdownAsterisks,
-                simpleMeaning: $0.simpleMeaning.strippingMarkdownAsterisks
+                term: $0.term.sanitizingFrenchFondEtForme,
+                simpleMeaning: $0.simpleMeaning.sanitizingFrenchFondEtForme
             )
         }
         self.mascotPose = mascotPose
-        self.options = options
-        self.cliPrefix = cliPrefix?.strippingMarkdownAsterisks
-        self.cliSuffix = cliSuffix?.strippingMarkdownAsterisks
-        self.expectedCLIInput = expectedCLIInput?.strippingMarkdownAsterisks
-        self.cliSuggestionBricks = cliSuggestionBricks.map(\.strippingMarkdownAsterisks)
-        self.wordBankTargetTokens = wordBankTargetTokens.map(\.strippingMarkdownAsterisks)
-        self.wordBankAllBricks = wordBankAllBricks.map(\.strippingMarkdownAsterisks)
-        self.matchingLeftItems = matchingLeftItems.map(\.strippingMarkdownAsterisks)
-        self.matchingRightItems = matchingRightItems.map(\.strippingMarkdownAsterisks)
-        self.hierarchyCorrectOrder = hierarchyCorrectOrder.map(\.strippingMarkdownAsterisks)
-        self.examTip = examTip.strippingMarkdownAsterisks
-        self.comparisonLeftTitle = comparisonLeftTitle.strippingMarkdownAsterisks
-        self.comparisonLeftBullets = comparisonLeftBullets.map(\.strippingMarkdownAsterisks)
-        self.comparisonRightTitle = comparisonRightTitle.strippingMarkdownAsterisks
-        self.comparisonRightBullets = comparisonRightBullets.map(\.strippingMarkdownAsterisks)
-        self.comparisonGoldenRule = comparisonGoldenRule.strippingMarkdownAsterisks
+        self.options = normalizedOptions
+        self.cliPrefix = cliPrefix?.sanitizingFrenchFondEtForme
+        self.cliSuffix = cliSuffix?.sanitizingFrenchFondEtForme
+        self.expectedCLIInput = expectedCLIInput?.sanitizingFrenchFondEtForme
+        self.cliSuggestionBricks = cliSuggestionBricks.map(\.sanitizingFrenchFondEtForme)
+        self.wordBankTargetTokens = wordBankTargetTokens.map(\.sanitizingFrenchFondEtForme)
+        self.wordBankAllBricks = wordBankAllBricks.map(\.sanitizingFrenchFondEtForme)
+        self.matchingLeftItems = matchingLeftItems.map(\.sanitizingFrenchFondEtForme)
+        self.matchingRightItems = matchingRightItems.map(\.sanitizingFrenchFondEtForme)
+        self.hierarchyCorrectOrder = hierarchyCorrectOrder.map(\.sanitizingFrenchFondEtForme)
+        self.examTip = cleanExamTip
+        self.comparisonLeftTitle = comparisonLeftTitle.sanitizingFrenchFondEtForme
+        self.comparisonLeftBullets = comparisonLeftBullets.map(\.sanitizingFrenchFondEtForme)
+        self.comparisonRightTitle = comparisonRightTitle.sanitizingFrenchFondEtForme
+        self.comparisonRightBullets = comparisonRightBullets.map(\.sanitizingFrenchFondEtForme)
+        self.comparisonGoldenRule = cleanGoldenRule
         self.conceptId = conceptId.isEmpty ? id : conceptId
         self.conceptTitle = resolvedConceptTitle
         self.difficulty = min(max(difficulty, 0.0), 1.0)
@@ -1087,6 +1177,33 @@ public struct CertiGoNativeExerciseItem: Identifiable, Equatable, Sendable {
             return wordBankTargetTokens.joined(separator: " ")
         }
         return correctOptions.map(\.title).joined(separator: " + ")
+    }
+
+    public var explanation: String {
+        if let firstCorrect = options.first(where: \.isCorrect) {
+            return CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(firstCorrect.whyWrongOrRight)
+        }
+        return CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(examTip)
+    }
+
+    public var plainPrompt: String {
+        plainLanguagePrompt
+    }
+
+    public var plainOptions: [String] {
+        options.map(\.plainLanguageTitle)
+    }
+
+    public var plainExplanation: String {
+        let correctPlain = options.first(where: \.isCorrect)?.plainLanguageTitle ?? primaryCorrectOptionTitle
+        let glossaryLine: String = {
+            if let g = jargonGlossaryBridge.first {
+                return "En mots simples, « \(g.term) » veut dire : \(CertiGoDedicatedTrackQuestionBank.lowercaseFirst(g.simpleMeaning))."
+            }
+            return "Cette solution sécurise et automatise ton projet sans intervention manuelle fragile."
+        }()
+        let combined = "En pratique, la bonne action consiste à : \(CertiGoDedicatedTrackQuestionBank.lowercaseFirst(correctPlain)). \(glossaryLine)\n\nÀ retenir : \(examTip)"
+        return CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(combined.sanitizingFrenchFondEtForme)
     }
 }
 
@@ -1814,6 +1931,7 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
     public var isShowingDeclicCard15: Bool
     public var lessonSlideIndex: Int
     public var lessonSlides: [CertiGoLessonMicroSlide]
+    public var declicCard: LessonDeclicCard
     public var declicTitle: String
     public var declicDiagramTop: String
     public var declicDiagramBottom: String
@@ -1873,6 +1991,12 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         self.experienceLevelIndex = experienceLevelIndex
         self.isRescue90sSprint = isRescue90sSprint
         self.lastAnswerWasMasterStroke = false
+        let fullDeclic = CertiGoDedicatedTrackQuestionBank.lessonDeclicCard(
+            forRouteCode: routeCode,
+            lessonId: lessonId,
+            lessonTitle: lessonTitle
+        )
+        self.declicCard = fullDeclic
         let declic = Self.defaultDeclicCard(
             forRouteCode: routeCode,
             lessonId: lessonId,
@@ -2138,26 +2262,26 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                         .init(
                             id: "opt-b",
                             badge: "B",
-                            title: "Un redémarrage automatique des serveurs toutes les heures",
-                            plainLanguageTitle: "Éteindre et rallumer les serveurs toutes les heures",
+                            title: "Une tâche planifiée de redémarrage périodique des machines virtuelles chaque nuit",
+                            plainLanguageTitle: "Programmer un redémarrage automatique des serveurs chaque nuit",
                             isCorrect: false,
-                            whyWrongOrRight: "Redémarrer les machines coupe le service sans empêcher la suppression du dossier."
+                            whyWrongOrRight: "Redémarrer les machines relance le système d'exploitation mais n'empêche pas la suppression du groupe de ressources."
                         ),
                         .init(
                             id: "opt-c",
                             badge: "C",
-                            title: "Une suppression de tous les comptes administrateurs de l'entreprise",
-                            plainLanguageTitle: "Supprimer les comptes de toute l'équipe informatique",
+                            title: "Une étiquette de facturation (Tag CostCenter) appliquée sur le groupe de ressources",
+                            plainLanguageTitle: "Ajouter une simple étiquette de classement budgétaire sur le dossier",
                             isCorrect: false,
-                            whyWrongOrRight: "L'équipe a besoin de ses comptes pour travailler ; le verrou suffit à empêcher les suppressions accidentelles."
+                            whyWrongOrRight: "Les étiquettes (Tags) servent au tri budgétaire et ne bloquent aucune action de suppression."
                         ),
                         .init(
                             id: "opt-d",
                             badge: "D",
-                            title: "Un changement de langue du portail web Azure",
-                            plainLanguageTitle: "Changer la langue d'affichage de l'écran",
+                            title: "Un tableau de bord de suivi des métriques CPU dans Azure Monitor",
+                            plainLanguageTitle: "Afficher un graphique de surveillance de la vitesse des serveurs",
                             isCorrect: false,
-                            whyWrongOrRight: "Les préférences d'affichage du portail ne protègent aucune ressource Cloud."
+                            whyWrongOrRight: "Un tableau de bord observe les performances mais ne protège pas les ressources contre la suppression."
                         )
                     ],
                     examTip: "Un verrou CanNotDelete protège contre la suppression accidentelle et s'applique même aux Propriétaires (Owners) !",
@@ -2192,24 +2316,24 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
                     .init(
                         id: "opt-b",
                         badge: "B",
-                        title: "Doubler automatiquement la puissance du processeur de chaque serveur",
-                        plainLanguageTitle: "Rendre les ordinateurs deux fois plus rapides par magie",
+                        title: "Augmenter automatiquement la fréquence processeur et la mémoire vive de chaque machine virtuelle",
+                        plainLanguageTitle: "Augmenter automatiquement la puissance matérielle des ordinateurs du projet",
                         isCorrect: false,
-                        whyWrongOrRight: "Un Groupe de ressources est un dossier d'organisation logique et ne modifie pas la vitesse des machines."
+                        whyWrongOrRight: "Un Groupe de ressources est un dossier d'organisation logique et ne modifie pas la puissance des machines."
                     ),
                     .init(
                         id: "opt-c",
                         badge: "C",
-                        title: "Rendre toutes les bases de données publiques sur Internet sans mot de passe",
-                        plainLanguageTitle: "Ouvrir toutes les données au grand public sans sécurité",
+                        title: "Créer automatiquement un tunnel VPN hybride vers les bureaux physiques de l'entreprise",
+                        plainLanguageTitle: "Relier automatiquement le réseau de l'entreprise sans configurer de passerelle",
                         isCorrect: false,
-                        whyWrongOrRight: "Ranger des ressources dans un groupe n'ouvre jamais d'accès public sur Internet."
+                        whyWrongOrRight: "Un Groupe de ressources organise les métadonnées et les droits sans créer de liaison réseau."
                     ),
                     .init(
                         id: "opt-d",
                         badge: "D",
-                        title: "Remplacer le besoin d'avoir un compte ou un abonnement Azure",
-                        plainLanguageTitle: "Utiliser Azure gratuitement sans avoir de compte",
+                        title: "Remplacer le besoin de rattacher les services à un abonnement de facturation Azure",
+                        plainLanguageTitle: "Déployer des services Cloud sans avoir besoin d'un abonnement de facturation",
                         isCorrect: false,
                         whyWrongOrRight: "Chaque Groupe de ressources est toujours créé à l'intérieur d'un Abonnement Azure."
                     )
@@ -6012,28 +6136,60 @@ public struct CertiGoNativeExamQuestion: Identifiable, Codable, Equatable, Hasha
         plainLanguageStem: String? = nil,
         choices: [Choice]
     ) {
-        let cleanDomain = domainTitle.strippingMarkdownAsterisks
-        let cleanStem = stem.strippingMarkdownAsterisks
+        let cleanDomain = domainTitle.sanitizingFrenchFondEtForme
+        let cleanStem = stem.sanitizingFrenchFondEtForme
         let rawPlain = (plainLanguageStem
             ?? CertiGoPlainLanguageTranslator.simplifyPrompt(
                 cleanStem,
                 forExerciseId: id,
                 conceptTitle: cleanDomain
-            )).strippingMarkdownAsterisks
+            )).sanitizingFrenchFondEtForme
         let distinctPlain = rawPlain == cleanStem
             ? CertiGoPlainLanguageTranslator.simplifyPrompt(
                 cleanStem,
                 forExerciseId: id,
                 conceptTitle: cleanDomain
-            ).strippingMarkdownAsterisks
+            ).sanitizingFrenchFondEtForme
             : rawPlain
+        let balancedChoices = CertiGoDedicatedTrackQuestionBank.balanceOptionPairs(
+            choices.map { (badge: $0.badge, title: $0.text, plainTitle: $0.plainLanguageText, isCorrect: $0.isCorrect) },
+            domainContext: cleanDomain,
+            routeCode: cleanDomain
+        )
         self.id = id
         self.number = number
         self.domainTitle = cleanDomain
-        self.caseStudyBadge = caseStudyBadge.strippingMarkdownAsterisks
+        self.caseStudyBadge = caseStudyBadge.sanitizingFrenchFondEtForme
         self.stem = cleanStem
-        self.plainLanguageStem = distinctPlain == cleanStem ? "En clair : \(cleanStem)" : distinctPlain
-        self.choices = choices
+        self.plainLanguageStem = distinctPlain == cleanStem
+            ? "Dans ton projet sur « \(cleanDomain) », voici le cas concret :\n\(cleanStem)"
+            : distinctPlain
+        self.choices = choices.enumerated().map { idx, ch in
+            let pair = balancedChoices[idx]
+            return Choice(
+                id: ch.id,
+                badge: ch.badge,
+                text: pair.title,
+                isCorrect: ch.isCorrect,
+                plainLanguageText: pair.plainTitle
+            )
+        }
+    }
+
+    public var prompt: String { stem }
+    public var plainPrompt: String { plainLanguageStem }
+    public var options: [String] { choices.map(\.text) }
+    public var plainOptions: [String] { choices.map(\.plainLanguageText) }
+    public var explanation: String {
+        CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+            CertiGoNativeRichCatalog.officialExplanation(forExamQuestion: self).sanitizingFrenchFondEtForme
+        )
+    }
+    public var plainExplanation: String {
+        let correctPlain = choices.first(where: \.isCorrect)?.plainLanguageText ?? ""
+        return CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+            "En langage courant, la bonne solution sur « \(domainTitle) » consiste à : \(CertiGoDedicatedTrackQuestionBank.lowercaseFirst(correctPlain)).\n\nCette configuration assure la sécurité, l'isolation et la disponibilité attendues en production.".sanitizingFrenchFondEtForme
+        )
     }
 }
 
@@ -10266,6 +10422,10 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
         builtEngine.lessonSlides = builtEngine.lessonSlides.map {
             CertiGoMultilingualEngine.localizedLessonSlide($0, lang: settingsLanguageIndex)
         }
+        builtEngine.declicCard = CertiGoMultilingualEngine.localizedLessonDeclicCard(
+            builtEngine.declicCard,
+            lang: settingsLanguageIndex
+        )
         builtEngine.declicTitle = tr(builtEngine.declicTitle)
         builtEngine.declicDiagramTop = tr(builtEngine.declicDiagramTop)
         builtEngine.declicDiagramBottom = tr(builtEngine.declicDiagramBottom)
@@ -11604,21 +11764,21 @@ extension CertiGoStructuredPromptView: View {
 
 private struct CertiGoScaledStructuredPromptBodyView: View {
     let prompt: String
-    @ScaledMetric(relativeTo: .body) private var scenarioFontSize: CGFloat = FigMetrics.typeBody
-    @ScaledMetric(relativeTo: .headline) private var questionFontSize: CGFloat = FigMetrics.typeCardTitle
+    @ScaledMetric(relativeTo: .body) private var scenarioFontSize: CGFloat = FigMetrics.sixteen
+    @ScaledMetric(relativeTo: .headline) private var questionFontSize: CGFloat = FigMetrics.eighteen
 
     var body: some View {
         let parts = CertiGoStructuredPromptView.splitScenarioAndQuestion(prompt)
         VStack(alignment: .leading, spacing: PrismSpacing.s) {
             if let scenario = parts.scenario, !scenario.isEmpty {
                 Text(verbatim: scenario)
-                    .font(PrismTypography.figmaFont(size: scenarioFontSize, style: "Semi Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#334155"))
-                    .lineSpacing(4)
+                    .font(PrismTypography.figmaFont(size: scenarioFontSize, style: "Regular"))
+                    .foregroundStyle(PrismColor.figmaHex("#1e293b"))
+                    .lineSpacing(5)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Text(verbatim: parts.question)
-                .font(PrismTypography.figmaFont(size: questionFontSize, style: "Bold"))
+                .font(PrismTypography.figmaFont(size: questionFontSize, style: "Semi Bold"))
                 .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                 .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
@@ -19263,9 +19423,7 @@ public struct CertiGoDiagnosticErrorCardView: View {
 
 public struct CertiGoNativeLessonSessionModalView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .body) private var scaledOptionTitleSize: CGFloat = FigMetrics.fifteenOrSixteen
     @ScaledMetric(relativeTo: .subheadline) private var scaledOptionSubtitleSize: CGFloat = FigMetrics.twelve
-    @ScaledMetric(relativeTo: .body) private var scaledSlideBodySize: CGFloat = FigMetrics.fifteenOrSixteen
     @Binding public var appState: CertiGoNativeAppState
     public let onCompleteSession: () -> Void
     public let onJumpToAIHubWithTopic: (String) -> Void
@@ -19419,11 +19577,15 @@ public struct CertiGoNativeLessonSessionModalView: View {
     }
 
     private var declicCard15ScrollView: some View {
+        lessonSlidesView
+    }
+
+    private var lessonSlidesView: some View {
         let slideIdx = min(max(appState.lessonSession.lessonSlideIndex, 0), max(0, appState.lessonSession.lessonSlides.count - 1))
         let slide = appState.lessonSession.currentLessonSlide
         let isLastSlide = slideIdx + 1 >= appState.lessonSession.lessonSlides.count
 
-        let paragraphLines = slide.bodyParagraph
+        let paragraphLines = slide.body
             .strippingMarkdownAsterisks
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -19474,8 +19636,9 @@ public struct CertiGoNativeLessonSessionModalView: View {
                             )
 
                         Text(verbatim: slide.title.strippingMarkdownAsterisks)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                            .lineSpacing(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
@@ -19483,9 +19646,9 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
                         ForEach(Array(paragraphLines.enumerated()), id: \.offset) { _, line in
                             Text(verbatim: line)
-                                .font(PrismTypography.figmaFont(size: scaledSlideBodySize, style: "Semi Bold"))
-                                .foregroundStyle(PrismColor.figmaHex("#334155"))
-                                .lineSpacing(4)
+                                .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Regular"))
+                                .foregroundStyle(PrismColor.figmaHex("#1e293b"))
+                                .lineSpacing(5)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -19498,13 +19661,17 @@ public struct CertiGoNativeLessonSessionModalView: View {
                         )
                     }
 
+                    if slideIdx == 2 {
+                        declicCardView
+                    }
+
                     HStack(alignment: .top, spacing: PrismSpacing.s) {
                         Text(verbatim: "💡")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Semi Bold"))
-                        Text(verbatim: slide.keyTakeawayPill.strippingMarkdownAsterisks)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Medium"))
+                        Text(verbatim: slide.highlight.strippingMarkdownAsterisks)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Medium"))
                             .foregroundStyle(PrismColor.figmaHex("#1e3a8a"))
-                            .lineSpacing(4)
+                            .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(PrismSpacing.m)
@@ -19628,15 +19795,42 @@ public struct CertiGoNativeLessonSessionModalView: View {
         )
     }
 
+    private var declicCardView: some View {
+        let card = appState.lessonSession.declicCard
+        return VStack(alignment: .leading, spacing: PrismSpacing.m) {
+            Text(verbatim: "✦ CARTE DÉCLIC · \(card.title)")
+                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            declicStepRow(title: "Analogie du quotidien", detail: card.analogy)
+            declicStepRow(title: "Points clés à retenir", detail: card.keyTakeawaysText)
+            declicStepRow(title: "Exemple concret en production", detail: card.concreteExample)
+        }
+        .padding(PrismSpacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .fill(PrismColor.figmaHex("#f8fafc"))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                .strokeBorder(PrismColor.figmaHex("#cbd5e1"), lineWidth: PrismBorder.standard)
+        )
+        .accessibilityIdentifier("declic15-declic-card-view")
+    }
+
     private func declicStepRow(title: String, detail: String) -> some View {
         VStack(alignment: .leading, spacing: PrismSpacing.xs) {
             Text(verbatim: title)
                 .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
                 .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                .fixedSize(horizontal: false, vertical: true)
             Text(verbatim: detail)
-                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                .foregroundStyle(PrismColor.figmaHex("#475569"))
-                .lineSpacing(3)
+                .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Regular"))
+                .foregroundStyle(PrismColor.figmaHex("#1e293b"))
+                .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(PrismSpacing.m)
@@ -19648,6 +19842,10 @@ public struct CertiGoNativeLessonSessionModalView: View {
     }
 
     private var exerciseActiveContentScrollView: some View {
+        lessonView
+    }
+
+    private var lessonView: some View {
         let ex = appState.lessonSession.currentExercise
         let twoColumnGrid = [
             GridItem(.flexible(), spacing: PrismSpacing.m),
@@ -19887,7 +20085,7 @@ public struct CertiGoNativeLessonSessionModalView: View {
                     }
 
                     Text(verbatim: isSimple ? opt.plainLanguageTitle : opt.title)
-                        .font(PrismTypography.figmaFont(size: scaledOptionTitleSize, style: "Semi Bold"))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Medium"))
                         .foregroundStyle(PrismColor.figmaHex(palette.text))
                         .lineSpacing(3)
                         .multilineTextAlignment(.leading)
@@ -19902,8 +20100,9 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 }
                 Spacer(minLength: PrismSpacing.xs)
             }
-            .padding(PrismSpacing.l)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, PrismSpacing.l)
+            .padding(.vertical, FigMetrics.fourteen)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(
             CertiGoTactile3DButtonStyle(
@@ -19950,21 +20149,22 @@ public struct CertiGoNativeLessonSessionModalView: View {
                         .frame(width: FigMetrics.fortyEight, height: FigMetrics.fortyEight)
                 }
                 Text(verbatim: isSimple ? opt.plainLanguageTitle : opt.title)
-                    .font(PrismTypography.figmaFont(size: scaledOptionTitleSize, style: "Semi Bold"))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Medium"))
                     .foregroundStyle(PrismColor.figmaHex(palette.text))
-                    .lineSpacing(2)
-                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                 if !isSimple, let sub = opt.subtitle {
                     Text(verbatim: sub)
                         .font(PrismTypography.figmaFont(size: scaledOptionSubtitleSize, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex("#475569"))
                         .lineSpacing(3)
-                        .multilineTextAlignment(.center)
+                        .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(PrismSpacing.l)
+            .padding(.horizontal, PrismSpacing.l)
+            .padding(.vertical, FigMetrics.fourteen)
             .frame(maxWidth: .infinity)
             .frame(minHeight: FigMetrics.oneHundredForty)
         }
@@ -20378,58 +20578,65 @@ public struct CertiGoNativeLessonSessionModalView: View {
                 .accessibilityIdentifier("sheet05-live-ai-explanation-card")
             }
 
-            if appState.lessonSession.selectedOptionSummaryText != ex.primaryCorrectOptionTitle {
-                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                    Text(verbatim: "✕ TA RÉPONSE : \(appState.lessonSession.selectedOptionSummaryText)")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#e11d48"))
-                    Text(verbatim: appState.lessonSession.selectedWhyWrongExplanation)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                        .foregroundStyle(PrismColor.figmaHex("#881337"))
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: PrismSpacing.m) {
+                    if appState.lessonSession.selectedOptionSummaryText != ex.primaryCorrectOptionTitle {
+                        VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                            Text(verbatim: "✕ TA RÉPONSE : \(appState.lessonSession.selectedOptionSummaryText)")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#e11d48"))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(verbatim: appState.lessonSession.selectedWhyWrongExplanation)
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Regular"))
+                                .foregroundStyle(PrismColor.figmaHex("#881337"))
+                                .lineSpacing(4)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(PrismSpacing.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                                .fill(PrismColor.figmaHex("#fff1f2"))
+                        )
+                    }
+
+                    VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                        Text(verbatim: "✓ BONNE RÉPONSE : \(ex.primaryCorrectOptionTitle)")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#15803d"))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(verbatim: appState.lessonSession.correctWhyRightExplanation)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Regular"))
+                            .foregroundStyle(PrismColor.figmaHex("#14532d"))
+                            .lineSpacing(4)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(PrismSpacing.m)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                            .fill(PrismColor.figmaHex("#f0fdf4"))
+                    )
+
+                    VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                        Text(verbatim: "💡 ASTUCE D'EXAMEN")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                        Text(verbatim: ex.examTip)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Regular"))
+                            .foregroundStyle(PrismColor.figmaHex("#1e3a8a"))
+                            .lineSpacing(4)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(PrismSpacing.m)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
+                            .fill(PrismColor.figmaHex("#eff6ff"))
+                    )
                 }
-                .padding(PrismSpacing.m)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                        .fill(PrismColor.figmaHex("#fff1f2"))
-                )
             }
-
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                Text(verbatim: "✓ BONNE RÉPONSE : \(ex.primaryCorrectOptionTitle)")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#15803d"))
-                Text(verbatim: appState.lessonSession.correctWhyRightExplanation)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                    .foregroundStyle(PrismColor.figmaHex("#14532d"))
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(PrismSpacing.m)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                    .fill(PrismColor.figmaHex("#f0fdf4"))
-            )
-
-            VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                Text(verbatim: "💡 ASTUCE D'EXAMEN")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#0078d4"))
-                Text(verbatim: ex.examTip)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
-                    .foregroundStyle(PrismColor.figmaHex("#1e3a8a"))
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(PrismSpacing.m)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous)
-                    .fill(PrismColor.figmaHex("#eff6ff"))
-            )
+            .frame(maxHeight: FigMetrics.twoHundredForty)
 
             HStack(spacing: PrismSpacing.m) {
                 Button {
@@ -20842,6 +21049,10 @@ public struct CertiGoNativeTimedExamCockpit23View: View {
     }
 
     public var body: some View {
+        examSessionView
+    }
+
+    private var examSessionView: some View {
         let q = appState.currentExamQuestion
         let selectedChoiceId = appState.selectedExamChoiceByQuestionNumber[q.number]
         let isFlagged = appState.flaggedExamQuestionNumbers.contains(q.number)
@@ -21043,7 +21254,7 @@ public struct CertiGoNativeTimedExamCockpit23View: View {
                                         ? choice.plainLanguageText
                                         : choice.text
                                 )
-                                .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Medium"))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Medium"))
                                 .foregroundStyle(isSelected ? PrismColor.figmaHex("#1e40af") : PrismColor.figmaHex("#0f172a"))
                                 .lineSpacing(3)
                                 .multilineTextAlignment(.leading)
@@ -21052,8 +21263,8 @@ public struct CertiGoNativeTimedExamCockpit23View: View {
                                 Spacer(minLength: PrismSpacing.xs)
                             }
                             .padding(.horizontal, PrismSpacing.l)
-                            .padding(.vertical, PrismSpacing.m)
-                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, FigMetrics.fourteen)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(
                             CertiGoTactile3DButtonStyle(

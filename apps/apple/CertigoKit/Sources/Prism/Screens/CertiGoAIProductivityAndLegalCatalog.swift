@@ -236,6 +236,9 @@ public struct CertiGoDeclicCardSpec: Identifiable, Equatable, Sendable {
     public let id: String
     public let lessonId: String
     public let title: String
+    public let analogy: String
+    public let keyTakeaways: [String]
+    public let concreteExample: String
     public let diagramTop: String
     public let diagramBottom: String
     public let step1: String
@@ -248,6 +251,9 @@ public struct CertiGoDeclicCardSpec: Identifiable, Equatable, Sendable {
         id: String,
         lessonId: String,
         title: String,
+        analogy: String = "",
+        keyTakeaways: [String] = [],
+        concreteExample: String = "",
         diagramTop: String,
         diagramBottom: String,
         step1: String,
@@ -259,12 +265,25 @@ public struct CertiGoDeclicCardSpec: Identifiable, Equatable, Sendable {
         let schema = threeBrickSchema
         self.id = id
         self.lessonId = lessonId
-        self.title = title.strippingMarkdownAsterisks
-        self.diagramTop = diagramTop.strippingMarkdownAsterisks
-        self.diagramBottom = diagramBottom.strippingMarkdownAsterisks
-        self.step1 = step1.strippingMarkdownAsterisks
-        self.step2 = step2.strippingMarkdownAsterisks
-        self.rule = rule.strippingMarkdownAsterisks
+        self.title = title.sanitizingFrenchFondEtForme
+        self.analogy = (analogy.isEmpty
+            ? "Imagine un chef d'orchestre qui vérifie la partition (\(threeBrickSchema.brick1.title)) avant de coordonner chaque pupitre (\(threeBrickSchema.brick2.title)).\n\nGrâce à ce cadrage, le livrable final (\(threeBrickSchema.brick3.title)) reste précis, vérifiable et sécurisé."
+            : analogy).sanitizingFrenchFondEtForme
+        self.keyTakeaways = (keyTakeaways.isEmpty
+            ? [
+                "• Entrée structurée : \(threeBrickSchema.brick1.title) (\(threeBrickSchema.brick1.subtitle)).",
+                "• Moteur central : \(threeBrickSchema.brick2.title) (\(threeBrickSchema.brick2.subtitle)).",
+                "• Livrable validé : \(threeBrickSchema.brick3.title) (\(threeBrickSchema.brick3.subtitle))."
+            ]
+            : keyTakeaways).map(\.sanitizingFrenchFondEtForme)
+        self.concreteExample = (concreteExample.isEmpty
+            ? "En production, l'équipe connecte \(threeBrickSchema.brick1.title) à \(threeBrickSchema.brick2.title) pour produire \(threeBrickSchema.brick3.title).\n\n\(CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(rule))"
+            : concreteExample).sanitizingFrenchFondEtForme
+        self.diagramTop = diagramTop.sanitizingFrenchFondEtForme
+        self.diagramBottom = diagramBottom.sanitizingFrenchFondEtForme
+        self.step1 = step1.sanitizingFrenchFondEtForme
+        self.step2 = step2.sanitizingFrenchFondEtForme
+        self.rule = rule.sanitizingFrenchFondEtForme
         self.threeBrickSchema = schema
         self.microSlides = microSlides
     }
@@ -625,22 +644,28 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     CertiGoLessonMicroSlide(
                         stepBadge: "1/3 · L'ESSENTIEL",
                         title: seed.stepTitle,
-                        bodyParagraph: "Concept clé (\(seed.stepTitle)) : \(seed.stepSubtitle). Cible immédiatement la bonne brique sans étape manuelle.",
-                        keyTakeawayPill: "Objectif : \(seed.brick3.title)",
+                        bodyParagraph: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+                            "« \(seed.stepTitle) » structure l'action suivante chez \(trackId.brandDisplayName) : \(seed.stepSubtitle). Le point d'entrée repose sur \(seed.brick1.title) (\(seed.brick1.subtitle)).\n\nCe mécanisme connecte directement ton contexte à \(seed.brick2.title) afin de produire un livrable fiable : \(seed.brick3.title) (\(seed.brick3.subtitle))."
+                        ),
+                        keyTakeawayPill: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding("Objectif : \(seed.brick3.title) (\(seed.brick3.subtitle))."),
                         serviceAssetName: seed.serviceAsset
                     ),
                     CertiGoLessonMicroSlide(
                         stepBadge: "2/3 · SCHÉMA 3 BRIQUES",
                         title: "Architecture · \(seed.stepTitle)",
-                        bodyParagraph: "1. \(seed.brick1.title) (\(seed.brick1.subtitle))\n2. \(seed.brick2.title) (\(seed.brick2.subtitle))\n3. \(seed.brick3.title) (\(seed.brick3.subtitle))",
-                        keyTakeawayPill: schema.flowSummaryLine,
+                        bodyParagraph: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+                            "Le fonctionnement en production s'articule en 3 briques :\n1. \(seed.brick1.title) (\(seed.brick1.subtitle)).\n2. \(seed.brick2.title) (\(seed.brick2.subtitle)).\n3. \(seed.brick3.title) (\(seed.brick3.subtitle)).\n\nChaque brique valide le périmètre de sécurité avant de passer à la suivante : \(seed.declicRule)"
+                        ),
+                        keyTakeawayPill: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding("Flux : \(schema.flowSummaryLine)."),
                         serviceAssetName: seed.serviceAsset
                     ),
                     CertiGoLessonMicroSlide(
                         stepBadge: "3/3 · RÈGLE D'OR",
                         title: "Cas pratique · \(seed.stepTitle)",
-                        bodyParagraph: "En situation réelle sur \(seed.stepTitle) : \(seed.qcmTip)",
-                        keyTakeawayPill: "Clé : \(seed.labExpectedToken)",
+                        bodyParagraph: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+                            "En situation réelle sur « \(seed.stepTitle) », la solution recommandée est : \(seed.qcmCorrect). \(seed.qcmTip)\n\nDans un workflow opérationnel (« \(seed.labPrefix) »), utilise systématiquement le jeton cible « \(seed.labExpectedToken) »."
+                        ),
+                        keyTakeawayPill: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding("Réflexe clé : \(seed.qcmTip)"),
                         serviceAssetName: seed.serviceAsset
                     )
                 ]
@@ -648,12 +673,23 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                 let declicCard = CertiGoDeclicCardSpec(
                     id: "declic-\(lessonId.lowercased())",
                     lessonId: lessonId,
-                    title: seed.declicTitle,
-                    diagramTop: "\(seed.brick1.icon) \(seed.brick1.title) ➔ \(seed.brick2.icon) \(seed.brick2.title)",
-                    diagramBottom: "🎯 \(seed.brick3.icon) \(seed.brick3.title) · \(seed.brick3.subtitle)",
-                    step1: "\(seed.brick1.title) : \(seed.brick1.subtitle)",
-                    step2: "\(seed.brick2.title) : \(seed.brick2.subtitle)",
-                    rule: seed.declicRule,
+                    title: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(seed.declicTitle),
+                    analogy: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+                        "Imagine un atelier structuré où chaque poste a un rôle précis : fournir les bonnes pièces dès le départ (\(seed.brick1.title)) permet au moteur (\(seed.brick2.title)) de travailler sans approximation.\n\nSur « \(seed.stepTitle) », cette discipline garantit immédiatement \(seed.brick3.title) (\(seed.brick3.subtitle))."
+                    ),
+                    keyTakeaways: [
+                        CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding("• 1. Point d'entrée : \(seed.brick1.title) (\(seed.brick1.subtitle))."),
+                        CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding("• 2. Traitement : \(seed.brick2.title) (\(seed.brick2.subtitle))."),
+                        CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding("• 3. Résultat : \(seed.brick3.title) (\(seed.declicRule)).")
+                    ],
+                    concreteExample: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+                        "Exemple concret chez \(trackId.brandDisplayName) : pour « \(seed.labPrefix) », l'opérateur applique « \(seed.labExpectedToken) ».\n\nCette action applique la règle d'or : \(seed.declicRule)"
+                    ),
+                    diagramTop: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding("\(seed.brick1.icon) \(seed.brick1.title) ➔ \(seed.brick2.icon) \(seed.brick2.title)."),
+                    diagramBottom: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding("🎯 \(seed.brick3.icon) \(seed.brick3.title) · \(seed.brick3.subtitle)."),
+                    step1: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding("\(seed.brick1.title) : \(seed.brick1.subtitle)."),
+                    step2: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding("\(seed.brick2.title) : \(seed.brick2.subtitle)."),
+                    rule: CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(seed.declicRule),
                     threeBrickSchema: schema,
                     microSlides: slides
                 )
@@ -1157,7 +1193,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     qcmCorrect: "Sélectionner le texte et utiliser « Visualiser sous forme de tableau »",
                     qcmWrong1: "Fermer Word et ressaisir chaque cellule à la main",
                     qcmWrong2: "Imprimer le document en PDF puis le scanner",
-                    qcmWrong3: "Supprimer les styles de titres Heading 1/2",
+                    qcmWrong3: "Convertir tous les paragraphes en texte brut sans hiérarchie de titres",
                     qcmTip: "La commande contextuelle « Visualiser sous forme de tableau » convertit le texte sélectionné sans quitter Word."
                 ),
                 LessonSeed(
@@ -1247,9 +1283,9 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     labDistractors: ["SUM_TEXT", "RAND_DELETE"],
                     qcmPrompt: "Quelle fonction matricielle dynamique Copilot utilise-t-il pour extraire automatiquement toutes les lignes dont la marge est inférieure à 15 % ?",
                     qcmCorrect: "=FILTER(Commandes; Commandes[Marge]<0,15)",
-                    qcmWrong1: "=CONCATENATE(A1:Z100)",
-                    qcmWrong2: "=NOW()",
-                    qcmWrong3: "=PROPER(A1)",
+                    qcmWrong1: "=CONCATENATE(A1:Z100) pour fusionner les cellules en une seule chaîne de texte",
+                    qcmWrong2: "=NOW() pour afficher la date et l'heure courantes de la feuille de calcul",
+                    qcmWrong3: "=PROPER(A1) pour convertir la première lettre de chaque mot en majuscule",
                     qcmTip: "La fonction dynamique =FILTER() propage instantanément les lignes correspondantes sans macro."
                 ),
                 LessonSeed(
@@ -1527,7 +1563,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     labDistractors: ["Modifier la prod sans test", "Supprimer le test qui échoue"],
                     qcmPrompt: "Quelle pratique garantit qu'un correctif généré par Codex résout réellement un bug sans régression ?",
                     qcmCorrect: "Demander à Codex d'écrire d'abord un test reproduisant l'échec, d'implémenter le correctif, puis de prouver que toute la suite passe au vert",
-                    qcmWrong1: "Supprimer les assertions des tests existants",
+                    qcmWrong1: "Désactiver temporairement les vérifications d'assertions de la suite CI existante",
                     qcmWrong2: "Fusionner sans lire le diff ni exécuter la CI",
                     qcmWrong3: "Ajouter un sleep(10) aléatoire",
                     qcmTip: "La boucle Reproduction ➔ Fix ➔ Validation par tests est la garantie de fiabilité d'un agent de code."
@@ -1620,7 +1656,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     qcmPrompt: "Quelles sont les deux exigences obligatoires sur chaque objet d'un JSON Schema lorsque tu actives strict: true avec Structured Outputs ?",
                     qcmCorrect: "Définir additionalProperties: false et inclure toutes les propriétés de l'objet dans le tableau required",
                     qcmWrong1: "Utiliser uniquement des noms de clés en majuscules",
-                    qcmWrong2: "Supprimer tous les types string et boolean",
+                    qcmWrong2: "Remplacer les types typés du schéma par un champ texte libre non contraint",
                     qcmWrong3: "Désactiver la validation côté serveur",
                     qcmTip: "Le décodage contraint (Constrained Decoding) d'OpenAI garantit mathématiquement le respect du schéma."
                 ),
@@ -1665,7 +1701,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     labDistractors: ["handoffs=None", "guardrails=[]"],
                     qcmPrompt: "Dans l'OpenAI Agents SDK, à quoi sert le mécanisme de Handoff ?",
                     qcmCorrect: "Permettre à un agent de triage de transférer proprement le contrôle et le contexte de conversation à un sous-agent spécialisé",
-                    qcmWrong1: "Supprimer la mémoire de l'application",
+                    qcmWrong1: "Réinitialiser l'état local du client sans transmettre l'historique au sous-agent",
                     qcmWrong2: "Fusionner les clés API de tous les clients",
                     qcmWrong3: "Désactiver la journalisation (Tracing)",
                     qcmTip: "Les Handoffs découpent un système complexe en agents spécialisés aux instructions courtes et fiables."
@@ -1807,7 +1843,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     labDistractors: ["\"type\": \"infinite_unbounded\"", "\"disable_prefix\": true"],
                     qcmPrompt: "Sur une fenêtre de contexte de 200k+ tokens avec Claude, où dois-tu placer le long corpus documentaire par rapport à la question finale ?",
                     qcmCorrect: "Placer les longs documents tout en haut (avec cache_control: ephemeral) et la question précise tout à la fin du prompt",
-                    qcmWrong1: "Couper la question mot par mot au milieu du document",
+                    qcmWrong1: "Disperser les consignes de la question à plusieurs endroits au milieu des annexes",
                     qcmWrong2: "Mettre la question en ligne 1 et ne pas fermer les balises",
                     qcmWrong3: "Dupliquer le document 5 fois dans le message",
                     qcmTip: "Documents en haut + cache_control: ephemeral + question en bas optimise à la fois le rappel et le coût (-90 % en lecture cache)."
@@ -1899,7 +1935,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     labDistractors: ["Éditer à l'aveugle sans lire les fichiers", "Forcer git push --force sur main"],
                     qcmPrompt: "Quelle est la séquence de travail recommandée avec Claude Code pour réussir une évolution complexe sur un grand dépôt ?",
                     qcmCorrect: "Explorer le code existant, établir et valider un plan concis, implémenter les modifications puis exécuter les tests pour vérifier",
-                    qcmWrong1: "Modifier tous les fichiers au hasard sans lire le code",
+                    qcmWrong1: "Appliquer directement un remplacement global sans explorer l'arbre des dépendances",
                     qcmWrong2: "Désactiver le compilateur et pousser directement sur main",
                     qcmWrong3: "Copier tout le dépôt dans un seul fichier texte",
                     qcmTip: "Séparer la phase de Planification de la phase d'Exécution dans Claude Code évite les retours en arrière coûteux."
@@ -1946,7 +1982,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     qcmPrompt: "Comment éviter de saturer la fenêtre de contexte principale de Claude Code lors d'une longue session de travail ?",
                     qcmCorrect: "Déléguer les recherches larges à des sous-agents et utiliser /compact (ou /clear entre tâches indépendantes)",
                     qcmWrong1: "Afficher en boucle des fichiers binaires de 500 Mo dans le terminal",
-                    qcmWrong2: "Ne jamais fermer une session pendant 6 mois",
+                    qcmWrong2: "Conserver une session unique indéfiniment ouverte sans compaction ni journal de suivi",
                     qcmWrong3: "Désactiver les outils de recherche grep et glob",
                     qcmTip: "Un contexte court et pertinent améliore directement la précision d'édition de Claude Code."
                 ),
@@ -2111,8 +2147,8 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     qcmPrompt: "Dans le cursus officiel Harvey Academy (AI for Legal Basics & Level 1 Foundations), quels éléments sont indispensables dans un prompt adressé à Harvey Assistant ?",
                     qcmCorrect: "La partie représentée (ex. Acquéreur/Client), la juridiction applicable, le document source et le format précis d'analyse/redline attendu",
                     qcmWrong1: "Uniquement le mot « Analyse » sans indiquer quelle partie on défend",
-                    qcmWrong2: "Demander à Harvey de choisir une juridiction au hasard",
-                    qcmWrong3: "Supprimer les numéros d'articles du contrat avant l'envoi",
+                    qcmWrong2: "Laisser le modèle sélectionner un droit applicable par défaut sans préciser la juridiction",
+                    qcmWrong3: "Retirer la numérotation contractuelle des articles avant l'analyse comparative",
                     qcmTip: "Harvey Academy enseigne qu'une clause d'indemnisation s'analyse de façon opposée selon que l'on conseille le Client ou le Prestataire."
                 ),
                 LessonSeed(
@@ -2135,7 +2171,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     qcmCorrect: "Faire générer simultanément le redline cible aligné sur le playbook, une clause de repli (fallback) et la note justificative commerciale",
                     qcmWrong1: "Envoyer les notes internes confidentielles directement au cocontractant",
                     qcmWrong2: "Accepter toutes les clauses sans lire les exclusions du plafond",
-                    qcmWrong3: "Supprimer la clause de droit applicable",
+                    qcmWrong3: "Omettre la clause de compétence juridictionnelle et de droit applicable dans la revue",
                     qcmTip: "Préparer la position cible + la position de repli + l'argumentaire structure toute la séance de négociation."
                 ),
                 LessonSeed(
@@ -2225,7 +2261,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     labDistractors: ["Répondre uniquement Oui sans citer la clause"],
                     qcmPrompt: "Lors d'une Due Diligence d'acquisition d'actions (Share Deal), quelle distinction précise ta grille Harvey Vault doit-elle extraire sur les clauses d'intuitu personae ?",
                     qcmCorrect: "Distinguer si le contrat interdit uniquement la cession du contrat (Assignment) ou s'il couvre aussi le changement de contrôle capitalistique direct/indirect (Change of Control)",
-                    qcmWrong1: "Ignorer les clauses de changement de contrôle dans un Share Deal",
+                    qcmWrong1: "Exclure les clauses de changement de contrôle du périmètre d'audit lors d'un Share Deal",
                     qcmWrong2: "Regrouper tous les contrats sous la mention « RAS » sans lecture",
                     qcmWrong3: "Ne vérifier que la date de signature",
                     qcmTip: "En Share Deal, une simple clause anti-cession (Assignment) ne se déclenche pas toujours, contrairement à une clause Change of Control explicite."
@@ -2248,7 +2284,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     labDistractors: ["Laisser le risque dans l'annexe d'exonération du vendeur"],
                     qcmPrompt: "Lorsqu'un risque majeur (ex. litige fiscal en cours) est identifié par Harvey Vault dans la Data Room, quelle mesure contractuelle protège l'acquéreur si la Data Room est déclarée exonératoire (Disclosed) ?",
                     qcmCorrect: "Négocier une clause d'indemnisation spécifique (Specific Indemnity) couvrant expressément ce risque identifié, hors franchise et plafond général",
-                    qcmWrong1: "Supprimer la pièce de la Data Room sans rien dire",
+                    qcmWrong1: "Écarter les pièces incomplètes de la Data Room sans les consigner au rapport d'audit",
                     qcmWrong2: "Compter uniquement sur les déclarations générales déjà exonérées par la divulgation",
                     qcmWrong3: "Signer le SPA sans annexe",
                     qcmTip: "Ce qui est connu (Disclosed) n'est plus couvert par la garantie générale : d'où le lien direct entre l'extraction Vault et les Specific Indemnities."
@@ -2296,7 +2332,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     qcmCorrect: "Exiger une matrice normalisée (Texte/Article, Entités visées, Délais de notification, Autorité de contrôle, Plafond de sanction) avec références vérifiables",
                     qcmWrong1: "Rédiger un texte continu de 40 pages sans aucun titre ni référence d'article",
                     qcmWrong2: "Appliquer le droit californien à une autorité administrative française",
-                    qcmWrong3: "Supprimer les délais légaux de 24h et 72h",
+                    qcmWrong3: "Remplacer les délais impératifs de 24h et 72h par un délai indicatif non borné",
                     qcmTip: "La matrice comparative permet d'aligner le groupe sur l'exigence la plus stricte (ex. alerte précoce 24h sous NIS 2)."
                 ),
                 LessonSeed(
@@ -2341,7 +2377,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     qcmPrompt: "Quel est l'objectif des Workflows dans la plateforme Harvey pour un cabinet d'avocats ou une direction juridique ?",
                     qcmCorrect: "Enchaîner de façon reproductible plusieurs étapes d'analyse, de contrôle et de génération documentaire selon les standards internes du cabinet",
                     qcmWrong1: "Remplacer la responsabilité civile professionnelle de l'avocat",
-                    qcmWrong2: "Supprimer l'étape de validation humaine avant l'envoi au client",
+                    qcmWrong2: "Transmettre automatiquement le livrable au client final sans revue préalable par l'associé",
                     qcmWrong3: "Mélanger les dossiers de clients concurrents",
                     qcmTip: "Les Workflows encodent la méthodologie des associés seniors dans des pipelines guidés et auditables."
                 ),
@@ -2434,7 +2470,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     qcmCorrect: "Auditer les milliers de contrats cibles dans Harvey Vault (AI Analysis for Legal Workflows), vérifier le droit dans Knowledge, puis rédiger les redlines du SPA dans Assistant / Word Add-In sous supervision d'avocat",
                     qcmWrong1: "Tout coller dans un outil grand public non sécurisé sans cloisonnement client",
                     qcmWrong2: "Signer le SPA avant d'ouvrir la Data Room",
-                    qcmWrong3: "Ne jamais vérifier les renvois aux pièces sources",
+                    qcmWrong3: "Valider la synthèse M&A sans contrôler les renvois cliquables vers les clauses sources",
                     qcmTip: "La complémentarité Vault (Data Room) + Knowledge (Droit sourcé) + Assistant/Word Add-In (Rédaction/Redline) est au cœur de Harvey Academy."
                 )
             ]
@@ -2449,58 +2485,116 @@ public enum CertiGoAIProductivityAndLegalCatalog {
         seed: LessonSeed
     ) -> [CertiGoNativeExerciseItem] {
         let lowerId = lessonId.lowercased()
+        let cleanPrompt = CertiGoDedicatedTrackQuestionBank.sanitizeText(seed.qcmPrompt)
+        let cleanPlainPrompt = CertiGoDedicatedTrackQuestionBank.sanitizeText(
+            "Dans ton utilisation quotidienne de \(trackId.brandDisplayName) sur « \(seed.stepTitle) » (\(seed.stepSubtitle)) :\n\(cleanPrompt)"
+        )
+        let cleanTip = CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+            CertiGoDedicatedTrackQuestionBank.sanitizeText(seed.qcmTip)
+        )
+        let cleanRule = CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+            CertiGoDedicatedTrackQuestionBank.sanitizeText(seed.declicRule)
+        )
+        let balancedQ1 = CertiGoDedicatedTrackQuestionBank.balanceOptionPairs(
+            [
+                (badge: "A", title: seed.qcmCorrect, plainTitle: "Appliquer la méthode « \(seed.qcmCorrect) » dans ton espace de travail", isCorrect: true),
+                (badge: "B", title: seed.qcmWrong1, plainTitle: "Passer par l'option « \(seed.qcmWrong1) » pour traiter la demande", isCorrect: false),
+                (badge: "C", title: seed.qcmWrong2, plainTitle: "Utiliser le réglage « \(seed.qcmWrong2) » sur tes documents", isCorrect: false),
+                (badge: "D", title: seed.qcmWrong3, plainTitle: "Choisir l'approche « \(seed.qcmWrong3) » sans configuration dédiée", isCorrect: false)
+            ],
+            domainContext: seed.stepTitle,
+            routeCode: trackId.code
+        )
+
         let q1 = CertiGoNativeExerciseItem(
             id: "\(lowerId)-q1",
             formatCode: "Q_TYPE_01",
             domainBadge: "\(trackId.code) · D\(seed.domainNumber)",
             subBadge: "MISE EN SITUATION PRO",
-            prompt: seed.qcmPrompt,
-            plainLanguagePrompt: "En clair (\(seed.stepTitle)) : \(seed.qcmPrompt)",
+            prompt: cleanPrompt,
+            plainLanguagePrompt: cleanPlainPrompt,
             mascotPose: .specialistAICoach,
             options: [
                 .init(
                     id: "\(lowerId)-q1-a",
                     badge: "A",
-                    title: seed.qcmCorrect,
-                    plainLanguageTitle: "Solution recommandée : \(seed.qcmCorrect)",
+                    title: balancedQ1[0].title,
+                    plainLanguageTitle: balancedQ1[0].plainTitle,
                     assetName: seed.serviceAsset,
                     isCorrect: true,
-                    whyWrongOrRight: "Bonne réponse (\(seed.stepTitle)) : \(seed.qcmTip)"
+                    whyWrongOrRight: CertiGoDedicatedTrackQuestionBank.buildRichExplanation(
+                        rawExplanation: "Cette configuration met en œuvre le mécanisme recommandé pour « \(seed.stepTitle) » : \(cleanTip)",
+                        optionBadge: "A",
+                        optionTitle: balancedQ1[0].title,
+                        isCorrect: true,
+                        examTip: cleanTip,
+                        compRule: cleanRule
+                    )
                 ),
                 .init(
                     id: "\(lowerId)-q1-b",
                     badge: "B",
-                    title: seed.qcmWrong1,
-                    plainLanguageTitle: "À éviter : \(seed.qcmWrong1)",
+                    title: balancedQ1[1].title,
+                    plainLanguageTitle: balancedQ1[1].plainTitle,
                     isCorrect: false,
-                    whyWrongOrRight: "Cette option contredit la règle : \(seed.declicRule)"
+                    whyWrongOrRight: CertiGoDedicatedTrackQuestionBank.buildRichExplanation(
+                        rawExplanation: "Cette option ne respecte pas l'architecture en 3 briques de « \(seed.stepTitle) ».",
+                        optionBadge: "B",
+                        optionTitle: balancedQ1[1].title,
+                        isCorrect: false,
+                        examTip: cleanTip,
+                        compRule: cleanRule
+                    )
                 ),
                 .init(
                     id: "\(lowerId)-q1-c",
                     badge: "C",
-                    title: seed.qcmWrong2,
-                    plainLanguageTitle: "À éviter : \(seed.qcmWrong2)",
+                    title: balancedQ1[2].title,
+                    plainLanguageTitle: balancedQ1[2].plainTitle,
                     isCorrect: false,
-                    whyWrongOrRight: "Approche non fiable ou contraire aux bonnes pratiques \(trackId.brandDisplayName)."
+                    whyWrongOrRight: CertiGoDedicatedTrackQuestionBank.buildRichExplanation(
+                        rawExplanation: "Cette approche contourne le flux \(seed.brick1.title) ➔ \(seed.brick2.title) ➔ \(seed.brick3.title) recommandé par \(trackId.brandDisplayName).",
+                        optionBadge: "C",
+                        optionTitle: balancedQ1[2].title,
+                        isCorrect: false,
+                        examTip: cleanTip,
+                        compRule: cleanRule
+                    )
                 ),
                 .init(
                     id: "\(lowerId)-q1-d",
                     badge: "D",
-                    title: seed.qcmWrong3,
-                    plainLanguageTitle: "À éviter : \(seed.qcmWrong3)",
+                    title: balancedQ1[3].title,
+                    plainLanguageTitle: balancedQ1[3].plainTitle,
                     isCorrect: false,
-                    whyWrongOrRight: "Compromet la sécurité, la traçabilité ou la qualité du livrable."
+                    whyWrongOrRight: CertiGoDedicatedTrackQuestionBank.buildRichExplanation(
+                        rawExplanation: "Cette méthode dégrade la fiabilité, la traçabilité des sources ou la sécurité du livrable.",
+                        optionBadge: "D",
+                        optionTitle: balancedQ1[3].title,
+                        isCorrect: false,
+                        examTip: cleanTip,
+                        compRule: cleanRule
+                    )
                 )
             ],
-            examTip: seed.qcmTip,
+            examTip: cleanTip,
             comparisonLeftTitle: seed.brick1.title,
             comparisonLeftBullets: [seed.brick1.subtitle, "Point d'entrée du flux"],
             comparisonRightTitle: seed.brick3.title,
-            comparisonRightBullets: [seed.brick3.subtitle, seed.declicRule],
-            comparisonGoldenRule: seed.declicRule,
+            comparisonRightBullets: [seed.brick3.subtitle, cleanRule],
+            comparisonGoldenRule: cleanRule,
             conceptId: "\(lowerId).concept",
             conceptTitle: seed.stepTitle,
             difficulty: 0.45
+        )
+
+        let balancedQ2 = CertiGoDedicatedTrackQuestionBank.balanceOptionPairs(
+            [
+                (badge: "A", title: seed.labTokens.joined(separator: " "), plainTitle: "Assembler la séquence complète « \(seed.labTokens.joined(separator: " ")) »", isCorrect: true),
+                (badge: "B", title: seed.labDistractors.joined(separator: " "), plainTitle: "Utiliser les paramètres « \(seed.labDistractors.joined(separator: " ")) »", isCorrect: false)
+            ],
+            domainContext: seed.stepTitle,
+            routeCode: trackId.code
         )
 
         let q2 = CertiGoNativeExerciseItem(
@@ -2509,25 +2603,39 @@ public enum CertiGoAIProductivityAndLegalCatalog {
             domainBadge: "\(trackId.code) · \(seed.labKind.rawValue)",
             subBadge: "EXERCICE PRATIQUE · \(seed.labKind.rawValue)",
             prompt: "[\(seed.stepTitle)] Assemble la brique exacte pour compléter : « \(seed.labPrefix) »",
-            plainLanguagePrompt: "Complète l'expression pratique pour « \(seed.stepTitle) » :",
+            plainLanguagePrompt: "Dans ton exercice pratique sur « \(seed.stepTitle) », complète l'expression suivante :\n« \(seed.labPrefix) »",
             mascotPose: .poseCLICoder,
             options: [
                 .init(
                     id: "\(lowerId)-q2-a",
                     badge: "A",
-                    title: seed.labTokens.joined(separator: " "),
-                    plainLanguageTitle: "Séquence valide : \(seed.labTokens.joined(separator: " "))",
+                    title: balancedQ2[0].title,
+                    plainLanguageTitle: balancedQ2[0].plainTitle,
                     assetName: seed.serviceAsset,
                     isCorrect: true,
-                    whyWrongOrRight: "Assemblage validé pour \(seed.stepTitle) : \(seed.declicRule)"
+                    whyWrongOrRight: CertiGoDedicatedTrackQuestionBank.buildRichExplanation(
+                        rawExplanation: "Cet assemblage complète correctement l'expression pour « \(seed.stepTitle) ».",
+                        optionBadge: "A",
+                        optionTitle: balancedQ2[0].title,
+                        isCorrect: true,
+                        examTip: cleanTip,
+                        compRule: cleanRule
+                    )
                 ),
                 .init(
                     id: "\(lowerId)-q2-b",
                     badge: "B",
-                    title: seed.labDistractors.joined(separator: " "),
-                    plainLanguageTitle: "Séquence invalide : \(seed.labDistractors.joined(separator: " "))",
+                    title: balancedQ2[1].title,
+                    plainLanguageTitle: balancedQ2[1].plainTitle,
                     isCorrect: false,
-                    whyWrongOrRight: "Syntaxe ou workflow invalide pour \(seed.stepTitle)."
+                    whyWrongOrRight: CertiGoDedicatedTrackQuestionBank.buildRichExplanation(
+                        rawExplanation: "Cette syntaxe ne respecte pas le format attendu pour « \(seed.stepTitle) ».",
+                        optionBadge: "B",
+                        optionTitle: balancedQ2[1].title,
+                        isCorrect: false,
+                        examTip: cleanTip,
+                        compRule: cleanRule
+                    )
                 )
             ],
             cliPrefix: seed.labPrefix,
@@ -2535,12 +2643,12 @@ public enum CertiGoAIProductivityAndLegalCatalog {
             cliSuggestionBricks: [seed.labExpectedToken] + seed.labDistractors,
             wordBankTargetTokens: seed.labTokens,
             wordBankAllBricks: seed.labTokens + seed.labDistractors,
-            examTip: seed.declicRule,
+            examTip: cleanRule,
             comparisonLeftTitle: seed.brick2.title,
             comparisonLeftBullets: [seed.brick2.subtitle],
             comparisonRightTitle: seed.brick3.title,
             comparisonRightBullets: [seed.brick3.subtitle],
-            comparisonGoldenRule: seed.declicRule,
+            comparisonGoldenRule: cleanRule,
             conceptId: "\(lowerId).lab",
             conceptTitle: seed.stepTitle,
             difficulty: 0.65
@@ -3007,7 +3115,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                 id: "\(codeLower)-q09-deny",
                 badge: "✕",
                 text: "NON CONFORME · Contournement des garde-fous et des sources",
-                explanation: "Viole l'architecture en 3 briques de \(code).",
+                explanation: CertiGoDedicatedTrackQuestionBank.sanitizeText("Viole l'architecture en 3 briques de \(code)."),
                 isCorrect: false
             )
         ]
@@ -3068,14 +3176,14 @@ public enum CertiGoAIProductivityAndLegalCatalog {
             PrismChoiceOption(
                 id: "\(codeLower)-q10-3",
                 badge: "3",
-                text: "Désactiver la gouvernance, les permissions et la relecture humaine",
+                text: "Exécuter le workflow en contournant le filtrage des permissions et la validation humaine",
                 explanation: "Interdit en production.",
                 isCorrect: false
             ),
             PrismChoiceOption(
                 id: "\(codeLower)-q10-4",
                 badge: "4",
-                text: "Ignorer les sources vérifiables et les schémas structurés",
+                text: "Générer la réponse en texte libre sans ancrage documentaire ni schéma structuré",
                 explanation: "Entraîne des erreurs et des hallucinations.",
                 isCorrect: false
             )

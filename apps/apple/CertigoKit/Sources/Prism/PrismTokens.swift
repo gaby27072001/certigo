@@ -396,9 +396,15 @@ public enum CertiGoTypeToken: String, Codable, Hashable, CaseIterable, Sendable 
       if size >= 26 {
         higPointSize = 28
         higWeight = .bold
-      } else if size >= 20 {
+      } else if size >= 22 {
         higPointSize = 22
         higWeight = .bold
+      } else if size >= 20 {
+        higPointSize = 20
+        higWeight = .bold
+      } else if size >= 18 {
+        higPointSize = 18
+        higWeight = (normalized == "regular") ? .regular : .semibold
       } else if size >= 17 {
         higPointSize = 17
         higWeight = (normalized == "regular") ? .regular : .semibold
@@ -415,10 +421,10 @@ public enum CertiGoTypeToken: String, Codable, Hashable, CaseIterable, Sendable 
         }
       } else if size >= 15 {
         if normalized == "regular" {
-          higPointSize = 16
+          higPointSize = 15
           higWeight = .regular
         } else if normalized == "medium" {
-          higPointSize = 16
+          higPointSize = 15
           higWeight = .medium
         } else {
           higPointSize = 15
@@ -426,10 +432,13 @@ public enum CertiGoTypeToken: String, Codable, Hashable, CaseIterable, Sendable 
         }
       } else if size >= 14 {
         if normalized == "regular" {
-          higPointSize = 16
+          higPointSize = 14
           higWeight = .regular
+        } else if normalized == "medium" {
+          higPointSize = 14
+          higWeight = .medium
         } else {
-          higPointSize = 15
+          higPointSize = 14
           higWeight = .semibold
         }
       } else if size >= 13 {

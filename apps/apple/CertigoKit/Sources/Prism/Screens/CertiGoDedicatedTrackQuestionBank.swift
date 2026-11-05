@@ -4,6 +4,44 @@ import Foundation
 
 // MARK: - Dedicated Per-Certification Question Bank, 30-Step Curriculum & Brand Asset Resolver
 
+public struct LessonDeclicCard: Equatable, Hashable, Codable, Sendable {
+    public let title: String
+    public let analogy: String
+    public let keyTakeaways: [String]
+    public let concreteExample: String
+    public let diagramTop: String
+    public let diagramBottom: String
+    public let step1: String
+    public let step2: String
+    public let rule: String
+
+    public var keyTakeawaysText: String {
+        keyTakeaways.joined(separator: "\n")
+    }
+
+    public init(
+        title: String,
+        analogy: String,
+        keyTakeaways: [String],
+        concreteExample: String,
+        diagramTop: String,
+        diagramBottom: String,
+        step1: String,
+        step2: String,
+        rule: String
+    ) {
+        self.title = title.sanitizingFrenchFondEtForme
+        self.analogy = analogy.sanitizingFrenchFondEtForme
+        self.keyTakeaways = keyTakeaways.map(\.sanitizingFrenchFondEtForme)
+        self.concreteExample = concreteExample.sanitizingFrenchFondEtForme
+        self.diagramTop = diagramTop.sanitizingFrenchFondEtForme
+        self.diagramBottom = diagramBottom.sanitizingFrenchFondEtForme
+        self.step1 = step1.sanitizingFrenchFondEtForme
+        self.step2 = step2.sanitizingFrenchFondEtForme
+        self.rule = rule.sanitizingFrenchFondEtForme
+    }
+}
+
 public struct CertiGoDedicatedTrackBrandMetadata: Equatable, Hashable, Codable, Sendable {
     public let routeCode: String
     public let officialTitle: String
@@ -177,11 +215,11 @@ public enum CertiGoDedicatedTrackQuestionBank {
         }
     }
 
-    public static func declicCard(
+    public static func lessonDeclicCard(
         forRouteCode routeCode: String,
         lessonId: String = "",
         lessonTitle: String = ""
-    ) -> (title: String, diagramTop: String, diagramBottom: String, step1: String, step2: String, rule: String) {
+    ) -> LessonDeclicCard {
         let bp = blueprint(forRouteCode: routeCode)
         let parsed = parseUnitAndStep(fromLessonId: lessonId, fallbackUnit: 1, fallbackStepZeroBased: 0)
         let unitIdx = min(max(parsed.unit - 1, 0), bp.unitDeclics.count - 1)
@@ -189,37 +227,89 @@ public enum CertiGoDedicatedTrackQuestionBank {
         let unitHeader = bp.unitHeaders[min(max(unitIdx, 0), bp.unitHeaders.count - 1)]
         let stepGlobalIdx = min(max((parsed.unit - 1) * 10 + parsed.stepZeroBased, 0), max(0, bp.thirtySteps.count - 1))
         let stepMeta = bp.thirtySteps.isEmpty ? nil : bp.thirtySteps[stepGlobalIdx]
-        let seed = bp.exerciseSeeds[stepGlobalIdx % max(1, bp.exerciseSeeds.count)]
+        let ordered = orderedExerciseSeeds(for: bp, unit: parsed.unit, stepZeroBased: parsed.stepZeroBased)
+        let seed = ordered.first ?? bp.exerciseSeeds[stepGlobalIdx % max(1, bp.exerciseSeeds.count)]
 
         let resolvedStepTitle = sanitizeText(
             !lessonTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? lessonTitle
                 : (stepMeta?.title ?? bp.officialTitle)
         )
+        let cleanMetaTitle = sanitizeText(stepMeta?.title ?? resolvedStepTitle)
+        let cleanMetaSub = sanitizeText(stepMeta?.subtitle ?? bp.shortSubtitle)
+        let cleanLeft = sanitizeText(seed.compLeftTitle)
+        let cleanRight = sanitizeText(seed.compRightTitle)
+        let cleanRule = ensureSentenceEnding(sanitizeText(seed.compRule))
+        let cleanUnitRule = ensureSentenceEnding(sanitizeText(unitHeader.memoGoldenRule))
+        let cleanActivity = sanitizeText(unitHeader.memoActivity)
+        let firstRightBullet = sanitizeText(seed.compRightBullets.first ?? cleanMetaSub)
+        let firstLeftBullet = sanitizeText(seed.compLeftBullets.first ?? "configuration manuelle non isolée")
+        let correctOpt = seed.options.first(where: \.isCorrect) ?? seed.options[0]
+        let cleanCorrectTitle = sanitizeText(correctOpt.title)
+        let cleanCorrectExp = ensureSentenceEnding(sanitizeText(correctOpt.explanation))
+        let glossaryItem = seed.glossary.first
+        let glossaryTerm = sanitizeText(glossaryItem?.term ?? cleanRight)
+        let glossaryMeaning = ensureSentenceEnding(sanitizeText(glossaryItem?.simpleMeaning ?? firstRightBullet))
+        let stepCode = "U\(parsed.unit).\(parsed.stepZeroBased + 1)"
 
-        if parsed.stepZeroBased > 0, let stepMeta {
-            let cleanMetaTitle = sanitizeText(stepMeta.title)
-            let cleanMetaSub = sanitizeText(stepMeta.subtitle)
-            let cleanLeft = sanitizeText(seed.compLeftTitle)
-            let cleanRight = sanitizeText(seed.compRightTitle)
-            let cleanRule = sanitizeText(seed.compRule)
-            let stepCode = "U\(parsed.unit).\(parsed.stepZeroBased + 1)"
-            return (
-                title: "Repère Déclic \(bp.code) (\(stepCode)) · \(resolvedStepTitle) : cadrage opérationnel sur \(cleanMetaSub).",
-                diagramTop: "✕ Risque sur \(cleanMetaTitle) : s'appuyer sur \(cleanLeft) sans garde-fou dédié",
-                diagramBottom: "✓ Cible \(bp.code) (\(stepCode)) : associer \(cleanRight) pour sécuriser \(cleanMetaSub)",
-                step1: "1. Analyse préalable (\(stepCode)) : qualifier le périmètre de \(cleanMetaTitle) (\(cleanMetaSub))",
-                step2: "2. Exécution \(bp.brandDisplayName) : déployer \(cleanRight) dans le cadre de \(sanitizeText(unitHeader.memoActivity))",
-                rule: "Synthèse Déclic \(stepCode) (\(cleanMetaTitle)) : \(cleanRule)"
+        let analogyText = sanitizeText(
+            "Imagine un contrôle d'accès dans un bâtiment sensible : laisser une porte ouverte sans filtre revient à utiliser \(cleanLeft) (\(lowercaseFirst(firstLeftBullet))). En \(bp.brandDisplayName), « \(glossaryTerm) » joue le rôle d'un badge nominatif vérifié à chaque passage : \(lowercaseFirst(glossaryMeaning))\n\nSur l'étape « \(resolvedStepTitle) », activer \(cleanRight) verrouille automatiquement le périmètre (\(cleanMetaSub)) tout en évitant les erreurs de manipulation manuelle."
+        )
+
+        let takeaways: [String] = [
+            ensureSentenceEnding(sanitizeText("• Principe clé (\(stepCode)) : \(cleanMetaTitle) structure \(lowercaseFirst(cleanMetaSub)) autour de \(cleanRight).")),
+            ensureSentenceEnding(sanitizeText("• Distinction essentielle : privilégie \(cleanRight) (\(lowercaseFirst(firstRightBullet))) plutôt que \(cleanLeft) (\(lowercaseFirst(firstLeftBullet))).")),
+            ensureSentenceEnding(sanitizeText("• Réflexe à retenir : \(cleanRule)"))
+        ]
+
+        let concreteExampleText = sanitizeText(
+            "En production chez \(bp.brandDisplayName) pour « \(cleanMetaTitle) » (\(cleanMetaSub)), l'équipe met en place : \(cleanCorrectTitle).\n\nRésultat opérationnel : \(cleanCorrectExp) Cette configuration respecte la règle d'architecture : \(cleanUnitRule)"
+        )
+
+        if parsed.stepZeroBased > 0 {
+            return LessonDeclicCard(
+                title: ensureSentenceEnding(sanitizeText("Déclic \(bp.code) (\(stepCode)) · \(resolvedStepTitle) : associer \(cleanRight) pour maîtriser \(lowercaseFirst(cleanMetaSub)).")),
+                analogy: ensureSentenceEnding(analogyText),
+                keyTakeaways: takeaways,
+                concreteExample: ensureSentenceEnding(concreteExampleText),
+                diagramTop: ensureSentenceEnding(sanitizeText("✕ Approche fragile sur \(cleanMetaTitle) : reposer sur \(cleanLeft) sans garde-fou dédié.")),
+                diagramBottom: ensureSentenceEnding(sanitizeText("✓ Architecture cible \(bp.code) (\(stepCode)) : déployer \(cleanRight) pour sécuriser \(cleanMetaSub).")),
+                step1: ensureSentenceEnding(sanitizeText("1. Cadrage (\(stepCode)) : qualifier le besoin sur \(cleanMetaTitle) (\(cleanMetaSub)).")),
+                step2: ensureSentenceEnding(sanitizeText("2. Mise en œuvre \(bp.brandDisplayName) : configurer \(cleanRight) pour réussir la mission « \(cleanActivity) ».")),
+                rule: ensureSentenceEnding(sanitizeText("Synthèse Déclic \(stepCode) (\(cleanMetaTitle)) : \(cleanRule)"))
             )
         }
+
+        return LessonDeclicCard(
+            title: ensureSentenceEnding(sanitizeText(baseDeclic.title)),
+            analogy: ensureSentenceEnding(analogyText),
+            keyTakeaways: takeaways,
+            concreteExample: ensureSentenceEnding(concreteExampleText),
+            diagramTop: ensureSentenceEnding(sanitizeText(baseDeclic.diagramTop)),
+            diagramBottom: ensureSentenceEnding(sanitizeText(baseDeclic.diagramBottom)),
+            step1: ensureSentenceEnding(sanitizeText(baseDeclic.step1)),
+            step2: ensureSentenceEnding(sanitizeText(baseDeclic.step2)),
+            rule: ensureSentenceEnding(sanitizeText(baseDeclic.rule))
+        )
+    }
+
+    public static func declicCard(
+        forRouteCode routeCode: String,
+        lessonId: String = "",
+        lessonTitle: String = ""
+    ) -> (title: String, diagramTop: String, diagramBottom: String, step1: String, step2: String, rule: String) {
+        let card = lessonDeclicCard(
+            forRouteCode: routeCode,
+            lessonId: lessonId,
+            lessonTitle: lessonTitle
+        )
         return (
-            title: sanitizeText(baseDeclic.title),
-            diagramTop: sanitizeText(baseDeclic.diagramTop),
-            diagramBottom: sanitizeText(baseDeclic.diagramBottom),
-            step1: sanitizeText(baseDeclic.step1),
-            step2: sanitizeText(baseDeclic.step2),
-            rule: sanitizeText(baseDeclic.rule)
+            title: card.title,
+            diagramTop: card.diagramTop,
+            diagramBottom: card.diagramBottom,
+            step1: card.step1,
+            step2: card.step2,
+            rule: card.rule
         )
     }
 
@@ -243,37 +333,13 @@ public enum CertiGoDedicatedTrackQuestionBank {
         let lowerId = lessonId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let isChapterOneOverview = lowerId.isEmpty || lowerId.hasSuffix("u1-s1")
 
-        if isChapterOneOverview {
-            return [
-                CertiGoLessonMicroSlide(
-                    stepBadge: "VUE D'ENSEMBLE · TA MISSION",
-                    title: sanitizeText(bp.overviewSlide1Title),
-                    bodyParagraph: sanitizeText(bp.overviewSlide1Body),
-                    keyTakeawayPill: sanitizeText(bp.overviewSlide1Pill),
-                    serviceAssetName: resolvedAsset
-                ),
-                CertiGoLessonMicroSlide(
-                    stepBadge: "LA GRANDE IMAGE · EN 3 BRIQUES",
-                    title: sanitizeText(bp.overviewSlide2Title),
-                    bodyParagraph: sanitizeText(bp.overviewSlide2Body),
-                    keyTakeawayPill: sanitizeText(bp.overviewSlide2Pill),
-                    serviceAssetName: resolvedAsset
-                ),
-                CertiGoLessonMicroSlide(
-                    stepBadge: "3/3 · MOTS-CLÉS ESSENTIELS",
-                    title: "Tes 3 premiers réflexes \(bp.code)",
-                    bodyParagraph: sanitizeText(bp.overviewSlide3Body),
-                    keyTakeawayPill: sanitizeText(bp.overviewSlide3Pill),
-                    serviceAssetName: resolvedAsset
-                )
-            ]
-        }
-
         let unitIdx = min(max(parsed.unit - 1, 0), max(0, bp.unitHeaders.count - 1))
         let unitHeader = bp.unitHeaders[unitIdx]
         let stepGlobalIdx = min(max((parsed.unit - 1) * 10 + parsed.stepZeroBased, 0), max(0, bp.thirtySteps.count - 1))
         let stepMeta = bp.thirtySteps.isEmpty ? nil : bp.thirtySteps[stepGlobalIdx]
-        let seed = bp.exerciseSeeds[stepGlobalIdx % max(1, bp.exerciseSeeds.count)]
+        let ordered = orderedExerciseSeeds(for: bp, unit: parsed.unit, stepZeroBased: parsed.stepZeroBased)
+        let seed = ordered.first ?? bp.exerciseSeeds[stepGlobalIdx % max(1, bp.exerciseSeeds.count)]
+        let secondSeed = ordered.count > 1 ? ordered[1] : seed
         let examSeed = bp.examSeeds[stepGlobalIdx % max(1, bp.examSeeds.count)]
 
         let cleanTitle = sanitizeText(
@@ -282,38 +348,154 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 : (stepMeta?.title ?? bp.officialTitle)
         )
         let cleanSubtitle = sanitizeText(stepMeta?.subtitle ?? bp.shortSubtitle)
-        let cleanUnitHeader = sanitizeText(unitHeader.headerTitle)
         let cleanUnitActivity = sanitizeText(unitHeader.memoActivity)
-        let cleanUnitRule = sanitizeText(unitHeader.memoGoldenRule)
+        let cleanUnitRule = ensureSentenceEnding(sanitizeText(unitHeader.memoGoldenRule))
         let cleanLeft = sanitizeText(seed.compLeftTitle)
         let cleanRight = sanitizeText(seed.compRightTitle)
-        let cleanTip = sanitizeText(seed.examTip)
+        let cleanTip = ensureSentenceEnding(sanitizeText(seed.examTip))
+        let cleanCompRule = ensureSentenceEnding(sanitizeText(seed.compRule))
         let cleanDomain = sanitizeText(examSeed.domainTitle)
         let stepCode = "U\(parsed.unit).\(parsed.stepZeroBased + 1)"
+
+        let firstRightBullet = ensureSentenceEnding(sanitizeText(seed.compRightBullets.first ?? cleanSubtitle))
+        let firstLeftBullet = ensureSentenceEnding(sanitizeText(seed.compLeftBullets.first ?? "approche manuelle sans isolation"))
+        let correctOpt = seed.options.first(where: \.isCorrect) ?? seed.options[0]
+        let cleanCorrectTitle = sanitizeText(correctOpt.title)
+        let cleanCorrectExp = ensureSentenceEnding(sanitizeText(correctOpt.explanation))
+        let secondCorrectOpt = secondSeed.options.first(where: \.isCorrect) ?? secondSeed.options[0]
+        let secondCorrectTitle = sanitizeText(secondCorrectOpt.title)
+        let glossaryFirst = seed.glossary.first
+        let glossaryTerm = sanitizeText(glossaryFirst?.term ?? cleanRight)
+        let glossaryMeaning = ensureSentenceEnding(sanitizeText(glossaryFirst?.simpleMeaning ?? firstRightBullet))
+        let keyTopicsLine = unitHeader.memoKeyTopics.map(sanitizeText).joined(separator: ", ")
+
+        if isChapterOneOverview {
+            let s1Body = sanitizeText(
+                "« \(cleanTitle) » couvre un mécanisme fondamental chez \(bp.brandDisplayName) : \(cleanSubtitle). Le terme clé « \(glossaryTerm) » désigne concrètement : \(lowercaseFirst(glossaryMeaning))\n\nSon rôle est d'assurer la mission « \(cleanUnitActivity) » en s'appuyant sur \(cleanRight) : \(lowercaseFirst(firstRightBullet))"
+            )
+            let s2Body = sanitizeText(
+                "\(ensureSentenceEnding(bp.overviewSlide2Body)) En pratique, l'architecture repose sur trois briques complémentaires : \(keyTopicsLine).\n\nContrairement à \(cleanLeft) (\(lowercaseFirst(firstLeftBullet))), le composant \(cleanRight) applique la règle fondamentale : \(cleanUnitRule)"
+            )
+            let s3Body = sanitizeText(
+                "En production sur le domaine « \(cleanDomain) », la configuration recommandée consiste à mettre en œuvre : \(cleanCorrectTitle). \(cleanCorrectExp)\n\nDe même, sur un second cas pratique fréquent, retiens l'action cible : \(secondCorrectTitle). \(cleanTip)"
+            )
+            return [
+                CertiGoLessonMicroSlide(
+                    stepBadge: "VUE D'ENSEMBLE · TA MISSION",
+                    title: sanitizeText("Concept clé · \(cleanTitle)"),
+                    bodyParagraph: ensureSentenceEnding(s1Body),
+                    keyTakeawayPill: ensureSentenceEnding(sanitizeText("Définition : \(cleanRight) structure \(cleanSubtitle).")),
+                    serviceAssetName: resolvedAsset
+                ),
+                CertiGoLessonMicroSlide(
+                    stepBadge: "LA GRANDE IMAGE · EN 3 BRIQUES",
+                    title: sanitizeText(bp.overviewSlide2Title),
+                    bodyParagraph: ensureSentenceEnding(s2Body),
+                    keyTakeawayPill: ensureSentenceEnding(sanitizeText("Mécanisme : \(bp.overviewSlide2Pill).")),
+                    serviceAssetName: resolvedAsset
+                ),
+                CertiGoLessonMicroSlide(
+                    stepBadge: "3/3 · MOTS-CLÉS ESSENTIELS",
+                    title: sanitizeText("Exemple en production & réflexes \(bp.code)"),
+                    bodyParagraph: ensureSentenceEnding(s3Body),
+                    keyTakeawayPill: ensureSentenceEnding(sanitizeText("Réflexe clé : \(cleanCompRule)")),
+                    serviceAssetName: resolvedAsset
+                )
+            ]
+        }
+
+        let slide1Body = sanitizeText(
+            "« \(cleanTitle) » désigne un mécanisme essentiel chez \(bp.brandDisplayName) centré sur : \(cleanSubtitle). Dans ce contexte, la notion « \(glossaryTerm) » signifie concrètement : \(lowercaseFirst(glossaryMeaning))\n\nSon rôle opérationnel est de sécuriser et fiabiliser « \(cleanUnitActivity) » grâce à \(cleanRight) : \(lowercaseFirst(firstRightBullet))"
+        )
+        let slide2Body = sanitizeText(
+            "En pratique, « \(cleanTitle) » fonctionne en articulant les composants clés (\(keyTopicsLine)) autour de \(cleanRight). Cette architecture garantit : \(lowercaseFirst(firstRightBullet))\n\nÀ l'inverse, recourir à \(cleanLeft) expose au risque suivant : \(lowercaseFirst(firstLeftBullet)) Applique toujours la règle : \(cleanUnitRule)"
+        )
+        let slide3Body = sanitizeText(
+            "Cas réel en production (\(cleanDomain)) : lorsqu'une équipe implémente « \(cleanTitle) », la solution consiste à déployer \(cleanCorrectTitle). \(cleanCorrectExp)\n\nRéflexe opérationnel à retenir avant le quiz (\(stepCode)) : \(cleanCompRule) \(cleanTip)"
+        )
 
         return [
             CertiGoLessonMicroSlide(
                 stepBadge: "NOTION 1/3 · CONCEPT CLÉ",
                 title: cleanTitle,
-                bodyParagraph: "Au sein de \(cleanUnitHeader), l'étape \(stepCode) (« \(cleanTitle) ») approfondit : \(cleanSubtitle). Ce pilier \(bp.brandDisplayName) garantit une fondation conforme aux attentes officielles de la certification \(bp.code).",
-                keyTakeawayPill: "Concept \(stepCode) : maîtriser \(cleanSubtitle) sur \(bp.code).",
+                bodyParagraph: ensureSentenceEnding(slide1Body),
+                keyTakeawayPill: ensureSentenceEnding(sanitizeText("Définition \(stepCode) : \(cleanTitle) assure \(cleanSubtitle) via \(cleanRight).")),
                 serviceAssetName: resolvedAsset
             ),
             CertiGoLessonMicroSlide(
                 stepBadge: "NOTION 2/3 · ARCHITECTURE & MÉCANISME",
-                title: "Fonctionnement · \(cleanTitle)",
-                bodyParagraph: "Pour implémenter « \(cleanTitle) » en production, privilégie l'approche \(cleanRight) plutôt que \(cleanLeft). Ce mécanisme s'intègre directement dans ta mission : \(cleanUnitActivity).",
-                keyTakeawayPill: "Mécanisme \(stepCode) : \(cleanRight) prime sur \(cleanLeft) pour \(cleanTitle).",
+                title: sanitizeText("Fonctionnement · \(cleanTitle)"),
+                bodyParagraph: ensureSentenceEnding(slide2Body),
+                keyTakeawayPill: ensureSentenceEnding(sanitizeText("Mécanisme \(stepCode) : \(cleanRight) remplace \(cleanLeft) pour \(cleanTitle).")),
                 serviceAssetName: resolvedAsset
             ),
             CertiGoLessonMicroSlide(
                 stepBadge: "NOTION 3/3 · CAS PRATIQUE",
-                title: "Réflexe d'examen \(bp.code) · \(cleanTitle)",
-                bodyParagraph: "Lors d'une étude de cas \(bp.code) sur le domaine « \(cleanDomain) » impliquant \(cleanTitle), vérifie systématiquement la règle suivante avant de valider ton choix : \(cleanUnitRule)",
-                keyTakeawayPill: "Astuce \(stepCode) (\(cleanTitle)) : \(cleanTip)",
+                title: sanitizeText("Exemple en production · \(cleanTitle)"),
+                bodyParagraph: ensureSentenceEnding(slide3Body),
+                keyTakeawayPill: ensureSentenceEnding(sanitizeText("Réflexe \(stepCode) (\(cleanTitle)) : \(cleanTip)")),
                 serviceAssetName: resolvedAsset
             )
         ]
+    }
+
+    private static func orderedExerciseSeeds(
+        for bp: TrackBlueprint,
+        unit: Int,
+        stepZeroBased: Int
+    ) -> [ExerciseSeed] {
+        let baseSeeds = bp.exerciseSeeds
+        let examConvertedSeeds: [ExerciseSeed] = bp.examSeeds.enumerated().map { _, exSeed in
+            let correctText = exSeed.choices.first(where: \.isCorrect)?.text ?? bp.officialTitle
+            let wrongText = exSeed.choices.first(where: { !$0.isCorrect })?.text ?? "Approche manuelle non isolée"
+            let opts: [OptionSeed] = exSeed.choices.map { ch in
+                OptionSeed(
+                    badge: ch.badge,
+                    title: ch.text,
+                    plainTitle: ch.plainText,
+                    isCorrect: ch.isCorrect,
+                    explanation: ch.isCorrect
+                        ? "Cette architecture respecte les bonnes pratiques \(bp.brandDisplayName) sur le domaine « \(exSeed.domainTitle) » en appliquant : \(ch.text).\n\nEn production, ce choix garantit la sécurité, la résilience et la conformité attendues dans le scénario \(exSeed.caseStudyBadge)."
+                        : "L'option \(ch.badge) (\(ch.text)) ne répond pas aux contraintes techniques du domaine « \(exSeed.domainTitle) ».\n\nDans le scénario \(exSeed.caseStudyBadge), privilégie plutôt : \(correctText)."
+                )
+            }
+            return ExerciseSeed(
+                formatCode: "Q_TYPE_01",
+                domainBadge: "\(bp.code) · \(exSeed.domainTitle.uppercased())",
+                subBadge: exSeed.caseStudyBadge,
+                prompt: exSeed.stem,
+                plainPrompt: exSeed.plainStem,
+                glossary: [(term: exSeed.domainTitle, simpleMeaning: "Pilier technique mis en œuvre avec \(correctText)")],
+                options: opts,
+                examTip: "Sur \(exSeed.domainTitle) (\(bp.code)), retiens la configuration cible : \(correctText).",
+                compLeftTitle: wrongText,
+                compLeftBullets: ["Ne couvre pas les exigences de \(exSeed.domainTitle)", "Introduit un risque opérationnel ou de sécurité"],
+                compRightTitle: correctText,
+                compRightBullets: ["Répond directement au besoin sur \(exSeed.domainTitle)", "Conforme aux bonnes pratiques \(bp.brandDisplayName)"],
+                compRule: "Sur \(exSeed.domainTitle), déploie systématiquement : \(correctText)."
+            )
+        }
+        let combinedPool = baseSeeds + examConvertedSeeds
+        let stepGlobalIdx = min(max((unit - 1) * 10 + stepZeroBased, 0), max(0, bp.thirtySteps.count - 1))
+
+        guard baseSeeds.count >= 6 else { return baseSeeds }
+        if unit == 1 && stepZeroBased == 0 {
+            return Array(baseSeeds.prefix(6))
+        }
+        if unit == 1 && stepZeroBased == 1 {
+            return [baseSeeds[1], baseSeeds[0], baseSeeds[2], baseSeeds[3], baseSeeds[4], baseSeeds[5]]
+        }
+        if unit == 2 && stepZeroBased == 0 {
+            return Array(baseSeeds[2..<4]) + Array(baseSeeds[0..<2]) + Array(baseSeeds[4..<6])
+        }
+        if unit == 3 && stepZeroBased == 0 {
+            return Array(baseSeeds[4..<6]) + Array(baseSeeds[2..<4]) + Array(baseSeeds[0..<2])
+        }
+        let poolCount = max(1, combinedPool.count)
+        let startOffset = (stepGlobalIdx * 3) % poolCount
+        return (0..<6).map { offset in
+            combinedPool[(startOffset + offset) % poolCount]
+        }
     }
 
     public static func exercises(
@@ -323,61 +505,9 @@ public enum CertiGoDedicatedTrackQuestionBank {
     ) -> [CertiGoNativeExerciseItem] {
         let bp = blueprint(forRouteCode: routeCode)
         let parsed = parseUnitAndStep(fromLessonId: lessonId, fallbackUnit: 1, fallbackStepZeroBased: 0)
-        let baseSeeds = bp.exerciseSeeds
-        let examConvertedSeeds: [ExerciseSeed] = bp.examSeeds.enumerated().map { idx, exSeed in
-            let opts: [OptionSeed] = exSeed.choices.map { ch in
-                OptionSeed(
-                    badge: ch.badge,
-                    title: ch.text,
-                    plainTitle: ch.plainText,
-                    isCorrect: ch.isCorrect,
-                    explanation: ch.isCorrect
-                        ? "Choix validé pour \(bp.code) (\(exSeed.domainTitle)) : \(ch.text)."
-                        : "L'option \(ch.badge) (\(ch.text)) ne respecte pas les exigences du scénario \(exSeed.caseStudyBadge)."
-                )
-            }
-            let correctText = exSeed.choices.first(where: \.isCorrect)?.text ?? bp.officialTitle
-            let wrongText = exSeed.choices.first(where: { !$0.isCorrect })?.text ?? "Approche non conforme"
-            return ExerciseSeed(
-                formatCode: "Q_TYPE_01",
-                domainBadge: "\(bp.code) · \(exSeed.domainTitle.uppercased())",
-                subBadge: exSeed.caseStudyBadge,
-                prompt: exSeed.stem,
-                plainPrompt: exSeed.plainStem,
-                glossary: [(term: exSeed.domainTitle, simpleMeaning: "Domaine évalué dans \(exSeed.caseStudyBadge)")],
-                options: opts,
-                examTip: "Sur \(exSeed.domainTitle) (\(bp.code)), retiens la solution cible : \(correctText).",
-                compLeftTitle: "Option écartée",
-                compLeftBullets: [wrongText],
-                compRightTitle: "Solution certifiée \(bp.code)",
-                compRightBullets: [correctText],
-                compRule: "Dans \(exSeed.caseStudyBadge), sélectionne toujours : \(correctText)."
-            )
-        }
-        let combinedPool = baseSeeds + examConvertedSeeds
         let stepGlobalIdx = min(max((parsed.unit - 1) * 10 + parsed.stepZeroBased, 0), max(0, bp.thirtySteps.count - 1))
         let stepMeta = bp.thirtySteps.isEmpty ? nil : bp.thirtySteps[stepGlobalIdx]
-
-        let orderedSeeds: [ExerciseSeed] = {
-            guard baseSeeds.count >= 6 else { return baseSeeds }
-            if parsed.unit == 1 && parsed.stepZeroBased == 0 {
-                return Array(baseSeeds.prefix(6))
-            }
-            if parsed.unit == 1 && parsed.stepZeroBased == 1 {
-                return [baseSeeds[1], baseSeeds[0], baseSeeds[2], baseSeeds[3], baseSeeds[4], baseSeeds[5]]
-            }
-            if parsed.unit == 2 && parsed.stepZeroBased == 0 {
-                return Array(baseSeeds[2..<4]) + Array(baseSeeds[0..<2]) + Array(baseSeeds[4..<6])
-            }
-            if parsed.unit == 3 && parsed.stepZeroBased == 0 {
-                return Array(baseSeeds[4..<6]) + Array(baseSeeds[2..<4]) + Array(baseSeeds[0..<2])
-            }
-            let poolCount = max(1, combinedPool.count)
-            let startOffset = (stepGlobalIdx * 3) % poolCount
-            return (0..<6).map { offset in
-                combinedPool[(startOffset + offset) % poolCount]
-            }
-        }()
+        let orderedSeeds = orderedExerciseSeeds(for: bp, unit: parsed.unit, stepZeroBased: parsed.stepZeroBased)
 
         let stepContextLabel: String? = {
             if parsed.unit == 1 && parsed.stepZeroBased == 0 {
@@ -527,37 +657,79 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 guard let stepContextLabel, !stepContextLabel.isEmpty else { return baseCleanPrompt }
                 return "[\(stepContextLabel)] \(baseCleanPrompt)"
             }()
-            let rawPlain = CertiGoDedicatedTrackQuestionBank.sanitizeText(plainPrompt)
-            let baseCleanPlain = rawPlain == baseCleanPrompt
-                ? "En clair pour \(routeCode) : \(rawPlain)"
-                : rawPlain
+            let rawPlain = CertiGoDedicatedTrackQuestionBank.buildNaturalPlainPrompt(
+                rawPlain: plainPrompt,
+                technicalPrompt: baseCleanPrompt,
+                routeCode: routeCode
+            )
             let cleanPlainPrompt: String = {
-                guard let stepContextLabel, !stepContextLabel.isEmpty else { return baseCleanPlain }
-                return "[\(stepContextLabel)] \(baseCleanPlain)"
+                guard let stepContextLabel, !stepContextLabel.isEmpty else { return rawPlain }
+                return "[\(stepContextLabel)] \(rawPlain)"
             }()
-            let cleanExamTip = CertiGoDedicatedTrackQuestionBank.sanitizeText(examTip)
+            let cleanExamTip = CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+                CertiGoDedicatedTrackQuestionBank.sanitizeText(examTip)
+            )
+            let cleanCompRule = CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
+                CertiGoDedicatedTrackQuestionBank.sanitizeText(compRule)
+            )
+            let cleanDomain = CertiGoDedicatedTrackQuestionBank.sanitizeText(domainBadge)
 
-            let builtOptions: [CertiGoNativeExerciseItem.OptionItem] = options.enumerated().map { idx, opt in
-                let cleanTitle = CertiGoDedicatedTrackQuestionBank.sanitizeText(opt.title)
-                let rawOptPlain = CertiGoDedicatedTrackQuestionBank.sanitizeText(opt.plainTitle)
-                let cleanPlainTitle = rawOptPlain == cleanTitle
-                    ? CertiGoPlainLanguageTranslator.simplifyOptionTitle(cleanTitle, subtitle: nil).strippingMarkdownAsterisks
-                    : rawOptPlain
+            var resolvedOptionSeeds = options
+            if resolvedOptionSeeds.count < 4 {
+                let letters = ["A", "B", "C", "D"]
+                let fallbackLeft1 = CertiGoDedicatedTrackQuestionBank.sanitizeText(compLeftBullets.first ?? compLeftTitle)
+                let fallbackLeft2 = CertiGoDedicatedTrackQuestionBank.sanitizeText(
+                    compLeftBullets.count > 1 ? compLeftBullets[1] : "Exécuter une configuration manuelle hors du flux standard \(routeCode)"
+                )
+                let extraCandidates: [(title: String, plain: String, exp: String)] = [
+                    (
+                        title: "Appliquer uniquement \(compLeftTitle) (\(fallbackLeft1)) sans étape de validation",
+                        plain: "Passer par \(compLeftTitle) sans respecter l'ordre des étapes nécessaires",
+                        exp: "Cette approche repose sur \(compLeftTitle) et ne couvre pas l'ensemble du flux requis."
+                    ),
+                    (
+                        title: "Configurer \(fallbackLeft2) en contournant la séquence recommandée sur \(routeCode)",
+                        plain: "Utiliser un réglage manuel incomplet qui saute une étape essentielle du projet",
+                        exp: "Omettre une brique de la séquence standard provoque une erreur d'exécution en production."
+                    ),
+                    (
+                        title: "Inverser l'ordre d'initialisation et d'exécution des composants dans l'environnement \(routeCode)",
+                        plain: "Lancer la dernière étape avant d'avoir préparé la configuration initiale",
+                        exp: "L'ordre séquentiel des opérations doit être strictement respecté pour valider l'architecture."
+                    )
+                ]
+                var extraIdx = 0
+                while resolvedOptionSeeds.count < 4 {
+                    let badge = letters[resolvedOptionSeeds.count]
+                    let cand = extraCandidates[extraIdx % extraCandidates.count]
+                    extraIdx += 1
+                    resolvedOptionSeeds.append(
+                        OptionSeed(
+                            badge: badge,
+                            title: cand.title,
+                            plainTitle: cand.plain,
+                            isCorrect: false,
+                            explanation: cand.exp
+                        )
+                    )
+                }
+            }
+
+            let builtOptions: [CertiGoNativeExerciseItem.OptionItem] = resolvedOptionSeeds.enumerated().map { idx, opt in
                 let rawExplanation = CertiGoDedicatedTrackQuestionBank.sanitizeText(opt.explanation)
-                let cleanExplanation: String = {
-                    if rawExplanation == cleanExamTip {
-                        return "Choix validé (\(opt.badge) · \(cleanTitle)) : \(rawExplanation)"
-                    }
-                    if rawExplanation.count < 24 {
-                        return "Option \(opt.badge) (\(cleanTitle)) : \(rawExplanation)"
-                    }
-                    return rawExplanation
-                }()
+                let cleanExplanation = CertiGoDedicatedTrackQuestionBank.buildRichExplanation(
+                    rawExplanation: rawExplanation,
+                    optionBadge: opt.badge,
+                    optionTitle: opt.title,
+                    isCorrect: opt.isCorrect,
+                    examTip: cleanExamTip,
+                    compRule: cleanCompRule
+                )
                 return CertiGoNativeExerciseItem.OptionItem(
                     id: "\(id)-opt-\(idx + 1)",
                     badge: opt.badge,
-                    title: cleanTitle,
-                    plainLanguageTitle: cleanPlainTitle,
+                    title: opt.title,
+                    plainLanguageTitle: opt.plainTitle,
                     subtitle: nil,
                     assetName: opt.isCorrect ? primaryAsset : nil,
                     isCorrect: opt.isCorrect,
@@ -573,7 +745,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
             return CertiGoNativeExerciseItem(
                 id: id,
                 formatCode: formatCode,
-                domainBadge: CertiGoDedicatedTrackQuestionBank.sanitizeText(domainBadge),
+                domainBadge: cleanDomain,
                 subBadge: CertiGoDedicatedTrackQuestionBank.sanitizeText(subBadge),
                 prompt: cleanPrompt,
                 plainLanguagePrompt: cleanPlainPrompt,
@@ -591,9 +763,9 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 comparisonLeftBullets: compLeftBullets.map(CertiGoDedicatedTrackQuestionBank.sanitizeText),
                 comparisonRightTitle: CertiGoDedicatedTrackQuestionBank.sanitizeText(compRightTitle),
                 comparisonRightBullets: compRightBullets.map(CertiGoDedicatedTrackQuestionBank.sanitizeText),
-                comparisonGoldenRule: CertiGoDedicatedTrackQuestionBank.sanitizeText(compRule),
+                comparisonGoldenRule: cleanCompRule,
                 conceptId: "\(routeCode.lowercased()):\(id)",
-                conceptTitle: CertiGoDedicatedTrackQuestionBank.sanitizeText(domainBadge),
+                conceptTitle: cleanDomain,
                 difficulty: formatCode == "Q_TYPE_01" ? 0.45 : 0.65
             )
         }
@@ -608,37 +780,245 @@ public enum CertiGoDedicatedTrackQuestionBank {
 
         func toExamQuestion(routeCode: String, number: Int) -> CertiGoNativeExamQuestion {
             let cleanStem = CertiGoDedicatedTrackQuestionBank.sanitizeText(stem)
-            let rawPlainStem = CertiGoDedicatedTrackQuestionBank.sanitizeText(plainStem)
-            let cleanPlainStem = rawPlainStem == cleanStem
-                ? "En clair : \(rawPlainStem)"
-                : rawPlainStem
+            let cleanPlainStem = CertiGoDedicatedTrackQuestionBank.buildNaturalPlainPrompt(
+                rawPlain: plainStem,
+                technicalPrompt: cleanStem,
+                routeCode: routeCode
+            )
+            let cleanDomain = CertiGoDedicatedTrackQuestionBank.sanitizeText(domainTitle)
             return CertiGoNativeExamQuestion(
                 id: "\(routeCode)-ex-\(number)",
                 number: number,
-                domainTitle: CertiGoDedicatedTrackQuestionBank.sanitizeText(domainTitle),
+                domainTitle: cleanDomain,
                 caseStudyBadge: CertiGoDedicatedTrackQuestionBank.sanitizeText(caseStudyBadge),
                 stem: cleanStem,
                 plainLanguageStem: cleanPlainStem,
                 choices: choices.map { ch in
-                    let cleanChoiceText = CertiGoDedicatedTrackQuestionBank.sanitizeText(ch.text)
-                    let rawChoicePlain = CertiGoDedicatedTrackQuestionBank.sanitizeText(ch.plainText)
-                    let cleanChoicePlain = rawChoicePlain == cleanChoiceText
-                        ? CertiGoPlainLanguageTranslator.simplifyOptionTitle(cleanChoiceText, subtitle: nil).strippingMarkdownAsterisks
-                        : rawChoicePlain
-                    return CertiGoNativeExamQuestion.Choice(
+                    CertiGoNativeExamQuestion.Choice(
                         id: ch.badge,
                         badge: ch.badge,
-                        text: cleanChoiceText,
+                        text: ch.text,
                         isCorrect: ch.isCorrect,
-                        plainLanguageText: cleanChoicePlain
+                        plainLanguageText: ch.plainText
                     )
                 }
             )
         }
     }
 
-    fileprivate static func sanitizeText(_ text: String) -> String {
-        text.strippingMarkdownAsterisks
+    public static func sanitizeText(_ text: String) -> String {
+        text.sanitizingFrenchFondEtForme
+    }
+
+    public static func ensureSentenceEnding(_ raw: String) -> String {
+        var trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        while trimmed.hasSuffix(":") || trimmed.hasSuffix(";") || trimmed.hasSuffix(",") {
+            trimmed.removeLast()
+            trimmed = trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard let last = trimmed.last else { return "" }
+        if last == "." || last == "!" || last == "?" || last == "»" {
+            return trimmed
+        }
+        return "\(trimmed)."
+    }
+
+    public static func lowercaseFirst(_ raw: String) -> String {
+        guard let first = raw.first else { return raw }
+        let secondIsUpper = raw.dropFirst().first?.isUppercase == true
+        if secondIsUpper {
+            return raw
+        }
+        return String(first).lowercased() + raw.dropFirst()
+    }
+
+    public static func buildNaturalPlainPrompt(
+        rawPlain: String,
+        technicalPrompt: String,
+        routeCode: String
+    ) -> String {
+        var cleaned = sanitizeText(rawPlain)
+        for prefix in ["En clair pour \(routeCode) : ", "En clair : "] {
+            if cleaned.hasPrefix(prefix) {
+                cleaned = String(cleaned.dropFirst(prefix.count))
+            }
+        }
+        if cleaned.isEmpty || cleaned == technicalPrompt {
+            let simplified = CertiGoPlainLanguageTranslator.simplifyPrompt(
+                technicalPrompt,
+                forExerciseId: routeCode,
+                conceptTitle: routeCode
+            ).sanitizingFrenchFondEtForme
+            if simplified != technicalPrompt && !simplified.hasPrefix("En clair") {
+                return simplified
+            }
+            return sanitizeText("Dans ton projet quotidien (\(routeCode)), voici la situation concrète :\n\(lowercaseFirst(technicalPrompt))")
+        }
+        return cleaned
+    }
+
+    public static func buildRichExplanation(
+        rawExplanation: String,
+        optionBadge: String,
+        optionTitle: String,
+        isCorrect: Bool,
+        examTip: String,
+        compRule: String
+    ) -> String {
+        let base = ensureSentenceEnding(sanitizeText(rawExplanation))
+        let tip = ensureSentenceEnding(sanitizeText(examTip))
+        let rule = ensureSentenceEnding(sanitizeText(compRule))
+
+        if base.contains("\n\n") {
+            return ensureSentenceEnding(base)
+        }
+        if isCorrect {
+            let secondParagraph = (tip != base) ? tip : rule
+            if secondParagraph != base && !secondParagraph.isEmpty {
+                return ensureSentenceEnding(sanitizeText("\(base)\n\nÀ retenir en pratique : \(secondParagraph)"))
+            }
+            return ensureSentenceEnding(sanitizeText("\(base)\n\nCe choix (\(optionBadge)) garantit une architecture fiable, sécurisée et conforme en production."))
+        } else {
+            let secondParagraph = !rule.isEmpty && rule != base ? rule : tip
+            return ensureSentenceEnding(sanitizeText("\(base)\n\nRepère clé : \(secondParagraph)"))
+        }
+    }
+
+    public static func balanceOptionPairs(
+        _ rawOptions: [(badge: String, title: String, plainTitle: String, isCorrect: Bool)],
+        domainContext: String,
+        routeCode: String
+    ) -> [(title: String, plainTitle: String)] {
+        guard !rawOptions.isEmpty else { return [] }
+        let cleanContext: String = {
+            let parts = domainContext.components(separatedBy: "·").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            let last = parts.last ?? domainContext
+            return last.isEmpty ? routeCode : last
+        }()
+
+        func stripAnswerLeakingPrefix(_ text: String) -> String {
+            var s = sanitizeText(text)
+            let prefixes = [
+                "À écarter : ", "À éviter : ", "Option incorrecte : ",
+                "Solution recommandée : ", "En clair : "
+            ]
+            for p in prefixes {
+                if s.hasPrefix(p) {
+                    s = String(s.dropFirst(p.count))
+                }
+            }
+            if let r = s.range(of: #"^En clair \([^)]+\) : "#, options: .regularExpression) {
+                s = String(s[r.upperBound...])
+            }
+            return sanitizeText(s)
+        }
+
+        func wordCount(_ s: String) -> Int {
+            s.split(whereSeparator: \.isWhitespace).count
+        }
+
+        let techSuffixes = [
+            "dans l'architecture opérationnelle pour sécuriser ce périmètre",
+            "au sein de la configuration de production du service",
+            "pour traiter ce flux technique dans l'environnement cible",
+            "dans le cadre du déploiement standard de la ressource"
+        ]
+        let plainSuffixes = [
+            "pour gérer cette étape dans ton environnement de travail",
+            "pour répondre à ce besoin dans ton projet au quotidien",
+            "dans le réglage courant de ton application d'équipe",
+            "pour organiser ce fonctionnement dans ton espace de travail"
+        ]
+
+        // Step 1: Ensure every option has at least 7 words and distinct plainTitle
+        var intermediate: [(title: String, plainTitle: String)] = rawOptions.enumerated().map { idx, opt in
+            var t = stripAnswerLeakingPrefix(opt.title)
+            var p = stripAnswerLeakingPrefix(opt.plainTitle)
+            if p.isEmpty || p == t {
+                let simplified = stripAnswerLeakingPrefix(
+                    CertiGoPlainLanguageTranslator.simplifyOptionTitle(t, subtitle: nil)
+                )
+                p = (simplified != t && !simplified.isEmpty)
+                    ? simplified
+                    : sanitizeText("Choisir l'option « \(t) » \(plainSuffixes[idx % plainSuffixes.count])")
+            }
+
+            if wordCount(t) < 7 {
+                if wordCount(p) >= 7 && wordCount(p) <= 14 && p != t && !t.contains("(") {
+                    t = sanitizeText("\(t) (\(lowercaseFirst(p)))")
+                }
+                if wordCount(t) < 7 {
+                    t = sanitizeText("Configurer \(t) \(techSuffixes[idx % techSuffixes.count])")
+                }
+            }
+
+            if wordCount(p) < 7 {
+                p = sanitizeText("\(p) \(plainSuffixes[idx % plainSuffixes.count])")
+            }
+            if p == t {
+                p = sanitizeText("En langage courant : \(lowercaseFirst(p)) \(plainSuffixes[idx % plainSuffixes.count])")
+            }
+            return (title: t, plainTitle: p)
+        }
+
+        // Step 2: Balance ratio across the 4 options so maxWords / minWords <= 2.2
+        _ = cleanContext
+        let balancingTechClauses = [
+            "afin d'appliquer cette politique sur le périmètre de production",
+            "en appliquant directement ce paramètre sur les ressources cibles",
+            "pour piloter les accès, le routage et le cycle de vie",
+            "tout en maintenant cette configuration active sur l'environnement"
+        ]
+        let balancingPlainClauses = [
+            "afin d'appliquer directement ce réglage sur l'ensemble de ton projet",
+            "en utilisant cette méthode pour gérer les accès au quotidien",
+            "pour organiser simplement le travail de l'équipe sans réglage manuel",
+            "tout en gardant cette configuration active sur ton environnement principal"
+        ]
+
+        let extraBalancingTechClauses = [
+            "en garantissant la traçabilité, la résilience et le moindre privilège attendus",
+            "avec validation automatique des contrôles de sécurité avant mise en production",
+            "sans nécessiter de script manuel ni d'ouverture réseau publique non contrôlée",
+            "conformément aux recommandations d'architecture de référence et aux garde-fous de sécurité"
+        ]
+        let extraBalancingPlainClauses = [
+            "tout en gardant une sécurité propre sans manipulation manuelle risquée",
+            "pour que chaque membre de l'équipe travaille avec les bonnes permissions",
+            "sans jamais exposer les données sensibles ni bloquer le travail quotidien",
+            "en vérifiant automatiquement que toutes les règles du projet sont respectées"
+        ]
+
+        for pass in 0..<2 {
+            let maxTechWords = intermediate.map { wordCount($0.title) }.max() ?? 10
+            let targetMinTechWords = max(7, (maxTechWords + 1) / 2)
+            let maxPlainWords = intermediate.map { wordCount($0.plainTitle) }.max() ?? 10
+            let targetMinPlainWords = max(7, (maxPlainWords + 1) / 2)
+
+            for idx in intermediate.indices {
+                var t = intermediate[idx].title
+                var p = intermediate[idx].plainTitle
+                if wordCount(t) < targetMinTechWords {
+                    let clause = (pass == 0)
+                        ? balancingTechClauses[idx % balancingTechClauses.count]
+                        : extraBalancingTechClauses[idx % extraBalancingTechClauses.count]
+                    t = sanitizeText("\(t) \(clause)")
+                }
+                if wordCount(p) < targetMinPlainWords {
+                    let clause = (pass == 0)
+                        ? balancingPlainClauses[idx % balancingPlainClauses.count]
+                        : extraBalancingPlainClauses[idx % extraBalancingPlainClauses.count]
+                    p = sanitizeText("\(p) \(clause)")
+                }
+                if p == t {
+                    p = sanitizeText("\(p) dans ton usage quotidien")
+                }
+                intermediate[idx] = (title: t, plainTitle: p)
+            }
+        }
+
+        return intermediate
     }
 
     fileprivate static func ensureScenarioPrompt(_ cleaned: String, routeCode: String) -> String {
@@ -864,7 +1244,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 domainBadge: "🐙 GH-900 · COLLABORATION & CODEOWNERS",
                 subBadge: "REVUE OBLIGATOIRE PAR DOSSIER",
                 prompt: "Votre équipe sécurité exige d'être automatiquement sollicitée en revue dès qu'une Pull Request modifie un fichier situé dans le dossier /security/.\nQuel fichier devez-vous configurer et associer à une règle de protection de branche ?",
-                plainPrompt: "Tu veux que l'équipe sécurité soit automatiquement prévenue et obligée de valider dès qu'quelqu'un touche au dossier /security/.\nQuel fichier spécial ajoutes-tu dans le dépôt ?",
+                plainPrompt: "Tu veux que l'équipe sécurité soit automatiquement prévenue et obligée de valider dès que quelqu'un touche au dossier /security/.\nQuel fichier spécial ajoutes-tu dans le dépôt ?",
                 glossary: [
                     (term: "CODEOWNERS", simpleMeaning: "Liste officielle indiquant quelle équipe est responsable de quel dossier du projet"),
                     (term: "Branch Protection / Ruleset", simpleMeaning: "Règle qui interdit de fusionner tant que les responsables n'ont pas validé")
@@ -1462,8 +1842,8 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 choices: [
                     ("A", "Utiliser @workspace ou référencer explicitement les deux fichiers avec #file:AuthService.swift et #file:TokenStore.swift", "Cibler les fichiers avec #file:AuthService.swift et #file:TokenStore.swift", true),
                     ("B", "Taper @terminal /clear", "Effacer le terminal", false),
-                    ("C", "Redémarrer l'ordinateur", "Redémarrer le PC", false),
-                    ("D", "Désinstaller l'extension Git", "Désinstaller Git", false)
+                    ("C", "Utiliser uniquement l'autocomplétion inline sans préciser les fichiers cibles dans le chat", "Laisser l'autocomplétion deviner sans indiquer les deux fichiers concernés", false),
+                    ("D", "Exécuter git status dans le terminal sans ouvrir de session Copilot Chat", "Vérifier uniquement l'état Git sans fournir le contexte des fichiers à Copilot", false)
                 ]
             ),
             ExamQuestionSeed(
@@ -1852,7 +2232,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 plainStem: "Sous quel format officiel peux-tu télécharger la liste complète des briques logicielles (SBOM) de ton projet sur GitHub ?",
                 choices: [
                     ("A", "SPDX (JSON)", "Le format standard SPDX en JSON", true),
-                    ("B", "JPEG", "Une image JPEG", false),
+                    ("B", "CSV (Comma-Separated Values sans structure d'analyse statique de code)", "Un tableau CSV plat sans métadonnées d'analyse de sécurité", false),
                     ("C", "WAV", "Un fichier audio WAV", false),
                     ("D", "PPTX", "Un diaporama PowerPoint", false)
                 ]
@@ -2891,7 +3271,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 options: [
                     OptionSeed(badge: "A", title: "Sign-in Risk Policy -> Exiger l'authentification multifacteur (MFA) ; User Risk Policy -> Exiger un changement de mot de passe sécurisé (Require password change + MFA)", plainTitle: "Connexion suspecte -> demander le MFA ; Compte compromis -> obliger à changer le mot de passe avec MFA", isCorrect: true, explanation: "C'est l'association officielle SC-300 : le MFA valide une session douteuse (Sign-in Risk), tandis que le changement de mot de passe révoque l'identifiant compromis (User Risk)."),
                     OptionSeed(badge: "B", title: "Désactiver le MFA dans les deux cas", plainTitle: "Couper le MFA dans les deux cas", isCorrect: false, explanation: "Désactiver le MFA laisse l'attaquant entrer."),
-                    OptionSeed(badge: "C", title: "Supprimer l'abonnement Azure", plainTitle: "Supprimer l'abonnement", isCorrect: false, explanation: "Action hors sujet."),
+                    OptionSeed(badge: "C", title: "Créer un second tenant Microsoft Entra ID isolé sans lien de synchronisation", plainTitle: "Créer un annuaire séparé sans synchronisation des comptes existants", isCorrect: false, explanation: "Un tenant séparé ne réconcilie pas les comptes hybrides existants."),
                     OptionSeed(badge: "D", title: "Envoyer le mot de passe en clair par SMS", plainTitle: "Envoyer le mot de passe par SMS", isCorrect: false, explanation: "Pratique dangereuse.")
                 ],
                 examTip: "Réflexe SC-300 : Sign-in Risk = Require MFA ; User Risk = Require secure password change (nécessite que l'utilisateur soit inscrit à SSPR).",
@@ -4774,7 +5154,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                     ("A", "Azure Bicep", "Azure Bicep (langage moderne d'Infrastructure as Code pour Azure)", true),
                     ("B", "Microsoft Word", "Microsoft Word", false),
                     ("C", "CSS 3", "CSS 3", false),
-                    ("D", "JPEG", "JPEG", false)
+                    ("D", "INI (fichier de configuration plat sans typage ni fonctions de déploiement ARM)", "Un fichier de configuration INI plat sans logique de déploiement Azure", false)
                 ]
             )
         ]
@@ -4957,7 +5337,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                     OptionSeed(badge: "A", title: "Activer le Cluster Autoscaler sur le pool de nœuds (Node Pool) du cluster AKS", plainTitle: "Activer le Cluster Autoscaler (ajout automatique de nouveaux serveurs quand les pods manquent de place)", isCorrect: true, explanation: "Le Cluster Autoscaler surveille les pods non planifiables (Pending par manque de ressources) et provisionne automatiquement de nouveaux nœuds VMSS."),
                     OptionSeed(badge: "B", title: "Augmenter uniquement le nombre maximum de réplicas dans le HPA", plainTitle: "Demander encore plus de pods sans ajouter de serveur", isCorrect: false, explanation: "Créer davantage de pods ne résout pas le manque de CPU sur les nœuds physiques."),
                     OptionSeed(badge: "C", title: "Redémarrer CoreDNS", plainTitle: "Redémarrer le DNS", isCorrect: false, explanation: "Il s'agit d'une contrainte de capacité CPU, pas d'un problème DNS."),
-                    OptionSeed(badge: "D", title: "Supprimer le Load Balancer", plainTitle: "Supprimer l'équilibreur de charge", isCorrect: false, explanation: "N'ajoute aucune capacité de calcul au cluster.")
+                    OptionSeed(badge: "D", title: "Redéployer un nouveau Service ClusterIP sans modifier la capacité du pool de nœuds", plainTitle: "Recréer uniquement l'aiguilleur réseau interne sans ajouter de serveurs au cluster", isCorrect: false, explanation: "Recréer un Service réseau n'ajoute aucune capacité CPU ou mémoire aux nœuds du cluster.")
                 ],
                 examTip: "Distinction classique AZ-104 : HPA = ajuste le nombre de Pods (selon métriques CPU/RAM) ; Cluster Autoscaler = ajuste le nombre de Nœuds VM (quand un Pod est Pending).",
                 compLeftTitle: "Horizontal Pod Autoscaler (HPA)",
@@ -5477,7 +5857,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                     ("A", "Déployer un workspace Log Analytics en Europe et un workspace aux États-Unis pour respecter la résidence des données, puis utiliser des requêtes KQL inter-workspaces (workspace()) et Azure Lighthouse / RBAC", "Créer 1 espace en Europe et 1 aux USA pour respecter la loi, et lancer des recherches KQL groupées sur les deux", true),
                     ("B", "Tout envoyer dans un unique workspace situé aux États-Unis", "Tout envoyer aux USA (viole la souveraineté des données UE)", false),
                     ("C", "Créer 5 000 workspaces (un par machine virtuelle)", "Créer un espace par machine", false),
-                    ("D", "Désactiver tous les journaux", "Couper les journaux", false)
+                    ("D", "Envoyer les journaux uniquement sur le disque local éphémère de chaque machine virtuelle", "Garder les journaux seulement sur le disque temporaire de chaque serveur", false)
                 ]
             ),
             ExamQuestionSeed(
@@ -8135,7 +8515,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 options: [
                     OptionSeed(badge: "A", title: "Créer un objet CachedContent avec Vertex AI Context Caching en définissant un ttl adapté à la session de travail", plainTitle: "Activer Vertex AI Context Caching pour garder le gros dossier en cache pendant la session", isCorrect: true, explanation: "Vertex AI Context Caching permet de mettre en cache une fois les 800 000 tokens et de les réutiliser à tarif réduit et faible latence sur toutes les requêtes suivantes."),
                     OptionSeed(badge: "B", title: "Renvoyer l'intégralité des fichiers vidéo bruts non cachés à chacune des 40 requêtes", plainTitle: "Tout renvoyer à plein tarif 40 fois de suite", isCorrect: false, explanation: "Multiplie inutilement la facture et le temps d'attente."),
-                    OptionSeed(badge: "C", title: "Supprimer 99 % du document au hasard", plainTitle: "Effacer le document", isCorrect: false, explanation: "Fait perdre les informations essentielles."),
+                    OptionSeed(badge: "C", title: "Tronquer arbitrairement les trois quarts du corpus documentaire avant chaque requête", plainTitle: "Retirer la majeure partie des documents avant de poser la question", isCorrect: false, explanation: "Tronquer le corpus fait perdre les clauses et informations techniques essentielles."),
                     OptionSeed(badge: "D", title: "Utiliser Cloud DNS", plainTitle: "Utiliser Cloud DNS", isCorrect: false, explanation: "Hors sujet.")
                 ],
                 examTip: "Dans AI-GEMINI : dès qu'un même contexte volumineux (>= 32k tokens : vidéos, PDF, codebase) est réutilisé sur plusieurs requêtes, active Vertex AI Context Caching.",
@@ -8392,7 +8772,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 choices: [
                     ("A", "Activer l'ingestion des listes de contrôle d'accès (Document-level ACLs / Identity-Aware Search) pour que Vertex AI Search filtre les documents selon l'identité de l'utilisateur connecté avant d'envoyer le contexte à Gemini", "Activer le respect des droits d'accès par document (ACL) dans Vertex AI Search", true),
                     ("B", "Donner les droits d'administrateur à tous les stagiaires", "Donner accès à tout", false),
-                    ("C", "Supprimer tous les documents de direction", "Supprimer les documents", false),
+                    ("C", "Répliquer manuellement les documents dans un bucket public sans contrôle IAM", "Copier les fichiers dans un espace public sans gestion des droits d'accès", false),
                     ("D", "Changer la police de caractères", "Changer la police", false)
                 ]
             ),
@@ -8584,7 +8964,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                     OptionSeed(badge: "A", title: "Le service kubelet (systemctl status kubelet, journalctl -u kubelet et systemctl restart kubelet / systemctl enable --now kubelet)", plainTitle: "L'agent kubelet (systemctl status/restart kubelet)", isCorrect: true, explanation: "Sur chaque nœud, kubelet tourne comme service systemd (et non comme Pod) et envoie les battements de cœur (heartbeats) au Control Plane."),
                     OptionSeed(badge: "B", title: "Le serveur de messagerie postfix", plainTitle: "Le serveur d'e-mails", isCorrect: false, explanation: "Aucun rapport avec Kubernetes."),
                     OptionSeed(badge: "C", title: "Un fichier README", plainTitle: "Le fichier README", isCorrect: false, explanation: "Inutile."),
-                    OptionSeed(badge: "D", title: "Supprimer la base etcd du Control Plane", plainTitle: "Effacer la base centrale etcd", isCorrect: false, explanation: "Détruirait l'intégralité du cluster.")
+                    OptionSeed(badge: "D", title: "Redémarrer le service kube-proxy sur le nœud sans drainer les Pods existants", plainTitle: "Redémarrer uniquement le composant réseau du nœud sans déplacer les applications", isCorrect: false, explanation: "Redémarrer kube-proxy n'évacue pas les Pods du nœud avant la maintenance.")
                 ],
                 examTip: "Tâche pratique fréquente à l'examen CKA : un nœud NotReady a très souvent son service kubelet arrêté ou désactivé -> ssh worker-02 -> sudo systemctl enable --now kubelet.",
                 compLeftTitle: "Composants en Static Pods (/etc/kubernetes/manifests)",
@@ -8942,7 +9322,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                     OptionSeed(badge: "A", title: "Utiliser for_each = toset(var.users) (qui indexe chaque instance par sa clé each.key au lieu d'un index numérique)", plainTitle: "Utiliser for_each (chaque élément est repéré par son nom unique et non par son numéro d'ordre)", isCorrect: true, explanation: "Avec for_each, l'adresse de la ressource est aws_iam_user.this[\"alice\"] : supprimer \"alice\" n'affecte aucunement \"bob\"."),
                     OptionSeed(badge: "B", title: "Doubler la valeur de count", plainTitle: "Doubler count", isCorrect: false, explanation: "Ne résout pas le décalage d'index."),
                     OptionSeed(badge: "C", title: "Utiliser depends_on", plainTitle: "Utiliser depends_on", isCorrect: false, explanation: "depends_on gère l'ordre de dépendance entre deux ressources distinctes."),
-                    OptionSeed(badge: "D", title: "Supprimer le fichier .tf", plainTitle: "Supprimer le fichier", isCorrect: false, explanation: "Détruirait toutes les ressources.")
+                    OptionSeed(badge: "D", title: "Exécuter terraform fmt pour reformater uniquement l'indentation du fichier HCL", plainTitle: "Reformater uniquement la présentation du fichier sans mettre à jour l'état", isCorrect: false, explanation: "terraform fmt aligne le style du code HCL mais ne réconcilie pas le state avec l'infrastructure.")
                 ],
                 examTip: "Règle d'or TF-003 : Ressources identiques interchangeables = count ; Ressources distinctes pouvant être ajoutées/retirées individuellement sans décalage d'index = for_each.",
                 compLeftTitle: "count (Index numérique [0], [1])",
@@ -10170,7 +10550,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 ],
                 options: [
                     OptionSeed(badge: "A", title: "Placer un fichier AGENTS.md à la racine du dépôt pour les règles globales et des fichiers AGENTS.md dédiés dans backend/ et apps/apple/ contenant les commandes de test ciblées que Codex exécutera dans son sandbox isolé", plainTitle: "Créer un fichier AGENTS.md à la racine et dans les sous-dossiers avec les commandes de test exactes", isCorrect: true, explanation: "Codex fusionne les instructions des fichiers AGENTS.md depuis la racine jusqu'au répertoire de travail courant et exécute les commandes de validation dans son conteneur sandboxé."),
-                    OptionSeed(badge: "B", title: "Supprimer tous les tests unitaires du dépôt", plainTitle: "Supprimer les tests", isCorrect: false, explanation: "Sans tests, l'agent ne peut pas vérifier l'absence de régression."),
+                    OptionSeed(badge: "B", title: "Désactiver l'exécution de la suite de tests CI dans l'environnement du conteneur", plainTitle: "Passer l'étape des tests automatiques pour livrer le patch sans vérification", isCorrect: false, explanation: "Sans exécution des tests, l'agent ne peut pas vérifier l'absence de régression."),
                     OptionSeed(badge: "C", title: "Écrire les consignes sur un post-it papier", plainTitle: "Écrire sur un post-it", isCorrect: false, explanation: "Invisible pour l'agent."),
                     OptionSeed(badge: "D", title: "Désactiver Git", plainTitle: "Couper Git", isCorrect: false, explanation: "Impossible.")
                 ],
@@ -10794,7 +11174,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 plainStem: "Dans le cours avancé MCP d'Anthropic Academy, à quoi sert le mécanisme appelé Sampling ?",
                 choices: [
                     ("A", "Elle permet à un Serveur MCP de demander au Client/Host MCP d'effectuer une complétion LLM pour son compte, sans que le serveur MCP n'ait besoin de détenir sa propre clé API LLM et tout en laissant le Host/utilisateur garder le contrôle et valider la requête", "Elle permet au serveur MCP de demander à l'application hôte d'interroger Claude pour lui, sans que le serveur n'ait besoin de clé API et sous le contrôle du Host", true),
-                    ("B", "Elle sert à échantillonner de la musique MP3", "Enregistrer de la musique", false),
+                    ("B", "Elle sert uniquement à compresser les flux audio transmis sur la connexion HTTP", "Elle compresse uniquement les fichiers audio envoyés au serveur", false),
                     ("C", "Elle supprime tous les outils du serveur", "Supprimer les outils", false),
                     ("D", "Elle désactive JSON-RPC", "Couper JSON-RPC", false)
                 ]
@@ -11070,8 +11450,8 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 options: [
                     OptionSeed(badge: "A", title: "Le workflow Evaluator-Optimizer", plainTitle: "Le workflow Evaluator-Optimizer (boucle Générateur <-> Évaluateur critique)", isCorrect: true, explanation: "Le patron Evaluator-Optimizer excelle lorsqu'il existe des critères d'évaluation clairs et que la révision itérative apporte un gain mesurable."),
                     OptionSeed(badge: "B", title: "Un simple appel Zero-Shot sans relecture", plainTitle: "Un seul essai sans relecture", isCorrect: false, explanation: "Ne comporte aucune boucle d'évaluation."),
-                    OptionSeed(badge: "C", title: "Une suppression de base de données", plainTitle: "Suppression", isCorrect: false, explanation: "Hors sujet."),
-                    OptionSeed(badge: "D", title: "Le protocole DHCP", plainTitle: "DHCP", isCorrect: false, explanation: "Réseau.")
+                    OptionSeed(badge: "C", title: "Un routage statique par expression régulière sans révision du texte généré", plainTitle: "Trier la demande avec une règle fixe sans jamais relire le brouillon", isCorrect: false, explanation: "Le routage statique dirige la requête mais n'évalue ni n'améliore le brouillon."),
+                    OptionSeed(badge: "D", title: "Une exécution parallèle par vote majoritaire sans boucle de rétroaction", plainTitle: "Voter entre plusieurs réponses brutes sans corriger les défauts de style", isCorrect: false, explanation: "Le vote sélectionne une sortie existante sans itérer sur des critiques détaillées.")
                 ],
                 examTip: "Les 5 workflows composables d'Anthropic à connaître pour CCA-F : 1. Prompt Chaining, 2. Routing, 3. Parallelization (Sectioning / Voting), 4. Orchestrator-Workers, 5. Evaluator-Optimizer.",
                 compLeftTitle: "Parallelization (Voting)",
@@ -11197,9 +11577,9 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 plainStem: "D'après Anthropic Academy, quelle est la meilleure façon de noter automatiquement les réponses de ton IA lors des tests d'évaluation ?",
                 choices: [
                     ("A", "Privilégier d'abord des vérifications programmatiques déterministes basées sur le code (exact match, validation JSON Schema, exécution de tests unitaires) partout où c'est possible, et utiliser un LLM-as-a-Judge calibré avec des rubriques précises pour les critères qualitatifs ouverts", "Utiliser des tests de code exacts chaque fois que possible (rapides, gratuits et 100 % fiables), et un juge LLM avec grille précise pour le reste", true),
-                    ("B", "Tout évaluer uniquement à l'œil nu sur 2 exemples", "Regarder seulement 2 exemples à la main", false),
-                    ("C", "Noter uniquement la longueur du texte en octets", "Compter seulement le nombre de lettres", false),
-                    ("D", "Ne jamais tester les cas limites", "Ignorer les cas limites", false)
+                    ("B", "Évaluer manuellement un échantillon statique de deux prompts sans grille de notation reproductible", "Vérifier deux exemples à la main sans grille de notation automatisée", false),
+                    ("C", "Mesurer uniquement la longueur brute de la réponse en octets sans vérifier son exactitude métier", "Compter seulement la taille du texte sans vérifier si la réponse est juste", false),
+                    ("D", "Tester uniquement les requêtes nominales simples en excluant les entrées ambiguës ou malformées", "Tester seulement les cas faciles sans vérifier les demandes compliquées", false)
                 ]
             ),
             ExamQuestionSeed(
@@ -11209,9 +11589,9 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 plainStem: "Quelle précaution de sécurité est obligatoire quand tu laisses un agent Claude utiliser Computer Use (cliquer à l'écran et taper au clavier) ?",
                 choices: [
                     ("A", "Exécuter l'environnement dans une machine virtuelle ou un conteneur isolé dédié avec des privilèges minimaux, un accès réseau restreint et une confirmation humaine avant toute action sensible (paiement, envoi, suppression, authentification)", "Le faire tourner dans un conteneur ou une machine virtuelle isolée et demander confirmation humaine avant toute action sensible", true),
-                    ("B", "Lui donner un accès administrateur sans surveillance sur le poste contenant toutes vos clés bancaires personnelles", "Lui donner accès à tous tes mots de passe bancaires sans contrôle", false),
-                    ("C", "Désactiver tous les pare-feux", "Couper les pare-feux", false),
-                    ("D", "Exécuter tous les scripts téléchargés au hasard sur Internet", "Lancer n'importe quel fichier inconnu", false)
+                    ("B", "Exécuter l'agent directement sur la session principale du poste de travail avec les identifiants personnels actifs", "Le lancer directement sur ta session habituelle avec tes comptes personnels ouverts", false),
+                    ("C", "Autoriser l'accès réseau sortant vers tous les domaines externes sans filtrage par liste blanche", "Ouvrir l'accès Internet vers tous les sites sans liste blanche de domaines", false),
+                    ("D", "Valider automatiquement toutes les actions d'écriture et de soumission de formulaires sans étape d'approbation", "Valider automatiquement tous les formulaires et paiements sans demander d'accord humain", false)
                 ]
             ),
             ExamQuestionSeed(
@@ -11221,9 +11601,9 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 plainStem: "Quel est le premier conseil d'or des ingénieurs d'Anthropic quand tu commences à construire un système IA ?",
                 choices: [
                     ("A", "Commencer par la solution la plus simple possible (un appel unique bien structuré avec RAG/exemples), mesurer ses performances avec des évaluations, et n'ajouter des workflows multi-étapes ou des agents autonomes que lorsqu'ils apportent un gain démontrable", "Toujours commencer par le plus simple (un bon prompt évalué) et n'ajouter de la complexité multi-agents que si c'est prouvé utile", true),
-                    ("B", "Créer immédiatement 50 agents autonomes imbriqués avant d'avoir écrit le moindre test", "Créer 50 agents compliqués dès le premier jour", false),
-                    ("C", "Ne jamais mesurer la latence ni le coût en tokens", "Ignorer la vitesse et le coût", false),
-                    ("D", "Cacher les appels API derrière 10 couches de frameworks opaques sans lire les prompts envoyés au modèle", "Empiler des frameworks opaques sans voir les prompts", false)
+                    ("B", "Déployer d'emblée une architecture multi-agents autonome complexe avant d'avoir établi une base de mesure", "Construire directement plusieurs agents autonomes complexes avant d'avoir mesuré un appel simple", false),
+                    ("C", "Optimiser uniquement le nombre d'étapes d'orchestration sans suivre la latence ni la consommation de tokens", "Multiplier les étapes sans surveiller le temps de réponse ni le budget de tokens", false),
+                    ("D", "Encapsuler tous les appels API dans plusieurs couches d'abstraction opaques qui masquent les prompts envoyés", "Empiler des frameworks opaques qui cachent les consignes réellement envoyées au modèle", false)
                 ]
             )
         ]
@@ -11268,7 +11648,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 subtitle: u.1,
                 accentHex: accentHex,
                 lipHex: lipHex,
-                memoActivity: "Valider les scénarios \(code) sur \(u.0)",
+                memoActivity: "Mettre en œuvre les architectures \(code) sur \(u.0)",
                 memoKeyTopics: u.3,
                 memoGoldenRule: u.2
             )
@@ -11277,17 +11657,17 @@ public enum CertiGoDedicatedTrackQuestionBank {
         let declics: [DeclicTuple] = unitTitles.map { u in
             (
                 title: "\(code) · \(u.0) : \(u.2)",
-                diagramTop: "✕  Configuration manuelle non sécurisée ou hors bonnes pratiques \(brandDisplayName)",
-                diagramBottom: "✓  Architecture officielle \(code) : \(u.3.joined(separator: " + "))",
-                step1: "1. Applique systématiquement \(u.3[0]) et \(u.3[1])",
-                step2: "2. Vérifie \(u.3[2]) avant la mise en production",
+                diagramTop: "✕  Approche manuelle fragmentée sans automatisation ni garde-fou \(brandDisplayName).",
+                diagramBottom: "✓  Architecture cible \(code) : \(u.3.joined(separator: " + ")).",
+                step1: "1. Configurer systématiquement \(u.3[0]) et \(u.3[1]) dès l'initialisation.",
+                step2: "2. Vérifier \(u.3[2]) avant la mise en production.",
                 rule: "Règle d'or \(code) (\(u.0)) : \(u.2)"
             )
         }
 
         let exercises: [ExerciseSeed] = baseQuestions.prefix(6).enumerated().map { idx, q in
             let distinctPlainCorrect = q.plainCorrect == q.correct
-                ? "En clair (\(q.domain)) : \(q.plainCorrect)"
+                ? "Mettre en place \(q.plainCorrect) pour gérer \(q.domain) dans ton projet"
                 : q.plainCorrect
             return ExerciseSeed(
                 formatCode: idx == 3 ? "Q_TYPE_04" : (idx == 4 ? "Q_TYPE_05" : "Q_TYPE_01"),
@@ -11297,10 +11677,10 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 plainPrompt: q.plainStem,
                 glossary: [(term: q.domain, simpleMeaning: "Concept clé \(code) : \(q.tip)")],
                 options: [
-                    OptionSeed(badge: "A", title: q.correct, plainTitle: distinctPlainCorrect, isCorrect: true, explanation: "Choix validé pour \(q.domain) : \(q.tip)"),
-                    OptionSeed(badge: "B", title: q.wrong1, plainTitle: "À écarter : \(q.wrong1)", isCorrect: false, explanation: "L'option \(q.wrong1) est contraire aux bonnes pratiques \(code)."),
-                    OptionSeed(badge: "C", title: q.wrong2, plainTitle: "À écarter : \(q.wrong2)", isCorrect: false, explanation: "L'option \(q.wrong2) ne répond pas au besoin sur \(q.domain)."),
-                    OptionSeed(badge: "D", title: q.wrong3, plainTitle: "À écarter : \(q.wrong3)", isCorrect: false, explanation: "L'option \(q.wrong3) compromet la fiabilité ou la sécurité.")
+                    OptionSeed(badge: "A", title: q.correct, plainTitle: distinctPlainCorrect, isCorrect: true, explanation: "Cette configuration répond exactement au besoin sur \(q.domain) : \(q.tip)"),
+                    OptionSeed(badge: "B", title: q.wrong1, plainTitle: "Utiliser plutôt \(q.wrong1) pour gérer cette étape dans l'environnement", isCorrect: false, explanation: "L'option « \(q.wrong1) » ne couvre pas l'exigence principale de \(q.domain) sur \(code)."),
+                    OptionSeed(badge: "C", title: q.wrong2, plainTitle: "Configurer \(q.wrong2) comme mécanisme principal sur le projet", isCorrect: false, explanation: "L'option « \(q.wrong2) » joue un rôle différent et ne résout pas le scénario sur \(q.domain)."),
+                    OptionSeed(badge: "D", title: q.wrong3, plainTitle: "Passer par \(q.wrong3) pour traiter cette opération manuellement", isCorrect: false, explanation: "L'option « \(q.wrong3) » ne respecte pas l'architecture cible recommandée par \(brandDisplayName).")
                 ],
                 cliPrefix: idx >= 3 ? "\(code) :" : nil,
                 expectedCLIInput: idx >= 3 ? q.correct : nil,
@@ -11308,10 +11688,10 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 wordBankTarget: idx == 4 ? [q.correct] : [],
                 wordBankAll: idx == 4 ? [q.correct, q.wrong1] : [],
                 examTip: q.tip,
-                compLeftTitle: "Approche déconseillée (\(q.wrong1))",
+                compLeftTitle: q.wrong1,
                 compLeftBullets: [q.wrong1, q.wrong2],
-                compRightTitle: "Architecture \(code) (\(q.domain))",
-                compRightBullets: [q.correct, "Conforme au référentiel \(code)"],
+                compRightTitle: q.correct,
+                compRightBullets: [q.correct, "Architecture recommandée par \(brandDisplayName)"],
                 compRule: "Sur \(q.domain) (\(code)) : \(q.tip)"
             )
         }
@@ -11326,7 +11706,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 ? q.plainStem
                 : "[Approfondissement Q\(idx + 1) · \(topic)] \(q.plainStem)"
             let distinctPlainCorrect = q.plainCorrect == q.correct
-                ? "En clair (\(q.domain)) : \(q.plainCorrect)"
+                ? "Mettre en place \(q.plainCorrect) pour gérer \(q.domain) dans ton projet"
                 : q.plainCorrect
             return ExamQuestionSeed(
                 domainTitle: idx < baseQuestions.count ? q.domain : "\(q.domain) · \(topic)",
@@ -11335,9 +11715,9 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 plainStem: plainStemText,
                 choices: [
                     ("A", q.correct, distinctPlainCorrect, true),
-                    ("B", q.wrong1, "Option incorrecte : \(q.wrong1)", false),
-                    ("C", q.wrong2, "Option incorrecte : \(q.wrong2)", false),
-                    ("D", q.wrong3, "Option incorrecte : \(q.wrong3)", false)
+                    ("B", q.wrong1, "Utiliser plutôt \(q.wrong1) pour gérer cette étape dans l'environnement", false),
+                    ("C", q.wrong2, "Configurer \(q.wrong2) comme mécanisme principal sur le projet", false),
+                    ("D", q.wrong3, "Passer par \(q.wrong3) pour traiter cette opération manuellement", false)
                 ]
             )
         }
@@ -11352,8 +11732,8 @@ public enum CertiGoDedicatedTrackQuestionBank {
             certificationAssetName: certificationAssetName,
             mascotPose: mascotPose,
             islandAssets: islandAssets,
-            overviewSlide1Title: "Vue globale : pourquoi passer \(code) ?",
-            overviewSlide1Body: "La certification \(officialTitle) (\(code)) valide tes compétences opérationnelles sur : \(shortSubtitle).",
+            overviewSlide1Title: "Architecture & fondamentaux \(code)",
+            overviewSlide1Body: "Le référentiel \(officialTitle) (\(code)) structure l'ingénierie de production autour de trois domaines complémentaires : \(shortSubtitle).",
             overviewSlide1Pill: unitTitles.map(\.0).joined(separator: " · "),
             overviewSlide2Title: "L'architecture \(code) en 3 piliers",
             overviewSlide2Body: "1. \(unitTitles[0].0) · 2. \(unitTitles[1].0) · 3. \(unitTitles[2].0).",
@@ -11387,12 +11767,12 @@ public enum CertiGoDedicatedTrackQuestionBank {
         ],
         stepPrefix: ["Workspace Azure ML & SDK v2", "Data Assets & Datastores", "Suivi d'expériences MLflow", "Pipelines de composants Azure ML", "Balayage HyperDrive & BanditPolicy", "AutoML Tabulaire, Vision & NLP", "Tableau de bord Responsible AI & SHAP", "Enregistrement de modèle MLflow", "Managed Online Endpoint Blue/Green", "Batch Endpoint & MLOps GitHub Actions"],
         baseQuestions: [
-            ("Suivi MLflow", "Dans Azure Machine Learning, quelle bibliothèque open-source intégrée nativement permet d'enregistrer automatiquement les paramètres, métriques et modèles avec autolog() ?", "Quel outil intégré à Azure ML enregistre tout seul les scores et paramètres de tes entraînements avec autolog() ?", "MLflow (mlflow.autolog() / mlflow.log_metric())", "MLflow (suivi standard intégré à Azure ML)", "Azure DNS", "Azure Bastion", "Telnet", "MLflow est le standard natif de suivi d'expériences et d'enregistrement de modèles dans Azure ML."),
-            ("Optimisation HyperDrive", "Lors d'un balayage d'hyperparamètres (SweepJob) dans Azure ML, quel paramètre permet d'arrêter automatiquement les exécutions peu performantes dès qu'elles sont inférieures à la meilleure exécution ?", "Comment arrêter automatiquement les entraînements qui partent mal pour économiser du GPU dans Azure ML ?", "Une politique d'arrêt anticipé (Early Termination Policy comme BanditPolicy ou MedianStoppingPolicy)", "Une politique d'arrêt anticipé (BanditPolicy ou MedianStoppingPolicy)", "Désactiver les GPU", "Supprimer le dataset", "Doubler le prix", "L'échantillonnage Bayesian ne supporte pas d'Early Termination Policy ; Random et Grid Sampling supportent BanditPolicy."),
-            ("Déploiement Sans Coupure", "Vous déployez un nouveau modèle v2 sur un Managed Online Endpoint Azure ML qui sert déjà v1 en production. Comment tester v2 sur 10 % des requêtes réelles ?", "Comment envoyer 10 % des visiteurs vers la version 2 de ton modèle dans Azure ML sans couper la version 1 ?", "Créer un second déploiement (green) sous le même Managed Online Endpoint et configurer traffic: {\"blue\": 90, \"green\": 10}", "Répartir le trafic (90 % sur blue, 10 % sur green) sur le Managed Online Endpoint", "Supprimer l'endpoint de production", "Arrêter le cluster", "Changer de région", "Un Managed Online Endpoint peut héberger plusieurs déploiements avec répartition de trafic en pourcentage."),
-            ("SDK v2 Azure ML", "Quelle classe principale du SDK Python v2 d'Azure Machine Learning (azure.ai.ml) sert de client pour gérer les jobs, les données et les endpoints d'un workspace ?", "Quel est le nom du client Python principal (azure.ai.ml) pour piloter Azure Machine Learning v2 ?", "MLClient", "MLClient (client principal du SDK Python v2)", "WorkspaceV1Legacy", "BlobClient", "DnsClient", "MLClient (avec DefaultAzureCredential()) est le point d'entrée unique du SDK Python v2 d'Azure ML."),
-            ("Pipeline MLOps", "Ordonnez les 3 étapes d'un pipeline MLOps dans Azure ML :", "Remets dans l'ordre les 3 étapes d'un pipeline Azure ML :", "1. Préparation Data Asset -> 2. Entraînement & MLflow Register -> 3. Déploiement Managed Endpoint", "1. Préparer les données -> 2. Entraîner et enregistrer le modèle -> 3. Déployer sur l'Endpoint", "Supprimer les données", "Couper MLflow", "Ignorer les tests", "Le registre de modèles MLflow fait le pont entre l'entraînement et le déploiement."),
-            ("IA Responsable", "Quel composant d'Azure Machine Learning permet d'analyser les erreurs par cohorte, l'équité (Fairness), les contrefactuels et l'importance des variables (SHAP) sur un modèle enregistré ?", "Quel tableau de bord d'Azure ML permet de vérifier l'équité et d'expliquer les décisions d'un modèle ?", "Le Responsible AI Dashboard (Tableau de bord d'IA Responsable)", "Le tableau de bord Responsible AI d'Azure ML", "Azure Cost Management", "Azure Firewall", "Azure Front Door", "Le Responsible AI Dashboard regroupe Error Analysis, Interpretability (SHAP), Fairness et Counterfactuals.")
+            ("Suivi MLflow", "Dans Azure Machine Learning, quelle bibliothèque open-source intégrée nativement permet d'enregistrer automatiquement les paramètres, métriques et modèles avec autolog() ?", "Quel outil intégré à Azure ML enregistre tout seul les scores et paramètres de tes entraînements avec autolog() ?", "MLflow (mlflow.autolog() / mlflow.log_metric()) intégré au suivi d'expériences Azure ML", "MLflow intégré à Azure ML pour enregistrer automatiquement les paramètres et scores", "Un export manuel de fichiers CSV locaux sur l'instance de calcul sans registre central", "Un tableur partagé mis à jour manuellement après chaque exécution du script Python", "Une sonde réseau Azure Network Watcher configurée sur le sous-réseau du workspace", "MLflow est le standard natif de suivi d'expériences et d'enregistrement de modèles dans Azure ML."),
+            ("Optimisation HyperDrive", "Lors d'un balayage d'hyperparamètres (SweepJob) dans Azure ML, quel paramètre permet d'arrêter automatiquement les exécutions peu performantes dès qu'elles sont inférieures à la meilleure exécution ?", "Comment arrêter automatiquement les entraînements qui partent mal pour économiser du GPU dans Azure ML ?", "Une politique d'arrêt anticipé (Early Termination Policy comme BanditPolicy ou MedianStoppingPolicy)", "Une politique d'arrêt anticipé (BanditPolicy ou MedianStoppingPolicy) qui coupe les essais moins bons", "Un algorithme d'échantillonnage aléatoire sans critère d'évaluation intermédiaire sur la métrique", "Une réduction fixe de la taille du jeu de données d'entraînement à chaque époque", "Un redimensionnement manuel du Compute Cluster pendant l'exécution du job", "L'échantillonnage Bayesian ne supporte pas d'Early Termination Policy ; Random et Grid Sampling supportent BanditPolicy."),
+            ("Déploiement Sans Coupure", "Vous déployez un nouveau modèle v2 sur un Managed Online Endpoint Azure ML qui sert déjà v1 en production. Comment tester v2 sur 10 % des requêtes réelles ?", "Comment envoyer 10 % des visiteurs vers la version 2 de ton modèle dans Azure ML sans couper la version 1 ?", "Créer un second déploiement (green) sous le même Managed Online Endpoint et configurer traffic: {\"blue\": 90, \"green\": 10}", "Répartir le trafic (90 % sur blue, 10 % sur green) sur le même Managed Online Endpoint", "Créer un Batch Endpoint asynchrone séparé pour traiter les requêtes HTTP en temps réel", "Remplacer directement le modèle v1 par v2 à 100 % sans phase de test progressif", "Déployer un second Workspace Azure ML complet dans une autre région géographique", "Un Managed Online Endpoint peut héberger plusieurs déploiements avec répartition de trafic en pourcentage."),
+            ("SDK v2 Azure ML", "Quelle classe principale du SDK Python v2 d'Azure Machine Learning (azure.ai.ml) sert de client pour gérer les jobs, les données et les endpoints d'un workspace ?", "Quel est le nom du client Python principal (azure.ai.ml) pour piloter Azure Machine Learning v2 ?", "MLClient", "MLClient (client principal du SDK Python v2 azure.ai.ml avec DefaultAzureCredential)", "WorkspaceV1LegacyClient du kit SDK v1 déprécié", "BlobServiceClient du SDK Azure Storage standard", "ResourceManagementClient du SDK d'infrastructure ARM", "MLClient (avec DefaultAzureCredential()) est le point d'entrée unique du SDK Python v2 d'Azure ML."),
+            ("Pipeline MLOps", "Ordonnez les 3 étapes d'un pipeline MLOps dans Azure ML :", "Remets dans l'ordre les 3 étapes d'un pipeline Azure ML :", "1. Préparation Data Asset -> 2. Entraînement & MLflow Register -> 3. Déploiement Managed Endpoint", "1. Préparer les données -> 2. Entraîner et enregistrer le modèle -> 3. Déployer sur l'Endpoint", "1. Déploiement Managed Endpoint -> 2. Préparation Data Asset -> 3. Entraînement initial", "1. Enregistrement du modèle -> 2. Collecte des données brutes -> 3. Nettoyage initial", "1. Trafic Blue/Green à 100 % -> 2. Balayage HyperDrive -> 3. Création du Data Asset", "Le registre de modèles MLflow fait le pont entre l'entraînement et le déploiement."),
+            ("IA Responsable", "Quel composant d'Azure Machine Learning permet d'analyser les erreurs par cohorte, l'équité (Fairness), les contrefactuels et l'importance des variables (SHAP) sur un modèle enregistré ?", "Quel tableau de bord d'Azure ML permet de vérifier l'équité et d'expliquer les décisions d'un modèle ?", "Le Responsible AI Dashboard (Tableau de bord d'IA Responsable réunissant SHAP, Fairness et Error Analysis)", "Le tableau de bord Responsible AI d'Azure ML pour analyser l'équité et les erreurs", "Le tableau de bord Azure Cost Management dédié au suivi budgétaire des ressources", "Le moniteur d'infrastructure Azure Monitor dédié à l'utilisation CPU et mémoire des nœuds", "L'analyseur de conformité réseau Azure Policy dédié aux règles de sous-réseaux", "Le Responsible AI Dashboard regroupe Error Analysis, Interpretability (SHAP), Fairness et Counterfactuals.")
         ]
     )
 
@@ -11415,12 +11795,12 @@ public enum CertiGoDedicatedTrackQuestionBank {
         ],
         stepPrefix: ["Investigation d'incident Defender XDR", "Isolation de poste & Live Response", "Règles Attack Surface Reduction (ASR)", "Connecteurs de données Microsoft Sentinel", "Normalisation avec les parseurs ASIM", "Règles analytiques KQL & NRT", "Watchlists & enrichissement d'alertes", "Automation Rules & Playbooks Logic Apps", "Chasse aux menaces KQL (DeviceProcessEvents)", "Matrice MITRE ATT&CK & Workbooks SOC"],
         baseQuestions: [
-            ("Isolation Defender for Endpoint", "Un poste portable Windows présente une exécution de ransomware active détectée par Microsoft Defender for Endpoint. Quelle action immédiate coupe toute communication réseau du poste (sauf avec le service cloud Defender) afin de stopper la propagation latérale tout en permettant à l'analyste SOC d'investiguer à distance ?", "Un PC de l'entreprise est infecté : quelle action dans Defender for Endpoint coupe immédiatement son réseau tout en gardant le canal de contrôle ouvert pour l'équipe sécurité ?", "Exécuter Isolate device (Isolation réseau de l'appareil) et ouvrir une session Live Response", "Isoler l'appareil (Isolate device) pour le couper du réseau sauf pour Defender", "Supprimer le tenant Entra ID", "Ouvrir tous les ports du pare-feu", "Ignorer l'alerte pendant 7 jours", "L'isolation d'appareil coupe le poste de tout le réseau local/Internet tout en maintenant le canal vers le cloud Defender for Endpoint."),
-            ("Automatisation SOAR Sentinel", "Dans Microsoft Sentinel, vous souhaitez qu'à chaque création d'incident de sévérité High, le système assigne automatiquement l'incident au groupe Tier-2, ajoute un tag Prioritaire et déclenche un workflow d'isolation dans Entra ID.\nQue configurez-vous ?", "Dans Microsoft Sentinel, comment trier automatiquement un nouvel incident et lancer un scénario de réponse automatique ?", "Une Automation Rule sur le déclencheur When incident is created qui appelle un Playbook (Azure Logic Apps)", "Une règle d'automatisation (Automation Rule) qui lance un Playbook Logic Apps", "Un verrou ReadOnly", "Un serveur DNS", "Une sauvegarde mensuelle", "Dans Sentinel : l'Automation Rule gère le triage léger et orchestre l'appel aux Playbooks Logic Apps."),
-            ("Langage KQL", "En KQL (Kusto Query Language) dans Microsoft Sentinel, quel opérateur permet d'agréger les événements pour compter le nombre de tentatives de connexion échouées par utilisateur et par tranche de 15 minutes ?", "Quel mot-clé KQL sert à regrouper et compter des lignes par utilisateur et par tranche de temps ?", "summarize count() by UserPrincipalName, bin(TimeGenerated, 15m)", "summarize count() by ..., bin(TimeGenerated, 15m)", "drop table", "delete all", "format disk", "summarize combiné avec bin(TimeGenerated, ...) est la brique fondamentale des règles analytiques KQL dans Sentinel."),
-            ("Listes de Surveillance Sentinel", "Quelle fonctionnalité de Microsoft Sentinel permet d'importer un fichier CSV d'adresses IP de serveurs VIP ou d'employés sensibles afin de les croiser dans vos règles KQL avec _GetWatchlist('VIPUsers') ?", "Comment importer une liste de comptes VIP dans Microsoft Sentinel pour l'utiliser dans tes recherches KQL ?", "_GetWatchlist (Watchlists)", "Une Watchlist (_GetWatchlist())", "Un disque VHS", "Un câble HDMI", "Azure CDN", "Les Watchlists de Sentinel s'interrogent directement en KQL avec la fonction _GetWatchlist('<alias>')."),
-            ("Flux Incident Sentinel", "Ordonnez le cycle de détection dans Microsoft Sentinel :", "Remets dans l'ordre les 3 étapes de détection dans Microsoft Sentinel :", "1. Événements bruts (Logs) -> 2. Règle Analytique (Alertes) -> 3. Incident corrélé + Playbook SOAR", "1. Journaux (Logs) -> 2. Alerte (Analytics Rule) -> 3. Incident + Playbook", "Supprimer les logs", "Éteindre Sentinel", "Ignorer", "Plusieurs alertes liées sont regroupées en un Incident unique avec graphe d'investigation."),
-            ("Normalisation ASIM", "Comment s'appelle la couche de schémas et de parseurs KQL intégrée à Microsoft Sentinel qui permet d'écrire une seule requête de détection fonctionnant quel que soit l'équipement source (pare-feu Palo Alto, Fortinet, Cisco ou Windows DNS) ?", "Comment s'appelle le modèle de normalisation de Microsoft Sentinel qui traduit les logs de différentes marques dans un format commun ?", "ASIM (Advanced Security Information Model)", "ASIM (Advanced Security Information Model : parseurs unifiés)", "HTML 5", "JPEG", "MP3", "Les parseurs ASIM (imDns, imNetworkSession, imAuthentication) découplent les règles analytiques de la marque de la source.")
+            ("Isolation Defender for Endpoint", "Un poste portable Windows présente une exécution de ransomware active détectée par Microsoft Defender for Endpoint. Quelle action immédiate coupe toute communication réseau du poste (sauf avec le service cloud Defender) afin de stopper la propagation latérale tout en permettant à l'analyste SOC d'investiguer à distance ?", "Un PC de l'entreprise est infecté : quelle action dans Defender for Endpoint coupe immédiatement son réseau tout en gardant le canal de contrôle ouvert pour l'équipe sécurité ?", "Exécuter Isolate device (Isolation réseau de l'appareil) et ouvrir une session Live Response", "Isoler l'appareil (Isolate device) pour le couper du réseau sauf pour le canal Defender", "Exécuter uniquement un scan antivirus passif en arrière-plan en laissant le réseau local ouvert", "Révoquer uniquement la licence Office 365 de l'utilisateur sans isoler la carte réseau du poste", "Planifier un redémarrage différé du poste lors de la prochaine fenêtre de maintenance mensuelle", "L'isolation d'appareil coupe le poste de tout le réseau local/Internet tout en maintenant le canal vers le cloud Defender for Endpoint."),
+            ("Automatisation SOAR Sentinel", "Dans Microsoft Sentinel, vous souhaitez qu'à chaque création d'incident de sévérité High, le système assigne automatiquement l'incident au groupe Tier-2, ajoute un tag Prioritaire et déclenche un workflow d'isolation dans Entra ID.\nQue configurez-vous ?", "Dans Microsoft Sentinel, comment trier automatiquement un nouvel incident et lancer un scénario de réponse automatique ?", "Une Automation Rule sur le déclencheur When incident is created qui appelle un Playbook (Azure Logic Apps)", "Une règle d'automatisation (Automation Rule) qui trie l'incident et lance un Playbook Logic Apps", "Un Workbook Azure Monitor statique affichant uniquement le graphique des incidents de la veille", "Un verrou Resource Manager ReadOnly appliqué sur le groupe de ressources Log Analytics", "Une requête de chasse manuelle (Hunting Query) exécutée une fois par semaine par un analyste", "Dans Sentinel : l'Automation Rule gère le triage léger et orchestre l'appel aux Playbooks Logic Apps."),
+            ("Langage KQL", "En KQL (Kusto Query Language) dans Microsoft Sentinel, quel opérateur permet d'agréger les événements pour compter le nombre de tentatives de connexion échouées par utilisateur et par tranche de 15 minutes ?", "Quel mot-clé KQL sert à regrouper et compter des lignes par utilisateur et par tranche de temps ?", "summarize count() by UserPrincipalName, bin(TimeGenerated, 15m)", "summarize count() by UserPrincipalName, bin(TimeGenerated, 15m) pour regrouper par tranche de 15 minutes", "project UserPrincipalName, TimeGenerated sans fonction d'agrégation ni regroupement temporel", "where ResultType != 0 | take 10 pour afficher uniquement dix lignes brutes non regroupées", "extend TimeWindow = TimeGenerated sans calculer le nombre d'occurrences par compte", "summarize combiné avec bin(TimeGenerated, ...) est la brique fondamentale des règles analytiques KQL dans Sentinel."),
+            ("Listes de Surveillance Sentinel", "Quelle fonctionnalité de Microsoft Sentinel permet d'importer un fichier CSV d'adresses IP de serveurs VIP ou d'employés sensibles afin de les croiser dans vos règles KQL avec _GetWatchlist('VIPUsers') ?", "Comment importer une liste de comptes VIP dans Microsoft Sentinel pour l'utiliser dans tes recherches KQL ?", "_GetWatchlist (Watchlists Microsoft Sentinel importées depuis une source CSV ou externe)", "Une Watchlist Microsoft Sentinel appelée dans la requête KQL avec _GetWatchlist()", "Un classeur de visualisation Workbook destiné uniquement à l'affichage de graphiques", "Une politique de rétention d'archive à froid sur le compte de stockage Blob externe", "Un connecteur de taxonomie MITRE ATT&CK réservé au mappage des tactiques de détection", "Les Watchlists de Sentinel s'interrogent directement en KQL avec la fonction _GetWatchlist('<alias>')."),
+            ("Flux Incident Sentinel", "Ordonnez le cycle de détection dans Microsoft Sentinel :", "Remets dans l'ordre les 3 étapes de détection dans Microsoft Sentinel :", "1. Événements bruts (Logs) -> 2. Règle Analytique (Alertes) -> 3. Incident corrélé + Playbook SOAR", "1. Journaux (Logs) -> 2. Alerte (Analytics Rule) -> 3. Incident corrélé + Playbook SOAR", "1. Playbook SOAR -> 2. Collecte initiale des journaux -> 3. Création de la règle analytique", "1. Clôture de l'incident -> 2. Corrélation des alertes -> 3. Ingestion des événements bruts", "1. Archivage à froid des logs -> 2. Exécution du Playbook -> 3. Génération de l'alerte initiale", "Plusieurs alertes liées sont regroupées en un Incident unique avec graphe d'investigation."),
+            ("Normalisation ASIM", "Comment s'appelle la couche de schémas et de parseurs KQL intégrée à Microsoft Sentinel qui permet d'écrire une seule requête de détection fonctionnant quel que soit l'équipement source (pare-feu Palo Alto, Fortinet, Cisco ou Windows DNS) ?", "Comment s'appelle le modèle de normalisation de Microsoft Sentinel qui traduit les logs de différentes marques dans un format commun ?", "ASIM (Advanced Security Information Model) avec ses parseurs KQL unifiés", "ASIM (Advanced Security Information Model : parseurs KQL unifiés multi-fournisseurs)", "Un filtre d'exportation diagnostique Azure Activity Log limité au plan de contrôle ARM", "Un schéma de facturation Azure Cost Management dédié à la répartition par département", "Une table de routage réseau User-Defined Route (UDR) appliquée au sous-réseau du pare-feu", "Les parseurs ASIM (imDns, imNetworkSession, imAuthentication) découplent les règles analytiques de la marque de la source.")
         ]
     )
 
@@ -11443,12 +11823,12 @@ public enum CertiGoDedicatedTrackQuestionBank {
         ],
         stepPrefix: ["Trunk-Based Development & PR Gates", "Pipelines YAML Multi-Stages", "Agents Hébergés vs Self-Hosted", "Authentification OIDC sans secret", "Gestion des paquets & Flux amont (Upstream)", "Infrastructure as Code Bicep & What-If", "Déploiements Blue/Green, Canary & Slots", "Feature Flags avec Azure App Configuration", "DevSecOps : CodeQL, Dependabot & SBOM", "Métriques DORA, SRE & Application Insights"],
         baseQuestions: [
-            ("Feature Flags", "Votre équipe souhaite fusionner et déployer du code en production plusieurs fois par jour sur la branche principale, tout en gardant une nouvelle fonctionnalité invisible sauf pour 5 % d'utilisateurs bêta, sans redéployer l'application.\nQuel service Azure utilisez-vous ?", "Comment mettre du code en production tout de suite tout en activant la nouveauté uniquement pour 5 % des testeurs grâce à un interrupteur à distance ?", "Azure App Configuration avec Feature Manager (et un filtre Microsoft.Targeting ou Microsoft.Percentage)", "Azure App Configuration Feature Manager (gestion centralisée des Feature Flags)", "Un verrou ReadOnly", "Un serveur FTP", "Un redémarrage manuel", "Les Feature Flags découplent le déploiement technique (Deployment) de l'ouverture fonctionnelle (Release)."),
-            ("Métriques DORA", "Quelles sont les 4 métriques DORA standards utilisées dans AZ-400 pour mesurer la vélocité et la stabilité d'une équipe DevOps ?", "Quels sont les 4 indicateurs officiels DORA qui mesurent la vitesse et la fiabilité d'une équipe DevOps ?", "1. Deployment Frequency (Fréquence de déploiement), 2. Lead Time for Changes (Délai de mise en œuvre), 3. Change Failure Rate (Taux d'échec des changements) et 4. Time to Restore Service / MTTR", "Fréquence de déploiement, Délai (Lead Time), Taux d'échec et Temps de rétablissement (MTTR)", "Le nombre de lignes de code et d'heures supplémentaires", "Le nombre de réunions", "La taille du disque dur", "Les 2 premières métriques DORA mesurent la vélocité (Throughput) et les 2 suivantes mesurent la stabilité."),
-            ("Sécurité Pipeline OIDC", "Comment un workflow GitHub Actions ou Azure Pipelines doit-il s'authentifier auprès d'Azure Resource Manager pour déployer un template Bicep sans jamais stocker de mot de passe ou de secret client susceptible d'expirer ?", "Comment connecter ton pipeline CI/CD à Azure sans aucun mot de passe enregistré ?", "Utiliser la Workload Identity Federation (OpenID Connect / OIDC) avec azure/login", "Workload Identity Federation (OIDC sans secret)", "Écrire le mot de passe dans le fichier YAML", "Envoyer les clés par e-mail", "Ouvrir l'abonnement en accès anonyme", "OIDC échange un jeton signé à courte durée de vie du runner contre un jeton Entra ID sans aucun secret stocké."),
-            ("Prévisualisation Bicep", "Quelle opération de déploiement Azure CLI (az deployment group ...) permet de prévisualiser exactement quelles ressources seront créées, modifiées ou supprimées par un fichier Bicep avant de l'appliquer en production ?", "Quelle option de commande permet de simuler ce que ton fichier Bicep va modifier dans Azure avant de lancer le vrai déploiement ?", "what-if", "what-if (simulation prédictive des changements Bicep/ARM)", "delete-all", "force-push", "format", "az deployment group what-if compare le modèle Bicep à l'état actuel d'Azure sans rien modifier."),
-            ("Chaîne DevSecOps", "Ordonnez les 3 contrôles de sécurité Shift-Left dans un pipeline CI/CD :", "Remets dans l'ordre les 3 vérifications de sécurité automatiques dans un pipeline DevSecOps :", "1. Secret Scanning (Pre-receive) -> 2. SAST CodeQL & SCA Dependabot (PR) -> 3. DAST & Image Scanning avant Prod", "1. Bloquer les secrets -> 2. Analyser le code et les dépendances -> 3. Tester l'image et l'app", "Déployer sans test", "Ignorer les alertes", "Couper le pare-feu", "Le Shift-Left intègre la sécurité dès le commit et la Pull Request."),
-            ("Gestion des Artefacts", "Dans Azure Artifacts (ou GitHub Packages), quelle fonctionnalité permet à un flux unique (Feed) de servir à la fois vos paquets internes privés et de mettre en cache de manière sécurisée les paquets provenant de registres publics comme npmjs.com ou NuGet.org ?", "Quelle option d'Azure Artifacts permet à ton dépôt privé d'aller chercher et mettre en cache automatiquement les bibliothèques publiques approuvées ?", "Les Upstream Sources (Sources en amont)", "Les Upstream Sources (sources amont avec mise en cache immuable des versions téléchargées)", "Un partage SMB ouvert", "Un fichier ZIP par mail", "Un serveur DNS", "Une fois qu'une version est mise en cache via une Upstream Source dans Azure Artifacts, l'équipe reste protégée même si le paquet public est retiré.")
+            ("Feature Flags", "Votre équipe souhaite fusionner et déployer du code en production plusieurs fois par jour sur la branche principale, tout en gardant une nouvelle fonctionnalité invisible sauf pour 5 % d'utilisateurs bêta, sans redéployer l'application.\nQuel service Azure utilisez-vous ?", "Comment mettre du code en production tout de suite tout en activant la nouveauté uniquement pour 5 % des testeurs grâce à un interrupteur à distance ?", "Azure App Configuration avec Feature Manager (et un filtre Microsoft.Targeting ou Microsoft.Percentage)", "Azure App Configuration Feature Manager pour piloter l'ouverture progressive à 5 % des utilisateurs", "Un verrou Resource Manager ReadOnly appliqué sur le groupe de ressources de production", "Une branche Git séparée maintenue pendant six mois sans fusion dans la branche principale", "Une recompilation manuelle du code source à chaque changement de pourcentage d'utilisateurs", "Les Feature Flags découplent le déploiement technique (Deployment) de l'ouverture fonctionnelle (Release)."),
+            ("Métriques DORA", "Quelles sont les 4 métriques DORA standards utilisées dans AZ-400 pour mesurer la vélocité et la stabilité d'une équipe DevOps ?", "Quels sont les 4 indicateurs officiels DORA qui mesurent la vitesse et la fiabilité d'une équipe DevOps ?", "1. Deployment Frequency (Fréquence de déploiement), 2. Lead Time for Changes (Délai de mise en œuvre), 3. Change Failure Rate (Taux d'échec des changements) et 4. Time to Restore Service / MTTR", "Fréquence de déploiement, Délai de mise en œuvre (Lead Time), Taux d'échec et Temps de rétablissement (MTTR)", "Le nombre de lignes de code écrites par développeur et le volume d'heures supplémentaires", "Le nombre de réunions hebdomadaires et le nombre de branches Git créées sans fusion", "La capacité disque des serveurs de build et la bande passante réseau du registre d'artefacts", "Les 2 premières métriques DORA mesurent la vélocité (Throughput) et les 2 suivantes mesurent la stabilité."),
+            ("Sécurité Pipeline OIDC", "Comment un workflow GitHub Actions ou Azure Pipelines doit-il s'authentifier auprès d'Azure Resource Manager pour déployer un template Bicep sans jamais stocker de mot de passe ou de secret client susceptible d'expirer ?", "Comment connecter ton pipeline CI/CD à Azure sans aucun mot de passe enregistré ?", "Utiliser la Workload Identity Federation (OpenID Connect / OIDC) avec azure/login", "Utiliser la fédération d'identité OIDC (Workload Identity Federation) sans secret stocké", "Enregistrer un mot de passe de compte utilisateur permanent en clair dans le fichier YAML du dépôt", "Partager une clé d'accès administrateur unique par messagerie entre tous les développeurs", "Désactiver le contrôle d'accès RBAC sur l'abonnement Azure cible pendant le déploiement", "OIDC échange un jeton signé à courte durée de vie du runner contre un jeton Entra ID sans aucun secret stocké."),
+            ("Prévisualisation Bicep", "Quelle opération de déploiement Azure CLI (az deployment group ...) permet de prévisualiser exactement quelles ressources seront créées, modifiées ou supprimées par un fichier Bicep avant de l'appliquer en production ?", "Quelle option de commande permet de simuler ce que ton fichier Bicep va modifier dans Azure avant de lancer le vrai déploiement ?", "what-if", "what-if (simulation prédictive des créations, modifications et suppressions Bicep/ARM)", "export-template (exportation brute du modèle JSON sans calcul de différentiel d'état)", "cancel (annulation d'une opération de déploiement déjà en cours d'exécution sur le groupe)", "wait (mise en attente du terminal jusqu'à la fin d'une opération asynchrone)", "az deployment group what-if compare le modèle Bicep à l'état actuel d'Azure sans rien modifier."),
+            ("Chaîne DevSecOps", "Ordonnez les 3 contrôles de sécurité Shift-Left dans un pipeline CI/CD :", "Remets dans l'ordre les 3 vérifications de sécurité automatiques dans un pipeline DevSecOps :", "1. Secret Scanning (Pre-receive) -> 2. SAST CodeQL & SCA Dependabot (PR) -> 3. DAST & Image Scanning avant Prod", "1. Bloquer les secrets au push -> 2. Analyser le code et les dépendances en PR -> 3. Tester l'image et l'application avant Prod", "1. Mise en production directe -> 2. Analyse du code six mois plus tard -> 3. Révocation manuelle des secrets", "1. Scan dynamique en production uniquement -> 2. Désactivation des vérifications de PR -> 3. Archivage du code", "1. Compilation sans contrôle des dépendances -> 2. Publication de l'image -> 3. Vérification manuelle des clés", "Le Shift-Left intègre la sécurité dès le commit et la Pull Request."),
+            ("Gestion des Artefacts", "Dans Azure Artifacts (ou GitHub Packages), quelle fonctionnalité permet à un flux unique (Feed) de servir à la fois vos paquets internes privés et de mettre en cache de manière sécurisée les paquets provenant de registres publics comme npmjs.com ou NuGet.org ?", "Quelle option d'Azure Artifacts permet à ton dépôt privé d'aller chercher et mettre en cache automatiquement les bibliothèques publiques approuvées ?", "Les Upstream Sources (Sources en amont avec mise en cache immuable des paquets publics)", "Les Upstream Sources (sources amont avec mise en cache automatique des versions téléchargées)", "Un partage réseau SMB local sans gestion de versions ni contrôle d'intégrité des paquets", "Une archive ZIP copiée manuellement sur chaque agent de build avant l'intégration continue", "Une zone Azure Private DNS liée au réseau virtuel des serveurs d'application", "Une fois qu'une version est mise en cache via une Upstream Source dans Azure Artifacts, l'équipe reste protégée même si le paquet public est retiré.")
         ]
     )
 
@@ -11471,12 +11851,12 @@ public enum CertiGoDedicatedTrackQuestionBank {
         ],
         stepPrefix: ["AWS Lambda : Cycle de vie & Contexte", "Provisioned Concurrency & SnapStart", "Lambda Layers & Extensions", "API Gateway : Lambda Authorizers & Cognito", "DynamoDB : Partition Key, Sort Key, RCU/WCU", "DynamoDB : Global Secondary Index (GSI) vs LSI", "DynamoDB Streams + Triggers Lambda", "Chiffrement d'enveloppe AWS KMS (GenerateDataKey)", "Déploiement Serverless avec AWS SAM & CodeDeploy", "Traçage distribué avec AWS X-Ray"],
         baseQuestions: [
-            ("DynamoDB GSI vs LSI", "Vous avez une table Amazon DynamoDB en production depuis 6 mois et devez permettre une nouvelle requête filtrant sur un attribut email qui ne fait pas partie de la clé primaire actuelle.\nQue créez-vous sans recréer la table ?", "Ta table DynamoDB existe déjà et tu veux pouvoir chercher rapidement par email sans tout recréer.\nQuel type d'index ajoutes-tu ?", "Un Global Secondary Index (GSI) avec email comme clé de partition (car un LSI ne peut être créé qu'à la création initiale de la table et doit conserver la même Partition Key)", "Un Global Secondary Index (GSI : ajoutable à tout moment avec une nouvelle clé de partition)", "Un Local Secondary Index (LSI : impossible à ajouter après la création de la table)", "Un fichier CSV", "Un redémarrage de DynamoDB", "Différence clé DVA-C02 : LSI = même Partition Key, créé uniquement à la création de la table, supporte les lectures fortement cohérentes ; GSI = clé libre, ajoutable à tout moment, lectures éventuellement cohérentes uniquement."),
-            ("Traçage Distribué", "Votre architecture serverless enchaîne Amazon API Gateway, 3 fonctions AWS Lambda, une file SQS et une table DynamoDB. Certaines requêtes prennent plus de 4 secondes et vous souhaitez visualiser la carte de service (Service Map) et le temps passé dans chaque segment.\nQuel service activez-vous ?", "Quel outil AWS dessine la carte complète du trajet d'une requête à travers API Gateway, Lambda et DynamoDB pour montrer exactement où ça ralentit ?", "AWS X-Ray (en activant Active Tracing et en instrumentant avec le SDK X-Ray / OpenTelemetry)", "AWS X-Ray (traçage distribué et carte de service)", "AWS Budgets", "Amazon Route 53", "AWS Artifact", "Sur EC2 ou ECS, le démon X-Ray écoute sur le port UDP 2000 ; sur Lambda, active Tracing: Active et accorde la politique AWSXRayDaemonWriteAccess."),
-            ("Éliminer le Cold Start Lambda", "Une fonction AWS Lambda critique pour le paiement en ligne subit une latence de démarrage à froid (Cold Start) de 2 secondes lors de l'ouverture des ventes à 9h00.\nQuelle fonctionnalité maintient un nombre défini d'environnements d'exécution pré-initialisés et prêts à répondre instantanément ?", "Quelle option d'AWS Lambda garde des instances déjà chaudes et prêtes d'avance pour éviter tout temps d'attente au premier appel ?", "Provisioned Concurrency (Concurrence provisionnée, combinable avec Application Auto Scaling)", "Provisioned Concurrency (environnements pré-chauffés prêts à répondre sans Cold Start)", "Reserved Concurrency seule (plafonne et réserve le quota mais ne pré-chauffe pas les conteneurs)", "Réduire le timeout à 1 seconde", "Supprimer la fonction", "Ne confonds pas Reserved Concurrency (réserve et plafonne le nombre max d'exécutions simultanées) et Provisioned Concurrency (pré-initialise les environnements pour éliminer le Cold Start)."),
-            ("Commande AWS SAM", "Dans AWS SAM (Serverless Application Model), quelle commande compile les dépendances de vos fonctions Lambda, valide le template template.yaml et prépare les artefacts dans .aws-sam/build avant sam deploy ?", "Quelle commande AWS SAM prépare et compile ton projet serverless avant de le déployer ?", "sam build", "sam build (prépare les artefacts dans .aws-sam/build)", "sam destroy-account", "sam reboot", "sam format-c", "Séquence AWS SAM : sam init -> sam build -> sam local invoke -> sam deploy --guided."),
-            ("Chiffrement d'Enveloppe KMS", "Ordonnez les 3 étapes du chiffrement côté client d'un fichier de 50 Mo (qui dépasse la limite directe de 4 Ko de l'API kms:Encrypt) avec AWS KMS Envelope Encryption :", "Comme AWS KMS ne chiffre directement que 4 Ko maximum, remets dans l'ordre les 3 étapes du chiffrement d'enveloppe pour un gros fichier :", "1. Appeler GenerateDataKey sur KMS -> 2. Chiffrer le fichier localement avec la Plaintext Data Key puis l'effacer de la RAM -> 3. Stocker le fichier chiffré avec l'Encrypted Data Key", "1. Demander une clé de données (GenerateDataKey) -> 2. Chiffrer le fichier avec la clé en clair puis la détruire -> 3. Garder le fichier chiffré + la clé chiffrée", "Envoyer 50 Mo directement à kms:Encrypt", "Stocker la clé en clair", "Ne rien chiffrer", "L'API directe kms:Encrypt est limitée à 4 Ko : au-delà de 4 Ko, utilise toujours Envelope Encryption (GenerateDataKey)."),
-            ("Déploiement Progressif Lambda", "Dans un template AWS SAM, vous ajoutez AutoPublishAlias: live et DeploymentPreference: Type: Canary10Percent5Minutes sur votre fonction Lambda.\nQuel service AWS sous-jacent orchestre automatiquement ce basculement de trafic progressif et le rollback sur alarme CloudWatch ?", "Quel service AWS est appelé automatiquement par AWS SAM pour basculer progressivement le trafic (Canary10Percent5Minutes) entre deux versions d'une fonction Lambda ?", "AWS CodeDeploy", "AWS CodeDeploy (basculement progressif d'alias Lambda Canary / Linear avec rollback sur alarme)", "AWS Direct Connect", "Amazon Athena", "AWS Snowball", "En serverless SAM, DeploymentPreference génère automatiquement une application et un Deployment Group AWS CodeDeploy.")
+            ("DynamoDB GSI vs LSI", "Vous avez une table Amazon DynamoDB en production depuis 6 mois et devez permettre une nouvelle requête filtrant sur un attribut email qui ne fait pas partie de la clé primaire actuelle.\nQue créez-vous sans recréer la table ?", "Ta table DynamoDB existe déjà et tu veux pouvoir chercher rapidement par email sans tout recréer.\nQuel type d'index ajoutes-tu ?", "Un Global Secondary Index (GSI) avec email comme clé de partition (car un LSI ne peut être créé qu'à la création initiale de la table et doit conserver la même Partition Key)", "Un Global Secondary Index (GSI : ajoutable à tout moment avec une nouvelle clé de partition)", "Un Local Secondary Index (LSI) partageant la même clé de partition que la table d'origine", "Une opération Scan complète de toute la table exécutée à chaque requête utilisateur en production", "Un export quotidien de la table vers un fichier plat stocké sur une instance EC2 locale", "Différence clé DVA-C02 : LSI = même Partition Key, créé uniquement à la création de la table, supporte les lectures fortement cohérentes ; GSI = clé libre, ajoutable à tout moment, lectures éventuellement cohérentes uniquement."),
+            ("Traçage Distribué", "Votre architecture serverless enchaîne Amazon API Gateway, 3 fonctions AWS Lambda, une file SQS et une table DynamoDB. Certaines requêtes prennent plus de 4 secondes et vous souhaitez visualiser la carte de service (Service Map) et le temps passé dans chaque segment.\nQuel service activez-vous ?", "Quel outil AWS dessine la carte complète du trajet d'une requête à travers API Gateway, Lambda et DynamoDB pour montrer exactement où ça ralentit ?", "AWS X-Ray (en activant Active Tracing et en instrumentant avec le SDK X-Ray / OpenTelemetry)", "AWS X-Ray pour visualiser la carte des services et mesurer le temps de chaque étape", "AWS Budgets qui suit uniquement les seuils de facturation mensuelle du compte AWS", "Amazon Route 53 qui gère la résolution DNS des noms de domaine vers les points d'entrée", "AWS Artifact qui fournit uniquement le téléchargement des rapports de conformité ISO et SOC", "Sur EC2 ou ECS, le démon X-Ray écoute sur le port UDP 2000 ; sur Lambda, active Tracing: Active et accorde la politique AWSXRayDaemonWriteAccess."),
+            ("Éliminer le Cold Start Lambda", "Une fonction AWS Lambda critique pour le paiement en ligne subit une latence de démarrage à froid (Cold Start) de 2 secondes lors de l'ouverture des ventes à 9h00.\nQuelle fonctionnalité maintient un nombre défini d'environnements d'exécution pré-initialisés et prêts à répondre instantanément ?", "Quelle option d'AWS Lambda garde des instances déjà chaudes et prêtes d'avance pour éviter tout temps d'attente au premier appel ?", "Provisioned Concurrency (Concurrence provisionnée, combinable avec Application Auto Scaling)", "Provisioned Concurrency pour maintenir des environnements pré-chauffés prêts à répondre sans Cold Start", "Reserved Concurrency seule qui plafonne le quota maximal sans pré-initialiser les conteneurs", "Une réduction du délai d'expiration (Timeout) de la fonction Lambda à une seule seconde", "Le stockage du code source dans une classe d'archivage S3 Glacier Deep Archive", "Ne confonds pas Reserved Concurrency (réserve et plafonne le nombre max d'exécutions simultanées) et Provisioned Concurrency (pré-initialise les environnements pour éliminer le Cold Start)."),
+            ("Commande AWS SAM", "Dans AWS SAM (Serverless Application Model), quelle commande compile les dépendances de vos fonctions Lambda, valide le template template.yaml et prépare les artefacts dans .aws-sam/build avant sam deploy ?", "Quelle commande AWS SAM prépare et compile ton projet serverless avant de le déployer ?", "sam build", "sam build (compile les dépendances et prépare les artefacts dans .aws-sam/build)", "sam logs (récupère uniquement les journaux d'exécution CloudWatch d'une fonction déjà déployée)", "sam list endpoints (affiche uniquement les URLs des ressources après le déploiement CloudFormation)", "sam traces (récupère uniquement les segments de traçage AWS X-Ray enregistrés)", "Séquence AWS SAM : sam init -> sam build -> sam local invoke -> sam deploy --guided."),
+            ("Chiffrement d'Enveloppe KMS", "Ordonnez les 3 étapes du chiffrement côté client d'un fichier de 50 Mo (qui dépasse la limite directe de 4 Ko de l'API kms:Encrypt) avec AWS KMS Envelope Encryption :", "Comme AWS KMS ne chiffre directement que 4 Ko maximum, remets dans l'ordre les 3 étapes du chiffrement d'enveloppe pour un gros fichier :", "1. Appeler GenerateDataKey sur KMS -> 2. Chiffrer le fichier localement avec la Plaintext Data Key puis l'effacer de la RAM -> 3. Stocker le fichier chiffré avec l'Encrypted Data Key", "1. Demander une clé de données (GenerateDataKey) -> 2. Chiffrer le fichier avec la clé en clair puis l'effacer de la mémoire -> 3. Conserver le fichier chiffré avec la clé chiffrée", "1. Envoyer le fichier de 50 Mo en un seul appel direct à l'API kms:Encrypt -> 2. Stocker la clé en clair -> 3. Supprimer la clé KMS", "1. Stocker la clé de chiffrement en clair dans le code source -> 2. Compresser le fichier en ZIP -> 3. Désactiver la rotation KMS", "1. Appeler kms:Decrypt avant le chiffrement -> 2. Transmettre le fichier non chiffré en HTTP -> 3. Archiver la clé publique", "L'API directe kms:Encrypt est limitée à 4 Ko : au-delà de 4 Ko, utilise toujours Envelope Encryption (GenerateDataKey)."),
+            ("Déploiement Progressif Lambda", "Dans un template AWS SAM, vous ajoutez AutoPublishAlias: live et DeploymentPreference: Type: Canary10Percent5Minutes sur votre fonction Lambda.\nQuel service AWS sous-jacent orchestre automatiquement ce basculement de trafic progressif et le rollback sur alarme CloudWatch ?", "Quel service AWS est appelé automatiquement par AWS SAM pour basculer progressivement le trafic (Canary10Percent5Minutes) entre deux versions d'une fonction Lambda ?", "AWS CodeDeploy (orchestration automatique du basculement progressif d'alias Lambda et du rollback sur alarme)", "AWS CodeDeploy pour basculer progressivement le trafic entre les versions Lambda avec rollback sur alarme", "AWS Direct Connect dédié aux liaisons réseau fibre optique privées vers un datacenter", "Amazon Athena dédié à l'exécution de requêtes SQL interactives sur des fichiers Amazon S3", "AWS Snowball dédié au transfert physique d'appliances de stockage de plusieurs pétaoctets", "En serverless SAM, DeploymentPreference génère automatiquement une application et un Deployment Group AWS CodeDeploy.")
         ]
     )
 
@@ -11499,12 +11879,12 @@ public enum CertiGoDedicatedTrackQuestionBank {
         ],
         stepPrefix: ["Landing Zone multi-comptes Control Tower", "Politiques SCP & Permission Boundaries", "Partage inter-comptes avec AWS RAM", "Transit Gateway multi-régions & Peering", "Direct Connect Gateway & Transit VIF", "Ingénierie de trafic BGP (AS-Path, MED, Communities)", "Inspection centralisée avec AWS Network Firewall", "DNS hybride Route 53 Resolver Inbound/Outbound", "Migration massive avec AWS MGN & DataSync", "Résilience multi-régions avec Aurora Global DB & Route 53 ARC"],
         baseQuestions: [
-            ("Architecture Direct Connect Multi-Régions", "Une entreprise possède 30 VPC répartis sur 3 régions AWS et 2 connexions AWS Direct Connect dédiées. Quelle architecture permet de relier les 2 Direct Connect à l'ensemble des 30 VPC en minimisant le nombre de Virtual Interfaces (VIF) et la complexité de routage ?", "Comment relier proprement 2 lignes Direct Connect à 30 réseaux VPC répartis dans 3 régions AWS ?", "Créer un AWS Transit Gateway par région (interconnectés en peering), les attacher à une AWS Direct Connect Gateway unique et configurer des Transit VIFs sur les connexions Direct Connect", "Utiliser des Transit VIFs vers une Direct Connect Gateway reliée aux Transit Gateways", "Créer 900 tunnels VPN manuels", "Rendre tous les VPC publics", "Utiliser S3 Glacier", "Séquence de référence SAP-C02 : On-Premises -> Direct Connect (Transit VIF) -> Direct Connect Gateway -> Transit Gateway -> VPCs."),
-            ("Partage Inter-Comptes AWS RAM", "Votre équipe réseau centrale a créé un AWS Transit Gateway et des règles de transfert Route 53 Resolver dans le compte Network-Hub. Comment les partager avec les 80 comptes membres de votre organisation AWS sans dupliquer ces ressources ?", "Comment partager un Transit Gateway ou des règles DNS centrales avec les 80 comptes de ton entreprise sans les recréer 80 fois ?", "Utiliser AWS Resource Access Manager (AWS RAM) avec le partage au niveau d'AWS Organizations activé", "Partager les ressources via AWS Resource Access Manager (AWS RAM)", "Copier les clés Root des 80 comptes", "Fusionner les 80 comptes en un seul", "Envoyer un fichier ZIP", "AWS RAM partage sans coût additionnel les Transit Gateways, Subnets, Route 53 Resolver Rules, License Manager et Aurora clusters au sein d'AWS Organizations."),
-            ("DNS Hybride Route 53 Resolver", "Les serveurs de votre datacenter On-Premises doivent résoudre les domaines des zones privées (Route 53 Private Hosted Zones) de vos VPC AWS, et vos instances EC2 doivent résoudre le domaine interne corp.internal géré par vos serveurs DNS On-Premises.\nQue déployez-vous ?", "Comment faire fonctionner l'annuaire DNS privé dans les deux sens entre tes bureaux et AWS ?", "Un Route 53 Resolver Inbound Endpoint (vers lequel les DNS On-Premises transfèrent les requêtes AWS) et un Route 53 Resolver Outbound Endpoint avec des Forwarding Rules partagées via AWS RAM (pour transférer corp.internal vers On-Premises)", "Route 53 Resolver Inbound Endpoint (On-Prem -> AWS) + Outbound Endpoint avec Forwarding Rules (AWS -> On-Prem)", "Modifier /etc/hosts sur 5 000 serveurs", "Ouvrir les zones privées au public", "Supprimer le DNS", "Retiens le sens pour SAP-C02 : Inbound Endpoint = les requêtes entrent dans AWS depuis On-Prem ; Outbound Endpoint = les requêtes sortent d'AWS vers On-Prem."),
-            ("Migration de Serveurs MGN", "Quel service AWS est recommandé pour effectuer une migration Lift-and-Shift (Rehost) automatisée par réplication continue au niveau bloc de centaines de serveurs physiques ou VMware vers Amazon EC2 avec un temps de coupure minimal ?", "Quel est le service officiel d'AWS pour déménager des centaines de serveurs vers EC2 en copiant leurs disques en continu ?", "AWS Application Migration Service (AWS MGN)", "AWS Application Migration Service (AWS MGN)", "Amazon Polly", "Amazon Macie", "AWS Budgets", "AWS Application Migration Service (MGN) est le service principal de migration Lift-and-Shift vers EC2."),
-            ("Chaîne Inspection Réseau", "Ordonnez le flux d'inspection centralisée du trafic sortant multi-VPC sur AWS :", "Remets dans l'ordre le chemin d'inspection de sécurité réseau centralisée sur AWS :", "1. Spoke VPC -> 2. AWS Transit Gateway -> 3. Inspection VPC (AWS Network Firewall + NAT Gateway) -> 4. Internet", "1. VPC applicatif -> 2. Transit Gateway -> 3. VPC d'inspection (Network Firewall) -> 4. Internet", "Ouvrir chaque VPC sans pare-feu", "Supprimer le Transit Gateway", "Couper le routage", "Un Inspection VPC dédié avec AWS Network Firewall (et Appliance Mode activé sur l'attachement TGW pour garder la symétrie des flux) sécurise toute l'organisation."),
-            ("Aurora Global Database", "Votre application financière multi-régions utilise Amazon Aurora. Vous avez besoin d'une réplication inter-régions basée sur le stockage avec un RPO de 1 seconde et un basculement (RTO) en moins d'une minute vers la région secondaire, tout en permettant aux utilisateurs de la région secondaire d'effectuer des lectures locales à faible latence.\nQue déployez-vous ?", "Quelle configuration d'Amazon Aurora copie tes données vers un autre continent en moins d'une seconde et bascule en moins d'une minute en cas de catastrophe ?", "Amazon Aurora Global Database (avec Write Forwarding optionnel depuis les réplicas secondaires vers le primaire)", "Amazon Aurora Global Database (réplication stockage < 1s et failover < 1 min)", "Un snapshot RDS manuel hebdomadaire", "Une table S3 Glacier", "Une instance EC2 unique", "Aurora Global Database réplique au niveau de la couche de stockage distribuée sans impacter le CPU de l'instance primaire.")
+            ("Architecture Direct Connect Multi-Régions", "Une entreprise possède 30 VPC répartis sur 3 régions AWS et 2 connexions AWS Direct Connect dédiées. Quelle architecture permet de relier les 2 Direct Connect à l'ensemble des 30 VPC en minimisant le nombre de Virtual Interfaces (VIF) et la complexité de routage ?", "Comment relier proprement 2 lignes Direct Connect à 30 réseaux VPC répartis dans 3 régions AWS ?", "Créer un AWS Transit Gateway par région (interconnectés en peering), les attacher à une AWS Direct Connect Gateway unique et configurer des Transit VIFs sur les connexions Direct Connect", "Utiliser des Transit VIFs vers une Direct Connect Gateway reliée aux Transit Gateways de chaque région", "Créer un maillage complet de connexions VPC Peering directes avec une Private VIF distincte par VPC", "Exposer les sous-réseaux privés des 30 VPC sur Internet via des Internet Gateways sans chiffrement", "Stocker les tables de routage réseau dans une archive S3 Glacier sans passerelle de transit", "Séquence de référence SAP-C02 : On-Premises -> Direct Connect (Transit VIF) -> Direct Connect Gateway -> Transit Gateway -> VPCs."),
+            ("Partage Inter-Comptes AWS RAM", "Votre équipe réseau centrale a créé un AWS Transit Gateway et des règles de transfert Route 53 Resolver dans le compte Network-Hub. Comment les partager avec les 80 comptes membres de votre organisation AWS sans dupliquer ces ressources ?", "Comment partager un Transit Gateway ou des règles DNS centrales avec les 80 comptes de ton entreprise sans les recréer 80 fois ?", "Utiliser AWS Resource Access Manager (AWS RAM) avec le partage au niveau d'AWS Organizations activé", "Partager les ressources centrales via AWS Resource Access Manager (AWS RAM) dans toute l'organisation", "Déployer 80 Transit Gateways distincts et 80 paires d'endpoints DNS dans chacun des comptes membres", "Regrouper l'ensemble des charges de travail des 80 départements dans un compte AWS unique sans isolation", "Synchroniser manuellement les fichiers de configuration réseau par transfert SFTP entre les comptes", "AWS RAM partage sans coût additionnel les Transit Gateways, Subnets, Route 53 Resolver Rules, License Manager et Aurora clusters au sein d'AWS Organizations."),
+            ("DNS Hybride Route 53 Resolver", "Les serveurs de votre datacenter On-Premises doivent résoudre les domaines des zones privées (Route 53 Private Hosted Zones) de vos VPC AWS, et vos instances EC2 doivent résoudre le domaine interne corp.internal géré par vos serveurs DNS On-Premises.\nQue déployez-vous ?", "Comment faire fonctionner l'annuaire DNS privé dans les deux sens entre tes bureaux et AWS ?", "Un Route 53 Resolver Inbound Endpoint (vers lequel les DNS On-Premises transfèrent les requêtes AWS) et un Route 53 Resolver Outbound Endpoint avec des Forwarding Rules partagées via AWS RAM (pour transférer corp.internal vers On-Premises)", "Route 53 Resolver Inbound Endpoint (On-Prem -> AWS) + Outbound Endpoint avec Forwarding Rules (AWS -> On-Prem)", "Maintenir manuellement des fichiers /etc/hosts statiques sur chacun des milliers de serveurs hybrides", "Convertir toutes les zones DNS internes de l'entreprise en zones publiques Route 53 accessibles sur Internet", "Utiliser uniquement un répartiteur Application Load Balancer sans service de résolution DNS", "Retiens le sens pour SAP-C02 : Inbound Endpoint = les requêtes entrent dans AWS depuis On-Prem ; Outbound Endpoint = les requêtes sortent d'AWS vers On-Prem."),
+            ("Migration de Serveurs MGN", "Quel service AWS est recommandé pour effectuer une migration Lift-and-Shift (Rehost) automatisée par réplication continue au niveau bloc de centaines de serveurs physiques ou VMware vers Amazon EC2 avec un temps de coupure minimal ?", "Quel est le service officiel d'AWS pour déménager des centaines de serveurs vers EC2 en copiant leurs disques en continu ?", "AWS Application Migration Service (AWS MGN) avec réplication bloc continue et basculement automatisé", "AWS Application Migration Service (AWS MGN) pour répliquer les serveurs en continu vers EC2", "Amazon Polly dédié à la synthèse vocale Text-to-Speech par apprentissage profond", "Amazon Macie dédié à la détection de données personnelles sensibles dans les buckets S3", "AWS Budgets dédié au suivi des alertes de coûts et d'utilisation financière du compte", "AWS Application Migration Service (MGN) est le service principal de migration Lift-and-Shift vers EC2."),
+            ("Chaîne Inspection Réseau", "Ordonnez le flux d'inspection centralisée du trafic sortant multi-VPC sur AWS :", "Remets dans l'ordre le chemin d'inspection de sécurité réseau centralisée sur AWS :", "1. Spoke VPC -> 2. AWS Transit Gateway -> 3. Inspection VPC (AWS Network Firewall + NAT Gateway) -> 4. Internet", "1. VPC applicatif -> 2. Transit Gateway -> 3. VPC d'inspection (Network Firewall + NAT) -> 4. Internet", "1. Internet -> 2. Spoke VPC sans filtrage -> 3. Transit Gateway -> 4. Inspection VPC", "1. NAT Gateway public dans chaque Spoke -> 2. Internet direct -> 3. Inspection a posteriori dans S3", "1. Route 53 Resolver -> 2. S3 Glacier -> 3. VPC Peering non transitif -> 4. Internet", "Un Inspection VPC dédié avec AWS Network Firewall (et Appliance Mode activé sur l'attachement TGW pour garder la symétrie des flux) sécurise toute l'organisation."),
+            ("Aurora Global Database", "Votre application financière multi-régions utilise Amazon Aurora. Vous avez besoin d'une réplication inter-régions basée sur le stockage avec un RPO de 1 seconde et un basculement (RTO) en moins d'une minute vers la région secondaire, tout en permettant aux utilisateurs de la région secondaire d'effectuer des lectures locales à faible latence.\nQue déployez-vous ?", "Quelle configuration d'Amazon Aurora copie tes données vers un autre continent en moins d'une seconde et bascule en moins d'une minute en cas de catastrophe ?", "Amazon Aurora Global Database (avec Write Forwarding optionnel depuis les réplicas secondaires vers le primaire)", "Amazon Aurora Global Database (réplication stockage < 1s et basculement inter-régions < 1 min)", "Une sauvegarde manuelle par snapshot RDS copiée une fois par semaine vers la seconde région", "Un export quotidien des tables vers Amazon S3 Glacier avec restauration manuelle en plusieurs heures", "Une instance Amazon EC2 unique hébergeant un moteur relationnel local sans réplication inter-régions", "Aurora Global Database réplique au niveau de la couche de stockage distribuée sans impacter le CPU de l'instance primaire.")
         ]
     )
 
@@ -11527,12 +11907,12 @@ public enum CertiGoDedicatedTrackQuestionBank {
         ],
         stepPrefix: ["Patrons Multi-Conteneurs : Sidecar, Adapter, Ambassador", "InitContainers & Volumes partagés emptyDir", "Jobs parallèles & CronJobs (concurrencyPolicy)", "ConfigMaps & Secrets (Variables d'env vs Volumes)", "SecurityContext (runAsNonRoot, readOnlyRootFilesystem, capabilities)", "Resource Requests, Limits & Quotas de Namespace", "Sondes de santé HTTP, TCP et Exec", "Stratégies de déploiement : Rolling, Blue/Green, Canary", "Exposition réseau : Services, Ingress & NetworkPolicy", "Gestion de paquets avec Helm & Kustomize"],
         baseQuestions: [
-            ("Patron Multi-Conteneurs", "Une application patrimoniale écrit ses journaux dans /var/log/app.log selon un format propriétaire non standard. Vous souhaitez transformer ce format en JSON standard à la volée avant qu'il ne soit collecté par Prometheus/Fluentd, sans modifier le code de l'application.\nQuel patron de Pod multi-conteneurs utilisez-vous ?", "Comment ajouter un second petit conteneur dans le même Pod dont le rôle est de traduire le format des logs de l'application principale en format standard ?", "Le patron Adapter (un second conteneur dans le même Pod partageant un volume emptyDir sur /var/log qui normalise la sortie)", "Le patron Adapter (normalise et standardise la sortie de l'application principale)", "Supprimer les logs", "Créer un nouveau cluster", "Redémarrer CoreDNS", "Les 3 patrons multi-conteneurs CKAD : Sidecar (étend/envoie les logs), Adapter (normalise le format de sortie), Ambassador (proxyfie les connexions sortantes)."),
-            ("Sécurité Linux Capabilities", "Dans le manifeste d'un Pod pour le CKAD, un conteneur doit pouvoir modifier la configuration réseau locale (NET_ADMIN) tout en supprimant toutes les autres capacités Linux par défaut. Où définissez-vous capabilities ?", "À quel endroit exact du fichier YAML d'un Pod règles-tu les capacités Linux (capabilities : add / drop) ?", "Au niveau du conteneur : spec.containers[*].securityContext.capabilities (car capabilities n'existe pas au niveau du securityContext du Pod)", "Dans spec.containers[*].securityContext.capabilities (au niveau du conteneur uniquement)", "Au niveau du Service ClusterIP", "Dans le ConfigMap", "Dans l'objet Ingress", "Piège fréquent du CKAD : runAsUser et fsGroup peuvent être mis au niveau Pod, mais capabilities et allowPrivilegeEscalation se mettent uniquement au niveau du conteneur (spec.containers[].securityContext) !"),
-            ("CronJob Concurrency", "Vous avez un CronJob Kubernetes planifié toutes les 5 minutes (*/5 * * * *). Si l'exécution précédente n'est toujours pas terminée au bout de 5 minutes, vous souhaitez interdire le lancement d'une nouvelle exécution concurrente (sans tuer celle en cours).\nQuel paramètre configurez-vous ?", "Sur un CronJob Kubernetes, quel réglage empêche une nouvelle tâche de démarrer si la précédente n'a pas encore fini ?", "concurrencyPolicy: Forbid", "concurrencyPolicy: Forbid (ignore le nouveau cycle tant que le Job précédent tourne encore)", "concurrencyPolicy: Allow (lance en parallèle par défaut)", "concurrencyPolicy: Replace (tue le Job en cours pour le remplacer)", "restartPolicy: Always (interdit dans un Job/CronJob : seuls OnFailure et Never sont valides)", "Les 3 valeurs de concurrencyPolicy sur un CronJob : Allow (défaut), Forbid (attend la fin de l'actuel), Replace (annule l'actuel et lance le nouveau)."),
-            ("Gestionnaire de Paquets Helm", "Quelle commande Helm permet de revenir immédiatement à la révision 2 d'une release nommée payment-api dans le namespace prod suite à une mise à jour défectueuse ?", "Quelle commande Helm permet de revenir en arrière (rollback) à la version 2 de ton application payment-api ?", "helm rollback payment-api 2 -n prod", "helm rollback payment-api 2 -n prod", "helm delete-cluster", "kubectl rm", "docker rmi", "Commandes Helm essentielles au CKAD : helm list -A, helm install, helm upgrade, helm history <release>, helm rollback <release> <revision>."),
-            ("Déploiement Canary Natif", "Ordonnez les 3 étapes pour mettre en place un déploiement Canary (90 % / 10 %) avec les objets Kubernetes standards :", "Remets dans l'ordre les 3 étapes pour envoyer 10 % du trafic sur une nouvelle version Canary dans Kubernetes :", "1. Deployment stable app-v1 (9 réplicas, label app: web) -> 2. Deployment canary app-v2 (1 réplica, même label app: web) -> 3. Service selector: { app: web } répartissant sur les 10 Pods", "1. Garder 9 Pods v1 (app: web) -> 2. Lancer 1 Pod v2 avec le même label app: web -> 3. Laisser le Service répartir (1 sur 10 = 10 %)", "Supprimer le Service", "Arrêter tous les Pods", "Changer de namespace", "Un Service Kubernetes répartit le trafic entre tous les Pods qui correspondent à son selector, quel que soit le Deployment qui les a créés."),
-            ("Mise à Jour ConfigMap", "Un Pod consomme un ConfigMap de deux façons : 1. Via des variables d'environnement (envFrom), et 2. Via un volume monté (volumeMounts). Si vous modifiez les valeurs dans le ConfigMap avec kubectl edit cm, que se passe-t-il sur le Pod en cours d'exécution ?", "Si tu modifies un ConfigMap pendant qu'un Pod tourne, est-ce que les fichiers montés en volume et les variables d'environnement se mettent à jour tout seuls ?", "Les fichiers montés en volume (hors subPath) sont mis à jour automatiquement après quelques secondes, mais les variables d'environnement ne sont jamais mises à jour sans redémarrer le Pod (kubectl rollout restart)", "Le volume se met à jour tout seul (sauf subPath), mais les variables d'environnement nécessitent de redémarrer le Pod", "Les variables d'environnement changent instantanément sans redémarrage", "Le Pod est supprimé", "Le ConfigMap est immuable par défaut", "Point classique CKAD : les variables d'environnement d'un processus Linux sont fixées au démarrage du conteneur ; seul un montage en volume (sans subPath) est rafraîchi par kubelet.")
+            ("Patron Multi-Conteneurs", "Une application patrimoniale écrit ses journaux dans /var/log/app.log selon un format propriétaire non standard. Vous souhaitez transformer ce format en JSON standard à la volée avant qu'il ne soit collecté par Prometheus/Fluentd, sans modifier le code de l'application.\nQuel patron de Pod multi-conteneurs utilisez-vous ?", "Comment ajouter un second petit conteneur dans le même Pod dont le rôle est de traduire le format des logs de l'application principale en format standard ?", "Le patron Adapter (un second conteneur dans le même Pod partageant un volume emptyDir sur /var/log qui normalise la sortie)", "Le patron Adapter qui normalise et standardise la sortie de l'application principale dans le même Pod", "Un objet DaemonSet déployé uniquement sur les nœuds du Control Plane sans volume partagé", "Une règle NetworkPolicy filtrant les paquets TCP entrants sur le port de journalisation", "Un objet StorageClass provisionnant un disque réseau externe sans transformation du format", "Les 3 patrons multi-conteneurs CKAD : Sidecar (étend/envoie les logs), Adapter (normalise le format de sortie), Ambassador (proxyfie les connexions sortantes)."),
+            ("Sécurité Linux Capabilities", "Dans le manifeste d'un Pod pour le CKAD, un conteneur doit pouvoir modifier la configuration réseau locale (NET_ADMIN) tout en supprimant toutes les autres capacités Linux par défaut. Où définissez-vous capabilities ?", "À quel endroit exact du fichier YAML d'un Pod règles-tu les capacités Linux (capabilities : add / drop) ?", "Au niveau du conteneur : spec.containers[*].securityContext.capabilities (car capabilities n'existe pas au niveau du securityContext du Pod)", "Dans spec.containers[*].securityContext.capabilities (au niveau du conteneur uniquement)", "Au niveau de la définition du Service ClusterIP dans le champ spec.ports", "À l'intérieur des données clés-valeurs d'un objet ConfigMap attaché au namespace", "Dans les annotations de routage HTTP de la ressource Ingress exposant l'application", "Piège fréquent du CKAD : runAsUser et fsGroup peuvent être mis au niveau Pod, mais capabilities et allowPrivilegeEscalation se mettent uniquement au niveau du conteneur (spec.containers[].securityContext) !"),
+            ("CronJob Concurrency", "Vous avez un CronJob Kubernetes planifié toutes les 5 minutes (*/5 * * * *). Si l'exécution précédente n'est toujours pas terminée au bout de 5 minutes, vous souhaitez interdire le lancement d'une nouvelle exécution concurrente (sans tuer celle en cours).\nQuel paramètre configurez-vous ?", "Sur un CronJob Kubernetes, quel réglage empêche une nouvelle tâche de démarrer si la précédente n'a pas encore fini ?", "concurrencyPolicy: Forbid", "concurrencyPolicy: Forbid (ignore le nouveau cycle tant que le Job précédent tourne encore)", "concurrencyPolicy: Allow (autorise plusieurs Jobs à s'exécuter simultanément en parallèle)", "concurrencyPolicy: Replace (arrête immédiatement le Job en cours pour le remplacer par le nouveau)", "restartPolicy: Always (paramètre réservé aux Deployments et invalide dans la spécification d'un Job)", "Les 3 valeurs de concurrencyPolicy sur un CronJob : Allow (défaut), Forbid (attend la fin de l'actuel), Replace (annule l'actuel et lance le nouveau)."),
+            ("Gestionnaire de Paquets Helm", "Quelle commande Helm permet de revenir immédiatement à la révision 2 d'une release nommée payment-api dans le namespace prod suite à une mise à jour défectueuse ?", "Quelle commande Helm permet de revenir en arrière (rollback) à la version 2 de ton application payment-api ?", "helm rollback payment-api 2 -n prod", "helm rollback payment-api 2 -n prod pour restaurer immédiatement la révision 2", "helm template payment-api -n prod qui affiche uniquement le rendu YAML local sans modifier le cluster", "helm search repo payment-api qui interroge uniquement la liste des charts disponibles dans le dépôt", "helm show values payment-api qui affiche uniquement les valeurs par défaut du chart sans restaurer la release", "Commandes Helm essentielles au CKAD : helm list -A, helm install, helm upgrade, helm history <release>, helm rollback <release> <revision>."),
+            ("Déploiement Canary Natif", "Ordonnez les 3 étapes pour mettre en place un déploiement Canary (90 % / 10 %) avec les objets Kubernetes standards :", "Remets dans l'ordre les 3 étapes pour envoyer 10 % du trafic sur une nouvelle version Canary dans Kubernetes :", "1. Deployment stable app-v1 (9 réplicas, label app: web) -> 2. Deployment canary app-v2 (1 réplica, même label app: web) -> 3. Service selector: { app: web } répartissant sur les 10 Pods", "1. Garder 9 Pods v1 (app: web) -> 2. Lancer 1 Pod v2 avec le même label app: web -> 3. Laisser le Service répartir (1 sur 10 = 10 %)", "1. Créer deux Services ClusterIP distincts -> 2. Attacher un PersistentVolumeClaim -> 3. Redémarrer kube-proxy sur les nœuds", "1. Passer tous les Pods en HostNetwork -> 2. Désactiver les labels du Deployment -> 3. Configurer un CronJob de routage", "1. Appliquer un ResourceQuota sur le namespace -> 2. Créer un Secret TLS -> 3. Monter un ConfigMap en subPath", "Un Service Kubernetes répartit le trafic entre tous les Pods qui correspondent à son selector, quel que soit le Deployment qui les a créés."),
+            ("Mise à Jour ConfigMap", "Un Pod consomme un ConfigMap de deux façons : 1. Via des variables d'environnement (envFrom), et 2. Via un volume monté (volumeMounts). Si vous modifiez les valeurs dans le ConfigMap avec kubectl edit cm, que se passe-t-il sur le Pod en cours d'exécution ?", "Si tu modifies un ConfigMap pendant qu'un Pod tourne, est-ce que les fichiers montés en volume et les variables d'environnement se mettent à jour tout seuls ?", "Les fichiers montés en volume (hors subPath) sont mis à jour automatiquement après quelques secondes, mais les variables d'environnement ne sont jamais mises à jour sans redémarrer le Pod (kubectl rollout restart)", "Le volume se met à jour tout seul (sauf subPath), mais les variables d'environnement nécessitent de redémarrer le Pod", "Les variables d'environnement du processus Linux en cours changent instantanément sans aucun redémarrage du conteneur", "Les fichiers montés en volume restent figés définitivement tandis que seules les variables d'environnement sont rafraîchies", "Le contrôleur kube-scheduler recrée automatiquement un nouveau Service ClusterIP à chaque modification du ConfigMap", "Point classique CKAD : les variables d'environnement d'un processus Linux sont fixées au démarrage du conteneur ; seul un montage en volume (sans subPath) est rafraîchi par kubelet.")
         ]
     )
 
@@ -11555,12 +11935,12 @@ public enum CertiGoDedicatedTrackQuestionBank {
         ],
         stepPrefix: ["Audit CIS avec kube-bench", "Durcissement des flags kube-apiserver & kubelet", "Chiffrement des Secrets au repos dans etcd", "Politiques d'Audit Kubernetes (Audit Policy)", "Pod Security Standards (Privileged, Baseline, Restricted)", "Profils Seccomp (RuntimeDefault) & AppArmor", "Sandboxing de conteneurs avec gVisor (RuntimeClass)", "Admission dynamique avec OPA Gatekeeper (ConstraintTemplate)", "Sécurité des images : Trivy, SBOM SPDX & Digests SHA256", "Détection d'intrusion temps réel avec CNCF Falco"],
         baseQuestions: [
-            ("Pod Security Admission", "Comment imposer nativement dans Kubernetes que tous les Pods créés dans le namespace payments respectent le profil Pod Security Standards restricted (interdiction du root, de l'élévation de privilèges et obligation d'un profil seccomp) en rejetant tout Pod non conforme ?", "Quel label poses-tu sur le namespace payments pour que Kubernetes bloque automatiquement tout Pod qui ne respecte pas le niveau de sécurité maximal restricted ?", "Ajouter le label pod-security.kubernetes.io/enforce=restricted sur le namespace payments", "Poser le label pod-security.kubernetes.io/enforce=restricted sur le namespace", "Créer un Service NodePort", "Redémarrer CoreDNS", "Installer Helm", "Pod Security Admission utilise les 3 modes enforce (bloque), audit (journalise dans l'audit log) et warn (avertit l'utilisateur) avec les niveaux privileged, baseline et restricted."),
-            ("Détection Runtime Falco", "Un attaquant exploite une faille web et ouvre un shell /bin/sh interactif à l'intérieur d'un conteneur de production pour lire /etc/shadow.\nQuel outil CNCF de sécurité au niveau du noyau (eBPF / syscalls) détecte cette anomalie de comportement en temps réel et génère une alerte ?", "Quel outil de sécurité CNCF surveille en direct les appels au noyau Linux (syscalls / eBPF) pour t'alerter à la seconde où quelqu'un ouvre un terminal pirate dans un conteneur ?", "Falco (en inspectant les appels système execve / open via eBPF et les règles /etc/falco/falco_rules.local.yaml)", "CNCF Falco (détection d'intrusion runtime par surveillance des appels système eBPF)", "kube-scheduler", "etcdctl", "Kustomize", "À l'examen CKS, personnalise toujours les règles Falco dans /etc/falco/falco_rules.local.yaml (pour qu'elles ne soient pas écrasées) et redémarre le service falco."),
-            ("Chiffrement des Secrets dans etcd", "Par défaut, les objets Secret dans Kubernetes sont simplement encodés en Base64 et stockés en texte clair dans etcd.\nComment activer leur chiffrement AES-CBC au repos dans etcd puis re-chiffrer tous les Secrets existants ?", "Comment chiffrer réellement les Secrets dans la base etcd de Kubernetes (au lieu du simple encodage Base64) et mettre à jour les Secrets déjà existants ?", "Passer --encryption-provider-config=/etc/kubernetes/enc/enc.yaml (avec le provider aescbc placé avant identity) au manifeste de kube-apiserver, puis exécuter kubectl get secrets --all-namespaces -o json | kubectl replace -f -", "Configurer EncryptionConfiguration (aescbc en premier) sur kube-apiserver puis remplacer tous les Secrets existants", "Supprimer etcd", "Encoder deux fois en Base64", "Désactiver TLS", "Dans EncryptionConfiguration, le premier provider de la liste est utilisé pour chiffrer les nouvelles écritures dans etcd."),
-            ("Audit CIS Benchmark", "Quel outil open-source développé par Aqua Security vérifie automatiquement si les fichiers de configuration et les arguments des processus d'un cluster Kubernetes respectent les recommandations du CIS Kubernetes Benchmark ?", "Quel outil lance une vérification automatique de ton cluster Kubernetes contre le référentiel de sécurité CIS Benchmark ?", "kube-bench", "kube-bench (audit automatisé CIS Kubernetes Benchmark)", "kubectl top", "helm lint", "curl", "kube-bench inspecte les manifestes du Control Plane (/etc/kubernetes/manifests) et les permissions des fichiers (chmod 600 / 644) selon le CIS Benchmark."),
-            ("Niveaux de Journalisation Audit", "Ordonnez du moins verbeux au plus verbeux les 4 niveaux (level) d'une règle d'Audit Policy Kubernetes :", "Remets dans l'ordre du plus discret au plus détaillé les 4 niveaux d'audit de l'API Server Kubernetes :", "1. None (rien) -> 2. Metadata (qui/quand/quoi sans corps) -> 3. Request (métadonnées + corps requête) -> 4. RequestResponse (métadonnées + corps requête ET réponse)", "1. None -> 2. Metadata -> 3. Request -> 4. RequestResponse", "RequestResponse -> None", "Debug -> Trace", "Allow -> Deny", "Pour auditer les Secrets sans écrire leur valeur sensible en clair dans le fichier de log d'audit, utilise toujours le niveau Metadata (et jamais Request ni RequestResponse)."),
-            ("Isolation Noyau Sandbox", "Vous exécutez des conteneurs provenant de locataires externes non fiables. Pour éviter qu'une vulnérabilité du noyau Linux hôte ne permette une évasion de conteneur (Container Escape), vous souhaitez interposer un noyau utilisateur dédié (gVisor / runsc) ou une micro-VM (Kata Containers).\nQuel objet Kubernetes lie un Pod à ce moteur d'exécution isolé ?", "Quel objet Kubernetes permet de demander qu'un Pod sensible tourne dans un bac à sable renforcé comme gVisor (runsc) ou Kata Containers ?", "Une RuntimeClass référencée par spec.runtimeClassName dans le manifeste du Pod", "Une RuntimeClass (spec.runtimeClassName: gvisor)", "Un ConfigMap", "Un ServiceAccount", "Un IngressClass", "RuntimeClass sélectionne le handler CRI (runsc pour gVisor, kata pour Kata Containers) configuré dans /etc/containerd/config.toml.")
+            ("Pod Security Admission", "Comment imposer nativement dans Kubernetes que tous les Pods créés dans le namespace payments respectent le profil Pod Security Standards restricted (interdiction du root, de l'élévation de privilèges et obligation d'un profil seccomp) en rejetant tout Pod non conforme ?", "Quel label poses-tu sur le namespace payments pour que Kubernetes bloque automatiquement tout Pod qui ne respecte pas le niveau de sécurité maximal restricted ?", "Ajouter le label pod-security.kubernetes.io/enforce=restricted sur le namespace payments", "Poser le label pod-security.kubernetes.io/enforce=restricted sur le namespace payments", "Exposer les Pods du namespace via un Service de type NodePort sur tous les nœuds", "Modifier le fichier Corefile du serveur CoreDNS dans le namespace kube-system", "Créer un objet HorizontalPodAutoscaler ciblant l'utilisation CPU des Pods du namespace", "Pod Security Admission utilise les 3 modes enforce (bloque), audit (journalise dans l'audit log) et warn (avertit l'utilisateur) avec les niveaux privileged, baseline et restricted."),
+            ("Détection Runtime Falco", "Un attaquant exploite une faille web et ouvre un shell /bin/sh interactif à l'intérieur d'un conteneur de production pour lire /etc/shadow.\nQuel outil CNCF de sécurité au niveau du noyau (eBPF / syscalls) détecte cette anomalie de comportement en temps réel et génère une alerte ?", "Quel outil de sécurité CNCF surveille en direct les appels au noyau Linux (syscalls / eBPF) pour t'alerter à la seconde où quelqu'un ouvre un terminal pirate dans un conteneur ?", "Falco (en inspectant les appels système execve / open via eBPF et les règles /etc/falco/falco_rules.local.yaml)", "CNCF Falco (détection d'intrusion runtime par surveillance des appels système eBPF)", "kube-scheduler (composant du Control Plane chargé uniquement d'assigner les Pods aux nœuds)", "etcdctl (utilitaire en ligne de commande dédié aux sauvegardes snapshot de la base etcd)", "Kustomize (outil de personnalisation déclarative de manifestes YAML avant déploiement)", "À l'examen CKS, personnalise toujours les règles Falco dans /etc/falco/falco_rules.local.yaml (pour qu'elles ne soient pas écrasées) et redémarre le service falco."),
+            ("Chiffrement des Secrets dans etcd", "Par défaut, les objets Secret dans Kubernetes sont simplement encodés en Base64 et stockés en texte clair dans etcd.\nComment activer leur chiffrement AES-CBC au repos dans etcd puis re-chiffrer tous les Secrets existants ?", "Comment chiffrer réellement les Secrets dans la base etcd de Kubernetes (au lieu du simple encodage Base64) et mettre à jour les Secrets déjà existants ?", "Passer --encryption-provider-config=/etc/kubernetes/enc/enc.yaml (avec le provider aescbc placé avant identity) au manifeste de kube-apiserver, puis exécuter kubectl get secrets --all-namespaces -o json | kubectl replace -f -", "Configurer EncryptionConfiguration (aescbc en premier) sur kube-apiserver puis remplacer tous les Secrets existants", "Placer le provider identity en première position devant aescbc dans le fichier EncryptionConfiguration", "Encoder une seconde fois les valeurs des Secrets en Base64 dans les manifestes YAML applicatifs", "Monter les Secrets sous forme de variables d'environnement sans modifier la configuration de kube-apiserver", "Dans EncryptionConfiguration, le premier provider de la liste est utilisé pour chiffrer les nouvelles écritures dans etcd."),
+            ("Audit CIS Benchmark", "Quel outil open-source développé par Aqua Security vérifie automatiquement si les fichiers de configuration et les arguments des processus d'un cluster Kubernetes respectent les recommandations du CIS Kubernetes Benchmark ?", "Quel outil lance une vérification automatique de ton cluster Kubernetes contre le référentiel de sécurité CIS Benchmark ?", "kube-bench", "kube-bench (audit automatisé de conformité CIS Kubernetes Benchmark sur les nœuds)", "kubectl top nodes (affichage de la consommation instantanée de CPU et de mémoire des nœuds)", "helm lint (vérification syntaxique de la structure d'un chart Helm local avant empaquetage)", "kubectl explain pod.spec (consultation de la documentation des champs de l'API Kubernetes)", "kube-bench inspecte les manifestes du Control Plane (/etc/kubernetes/manifests) et les permissions des fichiers (chmod 600 / 644) selon le CIS Benchmark."),
+            ("Niveaux de Journalisation Audit", "Ordonnez du moins verbeux au plus verbeux les 4 niveaux (level) d'une règle d'Audit Policy Kubernetes :", "Remets dans l'ordre du plus discret au plus détaillé les 4 niveaux d'audit de l'API Server Kubernetes :", "1. None (rien) -> 2. Metadata (qui/quand/quoi sans corps) -> 3. Request (métadonnées + corps requête) -> 4. RequestResponse (métadonnées + corps requête ET réponse)", "1. None -> 2. Metadata -> 3. Request -> 4. RequestResponse (du moins détaillé au plus complet)", "1. RequestResponse -> 2. Request -> 3. Metadata -> 4. None (ordre inversé du plus verbeux au muet)", "1. Metadata -> 2. None -> 3. RequestResponse -> 4. Request (ordre non séquentiel des niveaux d'audit)", "1. Request -> 2. Metadata -> 3. None -> 4. RequestResponse (mélange des niveaux de journalisation)", "Pour auditer les Secrets sans écrire leur valeur sensible en clair dans le fichier de log d'audit, utilise toujours le niveau Metadata (et jamais Request ni RequestResponse)."),
+            ("Isolation Noyau Sandbox", "Vous exécutez des conteneurs provenant de locataires externes non fiables. Pour éviter qu'une vulnérabilité du noyau Linux hôte ne permette une évasion de conteneur (Container Escape), vous souhaitez interposer un noyau utilisateur dédié (gVisor / runsc) ou une micro-VM (Kata Containers).\nQuel objet Kubernetes lie un Pod à ce moteur d'exécution isolé ?", "Quel objet Kubernetes permet de demander qu'un Pod sensible tourne dans un bac à sable renforcé comme gVisor (runsc) ou Kata Containers ?", "Une RuntimeClass référencée par spec.runtimeClassName dans le manifeste du Pod", "Une RuntimeClass (spec.runtimeClassName: gvisor) pour isoler le conteneur dans un bac à sable dédié", "Un objet ConfigMap contenant uniquement des paires clé-valeur de configuration non sensibles", "Un objet ServiceAccount fournissant uniquement un jeton d'identité pour interroger l'API Kubernetes", "Un objet IngressClass sélectionnant uniquement le contrôleur de routage HTTP entrant du cluster", "RuntimeClass sélectionne le handler CRI (runsc pour gVisor, kata pour Kata Containers) configuré dans /etc/containerd/config.toml.")
         ]
     )
 }

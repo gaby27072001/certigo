@@ -1452,7 +1452,7 @@ public struct CertiGoFluidErrorFeedbackCardView: View {
 
     @ScaledMetric(relativeTo: .headline) private var scaledHeaderSize: CGFloat = FigMetrics.seventeen
     @ScaledMetric(relativeTo: .subheadline) private var scaledAnswerSize: CGFloat = FigMetrics.fourteen
-    @ScaledMetric(relativeTo: .footnote) private var scaledTakeawaySize: CGFloat = FigMetrics.thirteen
+    @ScaledMetric(relativeTo: .footnote) private var scaledTakeawaySize: CGFloat = FigMetrics.fifteen
 
     public init(
         isCorrect: Bool,
@@ -1514,25 +1514,29 @@ public struct CertiGoFluidErrorFeedbackCardView: View {
                 }
             }
 
-            if !isCorrect {
-                VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
-                    Text(verbatim: "✓ Bonne réponse : \(primaryCorrectTitle.strippingMarkdownAsterisks)")
-                        .font(PrismTypography.figmaFont(size: scaledAnswerSize, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#991b1b"))
-                        .fixedSize(horizontal: false, vertical: true)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                    if !isCorrect {
+                        Text(verbatim: "✓ Bonne réponse : \(primaryCorrectTitle.strippingMarkdownAsterisks)")
+                            .font(PrismTypography.figmaFont(size: scaledAnswerSize, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#991b1b"))
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(verbatim: isMasterStroke ? "⚡ +30 XP · < 8s" : "✓ +15 XP")
+                            .font(PrismTypography.figmaFont(size: scaledAnswerSize, style: "Semi Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#3f7d00"))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
 
                     Text(verbatim: takeawayDetail)
-                        .font(PrismTypography.figmaFont(size: scaledTakeawaySize, style: "Semi Bold"))
-                        .foregroundStyle(PrismColor.figmaHex("#7f1d1d"))
-                        .lineSpacing(2)
+                        .font(PrismTypography.figmaFont(size: scaledTakeawaySize, style: "Regular"))
+                        .foregroundStyle(PrismColor.figmaHex(isCorrect ? "#14532d" : "#7f1d1d"))
+                        .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            } else {
-                Text(verbatim: isMasterStroke ? "⚡ +30 XP · < 8s" : "✓ +15 XP")
-                    .font(PrismTypography.figmaFont(size: scaledAnswerSize, style: "Semi Bold"))
-                    .foregroundStyle(PrismColor.figmaHex("#3f7d00"))
-                    .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxHeight: FigMetrics.oneHundredSeventyFive)
 
             HStack(spacing: PrismSpacing.m) {
                 Button(action: onTapDeepenExplanation) {
