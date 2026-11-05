@@ -11788,42 +11788,6 @@ private struct CertiGoScaledStructuredPromptBodyView: View {
     }
 }
 
-extension View {
-    @ViewBuilder
-    fileprivate func applyiOS26LiquidGlassIfAvailable(
-        intensity: Double,
-        tintOpacity: Double = 0.22
-    ) -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, macOS 26.0, *), intensity > 0.01 {
-            self.glassEffect(
-                .regular.tint(Color.white.opacity(tintOpacity)).interactive(),
-                in: Capsule(style: .continuous)
-            )
-        } else {
-            self
-        }
-        #else
-        self
-        #endif
-    }
-
-    @ViewBuilder
-    fileprivate func wrapIniOS26GlassEffectContainerIfAvailable(intensity: Double) -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, macOS 26.0, *), intensity > 0.01 {
-            GlassEffectContainer(spacing: FigMetrics.twelve) {
-                self
-            }
-        } else {
-            self
-        }
-        #else
-        self
-        #endif
-    }
-}
-
 extension CertiGoTrueLiquidGlassDropletView: View {
     public var body: some View {
         let dropletRadius = Self.concentricCornerRadius
@@ -11933,7 +11897,6 @@ extension CertiGoTrueLiquidGlassDropletView: View {
                     .padding(FigMetrics.one)
             }
         }
-        .applyiOS26LiquidGlassIfAvailable(intensity: t, tintOpacity: tintOpacity)
         // 5. Ombre caustique harmonisée et modulée par l'intensité Liquid Glass
         .shadow(
             color: PrismColor.figmaHex("\(trackTheme.primaryHex):22").opacity(t),
@@ -12267,8 +12230,6 @@ public struct CertiGoNativeFigmaAppView: View {
     @State private var activeNodePulse: Bool = false
     @State private var voiceHaloPulse: Bool = false
     @State private var stepSheetDragOffset: CGFloat = 0
-    @State private var tabBarDragX: CGFloat? = nil
-    @Namespace private var bottomTabGlassNamespace
     @FocusState private var isAIInputFocused: Bool
 
     public init(
@@ -12283,11 +12244,12 @@ public struct CertiGoNativeFigmaAppView: View {
         self.preferenceStore = preferenceStore
     }
 
-    private var isModalSheetOrOverlayOpen: Bool {
-        appState.activeStepSheet != nil
+    private var isBottomTabBarHiddenByOverlayOrNavigation: Bool {
+        (appState.selectedTab == .moi && !profileNavPath.isEmpty)
+            || isAIInputFocused
+            || (appState.selectedTab == .hubIA && appState.isAIDrawerOpen06D)
+            || appState.activeStepSheet != nil
             || appState.showExamLaunchSheet22
-            || appState.showCoursePopover02
-            || appState.isPresentingGuidedAppTour
     }
 
     public var body: some View {
@@ -12318,17 +12280,10 @@ public struct CertiGoNativeFigmaAppView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea(edges: .bottom)
-
-            // Pinned Floating Bottom Tab Bar (5 Tabs: Parcours, Actus, ✦ IA, Social, Moi)
-            if !(appState.selectedTab == .moi && !profileNavPath.isEmpty)
-                && !isAIInputFocused
-                && !(appState.selectedTab == .hubIA && appState.isAIDrawerOpen06D)
-            {
-                floatingBottomTabBar
-                    .opacity(isModalSheetOrOverlayOpen ? 0.0 : 1.0)
-                    .allowsHitTesting(!isModalSheetOrOverlayOpen)
-                    .accessibilityHidden(isModalSheetOrOverlayOpen)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !isBottomTabBarHiddenByOverlayOrNavigation {
+                    floatingBottomTabBar
+                }
             }
 
             // Full-Screen Smooth Backdrop Dimmer (opacity-only, zero bottom edge border)
@@ -12563,19 +12518,7 @@ public struct CertiGoNativeFigmaAppView: View {
         }
     }
 
-    // MARK: - Pinned Floating Bottom Tab Bar (`CANVAS_BOTTOM_TAB_BAR` with Draggable Liquid Glass Pill)
-
-    private var orderedBottomTabs: [CertiGoNativeTab] {
-        [.parcours, .examens, .hubIA, .social, .moi]
-    }
-
-    private func hoveredBottomTab(forDragX dragX: CGFloat?, totalWidth: CGFloat) -> CertiGoNativeTab {
-        guard let dragX, totalWidth > 0 else { return appState.selectedTab }
-        let colWidth = totalWidth / 5.0
-        let rawIndex = Int((dragX / max(1, colWidth)).rounded(.down))
-        let clamped = min(max(rawIndex, 0), 4)
-        return orderedBottomTabs[clamped]
-    }
+    // MARK: - Pinned Floating Bottom Tab Bar (`CertiGoBottomTabBarView`)
 
     private func selectBottomTab(_ tab: CertiGoNativeTab) {
         CertiGoHapticsEngine.shared.playOptionSelection()
@@ -12599,255 +12542,19 @@ public struct CertiGoNativeFigmaAppView: View {
     }
 
     private var floatingBottomTabBar: some View {
-        let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: appState.activeRouteCode)
-        let glassIntensity = reduceTransparency ? 0 : appState.settingsLiquidGlassIntensityPercent
-        let t = reduceTransparency ? 0.0 : appState.liquidGlassIntensity
-        // Neutral translucent base: 0% -> 0.94 quasi-opaque sober surface; 100% -> 0.28 translucent neutral veil keeping crisp inactive tab contrast over green/blue cards
-        let tintOpacity = 0.94 - (0.66 * t)
-        let meniscusOpacity = 0.25 + (0.70 * t)
-        let shadowRadius = FigMetrics.eight + (FigMetrics.eight * CGFloat(t))
-        let shadowOpacity = 0.08 + (0.08 * t)
-        let morphSpring = bottomTabLensMorphAnimation
-
-        return GeometryReader { barGeo in
-            let innerWidth = max(FigMetrics.twoHundredEighty, barGeo.size.width - FigMetrics.six * 2)
-            let colWidth = innerWidth / 5.0
-            let pillWidth = max(FigMetrics.fiftyTwo, colWidth + FigMetrics.four)
-            let dropletHeight = FigMetrics.fortyEight
-            let isDragging = tabBarDragX != nil
-            let activeTab = hoveredBottomTab(forDragX: tabBarDragX, totalWidth: innerWidth)
-            let activeIndex = orderedBottomTabs.firstIndex(of: activeTab) ?? 0
-            let pillCenterX: CGFloat = {
-                if let dragX = tabBarDragX {
-                    let halfPill = colWidth * 0.5
-                    return min(max(dragX, halfPill), innerWidth - halfPill)
-                }
-                return (CGFloat(activeIndex) + 0.5) * colWidth
-            }()
-            let droplet = CertiGoTrueLiquidGlassDropletView(
-                trackTheme: trackTheme,
-                width: pillWidth,
-                height: dropletHeight,
-                isDragging: isDragging,
-                intensityPercent: glassIntensity
-            )
-
-            ZStack(alignment: .leading) {
-                // Layer 1 (Base): All tab icons and letters in high-contrast slate `#475569`
-                bottomBarItemsLayer(isHighlightedBlue: false, innerWidth: innerWidth)
-
-                // Layer 2: True iOS 26 Liquid Glass Morphing Lens (`matchedGeometryEffect` + draggable tracking)
-                if isDragging {
-                    droplet
-                        .matchedGeometryEffect(id: "activeBottomTabLens", in: bottomTabGlassNamespace)
-                        .position(x: FigMetrics.six + pillCenterX, y: FigMetrics.thirty)
-                        .animation(morphSpring, value: activeIndex)
-                        .animation(morphSpring, value: isDragging)
-                        .allowsHitTesting(false)
-                } else {
-                    HStack(spacing: .zero) {
-                        ForEach(orderedBottomTabs, id: \.self) { tab in
-                            ZStack {
-                                if tab == activeTab {
-                                    droplet
-                                        .matchedGeometryEffect(id: "activeBottomTabLens", in: bottomTabGlassNamespace)
-                                }
-                            }
-                            .frame(width: colWidth, height: FigMetrics.bottomBarCompactHeight)
-                        }
-                    }
-                    .padding(.horizontal, FigMetrics.six)
-                    .animation(morphSpring, value: activeTab)
-                    .allowsHitTesting(false)
-                }
-
-                // Layer 3 (Refracted Track-Colored Layer): Identical tab items in track dominant color (`trackTheme.primaryHex`), masked pixel-for-pixel by the Liquid Glass water droplet!
-                bottomBarItemsLayer(isHighlightedBlue: true, innerWidth: innerWidth)
-                    .mask(
-                        ZStack(alignment: .leading) {
-                            Color.clear
-                            Capsule(style: .continuous)
-                                .fill(Color.black)
-                                .frame(width: pillWidth, height: dropletHeight)
-                                .scaleEffect(
-                                    x: droplet.effectiveScaleX,
-                                    y: droplet.effectiveScaleY
-                                )
-                                .position(x: FigMetrics.six + pillCenterX, y: FigMetrics.thirty)
-                        }
-                    )
-                    .animation(morphSpring, value: activeIndex)
-                    .animation(morphSpring, value: isDragging)
-                    .allowsHitTesting(false)
-            }
-            .frame(height: FigMetrics.bottomBarCompactHeight)
-            .background(
-                ZStack {
-                    if glassIntensity == 0 {
-                        Capsule(style: .continuous)
-                            .fill(PrismColor.surface.opacity(0.96))
-                    } else {
-                        Capsule(style: .continuous)
-                            .fill(.ultraThinMaterial)
-                        Capsule(style: .continuous)
-                            .fill(Color.white.opacity(tintOpacity))
-                        // Top specular meniscus + bottom chromatic refraction rim connected to state.liquidGlassIntensity
-                        Capsule(style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    stops: [
-                                        .init(color: Color.white.opacity(0.82 * t), location: 0.0),
-                                        .init(color: Color.white.opacity(0.18 * t), location: 0.28),
-                                        .init(color: Color.clear, location: 0.62),
-                                        .init(color: PrismColor.figmaHex("\(trackTheme.ringHex):28").opacity(t), location: 1.0)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                    }
-                }
-                .applyiOS26LiquidGlassIfAvailable(intensity: t, tintOpacity: tintOpacity)
-                .shadow(
-                    color: Color.black.opacity(shadowOpacity),
-                    radius: shadowRadius,
-                    x: FigMetrics.zero,
-                    y: FigMetrics.four
-                )
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(meniscusOpacity),
-                                PrismColor.figmaHex("\(trackTheme.ringHex):32").opacity(t),
-                                PrismColor.figmaHex("#cbd5e1:85")
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: PrismBorder.standard
-                    )
-            )
-            .wrapIniOS26GlassEffectContainerIfAvailable(intensity: t)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 4)
-                    .onChanged { value in
-                        let localX = value.location.x - FigMetrics.six
-                        tabBarDragX = min(max(localX, 0), innerWidth)
-                    }
-                    .onEnded { value in
-                        let localX = value.location.x - FigMetrics.six
-                        let targetTab = hoveredBottomTab(forDragX: localX, totalWidth: innerWidth)
-                        withAnimation(morphSpring) {
-                            tabBarDragX = nil
-                            selectBottomTab(targetTab)
-                        }
-                    }
-            )
-        }
-        .frame(height: FigMetrics.bottomBarCompactHeight)
-        .padding(.horizontal, PrismSpacing.xl)
-        .padding(.bottom, FigMetrics.zero)
-        .offset(y: FigMetrics.bottomBarBottomOffset)
-    }
-
-    private func bottomBarItemsLayer(isHighlightedBlue: Bool, innerWidth: CGFloat) -> some View {
-        let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: appState.activeRouteCode)
-        return HStack(spacing: PrismSpacing.xs) {
-            tabBarItemButton(
-                tab: .parcours,
-                symbol: "safari.fill",
-                label: appState.tr("Parcours"),
-                isHighlightedBlue: isHighlightedBlue
-            )
-            tabBarItemButton(
-                tab: .actus,
-                symbol: "newspaper.fill",
-                label: CertiGoNativeTab.actus.localizedTabTitle(languageIndex: appState.settingsLanguageIndex),
-                isHighlightedBlue: isHighlightedBlue
-            )
-
-            // Center 3D AI Hub Orb Button (`✦` : Figma `57:372` White Circle with Multicolor AngularGradient Ring)
-            Button {
+        CertiGoBottomTabBarView(
+            selectedTab: appState.selectedTab,
+            liquidGlassIntensity: appState.liquidGlassIntensity,
+            languageIndex: appState.settingsLanguageIndex,
+            routeCode: appState.activeRouteCode,
+            onSelectTab: { tab in
                 withAnimation(bottomTabLensMorphAnimation) {
-                    selectBottomTab(.hubIA)
+                    selectBottomTab(tab)
                 }
-            } label: {
-                ZStack {
-                    Circle()
-                        .strokeBorder(
-                            AngularGradient(
-                                colors: [
-                                    PrismColor.figmaHex("#0078d4"),
-                                    PrismColor.figmaHex("#22c55e"),
-                                    PrismColor.figmaHex("#eab308"),
-                                    PrismColor.figmaHex("#ef4444"),
-                                    PrismColor.figmaHex("#8b5cf6"),
-                                    PrismColor.figmaHex("#0078d4")
-                                ],
-                                center: .center
-                            ),
-                            lineWidth: 4.0
-                        )
-                        .frame(width: FigMetrics.fortyFour, height: FigMetrics.fortyFour)
-                        .shadow(
-                            color: PrismColor.figmaHex("\(trackTheme.primaryHex):24"),
-                            radius: FigMetrics.eight,
-                            x: FigMetrics.zero,
-                            y: FigMetrics.three
-                        )
-
-                    Circle()
-                        .fill(PrismColor.surface)
-                        .frame(width: FigMetrics.thirtyFour, height: FigMetrics.thirtyFour)
-
-                    Text(verbatim: "✦")
-                        .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
-                        .foregroundStyle(PrismColor.figmaHex(trackTheme.primaryHex))
-                }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(isHighlightedBlue ? "native-tab-hub-ia-mask" : "native-tab-hub-ia")
-
-            tabBarItemButton(tab: .social, symbol: "trophy.fill", label: appState.tr("Social"), isHighlightedBlue: isHighlightedBlue)
-            tabBarItemButton(tab: .moi, symbol: "person.crop.circle.fill", label: appState.tr("Moi"), isHighlightedBlue: isHighlightedBlue)
-        }
-        .padding(.horizontal, FigMetrics.six)
-        .padding(.vertical, FigMetrics.six)
-    }
-
-    private func tabBarItemButton(
-        tab: CertiGoNativeTab,
-        symbol: String,
-        label: String,
-        isHighlightedBlue: Bool
-    ) -> some View {
-        let trackTheme = CertiGoTrackThemePalette.palette(forRouteCode: appState.activeRouteCode)
-        return Button {
-            withAnimation(bottomTabLensMorphAnimation) {
-                selectBottomTab(tab)
-            }
-        } label: {
-            VStack(spacing: PrismSpacing.xxs) {
-                Image(systemName: symbol)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
-                    .foregroundStyle(
-                        isHighlightedBlue ? PrismColor.figmaHex(trackTheme.primaryHex) : PrismColor.figmaHex("#475569")
-                    )
-                Text(verbatim: label)
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                    .foregroundStyle(
-                        isHighlightedBlue ? PrismColor.figmaHex(trackTheme.primaryHex) : PrismColor.figmaHex("#475569")
-                    )
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: FigMetrics.fortyEight)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(isHighlightedBlue ? "native-tab-\(tab.rawValue)-mask" : "native-tab-\(tab.rawValue)")
+        )
+        .padding(.horizontal, PrismSpacing.xl)
+        .padding(.bottom, FigMetrics.four)
     }
 
     // MARK: - TAB 1: Parcours (`01`) : Levitating Top Pills over Full-Bleed Orthogonal S-Curve Path
@@ -15359,6 +15066,35 @@ public struct CertiGoNativeFigmaAppView: View {
                                             .accessibilityIdentifier("settings28-liquid-glass-preset-\(preset)")
                                         }
                                     }
+
+                                    // Live interactive preview of the 5-button CertiGoBottomTabBarView reacting in real time to 0 % - 100 %
+                                    ZStack {
+                                        LinearGradient(
+                                            colors: [
+                                                PrismColor.figmaHex("#DBEAFE"),
+                                                PrismColor.figmaHex("#E0E7FF"),
+                                                PrismColor.figmaHex("#DCFCE7")
+                                            ],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: PrismRadius.l, style: .continuous))
+
+                                        CertiGoBottomTabBarView(
+                                            selectedTab: appState.selectedTab,
+                                            liquidGlassIntensity: appState.liquidGlassIntensity,
+                                            languageIndex: appState.settingsLanguageIndex,
+                                            routeCode: appState.activeRouteCode,
+                                            accessibilityPrefix: "settings28-preview-tab",
+                                            onSelectTab: { tab in
+                                                withAnimation(bottomTabLensMorphAnimation) {
+                                                    selectBottomTab(tab)
+                                                }
+                                            }
+                                        )
+                                        .padding(PrismSpacing.xs)
+                                    }
+                                    .accessibilityIdentifier("settings28-liquid-glass-live-preview")
                                 }
                                 .padding(PrismSpacing.m)
 

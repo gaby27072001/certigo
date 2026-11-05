@@ -318,6 +318,10 @@ public enum CertiGoMultilingualEngine {
             en: "Path", es: "Ruta", de: "Pfad", it: "Percorso", pt: "Percurso",
             ar: "المسار", ja: "コース", hi: "पथ", zhHans: "路径", ko: "학습 경로"
         ),
+        "Actus": .init(
+            en: "News", es: "Noticias", de: "Aktuelles", it: "Notizie", pt: "Notícias",
+            ar: "الأخبار", ja: "ニュース", hi: "समाचार", zhHans: "资讯", ko: "뉴스"
+        ),
         "Examens": .init(
             en: "Exams", es: "Exámenes", de: "Prüfungen", it: "Esami", pt: "Exames",
             ar: "الاختبارات", ja: "模擬試験", hi: "परीक्षाएं", zhHans: "模拟考试", ko: "모의고사"
