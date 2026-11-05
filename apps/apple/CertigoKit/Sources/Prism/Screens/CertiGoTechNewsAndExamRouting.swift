@@ -1264,14 +1264,7 @@ extension CertiGoNativeTab {
     }
 
     public func localizedTabTitle(languageIndex: Int) -> String {
-        let isEN = (languageIndex % 6) == 2
-        switch self {
-        case .parcours: return isEN ? "Path" : "Parcours"
-        case .examens: return isEN ? "News" : "Actus"
-        case .hubIA: return "✦ IA"
-        case .social: return "Social"
-        case .moi: return isEN ? "Me" : "Moi"
-        }
+        CertiGoMultilingualEngine.localizedTabTitle(self, lang: languageIndex)
     }
 }
 

@@ -1855,8 +1855,9 @@ struct CertiGoNativeFigmaAppTests {
         #expect(!figmaAppSource.contains("CertiGoOneTapSprintBarView("))
         #expect(!figmaAppSource.contains("CertiGoTopProgressiveVignetteView()"))
         #expect(figmaAppSource.contains("CertiGoTrueLiquidGlassDropletView("))
+        #expect(figmaAppSource.contains("CertiGoBottomTabBarView("))
         #expect(figmaAppSource.contains(".padding(.top, FigMetrics.sixtyEight)"))
-        #expect(figmaAppSource.contains(".offset(y: FigMetrics.bottomBarBottomOffset)"))
+        #expect(figmaAppSource.contains(".safeAreaInset(edge: .bottom, spacing: 0)"))
         #expect(figmaAppSource.contains("settings28-liquid-glass-slider"))
 
         let archiveScript = try String(
@@ -2696,11 +2697,16 @@ struct CertiGoNativeFigmaAppTests {
             encoding: .utf8
         )
 
-        #expect(figmaSource.contains("GlassEffectContainer"))
-        #expect(figmaSource.contains(".glassEffect("))
+        let bottomBarSource = try String(
+            contentsOf: repoRoot.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Screens/CertiGoBottomTabBarView.swift"),
+            encoding: .utf8
+        )
+
+        #expect(figmaSource.contains("CertiGoBottomTabBarView("))
+        #expect(figmaSource.contains("settings28-liquid-glass-live-preview"))
         #expect(!figmaSource.contains(".explainingError("))
         #expect(!figmaSource.contains(".comparingServices("))
-        #expect(figmaSource.contains("matchedGeometryEffect(id: \"activeBottomTabLens\", in: bottomTabGlassNamespace)"))
+        #expect(bottomBarSource.contains("matchedGeometryEffect(id: \"activeBottomTabLens\", in: activeTabLensNamespace)"))
         #expect(figmaSource.contains(".spring(response: responseSeconds, dampingFraction: dampingRatio)"))
         #expect(figmaSource.contains("✓ Bonne réponse"))
         #expect(figmaSource.contains("✕ Ta réponse"))
@@ -2720,5 +2726,125 @@ struct CertiGoNativeFigmaAppTests {
         #expect(actusSource.contains("Question rapide"))
         #expect(actusSource.contains("Ouvrir dans le Coach"))
         #expect(actusSource.contains("Impact sur l'examen"))
+    }
+
+    @Test("CertiGoBottomTabBarView: 5 mandatory buttons, SF Symbols, 12-language localization, monotonic Liquid Glass metrics, and 100% foreground opacity")
+    func bottomTabBarViewFiveButtonsMetricsAndFlatHierarchy() throws {
+        // 1. Verify exact 5 mandatory buttons and semantic aliases (.learn, .techNews, .hubIA, .league, .profile)
+        #expect(CertiGoNativeTab.learn == .parcours)
+        #expect(CertiGoNativeTab.techNews == .examens)
+        #expect(CertiGoNativeTab.actus == .examens)
+        #expect(CertiGoNativeTab.league == .social)
+        #expect(CertiGoNativeTab.profile == .moi)
+        #expect(CertiGoBottomTabItemSpec.orderedTabs == [.learn, .techNews, .hubIA, .league, .profile])
+        #expect(CertiGoBottomTabItemSpec.orderedTabs.count == 5)
+
+        let defaultItems = CertiGoBottomTabItemSpec.allItems(languageIndex: 0)
+        #expect(defaultItems.count == 5)
+        #expect(defaultItems.map(\.tab) == [.parcours, .examens, .hubIA, .social, .moi])
+        #expect(defaultItems.map(\.title) == ["Parcours", "Actus", "✦ IA", "Social", "Moi"])
+        #expect(defaultItems.map(\.selectedSymbol) == [
+            "map.fill",
+            "newspaper.fill",
+            "sparkles",
+            "person.2.fill",
+            "person.crop.circle.fill"
+        ])
+        #expect(defaultItems.map(\.unselectedSymbol) == [
+            "map",
+            "newspaper",
+            "sparkles",
+            "person.2",
+            "person.crop.circle"
+        ])
+        #expect(defaultItems.map(\.accessibilityIdentifier) == [
+            "native-tab-parcours",
+            "native-tab-examens",
+            "native-tab-hub-ia",
+            "native-tab-social",
+            "native-tab-moi"
+        ])
+
+        for item in defaultItems {
+            #expect(item.symbolName(isSelected: true) == item.selectedSymbol)
+            #expect(item.symbolName(isSelected: false) == item.unselectedSymbol)
+            #expect(item.iconOpacity == 1.0)
+            #expect(item.titleOpacity == 1.0)
+        }
+
+        // 2. Verify localized non-empty titles and 100% button visibility across all 12 language modes
+        for langIndex in 0..<CertiGoSupportedLanguage.allCases.count {
+            let localizedItems = CertiGoBottomTabItemSpec.allItems(languageIndex: langIndex)
+            #expect(localizedItems.count == 5)
+            for item in localizedItems {
+                #expect(!item.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                #expect(!item.selectedSymbol.isEmpty)
+                #expect(!item.unselectedSymbol.isEmpty)
+                #expect(item.iconOpacity == 1.0)
+                #expect(item.titleOpacity == 1.0)
+            }
+        }
+        let enItems = CertiGoBottomTabItemSpec.allItems(languageIndex: 2)
+        #expect(enItems.map(\.title) == ["Path", "News", "✦ AI", "Social", "Me"])
+
+        // 3. Verify CertiGoBottomTabBarStyleMetrics monotonic variation and 100% foreground opacity invariant
+        let metrics0 = CertiGoBottomTabBarStyleMetrics(liquidGlassIntensity: 0.0)
+        let metrics25 = CertiGoBottomTabBarStyleMetrics(liquidGlassIntensity: 0.25)
+        let metrics50 = CertiGoBottomTabBarStyleMetrics(liquidGlassIntensity: 0.50)
+        let metrics75 = CertiGoBottomTabBarStyleMetrics(liquidGlassIntensity: 0.75)
+        let metrics100 = CertiGoBottomTabBarStyleMetrics(liquidGlassIntensity: 1.0)
+
+        #expect(abs(metrics0.surfaceWhiteOpacity - 0.96) < 0.0001)
+        #expect(abs(metrics100.surfaceWhiteOpacity - 0.58) < 0.0001)
+        #expect(metrics0.surfaceWhiteOpacity > metrics25.surfaceWhiteOpacity)
+        #expect(metrics25.surfaceWhiteOpacity > metrics50.surfaceWhiteOpacity)
+        #expect(metrics50.surfaceWhiteOpacity > metrics75.surfaceWhiteOpacity)
+        #expect(metrics75.surfaceWhiteOpacity > metrics100.surfaceWhiteOpacity)
+
+        #expect(metrics0.specularBorderOpacity < metrics25.specularBorderOpacity)
+        #expect(metrics25.specularBorderOpacity < metrics50.specularBorderOpacity)
+        #expect(metrics50.specularBorderOpacity < metrics75.specularBorderOpacity)
+        #expect(metrics75.specularBorderOpacity < metrics100.specularBorderOpacity)
+
+        #expect(metrics0.prismGlowOpacity < metrics50.prismGlowOpacity)
+        #expect(metrics50.prismGlowOpacity < metrics100.prismGlowOpacity)
+        #expect(metrics0.dropShadowOpacity < metrics50.dropShadowOpacity)
+        #expect(metrics50.dropShadowOpacity < metrics100.dropShadowOpacity)
+        #expect(metrics0.activeLensFillOpacity > metrics100.activeLensFillOpacity)
+
+        for sample in [metrics0, metrics25, metrics50, metrics75, metrics100] {
+            #expect(sample.buttonCount == 5)
+            #expect(sample.iconOpacity == 1.0)
+            #expect(sample.titleOpacity == 1.0)
+        }
+
+        // Verify clamping and reduceTransparency fallback
+        let clampedLow = CertiGoBottomTabBarStyleMetrics(liquidGlassIntensity: -0.4)
+        let clampedHigh = CertiGoBottomTabBarStyleMetrics(liquidGlassIntensity: 1.8)
+        let reduced = CertiGoBottomTabBarStyleMetrics(liquidGlassIntensity: 0.85, reduceTransparency: true)
+        #expect(clampedLow.liquidGlassIntensity == 0.0)
+        #expect(clampedHigh.liquidGlassIntensity == 1.0)
+        #expect(reduced.liquidGlassIntensity == 0.0)
+        #expect(abs(reduced.surfaceWhiteOpacity - 0.96) < 0.0001)
+
+        // 4. Verify flat SwiftUI structure in CertiGoBottomTabBarView.swift (no GlassEffectContainer, no GeometryReader)
+        var repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: repoRoot.appendingPathComponent("AGENTS.md").path) {
+            let parent = repoRoot.deletingLastPathComponent()
+            guard parent != repoRoot else { throw CocoaError(.fileNoSuchFile) }
+            repoRoot = parent
+        }
+        let bottomBarSource = try String(
+            contentsOf: repoRoot.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism/Screens/CertiGoBottomTabBarView.swift"),
+            encoding: .utf8
+        )
+        #expect(bottomBarSource.contains("HStack(spacing: FigMetrics.four)"))
+        #expect(bottomBarSource.contains("minHeight: CertiGoBottomTabBarStyleMetrics.fixedBarHeight"))
+        #expect(bottomBarSource.contains("maxHeight: CertiGoBottomTabBarStyleMetrics.fixedBarHeight"))
+        #expect(bottomBarSource.contains("liquidGlassDockBackground"))
+        #expect(bottomBarSource.contains("liquidGlassSpecularRim"))
+        #expect(!bottomBarSource.contains("GlassEffectContainer("))
+        #expect(!bottomBarSource.contains(".glassEffect("))
+        #expect(!bottomBarSource.contains("GeometryReader"))
     }
 }
