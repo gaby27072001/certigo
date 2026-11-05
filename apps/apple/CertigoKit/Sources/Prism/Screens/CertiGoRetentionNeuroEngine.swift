@@ -1494,6 +1494,12 @@ public struct CertiGoFluidErrorFeedbackCardView: View {
 
         VStack(alignment: .leading, spacing: PrismSpacing.s) {
             HStack(spacing: PrismSpacing.xs) {
+                Image(systemName: isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .font(PrismTypography.figmaFont(size: scaledHeaderSize, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex(titleHex))
+                    .certiGoSymbolBounce(trigger: isCorrect)
+                    .certiGoSymbolWiggle(trigger: !isCorrect)
+
                 Text(verbatim: isCorrect ? "✓  Exact !" : "✕  À retenir")
                     .font(PrismTypography.figmaFont(size: scaledHeaderSize, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex(titleHex))

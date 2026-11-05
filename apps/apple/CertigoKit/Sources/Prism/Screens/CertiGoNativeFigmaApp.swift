@@ -9181,6 +9181,8 @@ public struct CertiGoNativeAppState: Equatable, Sendable {
     public var showCoursePopover02: Bool = false
     public var isPresentingExamCenterModule: Bool = false
     public var techNewsState: CertiGoTechNewsRuntimeState = CertiGoTechNewsRuntimeState()
+    public var sharedIntelligenceContext: CertiGoSharedIntelligenceContext = CertiGoSharedIntelligenceContext()
+    public var lockedNodeWiggleTrigger: Int = 0
     public var activeStepSheet: CertiGoStepSheetMode?
     public var activeGamificationSheet: CertiGoGamificationSheetKind? = nil
     public var showExamLaunchSheet22: Bool = false
@@ -12731,11 +12733,17 @@ public struct CertiGoNativeFigmaAppView: View {
                     Button {
                         appState.activeGamificationSheet = .streak
                     } label: {
-                        Text(verbatim: "🔥 \(appState.streakDays)")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#ea580c"))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
+                        HStack(spacing: FigMetrics.two) {
+                            Image(systemName: "flame.fill")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#ea580c"))
+                                .certiGoSymbolBounce(trigger: appState.streakDays)
+                            Text(verbatim: "🔥 \(appState.streakDays)")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#ea580c"))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("parcours-pill-streak")
@@ -12743,11 +12751,17 @@ public struct CertiGoNativeFigmaAppView: View {
                     Button {
                         appState.activeGamificationSheet = .gems
                     } label: {
-                        Text(verbatim: "💎 \(appState.gemsCount)")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#0284c7"))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
+                        HStack(spacing: FigMetrics.two) {
+                            Image(systemName: "diamond.fill")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#0284c7"))
+                                .certiGoSymbolBounce(trigger: appState.gemsCount)
+                            Text(verbatim: "💎 \(appState.gemsCount)")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#0284c7"))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("parcours-pill-gems")
@@ -12996,6 +13010,9 @@ public struct CertiGoNativeFigmaAppView: View {
 
                     Button {
                         withAnimation(CertiGoMotion.spring(for: .anim02ApplePayBottomSheet, reduceMotion: reduceMotion)) {
+                            if lesson.state == .locked {
+                                appState.lockedNodeWiggleTrigger += 1
+                            }
                             appState.openStepPreviewSheet(forLessonId: lesson.id)
                         }
                     } label: {
@@ -13045,6 +13062,7 @@ public struct CertiGoNativeFigmaAppView: View {
                             Image(systemName: "lock.fill")
                                 .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
                                 .foregroundStyle(PrismColor.onAccent)
+                                .certiGoSymbolWiggle(trigger: appState.lockedNodeWiggleTrigger)
                                 .frame(width: FigMetrics.twentySix, height: FigMetrics.twentySix)
                                 .background(
                                     Circle()
@@ -13117,6 +13135,7 @@ public struct CertiGoNativeFigmaAppView: View {
                         Image(systemName: "lock.fill")
                             .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#475569"))
+                            .certiGoSymbolWiggle(trigger: appState.lockedNodeWiggleTrigger)
                     }
                     Text(verbatim: lesson.title)
                         .font(PrismTypography.figmaFont(size: FigMetrics.fifteenOrSixteen, style: "Bold"))
@@ -13136,6 +13155,7 @@ public struct CertiGoNativeFigmaAppView: View {
                         Image(systemName: "lock.fill")
                             .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#475569"))
+                            .certiGoSymbolWiggle(trigger: appState.lockedNodeWiggleTrigger)
                     }
                 }
                 .frame(
@@ -13289,6 +13309,7 @@ public struct CertiGoNativeFigmaAppView: View {
                             } label: {
                                 HStack(spacing: PrismSpacing.m) {
                                     CertiGoOfficialCrestView(routeCode: item.code, size: FigMetrics.fortyFour)
+                                        .certiGoHolographicBadgeEffect(isUnlocked: true, showSparklesBadge: isActive)
 
                                     VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
                                         HStack(spacing: PrismSpacing.xs) {
@@ -13600,6 +13621,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                         Image(systemName: "lock.fill")
                                             .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
                                             .foregroundStyle(PrismColor.figmaHex("#94a3b8"))
+                                            .certiGoSymbolWiggle(trigger: appState.lockedNodeWiggleTrigger)
                                     }
                                 }
                                 .padding(FigMetrics.fourteen)
@@ -14603,6 +14625,7 @@ public struct CertiGoNativeFigmaAppView: View {
                                     } label: {
                                         HStack(spacing: PrismSpacing.m) {
                                             CertiGoOfficialCrestView(routeCode: code, size: FigMetrics.fortyEight)
+                                                .certiGoHolographicBadgeEffect(isUnlocked: true, showSparklesBadge: pct >= 50)
                                             VStack(alignment: .leading, spacing: PrismSpacing.xxs) {
                                                 // Dedicated line for the certification code + explicit scope (`Parcours AZ-900` & `Unité 1`)
                                                 HStack(spacing: PrismSpacing.xs) {
@@ -15034,6 +15057,7 @@ public struct CertiGoNativeFigmaAppView: View {
                     VStack(spacing: PrismSpacing.l) {
                         VStack(spacing: PrismSpacing.s) {
                             CertiGoOfficialCrestView(routeCode: code, size: PrismSize.crestHero)
+                                .certiGoHolographicBadgeEffect(isUnlocked: true, showSparklesBadge: true)
                             Text(verbatim: detail.title)
                                 .font(PrismTypography.figmaFont(size: FigMetrics.twenty, style: "Bold"))
                                 .foregroundStyle(PrismColor.figmaHex("#0f172a"))
@@ -17861,9 +17885,10 @@ public struct CertiGoNativeFigmaAppView: View {
                             .fill(PrismColor.surface)
                             .frame(width: FigMetrics.fiftySix, height: FigMetrics.fiftySix)
 
-                        Text(verbatim: "✦")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Bold"))
+                        Image(systemName: "sparkles")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                            .certiGoSymbolBreathe(isActive: true)
                     }
 
                     Text(verbatim: "CertiGo AI")
@@ -17984,6 +18009,10 @@ public struct CertiGoNativeFigmaAppView: View {
 
                         if turn.isStreamingOrLoading {
                             HStack(spacing: PrismSpacing.s) {
+                                Image(systemName: "sparkles")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#0078d4"))
+                                    .certiGoSymbolBreathe(isActive: true)
                                 ProgressView()
                                     .controlSize(.small)
                                 Text(verbatim: "✦ CertiGo AI réfléchit...")
@@ -20133,15 +20162,28 @@ public struct CertiGoNativeLessonSessionModalView: View {
 
                 VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                     if let status = statusStateBadge {
-                        Text(verbatim: status.text)
-                            .font(PrismTypography.figmaFont(size: scaledOptionSubtitleSize, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex(status.fgHex))
-                            .padding(.horizontal, PrismSpacing.s)
-                            .padding(.vertical, FigMetrics.two)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(PrismColor.figmaHex(status.bgHex))
-                            )
+                        HStack(spacing: FigMetrics.four) {
+                            if opt.isCorrect {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(PrismTypography.figmaFont(size: scaledOptionSubtitleSize, style: "Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex(status.fgHex))
+                                    .certiGoSymbolBounce(trigger: isCheckedPhase)
+                            } else {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(PrismTypography.figmaFont(size: scaledOptionSubtitleSize, style: "Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex(status.fgHex))
+                                    .certiGoSymbolWiggle(trigger: isCheckedPhase)
+                            }
+                            Text(verbatim: status.text)
+                                .font(PrismTypography.figmaFont(size: scaledOptionSubtitleSize, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex(status.fgHex))
+                        }
+                        .padding(.horizontal, PrismSpacing.s)
+                        .padding(.vertical, FigMetrics.two)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(PrismColor.figmaHex(status.bgHex))
+                        )
                     }
 
                     Text(verbatim: isSimple ? opt.plainLanguageTitle : opt.title)
