@@ -130,20 +130,52 @@ public enum CertiGoOfficialAssetCatalog {
             return "Certifications/tech-terraform-associate"
         case "VAULT":
             return "Certifications/tech-vault-associate"
-        case "CCA-F", "CLAUDE", "ANTHROPIC-CLAUDE":
+        case "CCA-F", "CLAUDE", "ANTHROPIC-CLAUDE", "AI-ANTHROPIC", "AI-CLAUDE", "TRACK-ANTHROPIC-CLAUDE", "CLAUDE-CODE-MCP", "VEILLE-ANTHROPIC":
             return "Certifications/tech-anthropic-cca-foundations"
-        case "MS-365-COPILOT", "M365-COPILOT":
+        case "MS-365-COPILOT", "M365-COPILOT", "TRACK-MS-365-COPILOT", "COPILOT-M365":
             return "BrandLogos/brand-m365-copilot"
-        case "OPENAI-PRO":
+        case "AI-FOUNDRY":
+            return "Certifications/tech-github-copilot"
+        case "OPENAI-PRO", "AI-OPENAI", "TRACK-OPENAI-PRO", "CHATGPT-PRO", "OPENAI-CODEX", "VEILLE-OPENAI":
             return "BrandLogos/brand-openai"
-        case "HARVEY-LEGAL", "HARVEY":
+        case "HARVEY-LEGAL", "HARVEY", "TRACK-HARVEY-LEGAL", "HARVEY-AI", "HARVEY-ACADEMY":
             return "BrandLogos/brand-harvey"
+        case "AI-GEMINI", "GEMINI", "GOOGLE-GEMINI":
+            return "Certifications/tech-gcp-ml-engineer"
+        case "AI-MISTRAL", "MISTRAL":
+            return "BrandLogos/brand-mistral-ai"
+        case "AI-FRONTIER":
+            return "BrandLogos/brand-claude-ai"
         default:
-            if upper.hasPrefix("AWS") {
+            if upper.contains("ANTHROPIC") || upper.contains("CLAUDE") || upper.contains("CCA") {
+                return "Certifications/tech-anthropic-cca-foundations"
+            }
+            if upper.contains("OPENAI") || upper.contains("CHATGPT") || upper.contains("CODEX") {
+                return "BrandLogos/brand-openai"
+            }
+            if upper.contains("HARVEY") {
+                return "BrandLogos/brand-harvey"
+            }
+            if upper.hasPrefix("AWS") || ["CLF", "SAA", "DVA", "SAP", "SOA", "AIF"].contains(where: { upper.hasPrefix($0) }) {
                 return "Certifications/tech-aws-solutions-architect"
             }
-            if upper.hasPrefix("GCP") {
+            if upper.hasPrefix("GCP") || upper.contains("GOOGLE") || upper.contains("GEMINI") {
                 return "Certifications/tech-gcp-cloud-engineer"
+            }
+            if upper.hasPrefix("GH-") || upper.contains("GITHUB") {
+                return "Certifications/tech-github-copilot"
+            }
+            if upper.contains("CKA") || upper.contains("CKS") || upper.contains("K8S") || upper.contains("KUBERNETES") {
+                return "Certifications/tech-cka"
+            }
+            if upper.contains("TERRAFORM") || upper.hasPrefix("TF-") || upper.contains("HASHICORP") {
+                return "Certifications/tech-terraform-associate"
+            }
+            if upper.contains("CISCO") || upper.contains("CCNA") {
+                return "Certifications/tech-cisco-ccna"
+            }
+            if upper.contains("MISTRAL") {
+                return "BrandLogos/brand-mistral-ai"
             }
             return "Certifications/ms-official-associate-badge"
         }
@@ -151,11 +183,11 @@ public enum CertiGoOfficialAssetCatalog {
 
     public static func brandLogoAssetName(forVendorId vendorId: String) -> String {
         let normalized = vendorId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if normalized.contains("kubernetes") || normalized.contains("cncf") || normalized == "k8s" {
+        if normalized.contains("kubernetes") || normalized.contains("cncf") || normalized == "k8s" || ["cka", "ckad", "cks"].contains(normalized) {
             return "BrandLogos/brand-kubernetes"
         }
         switch normalized {
-        case "aws", "amazon":
+        case "aws", "amazon", "clf-c02", "saa-c03", "aif-c01", "dva-c02", "sap-c02":
             return "BrandLogos/brand-aws-official"
         case "microsoft":
             return "BrandLogos/brand-microsoft"
@@ -177,13 +209,13 @@ public enum CertiGoOfficialAssetCatalog {
             return "BrandLogos/brand-copilot-studio"
         case "azure":
             return "BrandLogos/brand-microsoft-azure"
-        case "gcp", "google", "google-cloud":
+        case "gcp", "google", "google-cloud", "ace", "pca", "pde":
             return "BrandLogos/brand-google-cloud"
-        case "github":
+        case "github", "gh-900", "gh-as":
             return "BrandLogos/brand-github"
-        case "copilot", "github-copilot":
+        case "copilot", "github-copilot", "gh-300", "ai-foundry":
             return "BrandLogos/brand-github-copilot"
-        case "openai", "chatgpt":
+        case "openai", "chatgpt", "openai-pro", "ai-openai":
             return "BrandLogos/brand-openai"
         case "openai-codex", "codex":
             return "BrandLogos/brand-openai-codex"
@@ -191,7 +223,7 @@ public enum CertiGoOfficialAssetCatalog {
             return "BrandLogos/brand-openai-o3"
         case "openai-agents", "responses-api":
             return "BrandLogos/brand-openai-agents"
-        case "claude", "anthropic":
+        case "claude", "anthropic", "anthropic-claude", "cca-f", "ai-anthropic", "ai-claude":
             return "BrandLogos/brand-claude-ai"
         case "claude-code":
             return "BrandLogos/brand-claude-code"
@@ -207,9 +239,9 @@ public enum CertiGoOfficialAssetCatalog {
             return "BrandLogos/brand-harvey-vault"
         case "harvey-knowledge":
             return "BrandLogos/brand-harvey-knowledge"
-        case "gemini", "google-gemini":
+        case "gemini", "google-gemini", "ai-gemini":
             return "BrandLogos/brand-google-gemini"
-        case "mistral":
+        case "mistral", "ai-mistral":
             return "BrandLogos/brand-mistral-ai"
         case "meta", "llama":
             return "BrandLogos/brand-meta"
@@ -219,9 +251,9 @@ public enum CertiGoOfficialAssetCatalog {
             return "BrandLogos/brand-nvidia"
         case "cncf", "kubernetes", "k8s":
             return "BrandLogos/brand-kubernetes"
-        case "terraform", "hashicorp":
+        case "terraform", "hashicorp", "tf-003":
             return "BrandLogos/brand-terraform"
-        case "cisco":
+        case "cisco", "ccna":
             return "BrandLogos/brand-cisco"
         case "docker":
             return "BrandLogos/brand-docker"
@@ -276,6 +308,10 @@ public struct CertiGoTrackThemePalette: Codable, Equatable, Hashable, Sendable {
             return .init(primaryHex: "#24292f", lipHex: "#0d1117", softHex: "#f3f4f6", ringHex: "#8b5cf6")
         case "CKA", "CKAD", "CKS":
             return .init(primaryHex: "#2563eb", lipHex: "#1d4ed8", softHex: "#eff6ff", ringHex: "#60a5fa")
+        case "TF-003", "TERRAFORM":
+            return .init(primaryHex: "#7b42bc", lipHex: "#5b21b6", softHex: "#f5f3ff", ringHex: "#a78bfa")
+        case "CCNA", "CISCO":
+            return .init(primaryHex: "#049fd9", lipHex: "#0284c7", softHex: "#f0f9ff", ringHex: "#38bdf8")
         case "ACE", "PCA", "PDE", "AI-GEMINI":
             return .init(primaryHex: "#1a73e8", lipHex: "#1557b0", softHex: "#eff6ff", ringHex: "#60a5fa")
         default:

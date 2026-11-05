@@ -2847,4 +2847,94 @@ struct CertiGoNativeFigmaAppTests {
         #expect(!bottomBarSource.contains(".glassEffect("))
         #expect(!bottomBarSource.contains("GeometryReader"))
     }
+
+    @Test("33 Certifications Badges/Logos/Metadata Audit, Symmetric CoursePopover02 (16pt/16pt), Clickable Unit Banner, 3D Lock Stamps & Purified Apple HIG Unit Guide")
+    func all33CertificationsBadgesMetadataCoursePopoverUnitBannerLocksAndUnitGuideAudit() throws {
+        let microsoftCodes: Set<String> = [
+            "AZ-900", "AZ-104", "AZ-305", "AZ-400",
+            "AI-900", "AI-102", "DP-900", "DP-100",
+            "SC-900", "SC-200", "SC-300", "MS-365-COPILOT"
+        ]
+        let all33Codes = CertiGoDedicatedTrackQuestionBank.allSupportedRouteCodes
+        #expect(all33Codes.count == 33)
+        #expect(CertiGoNativeRichCatalog.allOnboardingCatalogItems.count == 33)
+        #expect(Set(CertiGoNativeRichCatalog.allOnboardingCatalogItems.map(\.code)) == Set(all33Codes))
+
+        // 1. Verify strict badge/logo/vendor isolation across all 33 certifications + AI Frontier / Veille codes
+        let extraWatchCodes = ["AI-ANTHROPIC", "AI-OPENAI", "AI-GEMINI", "AI-MISTRAL", "VEILLE-ANTHROPIC", "VEILLE-OPENAI"]
+        for code in all33Codes + extraWatchCodes {
+            let crestAsset = CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: code)
+            let liveCurriculum = CertiGoLiveTrackCurriculum.curriculum(forRouteCode: code)
+            let brandLogo = CertiGoOfficialAssetCatalog.brandLogoAssetName(forVendorId: liveCurriculum.vendorId)
+
+            if microsoftCodes.contains(code) {
+                #expect(liveCurriculum.vendorId == "microsoft")
+                #expect(
+                    crestAsset.hasPrefix("Certifications/ms-official-") || crestAsset == "BrandLogos/brand-m365-copilot",
+                    "Unexpected Microsoft badge \(crestAsset) for \(code)"
+                )
+            } else {
+                // Non-Microsoft tracks MUST NEVER use a Microsoft badge or Microsoft vendorId
+                #expect(
+                    !crestAsset.contains("ms-official-"),
+                    "Non-Microsoft track \(code) resolved to Microsoft badge \(crestAsset)"
+                )
+                #expect(
+                    !crestAsset.lowercased().contains("microsoft"),
+                    "Non-Microsoft track \(code) resolved to Microsoft asset \(crestAsset)"
+                )
+                #expect(
+                    liveCurriculum.vendorId != "microsoft",
+                    "Non-Microsoft track \(code) resolved to vendorId 'microsoft'"
+                )
+                #expect(
+                    !brandLogo.contains("brand-microsoft"),
+                    "Non-Microsoft track \(code) resolved to Microsoft brand logo \(brandLogo)"
+                )
+                #expect(
+                    !liveCurriculum.unitBannerTitle.contains("Entra ID"),
+                    "Non-Microsoft track \(code) fell back to Azure Entra ID unitBannerTitle"
+                )
+            }
+        }
+
+        // Specific vendor checks for Anthropic ("Veille Anthropic" / ANTHROPIC-CLAUDE / CCA-F), OpenAI, Harvey, Terraform, Cisco, Kubernetes
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "ANTHROPIC-CLAUDE") == "Certifications/tech-anthropic-cca-foundations")
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "CCA-F") == "Certifications/tech-anthropic-cca-foundations")
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "AI-ANTHROPIC") == "Certifications/tech-anthropic-cca-foundations")
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "OPENAI-PRO") == "BrandLogos/brand-openai")
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "AI-OPENAI") == "BrandLogos/brand-openai")
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "HARVEY-LEGAL") == "BrandLogos/brand-harvey")
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "AI-GEMINI") == "Certifications/tech-gcp-ml-engineer")
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "TF-003") == "Certifications/tech-terraform-associate")
+        #expect(CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: "CCNA") == "Certifications/tech-cisco-ccna")
+
+        // Verify CoursePopover02 vendor tabs & per-vendor items never mix Microsoft badges into non-Microsoft vendors
+        #expect(CertiGoNativeAppState.coursePopoverHorizontalMarginLeft == 16)
+        #expect(CertiGoNativeAppState.coursePopoverHorizontalMarginRight == 16)
+        #expect(CertiGoNativeAppState.coursePopoverHorizontalMarginLeft == CertiGoNativeAppState.coursePopoverHorizontalMarginRight)
+        #expect(CertiGoNativeAppState.coursePopoverUsesFullSymmetricWidth == true)
+        #expect(CertiGoNativeAppState.coursePopoverVendorTabs.map(\.id) == [
+            "microsoft", "github", "aws", "google", "openai", "anthropic", "harvey", "kubernetes", "terraform", "cisco"
+        ])
+
+        for vendor in CertiGoNativeAppState.coursePopoverVendorTabs where vendor.id != "microsoft" {
+            let items = CertiGoNativeRichCatalog.coursePopoverItems(forVendor: vendor.id)
+            #expect(!items.isEmpty, "Empty popover items for vendor \(vendor.id)")
+            for item in items {
+                #expect(item.vendorId == vendor.id)
+                let crest = CertiGoOfficialAssetCatalog.certificationAssetName(forRouteCode: item.code)
+                #expect(!crest.contains("ms-official-"), "Vendor \(vendor.id) item \(item.code) used Microsoft badge \(crest)")
+            }
+        }
+
+        // Verify Unit Banner click opens Unit Guide (.memo14) and selectRoute syncs selectedVendorInPopover
+        var appState = CertiGoNativeAppState(restoreFromDisk: false)
+        appState.selectRoute("ANTHROPIC-CLAUDE")
+        #expect(appState.selectedVendorInPopover == "anthropic")
+        appState.selectRoute("TF-003")
+        #expect(appState.selectedVendorInPopover == "terraform")
+        appState.openUnitGuide(forUnitNumber: 1)
+        #expect(appState.activeStepSheet == .memo14(lessonId: "TF-003-u1-s1"))
+    }
 }

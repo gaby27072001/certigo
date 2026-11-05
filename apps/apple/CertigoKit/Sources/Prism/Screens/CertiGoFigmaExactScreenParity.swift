@@ -3007,7 +3007,7 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                     ("5. Agents M365 & Copilot Studio", "Poids officiel : 20 %", "76 %", "#1d4ed8")
                 ]
             )
-        case "OPENAI-PRO":
+        case "OPENAI-PRO", "AI-OPENAI", "TRACK-OPENAI-PRO", "CHATGPT-PRO", "OPENAI-CODEX", "VEILLE-OPENAI":
             return CertiGoLiveTrackCurriculum(
                 vendorId: "openai",
                 unitBannerTitle: "UNITÉ 1 · ChatGPT Pro, o3/o4 & Deep Research",
@@ -3023,7 +3023,7 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                 memoActivity: "Choisir entre GPT-4o, o3/o4, Deep Research et Codex",
                 memoKeyTopics: ("Modèles o3/o4", "OpenAI Codex", "Structured Outputs"),
                 memoGoldenRule: "Active strict: true et additionalProperties: false sur chaque objet de ton JSON Schema en production.",
-                examOfficialTitle: "OpenAI : ChatGPT, Codex & Agents IA",
+                examOfficialTitle: "OpenAI ChatGPT, Codex & Agents",
                 examDomains: [
                     ("1. ChatGPT Pro, o3/o4 & Deep Research", "Poids officiel : 25 %", "88 %", "#15803d"),
                     ("2. OpenAI Codex & Dev Autonome", "Poids officiel : 25 %", "84 %", "#15803d"),
@@ -3032,10 +3032,35 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                     ("5. Prompt Caching & Agents SDK", "Poids officiel : Transversal", "74 %", "#1d4ed8")
                 ]
             )
-        case "ANTHROPIC-CLAUDE":
+        case "AI-MISTRAL", "MISTRAL":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "mistral",
+                unitBannerTitle: "UNITÉ 1 · Mixture-of-Experts (MoE), vLLM & Souveraineté",
+                unitProgressPercentText: "65%",
+                stepTitles: [
+                    "Architecture Sparse Mixture-of-Experts (SMoE)",
+                    "Service d'inférence vLLM & PagedAttention",
+                    "Quantification AWQ / FP8 & VRAM",
+                    "Fine-Tuning LoRA / QLoRA",
+                    "Déploiement Souverain sur Kubernetes"
+                ],
+                stepPreviewSubtitle: "Mistral AI & Open-Weight : MoE, vLLM, PagedAttention & FP8",
+                memoActivity: "Dimensionner un cluster GPU vLLM avec PagedAttention et FP8",
+                memoKeyTopics: ("Sparse MoE", "vLLM PagedAttention", "Quantification FP8"),
+                memoGoldenRule: "Active PagedAttention et Continuous Batching sur vLLM pour éliminer la fragmentation du KV Cache.",
+                examOfficialTitle: "Mistral AI & Modèles Open-Weight",
+                examDomains: [
+                    ("1. Architecture Sparse Mixture-of-Experts (SMoE)", "Poids officiel : 25 %", "84 %", "#15803d"),
+                    ("2. Inférence Haute Performance vLLM & PagedAttention", "Poids officiel : 25 %", "80 %", "#15803d"),
+                    ("3. Quantification AWQ / FP8 & Dimensionnement GPU", "Poids officiel : 20 %", "76 %", "#1d4ed8"),
+                    ("4. Fine-Tuning LoRA / QLoRA & Évaluation", "Poids officiel : 15 %", "74 %", "#1d4ed8"),
+                    ("5. Déploiement Souverain & Gouvernance Open-Weight", "Poids officiel : 15 %", "70 %", "#1d4ed8")
+                ]
+            )
+        case "ANTHROPIC-CLAUDE", "AI-ANTHROPIC", "AI-CLAUDE", "TRACK-ANTHROPIC-CLAUDE", "CLAUDE-CODE-MCP", "VEILLE-ANTHROPIC":
             return CertiGoLiveTrackCurriculum(
                 vendorId: "anthropic",
-                unitBannerTitle: "UNITÉ 1 · Prompt XML & Extended Thinking",
+                unitBannerTitle: "UNITÉ 1 · AI Fluency 4D, Claude Code & MCP",
                 unitProgressPercentText: "82%",
                 stepTitles: [
                     "Structuration XML Claude",
@@ -3044,11 +3069,11 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                     "Citations Natives & Grounding",
                     "Claude Projects & Équipe"
                 ],
-                stepPreviewSubtitle: "Prompt XML, Artifacts, Claude Code CLI & Serveurs MCP",
+                stepPreviewSubtitle: "Anthropic Academy : 4D AI Fluency, Claude Code, MCP & Agent Skills",
                 memoActivity: "Structurer un prompt XML avec Extended Thinking et MCP",
                 memoKeyTopics: ("Balises XML", "Claude Code CLI", "Protocole MCP"),
                 memoGoldenRule: "Place les documents longs dans <documents> tout en haut du prompt et la consigne finale tout en bas.",
-                examOfficialTitle: "Anthropic : Claude, Claude Code & MCP",
+                examOfficialTitle: "Anthropic Claude Pro & Agents",
                 examDomains: [
                     ("1. Prompt XML & Extended Thinking", "Poids officiel : 25 %", "90 %", "#15803d"),
                     ("2. Projects, Artifacts & Visuel", "Poids officiel : 25 %", "86 %", "#15803d"),
@@ -3057,10 +3082,35 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                     ("5. Constitutional AI & Guardrails", "Poids officiel : Transversal", "76 %", "#1d4ed8")
                 ]
             )
-        case "HARVEY-LEGAL", "HARVEY":
+        case "CCA-F":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "anthropic",
+                unitBannerTitle: "UNITÉ 1 · Messages API, Agent SDK & Serveurs MCP",
+                unitProgressPercentText: "74%",
+                stepTitles: [
+                    "Messages API & Prompt Caching",
+                    "Extended Thinking & Citations",
+                    "Serveurs MCP : Tools & Resources",
+                    "Workflows vs Agents Autonomes",
+                    "Évaluations Automatisées & Guardrails"
+                ],
+                stepPreviewSubtitle: "Anthropic Academy : Messages API, Prompt Caching, MCP & Claude Agent SDK",
+                memoActivity: "Concevoir un serveur MCP et orchestrer des sous-agents Claude",
+                memoKeyTopics: ("Prompt Caching", "Serveurs MCP", "Agent SDK"),
+                memoGoldenRule: "Place toujours tools puis system puis messages pour maximiser le préfixe exact du Prompt Caching Claude.",
+                examOfficialTitle: "Claude Certified Architect (CCA-F)",
+                examDomains: [
+                    ("1. Architecture de Prompts & Citations Grounded", "Poids officiel : 25 %", "91 %", "#15803d"),
+                    ("2. Serveurs Model Context Protocol (MCP) & Outils", "Poids officiel : 25 %", "85 %", "#15803d"),
+                    ("3. Workflows Déterministes vs Agents Autonomes", "Poids officiel : 20 %", "80 %", "#1d4ed8"),
+                    ("4. Évaluations Automatisées & Garde-fous", "Poids officiel : 15 %", "78 %", "#1d4ed8"),
+                    ("5. Context Engineering, Compaction & Caching", "Poids officiel : 15 %", "72 %", "#1d4ed8")
+                ]
+            )
+        case "HARVEY-LEGAL", "HARVEY", "TRACK-HARVEY-LEGAL", "HARVEY-AI", "HARVEY-ACADEMY":
             return CertiGoLiveTrackCurriculum(
                 vendorId: "harvey",
-                unitBannerTitle: "UNITÉ 1 · Harvey Academy Foundations, Assistant & Contrats",
+                unitBannerTitle: "UNITÉ 1 · Assistant, Vault M&A, Knowledge & Workflows",
                 unitProgressPercentText: "76%",
                 stepTitles: [
                     "Harvey Academy · Level 1 & Assistant",
@@ -3069,17 +3119,342 @@ public struct CertiGoLiveTrackCurriculum: Equatable, Sendable {
                     "Lab · Prompt Redlining MSA",
                     "Harvey Vault & Data Room M&A"
                 ],
-                stepPreviewSubtitle: "Harvey Academy (Level 1 & Legal Engineering), Assistant, Vault M&A, Word Add-In & Knowledge",
+                stepPreviewSubtitle: "Harvey Legal AI : Assistant, Vault, Knowledge & Workflows juridiques",
                 memoActivity: "Valider Harvey Academy Level 1, auditer une Data Room Vault et rédiger un redline MSA",
-                memoKeyTopics: ("Harvey Academy", "Harvey Vault M&A", "Legal Engineering"),
+                memoKeyTopics: ("Harvey Assistant", "Harvey Vault M&A", "Legal Workflows"),
                 memoGoldenRule: "Fournis toujours le rôle, la juridiction applicable et la position de repli (fallback) dans ton prompt Harvey.",
-                examOfficialTitle: "Harvey Academy : Legal IA, Vault & Legal Engineering",
+                examOfficialTitle: "Harvey Academy · Legal AI & Workflows",
                 examDomains: [
                     ("1. Harvey Academy Foundations & Assistant", "Poids officiel : 25 %", "88 %", "#15803d"),
                     ("2. Harvey Vault & Due Diligence M&A", "Poids officiel : 25 %", "84 %", "#15803d"),
                     ("3. Harvey Knowledge & Citations", "Poids officiel : 25 %", "80 %", "#1d4ed8"),
                     ("4. Legal Engineering & Déontologie", "Poids officiel : 25 %", "78 %", "#1d4ed8"),
                     ("5. Cloisonnement Matter & Zero-Training", "Poids officiel : Transversal", "75 %", "#1d4ed8")
+                ]
+            )
+        case "AI-GEMINI", "GEMINI", "GOOGLE-GEMINI":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "google",
+                unitBannerTitle: "UNITÉ 1 · Gemini Multimodal, Context Caching & Vertex AI",
+                unitProgressPercentText: "69%",
+                stepTitles: [
+                    "Architecture Multimodale Gemini 1M+",
+                    "Vertex AI Context Caching (TTL)",
+                    "Grounding avec Vertex AI Search",
+                    "Vertex AI Agent Builder & Tools",
+                    "Sécurité IAM & Model Monitoring"
+                ],
+                stepPreviewSubtitle: "Contexte multimodal 1M+, Context Caching, Grounding & Vertex AI",
+                memoActivity: "Configurer un CachedContent Vertex AI et ancrer Gemini sur Vertex AI Search",
+                memoKeyTopics: ("Context Caching", "Vertex Grounding", "Multimodal 1M+"),
+                memoGoldenRule: "Crée un objet CachedContent explicite sur Vertex AI pour réutiliser un corpus massif sans repayer la tokenisation.",
+                examOfficialTitle: "Google Gemini & Vertex AI",
+                examDomains: [
+                    ("1. Architecture Multimodale Native & Long Contexte", "Poids officiel : 25 %", "86 %", "#15803d"),
+                    ("2. Vertex AI Context Caching & Optimisation", "Poids officiel : 20 %", "82 %", "#15803d"),
+                    ("3. Grounding d'Entreprise avec Vertex AI Search", "Poids officiel : 25 %", "78 %", "#1d4ed8"),
+                    ("4. Vertex AI Agent Builder & Extensions", "Poids officiel : 15 %", "74 %", "#1d4ed8"),
+                    ("5. Gouvernance IAM, VPC-SC & Model Monitoring", "Poids officiel : 15 %", "70 %", "#1d4ed8")
+                ]
+            )
+        case "DVA-C02":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "aws",
+                unitBannerTitle: "UNITÉ 1 · AWS Lambda, DynamoDB & API Gateway",
+                unitProgressPercentText: "62%",
+                stepTitles: [
+                    "AWS Lambda, Concurrence & Layers",
+                    "Amazon API Gateway & Authorizers",
+                    "Modélisation Single-Table DynamoDB",
+                    "Step Functions & EventBridge",
+                    "Observabilité X-Ray & CloudWatch"
+                ],
+                stepPreviewSubtitle: "Serverless AWS : Lambda, DynamoDB, API Gateway, SAM & X-Ray",
+                memoActivity: "Concevoir une API Serverless avec Lambda, DynamoDB et traçage X-Ray",
+                memoKeyTopics: ("AWS Lambda", "DynamoDB GSI", "AWS X-Ray"),
+                memoGoldenRule: "Choisis une clé de partition à haute cardinalité dans DynamoDB pour éviter les Hot Partitions.",
+                examOfficialTitle: "AWS Certified Developer - Associate (DVA-C02)",
+                examDomains: [
+                    ("1. Développement avec les services AWS (Lambda/API)", "Poids officiel : 32 %", "84 %", "#15803d"),
+                    ("2. Sécurité IAM, KMS & Cognito", "Poids officiel : 26 %", "80 %", "#15803d"),
+                    ("3. Déploiement CI/CD, SAM & CloudFormation", "Poids officiel : 24 %", "76 %", "#1d4ed8"),
+                    ("4. Dépannage, Optimisation & AWS X-Ray", "Poids officiel : 18 %", "72 %", "#1d4ed8"),
+                    ("5. Architecture Event-Driven SQS, SNS & EventBridge", "Poids officiel : Transversal", "70 %", "#1d4ed8")
+                ]
+            )
+        case "SAP-C02":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "aws",
+                unitBannerTitle: "UNITÉ 1 · AWS Organizations, Transit Gateway & Migration",
+                unitProgressPercentText: "52%",
+                stepTitles: [
+                    "AWS Organizations, SCP & Control Tower",
+                    "Réseau Hybride Transit Gateway & Direct Connect",
+                    "Résilience Multi-Régions Active-Active",
+                    "Migration à Grande Échelle (6 R) & DMS",
+                    "Optimisation FinOps & Gouvernance Multi-Comptes"
+                ],
+                stepPreviewSubtitle: "Architecture multi-comptes AWS Organizations, Transit Gateway & DR",
+                memoActivity: "Concevoir une Landing Zone multi-comptes avec SCP et Transit Gateway",
+                memoKeyTopics: ("Organizations SCP", "Transit Gateway", "DR Multi-Région"),
+                memoGoldenRule: "Une Service Control Policy (SCP) définit le plafond maximal de permissions d'un compte membre AWS, y compris pour son utilisateur root.",
+                examOfficialTitle: "AWS Certified Solutions Architect - Professional (SAP-C02)",
+                examDomains: [
+                    ("1. Conception pour l'organisation complexe multi-comptes", "Poids officiel : 26 %", "82 %", "#15803d"),
+                    ("2. Conception de nouvelles solutions résilientes", "Poids officiel : 29 %", "78 %", "#15803d"),
+                    ("3. Amélioration continue des architectures existantes", "Poids officiel : 25 %", "74 %", "#1d4ed8"),
+                    ("4. Accélération de la migration et modernisation", "Poids officiel : 20 %", "70 %", "#1d4ed8"),
+                    ("5. Réseaux hybrides Direct Connect & Transit Gateway", "Poids officiel : Transversal", "68 %", "#1d4ed8")
+                ]
+            )
+        case "CKAD":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "kubernetes",
+                unitBannerTitle: "UNITÉ 1 · Pods Multi-Conteneurs, Probes & Helm",
+                unitProgressPercentText: "64%",
+                stepTitles: [
+                    "Pods, InitContainers & Sidecars",
+                    "Deployments, RollingUpdate & Rollback",
+                    "ConfigMaps, Secrets & SecurityContext",
+                    "Liveness, Readiness & Startup Probes",
+                    "Services, Ingress, NetworkPolicy & Helm"
+                ],
+                stepPreviewSubtitle: "Conception cloud-native Kubernetes : Pods, Probes, ConfigMaps & Helm",
+                memoActivity: "Déployer un Pod avec Readiness Probe, SecurityContext et NetworkPolicy",
+                memoKeyTopics: ("Readiness Probe", "ConfigMap/Secret", "Helm Chart"),
+                memoGoldenRule: "Utilise une Readiness Probe pour retirer un Pod non prêt des Endpoints du Service sans le redémarrer.",
+                examOfficialTitle: "CNCF Certified Kubernetes Application Developer (CKAD)",
+                examDomains: [
+                    ("1. Conception et construction d'applications (Pods/Images)", "Poids officiel : 20 %", "86 %", "#15803d"),
+                    ("2. Déploiement d'applications (Deployments/Helm)", "Poids officiel : 20 %", "82 %", "#15803d"),
+                    ("3. Observabilité et maintenance (Probes/Logs)", "Poids officiel : 15 %", "78 %", "#1d4ed8"),
+                    ("4. Environnement, configuration et sécurité", "Poids officiel : 25 %", "75 %", "#1d4ed8"),
+                    ("5. Services et réseau (Ingress/NetworkPolicy)", "Poids officiel : 20 %", "72 %", "#1d4ed8")
+                ]
+            )
+        case "CKS":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "kubernetes",
+                unitBannerTitle: "UNITÉ 1 · Durcissement Cluster, Falco & OPA Gatekeeper",
+                unitProgressPercentText: "58%",
+                stepTitles: [
+                    "Durcissement CIS Benchmark & API Server",
+                    "Pod Security Standards (Restricted)",
+                    "Politiques d'admission OPA Gatekeeper",
+                    "Sécurité Runtime avec Falco & Seccomp",
+                    "Chaîne Logistique : Trivy, SBOM & Cosign"
+                ],
+                stepPreviewSubtitle: "Sécurité Kubernetes : CIS Benchmark, Pod Security, OPA & Falco",
+                memoActivity: "Bloquer les conteneurs privilégiés avec Pod Security Restricted et Falco",
+                memoKeyTopics: ("PSS Restricted", "OPA Gatekeeper", "Falco Runtime"),
+                memoGoldenRule: "Applique le profil Pod Security Standard 'restricted' et interdis allowPrivilegeEscalation sur chaque conteneur.",
+                examOfficialTitle: "CNCF Certified Kubernetes Security Specialist (CKS)",
+                examDomains: [
+                    ("1. Configuration et durcissement du cluster", "Poids officiel : 15 %", "84 %", "#15803d"),
+                    ("2. Durcissement du système hôte (AppArmor/Seccomp)", "Poids officiel : 15 %", "80 %", "#15803d"),
+                    ("3. Réduction des vulnérabilités des microservices", "Poids officiel : 20 %", "76 %", "#1d4ed8"),
+                    ("4. Sécurité de la chaîne logistique (Images/SBOM)", "Poids officiel : 20 %", "74 %", "#1d4ed8"),
+                    ("5. Surveillance, audit et sécurité runtime (Falco)", "Poids officiel : 30 %", "70 %", "#1d4ed8")
+                ]
+            )
+        case "AZ-305":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Architecture d'Entreprise, HA/DR & Landing Zones",
+                unitProgressPercentText: "62%",
+                stepTitles: [
+                    "Gouvernance Cloud Adoption Framework & Landing Zones",
+                    "Identité Hybride Entra ID & Accès Conditionnel",
+                    "Architecture de Données SQL, Cosmos DB & Data Lake",
+                    "Haute Disponibilité Multi-Régions & Front Door",
+                    "Continuité d'Activité (BCDR), ASR & Sauvegarde"
+                ],
+                stepPreviewSubtitle: "Conception Azure : Landing Zones, HA/DR, Cosmos DB & Front Door",
+                memoActivity: "Arbitrer RPO/RTO et choisir la topologie multi-régions optimale",
+                memoKeyTopics: ("Landing Zones", "RPO / RTO", "Azure Front Door"),
+                memoGoldenRule: "Dimensionne toujours ta stratégie de reprise après sinistre à partir du RPO (perte de données) et du RTO (temps d'arrêt) métier.",
+                examOfficialTitle: "Microsoft Certified: Azure Solutions Architect Expert (AZ-305)",
+                examDomains: [
+                    ("1. Concevoir des solutions d'identité, gouvernance et suivi", "Poids officiel : 25-30 %", "86 %", "#15803d"),
+                    ("2. Concevoir des solutions de stockage de données", "Poids officiel : 20-25 %", "82 %", "#15803d"),
+                    ("3. Concevoir des solutions de continuité d'activité (BCDR)", "Poids officiel : 15-20 %", "78 %", "#1d4ed8"),
+                    ("4. Concevoir des solutions d'infrastructure (Calcul/Réseau)", "Poids officiel : 30-35 %", "75 %", "#1d4ed8"),
+                    ("5. Optimisation des coûts, Well-Architected & Migration", "Poids officiel : Transversal", "72 %", "#1d4ed8")
+                ]
+            )
+        case "AZ-400":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Pipelines CI/CD, GitHub Actions, Bicep & SRE",
+                unitProgressPercentText: "66%",
+                stepTitles: [
+                    "Stratégie de Branches Git & Trunk-Based Dev",
+                    "Pipelines CI/CD GitHub Actions & Azure Pipelines",
+                    "DevSecOps : CodeQL, Dependabot & Key Vault OIDC",
+                    "Infrastructure as Code avec Bicep & Déploiements",
+                    "Fiabilité SRE, Blue/Green, Canary & Application Insights"
+                ],
+                stepPreviewSubtitle: "DevOps Azure : CI/CD, fédération OIDC sans secret, Bicep & SRE",
+                memoActivity: "Déployer en Blue/Green avec fédération Workload Identity OIDC",
+                memoKeyTopics: ("OIDC sans secret", "Bicep IaC", "Canary / Blue-Green"),
+                memoGoldenRule: "Utilise la fédération OIDC (Workload Identity) entre GitHub Actions et Azure pour éliminer tout secret statique.",
+                examOfficialTitle: "Microsoft Certified: DevOps Engineer Expert (AZ-400)",
+                examDomains: [
+                    ("1. Configurer les processus et les communications", "Poids officiel : 10-15 %", "88 %", "#15803d"),
+                    ("2. Concevoir et implémenter le contrôle de code source", "Poids officiel : 15-20 %", "84 %", "#15803d"),
+                    ("3. Concevoir et implémenter des pipelines de build et release", "Poids officiel : 40-45 %", "80 %", "#1d4ed8"),
+                    ("4. Développer un plan de sécurité et de conformité", "Poids officiel : 10-15 %", "76 %", "#1d4ed8"),
+                    ("5. Implémenter une stratégie d'instrumentation SRE", "Poids officiel : 10-15 %", "74 %", "#1d4ed8")
+                ]
+            )
+        case "AI-900":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Fondamentaux IA Générative, Vision & NLP Azure",
+                unitProgressPercentText: "84%",
+                stepTitles: [
+                    "Principes d'IA Responsable Microsoft (6 Piliers)",
+                    "Apprentissage supervisé : Régression vs Classification",
+                    "Vision par ordinateur & Document Intelligence",
+                    "Traitement du langage naturel (NLP) & Speech",
+                    "IA Générative, Azure OpenAI & Copilot"
+                ],
+                stepPreviewSubtitle: "6 principes d'IA Responsable, Machine Learning, Vision & Azure OpenAI",
+                memoActivity: "Distinguer Régression, Classification et Clustering + 6 piliers IA Responsable",
+                memoKeyTopics: ("IA Responsable", "Classification/Régression", "Azure OpenAI"),
+                memoGoldenRule: "Les 6 principes d'IA Responsable Microsoft sont : Équité, Fiabilité/Sécurité, Confidentialité, Inclusion, Transparence et Responsabilité.",
+                examOfficialTitle: "Microsoft Certified: Azure AI Fundamentals (AI-900)",
+                examDomains: [
+                    ("1. Décrire les charges de travail IA et l'IA Responsable", "Poids officiel : 15-20 %", "92 %", "#15803d"),
+                    ("2. Principes fondamentaux du Machine Learning sur Azure", "Poids officiel : 20-25 %", "88 %", "#15803d"),
+                    ("3. Fonctionnalités de Vision par ordinateur sur Azure", "Poids officiel : 15-20 %", "85 %", "#15803d"),
+                    ("4. Traitement du langage naturel (NLP) sur Azure", "Poids officiel : 15-20 %", "82 %", "#1d4ed8"),
+                    ("5.Charges de travail d'IA Générative & Azure OpenAI", "Poids officiel : 20-25 %", "80 %", "#1d4ed8")
+                ]
+            )
+        case "DP-900":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Bases Relationnelles, Cosmos DB & Analytics Azure",
+                unitProgressPercentText: "80%",
+                stepTitles: [
+                    "Données Relationnelles (OLTP) vs Analytiques (OLAP)",
+                    "Services SQL Azure : SQL DB, Managed Instance & VM",
+                    "Données Non-Relationnelles & Azure Cosmos DB",
+                    "Pipelines ELT/ETL, Azure Data Factory & Fabric",
+                    "Entrepôt Analytique, Spark & Visualisation Power BI"
+                ],
+                stepPreviewSubtitle: "Fondamentaux Data : Azure SQL, Cosmos DB, Microsoft Fabric & Power BI",
+                memoActivity: "Choisir entre Azure SQL Database, SQL Managed Instance et Cosmos DB",
+                memoKeyTopics: ("OLTP vs OLAP", "Azure SQL / MI", "Cosmos DB & Fabric"),
+                memoGoldenRule: "Choisis Azure SQL Managed Instance pour migrer une base SQL Server on-premises nécessitant près de 100 % de compatibilité moteur.",
+                examOfficialTitle: "Microsoft Certified: Azure Data Fundamentals (DP-900)",
+                examDomains: [
+                    ("1. Décrire les concepts fondamentaux des données", "Poids officiel : 25-30 %", "90 %", "#15803d"),
+                    ("2. Considérations relatives aux données relationnelles", "Poids officiel : 20-25 %", "86 %", "#15803d"),
+                    ("3. Considérations relatives aux données non relationnelles", "Poids officiel : 15-20 %", "82 %", "#1d4ed8"),
+                    ("4. Décrire une charge de travail analytique (Fabric/Power BI)", "Poids officiel : 25-30 %", "78 %", "#1d4ed8"),
+                    ("5. Gouvernance, sécurité et traitement batch vs streaming", "Poids officiel : Transversal", "76 %", "#1d4ed8")
+                ]
+            )
+        case "DP-100":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Azure Machine Learning, MLOps & Entraînement",
+                unitProgressPercentText: "64%",
+                stepTitles: [
+                    "Espace de travail Azure ML, Datastores & Data Assets",
+                    "Entraînement distribué, Pipelines & Compute Clusters",
+                    "Suivi MLflow, Hyperdrive & AutoML",
+                    "IA Responsable : Fairlearn, SHAP & Explicabilité",
+                    "Déploiement Managed Online Endpoints & Blue/Green"
+                ],
+                stepPreviewSubtitle: "Data Science Azure ML : MLflow, Hyperdrive, Responsible AI & Endpoints",
+                memoActivity: "Suivre une expérience avec MLflow et déployer un Managed Online Endpoint",
+                memoKeyTopics: ("Azure ML Pipelines", "MLflow Tracking", "Managed Endpoints"),
+                memoGoldenRule: "Utilise un Managed Online Endpoint avec bascule progressive du trafic (Blue/Green) pour déployer un modèle en production sans coupure.",
+                examOfficialTitle: "Microsoft Certified: Azure Data Scientist Associate (DP-100)",
+                examDomains: [
+                    ("1. Concevoir et préparer une solution de Machine Learning", "Poids officiel : 20-25 %", "84 %", "#15803d"),
+                    ("2. Explorer les données et entraîner des modèles", "Poids officiel : 35-40 %", "80 %", "#15803d"),
+                    ("3. Préparer un modèle pour le déploiement", "Poids officiel : 20-25 %", "76 %", "#1d4ed8"),
+                    ("4. Déployer et réentraîner un modèle (MLOps)", "Poids officiel : 10-15 %", "74 %", "#1d4ed8"),
+                    ("5. Tableau de bord IA Responsable, SHAP & dérive", "Poids officiel : Transversal", "72 %", "#1d4ed8")
+                ]
+            )
+        case "SC-900":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Zero Trust, Microsoft Entra ID & Defender",
+                unitProgressPercentText: "82%",
+                stepTitles: [
+                    "Les 3 Piliers du Modèle Zero Trust",
+                    "Identité & Accès avec Microsoft Entra ID",
+                    "Protection XDR Microsoft Defender & Sentinel",
+                    "Gouvernance des Données Microsoft Purview",
+                    "Conformité, Privilège Minimal & Chiffrement"
+                ],
+                stepPreviewSubtitle: "Sécurité Microsoft : Zero Trust, Entra ID, Defender XDR, Sentinel & Purview",
+                memoActivity: "Appliquer les 3 principes Zero Trust sur l'identité, les appareils et les données",
+                memoKeyTopics: ("Zero Trust", "Microsoft Entra ID", "Defender & Purview"),
+                memoGoldenRule: "Les 3 principes Zero Trust sont : Vérifier explicitement, Appliquer le moindre privilège et Supposer la compromission.",
+                examOfficialTitle: "Microsoft Certified: Security, Compliance, and Identity Fundamentals (SC-900)",
+                examDomains: [
+                    ("1. Concepts de sécurité, de conformité et d'identité", "Poids officiel : 10-15 %", "92 %", "#15803d"),
+                    ("2. Capacités de Microsoft Entra (Identité & Accès)", "Poids officiel : 25-30 %", "88 %", "#15803d"),
+                    ("3. Capacités des solutions de sécurité Microsoft (Defender/Sentinel)", "Poids officiel : 35-40 %", "84 %", "#15803d"),
+                    ("4. Capacités des solutions de conformité Microsoft Purview", "Poids officiel : 20-25 %", "80 %", "#1d4ed8"),
+                    ("5. Gouvernance Zero Trust & Défense en profondeur", "Poids officiel : Transversal", "78 %", "#1d4ed8")
+                ]
+            )
+        case "SC-200":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Microsoft Sentinel, Defender XDR & Requêtes KQL",
+                unitProgressPercentText: "68%",
+                stepTitles: [
+                    "Protection des Endpoints (MDE) & Réduction Surface",
+                    "Investigation XDR Unifiée & Remédiation Automatique",
+                    "Architecture Microsoft Sentinel & Connecteurs",
+                    "Chasse aux Menaces Avancée en KQL",
+                    "Automatisation SOAR, Règles d'Analyse & Playbooks"
+                ],
+                stepPreviewSubtitle: "Opérations SOC : Microsoft Sentinel SIEM/SOAR, Defender XDR & KQL",
+                memoActivity: "Écrire une requête KQL de corrélation d'incident dans Microsoft Sentinel",
+                memoKeyTopics: ("Microsoft Sentinel", "Defender XDR", "Chasse KQL"),
+                memoGoldenRule: "Dans KQL, filtre toujours sur TimeGenerated tout en haut de la requête avant tout opérateur join ou summarize.",
+                examOfficialTitle: "Microsoft Certified: Security Operations Analyst Associate (SC-200)",
+                examDomains: [
+                    ("1. Atténuer les menaces avec Microsoft Defender XDR", "Poids officiel : 25-30 %", "86 %", "#15803d"),
+                    ("2. Atténuer les menaces avec Defender for Cloud", "Poids officiel : 15-20 %", "82 %", "#15803d"),
+                    ("3. Atténuer les menaces avec Microsoft Sentinel", "Poids officiel : 50-55 %", "78 %", "#1d4ed8"),
+                    ("4. Requêtes KQL, Hunting & Règles d'analyse", "Poids officiel : Transversal", "75 %", "#1d4ed8"),
+                    ("5. Automatisation SOAR avec Logic Apps Playbooks", "Poids officiel : Transversal", "72 %", "#1d4ed8")
+                ]
+            )
+        case "SC-300":
+            return CertiGoLiveTrackCurriculum(
+                vendorId: "microsoft",
+                unitBannerTitle: "UNITÉ 1 · Gouvernance Entra ID, Accès Conditionnel & PIM",
+                unitProgressPercentText: "72%",
+                stepTitles: [
+                    "Identités Hybrides Entra Connect & Cloud Sync",
+                    "Authentification MFA Phishing-Resistant & Accès Conditionnel",
+                    "Permissions Applications, App Registrations & Enterprise Apps",
+                    "Gouvernance des Identités, Entitlement Management & Access Reviews",
+                    "Élévation Juste-à-Temps avec Entra ID PIM"
+                ],
+                stepPreviewSubtitle: "Administration Identité : Entra ID, Accès Conditionnel, SSO & PIM",
+                memoActivity: "Configurer une politique d'Accès Conditionnel et un rôle éligible PIM",
+                memoKeyTopics: ("Accès Conditionnel", "Entra ID PIM", "Access Reviews"),
+                memoGoldenRule: "Exige toujours une Authentication Strength résistante au phishing (FIDO2/Windows Hello) pour les rôles privilégiés via PIM.",
+                examOfficialTitle: "Microsoft Certified: Identity and Access Administrator Associate (SC-300)",
+                examDomains: [
+                    ("1. Implémenter une solution de gestion des identités", "Poids officiel : 25-30 %", "88 %", "#15803d"),
+                    ("2. Implémenter l'authentification et la gestion des accès", "Poids officiel : 25-30 %", "84 %", "#15803d"),
+                    ("3. Implémenter la gestion des accès pour les applications", "Poids officiel : 15-20 %", "80 %", "#1d4ed8"),
+                    ("4. Planifier et implémenter la gouvernance des identités (PIM)", "Poids officiel : 25-30 %", "76 %", "#1d4ed8"),
+                    ("5. Identité hybride, Workload Identities & Sécurité", "Poids officiel : Transversal", "74 %", "#1d4ed8")
                 ]
             )
         default:
@@ -3465,6 +3840,8 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
         "github": "GitHub",
         "kubernetes": "Kubernetes",
         "cncf": "Kubernetes & CNCF",
+        "terraform": "Terraform",
+        "hashicorp": "HashiCorp Terraform",
         "cisco": "Cisco"
     ]
 
@@ -3472,21 +3849,22 @@ public struct CertiGoFigmaLiveRuntimeState: Equatable, Sendable {
         switch vendor.lowercased() {
         case "openai":
             return [
-                PopoverCertificationCardItem(code: "OPENAI-PRO", title: "ChatGPT, Codex & Agents IA"),
-                PopoverCertificationCardItem(code: "AI-OPENAI", title: "Architecture GPT & Schemas"),
-                PopoverCertificationCardItem(code: "AI-102", title: "Azure OpenAI & Foundry")
+                PopoverCertificationCardItem(code: "OPENAI-PRO", title: "OpenAI ChatGPT, Codex & Agents"),
+                PopoverCertificationCardItem(code: "AI-OPENAI", title: "Veille OpenAI · Architecture GPT & o3/o4")
             ]
         case "anthropic", "claude":
             return [
-                PopoverCertificationCardItem(code: "ANTHROPIC-CLAUDE", title: "Claude, Claude Code & MCP"),
-                PopoverCertificationCardItem(code: "CCA-F", title: "Claude Architect Foundations"),
+                PopoverCertificationCardItem(code: "ANTHROPIC-CLAUDE", title: "Anthropic Claude Pro & Agents"),
+                PopoverCertificationCardItem(code: "CCA-F", title: "Claude Certified Architect (CCA-F)"),
                 PopoverCertificationCardItem(code: "AI-ANTHROPIC", title: "Veille Anthropic & MCP")
             ]
         case "harvey", "harvey-legal", "harvey-ai":
             return [
-                PopoverCertificationCardItem(code: "HARVEY-LEGAL", title: "Harvey Legal IA & Pratique"),
-                PopoverCertificationCardItem(code: "MS-365-COPILOT", title: "M365 Copilot & Word Juridique"),
-                PopoverCertificationCardItem(code: "ANTHROPIC-CLAUDE", title: "Claude Citations & Contrats")
+                PopoverCertificationCardItem(code: "HARVEY-LEGAL", title: "Harvey Academy · Legal AI & Workflows")
+            ]
+        case "terraform", "hashicorp":
+            return [
+                PopoverCertificationCardItem(code: "TF-003", title: "HashiCorp Terraform Associate (003)")
             ]
         case "aws":
             return [

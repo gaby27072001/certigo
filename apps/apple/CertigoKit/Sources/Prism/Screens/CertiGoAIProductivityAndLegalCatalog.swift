@@ -1408,7 +1408,7 @@ public enum CertiGoAIProductivityAndLegalCatalog {
                     stepSubtitle: "Synthèse de bout en bout : Work IQ, Office Pro, Cowork & Agents",
                     domainNumber: 5,
                     iconSymbol: "crown.fill",
-                    serviceAsset: "Certifications/ms-official-associate-badge",
+                    serviceAsset: "BrandLogos/brand-m365-copilot",
                     declicTitle: "Architecture Complète M365 Copilot & Agents",
                     brick1: ("🕸️", "Work IQ & Graph", "Contexte métier unifié et sécurisé"),
                     brick2: ("💼", "Apps Office & Cowork", "Word, PPT, Excel, Teams, Outlook & Loop"),
