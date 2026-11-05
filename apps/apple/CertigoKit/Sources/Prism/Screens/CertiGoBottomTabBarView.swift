@@ -9,6 +9,9 @@ extension CertiGoNativeTab {
     /// Semantic alias for Tab #2 (`Actus`).
     public static var techNews: CertiGoNativeTab { .examens }
 
+    /// Semantic alias for Tab #3 (`✦ IA` / ChatGPT AI Tutor).
+    public static var aiTutor: CertiGoNativeTab { .hubIA }
+
     /// Semantic alias for Tab #4 (`Social`).
     public static var league: CertiGoNativeTab { .social }
 

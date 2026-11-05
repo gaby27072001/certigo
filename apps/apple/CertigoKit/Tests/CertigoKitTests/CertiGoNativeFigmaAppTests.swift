@@ -3120,4 +3120,114 @@ struct CertiGoNativeFigmaAppTests {
         #expect(CertiGoTechNewsAudioReaderState.shared.isSpeaking == true)
         CertiGoTechNewsAudioReaderState.shared.stop()
     }
+
+    @Test("ChatGPT iOS x Duolingo Liquid Glass AI Tab: Top/Bottom Floating Bars, Full-Bleed Rich Typography, 25ms Word-by-Word Streaming, Stop Button, and Temporary Chat")
+    func chatGPTiOSExperienceLiquidGlassStreamingAndEditorialTypography() throws {
+        // 1. Semantic tab alias `.aiTutor` == `.hubIA` (`✦ IA`)
+        #expect(CertiGoNativeTab.aiTutor == .hubIA)
+        #expect(CertiGoNativeTab.aiTutor.title == "✦ IA")
+
+        // 2. Top & Bottom Floating Chrome Specs + Pure Canvas (never enclosed in bubble/card)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.lightCanvasHex == "#FFFFFF")
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.darkCanvasHex == "#000000")
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.responseHorizontalPadding == 20)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.isResponseEnclosedInBubbleOrCard == false)
+
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.topLeftMenuButtonDiameter == 40)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.topLeftMenuTopLineWidth == 16)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.topLeftMenuBottomLineWidth == 10)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.topLeftMenuLineThickness == 2)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.centerPillTitle(forRouteCode: "AZ-900") == "✦ CertiGo GPT • AZ-900")
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.topRightCapsuleHeight == 40)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.topRightCapsuleCornerRadius == 20)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.topRightCapsuleIconSpacing == 16)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.topRightCapsuleHorizontalPadding == 14)
+
+        // 3. User Message Bubble specs (#EBF5FF / #1E293B, #0958A5 / #93C5FD, 16.5 pt, radius 22)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.userBubbleMinLeadingSpacer == 60)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.userBubbleCornerRadius == 22)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.userBubbleHorizontalPadding == 16)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.userBubbleVerticalPadding == 11)
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.userBubbleLightFillHex == "#EBF5FF")
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.userBubbleDarkFillHex == "#1E293B")
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.userBubbleLightTextHex == "#0958A5")
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.userBubbleDarkTextHex == "#93C5FD")
+        #expect(CertiGoChatGPTLiquidGlassChromeSpec.userBubbleFontSize == 16.5)
+
+        // 4. Right-hand 34x34 pt `#007AFF` Circle Button 3 Dynamic States (`waveform`, `arrow.up`, `stop.fill`)
+        #expect(CertiGoChatGPTActionCircleState.resolve(draftText: "", isStreaming: false) == .voiceWaveform)
+        #expect(CertiGoChatGPTActionCircleState.resolve(draftText: "   ", isStreaming: false) == .voiceWaveform)
+        #expect(CertiGoChatGPTActionCircleState.resolve(draftText: "Explique Private Link", isStreaming: false) == .sendArrowUp)
+        #expect(CertiGoChatGPTActionCircleState.resolve(draftText: "", isStreaming: true) == .stopSquare)
+        #expect(CertiGoChatGPTActionCircleState.resolve(draftText: "Suivi", isStreaming: true) == .stopSquare)
+        #expect(CertiGoChatGPTActionCircleState.stopSquare.sfSymbolName == "stop.fill")
+        #expect(CertiGoChatGPTActionCircleState.stopSquare.symbolPointSize == 11)
+        #expect(CertiGoChatGPTActionCircleState.sendArrowUp.sfSymbolName == "arrow.up")
+        #expect(CertiGoChatGPTActionCircleState.sendArrowUp.symbolPointSize == 15)
+        #expect(CertiGoChatGPTActionCircleState.voiceWaveform.sfSymbolName == "waveform")
+
+        // 5. Editorial Parser (`CertiGoChatGPTRichResponseParser`) & 25ms Token Streamer (`CertiGoChatGPTTokenStreamer`)
+        var appState = CertiGoNativeAppState(restoreFromDisk: false)
+        appState.selectRoute("AZ-900")
+        appState.sendAIMessage("Explique la différence entre RBAC et Azure Policy")
+        let turn = try #require(appState.chatTurns.last)
+        let doc = CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: "AZ-900")
+
+        #expect(!doc.emojiAndH2Title.isEmpty)
+        #expect(doc.metadataLines.count == 2)
+        #expect(doc.metadataLines[0].key == "Certification")
+        #expect(doc.metadataLines[0].value.contains("AZ-900"))
+        #expect(!doc.bulletItems.isEmpty)
+        #expect(!doc.numberedSteps.isEmpty)
+        #expect(doc.numberedSteps[0].number == 1)
+        #expect(doc.numberedSteps[0].boldLeadInWithColon.hasSuffix(":"))
+
+        var streamer = CertiGoChatGPTTokenStreamer(
+            turnId: turn.id,
+            fullText: doc.fullPlainText,
+            startImmediatelyCompleted: false
+        )
+        #expect(streamer.isStreaming == true)
+        #expect(streamer.visibleTokenCount == CertiGoChatGPTTokenStreamer.wordsPerTick)
+        #expect(CertiGoChatGPTTokenStreamer.tickIntervalMilliseconds == 25)
+
+        let beforeCount = streamer.visibleTokenCount
+        streamer.advanceTick()
+        #expect(streamer.visibleTokenCount > beforeCount)
+
+        // Stopping mid-stream freezes token count and sets wasStoppedByUser = true
+        streamer.stopByUser()
+        #expect(streamer.isStreaming == false)
+        #expect(streamer.wasStoppedByUser == true)
+        let stoppedCount = streamer.visibleTokenCount
+        streamer.advanceTick()
+        #expect(streamer.visibleTokenCount == stoppedCount)
+
+        // 6. Temporary Chat (`isTemporaryAIChatEnabled`) does not append to `aiThreads`
+        let threadCountBeforeTemp = appState.aiThreads.count
+        appState.toggleTemporaryAIChat()
+        #expect(appState.isTemporaryAIChatEnabled == true)
+        #expect(appState.chatTurns.isEmpty)
+        appState.sendAIMessage("Question éphémère confidentielle")
+        #expect(appState.chatTurns.count == 1)
+        #expect(appState.aiThreads.count == threadCountBeforeTemp)
+
+        // 7. Verify Liquid Glass `.ultraThinMaterial` and `ZStack` floating bars in `CertiGoChatGPTExperienceView.swift`
+        var repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: repoRoot.appendingPathComponent("AGENTS.md").path) {
+            let parent = repoRoot.deletingLastPathComponent()
+            guard parent != repoRoot else { throw CocoaError(.fileNoSuchFile) }
+            repoRoot = parent
+        }
+        let chatGPTSource = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "apps/apple/CertigoKit/Sources/Prism/Screens/CertiGoChatGPTExperienceView.swift"
+            ),
+            encoding: .utf8
+        )
+        #expect(chatGPTSource.contains(".ultraThinMaterial"))
+        #expect(chatGPTSource.contains("floatingTopChatGPTBar"))
+        #expect(chatGPTSource.contains("floatingBottomAskPillBar"))
+        #expect(chatGPTSource.contains("CertiGoChatGPTRichResponseView"))
+    }
 }
