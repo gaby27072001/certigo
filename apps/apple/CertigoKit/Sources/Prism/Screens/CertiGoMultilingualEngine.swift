@@ -136,6 +136,43 @@ extension String {
         }
         return cleaned
     }
+
+    private static let frenchFondEtFormeRegexRules: [(regex: NSRegularExpression, template: String)] = {
+        let patterns: [(String, String)] = [
+            (#"(?<![\p{L}\p{N}_])([Dd])e\s+([AEIOUÉÈÊËÀÂÎÏÔÙÛÜaeiouéèêëàâîïôùûü][A-Za-zÀ-ÿ0-9_-]*)"#, "$1'$2"),
+            (#"(?<![\p{L}\p{N}_])([Dd])e\s+([Hh](?:éberg|istori|yper|orizont|ybrid|eur|ôt|umain|abitud|abilit)[A-Za-zÀ-ÿ0-9_-]*)"#, "$1'$2"),
+            (#"(?<![\p{L}\p{N}_])([Ll])[ea]\s+((?:API|IAM|IA|AKS|EKS|EC2|accès|ajout|achat|activation|identité|architecture|exécution|entreprise|équipe|étape|examen|unité|option|opération|environnement|organisation|utilisateur|outil|erreur|incident|alerte|audit|isolation|automatisation|authentification|autorisation|entraînement|échantillonnage|arrêt|appareil|analyse|approbation|archivage|équilibre|équilibreur|Équilibreur|Identité)[A-Za-zÀ-ÿ0-9_-]*)"#, "$1'$2"),
+            (#"(?<![\p{L}\p{N}_])([Qq])ue\s+(il|elle|on|ils|elles|un|une)(?![\p{L}\p{N}_])"#, "$1u'$2"),
+            (#"(?<!\.)\.\.(?!\.|<)"#, ".")
+        ]
+        return patterns.compactMap { pat, tpl in
+            guard let rx = try? NSRegularExpression(pattern: pat, options: []) else { return nil }
+            return (regex: rx, template: tpl)
+        }
+    }()
+
+    /// Normalizes French elisions (`de Azure` ➔ `d'Azure`, `de OpenAI` ➔ `d'OpenAI`, `de Anthropic` ➔ `d'Anthropic`, `de IAM` ➔ `d'IAM`, `de IA` ➔ `d'IA`, `de API` ➔ `d'API`, `de identité` ➔ `d'identité`, `de architecture` ➔ `d'architecture`, `de exécution` ➔ `d'exécution`, `de accès` ➔ `d'accès`, `de entreprise` ➔ `d'entreprise`, `le API` / `un API` ➔ `l'API` / `une API`), fixes double punctuation (`..`, `: :`, `?.`, `, .`), and strips Markdown asterisks and long dashes.
+    public var sanitizingFrenchFondEtForme: String {
+        var out = self.strippingMarkdownAsterisks
+            .replacingOccurrences(of: "qu'quelqu'un", with: "que quelqu'un")
+            .replacingOccurrences(of: "Qu'quelqu'un", with: "Que quelqu'un")
+            .replacingOccurrences(of: "le API", with: "l'API")
+            .replacingOccurrences(of: "Le API", with: "L'API")
+            .replacingOccurrences(of: "un API", with: "une API")
+            .replacingOccurrences(of: "Un API", with: "Une API")
+            .replacingOccurrences(of: "du API", with: "de l'API")
+            .replacingOccurrences(of: "Du API", with: "De l'API")
+            .replacingOccurrences(of: ": :", with: ":")
+            .replacingOccurrences(of: "?.", with: "?")
+            .replacingOccurrences(of: ", .", with: ".")
+            .replacingOccurrences(of: ",.", with: ".")
+
+        for rule in Self.frenchFondEtFormeRegexRules {
+            let range = NSRange(out.startIndex..<out.endIndex, in: out)
+            out = rule.regex.stringByReplacingMatches(in: out, options: [], range: range, withTemplate: rule.template)
+        }
+        return out
+    }
 }
 
 // MARK: - 2. 100% Coverage Dynamic Localization Engine (`CertiGoMultilingualEngine`)
@@ -171,15 +208,15 @@ public enum CertiGoMultilingualEngine {
 
         // Mode 0: Standard French with English technical Cloud/AI terms ( sanitized of long dashes )
         if language == .frBilingual {
-            return cleanFr
+            return cleanFr.sanitizingFrenchFondEtForme
         }
 
         // Mode 1: Integral French (translates English technical terms into official French terminology)
         if language == .frFull {
             if let exact = exactTranslation(for: cleanFr, language: .frFull) {
-                return sanitizeNoLongDashes(exact)
+                return sanitizeNoLongDashes(exact).sanitizingFrenchFondEtForme
             }
-            return sanitizeNoLongDashes(applyIntegralFrenchTerminology(cleanFr))
+            return sanitizeNoLongDashes(applyIntegralFrenchTerminology(cleanFr)).sanitizingFrenchFondEtForme
         }
 
         // Modes 2..11: Non-French languages (`en`, `es`, `de`, `it`, `pt`, `ar`, `ja`, `hi`, `zh-Hans`, `ko`)
@@ -2008,6 +2045,9 @@ public enum CertiGoMultilingualEngine {
             id: card.id,
             lessonId: card.lessonId,
             title: tr(card.title, language: language),
+            analogy: tr(card.analogy, language: language),
+            keyTakeaways: card.keyTakeaways.map { tr($0, language: language) },
+            concreteExample: tr(card.concreteExample, language: language),
             diagramTop: tr(card.diagramTop, language: language),
             diagramBottom: tr(card.diagramBottom, language: language),
             step1: tr(card.step1, language: language),
@@ -2015,6 +2055,22 @@ public enum CertiGoMultilingualEngine {
             rule: tr(card.rule, language: language),
             threeBrickSchema: localizedThreeBrickSchema(card.threeBrickSchema, lang: lang),
             microSlides: card.microSlides.map { localizedLessonSlide($0, lang: lang) }
+        )
+    }
+
+    public static func localizedLessonDeclicCard(_ card: LessonDeclicCard, lang: Int) -> LessonDeclicCard {
+        let language = resolveLanguage(forIndex: lang)
+        guard language != .frBilingual else { return card }
+        return LessonDeclicCard(
+            title: tr(card.title, language: language),
+            analogy: tr(card.analogy, language: language),
+            keyTakeaways: card.keyTakeaways.map { tr($0, language: language) },
+            concreteExample: tr(card.concreteExample, language: language),
+            diagramTop: tr(card.diagramTop, language: language),
+            diagramBottom: tr(card.diagramBottom, language: language),
+            step1: tr(card.step1, language: language),
+            step2: tr(card.step2, language: language),
+            rule: tr(card.rule, language: language)
         )
     }
 
