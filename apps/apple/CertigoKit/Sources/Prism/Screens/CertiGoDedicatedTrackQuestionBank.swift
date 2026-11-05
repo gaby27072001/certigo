@@ -52,6 +52,18 @@ public struct CertiGoDedicatedTrackBrandMetadata: Equatable, Hashable, Codable, 
     public let certificationAssetName: String
     public let islandServiceAssetNames: [String]
 
+    public var displayName: String {
+        brandDisplayName
+    }
+
+    public var brandName: String {
+        brandDisplayName
+    }
+
+    public var title: String {
+        officialTitle
+    }
+
     public init(
         routeCode: String,
         officialTitle: String,

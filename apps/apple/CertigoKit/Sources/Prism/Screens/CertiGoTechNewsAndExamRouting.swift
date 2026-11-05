@@ -3112,13 +3112,13 @@ public struct CertiGoTechNewsFeedView: View {
             // Left 2-Line Masthead: Line 1 = Date (`#8E8E93`, `22 pt .bold`), Line 2 = ` Actus Tech` (`32 pt .heavy`, tight tracking)
             VStack(alignment: .leading, spacing: FigMetrics.two) {
                 Text(verbatim: appState.appleNewsMastheadDateLine(languageIndex: appState.settingsLanguageIndex))
-                    .font(.system(size: FigMetrics.twentyTwo, weight: .bold))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
                     .lineLimit(1)
 
                 HStack(alignment: .firstTextBaseline, spacing: PrismSpacing.xs) {
                     Text(verbatim: appState.appleNewsMastheadBrandLine(languageIndex: appState.settingsLanguageIndex))
-                        .font(.system(size: FigMetrics.thirtyTwo, weight: .heavy))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirtyTwo, style: "Heavy"))
                         .tracking(-0.8)
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                         .lineLimit(1)
@@ -3152,7 +3152,7 @@ public struct CertiGoTechNewsFeedView: View {
                 } label: {
                     let isSavedFilter = appState.techNewsState.selectedAppleNewsTopicPill == .saved
                     Image(systemName: "bookmark.fill")
-                        .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                         .foregroundStyle(
                             isSavedFilter
                                 ? PrismColor.onAccent
@@ -3176,7 +3176,7 @@ public struct CertiGoTechNewsFeedView: View {
                     appState.techNewsState.showTop100SourcesDirectorySheet = true
                 } label: {
                     Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                         .frame(width: FigMetrics.thirtyEight, height: FigMetrics.thirtyEight)
                         .background(floatingLiquidGlassCircleBackground(isHighlighted: false))
@@ -3192,7 +3192,7 @@ public struct CertiGoTechNewsFeedView: View {
                     }
                 } label: {
                     Image(systemName: appState.techNewsState.isSearchFieldVisible ? "xmark" : "magnifyingglass")
-                        .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                         .frame(width: FigMetrics.thirtyEight, height: FigMetrics.thirtyEight)
                         .background(
@@ -3220,7 +3220,7 @@ public struct CertiGoTechNewsFeedView: View {
                     }
                 } label: {
                     Image(systemName: appState.techNewsState.isRefreshingLiveRSS ? "arrow.trianglehead.2.clockwise" : "arrow.clockwise")
-                        .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate700))
                         .certiGoSymbolRotate(trigger: appState.techNewsState.refreshTriggerCount)
                         .frame(width: FigMetrics.thirtySix, height: FigMetrics.thirtySix)
@@ -3254,7 +3254,7 @@ public struct CertiGoTechNewsFeedView: View {
 
                 VStack(spacing: FigMetrics.one) {
                     Text(verbatim: "TECH EDITION")
-                        .font(.system(size: FigMetrics.six, weight: .heavy))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.six, style: "Heavy"))
                         .tracking(0.4)
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                         .lineLimit(1)
@@ -3264,12 +3264,12 @@ public struct CertiGoTechNewsFeedView: View {
                             .fill(PrismColor.figmaHex(FigPalette.appleNewsCoralRed))
                             .frame(width: FigMetrics.eighteen, height: FigMetrics.eighteen)
                         Image(systemName: "newspaper.fill")
-                            .font(.system(size: FigMetrics.ten, weight: .bold))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Bold"))
                             .foregroundStyle(Color.white)
                     }
 
                     Text(verbatim: "• CERTIGO •")
-                        .font(.system(size: FigMetrics.six, weight: .heavy))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.six, style: "Heavy"))
                         .tracking(0.4)
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                         .lineLimit(1)
@@ -3317,14 +3317,14 @@ public struct CertiGoTechNewsFeedView: View {
     private func appleNewsSearchFieldView(innerConcentricRadius: CGFloat) -> some View {
         HStack(spacing: PrismSpacing.s) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: FigMetrics.fourteen, weight: .semibold))
+                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
                 .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
 
             TextField(
                 isEnglish ? "Search an article, publisher, or topic..." : "Rechercher un article, un média ou un sujet...",
                 text: $appState.techNewsState.feedSearchQuery
             )
-            .font(.system(size: FigMetrics.fifteen, weight: .regular))
+            .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Regular"))
             .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
 
             if !appState.techNewsState.feedSearchQuery.isEmpty {
@@ -3332,7 +3332,7 @@ public struct CertiGoTechNewsFeedView: View {
                     appState.techNewsState.feedSearchQuery = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: FigMetrics.fourteen, weight: .semibold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
                 }
                 .buttonStyle(.plain)
@@ -3371,7 +3371,7 @@ public struct CertiGoTechNewsFeedView: View {
                         } label: {
                             HStack(spacing: FigMetrics.six) {
                                 Image(systemName: pill.sfSymbolName)
-                                    .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                                     .foregroundStyle(
                                         isSelected
                                             ? Color.white
@@ -3379,7 +3379,7 @@ public struct CertiGoTechNewsFeedView: View {
                                     )
 
                                 Text(verbatim: pill.displayTitle(languageIndex: appState.settingsLanguageIndex))
-                                    .font(.system(size: CertiGoAppleNewsTopicPillID.labelFontSize, weight: .semibold))
+                                    .font(PrismTypography.figmaFont(size: CertiGoAppleNewsTopicPillID.labelFontSize, style: "Semi Bold"))
                                     .foregroundStyle(
                                         isSelected
                                             ? Color.white
@@ -3451,7 +3451,7 @@ public struct CertiGoTechNewsFeedView: View {
             // Section Header `À la Une` in Apple News coral red (`#FA2D48`, `26 pt .heavy`)
             HStack(alignment: .firstTextBaseline) {
                 Text(verbatim: isEnglish ? "Top Stories" : "À la Une")
-                    .font(.system(size: FigMetrics.twentySix, weight: .heavy))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twentySix, style: "Heavy"))
                     .tracking(-0.5)
                     .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsCoralRed))
                     .lineLimit(1)
@@ -3485,7 +3485,7 @@ public struct CertiGoTechNewsFeedView: View {
             // Expanded additional top stories (`Dernières actualités`) when user taps `"Plus d'actualités à la une ›"`
             if appState.techNewsState.isMoreTopStoriesExpanded && articles.count > 4 {
                 Text(verbatim: isEnglish ? "Latest News" : "Dernières actualités")
-                    .font(.system(size: FigMetrics.eighteen, weight: .bold))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                     .padding(.top, PrismSpacing.xxs)
 
@@ -3510,7 +3510,7 @@ public struct CertiGoTechNewsFeedView: View {
                             ? (isEnglish ? "Show fewer Top Stories ‹" : "Réduire les actualités à la une ‹")
                             : (isEnglish ? "More Top Stories ›" : "Plus d'actualités à la une ›")
                     )
-                    .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                     .padding(.horizontal, PrismSpacing.l)
                     .frame(height: FigMetrics.thirtyEight)
@@ -3566,14 +3566,14 @@ public struct CertiGoTechNewsFeedView: View {
                         HStack(spacing: PrismSpacing.xs) {
                             CertiGoBrandLogoView(vendorId: article.vendorLogoId, size: FigMetrics.eighteen)
                             Text(verbatim: article.editorialMediaName)
-                                .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                 .lineLimit(1)
 
                             Spacer(minLength: PrismSpacing.xxs)
 
                             Text(verbatim: article.linkedCertificationCode)
-                                .font(.system(size: FigMetrics.eleven, weight: .heavy))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Heavy"))
                                 .foregroundStyle(PrismColor.figmaHex(article.editorialAccentHex))
                                 .padding(.horizontal, PrismSpacing.xs)
                                 .frame(height: FigMetrics.twentyTwo)
@@ -3585,7 +3585,7 @@ public struct CertiGoTechNewsFeedView: View {
 
                         // Large Editorial Headline (`21 pt .bold`, 3-4 lines max, zero body summary clutter on card)
                         Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
-                            .font(.system(size: FigMetrics.twentyOne, weight: .bold))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twentyOne, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                             .lineLimit(4)
                             .multilineTextAlignment(.leading)
@@ -3598,7 +3598,7 @@ public struct CertiGoTechNewsFeedView: View {
                 // Card Footer (`HStack`): Left = `"Il y a X • Source • 3 min"` (`12 pt #8E8E93`); Right = Quick Audio `🎧`, Bookmark, and Menu `•••`
                 HStack(spacing: PrismSpacing.xs) {
                     Text(verbatim: article.appleNewsHeroFooterMetadata(languageIndex: appState.settingsLanguageIndex))
-                        .font(.system(size: FigMetrics.twelve, weight: .medium))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
                         .lineLimit(1)
 
@@ -3620,9 +3620,9 @@ public struct CertiGoTechNewsFeedView: View {
                     } label: {
                         HStack(spacing: FigMetrics.four) {
                             Image(systemName: isSpeakingThis ? "pause.fill" : "headphones")
-                                .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                             Text(verbatim: "🎧")
-                                .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                         }
                         .foregroundStyle(
                             isSpeakingThis
@@ -3654,7 +3654,7 @@ public struct CertiGoTechNewsFeedView: View {
                         }
                     } label: {
                         Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                            .font(.system(size: FigMetrics.thirteen, weight: .semibold))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
                             .foregroundStyle(
                                 isBookmarked
                                     ? PrismColor.figmaHex(FigPalette.appleNewsCoralRed)
@@ -3701,7 +3701,7 @@ public struct CertiGoTechNewsFeedView: View {
             if showActusPlusBanner {
                 HStack(spacing: FigMetrics.four) {
                     Text(verbatim: "Actus+")
-                        .font(.system(size: FigMetrics.eleven, weight: .heavy))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Heavy"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsCoralRed))
                     Spacer()
                 }
@@ -3720,13 +3720,13 @@ public struct CertiGoTechNewsFeedView: View {
                             HStack(spacing: FigMetrics.six) {
                                 CertiGoBrandLogoView(vendorId: article.vendorLogoId, size: FigMetrics.sixteen)
                                 Text(verbatim: article.editorialMediaName)
-                                    .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                     .lineLimit(1)
                             }
 
                             Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
-                                .font(.system(size: FigMetrics.seventeen, weight: .bold))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.seventeen, style: "Bold"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                 .lineLimit(4)
                                 .multilineTextAlignment(.leading)
@@ -3739,7 +3739,7 @@ public struct CertiGoTechNewsFeedView: View {
                     Spacer(minLength: FigMetrics.four)
 
                     Text(verbatim: article.appleNewsCompactFooterMetadata(languageIndex: appState.settingsLanguageIndex))
-                        .font(.system(size: FigMetrics.twelve, weight: .medium))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
                         .lineLimit(1)
                 }
@@ -3793,7 +3793,7 @@ public struct CertiGoTechNewsFeedView: View {
                 // Amber/Yellow `Actus+` badge + White Publisher Name
                 HStack(spacing: FigMetrics.six) {
                     Text(verbatim: "Actus+")
-                        .font(.system(size: FigMetrics.ten, weight: .heavy))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Heavy"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                         .padding(.horizontal, FigMetrics.six)
                         .padding(.vertical, FigMetrics.two)
@@ -3803,7 +3803,7 @@ public struct CertiGoTechNewsFeedView: View {
                         )
 
                     Text(verbatim: article.editorialMediaName)
-                        .font(.system(size: FigMetrics.twelve, weight: .bold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                         .foregroundStyle(Color.white)
                         .lineLimit(1)
                 }
@@ -3812,7 +3812,7 @@ public struct CertiGoTechNewsFeedView: View {
                     appState.openTechNewsReaderSheet(forArticleId: article.id)
                 } label: {
                     Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
-                        .font(.system(size: FigMetrics.fifteenPointFive, weight: .bold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenPointFive, style: "Bold"))
                         .foregroundStyle(Color.white)
                         .lineLimit(4)
                         .multilineTextAlignment(.leading)
@@ -3824,7 +3824,7 @@ public struct CertiGoTechNewsFeedView: View {
 
                 HStack {
                     Text(verbatim: article.editorialHeroTimeLabel(languageIndex: appState.settingsLanguageIndex))
-                        .font(.system(size: FigMetrics.eleven, weight: .medium))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Medium"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate300))
                         .lineLimit(1)
 
@@ -3862,7 +3862,7 @@ public struct CertiGoTechNewsFeedView: View {
                 HStack(spacing: FigMetrics.six) {
                     CertiGoBrandLogoView(vendorId: article.vendorLogoId, size: FigMetrics.fourteen)
                     Text(verbatim: article.editorialMediaName)
-                        .font(.system(size: FigMetrics.twelve, weight: .bold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                         .lineLimit(1)
                 }
@@ -3871,7 +3871,7 @@ public struct CertiGoTechNewsFeedView: View {
                     appState.openTechNewsReaderSheet(forArticleId: article.id)
                 } label: {
                     Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
-                        .font(.system(size: FigMetrics.fifteenPointFive, weight: .bold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fifteenPointFive, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                         .lineLimit(4)
                         .multilineTextAlignment(.leading)
@@ -3883,7 +3883,7 @@ public struct CertiGoTechNewsFeedView: View {
 
                 HStack {
                     Text(verbatim: article.editorialHeroTimeLabel(languageIndex: appState.settingsLanguageIndex))
-                        .font(.system(size: FigMetrics.eleven, weight: .medium))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Medium"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
                         .lineLimit(1)
 
@@ -3917,7 +3917,7 @@ public struct CertiGoTechNewsFeedView: View {
                     }
                 } label: {
                     Text(verbatim: isEnglish ? "Generative AI & Models ›" : "IA Générative & Modèles ›")
-                        .font(.system(size: FigMetrics.twentyTwo, weight: .heavy))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Heavy"))
                         .tracking(-0.4)
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                 }
@@ -3928,7 +3928,7 @@ public struct CertiGoTechNewsFeedView: View {
                         ? "Curated selection from official sources"
                         : "Sélection vérifiée par les sources officielles"
                 )
-                .font(.system(size: FigMetrics.thirteen, weight: .medium))
+                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate600))
             }
 
@@ -3954,7 +3954,7 @@ public struct CertiGoTechNewsFeedView: View {
                     }
                 } label: {
                     Text(verbatim: isEnglish ? "See all in AI ›" : "Tout voir sur l'IA ›")
-                        .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                         .padding(.horizontal, PrismSpacing.l)
                         .frame(height: FigMetrics.thirtyEight)
@@ -3991,7 +3991,7 @@ public struct CertiGoTechNewsFeedView: View {
 
         return VStack(alignment: .leading, spacing: PrismSpacing.s) {
             Text(verbatim: isEnglish ? "Trending Tech" : "Tendances Tech")
-                .font(.system(size: FigMetrics.twentyFour, weight: .heavy))
+                .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Heavy"))
                 .tracking(-0.4)
                 .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsOrange))
 
@@ -4004,7 +4004,7 @@ public struct CertiGoTechNewsFeedView: View {
                                 .fill(PrismColor.figmaHex(FigPalette.appleNewsOrange).opacity(0.12))
                                 .frame(width: FigMetrics.thirtySix, height: FigMetrics.thirtySix)
                             Text(verbatim: "\(index + 1)")
-                                .font(.system(size: FigMetrics.twentyTwo, weight: .heavy))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Heavy"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsOrange))
                         }
                         .padding(.top, FigMetrics.two)
@@ -4017,20 +4017,20 @@ public struct CertiGoTechNewsFeedView: View {
                                 HStack(spacing: FigMetrics.six) {
                                     CertiGoBrandLogoView(vendorId: article.vendorLogoId, size: FigMetrics.fourteen)
                                     Text(verbatim: article.editorialMediaName)
-                                        .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                         .lineLimit(1)
                                 }
 
                                 Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
-                                    .font(.system(size: FigMetrics.sixteen, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                     .lineLimit(3)
                                     .multilineTextAlignment(.leading)
                                     .fixedSize(horizontal: false, vertical: true)
 
                                 Text(verbatim: article.editorialHeroTimeLabel(languageIndex: appState.settingsLanguageIndex))
-                                    .font(.system(size: FigMetrics.twelve, weight: .medium))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Medium"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
                             }
                         }
@@ -4081,7 +4081,7 @@ public struct CertiGoTechNewsFeedView: View {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: FigMetrics.two) {
                     Text(verbatim: isEnglish ? "Listen Now" : "Écouter maintenant")
-                        .font(.system(size: FigMetrics.twentyFour, weight: .heavy))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.twentyFour, style: "Heavy"))
                         .tracking(-0.4)
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
 
@@ -4090,7 +4090,7 @@ public struct CertiGoTechNewsFeedView: View {
                             ? "Audio stories narrated by neural voice"
                             : "Articles audio lus par la voix neurale"
                     )
-                    .font(.system(size: FigMetrics.thirteen, weight: .medium))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
                     .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
                 }
 
@@ -4103,9 +4103,9 @@ public struct CertiGoTechNewsFeedView: View {
                 } label: {
                     HStack(spacing: FigMetrics.six) {
                         Image(systemName: "play.fill")
-                            .font(.system(size: FigMetrics.eleven, weight: .bold))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                         Text(verbatim: isEnglish ? "Play All" : "Tout écouter")
-                            .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                     }
                     .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsCoralRed))
                     .padding(.horizontal, PrismSpacing.m)
@@ -4138,7 +4138,7 @@ public struct CertiGoTechNewsFeedView: View {
                             // `Audio+` badge + Publisher Name
                             HStack(spacing: FigMetrics.six) {
                                 Text(verbatim: "Audio+")
-                                    .font(.system(size: FigMetrics.ten, weight: .heavy))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Heavy"))
                                     .foregroundStyle(Color.white)
                                     .padding(.horizontal, FigMetrics.six)
                                     .padding(.vertical, FigMetrics.two)
@@ -4148,7 +4148,7 @@ public struct CertiGoTechNewsFeedView: View {
                                     )
 
                                 Text(verbatim: article.editorialMediaName)
-                                    .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                     .lineLimit(1)
                             }
@@ -4157,7 +4157,7 @@ public struct CertiGoTechNewsFeedView: View {
                                 appState.openTechNewsReaderSheet(forArticleId: article.id)
                             } label: {
                                 Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
-                                    .font(.system(size: FigMetrics.sixteen, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                     .lineLimit(3)
                                     .multilineTextAlignment(.leading)
@@ -4177,13 +4177,13 @@ public struct CertiGoTechNewsFeedView: View {
                             } label: {
                                 HStack(spacing: FigMetrics.six) {
                                     Image(systemName: isSpeakingThis ? "pause.fill" : "play.fill")
-                                        .font(.system(size: FigMetrics.ten, weight: .bold))
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Bold"))
                                     Text(
                                         verbatim: isSpeakingThis
                                             ? (isEnglish ? "🎧 Playing..." : "🎧 En écoute...")
                                             : article.appleNewsAudioDurationPillText(languageIndex: appState.settingsLanguageIndex)
                                     )
-                                    .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                 }
                                 .foregroundStyle(
                                     isSpeakingThis
@@ -4304,7 +4304,7 @@ public struct CertiGoTechNewsFeedView: View {
             }
         } label: {
             Image(systemName: "ellipsis")
-                .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                 .foregroundStyle(
                     isDarkCard
                         ? PrismColor.figmaHex(FigPalette.slate300)
@@ -4323,13 +4323,13 @@ public struct CertiGoTechNewsFeedView: View {
         let reader = appState.techNewsState.audioReader
         HStack(spacing: PrismSpacing.s) {
             Image(systemName: reader.isSpeaking ? "speaker.wave.3.fill" : "pause.fill")
-                .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                 .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsCoralRed))
                 .certiGoSymbolVariableColor(isActive: reader.isSpeaking)
                 .contentTransition(.symbolEffect(.replace))
 
             Text(verbatim: isEnglish ? "🎧 Podcast Reading · \(reader.activeArticleHeadline ?? "")" : "🎧 Lecture Audio · \(reader.activeArticleHeadline ?? "")")
-                .font(.system(size: FigMetrics.twelve, weight: .semibold))
+                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                 .lineLimit(1)
 
@@ -4339,7 +4339,7 @@ public struct CertiGoTechNewsFeedView: View {
                 appState.cycleTechNewsAudioSpeed()
             } label: {
                 Text(verbatim: reader.speedBadgeText)
-                    .font(.system(size: FigMetrics.eleven, weight: .bold))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                     .padding(.horizontal, PrismSpacing.xs)
                     .frame(height: FigMetrics.twentyEight)
@@ -4359,7 +4359,7 @@ public struct CertiGoTechNewsFeedView: View {
                 }
             } label: {
                 Image(systemName: reader.isSpeaking ? "pause.fill" : "play.fill")
-                    .font(.system(size: FigMetrics.twelve, weight: .bold))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsCoralRed))
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: FigMetrics.twentyEight, height: FigMetrics.twentyEight)
@@ -4374,7 +4374,7 @@ public struct CertiGoTechNewsFeedView: View {
                 appState.stopTechNewsAudioSpeech()
             } label: {
                 Image(systemName: "stop.fill")
-                    .font(.system(size: FigMetrics.eleven, weight: .bold))
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate500))
                     .frame(width: FigMetrics.twentyEight, height: FigMetrics.twentyEight)
                     .background(
@@ -4454,12 +4454,12 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         VStack(alignment: .leading, spacing: FigMetrics.two) {
                             HStack(spacing: FigMetrics.six) {
                                 Text(verbatim: article.editorialMediaName)
-                                    .font(.system(size: FigMetrics.eighteen, weight: .heavy))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.eighteen, style: "Heavy"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                     .lineLimit(1)
 
                                 Image(systemName: "checkmark.seal.fill")
-                                    .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsCoralRed))
                             }
 
@@ -4468,7 +4468,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                     ? "Verified Official Source • #\(article.sourceRank) Top 100 Tech"
                                     : "Source officielle vérifiée • #\(article.sourceRank) Top 100 Tech"
                             )
-                            .font(.system(size: FigMetrics.eleven, weight: .semibold))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
                             .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
                         }
 
@@ -4481,19 +4481,19 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                     // 2. Colored Uppercase Category Kicker + Large Apple News Editorial Headline (`26 pt .heavy`, tight line spacing) + Byline & Timestamp (`13 pt #8E8E93`)
                     VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                         Text(verbatim: article.appleNewsCategoryKicker(languageIndex: appState.settingsLanguageIndex))
-                            .font(.system(size: FigMetrics.twelve, weight: .heavy))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Heavy"))
                             .tracking(0.6)
                             .foregroundStyle(PrismColor.figmaHex(article.editorialAccentHex))
 
                         Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
-                            .font(.system(size: FigMetrics.twentySix, weight: .heavy))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twentySix, style: "Heavy"))
                             .tracking(-0.4)
                             .lineSpacing(FigMetrics.two)
                             .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                             .fixedSize(horizontal: false, vertical: true)
 
                         Text(verbatim: article.appleNewsBylineAndTimestamp(languageIndex: appState.settingsLanguageIndex))
-                            .font(.system(size: FigMetrics.thirteen, weight: .medium))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Medium"))
                             .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
                     }
 
@@ -4506,7 +4506,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         )
 
                         Text(verbatim: article.appleNewsPhotoCaptionCredit(languageIndex: appState.settingsLanguageIndex))
-                            .font(.system(size: FigMetrics.twelve, weight: .regular))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Regular"))
                             .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsSystemGray))
                     }
 
@@ -4526,7 +4526,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                 let _ = isEnglish ? "🔊 Read aloud" : "🔊 Écouter à haute voix"
                                 HStack(spacing: PrismSpacing.xs) {
                                     Image(systemName: isSpeakingThis ? "pause.fill" : "headphones")
-                                        .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                                         .certiGoSymbolVariableColor(isActive: isSpeakingThis)
                                         .contentTransition(.symbolEffect(.replace))
                                     Text(
@@ -4534,7 +4534,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                             ? (isEnglish ? "Pause • Neural Podcast Voice" : "Pause • Voix Neurale Podcast")
                                             : (isEnglish ? "🎧 Listen to this article • Neural Podcast Voice" : "🎧 Écouter cet article • Voix Neurale Podcast")
                                     )
-                                    .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                     .lineLimit(1)
                                 }
                                 .foregroundStyle(
@@ -4567,7 +4567,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                         appState.setTechNewsAudioSpeed(speed)
                                     } label: {
                                         Text(verbatim: speedText)
-                                            .font(.system(size: FigMetrics.eleven, weight: .bold))
+                                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
                                             .foregroundStyle(
                                                 isCurrentSpeed
                                                     ? Color.white
@@ -4591,7 +4591,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
 
                         HStack(spacing: PrismSpacing.s) {
                             Text(verbatim: appState.techNewsState.audioReader.voiceStatusLabel(languageIndex: appState.settingsLanguageIndex))
-                                .font(.system(size: FigMetrics.eleven, weight: .semibold))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate600))
                                 .lineLimit(1)
 
@@ -4600,7 +4600,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                             // Duolingo `Version simple` toggle
                             HStack(spacing: PrismSpacing.xs) {
                                 Text(verbatim: isEnglish ? "Simple version" : "Version simple")
-                                    .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                     .lineLimit(1)
 
@@ -4619,7 +4619,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
 
                         if appState.techNewsState.audioReader.isUsingDefaultCompactVoice {
                             Text(verbatim: CertiGoTechNewsAudioReaderState.premiumVoiceInstallationTip(languageIndex: appState.settingsLanguageIndex))
-                                .font(.system(size: FigMetrics.eleven, weight: .regular))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate500))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -4648,12 +4648,12 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         // Paragraph 1: `1. Les faits` (`À retenir`)
                         VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                             Text(verbatim: sections[0].heading)
-                                .font(.system(size: FigMetrics.thirteen, weight: .heavy))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Heavy"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsCoralRed))
                             let _ = isEnglish ? "Key takeaways" : "À retenir"
 
                             Text(verbatim: sections[0].body)
-                                .font(.system(size: bodyFontSize, weight: .regular))
+                                .font(PrismTypography.figmaFont(size: bodyFontSize, style: "Regular"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                 .lineSpacing(FigMetrics.six)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -4664,11 +4664,11 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         // Paragraph 2: `2. Comprendre le contexte technique`
                         VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                             Text(verbatim: sections[1].heading)
-                                .font(.system(size: FigMetrics.thirteen, weight: .heavy))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Heavy"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate700))
 
                             Text(verbatim: sections[1].body)
-                                .font(.system(size: bodyFontSize, weight: .regular))
+                                .font(PrismTypography.figmaFont(size: bodyFontSize, style: "Regular"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate800))
                                 .lineSpacing(FigMetrics.six)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -4677,12 +4677,12 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         // Structured Key Takeaway Callout: `3. Ce qu'il faut retenir` (`Pourquoi c'est important`)
                         VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                             Text(verbatim: sections[2].heading)
-                                .font(.system(size: FigMetrics.thirteen, weight: .heavy))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Heavy"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.royalBlue))
                             let _ = isEnglish ? "Why it matters" : "Pourquoi c'est important"
 
                             Text(verbatim: sections[2].body)
-                                .font(.system(size: bodyFontSize, weight: .medium))
+                                .font(PrismTypography.figmaFont(size: bodyFontSize, style: "Medium"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                 .lineSpacing(FigMetrics.five)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -4704,7 +4704,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         } label: {
                             HStack(spacing: PrismSpacing.xs) {
                                 Image(systemName: "sparkles")
-                                    .font(.system(size: FigMetrics.fifteen, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Bold"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.indigo600))
                                     .certiGoSymbolBreathe(isActive: true)
 
@@ -4713,7 +4713,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                         ? "Ask AI a question about this article"
                                         : "Poser une question à l'IA sur cet article"
                                 )
-                                .font(.system(size: FigMetrics.sixteen, weight: .bold))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
 
                                 let _ = isEnglish ? "✦ Questions about this news?" : "✦ Des questions sur cette actu ?"
@@ -4721,7 +4721,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                 Spacer()
 
                                 Image(systemName: appState.techNewsState.isReaderAIQuestionDrawerExpanded ? "chevron.up" : "chevron.down")
-                                    .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate500))
                             }
                         }
@@ -4745,10 +4745,10 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                         } label: {
                                             HStack(spacing: PrismSpacing.xxs) {
                                                 Text(verbatim: "✦")
-                                                    .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.indigo600))
                                                 Text(verbatim: shortTitle)
-                                                    .font(.system(size: FigMetrics.thirteen, weight: .semibold))
+                                                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
                                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate800))
                                                     .lineLimit(1)
                                                     .fixedSize(horizontal: true, vertical: false)
@@ -4788,7 +4788,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                             : "Poser une question sur cet article..."
                                     )
                                 }
-                                .font(.system(size: FigMetrics.fourteen, weight: .regular))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                 .submitLabel(.send)
                                 .onSubmit {
@@ -4805,7 +4805,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                     }
                                 } label: {
                                     Text(verbatim: isEnglish ? "Quick Q&A" : "Question rapide")
-                                        .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                         .foregroundStyle(PrismColor.onAccent)
                                         .lineLimit(1)
                                         .fixedSize(horizontal: true, vertical: false)
@@ -4835,9 +4835,9 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                             } label: {
                                 HStack(spacing: PrismSpacing.xs) {
                                     Text(verbatim: "✦")
-                                        .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                                     Text(verbatim: isEnglish ? "Open in Coach →" : "Ouvrir dans le Coach →")
-                                        .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                                         .lineLimit(1)
                                     Spacer()
                                 }
@@ -4859,11 +4859,11 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                             ForEach(qaEntries) { entry in
                                 VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                                     Text(verbatim: "💬 \(entry.userQuestion)")
-                                        .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                                         .foregroundStyle(PrismColor.figmaHex(FigPalette.indigo600))
 
                                     Text(verbatim: entry.aiAnswer)
-                                        .font(.system(size: FigMetrics.fourteen, weight: .regular))
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
                                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate800))
                                         .lineSpacing(FigMetrics.four)
                                         .fixedSize(horizontal: false, vertical: true)
@@ -4872,7 +4872,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                         onAskCertiGoAI(article)
                                     } label: {
                                         Text(verbatim: isEnglish ? "Open in Coach →" : "Ouvrir dans le Coach →")
-                                            .font(.system(size: FigMetrics.thirteen, weight: .bold))
+                                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                                             .foregroundStyle(PrismColor.figmaHex(FigPalette.indigo600))
                                             .padding(.top, PrismSpacing.xxs)
                                     }
@@ -4901,7 +4901,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                     // 7. Duolingo Flash Quiz (`⚡ Tester si j'ai compris (+10 XP)`) & Official Website Button (`Lire sur le site officiel`)
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
                         Text(verbatim: isEnglish ? "Go further" : "Aller plus loin")
-                            .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex(FigPalette.slate600))
 
                         // Collapsible Duolingo Flash Quiz Card (`+10 XP`)
@@ -4917,7 +4917,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                             ? (isEnglish ? "✓ Understood (+10 XP earned)" : "✓ Compris (+10 XP gagnés)")
                                             : (isEnglish ? "⚡ Test my understanding (+10 XP)" : "⚡ Tester si j'ai compris (+10 XP)")
                                     )
-                                    .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                                     .foregroundStyle(
                                         PrismColor.figmaHex(isValidated ? FigPalette.emerald600 : FigPalette.slate900)
                                     )
@@ -4925,7 +4925,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                     Spacer()
 
                                     Image(systemName: isFlashExpanded ? "chevron.up" : "chevron.down")
-                                        .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate500))
                                 }
                             }
@@ -4934,7 +4934,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
 
                             if isFlashExpanded {
                                 Text(verbatim: article.localizedFlashPrompt(languageIndex: appState.settingsLanguageIndex))
-                                    .font(.system(size: FigMetrics.fourteen, weight: .semibold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
                                     .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                     .fixedSize(horizontal: false, vertical: true)
 
@@ -4956,13 +4956,13 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                     } label: {
                                         HStack(spacing: PrismSpacing.s) {
                                             Text(verbatim: opt.badge)
-                                                .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                                 .frame(width: FigMetrics.twentyFour, height: FigMetrics.twentyFour)
                                                 .background(Circle().fill(PrismColor.figmaHex(FigPalette.slate100)))
 
                                             Text(verbatim: opt.localizedText(languageIndex: appState.settingsLanguageIndex))
-                                                .font(.system(size: FigMetrics.thirteen, weight: .regular))
+                                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
                                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                                                 .multilineTextAlignment(.leading)
 
@@ -4970,7 +4970,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
 
                                             if isChosen {
                                                 Text(verbatim: opt.isCorrect ? "+10 XP ✓" : "✕")
-                                                    .font(.system(size: FigMetrics.twelve, weight: .bold))
+                                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
                                                     .foregroundStyle(PrismColor.figmaHex(opt.isCorrect ? FigPalette.emerald600 : FigPalette.red500))
                                             }
                                         }
@@ -4990,7 +4990,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
 
                                 if selectedChoiceId != nil {
                                     Text(verbatim: article.localizedFlashExplanation(languageIndex: appState.settingsLanguageIndex))
-                                        .font(.system(size: FigMetrics.thirteen, weight: .regular))
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Regular"))
                                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate700))
                                         .padding(PrismSpacing.s)
                                 }
@@ -5014,13 +5014,13 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         } label: {
                             HStack(spacing: PrismSpacing.xs) {
                                 Image(systemName: "safari.fill")
-                                    .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                                 Text(
                                     verbatim: isEnglish
                                         ? "Read on official website (\(article.editorialMediaName)) ↗"
                                         : "Lire sur le site officiel (\(article.editorialMediaName)) ↗"
                                 )
-                                .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                                 .lineLimit(1)
                             }
                             .foregroundStyle(Color.white)
@@ -5047,7 +5047,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                     appState.closeTechNewsReaderSheet()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                        .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                         .frame(width: FigMetrics.thirtyEight, height: FigMetrics.thirtyEight)
                         .background(readerLiquidGlassControlBackground)
@@ -5067,9 +5067,9 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                     } label: {
                         HStack(spacing: FigMetrics.two) {
                             Text(verbatim: "Aa")
-                                .font(.system(size: FigMetrics.fourteen, weight: .heavy))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Heavy"))
                             Text(verbatim: "\(appState.techNewsState.readerFontSizeTier.rawValue)")
-                                .font(.system(size: FigMetrics.ten, weight: .bold))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.ten, style: "Bold"))
                                 .foregroundStyle(PrismColor.figmaHex(FigPalette.appleNewsCoralRed))
                         }
                         .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
@@ -5088,7 +5088,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         )
                     ) {
                         Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                             .frame(width: FigMetrics.thirtyEight, height: FigMetrics.thirtyEight)
                             .background(readerLiquidGlassControlBackground)
@@ -5102,7 +5102,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         }
                     } label: {
                         Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                            .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                             .foregroundStyle(
                                 isBookmarked
                                     ? PrismColor.figmaHex(FigPalette.appleNewsCoralRed)
@@ -5147,7 +5147,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: FigMetrics.fourteen, weight: .bold))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex(FigPalette.slate900))
                             .frame(width: FigMetrics.thirtyEight, height: FigMetrics.thirtyEight)
                             .background(readerLiquidGlassControlBackground)

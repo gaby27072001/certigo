@@ -1864,7 +1864,7 @@ struct CertiGoNativeFigmaAppTests {
             contentsOf: root.appendingPathComponent("tools/archive_testflight_mac.sh"),
             encoding: .utf8
         )
-        #expect(archiveScript.contains("build=${CERTIGO_DISTRIBUTION_BUILD:-13}"))
+        #expect(archiveScript.contains("build=${CERTIGO_DISTRIBUTION_BUILD:-15}"))
 
         // 6. Verify Typography Charter V3 (6+1 tokens), Widget App Group & Default Snapshot, Auth Validation, and Zero Long Dashes (— or –) across all Swift source files
         #expect(CertiGoTypeToken.displayHero.pointSize == 28)
@@ -3229,5 +3229,19 @@ struct CertiGoNativeFigmaAppTests {
         #expect(chatGPTSource.contains("floatingTopChatGPTBar"))
         #expect(chatGPTSource.contains("floatingBottomAskPillBar"))
         #expect(chatGPTSource.contains("CertiGoChatGPTRichResponseView"))
+
+        // 8. Verify CertiGoDedicatedTrackBrandMetadata.displayName & CertiGoChatGPTExperienceViewModel helpers across all 33 routes
+        for code in CertiGoDedicatedTrackQuestionBank.allSupportedRouteCodes {
+            let meta = CertiGoDedicatedTrackQuestionBank.brandMetadata(forRouteCode: code)
+            #expect(!meta.displayName.isEmpty)
+            #expect(meta.displayName == meta.brandDisplayName)
+            #expect(meta.brandName == meta.brandDisplayName)
+            #expect(meta.title == meta.officialTitle)
+            let subtitle = CertiGoChatGPTExperienceViewModel.welcomeSubtitle(forRouteCode: code)
+            #expect(subtitle.hasPrefix("\(meta.displayName) •"))
+        }
+        #expect(CertiGoChatGPTExperienceViewModel.welcomeSuggestions(for: appState).count == 4)
+        #expect(CertiGoChatGPTExperienceViewModel.voiceOrbTranscripts(for: appState).count == 3)
+        #expect(!CertiGoChatGPTExperienceViewModel.formattedConversationTranscriptForSharing(for: appState).isEmpty)
     }
 }
