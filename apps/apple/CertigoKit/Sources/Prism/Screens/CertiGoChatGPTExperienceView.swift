@@ -754,6 +754,143 @@ public struct CertiGoChatGPTTokenStreamer: Equatable, Sendable {
     }
 }
 
+// MARK: - 4B. Cross-Platform View-Model & Data Helpers (`CertiGoChatGPTExperienceViewModel`)
+
+/// Non-SwiftUI view-model helpers compiled and verified on both Linux (`swift test`) and Apple iOS SDK (`xcodebuild`).
+public enum CertiGoChatGPTExperienceViewModel {
+    public static func welcomeTitle(forRouteCode routeCode: String) -> String {
+        "Que révise-t-on sur \(routeCode) ?"
+    }
+
+    public static func welcomeSubtitle(forRouteCode routeCode: String) -> String {
+        let trackMeta = CertiGoDedicatedTrackQuestionBank.brandMetadata(forRouteCode: routeCode)
+        return "\(trackMeta.displayName) • Réponses structurées étape par étape et simulations d'examen."
+    }
+
+    public static func welcomeSuggestions(
+        for appState: CertiGoNativeAppState
+    ) -> [(icon: String, title: String, subtitle: String, key: String)] {
+        CertiGoMultilingualEngine.localizedAICoachSuggestions(
+            routeCode: appState.activeRouteCode,
+            lang: appState.settingsLanguageIndex
+        )
+    }
+
+    public static func voiceOrbTranscripts(
+        for appState: CertiGoNativeAppState
+    ) -> [(speaker: String, line: String)] {
+        [
+            (
+                "✦ CERTIGO GPT VOIX • \(appState.activeRouteCode)",
+                "« Pose-moi une question à l'oral sur \(appState.activeRouteCode) : je te réponds comme en entretien d'architecture. »"
+            ),
+            (
+                "🎙️ TOI (\(appState.firstNameText.uppercased()))",
+                "« Quelle est la différence décisive entre Private Endpoint et Service Endpoint à l'examen ? »"
+            ),
+            (
+                "✦ CERTIGO GPT VOIX • RÉPONSE",
+                "« Private Endpoint attribue une IP privée 10.x dans ton VNet accessible depuis On-Premises, tandis que Service Endpoint conserve l'IP publique du service PaaS. »"
+            )
+        ]
+    }
+
+    public static func currentVoiceOrbTranscript(
+        for appState: CertiGoNativeAppState
+    ) -> (speaker: String, line: String) {
+        let transcripts = voiceOrbTranscripts(for: appState)
+        return transcripts[max(0, appState.voiceLiveTranscriptIndex) % transcripts.count]
+    }
+
+    public static func formattedConversationTranscriptForSharing(
+        for appState: CertiGoNativeAppState
+    ) -> String {
+        appState.chatTurns.map { turn in
+            let doc = CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: appState.activeRouteCode)
+            return "Question : \(turn.userPrompt)\n\n\(doc.fullPlainText)"
+        }.joined(separator: "\n\n---\n\n")
+    }
+
+    public static func partitionedDrawerThreads(
+        for appState: CertiGoNativeAppState
+    ) -> (pinned: [CertiGoAIThreadItem], recent: [CertiGoAIThreadItem]) {
+        let filtered = appState.filteredAIThreads
+        return (
+            pinned: filtered.filter(\.isPinned),
+            recent: filtered.filter { !$0.isPinned }
+        )
+    }
+
+    public static func followUpPrompt(
+        for action: CertiGoChatGPTResponseMoreAction,
+        turn: CertiGoChatTurn,
+        routeCode: String
+    ) -> String? {
+        switch action {
+        case .regenerateResponse:
+            return nil
+        case .deepenWithConcreteExample:
+            return "Donne-moi un exemple concret d'architecture en production sur : \(turn.userPrompt)"
+        case .testWithOneExamQuestion:
+            return "Teste-moi avec 1 question d'examen officielle (\(routeCode)) sur : \(turn.userPrompt)"
+        }
+    }
+
+    public static func isAnyTurnCurrentlyStreaming(
+        appState: CertiGoNativeAppState,
+        activeStreamingTurnId: String?,
+        streamProgressByTurnId: [String: CertiGoChatGPTTokenStreamer]
+    ) -> Bool {
+        if let activeId = activeStreamingTurnId,
+           let streamer = streamProgressByTurnId[activeId],
+           streamer.isStreaming {
+            return true
+        }
+        return appState.chatTurns.last?.isStreamingOrLoading == true
+    }
+
+    public static func tickActiveStreamerIfNeeded(
+        activeStreamingTurnId: inout String?,
+        streamProgressByTurnId: inout [String: CertiGoChatGPTTokenStreamer],
+        appState: inout CertiGoNativeAppState
+    ) {
+        guard let activeId = activeStreamingTurnId,
+              var streamer = streamProgressByTurnId[activeId]
+        else { return }
+
+        guard streamer.isStreaming else {
+            activeStreamingTurnId = nil
+            return
+        }
+        streamer.advanceTick()
+        streamProgressByTurnId[activeId] = streamer
+        if !streamer.isStreaming {
+            activeStreamingTurnId = nil
+            if let idx = appState.chatTurns.firstIndex(where: { $0.id == activeId }) {
+                appState.chatTurns[idx].isStreamingOrLoading = false
+            }
+        }
+    }
+
+    public static func stopCurrentStreamingImmediately(
+        activeStreamingTurnId: inout String?,
+        streamProgressByTurnId: inout [String: CertiGoChatGPTTokenStreamer],
+        appState: inout CertiGoNativeAppState
+    ) {
+        if let activeId = activeStreamingTurnId,
+           var streamer = streamProgressByTurnId[activeId] {
+            streamer.stopByUser()
+            streamProgressByTurnId[activeId] = streamer
+            appState.stoppedStreamingTurnIds.insert(activeId)
+            activeStreamingTurnId = nil
+        }
+        if !appState.chatTurns.isEmpty {
+            let lastIdx = appState.chatTurns.count - 1
+            appState.chatTurns[lastIdx].isStreamingOrLoading = false
+        }
+    }
+}
+
 #if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
 import UIKit
@@ -809,12 +946,11 @@ public struct CertiGoChatGPTExperienceView: View {
     }
 
     private var isAnyTurnCurrentlyStreaming: Bool {
-        if let activeId = activeStreamingTurnId,
-           let streamer = streamProgressByTurnId[activeId],
-           streamer.isStreaming {
-            return true
-        }
-        return appState.chatTurns.last?.isStreamingOrLoading == true
+        CertiGoChatGPTExperienceViewModel.isAnyTurnCurrentlyStreaming(
+            appState: appState,
+            activeStreamingTurnId: activeStreamingTurnId,
+            streamProgressByTurnId: streamProgressByTurnId
+        )
     }
 
     public var body: some View {
@@ -1118,11 +1254,9 @@ public struct CertiGoChatGPTExperienceView: View {
     // MARK: - 5B. Welcome State on Pure Canvas (with Duolingo Pedagogical Clarity & Liquid Glass Prompts)
 
     private var chatGPTWelcomeCanvasContent: some View {
-        let suggestions = CertiGoMultilingualEngine.localizedAICoachSuggestions(
-            routeCode: appState.activeRouteCode,
-            lang: appState.settingsLanguageIndex
-        )
-        let trackMeta = CertiGoDedicatedTrackQuestionBank.brandMetadata(forRouteCode: appState.activeRouteCode)
+        let suggestions = CertiGoChatGPTExperienceViewModel.welcomeSuggestions(for: appState)
+        let welcomeTitleText = CertiGoChatGPTExperienceViewModel.welcomeTitle(forRouteCode: appState.activeRouteCode)
+        let welcomeSubtitleText = CertiGoChatGPTExperienceViewModel.welcomeSubtitle(forRouteCode: appState.activeRouteCode)
 
         return VStack(spacing: FigMetrics.twentyFour) {
             if let activeError = appState.activeDiagnosticError {
@@ -1164,13 +1298,13 @@ public struct CertiGoChatGPTExperienceView: View {
                 }
                 .padding(.top, FigMetrics.sixteen)
 
-                Text(verbatim: "Que révise-t-on sur \(appState.activeRouteCode) ?")
+                Text(verbatim: welcomeTitleText)
                     .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
                     .foregroundStyle(primaryInkColor)
                     .multilineTextAlignment(.center)
 
                 Text(
-                    verbatim: "\(trackMeta.displayName) • Réponses structurées étape par étape et simulations d'examen."
+                    verbatim: welcomeSubtitleText
                 )
                 .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
                 .foregroundStyle(PrismColor.figmaHex("#6E6E80"))
@@ -1753,21 +1887,7 @@ public struct CertiGoChatGPTExperienceView: View {
     // MARK: - 5H. Cloudy Blue ChatGPT Interactive Voice Orb (`06C`)
 
     private var chatGPTCloudyBlueVoiceOrbView: some View {
-        let transcripts: [(speaker: String, line: String)] = [
-            (
-                "✦ CERTIGO GPT VOIX • \(appState.activeRouteCode)",
-                "« Pose-moi une question à l'oral sur \(appState.activeRouteCode) : je te réponds comme en entretien d'architecture. »"
-            ),
-            (
-                "🎙️ TOI (\(appState.firstNameText.uppercased()))",
-                "« Quelle est la différence décisive entre Private Endpoint et Service Endpoint à l'examen ? »"
-            ),
-            (
-                "✦ CERTIGO GPT VOIX • RÉPONSE",
-                "« Private Endpoint attribue une IP privée 10.x dans ton VNet accessible depuis On-Premises, tandis que Service Endpoint conserve l'IP publique du service PaaS. »"
-            )
-        ]
-        let currentTranscript = transcripts[appState.voiceLiveTranscriptIndex % transcripts.count]
+        let currentTranscript = CertiGoChatGPTExperienceViewModel.currentVoiceOrbTranscript(for: appState)
 
         return ZStack {
             canvasColor
@@ -2120,8 +2240,9 @@ public struct CertiGoChatGPTExperienceView: View {
     }
 
     private func chatGPTHistoryDrawerView(width: CGFloat) -> some View {
-        let pinned = appState.filteredAIThreads.filter(\.isPinned)
-        let recent = appState.filteredAIThreads.filter { !$0.isPinned }
+        let partitioned = CertiGoChatGPTExperienceViewModel.partitionedDrawerThreads(for: appState)
+        let pinned = partitioned.pinned
+        let recent = partitioned.recent
 
         return VStack(alignment: .leading, spacing: FigMetrics.fourteen) {
             HStack {
@@ -2300,10 +2421,7 @@ public struct CertiGoChatGPTExperienceView: View {
     }
 
     private var formattedConversationTranscriptForSharing: String {
-        appState.chatTurns.map { turn in
-            let doc = CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: appState.activeRouteCode)
-            return "Question : \(turn.userPrompt)\n\n\(doc.fullPlainText)"
-        }.joined(separator: "\n\n---\n\n")
+        CertiGoChatGPTExperienceViewModel.formattedConversationTranscriptForSharing(for: appState)
     }
 
     private func submitPrompt(_ rawText: String) {
@@ -2320,8 +2438,13 @@ public struct CertiGoChatGPTExperienceView: View {
     }
 
     private func handleResponseMoreAction(_ action: CertiGoChatGPTResponseMoreAction, for turn: CertiGoChatTurn) {
-        switch action {
-        case .regenerateResponse:
+        if let prompt = CertiGoChatGPTExperienceViewModel.followUpPrompt(
+            for: action,
+            turn: turn,
+            routeCode: appState.activeRouteCode
+        ) {
+            submitPrompt(prompt)
+        } else {
             let doc = CertiGoChatGPTRichResponseParser.parse(turn: turn, routeCode: appState.activeRouteCode)
             streamProgressByTurnId[turn.id] = CertiGoChatGPTTokenStreamer(
                 turnId: turn.id,
@@ -2329,10 +2452,6 @@ public struct CertiGoChatGPTExperienceView: View {
                 startImmediatelyCompleted: false
             )
             activeStreamingTurnId = turn.id
-        case .deepenWithConcreteExample:
-            submitPrompt("Donne-moi un exemple concret d'architecture en production sur : \(turn.userPrompt)")
-        case .testWithOneExamQuestion:
-            submitPrompt("Teste-moi avec 1 question d'examen officielle (\(appState.activeRouteCode)) sur : \(turn.userPrompt)")
         }
     }
 
@@ -2376,36 +2495,19 @@ public struct CertiGoChatGPTExperienceView: View {
     }
 
     private func tickActiveStreamerIfNeeded() {
-        guard let activeId = activeStreamingTurnId,
-              var streamer = streamProgressByTurnId[activeId]
-        else { return }
-
-        guard streamer.isStreaming else {
-            activeStreamingTurnId = nil
-            return
-        }
-        streamer.advanceTick()
-        streamProgressByTurnId[activeId] = streamer
-        if !streamer.isStreaming {
-            activeStreamingTurnId = nil
-            if let idx = appState.chatTurns.firstIndex(where: { $0.id == activeId }) {
-                appState.chatTurns[idx].isStreamingOrLoading = false
-            }
-        }
+        CertiGoChatGPTExperienceViewModel.tickActiveStreamerIfNeeded(
+            activeStreamingTurnId: &activeStreamingTurnId,
+            streamProgressByTurnId: &streamProgressByTurnId,
+            appState: &appState
+        )
     }
 
     private func stopCurrentStreamingImmediately() {
-        if let activeId = activeStreamingTurnId,
-           var streamer = streamProgressByTurnId[activeId] {
-            streamer.stopByUser()
-            streamProgressByTurnId[activeId] = streamer
-            appState.stoppedStreamingTurnIds.insert(activeId)
-            activeStreamingTurnId = nil
-        }
-        if !appState.chatTurns.isEmpty {
-            let lastIdx = appState.chatTurns.count - 1
-            appState.chatTurns[lastIdx].isStreamingOrLoading = false
-        }
+        CertiGoChatGPTExperienceViewModel.stopCurrentStreamingImmediately(
+            activeStreamingTurnId: &activeStreamingTurnId,
+            streamProgressByTurnId: &streamProgressByTurnId,
+            appState: &appState
+        )
     }
 }
 
