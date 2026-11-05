@@ -207,6 +207,7 @@ public struct CertiGoBottomTabBarStyleMetrics: Equatable, Sendable {
 
 #if canImport(SwiftUI)
 import SwiftUI
+import Symbols
 
 /// Flat, deterministic 5-button Liquid Glass bottom navigation bar.
 /// Uses a single foreground HStack(spacing: 4) with a background material dock and a stroke-only specular rim
@@ -290,6 +291,9 @@ public struct CertiGoBottomTabBarView: View {
                             style: isSelected ? "Bold" : "Semi Bold"
                         )
                     )
+                    .symbolRenderingMode(.hierarchical)
+                    .contentTransition(.symbolEffect(.replace))
+                    .symbolEffect(.bounce.up.byLayer, value: selectedTab == item.tab)
                 Text(verbatim: item.title)
                     .font(
                         PrismTypography.figmaFont(

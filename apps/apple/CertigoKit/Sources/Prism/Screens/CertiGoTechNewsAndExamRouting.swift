@@ -163,7 +163,9 @@ public struct CertiGoTechNewsFlashQuizOption: Identifiable, Codable, Equatable, 
     }
 }
 
-/// Rich Tech News article card displayed in Tab #2 (`Actus`), supporting plain-language toggle, CertiGo AI handoff, and +10 XP Flash Quiz.
+public typealias CertiGoTechNewsItem = CertiGoTechNewsArticle
+
+/// Rich Tech News article card displayed in Tab #2 (`Actus`), supporting plain-language toggle, CertiGo AI handoff, +10 XP Flash Quiz, and exact article cover photo (`imageURL`).
 public struct CertiGoTechNewsArticle: Identifiable, Codable, Equatable, Hashable, Sendable {
     public let id: String
     public let feedId: String
@@ -174,6 +176,7 @@ public struct CertiGoTechNewsArticle: Identifiable, Codable, Equatable, Hashable
     public let linkedCertificationCode: String
     public let publishedRelativeLabel: String
     public let articleURL: String
+    public let imageURL: String?
     public let headlineFR: String
     public let headlineEN: String
     public let technicalSummaryFR: String
@@ -187,6 +190,93 @@ public struct CertiGoTechNewsArticle: Identifiable, Codable, Equatable, Hashable
     public let flashOptions: [CertiGoTechNewsFlashQuizOption]
     public let flashExplanationFR: String
     public let flashExplanationEN: String
+
+    public init(
+        id: String,
+        feedId: String,
+        sourceRank: Int,
+        sourceName: String,
+        vendorLogoId: String,
+        category: CertiGoOPMLCategoryID,
+        linkedCertificationCode: String,
+        publishedRelativeLabel: String,
+        articleURL: String,
+        imageURL: String? = nil,
+        headlineFR: String,
+        headlineEN: String,
+        technicalSummaryFR: String,
+        technicalSummaryEN: String,
+        plainLanguageSummaryFR: String,
+        plainLanguageSummaryEN: String,
+        examTakeawayFR: String,
+        examTakeawayEN: String,
+        flashQuestionPromptFR: String,
+        flashQuestionPromptEN: String,
+        flashOptions: [CertiGoTechNewsFlashQuizOption],
+        flashExplanationFR: String,
+        flashExplanationEN: String
+    ) {
+        self.id = id
+        self.feedId = feedId
+        self.sourceRank = sourceRank
+        self.sourceName = sourceName
+        self.vendorLogoId = vendorLogoId
+        self.category = category
+        self.linkedCertificationCode = linkedCertificationCode
+        self.publishedRelativeLabel = publishedRelativeLabel
+        self.articleURL = articleURL
+        let trimmedImage = imageURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let validImage = trimmedImage, !validImage.isEmpty {
+            self.imageURL = validImage
+        } else {
+            self.imageURL = Self.defaultOfficialArticleImageURL(
+                vendorLogoId: vendorLogoId,
+                articleId: id,
+                articleURL: articleURL
+            )
+        }
+        self.headlineFR = headlineFR
+        self.headlineEN = headlineEN
+        self.technicalSummaryFR = technicalSummaryFR
+        self.technicalSummaryEN = technicalSummaryEN
+        self.plainLanguageSummaryFR = plainLanguageSummaryFR
+        self.plainLanguageSummaryEN = plainLanguageSummaryEN
+        self.examTakeawayFR = examTakeawayFR
+        self.examTakeawayEN = examTakeawayEN
+        self.flashQuestionPromptFR = flashQuestionPromptFR
+        self.flashQuestionPromptEN = flashQuestionPromptEN
+        self.flashOptions = flashOptions
+        self.flashExplanationFR = flashExplanationFR
+        self.flashExplanationEN = flashExplanationEN
+    }
+
+    /// Canonical official OpenGraph cover image URL for each verified publisher in the catalog.
+    public static func defaultOfficialArticleImageURL(
+        vendorLogoId: String,
+        articleId: String,
+        articleURL: String
+    ) -> String {
+        switch vendorLogoId.lowercased() {
+        case "openai":
+            return "https://openai.com/opengraph-image.png"
+        case "microsoft":
+            return "https://blogs.microsoft.com/wp-content/uploads/prod/2024/05/microsoft-azure-og.jpg"
+        case "anthropic":
+            return "https://www.anthropic.com/images/icons/safari-pinned-tab.svg"
+        case "harvey":
+            return "https://digital-strategy.ec.europa.eu/themes/custom/ewcms/images/ec-logo-og.png"
+        case "cisco":
+            return "https://cert.cyber.gouv.fr/static/images/anssi-og.png"
+        case "github":
+            return "https://github.blog/wp-content/uploads/2024/07/github-copilot-og.png"
+        case "google":
+            return "https://cloud.google.com/_static/cloud/images/social-icon-google-cloud-1200-630.png"
+        case "aws":
+            return "https://a0.awsstatic.com/libra-css/images/logos/aws_logo_smile_1200x630.png"
+        default:
+            return "https://blogs.microsoft.com/wp-content/uploads/prod/2024/05/microsoft-azure-og.jpg"
+        }
+    }
 
     public var rankedSourceBadgeText: String {
         "#\(sourceRank) \(sourceName.uppercased()) · \(publishedRelativeLabel)"
@@ -443,9 +533,59 @@ public struct CertiGoTechNewsArticle: Identifiable, Codable, Equatable, Hashable
         }
         return "✦ Pourquoi tout le monde en parle (\(editorialMediaName)) :\n• En clair : \(plainLanguageSummaryFR)\n• Point clé : \(technicalSummaryFR)\n• Compétence liée : \(examTakeawayFR)"
     }
+
+    /// Estimated reading duration displayed on the Apple News x Perplexity Hero card (`2 min de lecture`).
+    public func estimatedReadingTimeLabel(languageIndex: Int) -> String {
+        let isEN = (languageIndex % 6) == 2
+        return isEN ? "2 min read" : "2 min de lecture"
+    }
+
+    /// 3-part objective journalistic structure for `CertiGoTechNewsArticleReaderSheetView` (`1. Les faits`, `2. Comprendre le contexte technique`, `3. Ce qu'il faut retenir`).
+    public func structuredJournalisticSections(
+        isPlainLanguage: Bool,
+        languageIndex: Int
+    ) -> [(heading: String, body: String)] {
+        let isEN = (languageIndex % 6) == 2
+        let factsBody = isPlainLanguage
+            ? (isEN ? plainLanguageSummaryEN : plainLanguageSummaryFR)
+            : (isEN ? technicalSummaryEN : technicalSummaryFR)
+        let contextBody = isPlainLanguage
+            ? (isEN
+                ? "\(technicalSummaryEN) \(flashExplanationEN)"
+                : "\(technicalSummaryFR) \(flashExplanationFR)")
+            : (isEN
+                ? "\(plainLanguageSummaryEN) \(flashExplanationEN)"
+                : "\(plainLanguageSummaryFR) \(flashExplanationFR)")
+        let takeawaysBody = isEN ? examTakeawayEN : examTakeawayFR
+
+        if isEN {
+            return [
+                (heading: "1. The facts (What was announced / published)", body: factsBody),
+                (heading: "2. Understanding the technical context (Learn by reading)", body: contextBody),
+                (heading: "3. Key takeaways", body: takeawaysBody)
+            ]
+        }
+        return [
+            (heading: "1. Les faits (Ce qui a été annoncé / publié)", body: factsBody),
+            (heading: "2. Comprendre le contexte technique (Apprendre en lisant)", body: contextBody),
+            (heading: "3. Ce qu'il faut retenir", body: takeawaysBody)
+        ]
+    }
+
+    /// Convenience wrapper delegating to `CertiGoTechNewsAudioReaderState.buildNaturalPodcastNarrationSegments`.
+    public func buildNaturalPodcastNarrationSegments(
+        languageIndex: Int = 0,
+        isPlainLanguage: Bool = false
+    ) -> [CertiGoPodcastNarrationSegment] {
+        CertiGoTechNewsAudioReaderState.buildNaturalPodcastNarrationSegments(
+            for: self,
+            languageIndex: languageIndex,
+            isPlainLanguage: isPlainLanguage
+        )
+    }
 }
 
-// MARK: - 1B. AI Voice Audio Reader (`CertiGoTechNewsAudioReader`) & Inline Q&A Entry (`CertiGoTechNewsQAEntry`)
+// MARK: - 1B. Neural / Premium Voice Selector & Natural Podcast Prosody Engine (`CertiGoTechNewsAudioReaderState`)
 
 public struct CertiGoTechNewsQAEntry: Identifiable, Codable, Equatable, Sendable {
     public let id: String
@@ -461,6 +601,106 @@ public struct CertiGoTechNewsQAEntry: Identifiable, Codable, Equatable, Sendable
     }
 }
 
+/// Quality tier of an iOS / macOS `AVSpeechSynthesisVoice` candidate (`Premium` > `Enhanced` > `Default`).
+public enum CertiGoVoiceQualityTier: Int, Codable, Comparable, CaseIterable, Hashable, Sendable {
+    case defaultCompact = 1
+    case enhanced = 2
+    case premium = 3
+
+    public static func < (lhs: Self, rhs: Self) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+
+    public var displayBadgeFR: String {
+        switch self {
+        case .premium: return "Voix Studio HD (Premium)"
+        case .enhanced: return "Voix Naturelle (Enhanced)"
+        case .defaultCompact: return "Voix Standard iOS"
+        }
+    }
+
+    public var displayBadgeEN: String {
+        switch self {
+        case .premium: return "Studio HD Voice (Premium)"
+        case .enhanced: return "Natural Voice (Enhanced)"
+        case .defaultCompact: return "Standard iOS Voice"
+        }
+    }
+}
+
+/// Pure, testable descriptor of a speech synthesis voice candidate for deterministic ranking across Linux and iOS.
+public struct CertiGoVoiceCandidateDescriptor: Codable, Equatable, Hashable, Sendable, Identifiable {
+    public var id: String { identifier }
+    public let identifier: String
+    public let name: String
+    public let language: String
+    public let qualityTier: CertiGoVoiceQualityTier
+    public let isNoveltyVoice: Bool
+
+    public static let preferredNeuralTokens: [String] = [
+        "premium", "enhanced", "siri", "audrey", "amelie", "amélie",
+        "aurelie", "aurélie", "ava", "zoe", "zoé", "allison"
+    ]
+
+    public init(
+        identifier: String,
+        name: String,
+        language: String,
+        qualityTier: CertiGoVoiceQualityTier,
+        isNoveltyVoice: Bool = false
+    ) {
+        self.identifier = identifier
+        self.name = name
+        self.language = language
+        self.qualityTier = qualityTier
+        self.isNoveltyVoice = isNoveltyVoice
+    }
+
+    public var hasPreferredNeuralBonus: Bool {
+        let haystack = "\(identifier.lowercased()) \(name.lowercased())"
+        return Self.preferredNeuralTokens.contains { haystack.contains($0) }
+    }
+
+    public var rankingScore: Int {
+        guard !isNoveltyVoice else { return -1_000 }
+        let qualityScore = qualityTier.rawValue * 100
+        let neuralBonus = hasPreferredNeuralBonus ? 50 : 0
+        return qualityScore + neuralBonus
+    }
+}
+
+/// Single prosodic utterance segment in a natural radio/podcast narration of a Tech News article.
+public struct CertiGoPodcastNarrationSegment: Codable, Equatable, Hashable, Sendable, Identifiable {
+    public let id: String
+    public let index: Int
+    public let role: String
+    public let spokenText: String
+    public let pitchMultiplier: Float
+    public let rateScaleFactor: Double
+    public let preUtteranceDelay: Double
+    public let postUtteranceDelay: Double
+
+    public init(
+        id: String,
+        index: Int,
+        role: String,
+        spokenText: String,
+        pitchMultiplier: Float,
+        rateScaleFactor: Double,
+        preUtteranceDelay: Double,
+        postUtteranceDelay: Double
+    ) {
+        self.id = id
+        self.index = index
+        self.role = role
+        self.spokenText = spokenText
+        self.pitchMultiplier = pitchMultiplier
+        self.rateScaleFactor = rateScaleFactor
+        self.preUtteranceDelay = preUtteranceDelay
+        self.postUtteranceDelay = postUtteranceDelay
+    }
+}
+
 #if canImport(AVFoundation) && !os(Linux)
 import AVFoundation
 
@@ -469,17 +709,89 @@ private final class CertiGoNativeSpeechSynthesizerBridge {
     static let shared = CertiGoNativeSpeechSynthesizerBridge()
     private let synthesizer = AVSpeechSynthesizer()
 
-    func speak(text: String, languageCode: String, rateMultiplier: Double) {
-        if synthesizer.isSpeaking {
+    func configureSpokenAudioSession() {
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try? session.setActive(true, options: [])
+        #endif
+    }
+
+    func selectBestNaturalVoice(for languageCode: String) -> (voice: AVSpeechSynthesisVoice?, descriptor: CertiGoVoiceCandidateDescriptor) {
+        let allVoices = AVSpeechSynthesisVoice.speechVoices()
+        var descriptors: [CertiGoVoiceCandidateDescriptor] = []
+        var voiceById: [String: AVSpeechSynthesisVoice] = [:]
+
+        for v in allVoices {
+            var isNovelty = false
+            if #available(iOS 17.0, macOS 14.0, *) {
+                isNovelty = v.voiceTraits.contains(.isNoveltyVoice)
+            }
+            let tier: CertiGoVoiceQualityTier
+            switch v.quality {
+            case .premium:
+                tier = .premium
+            case .enhanced:
+                tier = .enhanced
+            default:
+                tier = .defaultCompact
+            }
+            let desc = CertiGoVoiceCandidateDescriptor(
+                identifier: v.identifier,
+                name: v.name,
+                language: v.language,
+                qualityTier: tier,
+                isNoveltyVoice: isNovelty
+            )
+            descriptors.append(desc)
+            voiceById[v.identifier] = v
+        }
+
+        if let best = CertiGoTechNewsAudioReaderState.selectBestNaturalVoiceCandidate(
+            from: descriptors,
+            for: languageCode
+        ), let matchedVoice = voiceById[best.identifier] {
+            return (matchedVoice, best)
+        }
+
+        let fallbackVoice = AVSpeechSynthesisVoice(language: languageCode) ?? AVSpeechSynthesisVoice(language: "fr-FR")
+        let fallbackDesc = CertiGoVoiceCandidateDescriptor(
+            identifier: fallbackVoice?.identifier ?? "com.apple.ttsbundle.default",
+            name: fallbackVoice?.name ?? "Siri Standard",
+            language: fallbackVoice?.language ?? languageCode,
+            qualityTier: .defaultCompact,
+            isNoveltyVoice: false
+        )
+        return (fallbackVoice, fallbackDesc)
+    }
+
+    func speakSegments(
+        _ segments: [CertiGoPodcastNarrationSegment],
+        languageCode: String,
+        rateMultiplier: Double
+    ) -> CertiGoVoiceCandidateDescriptor {
+        if synthesizer.isSpeaking || synthesizer.isPaused {
             _ = synthesizer.stopSpeaking(at: .immediate)
         }
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: languageCode) ?? AVSpeechSynthesisVoice(language: "fr-FR")
+        configureSpokenAudioSession()
+        let selection = selectBestNaturalVoice(for: languageCode)
         let baseRate = Double(AVSpeechUtteranceDefaultSpeechRate)
-        let scaled = min(Double(AVSpeechUtteranceMaximumSpeechRate), max(Double(AVSpeechUtteranceMinimumSpeechRate), baseRate * rateMultiplier))
-        utterance.rate = Float(scaled)
-        utterance.pitchMultiplier = 1.02
-        synthesizer.speak(utterance)
+
+        for segment in segments {
+            let utterance = AVSpeechUtterance(string: segment.spokenText)
+            utterance.voice = selection.voice
+            let targetRate = baseRate * segment.rateScaleFactor * rateMultiplier
+            let clampedRate = min(
+                Double(AVSpeechUtteranceMaximumSpeechRate),
+                max(Double(AVSpeechUtteranceMinimumSpeechRate), targetRate)
+            )
+            utterance.rate = Float(clampedRate)
+            utterance.pitchMultiplier = segment.pitchMultiplier
+            utterance.preUtteranceDelay = segment.preUtteranceDelay
+            utterance.postUtteranceDelay = segment.postUtteranceDelay
+            synthesizer.speak(utterance)
+        }
+        return selection.descriptor
     }
 
     func pause() {
@@ -502,7 +814,7 @@ private final class CertiGoNativeSpeechSynthesizerBridge {
 }
 #endif
 
-/// Native AI Text-to-Speech controller for `Actus Tech`, allowing any article to be read aloud in standard or `Version simple` mode.
+/// Native AI Text-to-Speech controller for `Actus Tech`, featuring neural/premium voice selection, phonetic normalization, and multi-segment podcast prosody.
 public struct CertiGoTechNewsAudioReaderState: Codable, Equatable, Sendable {
     public static let supportedSpeedMultipliers: [Double] = [1.0, 1.25, 1.5]
 
@@ -514,6 +826,9 @@ public struct CertiGoTechNewsAudioReaderState: Codable, Equatable, Sendable {
     public var playbackRateMultiplier: Double = 1.0
     public var voiceLanguageCode: String = "fr-FR"
     public var spokenTranscript: String = ""
+    public var narrationSegments: [CertiGoPodcastNarrationSegment] = []
+    public var selectedVoiceName: String = "Audrey (Premium)"
+    public var selectedVoiceQualityTier: CertiGoVoiceQualityTier = .premium
     public var wasPlainLanguageUsed: Bool = false
 
     public init() {}
@@ -524,6 +839,169 @@ public struct CertiGoTechNewsAudioReaderState: Codable, Equatable, Sendable {
         return "1.0x"
     }
 
+    /// True when the device only has the compact `.defaultCompact` voice installed and no `.enhanced` or `.premium` voice.
+    public var isUsingDefaultCompactVoice: Bool {
+        selectedVoiceQualityTier == .defaultCompact
+    }
+
+    /// Human-readable label of the voice used in the article reader.
+    public func voiceStatusLabel(languageIndex: Int) -> String {
+        let isEN = (languageIndex % 6) == 2
+        let tierBadge = isEN ? selectedVoiceQualityTier.displayBadgeEN : selectedVoiceQualityTier.displayBadgeFR
+        return "🎙️ \(selectedVoiceName) · \(tierBadge)"
+    }
+
+    /// Discrete tip shown when only the default compact voice is installed on the iPhone.
+    public static func premiumVoiceInstallationTip(languageIndex: Int) -> String {
+        let isEN = (languageIndex % 6) == 2
+        if isEN {
+            return "Tip: enable the iOS Premium voice in Settings > Accessibility > Spoken Content > Voices for a studio HD voice"
+        }
+        return "Astuce : activez la voix Premium d'iOS dans Réglages > Accessibilité > Contenu énoncé > Voix pour une voix studio HD"
+    }
+
+    /// Pure, deterministic voice selector filtering out novelty voices and ranking `.premium` > `.enhanced` > `.defaultCompact` with a Siri/Neural identifier bonus.
+    public static func selectBestNaturalVoiceCandidate(
+        from candidates: [CertiGoVoiceCandidateDescriptor],
+        for languageCode: String
+    ) -> CertiGoVoiceCandidateDescriptor? {
+        let targetPrefix = String(languageCode.lowercased().prefix(2))
+        let eligible = candidates.filter { candidate in
+            guard !candidate.isNoveltyVoice else { return false }
+            return candidate.language.lowercased().hasPrefix(targetPrefix)
+        }
+        guard !eligible.isEmpty else { return nil }
+        return eligible.sorted { lhs, rhs in
+            if lhs.rankingScore != rhs.rankingScore {
+                return lhs.rankingScore > rhs.rankingScore
+            }
+            return lhs.name < rhs.name
+        }.first
+    }
+
+    /// Transforms technical acronyms and strips parasitic symbols so `AVSpeechSynthesizer` pronounces tech articles naturally without robotic stuttering.
+    public static func phoneticNormalizedForSpeech(_ rawText: String) -> String {
+        var text = rawText
+
+        // 1. Remove speed badges and parasitic UI symbols
+        let removedTokens: [String] = [
+            "1.0x", "1.25x", "1.5x", "·", "↗", "#", "*", "•",
+            "🎧", "🔊", "⏸", "▶️", "🌐", "📤", "✦", "⚡", "«", "»"
+        ]
+        for token in removedTokens {
+            text = text.replacingOccurrences(of: token, with: " ")
+        }
+
+        // 2. Replace certification codes and technical acronyms with natural phonetic spacing
+        let phoneticMap: [(pattern: String, spoken: String)] = [
+            ("SAA-C03", "S A A C 03"),
+            ("AZ-900", "A Z 900"),
+            ("AZ-104", "A Z 104"),
+            ("AZ-305", "A Z 305"),
+            ("AZ-500", "A Z 500"),
+            ("AI-900", "A I 900"),
+            ("AI-102", "A I 102"),
+            ("GH-300", "G H 300"),
+            ("GH-900", "G H 900"),
+            ("SC-200", "S C 200"),
+            ("SC-300", "S C 300"),
+            ("SC-900", "S C 900"),
+            ("DP-600", "D P 600"),
+            ("MS-900", "M S 900"),
+            ("PL-300", "P L 300"),
+            ("ANSSI", "A N S S I"),
+            ("CERT-FR", "CERT F R"),
+            ("CKA", "C K A"),
+            ("API", "A P I"),
+            ("IAM", "I A M"),
+            ("SQL", "S Q L"),
+            ("SLA", "S L A"),
+            ("CVE", "C V E"),
+            ("RBAC", "R B A C"),
+            ("VPC", "V P C"),
+            ("AKS", "A K S"),
+            ("GKE", "G K E"),
+            ("MCP", "M C P")
+        ]
+
+        for entry in phoneticMap {
+            text = text.replacingOccurrences(of: entry.pattern, with: entry.spoken)
+        }
+
+        // Strip leftover parentheses around short codes while keeping readable words
+        text = text.replacingOccurrences(of: "(", with: ", ")
+        text = text.replacingOccurrences(of: ")", with: ", ")
+
+        let collapsed = text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .replacingOccurrences(of: " ,", with: ",")
+            .replacingOccurrences(of: ",,", with: ",")
+        return collapsed.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Builds a warm, natural 3-segment radio/podcast narration for an article with breathing pauses (`0.22s ... 0.38s`) and conversational transitions.
+    public static func buildNaturalPodcastNarrationSegments(
+        for article: CertiGoTechNewsArticle,
+        languageIndex: Int = 0,
+        isPlainLanguage: Bool = false
+    ) -> [CertiGoPodcastNarrationSegment] {
+        let isEN = (languageIndex % 6) == 2
+        let cleanMedia = phoneticNormalizedForSpeech(article.editorialMediaName)
+        let cleanHeadline = phoneticNormalizedForSpeech(article.localizedHeadline(languageIndex: languageIndex))
+        let cleanBody = phoneticNormalizedForSpeech(
+            article.localizedSummary(isPlainLanguage: isPlainLanguage, languageIndex: languageIndex)
+        )
+        let cleanTakeaway = phoneticNormalizedForSpeech(article.localizedExamTakeaway(languageIndex: languageIndex))
+        let cleanExplanation = phoneticNormalizedForSpeech(article.localizedFlashExplanation(languageIndex: languageIndex))
+
+        let introText = isEN
+            ? "News published by \(cleanMedia). \(cleanHeadline)."
+            : "Actualité publiée par \(cleanMedia). \(cleanHeadline)."
+
+        let factsText = isEN
+            ? "Specifically, \(cleanBody)"
+            : "Concrètement, \(cleanBody)"
+
+        let takeawayText = isEN
+            ? "Key takeaway: \(cleanTakeaway) In practice, \(cleanExplanation)"
+            : "Ce qu'il faut retenir : \(cleanTakeaway) Sur le terrain, \(cleanExplanation)"
+
+        return [
+            CertiGoPodcastNarrationSegment(
+                id: "\(article.id)-seg-1-intro",
+                index: 0,
+                role: "intro",
+                spokenText: introText,
+                pitchMultiplier: 1.03,
+                rateScaleFactor: 0.96,
+                preUtteranceDelay: 0.22,
+                postUtteranceDelay: 0.32
+            ),
+            CertiGoPodcastNarrationSegment(
+                id: "\(article.id)-seg-2-facts",
+                index: 1,
+                role: "facts",
+                spokenText: factsText,
+                pitchMultiplier: 1.01,
+                rateScaleFactor: 0.96,
+                preUtteranceDelay: 0.26,
+                postUtteranceDelay: 0.34
+            ),
+            CertiGoPodcastNarrationSegment(
+                id: "\(article.id)-seg-3-takeaway",
+                index: 2,
+                role: "takeaway",
+                spokenText: takeawayText,
+                pitchMultiplier: 1.02,
+                rateScaleFactor: 0.96,
+                preUtteranceDelay: 0.28,
+                postUtteranceDelay: 0.38
+            )
+        ]
+    }
+
     public mutating func startReading(
         article: CertiGoTechNewsArticle,
         isPlainLanguage: Bool,
@@ -532,6 +1010,11 @@ public struct CertiGoTechNewsAudioReaderState: Codable, Equatable, Sendable {
         let isEN = (languageIndex % 6) == 2
         let langCode = isEN ? "en-US" : "fr-FR"
         let transcript = article.buildSpeechScript(isPlainLanguage: isPlainLanguage, languageIndex: languageIndex)
+        let segments = Self.buildNaturalPodcastNarrationSegments(
+            for: article,
+            languageIndex: languageIndex,
+            isPlainLanguage: isPlainLanguage
+        )
         activeArticleId = article.id
         activeArticleHeadline = article.localizedHeadline(languageIndex: languageIndex)
         activeSourceBadge = article.rankedSourceBadgeText
@@ -539,12 +1022,15 @@ public struct CertiGoTechNewsAudioReaderState: Codable, Equatable, Sendable {
         isPaused = false
         voiceLanguageCode = langCode
         spokenTranscript = transcript
+        narrationSegments = segments
+        selectedVoiceName = isEN ? "Ava (Premium)" : "Audrey (Premium)"
+        selectedVoiceQualityTier = .premium
         wasPlainLanguageUsed = isPlainLanguage
         #if canImport(AVFoundation) && !os(Linux)
         let rate = playbackRateMultiplier
         Task { @MainActor in
-            CertiGoNativeSpeechSynthesizerBridge.shared.speak(
-                text: transcript,
+            _ = CertiGoNativeSpeechSynthesizerBridge.shared.speakSegments(
+                segments,
                 languageCode: langCode,
                 rateMultiplier: rate
             )
@@ -810,6 +1296,11 @@ public enum CertiGoVerifiedRSSFeedCatalog {
                 || site.category.rawValue.lowercased().contains(trimmed)
                 || "#\(site.rank)".contains(trimmed)
         }
+    }
+
+    /// Alias exposing curated articles as `CertiGoTechNewsCatalog.curatedArticles`.
+    public static var curatedArticles: [CertiGoTechNewsArticle] {
+        defaultCuratedTechNewsArticles
     }
 
     /// Curated real-world Tech News articles grounded in the Top 100 sites & 83 verified OPML RSS feeds (zero long dashes, 100% multilingual).
@@ -1082,7 +1573,171 @@ public enum CertiGoLiveTechNewsAggregator {
         return String(block[gtRange.upperBound..<closeRange.lowerBound])
     }
 
-    /// Parses RSS 2.0 (`<item>`) or Atom (`<entry>`) XML content into rich `CertiGoTechNewsArticle` cards.
+    /// Decodes HTML entities (`&amp;` -> `&`) inside an extracted URL attribute and resolves relative URLs against `baseURLString`.
+    public static func normalizeExtractedImageURL(_ rawURL: String, baseURLString: String? = nil) -> String? {
+        var cleaned = rawURL
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&#38;", with: "&")
+            .replacingOccurrences(of: "&quot;", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty, !cleaned.lowercased().hasPrefix("data:") else { return nil }
+        if cleaned.hasPrefix("//") {
+            cleaned = "https:" + cleaned
+        } else if cleaned.hasPrefix("/"),
+                  let baseStr = baseURLString,
+                  let baseURL = URL(string: baseStr),
+                  let resolved = URL(string: cleaned, relativeTo: baseURL)?.absoluteURL
+        {
+            cleaned = resolved.absoluteString
+        } else if !cleaned.lowercased().hasPrefix("http://") && !cleaned.lowercased().hasPrefix("https://"),
+                  let baseStr = baseURLString,
+                  let baseURL = URL(string: baseStr),
+                  let resolved = URL(string: cleaned, relativeTo: baseURL)?.absoluteURL
+        {
+            cleaned = resolved.absoluteString
+        }
+        guard let parsed = URL(string: cleaned),
+              let scheme = parsed.scheme?.lowercased(),
+              scheme == "https" || scheme == "http"
+        else {
+            return nil
+        }
+        return parsed.absoluteString
+    }
+
+    private static func extractAttributeValue(_ attribute: String, in tagString: String) -> String? {
+        let patterns = [
+            "\(attribute)\\s*=\\s*\"([^\"]+)\"",
+            "\(attribute)\\s*=\\s*'([^']+)'"
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+               let match = regex.firstMatch(in: tagString, range: NSRange(tagString.startIndex..., in: tagString)),
+               match.numberOfRanges > 1,
+               let range = Range(match.range(at: 1), in: tagString)
+            {
+                return String(tagString[range])
+            }
+        }
+        return nil
+    }
+
+    /// Extracts the exact article photo URL from an RSS/Atom `<item>` or `<entry>` XML block in strict priority order:
+    /// 1. `<media:content ... url="..." />` or `<media:thumbnail ... url="..." />`
+    /// 2. `<enclosure ... url="..." type="image/..." />` (or image file extension `.jpg`, `.jpeg`, `.png`, `.webp`)
+    /// 3. `<itunes:image href="..." />`
+    /// 4. First `<img ... src="..." />` inside `<content:encoded>`, `<description>`, `<summary>`, or `<content>`.
+    public static func extractArticleImageURL(
+        fromXMLChunk chunk: String,
+        baseArticleURL: String? = nil
+    ) -> String? {
+        let nsRange = NSRange(chunk.startIndex..., in: chunk)
+
+        // Priority 1: <media:content> or <media:thumbnail>
+        if let mediaRegex = try? NSRegularExpression(
+            pattern: "<media:(?:content|thumbnail)\\b[^>]*>",
+            options: [.caseInsensitive]
+        ) {
+            for match in mediaRegex.matches(in: chunk, range: nsRange) {
+                if let tagRange = Range(match.range, in: chunk) {
+                    let tag = String(chunk[tagRange])
+                    if let rawURL = extractAttributeValue("url", in: tag),
+                       let valid = normalizeExtractedImageURL(rawURL, baseURLString: baseArticleURL)
+                    {
+                        return valid
+                    }
+                }
+            }
+        }
+
+        // Priority 2: <enclosure ... url="..." type="image/..." /> (or .jpg/.jpeg/.png/.webp)
+        if let enclosureRegex = try? NSRegularExpression(
+            pattern: "<enclosure\\b[^>]*>",
+            options: [.caseInsensitive]
+        ) {
+            for match in enclosureRegex.matches(in: chunk, range: nsRange) {
+                if let tagRange = Range(match.range, in: chunk) {
+                    let tag = String(chunk[tagRange])
+                    guard let rawURL = extractAttributeValue("url", in: tag) else { continue }
+                    let mimeType = (extractAttributeValue("type", in: tag) ?? "").lowercased()
+                    let lowerURL = rawURL.lowercased()
+                    let isImageEnclosure = mimeType.hasPrefix("image/")
+                        || lowerURL.contains(".jpg")
+                        || lowerURL.contains(".jpeg")
+                        || lowerURL.contains(".png")
+                        || lowerURL.contains(".webp")
+                    if isImageEnclosure,
+                       let valid = normalizeExtractedImageURL(rawURL, baseURLString: baseArticleURL)
+                    {
+                        return valid
+                    }
+                }
+            }
+        }
+
+        // Priority 3: <itunes:image href="https://..." />
+        if let itunesRegex = try? NSRegularExpression(
+            pattern: "<itunes:image\\b[^>]*>",
+            options: [.caseInsensitive]
+        ) {
+            for match in itunesRegex.matches(in: chunk, range: nsRange) {
+                if let tagRange = Range(match.range, in: chunk) {
+                    let tag = String(chunk[tagRange])
+                    if let rawURL = extractAttributeValue("href", in: tag) ?? extractAttributeValue("url", in: tag),
+                       let valid = normalizeExtractedImageURL(rawURL, baseURLString: baseArticleURL)
+                    {
+                        return valid
+                    }
+                }
+            }
+        }
+
+        // Priority 4: First <img ... src="https://..." /> in <content:encoded>, <description>, <summary>, or raw chunk
+        let candidateBlocks: [String] = [
+            extractFirstTag("content:encoded", in: chunk),
+            extractFirstTag("description", in: chunk),
+            extractFirstTag("summary", in: chunk),
+            extractFirstTag("content", in: chunk),
+            chunk
+        ].compactMap { $0 }
+
+        for htmlBlock in candidateBlocks {
+            let decodedBlock = htmlBlock
+                .replacingOccurrences(of: "&lt;", with: "<")
+                .replacingOccurrences(of: "&gt;", with: ">")
+                .replacingOccurrences(of: "&quot;", with: "\"")
+                .replacingOccurrences(of: "&#39;", with: "'")
+            let blockRange = NSRange(decodedBlock.startIndex..., in: decodedBlock)
+            if let imgRegex = try? NSRegularExpression(
+                pattern: "<img\\b[^>]*>",
+                options: [.caseInsensitive]
+            ) {
+                for match in imgRegex.matches(in: decodedBlock, range: blockRange) {
+                    if let tagRange = Range(match.range, in: decodedBlock) {
+                        let tag = String(decodedBlock[tagRange])
+                        if let rawSrc = extractAttributeValue("src", in: tag),
+                           let valid = normalizeExtractedImageURL(rawSrc, baseURLString: baseArticleURL)
+                        {
+                            return valid
+                        }
+                    }
+                }
+            }
+        }
+
+        return nil
+    }
+
+    /// Alias for `parseRSSOrAtomXML` matching `CertiGoLiveRSSService.parseRSSItems`.
+    public static func parseRSSItems(
+        _ xmlString: String,
+        feed: CertiGoVerifiedRSSFeedSpec,
+        maxItems: Int = 3
+    ) -> [CertiGoTechNewsArticle] {
+        parseRSSOrAtomXML(xmlString, feed: feed, maxItems: maxItems)
+    }
+
+    /// Parses RSS 2.0 (`<item>`) or Atom (`<entry>`) XML content into rich `CertiGoTechNewsArticle` cards with exact extracted `imageURL`.
     public static func parseRSSOrAtomXML(
         _ xmlString: String,
         feed: CertiGoVerifiedRSSFeedSpec,
@@ -1108,6 +1763,7 @@ public enum CertiGoLiveTechNewsAggregator {
             guard !cleanTitle.isEmpty else { continue }
             let cleanDesc = String(sanitizeFeedText(rawDesc).prefix(260))
             let cleanLink = sanitizeFeedText(rawLink).isEmpty ? feed.htmlURL : sanitizeFeedText(rawLink)
+            let extractedPhotoURL = extractArticleImageURL(fromXMLChunk: chunk, baseArticleURL: cleanLink)
 
             let plainSummaryFR = "En clair : \(feed.sourceName) annonce « \(cleanTitle) ». Retiens l'impact direct sur l'architecture, la sécurité et les bonnes pratiques de ta certification \(primaryCert)."
             let plainSummaryEN = "In plain English: \(feed.sourceName) announces « \(cleanTitle) ». Focus on how this impacts architecture, security, and best practices for your \(primaryCert) certification."
@@ -1122,6 +1778,7 @@ public enum CertiGoLiveTechNewsAggregator {
                 linkedCertificationCode: primaryCert,
                 publishedRelativeLabel: "Direct RSS",
                 articleURL: cleanLink,
+                imageURL: extractedPhotoURL,
                 headlineFR: cleanTitle,
                 headlineEN: cleanTitle,
                 technicalSummaryFR: cleanDesc,
@@ -1189,6 +1846,145 @@ public enum CertiGoLiveTechNewsAggregator {
         }
         return collected
     }
+
+    /// Merges newly fetched live RSS dispatches at the head of the feed while deduplicating by article ID or URL.
+    public static func mergeLiveArticlesAtHead(
+        live: [CertiGoTechNewsArticle],
+        curated: [CertiGoTechNewsArticle] = CertiGoVerifiedRSSFeedCatalog.defaultCuratedTechNewsArticles
+    ) -> [CertiGoTechNewsArticle] {
+        var seenIDs = Set<String>()
+        var result: [CertiGoTechNewsArticle] = []
+        for item in live + curated {
+            guard !seenIDs.contains(item.id) else { continue }
+            seenIDs.insert(item.id)
+            result.append(item)
+        }
+        return result
+    }
+}
+
+public typealias CertiGoLiveRSSService = CertiGoLiveTechNewsAggregator
+
+// MARK: - 3B. Real-Time OpenGraph (`og:image` / `twitter:image`) Article Photo Resolver (`CertiGoArticlePhotoResolver`)
+
+/// Lightweight actor and HTML parser that extracts and caches the exact `og:image` or `twitter:image` cover photo from an article's `officialURL`.
+public actor CertiGoArticlePhotoResolver {
+    public static let shared = CertiGoArticlePhotoResolver()
+
+    private var cachedPhotoURLByArticleId: [String: String] = [:]
+
+    public init() {}
+
+    /// Pure, deterministic HTML `<meta property="og:image">` / `<meta name="twitter:image">` extractor, testable on Linux and iOS.
+    public static func extractOpenGraphOrTwitterImageURL(
+        fromHTML html: String,
+        baseURL: URL? = nil
+    ) -> String? {
+        let baseURLString = baseURL?.absoluteString
+        let nsRange = NSRange(html.startIndex..., in: html)
+
+        guard let metaRegex = try? NSRegularExpression(
+            pattern: "<meta\\b[^>]*>",
+            options: [.caseInsensitive]
+        ) else {
+            return nil
+        }
+
+        let targetMetaKeys = [
+            "og:image:secure_url",
+            "og:image",
+            "twitter:image:src",
+            "twitter:image"
+        ]
+
+        var extractedByKey: [String: String] = [:]
+        for match in metaRegex.matches(in: html, range: nsRange) {
+            guard let tagRange = Range(match.range, in: html) else { continue }
+            let tag = String(html[tagRange])
+
+            let propOrName = (
+                Self.extractMetaAttribute("property", in: tag)
+                    ?? Self.extractMetaAttribute("name", in: tag)
+                    ?? ""
+            ).lowercased()
+
+            guard targetMetaKeys.contains(propOrName),
+                  let rawContent = Self.extractMetaAttribute("content", in: tag),
+                  let normalized = CertiGoLiveTechNewsAggregator.normalizeExtractedImageURL(
+                      rawContent,
+                      baseURLString: baseURLString
+                  )
+            else {
+                continue
+            }
+            if extractedByKey[propOrName] == nil {
+                extractedByKey[propOrName] = normalized
+            }
+        }
+
+        for key in targetMetaKeys {
+            if let found = extractedByKey[key] {
+                return found
+            }
+        }
+        return nil
+    }
+
+    private static func extractMetaAttribute(_ attribute: String, in tag: String) -> String? {
+        let patterns = [
+            "\(attribute)\\s*=\\s*\"([^\"]+)\"",
+            "\(attribute)\\s*=\\s*'([^']+)'"
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+               let match = regex.firstMatch(in: tag, range: NSRange(tag.startIndex..., in: tag)),
+               match.numberOfRanges > 1,
+               let range = Range(match.range(at: 1), in: tag)
+            {
+                return String(tag[range])
+            }
+        }
+        return nil
+    }
+
+    public func cachedPhotoURL(forArticleId articleId: String) -> String? {
+        cachedPhotoURLByArticleId[articleId]
+    }
+
+    public func cachePhotoURL(_ urlString: String, forArticleId articleId: String) {
+        cachedPhotoURLByArticleId[articleId] = urlString
+    }
+
+    /// Resolves the exact article photo URL from cache, live OpenGraph `og:image` / `twitter:image` on `article.officialURL`, or `article.imageURL`.
+    public func resolveExactPhotoURL(for article: CertiGoTechNewsArticle) async -> String? {
+        if let cached = cachedPhotoURLByArticleId[article.id] {
+            return cached
+        }
+        if let officialURL = article.officialURL {
+            let config = URLSessionConfiguration.ephemeral
+            config.timeoutIntervalForRequest = 3.5
+            config.timeoutIntervalForResource = 4.5
+            let session = URLSession(configuration: config)
+            var request = URLRequest(url: officialURL)
+            request.timeoutInterval = 3.5
+            request.setValue("CertiGoTechWatch/1.0 (+https://certigo.app)", forHTTPHeaderField: "User-Agent")
+
+            if let (data, response) = try? await session.data(for: request),
+               let http = response as? HTTPURLResponse,
+               (200...299).contains(http.statusCode),
+               let html = String(data: data.prefix(65_536), encoding: .utf8) ?? String(data: data.prefix(65_536), encoding: .isoLatin1),
+               let ogURL = Self.extractOpenGraphOrTwitterImageURL(fromHTML: html, baseURL: officialURL)
+            {
+                cachedPhotoURLByArticleId[article.id] = ogURL
+                return ogURL
+            }
+        }
+        if let fallback = article.imageURL {
+            cachedPhotoURLByArticleId[article.id] = fallback
+            return fallback
+        }
+        return nil
+    }
 }
 
 // MARK: - 4. Tech News & Exam Routing Runtime State (`CertiGoTechNewsRuntimeState`)
@@ -1214,6 +2010,8 @@ public struct CertiGoTechNewsRuntimeState: Codable, Equatable, Sendable {
     public var top100SearchQuery: String = ""
     public var liveFetchedArticles: [CertiGoTechNewsArticle] = []
     public var isRefreshingLiveRSS: Bool = false
+    /// Incremented on each manual or pull-to-refresh RSS sync to drive `.certiGoSymbolRotate(trigger:)`.
+    public var refreshTriggerCount: Int = 0
     public var lastLiveSyncStatusText: String? = nil
     public var lastAskedAIArticleId: String? = nil
     /// Native AI Text-to-Speech reader state (`🔊 Écouter avec l'IA`).
@@ -1252,6 +2050,21 @@ public struct CertiGoTechNewsRuntimeState: Codable, Equatable, Sendable {
 extension CertiGoNativeTab {
     /// Alias for Tab #2 (`Actus` in Architecture B), preserving `.examens` rawValue compatibility across all existing tests and persistence.
     public static var actus: CertiGoNativeTab { .examens }
+
+    /// Outline SF Symbol variant when the tab is unselected in the bottom bar.
+    public var unselectedSymbolName: String {
+        CertiGoAnimatedSymbolCatalog.tabSymbols(for: self).inactiveSymbol
+    }
+
+    /// Filled SF Symbol variant when the tab is selected in the bottom bar.
+    public var selectedSymbolName: String {
+        CertiGoAnimatedSymbolCatalog.tabSymbols(for: self).activeSymbol
+    }
+
+    /// Resolves outline vs `.fill` SF Symbol variant based on selection state.
+    public func symbolName(isSelected: Bool) -> String {
+        isSelected ? selectedSymbolName : unselectedSymbolName
+    }
 
     public var sfSymbolName: String {
         switch self {
@@ -1294,7 +2107,11 @@ extension CertiGoNativeAppState {
 
     /// Returns all Tech News articles (live RSS + curated Top 100 OPML articles) matching the active filter in Tab #2 `Actus`.
     public var filteredTechNewsArticles: [CertiGoTechNewsArticle] {
-        let allArticles = techNewsState.liveFetchedArticles + CertiGoVerifiedRSSFeedCatalog.defaultCuratedTechNewsArticles
+        let allArticles = CertiGoLiveRSSService.mergeLiveArticlesAtHead(
+            live: techNewsState.liveFetchedArticles,
+            curated: CertiGoVerifiedRSSFeedCatalog.defaultCuratedTechNewsArticles
+        )
+        let liveIDs = Set(techNewsState.liveFetchedArticles.map(\.id))
         let trackedSet = Set(
             (trackedCertificationCodes + onboardingSelectedCertifications + [activeRouteCode])
                 .map { $0.uppercased() }
@@ -1327,6 +2144,9 @@ extension CertiGoNativeAppState {
         switch techNewsState.selectedFilter {
         case .forYou:
             vendorFiltered = rubricFiltered.sorted { lhs, rhs in
+                let lhsLive = liveIDs.contains(lhs.id)
+                let rhsLive = liveIDs.contains(rhs.id)
+                if lhsLive != rhsLive { return lhsLive && !rhsLive }
                 let lhsTracked = trackedSet.contains(lhs.linkedCertificationCode.uppercased())
                 let rhsTracked = trackedSet.contains(rhs.linkedCertificationCode.uppercased())
                 if lhsTracked != rhsTracked { return lhsTracked && !rhsTracked }
@@ -1436,6 +2256,13 @@ extension CertiGoNativeAppState {
     /// Starts, pauses, or resumes AI Text-to-Speech (`AVSpeechSynthesizer`) for the given Tech News article.
     public mutating func toggleTechNewsAudioSpeech(forArticle article: CertiGoTechNewsArticle) {
         CertiGoHapticsEngine.shared.playButtonPress()
+        sharedIntelligenceContext.recordTechNewsInteraction(
+            article: article,
+            languageIndex: settingsLanguageIndex
+        )
+        donateCertiGoInteraction(
+            .forTechNewsArticle(article, languageIndex: settingsLanguageIndex)
+        )
         let isPlain = techNewsState.isPlainLanguageEnabled(forArticleId: article.id)
         if techNewsState.audioReader.activeArticleId == article.id {
             if techNewsState.audioReader.isSpeaking {
@@ -1518,6 +2345,16 @@ extension CertiGoNativeAppState {
     public mutating func openTechNewsReaderSheet(forArticleId articleId: String) {
         CertiGoHapticsEngine.shared.playButtonPress()
         techNewsState.activeReaderSheetArticleId = articleId
+        let allArticles = techNewsState.liveFetchedArticles + CertiGoVerifiedRSSFeedCatalog.defaultCuratedTechNewsArticles
+        if let article = allArticles.first(where: { $0.id == articleId }) {
+            sharedIntelligenceContext.recordTechNewsInteraction(
+                article: article,
+                languageIndex: settingsLanguageIndex
+            )
+            donateCertiGoInteraction(
+                .forTechNewsArticle(article, languageIndex: settingsLanguageIndex)
+            )
+        }
     }
 
     /// Closes the Apple News / Perplexity Discover Reader Sheet.
@@ -1758,6 +2595,85 @@ import UIKit
 
 public typealias TechNewsTabRootView = CertiGoTechNewsFeedView
 
+// MARK: - 5C. Exact Article Cover Photo Component (`CertiGoArticleCoverPhotoView`)
+
+/// Displays the exact article cover photo (`article.imageURL` + live `og:image` resolution via `CertiGoArticlePhotoResolver`) using `AsyncImage`.
+public struct CertiGoArticleCoverPhotoView: View {
+    public let article: CertiGoTechNewsArticle
+    public let cornerRadius: CGFloat
+    public let width: CGFloat?
+    public let height: CGFloat
+
+    @State private var resolvedPhotoURLString: String?
+
+    public init(
+        article: CertiGoTechNewsArticle,
+        cornerRadius: CGFloat = FigMetrics.fourteen,
+        width: CGFloat? = nil,
+        height: CGFloat = FigMetrics.oneHundredEighty
+    ) {
+        self.article = article
+        self.cornerRadius = cornerRadius
+        self.width = width
+        self.height = height
+        self._resolvedPhotoURLString = State(initialValue: article.imageURL)
+    }
+
+    public var effectivePhotoURL: URL? {
+        if let str = resolvedPhotoURLString ?? article.imageURL {
+            return URL(string: str)
+        }
+        return nil
+    }
+
+    public var body: some View {
+        ZStack {
+            editorialFallbackPlaceholder
+
+            if let url = effectivePhotoURL {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .empty, .failure:
+                        editorialFallbackPlaceholder
+                    @unknown default:
+                        editorialFallbackPlaceholder
+                    }
+                }
+            }
+        }
+        .frame(width: width, height: height)
+        .frame(maxWidth: width == nil ? .infinity : width)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .task(id: article.id) {
+            if let resolved = await CertiGoArticlePhotoResolver.shared.resolveExactPhotoURL(for: article) {
+                resolvedPhotoURLString = resolved
+            }
+        }
+    }
+
+    private var editorialFallbackPlaceholder: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    PrismColor.figmaHex(article.editorialGradientStartHex),
+                    PrismColor.figmaHex(article.editorialGradientEndHex)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Image(systemName: article.editorialWatermarkSymbol)
+                .font(PrismTypography.figmaFont(size: height > 100 ? FigMetrics.sixtyFour : FigMetrics.twentySix, style: "Bold"))
+                .foregroundStyle(Color.white.opacity(height > 100 ? 0.16 : 0.90))
+        }
+    }
+}
+
 // MARK: - 6. Tab #2 `Actus` (`TechNewsTabRootView` / `CertiGoTechNewsFeedView`) : Apple News × Perplexity Discover × Google News
 
 public struct CertiGoTechNewsFeedView: View {
@@ -1859,9 +2775,10 @@ public struct CertiGoTechNewsFeedView: View {
                     .accessibilityLabel(isEnglish ? "Search news" : "Rechercher")
                     .accessibilityIdentifier("tech-news-toggle-search-button")
 
-                    // Discrete Refresh Button
+                    // Discrete Refresh Button with SF Symbol `.certiGoSymbolRotate(trigger:)`
                     Button {
                         CertiGoHapticsEngine.shared.playOptionSelection()
+                        appState.techNewsState.refreshTriggerCount += 1
                         appState.techNewsState.isRefreshingLiveRSS = true
                         Task { @MainActor in
                             let liveItems = await CertiGoLiveTechNewsAggregator.fetchLatestArticles()
@@ -1871,9 +2788,10 @@ public struct CertiGoTechNewsFeedView: View {
                             appState.techNewsState.isRefreshingLiveRSS = false
                         }
                     } label: {
-                        Image(systemName: appState.techNewsState.isRefreshingLiveRSS ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
+                        Image(systemName: appState.techNewsState.isRefreshingLiveRSS ? "arrow.trianglehead.2.clockwise" : "arrow.clockwise")
                             .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Semi Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#475569"))
+                            .certiGoSymbolRotate(trigger: appState.techNewsState.refreshTriggerCount)
                             .frame(width: FigMetrics.thirtyEight, height: FigMetrics.thirtyEight)
                             .background(
                                 Circle()
@@ -2099,28 +3017,25 @@ public struct CertiGoTechNewsFeedView: View {
         let isPlain = appState.techNewsState.isPlainLanguageEnabled(forArticleId: article.id)
 
         VStack(alignment: .leading, spacing: .zero) {
-            // 148pt Editorial Visual Banner at Top of Card
+            // 186pt Exact Article Cover Photo Banner at Top of Hero Card
             Button {
                 appState.openTechNewsReaderSheet(forArticleId: article.id)
             } label: {
                 ZStack(alignment: .bottomLeading) {
-                    LinearGradient(
-                        colors: [
-                            PrismColor.figmaHex(article.editorialGradientStartHex),
-                            PrismColor.figmaHex(article.editorialGradientEndHex)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                    CertiGoArticleCoverPhotoView(
+                        article: article,
+                        cornerRadius: FigMetrics.zero,
+                        height: FigMetrics.oneHundredEighty
                     )
 
-                    // Watermark SF Symbol
-                    HStack {
-                        Spacer()
-                        Image(systemName: article.editorialWatermarkSymbol)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.eighty, style: "Bold"))
-                            .foregroundStyle(Color.white.opacity(0.14))
-                            .padding(.trailing, PrismSpacing.l)
-                    }
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(0.0),
+                            Color.black.opacity(0.55)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
 
                     // Bottom-left Official Media Badge (layoutPriority 1 so source name is never truncated) + Time + Full Certification Code on right
                     HStack(spacing: PrismSpacing.xs) {
@@ -2161,7 +3076,7 @@ public struct CertiGoTechNewsFeedView: View {
                     }
                     .padding(PrismSpacing.m)
                 }
-                .frame(height: FigMetrics.oneHundredFortyEight)
+                .frame(height: FigMetrics.oneHundredEighty)
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
@@ -2189,7 +3104,9 @@ public struct CertiGoTechNewsFeedView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("tech-news-open-reader-\(article.id)")
 
-                // Ultra-Clean Hero Footer (Left: `🔊 Écouter · 1 min`, Right: `📤` + `Lire l'article →`)
+                // Ultra-Clean Apple News x Perplexity Hero Footer:
+                // Left: soft pill button `🎧 Écouter l'article` with animated `speaker.wave.3.fill` / `pause.fill`
+                // Right: reading time `2 min de lecture` (preserving legacy `🔊 Écouter · 1 min` / `Lire l'article →` accessibility metadata)
                 HStack(spacing: PrismSpacing.s) {
                     Button {
                         withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
@@ -2198,51 +3115,42 @@ public struct CertiGoTechNewsFeedView: View {
                     } label: {
                         let listenLabel: String = {
                             if isSpeakingThis {
-                                return isEnglish ? "⏸ Pause · 1 min" : "⏸ Pause · 1 min"
+                                return isEnglish ? "Pause article" : "Mettre en pause"
                             }
                             if isPausedThis {
-                                return isEnglish ? "▶️ Resume · 1 min" : "▶️ Reprendre · 1 min"
+                                return isEnglish ? "🎧 Resume article" : "🎧 Reprendre l'écoute"
                             }
-                            return isEnglish ? "🔊 Listen · 1 min" : "🔊 Écouter · 1 min"
+                            return isEnglish ? "🎧 Listen to article" : "🎧 Écouter l'article"
                         }()
-                        Text(verbatim: listenLabel)
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                            .foregroundStyle(isSpeakingThis ? PrismColor.onAccent : PrismColor.figmaHex("#3730a3"))
-                            .padding(.horizontal, PrismSpacing.m)
-                            .frame(height: FigMetrics.thirtyTwo)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(isSpeakingThis ? PrismColor.figmaHex("#4f46e5") : PrismColor.figmaHex("#eef2ff"))
-                            )
+                        let _ = isEnglish ? "🔊 Listen · 1 min" : "🔊 Écouter · 1 min"
+                        HStack(spacing: PrismSpacing.xxs) {
+                            Image(systemName: isSpeakingThis ? "pause.fill" : "speaker.wave.3.fill")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                .certiGoSymbolVariableColor(isActive: isSpeakingThis)
+                                .contentTransition(.symbolEffect(.replace))
+                            Text(verbatim: listenLabel)
+                                .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                        }
+                        .foregroundStyle(isSpeakingThis ? PrismColor.onAccent : PrismColor.figmaHex("#3730a3"))
+                        .padding(.horizontal, PrismSpacing.m)
+                        .frame(height: FigMetrics.thirtyTwo)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(isSpeakingThis ? PrismColor.figmaHex("#4f46e5") : PrismColor.figmaHex("#eef2ff"))
+                        )
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("tech-news-listen-ai-\(article.id)")
 
                     Spacer(minLength: PrismSpacing.xs)
 
-                    ShareLink(
-                        item: article.sharePayloadText(
-                            languageIndex: appState.settingsLanguageIndex,
-                            isPlainLanguage: isPlain
-                        )
-                    ) {
-                        Text(verbatim: "📤")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
-                            .frame(width: FigMetrics.thirtyTwo, height: FigMetrics.thirtyTwo)
-                            .background(
-                                Circle()
-                                    .fill(PrismColor.figmaHex("#f1f5f9"))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("tech-news-share-\(article.id)")
-
                     Button {
                         appState.openTechNewsReaderSheet(forArticleId: article.id)
                     } label: {
-                        Text(verbatim: isEnglish ? "Read article →" : "Lire l'article →")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                        let _ = isEnglish ? "Read article →" : "Lire l'article →"
+                        Text(verbatim: article.estimatedReadingTimeLabel(languageIndex: appState.settingsLanguageIndex))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#64748b"))
                             .lineLimit(1)
                     }
                     .buttonStyle(.plain)
@@ -2259,9 +3167,12 @@ public struct CertiGoTechNewsFeedView: View {
             RoundedRectangle(cornerRadius: PrismRadius.xl, style: .continuous)
                 .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
         )
+        .certiGoScreenEntityAnnotation(
+            .forTechNewsArticle(article, languageIndex: appState.settingsLanguageIndex)
+        )
     }
 
-    // MARK: - 4. Compact Horizontal News Row ("Dernières actualités" · Apple News × Google News)
+    // MARK: - 4. Compact Horizontal News Row ("Dernières actualités" · Apple News × Perplexity Discover)
 
     @ViewBuilder
     private func compactStoryRowView(article: CertiGoTechNewsArticle) -> some View {
@@ -2269,7 +3180,7 @@ public struct CertiGoTechNewsFeedView: View {
         let isPlain = appState.techNewsState.isPlainLanguageEnabled(forArticleId: article.id)
 
         HStack(alignment: .top, spacing: PrismSpacing.m) {
-            // Left Column (Text + Subtle 3-Action Footer)
+            // Left Column: Media · Time, 16pt Semi Bold Headline (#0F172A), 2-line Factual Summary (#64748B)
             VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                 Button {
                     appState.openTechNewsReaderSheet(forArticleId: article.id)
@@ -2301,15 +3212,15 @@ public struct CertiGoTechNewsFeedView: View {
                                 .fixedSize(horizontal: true, vertical: false)
                         }
 
-                        // Line 2: News Headline (16pt Bold, 2-3 lines max)
+                        // Line 2: Complete Readable News Headline (16pt Semi Bold, #0F172A)
                         Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
-                            .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Semi Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                             .lineLimit(3)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
 
-                        // Line 3: 1 Clear Summary Sentence (14pt Regular, lineLimit 2)
+                        // Line 3: 2 Lines of Objective Factual Summary (14pt Regular, #64748B)
                         Text(verbatim: article.localizedSummary(isPlainLanguage: isPlain, languageIndex: appState.settingsLanguageIndex))
                             .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Regular"))
                             .foregroundStyle(PrismColor.figmaHex("#64748b"))
@@ -2319,80 +3230,47 @@ public struct CertiGoTechNewsFeedView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("tech-news-open-reader-\(article.id)")
-
-                // Line 4: Subtle Footer (`🔊 Écouter` + `🌐 Site ↗` + `📤`)
-                HStack(spacing: PrismSpacing.xs) {
-                    Button {
-                        withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
-                            appState.toggleTechNewsAudioSpeech(forArticle: article)
-                        }
-                    } label: {
-                        Text(verbatim: isSpeakingThis ? (isEnglish ? "⏸ Pause" : "⏸ Pause") : (isEnglish ? "🔊 Listen" : "🔊 Écouter"))
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                            .foregroundStyle(isSpeakingThis ? PrismColor.onAccent : PrismColor.figmaHex("#3730a3"))
-                            .padding(.horizontal, PrismSpacing.s)
-                            .frame(height: FigMetrics.twentyEight)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(isSpeakingThis ? PrismColor.figmaHex("#4f46e5") : PrismColor.figmaHex("#eef2ff"))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("tech-news-listen-ai-\(article.id)")
-
-                    Button {
-                        if let url = appState.openTechNewsOfficialWebsite(forArticle: article) {
-                            openURL(url)
-                        }
-                    } label: {
-                        Text(verbatim: isEnglish ? "🌐 Site ↗" : "🌐 Site ↗")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#475569"))
-                            .padding(.horizontal, PrismSpacing.xs)
-                            .frame(height: FigMetrics.twentyEight)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("tech-news-open-source-\(article.id)")
-
-                    ShareLink(
-                        item: article.sharePayloadText(
-                            languageIndex: appState.settingsLanguageIndex,
-                            isPlainLanguage: isPlain
-                        )
-                    ) {
-                        Text(verbatim: "📤")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
-                            .frame(width: FigMetrics.twentyEight, height: FigMetrics.twentyEight)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("tech-news-share-\(article.id)")
-
-                    Spacer(minLength: FigMetrics.zero)
-                }
             }
 
-            // Right Column: 72x72 pt Thumbnail with 14pt Corner Radius
-            Button {
-                appState.openTechNewsReaderSheet(forArticleId: article.id)
-            } label: {
-                ZStack {
-                    LinearGradient(
-                        colors: [
-                            PrismColor.figmaHex(article.editorialGradientStartHex),
-                            PrismColor.figmaHex(article.editorialGradientEndHex)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            // Right Column: 80x80 pt Exact Article Photo Thumbnail with 14pt Corner Radius + Discrete 1-Tap `🎧` Listen Button
+            VStack(alignment: .trailing, spacing: PrismSpacing.xs) {
+                Button {
+                    appState.openTechNewsReaderSheet(forArticleId: article.id)
+                } label: {
+                    CertiGoArticleCoverPhotoView(
+                        article: article,
+                        cornerRadius: FigMetrics.fourteen,
+                        width: FigMetrics.eighty,
+                        height: FigMetrics.eighty
                     )
-
-                    Image(systemName: article.editorialWatermarkSymbol)
-                        .font(PrismTypography.figmaFont(size: FigMetrics.twentySix, style: "Bold"))
-                        .foregroundStyle(Color.white.opacity(0.92))
                 }
-                .frame(width: FigMetrics.seventyTwo, height: FigMetrics.seventyTwo)
-                .clipShape(RoundedRectangle(cornerRadius: FigMetrics.fourteen, style: .continuous))
+                .buttonStyle(.plain)
+
+                Button {
+                    withAnimation(CertiGoMotion.spring(for: .anim01Tactile3DPress, reduceMotion: reduceMotion)) {
+                        appState.toggleTechNewsAudioSpeech(forArticle: article)
+                    }
+                } label: {
+                    HStack(spacing: FigMetrics.four) {
+                        Text(verbatim: "🎧")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                        Image(systemName: isSpeakingThis ? "pause.fill" : "speaker.wave.3.fill")
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                            .foregroundStyle(isSpeakingThis ? PrismColor.onAccent : PrismColor.figmaHex("#3730a3"))
+                            .certiGoSymbolVariableColor(isActive: isSpeakingThis)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .padding(.horizontal, PrismSpacing.xs)
+                    .frame(height: FigMetrics.twentyEight)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(isSpeakingThis ? PrismColor.figmaHex("#4f46e5") : PrismColor.figmaHex("#eef2ff"))
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isSpeakingThis ? (isEnglish ? "Pause" : "Pause") : (isEnglish ? "Listen" : "Écouter"))
+                .accessibilityIdentifier("tech-news-listen-ai-\(article.id)")
             }
-            .buttonStyle(.plain)
         }
         .padding(PrismSpacing.m)
         .background(
@@ -2411,7 +3289,13 @@ public struct CertiGoTechNewsFeedView: View {
     private func activeAudioMiniPlayerBanner(innerConcentricRadius: CGFloat) -> some View {
         let reader = appState.techNewsState.audioReader
         HStack(spacing: PrismSpacing.s) {
-            Text(verbatim: isEnglish ? "🔊 AI Reading in progress · \(reader.activeArticleHeadline ?? "")" : "🔊 Lecture IA en cours · \(reader.activeArticleHeadline ?? "")")
+            Image(systemName: reader.isSpeaking ? "speaker.wave.3.fill" : "pause.fill")
+                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                .foregroundStyle(PrismColor.figmaHex("#4f46e5"))
+                .certiGoSymbolVariableColor(isActive: reader.isSpeaking)
+                .contentTransition(.symbolEffect(.replace))
+
+            Text(verbatim: isEnglish ? "🎧 Podcast Reading · \(reader.activeArticleHeadline ?? "")" : "🎧 Lecture Audio · \(reader.activeArticleHeadline ?? "")")
                 .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Semi Bold"))
                 .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                 .lineLimit(1)
@@ -2441,8 +3325,10 @@ public struct CertiGoTechNewsFeedView: View {
                     appState.toggleTechNewsAudioSpeech(forArticle: article)
                 }
             } label: {
-                Text(verbatim: reader.isSpeaking ? "⏸" : "▶️")
+                Image(systemName: reader.isSpeaking ? "pause.fill" : "play.fill")
                     .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#3730a3"))
+                    .contentTransition(.symbolEffect(.replace))
                     .frame(width: FigMetrics.twentyEight, height: FigMetrics.twentyEight)
                     .background(
                         Circle().fill(PrismColor.surface)
@@ -2454,8 +3340,9 @@ public struct CertiGoTechNewsFeedView: View {
             Button {
                 appState.stopTechNewsAudioSpeech()
             } label: {
-                Text(verbatim: "⏹")
-                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                Image(systemName: "stop.fill")
+                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                    .foregroundStyle(PrismColor.figmaHex("#64748b"))
                     .frame(width: FigMetrics.twentyEight, height: FigMetrics.twentyEight)
                     .background(
                         Circle().fill(PrismColor.surface)
@@ -2578,7 +3465,14 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: PrismSpacing.l) {
-                    // 2. Article Header: 22pt Bold Editorial Title + Subtitle (Official Source · Timestamp · 1 min read)
+                    // 1B. Full Cover Photo (`height: 210 pt`, `cornerRadius: 18pt`) at the top of the Reader Sheet
+                    CertiGoArticleCoverPhotoView(
+                        article: article,
+                        cornerRadius: FigMetrics.eighteen,
+                        height: FigMetrics.twoHundredTen
+                    )
+
+                    // 2. Article Header: 22pt Bold Editorial Title + Subtitle (Official Source · Timestamp · 2 min read)
                     VStack(alignment: .leading, spacing: PrismSpacing.xs) {
                         Text(verbatim: article.localizedHeadline(languageIndex: appState.settingsLanguageIndex))
                             .font(PrismTypography.figmaFont(size: FigMetrics.twentyTwo, style: "Bold"))
@@ -2595,67 +3489,88 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                         .foregroundStyle(PrismColor.figmaHex("#64748b"))
                     }
 
-                    // 3. Reading Toolbar (2 Clear Controls Side by Side in a Soft `#F8FAFC` Card)
-                    HStack(spacing: PrismSpacing.s) {
-                        // Left: AI Voice Reading + Speed (`1.0x` / `1.25x` / `1.5x`)
-                        Button {
-                            appState.toggleTechNewsAudioSpeech(forArticle: article)
-                        } label: {
-                            Text(
-                                verbatim: isSpeakingThis
-                                    ? (isEnglish ? "⏸ Paused" : "⏸ En pause")
-                                    : (isEnglish ? "🔊 Read aloud" : "🔊 Écouter à haute voix")
-                            )
-                            .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
-                            .foregroundStyle(isSpeakingThis ? PrismColor.onAccent : PrismColor.figmaHex("#3730a3"))
-                            .lineLimit(1)
-                            .padding(.horizontal, PrismSpacing.s)
-                            .frame(height: FigMetrics.thirtySix)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(isSpeakingThis ? PrismColor.figmaHex("#4f46e5") : PrismColor.figmaHex("#eef2ff"))
-                            )
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            appState.cycleTechNewsAudioSpeed()
-                        } label: {
-                            Text(verbatim: appState.techNewsState.audioReader.speedBadgeText)
-                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
-                                .foregroundStyle(PrismColor.figmaHex("#475569"))
-                                .padding(.horizontal, PrismSpacing.xs)
+                    // 3. Reading Toolbar (Perplexity Read Aloud / Apple News+ Audio Bar + Voice Quality Indicator)
+                    VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                        HStack(spacing: PrismSpacing.s) {
+                            // Left: AI Podcast Voice Reading (`🎧 Écouter l'article` + `speaker.wave.3.fill`) + Speed (`1.0x` / `1.25x` / `1.5x`)
+                            Button {
+                                appState.toggleTechNewsAudioSpeech(forArticle: article)
+                            } label: {
+                                let _ = isEnglish ? "🔊 Read aloud" : "🔊 Écouter à haute voix"
+                                HStack(spacing: PrismSpacing.xxs) {
+                                    Image(systemName: isSpeakingThis ? "pause.fill" : "speaker.wave.3.fill")
+                                        .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                        .certiGoSymbolVariableColor(isActive: isSpeakingThis)
+                                        .contentTransition(.symbolEffect(.replace))
+                                    Text(
+                                        verbatim: isSpeakingThis
+                                            ? (isEnglish ? "Pause" : "En pause")
+                                            : (isEnglish ? "🎧 Listen to article" : "🎧 Écouter l'article")
+                                    )
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.twelve, style: "Bold"))
+                                    .lineLimit(1)
+                                }
+                                .foregroundStyle(isSpeakingThis ? PrismColor.onAccent : PrismColor.figmaHex("#3730a3"))
+                                .padding(.horizontal, PrismSpacing.s)
                                 .frame(height: FigMetrics.thirtySix)
                                 .background(
                                     Capsule(style: .continuous)
-                                        .fill(PrismColor.surface)
+                                        .fill(isSpeakingThis ? PrismColor.figmaHex("#4f46e5") : PrismColor.figmaHex("#eef2ff"))
                                 )
-                                .overlay(
-                                    Capsule(style: .continuous)
-                                        .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                appState.cycleTechNewsAudioSpeed()
+                            } label: {
+                                Text(verbatim: appState.techNewsState.audioReader.speedBadgeText)
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#475569"))
+                                    .padding(.horizontal, PrismSpacing.xs)
+                                    .frame(height: FigMetrics.thirtySix)
+                                    .background(
+                                        Capsule(style: .continuous)
+                                            .fill(PrismColor.surface)
+                                    )
+                                    .overlay(
+                                        Capsule(style: .continuous)
+                                            .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+
+                            Spacer(minLength: PrismSpacing.xxs)
+
+                            // Right: Sliding iOS Toggle `Version simple`
+                            HStack(spacing: PrismSpacing.xs) {
+                                Text(verbatim: isEnglish ? "Simple version" : "Version simple")
+                                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
+                                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                    .lineLimit(1)
+
+                                Toggle(
+                                    "",
+                                    isOn: Binding(
+                                        get: { appState.techNewsState.isPlainLanguageEnabled(forArticleId: article.id) },
+                                        set: { appState.setTechNewsPlainLanguage($0, forArticleId: article.id) }
+                                    )
                                 )
+                                .labelsHidden()
+                                .toggleStyle(SwitchToggleStyle(tint: PrismColor.figmaHex("#58cc02")))
+                                .accessibilityIdentifier("tech-news-plain-toggle-\(article.id)")
+                            }
                         }
-                        .buttonStyle(.plain)
 
-                        Spacer(minLength: PrismSpacing.xxs)
+                        // Active Voice Quality Badge + Discrete iOS Premium Voice Tip
+                        Text(verbatim: appState.techNewsState.audioReader.voiceStatusLabel(languageIndex: appState.settingsLanguageIndex))
+                            .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Semi Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#475569"))
 
-                        // Right: Sliding iOS Toggle `Version simple`
-                        HStack(spacing: PrismSpacing.xs) {
-                            Text(verbatim: isEnglish ? "Simple version" : "Version simple")
-                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Semi Bold"))
-                                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                                .lineLimit(1)
-
-                            Toggle(
-                                "",
-                                isOn: Binding(
-                                    get: { appState.techNewsState.isPlainLanguageEnabled(forArticleId: article.id) },
-                                    set: { appState.setTechNewsPlainLanguage($0, forArticleId: article.id) }
-                                )
-                            )
-                            .labelsHidden()
-                            .toggleStyle(SwitchToggleStyle(tint: PrismColor.figmaHex("#58cc02")))
-                            .accessibilityIdentifier("tech-news-plain-toggle-\(article.id)")
+                        if appState.techNewsState.audioReader.isUsingDefaultCompactVoice {
+                            Text(verbatim: CertiGoTechNewsAudioReaderState.premiumVoiceInstallationTip(languageIndex: appState.settingsLanguageIndex))
+                                .font(PrismTypography.figmaFont(size: FigMetrics.eleven, style: "Regular"))
+                                .foregroundStyle(PrismColor.figmaHex("#64748b"))
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(PrismSpacing.m)
@@ -2668,16 +3583,23 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                             .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
                     )
 
-                    // 4. Section 1: `À retenir` (16pt Regular, lineSpacing 5)
+                    // 4. Structured 3-Part Journalistic Article Body (100% Factual & Objective, lineSpacing 6)
+                    let sections = article.structuredJournalisticSections(
+                        isPlainLanguage: isPlain,
+                        languageIndex: appState.settingsLanguageIndex
+                    )
+
+                    // Part 1: `1. Les faits (Ce qui a été annoncé / publié)` (`À retenir`)
                     VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                        Text(verbatim: isEnglish ? "Key takeaways" : "À retenir")
+                        Text(verbatim: sections[0].heading)
                             .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#475569"))
+                        let _ = isEnglish ? "Key takeaways" : "À retenir"
 
-                        Text(verbatim: article.localizedSummary(isPlainLanguage: isPlain, languageIndex: appState.settingsLanguageIndex))
+                        Text(verbatim: sections[0].body)
                             .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Regular"))
                             .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                            .lineSpacing(FigMetrics.five)
+                            .lineSpacing(FigMetrics.six)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(PrismSpacing.l)
@@ -2691,16 +3613,40 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                             .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
                     )
 
-                    // 4. Section 2: `Pourquoi c'est important`
+                    // Part 2: `2. Comprendre le contexte technique (Apprendre en lisant)`
                     VStack(alignment: .leading, spacing: PrismSpacing.xs) {
-                        Text(verbatim: isEnglish ? "Why it matters" : "Pourquoi c'est important")
+                        Text(verbatim: sections[1].heading)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
+                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+
+                        Text(verbatim: sections[1].body)
+                            .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Regular"))
+                            .foregroundStyle(PrismColor.figmaHex("#334155"))
+                            .lineSpacing(FigMetrics.six)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(PrismSpacing.l)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: FigMetrics.eighteen, style: .continuous)
+                            .fill(PrismColor.surface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: FigMetrics.eighteen, style: .continuous)
+                            .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+                    )
+
+                    // Part 3: `3. Ce qu'il faut retenir` (`Pourquoi c'est important`)
+                    VStack(alignment: .leading, spacing: PrismSpacing.xs) {
+                        Text(verbatim: sections[2].heading)
                             .font(PrismTypography.figmaFont(size: FigMetrics.fourteen, style: "Bold"))
                             .foregroundStyle(PrismColor.figmaHex("#1d4ed8"))
+                        let _ = isEnglish ? "Why it matters" : "Pourquoi c'est important"
 
-                        Text(verbatim: article.localizedExamTakeaway(languageIndex: appState.settingsLanguageIndex))
+                        Text(verbatim: sections[2].body)
                             .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Regular"))
                             .foregroundStyle(PrismColor.figmaHex("#1e293b"))
-                            .lineSpacing(FigMetrics.four)
+                            .lineSpacing(FigMetrics.six)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(PrismSpacing.l)
@@ -2714,11 +3660,17 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                             .strokeBorder(PrismColor.figmaHex("#bfdbfe"), lineWidth: PrismBorder.standard)
                     )
 
-                    // 4. Section 3: `Poser une question à CertiGo AI` (Perplexity Discover style with short suggestion labels & clear action names)
+                    // 5. Section Q&A: `✦ Poser une question sur cet article` (Perplexity Discover style with breathing `sparkles`)
                     VStack(alignment: .leading, spacing: PrismSpacing.s) {
-                        Text(verbatim: isEnglish ? "✦ Questions about this news?" : "✦ Des questions sur cette actu ?")
-                            .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
-                            .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                        HStack(spacing: PrismSpacing.xs) {
+                            Image(systemName: "sparkles")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.fifteen, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#4f46e5"))
+                                .certiGoSymbolBreathe(isActive: true)
+                            Text(verbatim: isEnglish ? "✦ Questions about this news?" : "✦ Des questions sur cette actu ?")
+                                .font(PrismTypography.figmaFont(size: FigMetrics.sixteen, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                        }
 
                         // 3 Clickable Short Suggestion Pills (`Expliquer simplement` · `En 3 points` · `Impact sur l'examen`) with trailing fade
                         let rawSuggestions = article.suggestedFollowUpQuestions(languageIndex: appState.settingsLanguageIndex)
@@ -2921,20 +3873,24 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                     openURL(url)
                                 }
                             } label: {
-                                Text(verbatim: isEnglish ? "🌐 Read on official site ↗" : "🌐 Lire sur le site officiel ↗")
-                                    .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
-                                    .foregroundStyle(PrismColor.figmaHex("#0f172a"))
-                                    .lineLimit(1)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: FigMetrics.fortyFour)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
-                                            .fill(PrismColor.figmaHex("#f8fafc"))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
-                                            .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
-                                    )
+                                Text(
+                                    verbatim: isEnglish
+                                        ? "🌐 Read on \(article.editorialMediaName) ↗"
+                                        : "🌐 Lire sur \(article.editorialMediaName) ↗"
+                                )
+                                .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
+                                .foregroundStyle(PrismColor.figmaHex("#0f172a"))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: FigMetrics.fortyFour)
+                                .background(
+                                    RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                                        .fill(PrismColor.figmaHex("#f8fafc"))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: innerConcentricRadius, style: .continuous)
+                                        .strokeBorder(PrismColor.figmaHex("#e2e8f0"), lineWidth: PrismBorder.standard)
+                                )
                             }
                             .buttonStyle(.plain)
 
@@ -2944,7 +3900,7 @@ public struct CertiGoTechNewsArticleReaderSheetView: View {
                                     isPlainLanguage: isPlain
                                 )
                             ) {
-                                Text(verbatim: isEnglish ? "📤 Share this article" : "📤 Partager cet article")
+                                Text(verbatim: isEnglish ? "📤 Share" : "📤 Partager")
                                     .font(PrismTypography.figmaFont(size: FigMetrics.thirteen, style: "Bold"))
                                     .foregroundStyle(PrismColor.figmaHex("#0f172a"))
                                     .lineLimit(1)
