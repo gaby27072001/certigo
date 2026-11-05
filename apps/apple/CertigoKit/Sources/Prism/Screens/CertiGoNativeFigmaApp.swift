@@ -2537,16 +2537,18 @@ public struct CertiGoNativeLessonSessionEngine: Equatable, Sendable {
         attemptPhase = .comparingServices
     }
 
+    public var wasLatestAttemptCorrect: Bool {
+        if let latest = recentMistakesLog.first(where: { $0.conceptId == currentExercise.conceptId }) {
+            return latest.isCorrect
+        }
+        return currentExercise.options
+            .filter(\.isCorrect)
+            .map(\.id)
+            .allSatisfy { selectedOptionIds.contains($0) } && !selectedOptionIds.isEmpty
+    }
+
     public mutating func closeOverlaySheetToCheckedState() {
-        let wasCorrect: Bool = {
-            if let latest = recentMistakesLog.first(where: { $0.conceptId == currentExercise.conceptId }) {
-                return latest.isCorrect
-            }
-            return currentExercise.options
-                .filter(\.isCorrect)
-                .map(\.id)
-                .allSatisfy { selectedOptionIds.contains($0) } && !selectedOptionIds.isEmpty
-        }()
+        let wasCorrect = wasLatestAttemptCorrect
         if case .explainingError = attemptPhase {
             attemptPhase = .checked(isCorrect: wasCorrect)
         } else if case .comparingServices = attemptPhase {
@@ -19457,8 +19459,11 @@ public struct CertiGoNativeLessonSessionModalView: View {
                                 switch appState.lessonSession.attemptPhase {
                                 case .answering:
                                     verifierBottomBar
-                                case .checked(let isCorrect), .explainingError(let isCorrect), .comparingServices(let isCorrect):
+                                case .checked(let isCorrect):
                                     feedbackDrawer18Or04(isCorrect: isCorrect)
+                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                case .explainingError, .comparingServices:
+                                    feedbackDrawer18Or04(isCorrect: appState.lessonSession.wasLatestAttemptCorrect)
                                         .transition(.move(edge: .bottom).combined(with: .opacity))
                                 }
                             }

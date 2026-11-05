@@ -2698,6 +2698,8 @@ struct CertiGoNativeFigmaAppTests {
 
         #expect(figmaSource.contains("GlassEffectContainer"))
         #expect(figmaSource.contains(".glassEffect("))
+        #expect(!figmaSource.contains(".explainingError("))
+        #expect(!figmaSource.contains(".comparingServices("))
         #expect(figmaSource.contains("matchedGeometryEffect(id: \"activeBottomTabLens\", in: bottomTabGlassNamespace)"))
         #expect(figmaSource.contains(".spring(response: responseSeconds, dampingFraction: dampingRatio)"))
         #expect(figmaSource.contains("✓ Bonne réponse"))
