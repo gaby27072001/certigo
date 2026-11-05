@@ -396,6 +396,9 @@ public enum CertiGoTypeToken: String, Codable, Hashable, CaseIterable, Sendable 
       if size >= 26 {
         higPointSize = 28
         higWeight = .bold
+      } else if size >= 24 {
+        higPointSize = 24
+        higWeight = .bold
       } else if size >= 22 {
         higPointSize = 22
         higWeight = .bold
@@ -412,7 +415,10 @@ public enum CertiGoTypeToken: String, Codable, Hashable, CaseIterable, Sendable 
         if normalized == "black" || normalized == "heavy" || normalized == "extra bold" || normalized == "extrabold" || normalized == "bold" {
           higPointSize = 17
           higWeight = .semibold
-        } else if normalized == "medium" || normalized == "semi bold" || normalized == "semibold" {
+        } else if normalized == "semi bold" || normalized == "semibold" {
+          higPointSize = 16
+          higWeight = .semibold
+        } else if normalized == "medium" {
           higPointSize = 16
           higWeight = .medium
         } else {
@@ -443,10 +449,10 @@ public enum CertiGoTypeToken: String, Codable, Hashable, CaseIterable, Sendable 
         }
       } else if size >= 13 {
         higPointSize = 13
-        higWeight = (normalized == "regular") ? .regular : .semibold
+        higWeight = (normalized == "regular") ? .regular : ((normalized == "medium") ? .medium : .semibold)
       } else {
         higPointSize = 12
-        higWeight = .semibold
+        higWeight = (normalized == "regular") ? .regular : ((normalized == "medium") ? .medium : .semibold)
       }
       let effectivePointSize = max(higPointSize, size)
       return Font.system(size: effectivePointSize, weight: higWeight, design: .default)
