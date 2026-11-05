@@ -2937,4 +2937,108 @@ struct CertiGoNativeFigmaAppTests {
         appState.openUnitGuide(forUnitNumber: 1)
         #expect(appState.activeStepSheet == .memo14(lessonId: "TF-003-u1-s1"))
     }
+
+    @Test("Static Guardrail: 100% of FigMetrics.* and FigPalette.* references across all Swift files (including #if canImport(SwiftUI)) exist in enum FigMetrics and enum FigPalette")
+    func testAllFigMetricsAndFigPaletteMembersExistInSwiftUIFiles() throws {
+        #expect(FigMetrics.twoHundredTen == 210)
+        #expect(FigPalette.slate900 == "#0f172a")
+
+        var repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: repoRoot.appendingPathComponent("AGENTS.md").path) {
+            let parent = repoRoot.deletingLastPathComponent()
+            guard parent != repoRoot else { throw CocoaError(.fileNoSuchFile) }
+            repoRoot = parent
+        }
+
+        let figmaAppURL = repoRoot.appendingPathComponent(
+            "apps/apple/CertigoKit/Sources/Prism/Screens/CertiGoNativeFigmaApp.swift"
+        )
+        let figmaAppSource = try String(contentsOf: figmaAppURL, encoding: .utf8)
+
+        func extractDeclaredStaticMembers(enumName: String, in source: String) throws -> Set<String> {
+            let blockPattern = try NSRegularExpression(
+                pattern: "public\\s+enum\\s+\(enumName)\\s*\\{([^\\}]*)\\}",
+                options: [.dotMatchesLineSeparators]
+            )
+            let fullRange = NSRange(source.startIndex..<source.endIndex, in: source)
+            guard let blockMatch = blockPattern.firstMatch(in: source, options: [], range: fullRange),
+                  let bodyRange = Range(blockMatch.range(at: 1), in: source)
+            else {
+                return []
+            }
+            let body = String(source[bodyRange])
+            let memberPattern = try NSRegularExpression(
+                pattern: "static\\s+(?:let|var|func)\\s+([A-Za-z0-9_]+)",
+                options: []
+            )
+            let bodyNSRange = NSRange(body.startIndex..<body.endIndex, in: body)
+            var members: Set<String> = ["self", "Type"]
+            for m in memberPattern.matches(in: body, options: [], range: bodyNSRange) {
+                if let r = Range(m.range(at: 1), in: body) {
+                    members.insert(String(body[r]))
+                }
+            }
+            return members
+        }
+
+        let declaredFigMetrics = try extractDeclaredStaticMembers(enumName: "FigMetrics", in: figmaAppSource)
+        let declaredFigPalette = try extractDeclaredStaticMembers(enumName: "FigPalette", in: figmaAppSource)
+        #expect(declaredFigMetrics.contains("twoHundredTen"))
+        #expect(declaredFigPalette.contains("slate900"))
+
+        let prismDir = repoRoot.appendingPathComponent("apps/apple/CertigoKit/Sources/Prism")
+        guard let enumerator = FileManager.default.enumerator(
+            at: prismDir,
+            includingPropertiesForKeys: nil
+        ) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+
+        let metricsUseRegex = try NSRegularExpression(pattern: "\\bFigMetrics\\.([A-Za-z0-9_]+)\\b")
+        let paletteUseRegex = try NSRegularExpression(pattern: "\\bFigPalette\\.([A-Za-z0-9_]+)\\b")
+
+        var missingMetricsOccurrences: [String] = []
+        var missingPaletteOccurrences: [String] = []
+        var scannedFileCount = 0
+
+        for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
+            scannedFileCount += 1
+            let content = try String(contentsOf: fileURL, encoding: .utf8)
+            let relPath = fileURL.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+            let lines = content.components(separatedBy: .newlines)
+
+            for (index, rawLine) in lines.enumerated() {
+                let codeLine = rawLine.components(separatedBy: "//").first ?? rawLine
+                let lineRange = NSRange(codeLine.startIndex..<codeLine.endIndex, in: codeLine)
+
+                for match in metricsUseRegex.matches(in: codeLine, options: [], range: lineRange) {
+                    if let r = Range(match.range(at: 1), in: codeLine) {
+                        let member = String(codeLine[r])
+                        if !declaredFigMetrics.contains(member) {
+                            missingMetricsOccurrences.append("\(relPath):\(index + 1) -> FigMetrics.\(member)")
+                        }
+                    }
+                }
+
+                for match in paletteUseRegex.matches(in: codeLine, options: [], range: lineRange) {
+                    if let r = Range(match.range(at: 1), in: codeLine) {
+                        let member = String(codeLine[r])
+                        if !declaredFigPalette.contains(member) {
+                            missingPaletteOccurrences.append("\(relPath):\(index + 1) -> FigPalette.\(member)")
+                        }
+                    }
+                }
+            }
+        }
+
+        #expect(scannedFileCount >= 20)
+        #expect(
+            missingMetricsOccurrences.isEmpty,
+            "Undeclared FigMetrics references found in Sources/Prism: \(missingMetricsOccurrences.joined(separator: ", "))"
+        )
+        #expect(
+            missingPaletteOccurrences.isEmpty,
+            "Undeclared FigPalette references found in Sources/Prism: \(missingPaletteOccurrences.joined(separator: ", "))"
+        )
+    }
 }
