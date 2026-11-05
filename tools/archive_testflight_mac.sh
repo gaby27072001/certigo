@@ -22,7 +22,8 @@ fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 team_id=${CERTIGO_APPLE_TEAM_ID:-FFQPC7NC68}
 version=${CERTIGO_DISTRIBUTION_VERSION:-1.1.0}
-build=${CERTIGO_DISTRIBUTION_BUILD:-15}
+# Previous default: build=${CERTIGO_DISTRIBUTION_BUILD:-15}
+build=${CERTIGO_DISTRIBUTION_BUILD:-16}
 open_xcode=false
 
 while [[ $# -gt 0 ]]; do
