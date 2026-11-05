@@ -278,7 +278,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
             "En production chez \(bp.brandDisplayName) pour « \(cleanMetaTitle) » (\(cleanMetaSub)), l'équipe met en place : \(cleanCorrectTitle).\n\nRésultat opérationnel : \(cleanCorrectExp) Cette configuration respecte la règle d'architecture : \(cleanUnitRule)"
         )
 
-        if parsed.stepZeroBased > 0 {
+        if parsed.stepZeroBased > 0 || parsed.unit > 1 {
             return LessonDeclicCard(
                 title: ensureSentenceEnding(sanitizeText("Déclic \(bp.code) (\(stepCode)) · \(resolvedStepTitle) : associer \(cleanRight) pour maîtriser \(lowercaseFirst(cleanMetaSub)).")),
                 analogy: ensureSentenceEnding(analogyText),
@@ -351,8 +351,6 @@ public enum CertiGoDedicatedTrackQuestionBank {
         let stepMeta = bp.thirtySteps.isEmpty ? nil : bp.thirtySteps[stepGlobalIdx]
         let ordered = orderedExerciseSeeds(for: bp, unit: parsed.unit, stepZeroBased: parsed.stepZeroBased)
         let seed = ordered.first ?? bp.exerciseSeeds[stepGlobalIdx % max(1, bp.exerciseSeeds.count)]
-        let secondSeed = ordered.count > 1 ? ordered[1] : seed
-        let examSeed = bp.examSeeds[stepGlobalIdx % max(1, bp.examSeeds.count)]
 
         let cleanTitle = sanitizeText(
             !lessonTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -366,7 +364,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
         let cleanRight = sanitizeText(seed.compRightTitle)
         let cleanTip = ensureSentenceEnding(sanitizeText(seed.examTip))
         let cleanCompRule = ensureSentenceEnding(sanitizeText(seed.compRule))
-        let cleanDomain = sanitizeText(examSeed.domainTitle)
+        let cleanDomain = sanitizeText(unitHeader.headerTitle)
         let stepCode = "U\(parsed.unit).\(parsed.stepZeroBased + 1)"
 
         let firstRightBullet = ensureSentenceEnding(sanitizeText(seed.compRightBullets.first ?? cleanSubtitle))
@@ -374,8 +372,6 @@ public enum CertiGoDedicatedTrackQuestionBank {
         let correctOpt = seed.options.first(where: \.isCorrect) ?? seed.options[0]
         let cleanCorrectTitle = sanitizeText(correctOpt.title)
         let cleanCorrectExp = ensureSentenceEnding(sanitizeText(correctOpt.explanation))
-        let secondCorrectOpt = secondSeed.options.first(where: \.isCorrect) ?? secondSeed.options[0]
-        let secondCorrectTitle = sanitizeText(secondCorrectOpt.title)
         let glossaryFirst = seed.glossary.first
         let glossaryTerm = sanitizeText(glossaryFirst?.term ?? cleanRight)
         let glossaryMeaning = ensureSentenceEnding(sanitizeText(glossaryFirst?.simpleMeaning ?? firstRightBullet))
@@ -389,7 +385,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 "\(ensureSentenceEnding(bp.overviewSlide2Body)) En pratique, l'architecture repose sur trois briques complémentaires : \(keyTopicsLine).\n\nContrairement à \(cleanLeft) (\(lowercaseFirst(firstLeftBullet))), le composant \(cleanRight) applique la règle fondamentale : \(cleanUnitRule)"
             )
             let s3Body = sanitizeText(
-                "En production sur le domaine « \(cleanDomain) », la configuration recommandée consiste à mettre en œuvre : \(cleanCorrectTitle). \(cleanCorrectExp)\n\nDe même, sur un second cas pratique fréquent, retiens l'action cible : \(secondCorrectTitle). \(cleanTip)"
+                "En production sur le domaine « \(cleanDomain) », la configuration recommandée pour « \(cleanTitle) » consiste à mettre en œuvre : \(cleanCorrectTitle). \(cleanCorrectExp)\n\nPour valider l'étape (\(stepCode)) avec succès, retiens la règle opérationnelle : \(cleanCompRule) \(cleanTip)"
             )
             return [
                 CertiGoLessonMicroSlide(
@@ -451,6 +447,130 @@ public enum CertiGoDedicatedTrackQuestionBank {
         ]
     }
 
+    private static func synthesizeStepAlignedSeed(
+        for bp: TrackBlueprint,
+        unit: Int,
+        stepZeroBased: Int
+    ) -> ExerciseSeed {
+        let stepGlobalIdx = min(max((unit - 1) * 10 + stepZeroBased, 0), max(0, bp.thirtySteps.count - 1))
+        let unitIdx = min(max(unit - 1, 0), max(0, bp.unitHeaders.count - 1))
+        let unitHeader = bp.unitHeaders[unitIdx]
+        let stepMeta = bp.thirtySteps.isEmpty
+            ? StepBlueprint(bp.officialTitle, bp.shortSubtitle)
+            : bp.thirtySteps[stepGlobalIdx]
+        let cleanStepTitle = sanitizeText(stepMeta.title)
+        let cleanStepSubtitle = sanitizeText(stepMeta.subtitle)
+        let cleanUnitActivity = sanitizeText(unitHeader.memoActivity)
+        let cleanUnitRule = ensureSentenceEnding(sanitizeText(unitHeader.memoGoldenRule))
+        let stepCode = "U\(unit).\(stepZeroBased + 1)"
+        let lowerTitle = cleanStepTitle.lowercased()
+
+        // Dedicated interactive JSON RBAC Custom Role Lab for AZ-104 U1.4 (and any JSON custom role lab)
+        if bp.code == "AZ-104" && unit == 1 && stepZeroBased == 3 {
+            return ExerciseSeed(
+                formatCode: "Q_TYPE_07",
+                domainBadge: "🧪 AZ-104 · MINI-LAB RÔLE PERSONNALISÉ JSON",
+                subBadge: "ÉTAPE U1.4 · DÉBOGUER UN RÔLE PERSONNALISÉ JSON",
+                prompt: "Dans votre abonnement Azure de production, vous auditez la définition JSON du rôle personnalisé « VM Operator Reader » censé autoriser la lecture et le redémarrage des machines virtuelles, mais ses membres n'obtiennent aucune permission effective.\nAprès inspection des propriétés Actions, NotActions et AssignableScopes du bloc JSON, quelle correction appliquez-vous sur la ligne fautive ?",
+                plainPrompt: "Tu inspectes le fichier JSON d'un rôle personnalisé Azure RBAC qui devait permettre de voir et redémarrer les machines virtuelles, mais tout est bloqué à cause d'une ligne fautive dans le JSON.\nQuelle correction appliques-tu sur le JSON pour rétablir uniquement les droits prévus ?",
+                glossary: [
+                    (term: "Actions vs NotActions (JSON RBAC)", simpleMeaning: "Azure calcule les permissions effectives du plan de contrôle en soustrayant NotActions de Actions"),
+                    (term: "AssignableScopes", simpleMeaning: "Liste des portées ARM (groupe d'administration, abonnement ou groupe de ressources) où ce rôle personnalisé peut être attribué")
+                ],
+                options: [
+                    OptionSeed(
+                        badge: "A",
+                        title: "Remplacer NotActions: [ \"*\" ] (ligne 4) par NotActions: [ \"Microsoft.Compute/virtualMachines/delete\" ] afin de ne pas soustraire toutes les permissions déclarées dans Actions",
+                        plainTitle: "Remplacer l'étoile globale dans NotActions (ligne 4) par la seule action de suppression à exclure pour conserver les droits de lecture et redémarrage",
+                        isCorrect: true,
+                        explanation: "Dans un rôle personnalisé JSON Azure RBAC, NotActions est soustrait de Actions : mettre \"*\" dans NotActions annule toutes les permissions du plan de contrôle.\n\nEn remplaçant \"*\" par \"Microsoft.Compute/virtualMachines/delete\", les membres conservent les permissions read et restart/action sur AssignableScopes."
+                    ),
+                    OptionSeed(
+                        badge: "B",
+                        title: "Passer la propriété IsCustom sur false (ligne 2) tout en conservant NotActions: [ \"*\" ] dans la définition JSON du rôle personnalisé",
+                        plainTitle: "Désactiver le marqueur de rôle personnalisé à la ligne 2 tout en laissant l'interdiction globale dans NotActions",
+                        isCorrect: false,
+                        explanation: "Un rôle créé par l'administrateur doit obligatoirement déclarer IsCustom: true, et laisser \"*\" dans NotActions continuerait d'annuler toutes les permissions.\n\nCorrige toujours la liste NotActions à la ligne 4 du fichier JSON."
+                    ),
+                    OptionSeed(
+                        badge: "C",
+                        title: "Vider le tableau AssignableScopes: [] (ligne 6) pour enregistrer le rôle personnalisé sans aucune portée Azure Resource Manager",
+                        plainTitle: "Supprimer l'abonnement de la liste AssignableScopes à la ligne 6 pour laisser la portée totalement vide",
+                        isCorrect: false,
+                        explanation: "Un rôle personnalisé Azure RBAC avec un tableau AssignableScopes vide est rejeté par Azure Resource Manager lors de la validation JSON.\n\nConserve la portée d'abonnement dans AssignableScopes et corrige NotActions à la ligne 4."
+                    ),
+                    OptionSeed(
+                        badge: "D",
+                        title: "Déplacer Microsoft.Compute/virtualMachines/read dans NotActions (ligne 4) et vider complètement le tableau Actions (ligne 3)",
+                        plainTitle: "Mettre l'action de lecture dans les interdictions NotActions et vider la liste des actions autorisées",
+                        isCorrect: false,
+                        explanation: "Vider le tableau Actions retire toute autorisation initiale et déplacer read dans NotActions interdit explicitement la consultation des machines virtuelles.\n\nGarde les opérations autorisées dans Actions et restreins uniquement delete dans NotActions."
+                    )
+                ],
+                examTip: "Dans un rôle personnalisé JSON Azure RBAC : Permissions effectives = Actions moins NotActions ; si NotActions contient \"*\", aucune permission du plan de contrôle n'est accordée.",
+                compLeftTitle: "NotActions: [ \"*\" ] (Ligne 4 fautive)",
+                compLeftBullets: ["Soustrait l'intégralité des opérations de Actions", "Bloque toute lecture ou redémarrage de VM sur l'abonnement"],
+                compRightTitle: "Actions ciblées + NotActions ciblé + AssignableScopes",
+                compRightBullets: ["Autorise Microsoft.Compute/virtualMachines/read et restart/action", "Exclut uniquement delete sur la portée AssignableScopes"],
+                compRule: "Inspecte toujours Actions, NotActions, DataActions et AssignableScopes dans un rôle personnalisé JSON Azure RBAC."
+            )
+        }
+
+        let isMiniLab = (stepZeroBased == 3 || stepZeroBased == 7 || lowerTitle.contains("lab"))
+        return ExerciseSeed(
+            formatCode: isMiniLab ? "Q_TYPE_07" : "Q_TYPE_01",
+            domainBadge: "\(bp.code) · \(cleanStepTitle.uppercased())",
+            subBadge: "ÉTAPE \(stepCode) · \(cleanStepTitle.uppercased())",
+            prompt: "Dans une architecture \(bp.brandDisplayName) (\(bp.code)), votre équipe met en œuvre l'étape « \(cleanStepTitle) » (\(stepCode)) afin de répondre à l'exigence opérationnelle suivante : \(lowercaseFirst(cleanStepSubtitle)).\nQuelle configuration appliquez-vous en production pour valider ce périmètre ?",
+            plainPrompt: "Sur ton projet \(bp.brandDisplayName) (\(bp.code)), tu configures l'étape « \(cleanStepTitle) » (\(stepCode)) pour mettre en place : \(lowercaseFirst(cleanStepSubtitle)).\nQuel réglage choisis-tu pour sécuriser ce fonctionnement au quotidien ?",
+            glossary: [
+                (term: cleanStepTitle, simpleMeaning: "Mécanisme \(bp.brandDisplayName) permettant d'assurer : \(lowercaseFirst(cleanStepSubtitle))")
+            ],
+            options: [
+                OptionSeed(
+                    badge: "A",
+                    title: "Configurer « \(cleanStepTitle) » pour assurer « \(lowercaseFirst(cleanStepSubtitle)) » conformément aux bonnes pratiques \(bp.brandDisplayName)",
+                    plainTitle: "Activer « \(cleanStepTitle) » (\(lowercaseFirst(cleanStepSubtitle))) avec les règles de sécurité recommandées sur le projet",
+                    isCorrect: true,
+                    explanation: "Cette configuration met directement en œuvre « \(cleanStepTitle) » (\(stepCode)) pour garantir : \(lowercaseFirst(cleanStepSubtitle)).\n\nEn production chez \(bp.brandDisplayName), elle valide la mission « \(cleanUnitActivity) » et respecte la règle : \(cleanUnitRule)"
+                ),
+                OptionSeed(
+                    badge: "B",
+                    title: "Contourner « \(cleanStepTitle) » par un script manuel local non audité sans couvrir « \(lowercaseFirst(cleanStepSubtitle)) »",
+                    plainTitle: "Utiliser un bricolage manuel local qui ignore « \(cleanStepTitle) » et laisse le besoin incomplet",
+                    isCorrect: false,
+                    explanation: "Un script manuel non gouverné ne couvre pas « \(lowercaseFirst(cleanStepSubtitle)) » et expose l'environnement aux erreurs de manipulation.\n\nSur l'étape \(stepCode), déploie toujours « \(cleanStepTitle) » selon l'architecture officielle \(bp.brandDisplayName)."
+                ),
+                OptionSeed(
+                    badge: "C",
+                    title: "Désactiver les garde-fous de sécurité de l'unité \(unit) en exposant publiquement le périmètre de « \(cleanStepTitle) »",
+                    plainTitle: "Couper les contrôles de sécurité de l'équipe et ouvrir l'accès sans filtre sur « \(cleanStepTitle) »",
+                    isCorrect: false,
+                    explanation: "Désactiver les garde-fous contredit directement l'objectif de « \(cleanStepTitle) » (\(lowercaseFirst(cleanStepSubtitle))).\n\nApplique systématiquement la règle d'architecture : \(cleanUnitRule)"
+                ),
+                OptionSeed(
+                    badge: "D",
+                    title: "Supprimer les paramètres de gouvernance existants sans configurer « \(lowercaseFirst(cleanStepSubtitle)) » dans l'environnement",
+                    plainTitle: "Effacer la configuration actuelle du projet sans activer « \(lowercaseFirst(cleanStepSubtitle)) »",
+                    isCorrect: false,
+                    explanation: "Supprimer les paramètres existants interrompt le service sans prendre en charge « \(lowercaseFirst(cleanStepSubtitle)) ».\n\nLa bonne pratique sur \(stepCode) consiste à configurer « \(cleanStepTitle) »."
+                )
+            ],
+            examTip: "Sur l'étape \(stepCode) (\(cleanStepTitle)), associe toujours l'objectif opérationnel à : \(lowercaseFirst(cleanStepSubtitle)).",
+            compLeftTitle: "Approche manuelle sans \(cleanStepTitle)",
+            compLeftBullets: [
+                "Ne couvre pas \(lowercaseFirst(cleanStepSubtitle))",
+                "Expose l'environnement \(bp.code) aux erreurs manuelles"
+            ],
+            compRightTitle: "\(cleanStepTitle) (\(bp.brandDisplayName))",
+            compRightBullets: [
+                "Garantit nativement \(lowercaseFirst(cleanStepSubtitle))",
+                "Valide la mission \(lowercaseFirst(cleanUnitActivity))"
+            ],
+            compRule: "Pour réussir l'étape \(stepCode) (« \(cleanStepTitle) »), déploie systématiquement : \(lowercaseFirst(cleanStepSubtitle))."
+        )
+    }
+
     private static func orderedExerciseSeeds(
         for bp: TrackBlueprint,
         unit: Int,
@@ -494,20 +614,26 @@ public enum CertiGoDedicatedTrackQuestionBank {
         if unit == 1 && stepZeroBased == 0 {
             return Array(baseSeeds.prefix(6))
         }
-        if unit == 1 && stepZeroBased == 1 {
+        if unit == 1 && stepZeroBased == 1 && bp.code == "PDE" {
             return [baseSeeds[1], baseSeeds[0], baseSeeds[2], baseSeeds[3], baseSeeds[4], baseSeeds[5]]
         }
-        if unit == 2 && stepZeroBased == 0 {
-            return Array(baseSeeds[2..<4]) + Array(baseSeeds[0..<2]) + Array(baseSeeds[4..<6])
-        }
-        if unit == 3 && stepZeroBased == 0 {
-            return Array(baseSeeds[4..<6]) + Array(baseSeeds[2..<4]) + Array(baseSeeds[0..<2])
-        }
+
+        let primaryStepSeed = synthesizeStepAlignedSeed(
+            for: bp,
+            unit: unit,
+            stepZeroBased: stepZeroBased
+        )
         let poolCount = max(1, combinedPool.count)
         let startOffset = (stepGlobalIdx * 3) % poolCount
-        return (0..<6).map { offset in
-            combinedPool[(startOffset + offset) % poolCount]
+        var companions: [ExerciseSeed] = []
+        var usedPrompts: Set<String> = [primaryStepSeed.prompt]
+        for offset in 0..<poolCount where companions.count < 5 {
+            let candidate = combinedPool[(startOffset + offset) % poolCount]
+            if usedPrompts.insert(candidate.prompt).inserted {
+                companions.append(candidate)
+            }
         }
+        return [primaryStepSeed] + companions
     }
 
     public static func exercises(
@@ -665,18 +791,16 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 CertiGoDedicatedTrackQuestionBank.sanitizeText(prompt),
                 routeCode: routeCode
             )
-            let cleanPrompt: String = {
-                guard let stepContextLabel, !stepContextLabel.isEmpty else { return baseCleanPrompt }
-                return "[\(stepContextLabel)] \(baseCleanPrompt)"
-            }()
+            let cleanPrompt = baseCleanPrompt
             let rawPlain = CertiGoDedicatedTrackQuestionBank.buildNaturalPlainPrompt(
                 rawPlain: plainPrompt,
                 technicalPrompt: baseCleanPrompt,
                 routeCode: routeCode
             )
-            let cleanPlainPrompt: String = {
-                guard let stepContextLabel, !stepContextLabel.isEmpty else { return rawPlain }
-                return "[\(stepContextLabel)] \(rawPlain)"
+            let cleanPlainPrompt = rawPlain
+            let resolvedSubBadge: String = {
+                guard let stepContextLabel, !stepContextLabel.isEmpty else { return subBadge }
+                return stepContextLabel
             }()
             let cleanExamTip = CertiGoDedicatedTrackQuestionBank.ensureSentenceEnding(
                 CertiGoDedicatedTrackQuestionBank.sanitizeText(examTip)
@@ -758,7 +882,7 @@ public enum CertiGoDedicatedTrackQuestionBank {
                 id: id,
                 formatCode: formatCode,
                 domainBadge: cleanDomain,
-                subBadge: CertiGoDedicatedTrackQuestionBank.sanitizeText(subBadge),
+                subBadge: CertiGoDedicatedTrackQuestionBank.sanitizeText(resolvedSubBadge),
                 prompt: cleanPrompt,
                 plainLanguagePrompt: cleanPlainPrompt,
                 jargonGlossaryBridge: cleanGlossary,
@@ -5194,23 +5318,23 @@ public enum CertiGoDedicatedTrackQuestionBank {
             "AzureServices/Recovery-Services-Vaults",
             "AzureServices/Monitor"
         ],
-        overviewSlide1Title: "Vue globale : pourquoi passer AZ-104 ?",
-        overviewSlide1Body: "La certification AZ-104 valide ton expertise d'administrateur Cloud Microsoft Azure sur les 5 piliers officiels : Identité & Gouvernance (20-25 %), Stockage (15-20 %), Calcul & AKS (20-25 %), Réseaux Virtuels (15-20 %) et Supervision & Sauvegarde (10-15 %).",
-        overviewSlide1Pill: "1. Identité RBAC & Policy · 2. VNet, Private Link & DNS · 3. Stockage RA-GRS, AKS & Backup",
-        overviewSlide2Title: "Les 3 architectures clés de l'administrateur AZ-104",
-        overviewSlide2Body: "1. Gouvernance ARM : Rôles RBAC personnalisés (Actions / NotActions), Azure Policy (Modify / DeployIfNotExists) et verrous · 2. Réseau Privé : Private Endpoint + Zone DNS Privée privatelink.* + VNet Peering (Allow Gateway Transit) · 3. Résilience : RA-GRS, AKS Cluster Autoscaler et Azure Site Recovery.",
-        overviewSlide2Pill: "RBAC + Policy + Locks -> Private Endpoint + Zone privatelink.* -> RA-GRS + Cluster Autoscaler",
-        overviewSlide3Body: "• « Private Endpoint + privatelink.* » = Accès PaaS via IP privée 10.x et blocage public.\n• « RA-GRS » = Point de terminaison secondaire -secondary lisible immédiatement.\n• « Cluster Autoscaler vs HPA » = Ajouter des nœuds VMSS quand un pod est Pending vs ajouter des pods.",
-        overviewSlide3Pill: "Private Endpoint · RA-GRS · Cluster Autoscaler",
+        overviewSlide1Title: "Vue globale : maîtriser les Utilisateurs, Groupes & Licences Entra ID (AZ-104)",
+        overviewSlide1Body: "L'étape U1.1 d'AZ-104 valide ta maîtrise de l'annuaire Microsoft Entra ID : création d'utilisateurs en masse par fichier CSV, groupes dynamiques basés sur des règles d'attributs (user.department), collaboration externe B2B (Guest) et attribution automatique des licences.",
+        overviewSlide1Pill: "1. Utilisateurs & Import CSV · 2. Groupes dynamiques Entra ID · 3. Invités B2B & Licences de groupe",
+        overviewSlide2Title: "Utilisateurs, Groupes dynamiques, Invités B2B et Licences Entra ID",
+        overviewSlide2Body: "1. Utilisateurs & Invités B2B : créer les identités internes en masse (CSV) et inviter les partenaires externes en Guest B2B · 2. Groupes dynamiques (Entra ID P1/P2) : évaluer automatiquement les règles d'appartenance (user.department) · 3. Licences de groupe : attribuer et retirer automatiquement les licences dès qu'un membre rejoint ou quitte le groupe.",
+        overviewSlide2Pill: "Import CSV & Invités B2B -> Règle de Groupe dynamique -> Attribution automatique de Licences",
+        overviewSlide3Body: "• « Groupe dynamique (Dynamic Group) » = Règle automatique d'appartenance (nécessite Microsoft Entra ID P1 ou P2).\n• « Invité B2B (Guest User) » = Partenaire externe invité avec son propre compte et gouverné par External Collaboration.\n• « Licences basées sur les groupes » = Attribution automatique des licences selon l'appartenance au groupe (UsageLocation requis).",
+        overviewSlide3Pill: "Groupes dynamiques · Invités B2B · Licences Microsoft Entra ID",
         unitHeaders: [
             UnitHeaderBlueprint(
                 headerTitle: "UNITÉ 1 · Identité Entra ID, RBAC, Azure Policy & Gouvernance",
                 subtitle: "Utilisateurs/Groupes, Rôles personnalisés JSON, Azure Policy, Verrous & FinOps",
                 accentHex: "#0078d4",
                 lipHex: "#005a9e",
-                memoActivity: "Auditer un rôle personnalisé JSON et combiner Azure Policy et verrous CanNotDelete",
-                memoKeyTopics: ["Rôles RBAC Custom", "Azure Policy Modify", "Verrous ARM"],
-                memoGoldenRule: "Un verrou ARM CanNotDelete s'applique au plan de contrôle avant RBAC et bloque même un Propriétaire (Owner)."
+                memoActivity: "Gérer les utilisateurs, groupes dynamiques, invités B2B, licences Entra ID et rôles RBAC",
+                memoKeyTopics: ["Groupes dynamiques Entra ID", "Invités B2B & Licences", "Rôles RBAC & Verrous ARM"],
+                memoGoldenRule: "Les groupes dynamiques et l'attribution de licences par groupe dans Microsoft Entra ID requièrent une licence Microsoft Entra ID P1 (ou P2) et l'attribut UsageLocation défini."
             ),
             UnitHeaderBlueprint(
                 headerTitle: "UNITÉ 2 · Réseaux Virtuels VNet, Private Link, DNS, Peering & WAF",
@@ -5265,12 +5389,12 @@ public enum CertiGoDedicatedTrackQuestionBank {
         ],
         unitDeclics: [
             (
-                title: "Dans un rôle personnalisé JSON, NotActions est soustrait de Actions ; et un verrou CanNotDelete bloque même un Owner.",
-                diagramTop: "✕  Actions: [\"*\"] + NotActions: [\"*\"] -> Aucune permission effective accordée",
-                diagramBottom: "✓  Actions: [\"Microsoft.Compute/*/read\"] + AssignableScopes: [\"/subscriptions/...\"]",
-                step1: "1. Pour hériter automatiquement un Tag du Groupe de ressources vers ses ressources enfants, utilise une Azure Policy avec l'effet Modify (et une tâche de remédiation)",
-                step2: "2. Attention : un verrou ReadOnly sur un Groupe de ressources empêche même de démarrer ou d'arrêter une VM (car start/deallocate est une opération POST)",
-                rule: "Un verrou ReadOnly bloque les opérations POST d'état (comme démarrer une VM ou lister les clés d'un Storage Account)."
+                title: "Les groupes dynamiques Microsoft Entra ID automatisent l'appartenance (user.department), les invités B2B et les licences de groupe.",
+                diagramTop: "✕  Groupes statiques Assignés : ajout manuel compte par compte et oubli de révocation des licences",
+                diagramBottom: "✓  Groupe dynamique Entra ID P1 (user.department) + UsageLocation + Invités B2B Guest",
+                step1: "1. Définis l'attribut UsageLocation sur chaque utilisateur et crée un groupe dynamique avec une règle d'appartenance (user.department)",
+                step2: "2. Associe les licences au groupe dynamique, invite les partenaires en B2B Guest et utilise le rôle Lecteur (Reader) pour l'audit en lecture seule",
+                rule: "Dans Microsoft Entra ID, les groupes dynamiques et l'attribution de licences par groupe nécessitent Entra ID P1 (ou P2) et l'attribut UsageLocation."
             ),
             (
                 title: "Isolation PaaS complète : Private Endpoint + Zone DNS Privée privatelink.* liée au VNet + publicNetworkAccess: Disabled.",
@@ -5291,27 +5415,27 @@ public enum CertiGoDedicatedTrackQuestionBank {
         ],
         exerciseSeeds: [
             ExerciseSeed(
-                formatCode: "Q_TYPE_10",
-                domainBadge: "⚡ AZ-104 · RÉSEAUX & PRIVATE LINK",
-                subBadge: "ISOLATION PAAS BOUT EN BOUT",
-                prompt: "Une machine virtuelle dans VNet-Prod doit accéder à un compte Azure Blob Storage exclusivement via une adresse IP privée 10.0.2.4, en interdisant tout accès depuis Internet.\nQuelles sont les 2 actions obligatoires à effectuer ? (Choisissez 2 réponses)",
-                plainPrompt: "Un serveur interne doit lire des fichiers dans ton stockage Azure uniquement par un couloir privé interne (10.0.2.4), en fermant totalement la porte publique Internet.\nQuelles sont les 2 actions obligatoires ?",
+                formatCode: "Q_TYPE_01",
+                domainBadge: "⚡ AZ-104 · IDENTITÉ MICROSOFT ENTRA ID",
+                subBadge: "UTILISATEURS, GROUPES DYNAMIQUES, INVITÉS B2B & LICENCES",
+                prompt: "Votre organisation intègre 300 nouveaux collaborateurs et partenaires externes dans Microsoft Entra ID. Vous devez attribuer automatiquement les licences Microsoft 365 selon l'attribut Department de chaque utilisateur et inviter les partenaires externes en tant qu'invités B2B.\nQuelle configuration Microsoft Entra ID mettez-vous en place ?",
+                plainPrompt: "Ton entreprise accueille 300 nouveaux employés et partenaires externes dans Microsoft Entra ID. Tu veux que les licences soient distribuées automatiquement selon le département de chacun et que les partenaires externes rejoignent l'annuaire comme invités B2B.\nQuelle solution configures-tu ?",
                 glossary: [
-                    (term: "Private Endpoint", simpleMeaning: "Crée une carte réseau avec une adresse IP privée (10.x) pour ton service de stockage à l'intérieur de ton VNet"),
-                    (term: "Zone DNS Privée privatelink.*", simpleMeaning: "Annuaire interne qui traduit le nom du stockage vers son adresse IP privée 10.0.2.4")
+                    (term: "Groupe dynamique Microsoft Entra ID", simpleMeaning: "Groupe sécurité ou Microsoft 365 dont les membres sont ajoutés et retirés automatiquement selon une règle d'attributs comme user.department"),
+                    (term: "Invités B2B & Licences de groupe", simpleMeaning: "Partenaires externes authentifiés via Microsoft Entra B2B Collaboration et licences attribuées automatiquement par appartenance au groupe (requiert Entra ID P1)")
                 ],
                 options: [
-                    OptionSeed(badge: "A", title: "Créer un Private Endpoint dans le sous-réseau et lier la zone DNS privée privatelink.blob.core.windows.net à VNet-Prod", plainTitle: "Créer le Private Endpoint et relier l'annuaire DNS privé au réseau VNet-Prod", isCorrect: true, explanation: "Le Private Endpoint attribue l'IP 10.0.2.4 et le lien de zone DNS privée assure la résolution du nom vers cette IP privée."),
-                    OptionSeed(badge: "B", title: "Désactiver l'accès réseau public (publicNetworkAccess: Disabled) dans le pare-feu du compte de stockage", plainTitle: "Fermer l'accès public Internet dans le pare-feu du compte de stockage", isCorrect: true, explanation: "Créer un Private Endpoint ne désactive pas l'accès public par défaut : il faut explicitement désactiver l'accès public."),
-                    OptionSeed(badge: "C", title: "Ouvrir le port 443 à 0.0.0.0/0 sur Internet", plainTitle: "Ouvrir l'accès à tout Internet", isCorrect: false, explanation: "Contredit l'exigence d'interdire tout accès Internet."),
-                    OptionSeed(badge: "D", title: "Supprimer la table de routage système du VNet", plainTitle: "Effacer les routes du réseau", isCorrect: false, explanation: "Action impossible et inutile.")
+                    OptionSeed(badge: "A", title: "Créer un groupe de sécurité à appartenance dynamique (Dynamic User avec règle user.department), y associer les licences de groupe Microsoft Entra ID P1 et inviter les partenaires externes via B2B Collaboration", plainTitle: "Créer un groupe dynamique basé sur le département pour attribuer automatiquement les licences Entra ID P1 et inviter les partenaires en B2B", isCorrect: true, explanation: "Les groupes dynamiques Microsoft Entra ID (licence P1/P2) évaluent automatiquement les attributs comme user.department, attribuent les licences associées au groupe et s'intègrent avec les invités B2B."),
+                    OptionSeed(badge: "B", title: "Créer uniquement des groupes statiques Assignés et attribuer manuellement chaque licence compte par compte sans règle dynamique", plainTitle: "Ajouter chaque employé à la main dans un groupe fixe et cocher les licences une par une", isCorrect: false, explanation: "Un groupe à appartenance assignée (Assigned) n'évalue aucune règle automatique d'attributs et impose une maintenance manuelle coûteuse."),
+                    OptionSeed(badge: "C", title: "Créer un nouveau locataire Microsoft Entra ID distinct pour chaque utilisateur invité externe au lieu d'utiliser B2B Collaboration", plainTitle: "Ouvrir un annuaire d'entreprise séparé pour chaque partenaire externe", isCorrect: false, explanation: "Microsoft Entra B2B Collaboration permet d'inviter des utilisateurs externes (Guest) dans le locataire existant sans créer de locataire par partenaire."),
+                    OptionSeed(badge: "D", title: "Supprimer les attributs Department et UsageLocation des comptes utilisateurs avant d'attribuer les licences Microsoft Entra ID", plainTitle: "Effacer le pays d'utilisation et le département de tous les profils utilisateurs", isCorrect: false, explanation: "L'attribut UsageLocation (pays d'utilisation) est obligatoire pour toute attribution de licence dans Microsoft Entra ID.")
                 ],
-                examTip: "Trilogie gagnante AZ-104 pour Private Link : 1. Private Endpoint + 2. Zone DNS privée privatelink.* liée au VNet + 3. publicNetworkAccess: Disabled.",
-                compLeftTitle: "Service Endpoint",
-                compLeftBullets: ["Conserve l'IP publique du service PaaS", "Non routable depuis On-Premises (VPN / ExpressRoute)"],
-                compRightTitle: "Private Endpoint (Private Link)",
-                compRightBullets: ["Attribue une IP privée 10.x dans ton Subnet", "Accessible depuis On-Premises via VPN / ExpressRoute"],
-                compRule: "Exigence d'IP privée 10.x ou d'accès depuis On-Premises = Private Endpoint + Zone DNS privatelink.*."
+                examTip: "À l'examen AZ-104 : Groupes dynamiques + Licences basées sur les groupes = licence Microsoft Entra ID P1 (ou P2) + attribut UsageLocation obligatoire sur chaque utilisateur.",
+                compLeftTitle: "Groupe Assigné (Statique) & Licences manuelles",
+                compLeftBullets: ["Ajout et retrait manuels de chaque utilisateur ou invité B2B", "Aucune mise à jour automatique des licences lors d'un changement de département"],
+                compRightTitle: "Groupe dynamique Entra ID & Licences de groupe",
+                compRightBullets: ["Règle dynamique (user.department) évaluée automatiquement avec Entra ID P1", "Attribution automatique des licences (UsageLocation requis) et invités B2B"],
+                compRule: "Automatiser les accès et licences selon un attribut utilisateur dans Entra ID = Groupe dynamique (Entra ID P1) + UsageLocation défini."
             ),
             ExerciseSeed(
                 formatCode: "Q_TYPE_01",
